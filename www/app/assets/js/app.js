@@ -1289,8 +1289,8 @@ app.controller('ListEventsCtrl', [
     $scope.serverView = false;
 
     $scope.headers = [
-      {name: 'First Seen', field: 'firstSeen'},
       {name: 'Last Seen', field: 'lastSeen'},
+      {name: 'First Seen', field: 'firstSeen'},
       {name: 'Count', field: 'count'},
       {name: 'Name', field: 'name'},
       {name: 'Kind', field: 'kind'},
@@ -1301,8 +1301,8 @@ app.controller('ListEventsCtrl', [
     ];
 
 
-    $scope.sortable = ['firstSeen', 'lastSeen', 'count', 'name', 'kind', 'subObject', 'reason', 'source'];
-    $scope.count = 10;
+    $scope.sortable = ['lastSeen', 'firstSeen', 'count', 'name', 'kind', 'subObject', 'reason', 'source', 'message'];
+    $scope.count = 50;
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
       $scope.loading = false;
@@ -1346,6 +1346,11 @@ app.controller('ListEventsCtrl', [
 
         });
 
+        $scope.content = _.sortBy($scope.content, function(e){
+          return e.lastSeen;
+        }).reverse();
+
+
       }).error($scope.handleError);
     }
 
@@ -1380,9 +1385,9 @@ app.controller('ListMinionsCtrl', [
       status: 'grey',
       ip: 'grey'
     };
-    $scope.sortable = ['name', 'status', 'ip'];
+    $scope.sortable = ['name', 'status', 'addresses'];
     $scope.thumbs = 'thumb';
-    $scope.count = 10;
+    $scope.count = 50;
 
     $scope.go = function(d) { $location.path('/dashboard/nodes/' + d.name); };
 
@@ -1463,8 +1468,8 @@ app.controller('ListPodsCtrl', [
       labels: 'grey',
       status: 'grey'
     };
-    $scope.sortable = ['pod', 'ip', 'status'];
-    $scope.count = 10;
+    $scope.sortable = ['pod', 'ip', 'status','containers','images','host','labels'];
+    $scope.count = 50;
 
     $scope.go = function(data) { $location.path('/dashboard/pods/' + data.pod); };
 
@@ -1504,24 +1509,16 @@ app.controller('ListPodsCtrl', [
           }
 
           if (pod.metadata.labels) {
-            Object.keys(pod.metadata.labels)
-                .forEach(function(key) {
-                  if (key == 'name') {
-                    _labels += ', ' + pod.metadata.labels[key];
-                  }
-                  if (key == 'uses') {
-                    _uses += ', ' + pod.metadata.labels[key];
-                  }
-                });
-            }
+            _labels = _.map(pod.metadata.labels, function(v, k) { return k + ': ' + v }).join(', ');
+          }
 
           $scope.content.push({
             pod: pod.metadata.name,
             ip: pod.status.podIP,
             containers: _fixComma(_containers),
             images: _fixComma(_images),
-            host: pod.spec.host,
-            labels: _fixComma(_labels) + ':' + _fixComma(_uses),
+            host: pod.spec.nodeName,
+            labels: _labels,
             status: pod.status.phase
           });
 
@@ -1593,9 +1590,9 @@ app.controller('ListReplicationControllersCtrl', [
       selector: 'grey',
       replicas: 'grey'
     };
-    $scope.sortable = ['controller', 'containers', 'images'];
+    $scope.sortable = ['controller', 'containers', 'images', 'selector', 'replicas'];
     $scope.thumbs = 'thumb';
-    $scope.count = 10;
+    $scope.count = 50;
 
     $scope.go = function(data) { $location.path('/dashboard/replicationcontrollers/' + data.controller); };
 
@@ -1686,8 +1683,8 @@ app.controller('ListServicesCtrl', [
       port: 'grey',
       labels: 'grey'
     };
-    $scope.sortable = ['name', 'ip', 'port'];
-    $scope.count = 10;
+    $scope.sortable = ['name', 'ip', 'port', 'labels', 'selector'];
+    $scope.count = 50;
 
     $scope.go = function(data) { $location.path('/dashboard/services/' + data.name); };
 
@@ -1727,7 +1724,7 @@ app.controller('ListServicesCtrl', [
             var _labels = '';
 
             if (service.metadata.labels) {
-              _labels = _.map(service.metadata.labels, function(v, k) { return k + '=' + v }).join(', ');
+              _labels = _.map(service.metadata.labels, function(v, k) { return k + ': ' + v }).join(', ');
             }
 
             var _selectors = '';
@@ -1750,7 +1747,7 @@ app.controller('ListServicesCtrl', [
 
             $scope.content.push({
               name: service.metadata.name,
-              ip: service.spec.portalIP,
+              ip: service.spec.clusterIP,
               port: _ports,
               selector: _selectors,
               labels: _labels
@@ -2280,7 +2277,6 @@ app.controller('ServiceCtrl', [
                        $location.path(newValue);
                      }
                    });
-
                    $scope.subpages = [
                      {
                        category: 'dashboard',
@@ -2325,6 +2321,7 @@ app.controller('ServiceCtrl', [
             customClass: '=customClass',
             thumbs: '=',
             count: '=',
+            reverse: '=',
             doSelect: '&onSelect'
           },
           transclude: true,
@@ -2343,7 +2340,11 @@ app.controller('ServiceCtrl', [
               $scope.content = orderBy($scope.content, predicate, reverse);
               $scope.predicate = predicate;
             };
-            $scope.order($scope.sortable[0], false);
+            var reverse = false;
+            if($scope.reverse)
+              reverse = $scope.reverse;
+
+            $scope.order($scope.sortable[0], reverse);
             $scope.getNumber = function(num) { return new Array(num); };
             $scope.goToPage = function(page) { $scope.currentPage = page; };
             $scope.showMore = function() { return angular.isDefined($scope.moreClick);}

@@ -19,8 +19,8 @@ app.controller('ListEventsCtrl', [
     $scope.serverView = false;
 
     $scope.headers = [
-      {name: 'First Seen', field: 'firstSeen'},
       {name: 'Last Seen', field: 'lastSeen'},
+      {name: 'First Seen', field: 'firstSeen'},
       {name: 'Count', field: 'count'},
       {name: 'Name', field: 'name'},
       {name: 'Kind', field: 'kind'},
@@ -31,8 +31,8 @@ app.controller('ListEventsCtrl', [
     ];
 
 
-    $scope.sortable = ['firstSeen', 'lastSeen', 'count', 'name', 'kind', 'subObject', 'reason', 'source'];
-    $scope.count = 10;
+    $scope.sortable = ['lastSeen', 'firstSeen', 'count', 'name', 'kind', 'subObject', 'reason', 'source', 'message'];
+    $scope.count = 50;
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
       $scope.loading = false;
@@ -75,6 +75,11 @@ app.controller('ListEventsCtrl', [
 
 
         });
+
+        $scope.content = _.sortBy($scope.content, function(e){
+          return e.lastSeen;
+        }).reverse();
+
 
       }).error($scope.handleError);
     }

@@ -2,7 +2,7 @@
   <thead>
     <tr class="md-table-headers-row">
       <th class="md-table-header" ng-repeat="h in headers">
-        <a href ng-if="handleSort(h.field)" ng-click="reverse=!reverse;order(h.field,reverse)">{{h.name}} <span class="md-table-caret" ng-show="reverse && h.field == predicate"><img src="assets/img/ic_arrow_drop_up_24px.svg"></span><span  class="md-table-caret" ng-show="!reverse && h.field == predicate"><img src="assets/img/ic_arrow_drop_down_24px.svg"></span></a>
+        <a href ng-if="handleSort(h.field)" ng-click="reverse=!reverse;order(h.field,reverse)">{{h.name}} <span class="md-table-caret" ng-show="reverse && h.field == predicate"><img src="assets/img/ic_arrow_drop_down_24px.svg"></span><span  class="md-table-caret" ng-show="!reverse && h.field == predicate"><img src="assets/img/ic_arrow_drop_up_24px.svg"></span></a>
         <span ng-if="!handleSort(h.field)">{{h.name}}</span>
       </th>
       <th class="md-table-header" ng-show="showMore()"></th>
