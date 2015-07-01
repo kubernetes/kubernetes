@@ -151,6 +151,9 @@ docker:
     - enable: True
     - watch:
       - file: {{ environment_file }}
+{% if pillar.get('is_systemd') %}
+      - file: {{ pillar.get('systemd_system_path') }}/docker.service
+{% endif %}
 {% if override_docker_ver != '' %}
     - require:
       - pkg: lxc-docker-{{ override_docker_ver }}

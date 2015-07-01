@@ -133,6 +133,8 @@ addon-dir-create:
     - group: root
     - mode: 755
 
+{% endif %}
+
 # Stop kube-addons service each time salt is executed, just in case
 # there was a modification of addons.
 # Actually, this should be handled by watching file changes, but
@@ -146,5 +148,8 @@ kube-addons:
     - enable: True
     - require:
         - service: service-kube-addon-stop
-
+    - watch:
+{% if pillar.get('is_systemd') %}
+      - file: {{ pillar.get('systemd_system_path') }}/kube-addons.service
 {% endif %}
+
