@@ -301,9 +301,18 @@ function detect-ubuntu-image () {
 # Note that this is a different hash from the OpenSSH hash.
 # But AWS gives us this public key hash in the describe keys output, so we should stick with this format.
 # Hopefully this will be done by the aws cli tool one day: https://github.com/aws/aws-cli/issues/191
+# NOTE: This does not work on Mavericks, due to an odd ssh-keygen version, so we use get-ssh-fingerprint instead
 function get-aws-fingerprint {
   local -r pubkey_path=$1
   ssh-keygen -f ${pubkey_path} -e -m PKCS8  | openssl rsa -pubin -outform DER | openssl md5 -c | sed -e 's/(stdin)= //g'
+}
+
+# Computes the SSH fingerprint for a public key file ($1)
+# #1: path to public key file
+# Note this is different from the AWS fingerprint; see notes on get-aws-fingerprint
+function get-ssh-fingerprint {
+  local -r pubkey_path=$1
+  ssh-keygen -lf ${pubkey_path} | cut -f2 -d' '
 }
 
 # Import an SSH public key to AWS.
@@ -660,7 +669,10 @@ function kube-up {
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
   fi
 
-  AWS_SSH_KEY_FINGERPRINT=$(get-aws-fingerprint ${AWS_SSH_KEY}.pub)
+  # Note that we use get-ssh-fingerprint, so this works on OSX Mavericks
+  # get-aws-fingerprint gives the same fingerprint that AWS computes,
+  # but OSX Mavericks ssh-keygen can't compute it
+  AWS_SSH_KEY_FINGERPRINT=$(get-ssh-fingerprint ${AWS_SSH_KEY}.pub)
   echo "Using SSH key with (AWS) fingerprint: ${AWS_SSH_KEY_FINGERPRINT}"
   AWS_SSH_KEY_NAME="kubernetes-${AWS_SSH_KEY_FINGERPRINT//:/}"
 
