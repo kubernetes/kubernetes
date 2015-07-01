@@ -23,36 +23,49 @@ import (
 	"github.com/golang/glog"
 )
 
-type ServiceSpread struct {
-	serviceLister algorithm.ServiceLister
+type SelectorSpread struct {
+	serviceLister    algorithm.ServiceLister
+	controllerLister algorithm.ControllerLister
 }
 
-func NewServiceSpreadPriority(serviceLister algorithm.ServiceLister) algorithm.PriorityFunction {
-	serviceSpread := &ServiceSpread{
-		serviceLister: serviceLister,
+func NewSelectorSpreadPriority(serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister) algorithm.PriorityFunction {
+	selectorSpread := &SelectorSpread{
+		serviceLister:    serviceLister,
+		controllerLister: controllerLister,
 	}
-	return serviceSpread.CalculateSpreadPriority
+	return selectorSpread.CalculateSpreadPriority
 }
 
-// CalculateSpreadPriority spreads pods by minimizing the number of pods belonging to the same service
-// on the same machine.
-func (s *ServiceSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+// CalculateSpreadPriority spreads pods by minimizing the number of pods belonging to the same service or replication controller. It counts number of pods that run under
+// Services or RCs as the pod being scheduled and tries to minimize the number of conflicts. I.e. pushes scheduler towards a Node where there's a smallest number of
+// pods which match the same selectors of Services and RCs as current pod.
+func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	var maxCount int
-	var nsServicePods []*api.Pod
+	var nsPods []*api.Pod
 
+	selectors := make([]labels.Selector, 0)
 	services, err := s.serviceLister.GetPodServices(pod)
 	if err == nil {
-		// just use the first service and get the other pods within the service
-		// TODO: a separate predicate can be created that tries to handle all services for the pod
-		selector := labels.SelectorFromSet(services[0].Spec.Selector)
-		pods, err := podLister.List(selector)
+		for _, service := range services {
+			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
+		}
+	}
+	controllers, err := s.controllerLister.GetPodControllers(pod)
+	if err == nil {
+		for _, controller := range controllers {
+			selectors = append(selectors, labels.SelectorFromSet(controller.Spec.Selector))
+		}
+	}
+
+	if len(selectors) > 0 {
+		pods, err := podLister.List(labels.Everything())
 		if err != nil {
 			return nil, err
 		}
 		// consider only the pods that belong to the same namespace
 		for _, nsPod := range pods {
 			if nsPod.Namespace == pod.Namespace {
-				nsServicePods = append(nsServicePods, nsPod)
+				nsPods = append(nsPods, nsPod)
 			}
 		}
 	}
@@ -63,12 +76,21 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorith
 	}
 
 	counts := map[string]int{}
-	if len(nsServicePods) > 0 {
-		for _, pod := range nsServicePods {
-			counts[pod.Spec.NodeName]++
-			// Compute the maximum number of pods hosted on any minion
-			if counts[pod.Spec.NodeName] > maxCount {
-				maxCount = counts[pod.Spec.NodeName]
+	if len(nsPods) > 0 {
+		for _, pod := range nsPods {
+			matches := false
+			for _, selector := range selectors {
+				if selector.Matches(labels.Set(pod.ObjectMeta.Labels)) {
+					matches = true
+					break
+				}
+			}
+			if matches {
+				counts[pod.Spec.NodeName]++
+				// Compute the maximum number of pods hosted on any minion
+				if counts[pod.Spec.NodeName] > maxCount {
+					maxCount = counts[pod.Spec.NodeName]
+				}
 			}
 		}
 	}
@@ -84,7 +106,7 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorith
 		}
 		result = append(result, algorithm.HostPriority{Host: minion.Name, Score: int(fScore)})
 		glog.V(10).Infof(
-			"%v -> %v: ServiceSpreadPriority, Score: (%d)", pod.Name, minion.Name, int(fScore),
+			"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, minion.Name, int(fScore),
 		)
 	}
 	return result, nil

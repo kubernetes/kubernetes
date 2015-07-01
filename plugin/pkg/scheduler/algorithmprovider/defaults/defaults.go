@@ -67,10 +67,10 @@ func defaultPriorities() util.StringSet {
 		factory.RegisterPriorityFunction("BalancedResourceAllocation", priorities.BalancedResourceAllocation, 1),
 		// spreads pods by minimizing the number of pods (belonging to the same service) on the same minion.
 		factory.RegisterPriorityConfigFactory(
-			"ServiceSpreadingPriority",
+			"SelectorSpreadPriority",
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-					return priorities.NewServiceSpreadPriority(args.ServiceLister)
+					return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister)
 				},
 				Weight: 1,
 			},
