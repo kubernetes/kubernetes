@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
@@ -112,8 +113,9 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		Latest().
 		Flatten().
 		Do()
-	if r.err != nil {
-		return r.err
+	err = r.Err()
+	if err != nil {
+		return err
 	}
 
 	infos, err := r.Infos()
@@ -210,8 +212,16 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			delta = nil
 		} else {
 			delta.AddPreconditions(jsonmerge.RequireKeyUnchanged("apiVersion"))
+			delta.AddPreconditions(jsonmerge.RequireKeyUnchanged("kind"))
+			delta.AddPreconditions(jsonmerge.RequireMetadataKeyUnchanged("name"))
 			results.delta = delta
 			results.version = defaultVersion
+		}
+
+		//TODO: need a more strict check for lists
+		if hold, msg := delta.TestPreconditionsHold(); !hold {
+			fmt.Fprintf(cmd.Out(), msg)
+			return preservedFile(nil, file, cmd.Out())
 		}
 
 		err = visitor.Visit(func(info *resource.Info) error {
@@ -219,12 +229,14 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			if err != nil {
 				return err
 			}
-			updated, err := resource.NewHelper(info.Client, info.Mapping).Update(info.Namespace, info.Name, false, data)
+			//updated, err := resource.NewHelper(info.Client, info.Mapping).Update(info.Namespace, info.Name, false, data)
+			_ = data
+			err = errors.NewConflict("pod", "chao", nil)
 			if err != nil {
 				fmt.Fprintln(cmd.Out(), results.AddError(err, info))
 				return nil
 			}
-			info.Refresh(updated, true)
+			//	info.Refresh(updated, true)
 			fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
 			return nil
 		})
@@ -321,32 +333,11 @@ func (r *editResults) AddError(err error, info *resource.Info) string {
 		return fmt.Sprintf("Error: the %s %s has been deleted on the server", info.Mapping.Kind, info.Name)
 
 	case errors.IsConflict(err):
-		if r.delta != nil {
-			v1 := info.ResourceVersion
-			if perr := applyPatch(r.delta, info, r.version); perr != nil {
-				// the error was related to the patching process
-				if nerr, ok := perr.(patchError); ok {
-					r.conflict++
-					if jsonmerge.IsPreconditionFailed(nerr.error) {
-						return fmt.Sprintf("Error: the API version of the provided object cannot be changed")
-					}
-					// the patch is in conflict, report to user and exit
-					if jsonmerge.IsConflicting(nerr.error) {
-						// TODO: read message
-						return fmt.Sprintf("Error: a conflicting change was made to the %s %s on the server", info.Mapping.Kind, info.Name)
-					}
-					glog.V(4).Infof("Attempted to patch the resource, but failed: %v", perr)
-					return fmt.Sprintf("Error: %v", err)
-				}
-				// try processing this server error and unset delta so we don't recurse
-				r.delta = nil
-				return r.AddError(err, info)
-			}
-			return fmt.Sprintf("Applied your changes to %s from version %s onto %s", info.Name, v1, info.ResourceVersion)
+		v1 := info.ResourceVersion
+		if perr := submitPatch(r.delta.Edit(), info, r.version); perr != nil {
+			return fmt.Sprintf("Error: %v", err)
 		}
-		// no delta was available
-		r.conflict++
-		return fmt.Sprintf("Error: %v", err)
+		return fmt.Sprintf("Applied your changes to %s from version %s onto %s", info.Name, v1, info.ResourceVersion)
 	default:
 		r.retryable++
 		return fmt.Sprintf("Error: the %s %s could not be updated: %v", info.Mapping.Kind, info.Name, err)
@@ -355,6 +346,15 @@ func (r *editResults) AddError(err error, info *resource.Info) string {
 
 type patchError struct {
 	error
+}
+
+func submitPatch(patch []byte, info *resource.Info, version string) error {
+	patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.MergePatchType, patch)
+	if err != nil {
+		return err
+	}
+	info.Refresh(patched, true)
+	return nil
 }
 
 // applyPatch reads the latest version of the object, writes it to version, then attempts to merge

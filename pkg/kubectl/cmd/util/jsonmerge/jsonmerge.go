@@ -21,7 +21,7 @@ type Delta struct {
 
 // PreconditionFunc is a test to verify that an incompatible change
 // has occurred before an Apply can be successful.
-type PreconditionFunc func(interface{}) bool
+type PreconditionFunc func(interface{}) (hold bool, message string)
 
 // AddPreconditions adds precondition checks to a change which must
 // be satisfied before an Apply is considered successful. If a
@@ -35,15 +35,45 @@ func (d *Delta) AddPreconditions(fns ...PreconditionFunc) {
 // if the provided key is present in the diff (indicating its value
 // has changed).
 func RequireKeyUnchanged(key string) PreconditionFunc {
-	return func(diff interface{}) bool {
+	return func(diff interface{}) (bool, string) {
 		m, ok := diff.(map[string]interface{})
 		if !ok {
-			return true
+			return true, ""
 		}
 		// the presence of key in a diff means that its value has been changed, therefore
 		// we should fail the precondition.
 		_, ok = m[key]
-		return !ok
+		if ok {
+			return false, key + " should not be changed\n"
+		} else {
+			return true, ""
+		}
+	}
+}
+
+// RequireKeyUnchanged creates a precondition function that fails
+// if the metadata.key is present in the diff (indicating its value
+// has changed).
+func RequireMetadataKeyUnchanged(key string) PreconditionFunc {
+	return func(diff interface{}) (bool, string) {
+		m, ok := diff.(map[string]interface{})
+		if !ok {
+			return true, ""
+		}
+		m1, ok := m["metadata"]
+		if !ok {
+			return true, ""
+		}
+		m2, ok := m1.(map[string]interface{})
+		if !ok {
+			return true, ""
+		}
+		_, ok = m2[key]
+		if ok {
+			return false, "metadata." + key + " should not be changed\n"
+		} else {
+			return true, ""
+		}
 	}
 }
 
@@ -93,7 +123,9 @@ func (d *Delta) Apply(latest []byte) ([]byte, error) {
 		return nil, err
 	}
 	for _, fn := range d.preconditions {
-		if !fn(diff1) || !fn(diff2) {
+		hold1, _ := fn(diff1)
+		hold2, _ := fn(diff2)
+		if !hold1 || !hold2 {
 			return nil, ErrPreconditionFailed
 		}
 	}
@@ -158,4 +190,24 @@ func hasConflicts(left, right interface{}) bool {
 	default:
 		panic(fmt.Sprintf("unknown type: %v", reflect.TypeOf(left)))
 	}
+}
+
+// TestPreconditions test if d.preconditions hold given the d.edit
+func (d *Delta) TestPreconditionsHold() (bool, string) {
+	diff := make(map[string]interface{})
+	if err := json.Unmarshal(d.edit, &diff); err != nil {
+		return false, fmt.Sprintf("%v", err)
+	}
+	fmt.Println("CHAO: diff")
+	fmt.Println(diff)
+	for _, fn := range d.preconditions {
+		if hold, msg := fn(diff); !hold {
+			return false, msg
+		}
+	}
+	return true, ""
+}
+
+func (d *Delta) Edit() []byte {
+	return d.edit
 }
