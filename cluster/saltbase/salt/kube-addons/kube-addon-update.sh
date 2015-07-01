@@ -45,15 +45,18 @@
 
 # global config
 KUBECTL=${TEST_KUBECTL:-/usr/local/bin/kubectl}   # substitute for tests
-NUM_TRIES_FOR_CREATE=${TEST_NUM_TRIES:-100}
-DELAY_AFTER_CREATE_ERROR_SEC=${TEST_DELAY_AFTER_ERROR_SEC:=10}
-NUM_TRIES_FOR_STOP=${TEST_NUM_TRIES:-100}
-DELAY_AFTER_STOP_ERROR_SEC=${TEST_DELAY_AFTER_ERROR_SEC:=10}
-
 if [[ ! -x ${KUBECTL} ]]; then
     echo "ERROR: kubectl command (${KUBECTL}) not found or is not executable" 1>&2
     exit 1
 fi
+
+# If an add-on definition is incorrect, or a definition has just disappeared
+# from the local directory, the script will still keep on retrying.
+# The script does not end until all retries are done, so
+# one invalid manifest may block updates of other add-ons.
+# Be careful how you set these parameters
+NUM_TRIES=1    # will be updated based on input parameters
+DELAY_AFTER_ERROR_SEC=${TEST_DELAY_AFTER_ERROR_SEC:=10}
 
 
 # remember that you can't log from functions that print some output (because
@@ -227,14 +230,16 @@ function stop-object() {
     local -r obj_type=$1
     local -r obj_name=$2
     log INFO "Stopping ${obj_type} ${obj_name}"
-    run-until-success "${KUBECTL} stop ${obj_type} ${obj_name}" ${NUM_TRIES_FOR_STOP} ${DELAY_AFTER_STOP_ERROR_SEC}
+    run-until-success "${KUBECTL} stop ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function create-object() {
     local -r obj_type=$1
     local -r file_path=$2
     log INFO "Creating new ${obj_type} from file ${file_path}"
-    run-until-success "${KUBECTL} create -f ${file_path}" ${NUM_TRIES_FOR_CREATE} ${DELAY_AFTER_CREATE_ERROR_SEC}
+    # this will keep on failing if the ${file_path} disappeared in the meantime.
+    # Do not use too many retries.
+    run-until-success "${KUBECTL} create -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function update-object() {
@@ -266,6 +271,12 @@ function create-objects() {
     local -r file_paths=$2
     local file_path
     for file_path in ${file_paths}; do
+        # Remember that the file may have disappear by now
+        # But we don't want to check it here because
+        # such race condition may always happen after
+        # we check it. Let's have the race
+        # condition happen a bit more often so that
+        # we see that our tests pass anyway.
         create-object ${obj_type} ${file_path} &
     done
 }
@@ -363,6 +374,11 @@ function match-objects() {
 
     log DB3 "matched_files=${matched_files}"
 
+
+    # note that if the addon file is invalid (or got removed after listing files
+    # but before we managed to match it) it will not be matched to any
+    # of the existing objects. So we will treat it as a new file
+    # and try to create its object.
     for addon_path in ${addon_paths_in_files}; do
         echo ${matched_files} | grep "${addon_path}" >/dev/null
         if [[ $? -ne 0 ]]; then
@@ -433,11 +449,21 @@ function update-addons() {
     fi
 }
 
-if [[ $# -ne 1 ]]; then
-    echo "Illegal number of parameters" 1>&2
+# input parameters:
+# $1 input directory
+# $2 retry period in seconds - the script will retry api-server errors for approximately
+#     this amound of time (it is not very precise), at interval equal $DELAY_AFTER_ERROR_SEC.
+#
+
+if [[ $# -ne 2 ]]; then
+    echo "Illegal number of parameters. Usage $0 addon-dir [retry-period]" 1>&2
     exit 1
+fi
+
+NUM_TRIES=$(($2 / ${DELAY_AFTER_ERROR_SEC}))
+if [[ ${NUM_TRIES} -le 0 ]]; then
+    NUM_TRIES=1
 fi
 
 addon_path=$1
 update-addons ${addon_path}
-
