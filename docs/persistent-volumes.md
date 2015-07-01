@@ -1,10 +1,12 @@
 # Persistent Volumes and Claims
 
-This document describes the current state of Persistent Volumes in Kubernetes.  Familiarity with [volumes](./volumes.md) is suggested.
+This document describes the current state of ```PersistentVolumes``` in Kubernetes.  Familiarity with [volumes](./volumes.md) is suggested.
 
-A Persistent Volume (PV) is a piece of networked storage in the cluster that has been provisioned by an administrator.  It is a resource in the cluster just like a node is a cluster resource.   PVs are volume plugins like Volumes, but have a lifecycle independent of any individual pod that uses the PV.
+Managing storage is a distinct problem from managing compute. The ```PersistentVolume``` subsystem provides an API for users and administrators that abstracts details of how storage is provided from how it is consumed.  To do this we introduce two new API resources:  ```PersistentVolume``` and ```PersistentVolumeClaim```.
 
-A Persistent Volume Claim (PVC) is a request for storage by a user.  It is similar to a pod.  Pods consume node resources and PVCs consume PV resources.  Pods can request specific levels of resources (CPU and Memory).  Claims can request specific size and access modes (e.g, can be mounted once read/write or many times read-only).  
+A ```PersistentVolume``` (PV) is a piece of networked storage in the cluster that has been provisioned by an administrator.  It is a resource in the cluster just like a node is a cluster resource.   PVs are volume plugins like Volumes, but have a lifecycle independent of any individual pod that uses the PV.  This API object captures the details of the implementation of the storage, be that NFS, iSCSI, or a cloud-provider-specific storage system.
+
+A ```PersistentVolumeClaim``` (PVC) is a request for storage by a user.  It is similar to a pod.  Pods consume node resources and PVCs consume PV resources.  Pods can request specific levels of resources (CPU and Memory).  Claims can request specific size and access modes (e.g, can be mounted once read/write or many times read-only).  
 
 Please see the [detailed walkthrough with working examples](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/persistent-volumes).
 
@@ -15,35 +17,37 @@ PVs are resources in the cluster.  PVC are requests for those resources and also
 
 ### Provisioning
 	
-The volume is created by an administrator.  It becomes a cluster resource available for consumption.
+A cluster administrator creates some number of PVs. They carry the details of the real storage that is available for use by cluster users.  They exist in the Kubernetes API and are available for consumption.
 
 ### Binding
 
-A persistent volume claim is created by a user requesting a specific amount of storage and with certain access modes.  There is a process watching for new claims that binds them to an available volume if a match is available.  The user will always get at least what they asked for, but the volume may be in excess of what was requested.
+A user creates a ```PersistentVolumeClaim``` with a specific amount of storage requested and with certain access modes.  A control loop in the master watches for new PVCs, finds a matching PV (if possible), and binds them together.  The user will always get at least what they asked for, but the volume may be in excess of what was requested.
 
 Claims will remain unbound indefinitely if a matching volume does not exist.  Claims will be bound as matching volumes become available.  For example, a cluster provisioned with many 50Gi volumes would not match a PVC requesting 100Gi.  The PVC can be bound when a 100Gi PV is added to the cluster.
 
 ### Using
 
-Pods use their claim as a volume.  The cluster uses the claim to find the bound volume bound and mounts that volume for the user.  For those volumes that support multiple access modes, the user specifies which mode desired when using their claim as a volume in a pod.
+Pods use claims as volumes. The cluster inspects the claim to find the bound volume and mounts that volume for a pod.  For those volumes that support multiple access modes, the user specifies which mode desired when using their claim as a volume in a pod.
+
+Once a user has a claim and that claim is bound, the bound PV belongs to the user for as long as she needs it. Users schedule Pods and access their their claimed PVs by including a persistentVolumeClaim in their Pod's volumes block. [See below for syntax details](#claims-as-volumes).
 
 ### Releasing
 
-When a user is done with their volume, they can delete their claim which allows reclamation of the resource.  The volume is considered "released" when the claim is deleted, but it is not yet available for another claim.  The previous claimant's data remains on the volume which must be handled according to policy.
+When a user is done with their volume, they can delete the PVC objects from the API which allows reclamation of the resource.  The volume is considered "released" when the claim is deleted, but it is not yet available for another claim.  The previous claimant's data remains on the volume which must be handled according to policy.
 
 ### Reclaiming
 
-A persistent volume's reclaim policy tells the cluster what to do with the volume after it's released.  Currently, volumes can either be Retained or Recycled.  Retention allows for manual reclamation of the resource.  For those volume plugins that support it, recycling performs a basic scrub ("rm -rf /thevolume/*") on the volume and makes it available again for a new claim.
+A ```PersistentVolume's``` reclaim policy tells the cluster what to do with the volume after it's released.  Currently, volumes can either be Retained or Recycled.  Retention allows for manual reclamation of the resource.  For those volume plugins that support it, recycling performs a basic scrub ("rm -rf /thevolume/*") on the volume and makes it available again for a new claim.
 
 ## Types of Persistent Volumes
 
-Persistent volumes are implemented as plugins.  Kubernetes currently supports the following plugins:
+```PersistentVolume```s are implemented as plugins.  Kubernetes currently supports the following plugins:
 
 * GCEPersistentDisk
 * AWSElasticBlockStore
 * NFS
-* ISCSI
-* RBD
+* iSCSI
+* RBD (Ceph Block Device)
 * Glusterfs
 * HostPath (single node testing only)
 
@@ -51,6 +55,7 @@ Persistent volumes are implemented as plugins.  Kubernetes currently supports th
 ## Persistent Volumes
 
 Each PV contains a spec and status, which is the specification and status of the volume.  
+
 
 ```
 
@@ -67,8 +72,6 @@ Each PV contains a spec and status, which is the specification and status of the
     nfs:
       path: /tmp
       server: 172.17.0.2
-  status:
-      phase: Bound
 	
 ```
 
@@ -80,7 +83,7 @@ Currently, storage size is the only resource that can be set or requested.  Futu
 
 ### Access Modes
 
-Persistent Volumes can be mounted on a host in any way supported by the resource provider.  Providers will have different capabilities and each PV's access modes are set to the specific modes supported by that particular volume.  For example, NFS can support multiple read/write clients, but a specific NFS PV might be exported on the server as read-only.  Each PV gets its own set of access modes describing that specific PV's capabilities.
+```PersistentVolume```s can be mounted on a host in any way supported by the resource provider.  Providers will have different capabilities and each PV's access modes are set to the specific modes supported by that particular volume.  For example, NFS can support multiple read/write clients, but a specific NFS PV might be exported on the server as read-only.  Each PV gets its own set of access modes describing that specific PV's capabilities.
 
 The access modes are:
 
@@ -117,7 +120,7 @@ A volume will be in one of the following phases:
 
 The CLI will show the name of the PVC bound to the PV.
 
-## Persistent Volume Claims
+## PersistentVolumeClaims
 
 Each PVC contains a spec and status, which is the specification and status of the claim.
 
@@ -135,6 +138,7 @@ spec:
       storage: 8Gi
 
 ```
+
 ### Access Modes
 
 Claims use the same conventions as volumes when requesting storage with specific access modes.
@@ -143,9 +147,9 @@ Claims use the same conventions as volumes when requesting storage with specific
 
 Claims, like pods, can request specific quantities of a resource.  In this case, the request is for storage.  The same [resource model](./resources.md) applies to both volumes and claims.
 
-## Claims As Volumes
+## <a name="claims-as-volumes"></a> Claims As Volumes
 
-Pods access storage by using the claim as a volume.  Claims must exist in the same namespace as the pod using the claim.  The cluster finds the claim in the pod's namespace and uses it to get the persistent volume backing the claim.  The volume is then mounted to the host and into the pod.
+Pods access storage by using the claim as a volume.  Claims must exist in the same namespace as the pod using the claim.  The cluster finds the claim in the pod's namespace and uses it to get the ```PersistentVolume``` backing the claim.  The volume is then mounted to the host and into the pod.
 
 ```
 
