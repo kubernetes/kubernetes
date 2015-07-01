@@ -270,6 +270,7 @@ func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
 func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", limitRange.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", limitRange.Namespace)
 		fmt.Fprintf(out, "Type\tResource\tMin\tMax\tDefault\n")
 		fmt.Fprintf(out, "----\t--------\t---\t---\t---\n")
 		for i := range limitRange.Spec.Limits {
@@ -337,6 +338,7 @@ func (d *ResourceQuotaDescriber) Describe(namespace, name string) (string, error
 func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", resourceQuota.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", resourceQuota.Namespace)
 		fmt.Fprintf(out, "Resource\tUsed\tHard\n")
 		fmt.Fprintf(out, "--------\t----\t----\n")
 
@@ -402,6 +404,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", pod.Namespace)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&pod.Spec))
 		fmt.Fprintf(out, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
@@ -468,6 +471,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
 		fmt.Fprintf(out, "Status:\t%d\n", pvc.Status.Phase)
 		fmt.Fprintf(out, "Volume:\t%d\n", pvc.Spec.VolumeName)
 
@@ -563,6 +567,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 func describeReplicationController(controller *api.ReplicationController, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", controller.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", controller.Namespace)
 		if controller.Spec.Template != nil {
 			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&controller.Spec.Template.Spec))
 		} else {
@@ -598,6 +603,7 @@ func (d *SecretDescriber) Describe(namespace, name string) (string, error) {
 func describeSecret(secret *api.Secret) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", secret.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", secret.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(secret.Labels))
 		fmt.Fprintf(out, "Annotations:\t%s\n", formatLabels(secret.Annotations))
 
@@ -658,6 +664,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 	}
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", service.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Type:\t%s\n", service.Spec.Type)
@@ -720,6 +727,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, erro
 func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", serviceAccount.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", serviceAccount.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(serviceAccount.Labels))
 
 		if len(serviceAccount.Secrets) == 0 {
