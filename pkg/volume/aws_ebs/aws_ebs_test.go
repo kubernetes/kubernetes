@@ -196,13 +196,13 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
 	plug, _ := plugMgr.FindPluginByName(awsElasticBlockStorePluginName)
-	spec := volume.NewSpecFromPersistentVolume(pv, false)
 
+	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
+	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
 
-	if builder.IsReadOnly() {
-		t.Errorf("Expected false for builder.IsReadOnly")
+	if !builder.IsReadOnly() {
+		t.Errorf("Expected true for builder.IsReadOnly")
 	}
-
 }

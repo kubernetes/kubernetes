@@ -71,9 +71,15 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode 
 
 func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
 	if spec.VolumeSource.HostPath != nil {
-		return &hostPathBuilder{&hostPath{spec.VolumeSource.HostPath.Path}}, nil
+		return &hostPathBuilder{
+			hostPath:     spec.VolumeSource.HostPath,
+			readOnly: false,
+		}, nil
 	} else {
-		return &hostPathBuilder{&hostPath{spec.PersistentVolumeSource.HostPath.Path}}, nil
+		return &hostPathBuilder{
+			hostPath:     spec.PersistentVolumeSource.HostPath,
+			readOnly: spec.ReadOnly,
+		}, nil
 	}
 }
 
@@ -96,7 +102,7 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, er
 // HostPath volumes represent a bare host file or directory mount.
 // The direct at the specified path will be directly exposed to the container.
 type hostPath struct {
-	path string
+	path     string
 }
 
 func (hp *hostPath) GetPath() string {
@@ -105,6 +111,7 @@ func (hp *hostPath) GetPath() string {
 
 type hostPathBuilder struct {
 	*hostPath
+	readOnly bool
 }
 
 var _ volume.Builder = &hostPathBuilder{}
@@ -120,7 +127,7 @@ func (b *hostPathBuilder) SetUpAt(dir string) error {
 }
 
 func (b *hostPathBuilder) IsReadOnly() bool {
-	return false
+	return b.readOnly
 }
 
 func (b *hostPathBuilder) GetPath() string {

@@ -76,11 +76,13 @@ func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 
 func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Builder, error) {
 	var source *api.NFSVolumeSource
-
+	var readOnly bool
 	if spec.VolumeSource.NFS != nil {
 		source = spec.VolumeSource.NFS
+		readOnly = spec.VolumeSource.NFS.ReadOnly
 	} else {
 		source = spec.PersistentVolumeSource.NFS
+		readOnly = spec.ReadOnly
 	}
 	return &nfsBuilder{
 		nfs: &nfs{
@@ -91,7 +93,8 @@ func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mou
 		},
 		server:     source.Server,
 		exportPath: source.Path,
-		readOnly:   source.ReadOnly}, nil
+		readOnly:   readOnly,
+	}, nil
 }
 
 func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {

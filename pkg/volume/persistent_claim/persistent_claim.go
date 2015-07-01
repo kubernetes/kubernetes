@@ -53,7 +53,6 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	plugin.readOnly = spec.ReadOnly
 	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(pod.Namespace).Get(spec.VolumeSource.PersistentVolumeClaim.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.VolumeSource.PersistentVolumeClaim.ClaimName)
