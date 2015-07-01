@@ -255,7 +255,7 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 	return keys
 }
 
-var podColumns = []string{"NAME", "READY", "REASON", "RESTARTS", "AGE"}
+var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP(S)", "PORT(S)"}
