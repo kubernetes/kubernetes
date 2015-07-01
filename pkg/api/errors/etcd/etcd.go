@@ -27,10 +27,8 @@ func InterpretGetError(err error, kind, name string) error {
 	switch {
 	case tools.IsEtcdNotFound(err):
 		return errors.NewNotFound(kind, name)
-	case errors.IsAPIStatusError(err):
-		return err
 	default:
-		return errors.NewInternalError(err)
+		return err
 	}
 }
 
@@ -40,10 +38,8 @@ func InterpretCreateError(err error, kind, name string) error {
 	switch {
 	case tools.IsEtcdNodeExist(err):
 		return errors.NewAlreadyExists(kind, name)
-	case errors.IsAPIStatusError(err):
-		return err
 	default:
-		return errors.NewInternalError(err)
+		return err
 	}
 }
 
@@ -53,10 +49,8 @@ func InterpretUpdateError(err error, kind, name string) error {
 	switch {
 	case tools.IsEtcdTestFailed(err), tools.IsEtcdNodeExist(err):
 		return errors.NewConflict(kind, name, err)
-	case errors.IsAPIStatusError(err):
-		return err
 	default:
-		return errors.NewInternalError(err)
+		return err
 	}
 }
 
@@ -66,9 +60,7 @@ func InterpretDeleteError(err error, kind, name string) error {
 	switch {
 	case tools.IsEtcdNotFound(err):
 		return errors.NewNotFound(kind, name)
-	case errors.IsAPIStatusError(err):
-		return err
 	default:
-		return errors.NewInternalError(err)
+		return err
 	}
 }

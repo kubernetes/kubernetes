@@ -372,11 +372,6 @@ func IsServerTimeout(err error) bool {
 	return reasonForError(err) == api.StatusReasonServerTimeout
 }
 
-// IsInternalServerError determines if err is an error which indicates that there was an internal server error.
-func IsInternalServerError(err error) bool {
-	return reasonForError(err) == api.StatusReasonInternalError
-}
-
 // IsUnexpectedServerError returns true if the server response was not in the expected API format,
 // and may be the result of another HTTP actor.
 func IsUnexpectedServerError(err error) bool {
@@ -412,14 +407,6 @@ func SuggestsClientDelay(err error) (int, bool) {
 		}
 	}
 	return 0, false
-}
-
-func IsAPIStatusError(err error) bool {
-	switch err.(type) {
-	case *StatusError:
-		return true
-	}
-	return false
 }
 
 func reasonForError(err error) api.StatusReason {
