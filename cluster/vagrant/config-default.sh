@@ -88,4 +88,4 @@ DNS_REPLICAS=1
 RUNTIME_CONFIG="api/v1beta3"
 
 # Specify the inter-node network fabric. Valid values: openvswitch, calico
-NETWORK_MODE=openvswitch
+NETWORK_MODE=${NETWORK_MODE-"openvswitch"}
