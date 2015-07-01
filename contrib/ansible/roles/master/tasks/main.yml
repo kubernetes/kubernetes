@@ -11,7 +11,7 @@
     - restart apiserver
 
 - name: Ensure that a token auth file exists (addons may populate it)
-  file: path={{kube_token_dir }}/known_tokens.csv state=touch
+  file: path={{ kube_token_dir }}/known_tokens.csv state=touch
   changed_when: false
 
 - name: add cap_net_bind_service to kube-apiserver
