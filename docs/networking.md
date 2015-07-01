@@ -1,4 +1,20 @@
 # Networking in Kubernetes
+**Table of Contents**
+<!-- BEGIN GENERATED TOC -->
+- [Networking in Kubernetes](#networking-in-kubernetes)
+  - [Summary](#summary)
+  - [Docker model](#docker-model)
+  - [Kubernetes model](#kubernetes-model)
+  - [How to achieve this](#how-to-achieve-this)
+    - [Google Compute Engine (GCE)](#google-compute-engine-(gce))
+    - [L2 networks and linux bridging](#l2-networks-and-linux-bridging)
+    - [Flannel](#flannel)
+    - [OpenVSwitch](#openvswitch)
+    - [Weave](#weave)
+    - [Calico](#calico)
+  - [Other reading](#other-reading)
+
+<!-- END GENERATED TOC -->
 
 ## Summary
 
