@@ -191,9 +191,7 @@ func (e *Etcd) CreateWithName(ctx api.Context, name string, obj runtime.Object) 
 		return err
 	}
 	err = e.Helper.CreateObj(key, obj, nil, ttl)
-	if err != nil {
-		err = etcderr.InterpretCreateError(err, e.EndpointName, name)
-	}
+	err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 	if err == nil && e.Decorator != nil {
 		err = e.Decorator(obj)
 	}
@@ -252,9 +250,7 @@ func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) 
 		return err
 	}
 	err = e.Helper.SetObj(key, obj, nil, ttl)
-	if err != nil {
-		err = etcderr.InterpretUpdateError(err, e.EndpointName, name)
-	}
+	err = etcderr.InterpretUpdateError(err, e.EndpointName, name)
 	if err == nil && e.Decorator != nil {
 		err = e.Decorator(obj)
 	}

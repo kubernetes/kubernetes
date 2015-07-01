@@ -116,7 +116,7 @@ func TestCreateRegistryError(t *testing.T) {
 
 	resourcequota := validNewResourceQuota()
 	_, err := storage.Create(api.NewDefaultContext(), resourcequota)
-	if !errors.IsInternalServerError(err) {
+	if err != fakeEtcdClient.Err {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
