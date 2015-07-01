@@ -1334,18 +1334,24 @@ func getDesiredVolumes(pods []*api.Pod) map[string]api.Volume {
 	return desiredVolumes
 }
 
-func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod) error {
-	desired := util.NewStringSet()
+// cleanupOrphanedPodDirs removes a pod directory if the pod is not in the
+// desired set of pods and there is no running containers in the pod.
+func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+	active := util.NewStringSet()
 	for _, pod := range pods {
-		desired.Insert(string(pod.UID))
+		active.Insert(string(pod.UID))
 	}
+	for _, pod := range runningPods {
+		active.Insert(string(pod.ID))
+	}
+
 	found, err := kl.listPodsFromDisk()
 	if err != nil {
 		return err
 	}
 	errlist := []error{}
 	for i := range found {
-		if !desired.Has(string(found[i])) {
+		if !active.Has(string(found[i])) {
 			glog.V(3).Infof("Orphaned pod %q found, removing", found[i])
 			if err := os.RemoveAll(kl.getPodDir(found[i])); err != nil {
 				errlist = append(errlist, err)
@@ -1574,7 +1580,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// Note that we pass all pods (including terminated pods) to the function,
 	// so that we don't remove directories associated with terminated but not yet
 	// deleted pods.
-	err = kl.cleanupOrphanedPodDirs(allPods)
+	err = kl.cleanupOrphanedPodDirs(allPods, runningPods)
 	if err != nil {
 		glog.Errorf("Failed cleaning up orphaned pod directories: %v", err)
 		return err

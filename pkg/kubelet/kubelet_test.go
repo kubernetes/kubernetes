@@ -3243,6 +3243,22 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 	}
 }
 
+func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*api.Pod, podsToCheck []*api.Pod, shouldExist bool) {
+	kl := testKubelet.kubelet
+
+	kl.podManager.SetPods(pods)
+	kl.HandlePodSyncs(pods)
+	kl.HandlePodCleanups()
+	for i, pod := range podsToCheck {
+		exist := dirExists(kl.getPodDir(pod.UID))
+		if shouldExist && !exist {
+			t.Errorf("expected directory to exist for pod %d", i)
+		} else if !shouldExist && exist {
+			t.Errorf("expected directory to be removed for pod %d", i)
+		}
+	}
+}
+
 func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
@@ -3273,22 +3289,45 @@ func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 		},
 	}
 
-	kl.podManager.SetPods(pods)
-	// Sync to create pod directories.
-	kl.HandlePodSyncs(pods)
-	for i := range pods {
-		if !dirExists(kl.getPodDir(pods[i].UID)) {
-			t.Errorf("expected directory to exist for pod %d", i)
-		}
-	}
+	syncAndVerifyPodDir(t, testKubelet, pods, pods, true)
 	// Pod 1 failed, and pod 2 succeeded. None of the pod directories should be
 	// deleted.
 	kl.statusManager.SetPodStatus(pods[1], api.PodStatus{Phase: api.PodFailed})
 	kl.statusManager.SetPodStatus(pods[2], api.PodStatus{Phase: api.PodSucceeded})
-	kl.HandlePodCleanups()
-	for i := range pods {
-		if !dirExists(kl.getPodDir(pods[i].UID)) {
-			t.Errorf("expected directory to exist for pod %d", i)
-		}
+	syncAndVerifyPodDir(t, testKubelet, pods, pods, true)
+}
+
+func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	runningPod := &kubecontainer.Pod{
+		ID:        "12345678",
+		Name:      "pod1",
+		Namespace: "ns",
 	}
+	apiPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       runningPod.ID,
+			Name:      runningPod.Name,
+			Namespace: runningPod.Namespace,
+		},
+	}
+	// Sync once to create pod directory; confirm that the pod directory has
+	// already been created.
+	pods := []*api.Pod{apiPod}
+	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, true)
+
+	// Pretend the pod is deleted from apiserver, but is still active on the node.
+	// The pod directory should not be removed.
+	pods = []*api.Pod{}
+	testKubelet.fakeRuntime.PodList = []*kubecontainer.Pod{runningPod}
+	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, true)
+
+	// The pod is deleted and also not active on the node. The pod directory
+	// should be removed.
+	pods = []*api.Pod{}
+	testKubelet.fakeRuntime.PodList = []*kubecontainer.Pod{}
+	syncAndVerifyPodDir(t, testKubelet, pods, []*api.Pod{apiPod}, false)
 }
