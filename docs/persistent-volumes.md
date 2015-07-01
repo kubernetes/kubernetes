@@ -1,8 +1,8 @@
 # Persistent Volumes and Claims
 
-This document describes the current state of Persistent Volumes in kubernetes.  Familiarity with [volumes](./volumes.md) is suggested.
+This document describes the current state of Persistent Volumes in Kubernetes.  Familiarity with [volumes](./volumes.md) is suggested.
 
-A Persistent Volume (PV) is a piece of storage infrastructure in the cluster that has been provisioned by an administrator.  It is a resource available in the cluster just like a node is a cluster resource.   PVs are volume plugins like Volumes, but have a lifecycle independent of any individual pod that uses the PV.
+A Persistent Volume (PV) is a piece of networked storage in the cluster that has been provisioned by an administrator.  It is a resource in the cluster just like a node is a cluster resource.   PVs are volume plugins like Volumes, but have a lifecycle independent of any individual pod that uses the PV.
 
 A Persistent Volume Claim (PVC) is a request for storage by a user.  It is similar to a pod.  Pods consume node resources and PVCs consume PV resources.  Pods can request specific levels of resources (CPU and Memory).  Claims can request specific size and access modes (e.g, can be mounted once read/write or many times read-only).  
 
@@ -17,22 +17,23 @@ PVs are resources in the cluster.  PVC are requests for those resources and also
 	
 The volume is created by an administrator.  It becomes a cluster resource available for consumption.
 
-### Claiming
+### Binding
 
-A persistent volume claim is created by a user requesting a specific amount of storage and with certain access modes.  There is a process watching for new claims and it binds them to an available volume, if a match is available.  It is possible for claims to go unmatched.  For example, if an admin provisions the cluster with many 50Gi volumes but the user asks for 100Gi, a match will be unavailable.  The user will always get at least what they asked for, but the volume may be in excess of what was requested.
+A persistent volume claim is created by a user requesting a specific amount of storage and with certain access modes.  There is a process watching for new claims that binds them to an available volume if a match is available.  The user will always get at least what they asked for, but the volume may be in excess of what was requested.
+
+Claims will remain unbound indefinitely if a matching volume does not exist.  Claims will be bound as matching volumes become available.  For example, a cluster provisioned with many 50Gi volumes would not match a PVC requesting 100Gi.  The PVC can be bound when a 100Gi PV is added to the cluster.
 
 ### Using
 
-Pods use their claim as a volume.  The cluster uses the claim to find the volume bound to it and mounts that volume for the user.  For those volumes that support multiple access modes, the user specifies which mode desired when using their claim as a volume in a pod.
+Pods use their claim as a volume.  The cluster uses the claim to find the bound volume bound and mounts that volume for the user.  For those volumes that support multiple access modes, the user specifies which mode desired when using their claim as a volume in a pod.
 
 ### Releasing
 
-When a user is done with their volume, they can delete their claim which allows reclamation of the resource.  The volume is considered "released" when the claim is deleted, but it is not yet available for another claim.  The previous claimant's data remains on the volume and must be handled according to policy.
+When a user is done with their volume, they can delete their claim which allows reclamation of the resource.  The volume is considered "released" when the claim is deleted, but it is not yet available for another claim.  The previous claimant's data remains on the volume which must be handled according to policy.
 
 ### Reclaiming
 
-A persistent volume's reclaim policy tells the cluster what to do with the volume after its released from its claim.  Currently, volumes can be retained on release or recycled.  Retention allows for manual reclamation of the resource.  For those volume plugins that support it, recycling performs a basic scrub ("rm -rf /thevolume/*") on the volume and makes it available again for a new claim.
-
+A persistent volume's reclaim policy tells the cluster what to do with the volume after it's released.  Currently, volumes can either be Retained or Recycled.  Retention allows for manual reclamation of the resource.  For those volume plugins that support it, recycling performs a basic scrub ("rm -rf /thevolume/*") on the volume and makes it available again for a new claim.
 
 ## Types of Persistent Volumes
 
@@ -79,7 +80,7 @@ Currently, storage size is the only resource that can be set or requested.  Futu
 
 ### Access Modes
 
-Persistent Volumes can be mounted on a host in any way supported by the resource provider.  Providers will have different capabilities and each PV's access modes are set to the specific modes supported by that particular volume.  For example, NFS can support multiple read/write clients, but a specific NFS PV might be exported on the server as read-only.
+Persistent Volumes can be mounted on a host in any way supported by the resource provider.  Providers will have different capabilities and each PV's access modes are set to the specific modes supported by that particular volume.  For example, NFS can support multiple read/write clients, but a specific NFS PV might be exported on the server as read-only.  Each PV gets its own set of access modes describing that specific PV's capabilities.
 
 The access modes are:
 
@@ -93,7 +94,7 @@ In the CLI, the access modes are abbreviated to:
 * ROX - ReadOnlyMany
 * RWX - ReadWriteMany
 
-> __Important!__ A volume can only be mounted using one access mode at a time, even if it supports many.  For example, a GCEPersistentDisk can be mounted as ReadWriteOnce by a single node or ReadOnlyMany by many nodes, but not at the same time.  .
+> __Important!__ A volume can only be mounted using one access mode at a time, even if it supports many.  For example, a GCEPersistentDisk can be mounted as ReadWriteOnce by a single node or ReadOnlyMany by many nodes, but not at the same time.
 
 
 ### Recycling Policy
@@ -101,7 +102,7 @@ In the CLI, the access modes are abbreviated to:
 Current recycling policies are:
 
 * Retain -- manual reclamation
-* Recycle -- basic scrub
+* Recycle -- basic scrub ("rm -rf /thevolume/*")
 
 Currently, NFS and HostPath support recycling.
 
