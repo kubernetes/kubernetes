@@ -70,7 +70,7 @@ then you will see that a token has automatically been created and is referenced 
 In the future, you will be able to configure different access policies for each service account.
 
 To use a non-default service account, simply set the `spec.serviceAccount`
-field of a pod to the set to the name of the service account you wish to use.
+field of a pod to the name of the service account you wish to use.
 
 The service account has to exist at the time the pod is created, or it will be rejected.
 
