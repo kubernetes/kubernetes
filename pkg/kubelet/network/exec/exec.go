@@ -70,14 +70,9 @@ const (
 	initCmd     = "init"
 	setUpCmd    = "setup"
 	tearDownCmd = "teardown"
-	execDir     = "/usr/libexec/kubernetes/kubelet-plugins/net/exec/"
 )
 
-func ProbeNetworkPlugins() []network.NetworkPlugin {
-	return probeNetworkPluginsWithExecDir(execDir)
-}
-
-func probeNetworkPluginsWithExecDir(pluginDir string) []network.NetworkPlugin {
+func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
 	execPlugins := []network.NetworkPlugin{}
 
 	files, _ := ioutil.ReadDir(pluginDir)
