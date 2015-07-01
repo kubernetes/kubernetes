@@ -616,6 +616,9 @@ func printEndpointsList(list *api.EndpointsList, w io.Writer, withNamespace bool
 }
 
 func printNamespace(item *api.Namespace, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	if withNamespace {
+		return fmt.Errorf("namespace is not namespaced")
+	}
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", item.Name, formatLabels(item.Labels), item.Status.Phase); err != nil {
 		return err
 	}
@@ -683,6 +686,9 @@ func printServiceAccountList(list *api.ServiceAccountList, w io.Writer, withName
 }
 
 func printNode(node *api.Node, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	if withNamespace {
+		return fmt.Errorf("node is not namespaced")
+	}
 	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 	NodeAllConditions := []api.NodeConditionType{api.NodeReady}
 	for i := range node.Status.Conditions {
@@ -783,6 +789,9 @@ func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Wr
 }
 
 func printEvent(event *api.Event, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	if withNamespace {
+		return fmt.Errorf("event is not namespaced")
+	}
 	if _, err := fmt.Fprintf(
 		w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s",
 		event.FirstTimestamp.Time.Format(time.RFC1123Z),
@@ -863,6 +872,9 @@ func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer, withNamesp
 }
 
 func printComponentStatus(item *api.ComponentStatus, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	if withNamespace {
+		return fmt.Errorf("componentStatus is not namespaced")
+	}
 	status := "Unknown"
 	message := ""
 	error := ""
