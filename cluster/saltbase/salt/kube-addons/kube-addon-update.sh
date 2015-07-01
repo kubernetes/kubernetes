@@ -113,9 +113,11 @@ except Exception, ex:
 }
 
 # $1 yaml file path
-function get-object-name-from-file() {
+# returns a string of the form <namespace>/<name> (we call it nsnames)
+function get-object-nsname-from-file() {
     # prints to stdout, so log cannot be used
     #WARNING: only yaml is supported
+    #addons that do not specify a namespace are assumed to be in "default".
     cat $1 | python -c '''
 try:
         import pipes,sys,yaml
@@ -126,7 +128,10 @@ try:
             # Otherwise we are ignoring them (the update will not work anyway)
             print "ERROR"
         else:
-            print y["metadata"]["name"]
+            try:
+                print "%s/%s" % (y["metadata"]["namespace"], y["metadata"]["name"])
+            except Exception, ex:
+                print "default/%s" % y["metadata"]["name"]
 except Exception, ex:
         print "ERROR"
     '''
@@ -136,7 +141,7 @@ except Exception, ex:
 # $2 addon type (e.g. ReplicationController)
 # echoes the string with paths to files containing addon for the given type
 # works only for yaml files (!) (ignores json files)
-function get-addons-from-disk() {
+function get-addon-paths-from-disk() {
     # prints to stdout, so log cannot be used
     local -r addon_dir=$1
     local -r obj_type=$2
@@ -184,9 +189,10 @@ function run-until-success() {
 }
 
 # $1 object type
-function get-addons-from-server() {
+# returns a list of <namespace>/<name> pairs (nsnames)
+function get-addon-nsnames-from-server() {
     local -r obj_type=$1
-    "${KUBECTL}" get "${obj_type}" -o template -t "{{range.items}}{{.metadata.name}} {{end}}" --api-version=v1beta3 -l kubernetes.io/cluster-service=true
+    "${KUBECTL}" get "${obj_type}" --all-namespaces -o template -t "{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" --api-version=v1beta3 -l kubernetes.io/cluster-service=true
 }
 
 # returns the characters after the last separator (including)
@@ -228,38 +234,52 @@ function get-basename() {
 
 function stop-object() {
     local -r obj_type=$1
-    local -r obj_name=$2
-    log INFO "Stopping ${obj_type} ${obj_name}"
-    run-until-success "${KUBECTL} stop ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    local -r namespace=$2
+    local -r obj_name=$3
+    log INFO "Stopping ${obj_type} ${namespace}/${obj_name}"
+
+    run-until-success "${KUBECTL} stop --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function create-object() {
     local -r obj_type=$1
     local -r file_path=$2
-    log INFO "Creating new ${obj_type} from file ${file_path}"
+
+    local nsname_from_file
+    nsname_from_file=$(get-object-nsname-from-file ${file_path})
+    if [[ "${nsname_from_file}" == "ERROR" ]]; then
+       log INFO "Cannot read object name from ${file_path}. Ignoring"
+       return 1
+    fi
+    IFS='/' read namespace obj_name <<< "${nsname_from_file}"
+
+    log INFO "Creating new ${obj_type} from file ${file_path} in namespace ${namespace}, name: ${obj_name}"
     # this will keep on failing if the ${file_path} disappeared in the meantime.
     # Do not use too many retries.
-    run-until-success "${KUBECTL} create -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    run-until-success "${KUBECTL} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function update-object() {
     local -r obj_type=$1
-    local -r obj_name=$2
-    local -r file_path=$3
-    log INFO "updating the ${obj_type} ${obj_name} with the new definition ${file_path}"
-    stop-object ${obj_type} ${obj_name}
+    local -r namespace=$2
+    local -r obj_name=$3
+    local -r file_path=$4
+    log INFO "updating the ${obj_type} ${namespace}/${obj_name} with the new definition ${file_path}"
+    stop-object ${obj_type} ${namespace} ${obj_name}
     create-object ${obj_type} ${file_path}
 }
 
 # deletes the objects from the server
 # $1 object type
-# $2 a list of object names
+# $2 a list of object nsnames
 function stop-objects() {
     local -r obj_type=$1
-    local -r obj_names=$2
+    local -r obj_nsnames=$2
+    local namespace
     local obj_name
-    for obj_name in ${obj_names}; do
-        stop-object ${obj_type} ${obj_names} &
+    for nsname in ${obj_nsnames}; do
+        IFS='/' read namespace obj_name <<< "${nsname}"
+        stop-object ${obj_type} ${namespace} ${obj_name} &
     done
 }
 
@@ -284,22 +304,28 @@ function create-objects() {
 # updates objects
 # $1 object type
 # $2 a list of update specifications
-# each update specification is a ';' separated pair: <object name>;<file path>
+# each update specification is a ';' separated pair: <nsname>;<file path>
 function update-objects() {
     local -r obj_type=$1      # ignored
     local -r update_spec=$2
     local objdesc
+    local nsname
+    local obj_name
+    local namespace
+
     for objdesc in ${update_spec}; do
-        IFS=';' read -a array <<< ${objdesc}
-        update-object ${obj_type} ${array[0]} ${array[1]} &
+        IFS=';' read nsname file_path <<< "${objdesc}"
+        IFS='/' read namespace obj_name <<< "${nsname}"
+
+        update-object ${obj_type} ${namespace} ${obj_name} ${file_path} &
     done
 }
 
 # Global variables set by function match-objects.
-for_delete=""       # a list of object names to be deleted
-for_update=""      # a list of pairs <obj_name>;<filePath> for objects that should be updated
-for_ignore=""       # a list of object nanes that can be ignored
-new_files=""        # a list of file paths that weren't matched by any existing objects (these objects must be created now)
+nsnames_for_delete=""   # a list of object nsnames to be deleted
+for_update=""           # a list of pairs <nsname>;<filePath> for objects that should be updated
+nsnames_for_ignore=""   # a list of object nsnames that will be ignored
+new_files=""            # a list of file paths that weren't matched by any existing objects (these objects must be created now)
 
 
 # $1 path to files with objects
@@ -311,32 +337,36 @@ function match-objects() {
     local -r separator=$3
 
     # output variables (globals)
-    for_delete=""
+    nsnames_for_delete=""
     for_update=""
-    for_ignore=""
+    nsnames_for_ignore=""
     new_files=""
 
-    addon_names_on_server=$(get-addons-from-server "${obj_type}")
-    addon_paths_in_files=$(get-addons-from-disk "${addon_dir}" "${obj_type}")
+    addon_nsnames_on_server=$(get-addon-nsnames-from-server "${obj_type}")
+    addon_paths_in_files=$(get-addon-paths-from-disk "${addon_dir}" "${obj_type}")
 
-    log DB2 "addon_names_on_server=${addon_names_on_server}"
+    log DB2 "addon_nsnames_on_server=${addon_nsnames_on_server}"
     log DB2 "addon_paths_in_files=${addon_paths_in_files}"
 
     local matched_files=""
 
-    local basename_on_server=""
-    local name_on_server=""
+    local basensname_on_server=""
+    local nsname_on_server=""
     local suffix_on_server=""
-    local name_from_file=""
+    local nsname_from_file=""
     local suffix_from_file=""
     local found=0
     local addon_path=""
 
-    for name_on_server in ${addon_names_on_server}; do
-        basename_on_server=$(get-basename ${name_on_server} ${separator})
-        suffix_on_server="$(get-suffix ${name_on_server} ${separator})"
+    # objects that were moved between namespaces will have different nsname
+    # because the namespace is included. So they will be treated
+    # like different objects and not updated but deleted and created again
+    # (in the current version update is also delete+create, so it does not matter)
+    for nsname_on_server in ${addon_nsnames_on_server}; do
+        basensname_on_server=$(get-basename ${nsname_on_server} ${separator})
+        suffix_on_server="$(get-suffix ${nsname_on_server} ${separator})"
 
-        log DB3 "Found existing addon ${name_on_server}, basename=${basename_on_server}"
+        log DB3 "Found existing addon ${nsname_on_server}, basename=${basensname_on_server}"
 
         # check if the addon is present in the directory and decide
         # what to do with it
@@ -344,31 +374,31 @@ function match-objects() {
         # again. But for small number of addons it doesn't matter so much.
         found=0
         for addon_path in ${addon_paths_in_files}; do
-            name_from_file=$(get-object-name-from-file ${addon_path})
-            if [[ "${name_from_file}" == "ERROR" ]]; then
+            nsname_from_file=$(get-object-nsname-from-file ${addon_path})
+            if [[ "${nsname_from_file}" == "ERROR" ]]; then
                 log INFO "Cannot read object name from ${addon_path}. Ignoring"
                 continue
             else
-                log DB2 "Found object name '${name_from_file}' in file ${addon_path}"
+                log DB2 "Found object name '${nsname_from_file}' in file ${addon_path}"
             fi
-            suffix_from_file="$(get-suffix ${name_from_file} ${separator})"
+            suffix_from_file="$(get-suffix ${nsname_from_file} ${separator})"
 
-            log DB3 "matching: ${basename_on_server}${suffix_from_file} == ${name_from_file}"
-            if [[ "${basename_on_server}${suffix_from_file}" == "${name_from_file}" ]]; then
-                log DB3 "matched existing ${obj_type} ${name_on_server} to file ${addon_path}; suffix_on_server=${suffix_on_server}, suffix_from_file=${suffix_from_file}"
+            log DB3 "matching: ${basensname_on_server}${suffix_from_file} == ${nsname_from_file}"
+            if [[ "${basensname_on_server}${suffix_from_file}" == "${nsname_from_file}" ]]; then
+                log DB3 "matched existing ${obj_type} ${nsname_on_server} to file ${addon_path}; suffix_on_server=${suffix_on_server}, suffix_from_file=${suffix_from_file}"
                 found=1
                 matched_files="${matched_files} ${addon_path}"
                 if [[ "${suffix_on_server}" == "${suffix_from_file}" ]]; then
-                    for_ignore="${for_ignore} ${name_from_file}"
+                    nsnames_for_ignore="${nsnames_for_ignore} ${nsname_from_file}"
                 else
-                    for_update="${for_update} ${name_on_server};${addon_path}"
+                    for_update="${for_update} ${nsname_on_server};${addon_path}"
                 fi
                 break
             fi
         done
         if [[ ${found} -eq 0 ]]; then
-            log DB2 "No definition file found for replication controller ${name_on_server}. Scheduling for deletion"
-            for_delete="${for_delete} ${name_on_server}"
+            log DB2 "No definition file found for replication controller ${nsname_on_server}. Scheduling for deletion"
+            nsnames_for_delete="${nsnames_for_delete} ${nsname_on_server}"
         fi
     done
 
@@ -395,12 +425,12 @@ function reconcile-objects() {
     local -r separator=$3    # name separator
     match-objects ${addon_path} ${obj_type} ${separator}
 
-    log DBG "${obj_type}: for_delete=${for_delete}"
+    log DBG "${obj_type}: nsnames_for_delete=${nsnames_for_delete}"
     log DBG "${obj_type}: for_update=${for_update}"
-    log DBG "${obj_type}: for_ignore=${for_ignore}"
+    log DBG "${obj_type}: nsnames_for_ignore=${nsnames_for_ignore}"
     log DBG "${obj_type}: new_files=${new_files}"
 
-    stop-objects "${obj_type}" "${for_delete}"
+    stop-objects "${obj_type}" "${nsnames_for_delete}"
     # wait for jobs below is a protection against changing the basename
     # of a replication controllerm without changing the selector.
     # If we don't wait, the new rc may be created before the old one is deleted
@@ -414,9 +444,9 @@ function reconcile-objects() {
     create-objects "${obj_type}" "${new_files}"
     update-objects "${obj_type}" "${for_update}"
 
-    local obj
-    for obj in ${for_ignore}; do
-        log DB2 "The ${obj_type} ${obj} is already up to date"
+    local nsname
+    for nsname in ${nsnames_for_ignore}; do
+        log DB2 "The ${obj_type} ${nsname} is already up to date"
     done
 
     wait-for-jobs

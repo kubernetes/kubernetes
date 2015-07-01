@@ -39,7 +39,7 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   name: addon-test-v1
-  namespace: default
+  namespace: %s
   labels:
     k8s-app: addon-test
     version: v1
@@ -69,7 +69,7 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   name: addon-test-v2
-  namespace: default
+  namespace: %s
   labels:
     k8s-app: addon-test
     version: v2
@@ -99,7 +99,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: addon-test
-  namespace: default
+  namespace: %s
   labels:
     k8s-app: addon-test
     kubernetes.io/cluster-service: "true"
@@ -118,7 +118,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: addon-test-updated
-  namespace: default
+  namespace: %s
   labels:
     k8s-app: addon-test
     kubernetes.io/cluster-service: "true"
@@ -138,7 +138,7 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   name: invalid-addon-test-v1
-  namespace: default
+  namespace: %s
   labels:
     k8s-app: invalid-addon-test
     version: v1
@@ -167,7 +167,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ivalid-addon-test
-  namespace: default
+  namespace: %s
   labels:
     k8s-app: invalid-addon-test
     kubernetes.io/name: invalid-addon-test
@@ -181,8 +181,8 @@ spec:
 `
 
 var addonTestPollInterval = 3 * time.Second
-var addonTestPollTimeout = 1 * time.Minute
-var addonNamespace = api.NamespaceDefault // addons are in the default namespace
+var addonTestPollTimeout = 5 * time.Minute
+var defaultNsName = api.NamespaceDefault
 
 type stringPair struct {
 	data, fileName string
@@ -260,12 +260,12 @@ var _ = Describe("Addon update", func() {
 		svcInvalid := "invalid-addon-service-v1.yaml"
 
 		var remoteFiles []stringPair = []stringPair{
-			{addon_controller_v1, rcv1},
-			{addon_controller_v2, rcv2},
-			{addon_service_v1, svcv1},
-			{addon_service_v2, svcv2},
-			{invalid_addon_controller_v1, rcInvalid},
-			{invalid_addon_service_v1, svcInvalid},
+			{fmt.Sprintf(addon_controller_v1, defaultNsName), rcv1},
+			{fmt.Sprintf(addon_controller_v2, namespace.Name), rcv2},
+			{fmt.Sprintf(addon_service_v1, namespace.Name), svcv1},
+			{fmt.Sprintf(addon_service_v2, namespace.Name), svcv2},
+			{fmt.Sprintf(invalid_addon_controller_v1, namespace.Name), rcInvalid},
+			{fmt.Sprintf(invalid_addon_service_v1, defaultNsName), svcInvalid},
 		}
 
 		for _, p := range remoteFiles {
@@ -293,8 +293,8 @@ var _ = Describe("Addon update", func() {
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv1, destinationDir, rcv1))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcv1, destinationDir, svcv1))
 
-		waitForServiceInAddonTest(c, "addon-test", true)
-		waitForReplicationControllerInAddonTest(c, "addon-test-v1", true)
+		waitForServiceInAddonTest(c, namespace.Name, "addon-test", true)
+		waitForReplicationControllerInAddonTest(c, defaultNsName, "addon-test-v1", true)
 
 		By("update manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv2, destinationDir, rcv2))
@@ -307,34 +307,38 @@ var _ = Describe("Addon update", func() {
 		 * But it is ok - as long as we don't have rolling update, the result will be the same
 		 */
 
-		waitForServiceInAddonTest(c, "addon-test-updated", true)
-		waitForReplicationControllerInAddonTest(c, "addon-test-v2", true)
+		waitForServiceInAddonTest(c, namespace.Name, "addon-test-updated", true)
+		waitForReplicationControllerInAddonTest(c, namespace.Name, "addon-test-v2", true)
 
-		waitForServiceInAddonTest(c, "addon-test", false)
-		waitForReplicationControllerInAddonTest(c, "addon-test-v1", false)
+		waitForServiceInAddonTest(c, namespace.Name, "addon-test", false)
+		waitForReplicationControllerInAddonTest(c, defaultNsName, "addon-test-v1", false)
 
 		By("remove manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, rcv2))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcv2))
 
-		waitForServiceInAddonTest(c, "addon-test-updated", false)
-		waitForReplicationControllerInAddonTest(c, "invalid-addon-test-v1", false)
+		waitForServiceInAddonTest(c, namespace.Name, "addon-test-updated", false)
+		waitForReplicationControllerInAddonTest(c, namespace.Name, "addon-test-v2", false)
 
 		By("verify invalid API addons weren't created")
-		_, err = c.ReplicationControllers(addonNamespace).Get("invalid-addon-test-v1")
+		_, err = c.ReplicationControllers(namespace.Name).Get("invalid-addon-test-v1")
 		Expect(err).To(HaveOccurred())
-		_, err = c.Services(addonNamespace).Get("ivalid-addon-test")
+		_, err = c.ReplicationControllers(defaultNsName).Get("invalid-addon-test-v1")
+		Expect(err).To(HaveOccurred())
+		_, err = c.Services(namespace.Name).Get("ivalid-addon-test")
+		Expect(err).To(HaveOccurred())
+		_, err = c.Services(defaultNsName).Get("ivalid-addon-test")
 		Expect(err).To(HaveOccurred())
 
 		// invalid addons will be deleted by the deferred function
 	})
 })
 
-func waitForServiceInAddonTest(c *client.Client, name string, exist bool) {
+func waitForServiceInAddonTest(c *client.Client, addonNamespace, name string, exist bool) {
 	expectNoError(waitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
-func waitForReplicationControllerInAddonTest(c *client.Client, name string, exist bool) {
+func waitForReplicationControllerInAddonTest(c *client.Client, addonNamespace, name string, exist bool) {
 	expectNoError(waitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
