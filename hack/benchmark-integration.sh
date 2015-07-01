@@ -33,7 +33,7 @@ runTests() {
   kube::log::status "Running benchmarks"
   KUBE_GOFLAGS="-tags 'benchmark no-docker' -bench . -benchtime 1s -cpu 4" \
     KUBE_RACE="-race" \
-    KUBE_TEST_API_VERSIONS="v1beta3" \
+    KUBE_TEST_API_VERSIONS="v1" \
     KUBE_TIMEOUT="-timeout 10m" \
     KUBE_TEST_ETCD_PREFIXES="registry"\
     ETCD_CUSTOM_PREFIX="None" \

@@ -185,7 +185,7 @@ function run-until-success() {
 # $1 object type
 function get-addons-from-server() {
     local -r obj_type=$1
-    "${KUBECTL}" get "${obj_type}" -o template -t "{{range.items}}{{.metadata.name}} {{end}}" --api-version=v1beta3 -l kubernetes.io/cluster-service=true
+    "${KUBECTL}" get "${obj_type}" -o template -t "{{range.items}}{{.metadata.name}} {{end}}" --api-version=v1 -l kubernetes.io/cluster-service=true
 }
 
 # returns the characters after the last separator (including)
