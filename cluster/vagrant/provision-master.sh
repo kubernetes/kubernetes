@@ -104,6 +104,7 @@ grains:
     - kubernetes-master
   runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
+  cbr-cidr: '$(echo "$MASTER_CONTAINER_CIDR" | sed -e "s/'/''/g")'
 EOF
 
 mkdir -p /srv/salt-overlay/pillar

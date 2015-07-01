@@ -30,7 +30,7 @@ docker:
       - pkg: docker-io
     - require:
       - pkg: docker-io
-{% if grains.network_mode == "calico" and 'kubernetes-pool' in grains.roles %}
+{% if grains.network_mode == "calico" %}
       - container_bridge: cbr0
 
 cbr0:
