@@ -22,10 +22,12 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -165,13 +167,31 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 	return &ProxyServer{handler: mux}, nil
 }
 
-// Serve starts the server (http.DefaultServeMux) on given port, loops forever.
-func (s *ProxyServer) Serve(port int) error {
+// Listen is a simple wrapper around net.Listen.
+func (s *ProxyServer) Listen(port int) (net.Listener, error) {
+	return net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+}
+
+// ListenUnix does net.Listen for a unix socket
+func (s *ProxyServer) ListenUnix(path string) (net.Listener, error) {
+	// Remove any socket, stale or not, but fall through for other files
+	fi, err := os.Stat(path)
+	if err == nil && (fi.Mode()&os.ModeSocket) != 0 {
+		os.Remove(path)
+	}
+	// Default to only user accessible socket, caller can open up later if desired
+	oldmask, _ := util.Umask(0077)
+	l, err := net.Listen("unix", path)
+	util.Umask(oldmask)
+	return l, err
+}
+
+// Serve starts the server using given listener, loops forever.
+func (s *ProxyServer) ServeOnListener(l net.Listener) error {
 	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
 		Handler: s.handler,
 	}
-	return server.ListenAndServe()
+	return server.Serve(l)
 }
 
 func newProxy(target *url.URL) *httputil.ReverseProxy {
