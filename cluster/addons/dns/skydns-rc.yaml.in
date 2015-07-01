@@ -22,6 +22,10 @@ spec:
       containers:
       - name: etcd
         image: gcr.io/google_containers/etcd:2.0.9
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
         command:
         - /usr/local/bin/etcd
         - -listen-client-urls
@@ -32,11 +36,19 @@ spec:
         - skydns-etcd
       - name: kube2sky
         image: gcr.io/google_containers/kube2sky:1.10
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
         args:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
       - name: skydns
         image: gcr.io/google_containers/skydns:2015-03-11-001
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
         args:
         # command = "/skydns"
         - -machines=http://localhost:4001
