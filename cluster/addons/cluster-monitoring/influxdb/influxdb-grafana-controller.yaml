@@ -27,6 +27,9 @@ spec:
               hostPort: 8083
             - containerPort: 8086
               hostPort: 8086
+          volumeMounts:
+          - name: influxdb-persistent-storage
+            mountPath: /data
         - image: gcr.io/google_containers/heapster_grafana:v0.7
           name: grafana
           env: 
@@ -36,4 +39,7 @@ spec:
               value: monitoring-influxdb
             - name: INFLUXDB_PORT
               value: "8086"
+      volumes:
+      - name: influxdb-persistent-storage
+        emptyDir: {}
 
