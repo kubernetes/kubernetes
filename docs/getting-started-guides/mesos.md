@@ -60,6 +60,8 @@ It provides a step by step walk through of adding Kubernetes to a Mesos cluster 
 **NOTE:** There are [known issues with the current implementation][7] and support for centralized logging and monitoring is not yet available.
 Please [file an issue against the kubernetes-mesos project][8] if you have problems completing the steps below.
 
+Further information is available in the Kubernetes on Mesos [contrib directory][13].
+
 ### Prerequisites
 
 * Understanding of [Apache Mesos][6]
@@ -347,6 +349,8 @@ Address 1: 10.10.10.1
 
 Try out some of the standard [Kubernetes examples][9].
 
+Read about Kubernetes on Mesos' architecture in the [contrib directory][13].
+
 **NOTE:** Some examples require Kubernetes DNS to be installed on the cluster.
 Future work will add instructions to this guide to enable support for Kubernetes DNS.
 
@@ -364,6 +368,7 @@ Future work will add instructions to this guide to enable support for Kubernetes
 [10]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/#vpn-setup
 [11]: ../../cluster/addons/dns/skydns-rc.yaml.in
 [12]: ../../cluster/addons/dns/skydns-svc.yaml.in
+[13]: ../../contrib/mesos/README.md
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
