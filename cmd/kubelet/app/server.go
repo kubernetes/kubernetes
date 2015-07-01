@@ -286,7 +286,10 @@ func (s *KubeletServer) Run(_ []string) error {
 		DockerFreeDiskMB: s.LowDiskSpaceThresholdMB,
 		RootFreeDiskMB:   s.LowDiskSpaceThresholdMB,
 	}
-	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	if err != nil {
+		return err
+	}
 	glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 
 	hostNetworkSources, err := kubelet.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))

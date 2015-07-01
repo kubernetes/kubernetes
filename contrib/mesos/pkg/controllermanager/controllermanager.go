@@ -115,7 +115,10 @@ func (s *CMServer) Run(_ []string) error {
 	if s.CloudProvider != mesos.ProviderName {
 		glog.Fatalf("Only provider %v is supported, you specified %v", mesos.ProviderName, s.CloudProvider)
 	}
-	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	if err != nil {
+		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
 
 	nodeController := nodecontroller.NewNodeController(cloud, kubeClient, s.RegisterRetryCount,
 		s.PodEvictionTimeout, nodecontroller.NewPodEvictor(util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst)),
