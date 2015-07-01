@@ -3,7 +3,7 @@
     <div class="server-overview" layout="column">
       <!-- subheader -->
       <div class="group-heading" layout="row">
-        <div class="label">{{routeParams.grouping | ucfirst}}: <span class="bold">{{ (groupName) || "blank"  }}</span></div>
+        <div class="label">{{selectedGroupByName | ucfirst}}: <span class="bold">{{ (groupName) || "blank"  }}</span></div>
       </div>
       <!-- render group data -->
       <div ng-include="'components/dashboard/views/partials/groupItem.html'"></div>

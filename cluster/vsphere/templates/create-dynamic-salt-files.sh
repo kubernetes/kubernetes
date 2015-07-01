@@ -24,7 +24,6 @@ instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 node_instance_prefix: $NODE_INSTANCE_PREFIX
 service_cluster_ip_range: $SERVICE_CLUSTER_IP_RANGE
 enable_cluster_monitoring: $ENABLE_CLUSTER_MONITORING
-enable_node_monitoring: $ENABLE_NODE_MONITORING
 enable_cluster_logging: $ENABLE_CLUSTER_LOGGING
 enable_node_logging: $ENABLE_NODE_LOGGING
 logging_destination: $LOGGING_DESTINATION

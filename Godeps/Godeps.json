@@ -89,6 +89,11 @@
 			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
 		},
 		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/autoscaling",
+			"Comment": "v0.6.0-7-gcea3a42",
+			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/ec2",
 			"Comment": "v0.6.0-7-gcea3a42",
 			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
@@ -132,7 +137,7 @@
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
 		},
 		{
-			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
+			"ImportPath": "github.com/cpuguy83/go-md2man",
 			"Comment": "v1.0.2-5-g2831f11",
 			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
 		},
@@ -364,6 +369,10 @@
 			"Rev": "afde71eb1740fd763ab9450e1f700ba0e53c36d0"
 		},
 		{
+			"ImportPath": "github.com/juju/ratelimit",
+			"Rev": "772f5c38e468398c4511514f4f6aa9a4185bc0a0"
+		},
+		{
 			"ImportPath": "github.com/kardianos/osext",
 			"Rev": "8fef92e41e22a70e700a96b29f066cda30ea24ef"
 		},
@@ -418,8 +427,8 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
-			"Comment": "v1.2.0-beta-9-gfbb6632",
-			"Rev": "fbb663242655b700c623e9629d7781db98957501"
+			"Comment": "v1.2.0-6-gd981d36",
+			"Rev": "d981d36e9884231afa909627b9c275e4ba678f90"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
@@ -470,8 +479,8 @@
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",
-			"Comment": "2.0.1d-2-g245a121",
-			"Rev": "245a1216be2a7f5377ea56e957fdfa0de6ecd067"
+			"Comment": "2.5.1a",
+			"Rev": "1be70b5b8aa07acccd972146d84011b670af88b4"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",

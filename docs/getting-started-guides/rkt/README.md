@@ -34,7 +34,7 @@ $ export CONTAINER_RUNTIME=rkt
 $ hack/local-up-cluster.sh
 ```
 
-### CoreOS cluster on GCE
+### CoreOS cluster on Google Compute Engine (GCE)
 
 To use rkt as the container runtime for your CoreOS cluster on GCE, you need to specify the OS distribution, project, image:
 ```shell

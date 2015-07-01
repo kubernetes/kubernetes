@@ -1,0 +1,11 @@
+---
+- name: Get os_version from /etc/os-release
+  raw: "grep '^VERSION_ID=' /etc/os-release | sed s'/VERSION_ID=//'"
+  register: os_version
+
+- name: Get distro name from /etc/os-release
+  raw: "grep '^NAME=' /etc/os-release | sed s'/NAME=//'"
+  register: distro
+
+- include: fedora-dnf.yml
+  when: os_version.stdout|int >= 22 and 'Fedora' in distro.stdout

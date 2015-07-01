@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
@@ -98,8 +100,7 @@ func realVersion(s string) (string, error) {
 var masterUpgrade = func(v string) error {
 	switch testContext.Provider {
 	case "gce":
-		// TODO(mbforbes): Make master upgrade GCE use the provided version.
-		return masterUpgradeGCE()
+		return masterUpgradeGCE(v)
 	case "gke":
 		return masterUpgradeGKE(v)
 	default:
@@ -107,8 +108,9 @@ var masterUpgrade = func(v string) error {
 	}
 }
 
-func masterUpgradeGCE() error {
-	_, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-M", version)
+func masterUpgradeGCE(rawV string) error {
+	v := "v" + rawV
+	_, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-M", v)
 	return err
 }
 
@@ -136,8 +138,7 @@ var nodeUpgrade = func(f Framework, replicas int, v string) error {
 	var err error
 	switch testContext.Provider {
 	case "gce":
-		// TODO(mbforbes): Make node upgrade GCE use the provided version.
-		err = nodeUpgradeGCE()
+		err = nodeUpgradeGCE(v)
 	case "gke":
 		err = nodeUpgradeGKE(v)
 	default:
@@ -156,9 +157,10 @@ var nodeUpgrade = func(f Framework, replicas int, v string) error {
 	return waitForPodsRunningReady(f.Namespace.Name, replicas, restartPodReadyAgainTimeout)
 }
 
-func nodeUpgradeGCE() error {
-	Logf("Preparing node upgarde by creating new instance template for %q", version)
-	stdout, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-P", version)
+func nodeUpgradeGCE(rawV string) error {
+	v := "v" + rawV
+	Logf("Preparing node upgarde by creating new instance template for %q", v)
+	stdout, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-P", v)
 	if err != nil {
 		return err
 	}
@@ -196,11 +198,11 @@ var _ = Describe("Skipped", func() {
 			// The version is determined once at the beginning of the test so that
 			// the master and nodes won't be skewed if the value changes during the
 			// test.
-			// TODO(mbforbes): Use this version for GCE as well.
 			By(fmt.Sprintf("Getting real version for %q", version))
 			var err error
 			v, err = realVersion(version)
 			expectNoError(err)
+			Logf("Version for %q is %s", version, v)
 
 			By("Setting up the service, RC, and pods")
 			f.beforeEach()
@@ -238,11 +240,11 @@ var _ = Describe("Skipped", func() {
 		})
 
 		Describe("kube-push", func() {
+			BeforeEach(func() {
+				SkipUnlessProviderIs("gce")
+			})
+
 			It("of master should maintain responsive services", func() {
-				if !providerIs("gce") {
-					By(fmt.Sprintf("Skipping kube-push test, which is not implemented for %s", testContext.Provider))
-					return
-				}
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
@@ -253,15 +255,17 @@ var _ = Describe("Skipped", func() {
 		})
 
 		Describe("upgrade-master", func() {
+			BeforeEach(func() {
+				SkipUnlessProviderIs("gce", "gke")
+			})
+
 			It("should maintain responsive services", func() {
-				if !providerIs("gce", "gke") {
-					By(fmt.Sprintf("Skipping upgrade test, which is not implemented for %s", testContext.Provider))
-					return
-				}
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
 				testMasterUpgrade(ip, v, masterUpgrade)
+				By("Checking master version")
+				expectNoError(checkMasterVersion(f.Client, v))
 				By("Validating cluster after master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			})
@@ -311,15 +315,14 @@ var _ = Describe("Skipped", func() {
 			})
 
 			It("should maintain a functioning cluster", func() {
-				if !providerIs("gce", "gke") {
-					By(fmt.Sprintf("Skipping upgrade test, which is not implemented for %s", testContext.Provider))
-					return
-				}
+				SkipUnlessProviderIs("gce", "gke")
 
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
 				testMasterUpgrade(ip, v, masterUpgrade)
+				By("Checking master version")
+				expectNoError(checkMasterVersion(f.Client, v))
 				By("Validating cluster after master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a node upgrade")
@@ -369,20 +372,56 @@ func testMasterUpgrade(ip, v string, mUp func(v string) error) {
 	done <- struct{}{}
 	Logf("Stopping async validation")
 	wg.Wait()
-
-	// TODO(mbforbes): Validate that:
-	// - the master software version truly changed
-
 	Logf("Master upgrade complete")
+}
+
+func checkMasterVersion(c *client.Client, want string) error {
+	v, err := c.ServerVersion()
+	if err != nil {
+		return fmt.Errorf("checkMasterVersion() couldn't get the master version: %v", err)
+	}
+	// We do prefix trimming and then matching because:
+	// want looks like:  0.19.3-815-g50e67d4
+	// got  looks like: v0.19.3-815-g50e67d4034e858-dirty
+	got := strings.TrimPrefix(v.GitVersion, "v")
+	if !strings.HasPrefix(got, want) {
+		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s",
+			got, want)
+	}
+	Logf("Master is at version %s", want)
+	return nil
 }
 
 func testNodeUpgrade(f Framework, nUp func(f Framework, n int, v string) error, replicas int, v string) {
 	Logf("Starting node upgrade")
 	expectNoError(nUp(f, replicas, v))
 	Logf("Node upgrade complete")
+	By("Checking node versions")
+	expectNoError(checkNodesVersions(f.Client, v))
+	Logf("All nodes are at version %s", v)
+}
 
-	// TODO(mbforbes): Validate that:
-	// - the node software version truly changed
+func checkNodesVersions(c *client.Client, want string) error {
+	l, err := listNodes(c, labels.Everything(), fields.Everything())
+	if err != nil {
+		return fmt.Errorf("checkNodesVersions() failed to list nodes: %v", err)
+	}
+	for _, n := range l.Items {
+		// We do prefix trimming and then matching because:
+		// want   looks like:  0.19.3-815-g50e67d4
+		// kv/kvp look  like: v0.19.3-815-g50e67d4034e858-dirty
+		kv, kpv := strings.TrimPrefix(n.Status.NodeInfo.KubeletVersion, "v"),
+			strings.TrimPrefix(n.Status.NodeInfo.KubeProxyVersion, "v")
+		if !strings.HasPrefix(kv, want) {
+			return fmt.Errorf("node %s had kubelet version %s which does not start with %s",
+				n.ObjectMeta.Name, kv, want)
+		}
+		if !strings.HasPrefix(kpv, want) {
+			return fmt.Errorf("node %s had kube-proxy version %s which does not start with %s",
+				n.ObjectMeta.Name, kpv, want)
+		}
+	}
+	return nil
 }
 
 // retryCmd runs cmd using args and retries it for up to singleCallTimeout if

@@ -169,6 +169,7 @@ func TestPrintObjectSpecificMessage(t *testing.T) {
 func TestMakePortsString(t *testing.T) {
 	tests := []struct {
 		ports          []api.ServicePort
+		useNodePort    bool
 		expectedOutput string
 	}{
 		{ports: nil, expectedOutput: ""},
@@ -197,9 +198,24 @@ func TestMakePortsString(t *testing.T) {
 		},
 			expectedOutput: "tcp:80,udp:8080,tcp:9000",
 		},
+		{ports: []api.ServicePort{
+			{
+				Port:     80,
+				NodePort: 9090,
+				Protocol: "TCP",
+			},
+			{
+				Port:     8080,
+				NodePort: 80,
+				Protocol: "UDP",
+			},
+		},
+			useNodePort:    true,
+			expectedOutput: "tcp:9090,udp:80",
+		},
 	}
 	for _, test := range tests {
-		output := makePortsString(test.ports)
+		output := makePortsString(test.ports, test.useNodePort)
 		if output != test.expectedOutput {
 			t.Errorf("expected: %s, saw: %s.", test.expectedOutput, output)
 		}

@@ -33,7 +33,7 @@ base:
     - kube-controller-manager
     - kube-scheduler
     - monit
-{% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce' ] %}
+{% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce', 'vagrant' ] %}
     - nginx
 {% endif %}
     - cadvisor
@@ -47,20 +47,12 @@ base:
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
 {% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] == 'vagrant' %}
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
     - docker
     - kubelet
 {% if grains['network_mode'] is defined and grains['network_mode'] == 'calico' %}
     - calico.master
 {% endif %}
-{% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] == 'aws' %}
-    - docker
-    - kubelet
-{% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
-    - docker
-    - kubelet
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':

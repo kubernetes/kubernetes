@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -101,6 +102,7 @@ func recordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 type EtcdHelper struct {
 	Client EtcdGetSet
 	Codec  runtime.Codec
+	Copier runtime.ObjectCopier
 	// optional, no atomic operations can be performed without this interface
 	Versioner EtcdVersioner
 	// prefix for all etcd keys
@@ -118,11 +120,13 @@ type EtcdHelper struct {
 
 // NewEtcdHelper creates a helper that works against objects that use the internal
 // Kubernetes API objects.
+// TODO: Refactor to take a runtiem.ObjectCopier
 func NewEtcdHelper(client EtcdGetSet, codec runtime.Codec, prefix string) EtcdHelper {
 	return EtcdHelper{
 		Client:     client,
 		Codec:      codec,
 		Versioner:  APIObjectVersioner{},
+		Copier:     api.Scheme,
 		PathPrefix: prefix,
 		cache:      util.NewCache(maxEtcdCacheEntries),
 	}
@@ -207,7 +211,7 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 			}
 			if h.Versioner != nil {
 				// being unable to set the version does not prevent the object from being extracted
-				_ = h.Versioner.UpdateObject(obj.Interface().(runtime.Object), node)
+				_ = h.Versioner.UpdateObject(obj.Interface().(runtime.Object), node.Expiration, node.ModifiedIndex)
 			}
 			v.Set(reflect.Append(v, obj.Elem()))
 			if node.ModifiedIndex != 0 {
@@ -236,7 +240,7 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 	if found {
 		// We should not return the object itself to avoid poluting the cache if someone
 		// modifies returned values.
-		objCopy, err := api.Scheme.DeepCopy(obj)
+		objCopy, err := h.Copier.Copy(obj.(runtime.Object))
 		if err != nil {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
 			return nil, false
@@ -253,7 +257,7 @@ func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 	defer func() {
 		cacheAddLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
 	}()
-	objCopy, err := api.Scheme.DeepCopy(obj)
+	objCopy, err := h.Copier.Copy(obj)
 	if err != nil {
 		glog.Errorf("Error during DeepCopy of cached object: %q", err)
 		return
@@ -377,7 +381,7 @@ func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 	body = node.Value
 	err = h.Codec.DecodeInto([]byte(body), objPtr)
 	if h.Versioner != nil {
-		_ = h.Versioner.UpdateObject(objPtr, node)
+		_ = h.Versioner.UpdateObject(objPtr, node.Expiration, node.ModifiedIndex)
 		// being unable to set the version does not prevent the object from being extracted
 	}
 	return body, node, err
@@ -492,6 +496,11 @@ type ResponseMeta struct {
 	// zero or negative in some cases (objects may be expired after the requested
 	// expiration time due to server lag).
 	TTL int64
+	// Expiration is the time at which the node that contained the returned object will expire and be deleted.
+	// This can be nil if there is no expiration time set for the node.
+	Expiration *time.Time
+	// The resource version of the node that contained the returned object.
+	ResourceVersion uint64
 }
 
 // Pass an EtcdUpdateFunc to EtcdHelper.GuaranteedUpdate to make an etcd update that is guaranteed to succeed.
@@ -525,7 +534,7 @@ func SimpleUpdate(fn SimpleEtcdUpdateFunc) EtcdUpdateFunc {
 //	cur.Counter++
 //
 //	// Return the modified object. Return an error to stop iterating. Return a uint64 to alter
-//  // the TTL on the object, or nil to keep it the same value.
+//      // the TTL on the object, or nil to keep it the same value.
 //	return cur, nil, nil
 // })
 //
@@ -545,8 +554,12 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		meta := ResponseMeta{}
 		if node != nil {
 			meta.TTL = node.TTL
+			if node.Expiration != nil {
+				meta.Expiration = node.Expiration
+			}
+			meta.ResourceVersion = node.ModifiedIndex
 		}
-
+		// Get the object to be written by calling tryUpdate.
 		ret, newTTL, err := tryUpdate(obj, meta)
 		if err != nil {
 			return err
@@ -589,9 +602,11 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		}
 
 		startTime := time.Now()
+		// Swap origBody with data, if origBody is the latest etcd data.
 		response, err := h.Client.CompareAndSwap(key, string(data), ttl, origBody, index)
 		recordEtcdRequestLatency("compareAndSwap", getTypeName(ptrToType), startTime)
 		if IsEtcdTestFailed(err) {
+			// Try again.
 			continue
 		}
 		_, _, err = h.extractObj(response, err, ptrToType, false, false)
@@ -711,4 +726,20 @@ func NewEtcdClientStartServerIfNecessary(server string) (EtcdClient, error) {
 
 	servers := []string{server}
 	return etcd.NewClient(servers), nil
+}
+
+type etcdHealth struct {
+	// Note this has to be public so the json library can modify it.
+	Health string `json:health`
+}
+
+func EtcdHealthCheck(data []byte) error {
+	obj := etcdHealth{}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	if obj.Health != "true" {
+		return fmt.Errorf("Unhealthy status: %s", obj.Health)
+	}
+	return nil
 }

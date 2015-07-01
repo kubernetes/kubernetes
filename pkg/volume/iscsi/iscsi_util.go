@@ -83,15 +83,15 @@ func (util *ISCSIUtil) AttachDisk(iscsi iscsiDisk) error {
 	exist := waitForPathToExist(devicePath, 1)
 	if exist == false {
 		// discover iscsi target
-		_, err := iscsi.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", iscsi.portal})
+		out, err := iscsi.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", iscsi.portal})
 		if err != nil {
-			glog.Errorf("iscsi: failed to sendtargets to portal %s error:%v", iscsi.portal, err)
+			glog.Errorf("iscsi: failed to sendtargets to portal %s error: %s", iscsi.portal, string(out))
 			return err
 		}
 		// login to iscsi target
-		_, err = iscsi.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", iscsi.portal, "-T", iscsi.iqn, "--login"})
+		out, err = iscsi.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", iscsi.portal, "-T", iscsi.iqn, "--login"})
 		if err != nil {
-			glog.Errorf("iscsi: failed to attach disk:Error: %v", err)
+			glog.Errorf("iscsi: failed to attach disk:Error: %s (%v)", string(out), err)
 			return err
 		}
 		exist = waitForPathToExist(devicePath, 10)
@@ -146,9 +146,9 @@ func (util *ISCSIUtil) DetachDisk(iscsi iscsiDisk, mntPath string) error {
 			iqn := device[ind1+len("-iscsi-") : ind]
 
 			glog.Infof("iscsi: log out target %s iqn %s", portal, iqn)
-			_, err = iscsi.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"})
+			out, err := iscsi.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"})
 			if err != nil {
-				glog.Errorf("iscsi: failed to detach disk Error: %v", err)
+				glog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
 			}
 		}
 	}

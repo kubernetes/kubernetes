@@ -45,6 +45,12 @@ import (
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
+//
+// IANA_SVC_NAME: This is a string, no more than 15 characters long, that
+//      conforms to the definition of IANA service name in RFC 6335.
+//      It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
+//      Hypens ('-') cannot be leading or trailing character of the string
+//      and cannot be adjacent to other hyphens.
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
@@ -151,38 +157,6 @@ const (
 	// NamespaceAll is the default argument to specify on a context when you want to list or filter resources across all namespaces
 	NamespaceAll string = ""
 )
-
-//
-//// ContainerManifest corresponds to the Container Manifest format, documented at:
-//// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-//// This is used as the representation of Kubernetes workloads.
-//// DEPRECATED: Exists to allow backwards compatible storage for clients accessing etcd
-//// directly.
-//type ContainerManifest struct {
-//	// Required: This must be a supported version string, such as "v1beta1".
-//	Version string `json:"version"`
-//	// Required: This must be a DNS_SUBDOMAIN.
-//	// TODO: ID on Manifest is deprecated and will be removed in the future.
-//	ID string `json:"id"`
-//	// TODO: UUID on Manifest is deprecated in the future once we are done
-//	// with the API refactoring. It is required for now to determine the instance
-//	// of a Pod.
-//	UUID          types.UID      `json:"uuid,omitempty"`
-//	Volumes       []Volume      `json:"volumes"`
-//	Containers    []Container   `json:"containers"`
-//	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
-//}
-//
-//// ContainerManifestList is used to communicate container manifests to kubelet.
-//// DEPRECATED: Exists to allow backwards compatible storage for clients accessing etcd
-//// directly.
-//type ContainerManifestList struct {
-//	TypeMeta `json:",inline"`
-//	// ID is the legacy field representing Name
-//	ID string `json:"id,omitempty"`
-//
-//	Items []ContainerManifest `json:"items,omitempty"`
-//}
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
@@ -555,9 +529,9 @@ type ISCSIVolumeSource struct {
 
 // ContainerPort represents a network port in a single container.
 type ContainerPort struct {
-	// Optional: If specified, this must be a DNS_LABEL.  Each named port
+	// Optional: If specified, this must be a IANA_SVC_NAME.  Each named port
 	// in a pod must have a unique name.
-	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"`
+	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be a IANA_SVC_NAME and unique within the pod"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
 	// If HostNetwork is specified, this must match ContainerPort.
 	HostPort int `json:"hostPort,omitempty" description:"number of port to expose on the host; most containers do not need this"`
@@ -615,15 +589,27 @@ type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty" description:"path to access on the HTTP server"`
 	// Required: Name or number of the port to access on the container.
-	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container"`
+	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty" description:"hostname to connect to; defaults to pod IP"`
+	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
+	Scheme URIScheme `json:"scheme,omitempty" description:"scheme to connect with, must be HTTP or HTTPS, defaults to HTTP"`
 }
+
+// URIScheme identifies the scheme used for connection to a host for Get actions
+type URIScheme string
+
+const (
+	// URISchemeHTTP means that the scheme used will be http://
+	URISchemeHTTP URIScheme = "HTTP"
+	// URISchemeHTTPS means that the scheme used will be https://
+	URISchemeHTTPS URIScheme = "HTTPS"
+)
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
 	// Required: Port to connect to.
-	Port util.IntOrString `json:"port" description:"number of name of the port to access on the container"`
+	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"`
 }
 
 // ExecAction describes a "run in container" action.
@@ -989,8 +975,8 @@ type PodTemplateList struct {
 
 // ReplicationControllerSpec is the specification of a replication controller.
 type ReplicationControllerSpec struct {
-	// Replicas is the number of desired replicas.
-	Replicas int `json:"replicas,omitempty" description:"number of replicas desired"`
+	// Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified.
+	Replicas *int `json:"replicas,omitempty" description:"number of replicas desired"`
 
 	// Selector is a label query over pods that should match the Replicas count.
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.
@@ -1140,7 +1126,7 @@ type ServicePort struct {
 	// If this is a string, it will be looked up as a named port in the
 	// target Pod's container ports.  If this is not specified, the value
 	// of Port is used (an identity map).
-	TargetPort util.IntOrString `json:"targetPort,omitempty" description:"the port to access on the pods targeted by the service; defaults to the service port"`
+	TargetPort util.IntOrString `json:"targetPort,omitempty" description:"number or name of the port to access on the pods targeted by the service; defaults to the service port; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"`
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
@@ -1900,6 +1886,8 @@ const (
 	ServiceAccountTokenKey = "token"
 	// ServiceAccountKubeconfigKey is the key of the optional kubeconfig data for SecretTypeServiceAccountToken secrets
 	ServiceAccountKubeconfigKey = "kubernetes.kubeconfig"
+	// ServiceAccountRootCAKey is the key of the optional root certificate authority for SecretTypeServiceAccountToken secrets
+	ServiceAccountRootCAKey = "ca.crt"
 
 	// SecretTypeDockercfg contains a dockercfg file that follows the same format rules as ~/.dockercfg
 	//

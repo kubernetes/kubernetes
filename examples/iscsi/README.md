@@ -10,7 +10,7 @@ then edit */etc/iscsi/initiatorname.iscsi* and */etc/iscsi/iscsid.conf* to match
 
 I mostly followed these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi) to setup iSCSI target. and these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi&f=2) to setup iSCSI initiator.
 
-**Setup B.** On Unbuntu 12.04 and Debian 7 nodes on GCE
+**Setup B.** On Unbuntu 12.04 and Debian 7 nodes on Google Compute Engine (GCE)
 
 GCE does not provide preconfigured Fedora 21 image, so I set up the iSCSI target on a preconfigured Ubuntu 12.04 image, mostly following these [instructions](http://www.server-world.info/en/note?os=Ubuntu_12.04&p=iscsi). My Kubernetes cluster on GCE was running Debian 7 images, so I followed these [instructions](http://www.server-world.info/en/note?os=Debian_7.0&p=iscsi&f=2) to set up the iSCSI initiator.
 

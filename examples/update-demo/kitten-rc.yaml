@@ -3,7 +3,6 @@ kind: ReplicationController
 metadata:
   name: update-demo-kitten
 spec:
-  replicas: 1
   selector:
     name: update-demo
     version: kitten

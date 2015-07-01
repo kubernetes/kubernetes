@@ -47,6 +47,12 @@ import (
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
+//
+// IANA_SVC_NAME: This is a string, no more than 15 characters long, that
+//      conforms to the definition of IANA service name in RFC 6335.
+//      It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
+//      Hypens ('-') cannot be leading or trailing character of the string
+//      and cannot be adjacent to other hyphens.
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
@@ -239,7 +245,7 @@ type PersistentVolumeSource struct {
 
 type PersistentVolumeClaimVolumeSource struct {
 	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume
-	ClaimName string `json:"claimName" description:"the name of the claim in the same namespace to be mounted as a volume"`
+	ClaimName string `json:"claimName"`
 	// Optional: Defaults to false (read/write).  ReadOnly here
 	// will force the ReadOnly setting in VolumeMounts
 	ReadOnly bool `json:"readOnly,omitempty"`
@@ -268,7 +274,7 @@ type PersistentVolumeSpec struct {
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 	// Optional: what happens to a persistent volume when released from its claim.
-	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" description:"what happens to a volume when released from its claim; Valid options are Retain (default) and Recycle.  Recyling must be supported by the volume plugin underlying this persistent volume."`
+	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -545,7 +551,7 @@ type RBDVolumeSource struct {
 
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
-	// Optional: If specified, this must be a DNS_LABEL.  Each named port
+	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
@@ -610,7 +616,19 @@ type HTTPGetAction struct {
 	Port util.IntOrString `json:"port,omitempty"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty"`
+	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
+	Scheme URIScheme `json:"scheme,omitempty"`
 }
+
+// URIScheme identifies the scheme used for connection to a host for Get actions
+type URIScheme string
+
+const (
+	// URISchemeHTTP means that the scheme used will be http://
+	URISchemeHTTP URIScheme = "HTTP"
+	// URISchemeHTTPS means that the scheme used will be https://
+	URISchemeHTTPS URIScheme = "HTTPS"
+)
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
@@ -705,7 +723,7 @@ type Container struct {
 	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy"`
 	// Optional: SecurityContext defines the security options the pod should be run with
-	SecurityContext *SecurityContext `json:"securityContext,omitempty" description:"security options the pod should run with"`
+	SecurityContext *SecurityContext `json:"securityContext,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -901,7 +919,7 @@ type PodSpec struct {
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
-	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling the container images"`
+	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -912,7 +930,7 @@ type PodStatus struct {
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty"`
 	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'
-	Reason string `json:"reason,omitempty" description:"(brief-CamelCase) reason indicating details about why the pod is in this condition"`
+	Reason string `json:"reason,omitempty"`
 
 	HostIP string `json:"hostIP,omitempty"`
 	PodIP  string `json:"podIP,omitempty"`
@@ -1084,7 +1102,7 @@ type ServiceStatus struct {
 type LoadBalancerStatus struct {
 	// Ingress is a list containing ingress points for the load-balancer;
 	// traffic intended for the service should be sent to these ingress points.
-	Ingress []LoadBalancerIngress `json:"ingress,omitempty" description:"load-balancer ingress points"`
+	Ingress []LoadBalancerIngress `json:"ingress,omitempty"`
 }
 
 // LoadBalancerIngress represents the status of a load-balancer ingress point:
@@ -1092,11 +1110,11 @@ type LoadBalancerStatus struct {
 type LoadBalancerIngress struct {
 	// IP is set for load-balancer ingress points that are IP based
 	// (typically GCE or OpenStack load-balancers)
-	IP string `json:"ip,omitempty" description:"IP address of ingress point"`
+	IP string `json:"ip,omitempty"`
 
 	// Hostname is set for load-balancer ingress points that are DNS based
 	// (typically AWS load-balancers)
-	Hostname string `json:"hostname,omitempty" description:"hostname of ingress point"`
+	Hostname string `json:"hostname,omitempty"`
 }
 
 // ServiceSpec describes the attributes that a user creates on a service
@@ -1151,7 +1169,7 @@ type ServicePort struct {
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
-	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
+	NodePort int `json:"nodePort"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -1182,7 +1200,7 @@ type ServiceAccount struct {
 	// ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
 	// in pods that reference this ServiceAccount.  ImagePullSecrets are distinct from Secrets because Secrets
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
-	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling container images"`
+	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // ServiceAccountList is a list of ServiceAccount objects
@@ -1766,7 +1784,7 @@ type LocalObjectReference struct {
 
 type SerializedReference struct {
 	TypeMeta  `json:",inline"`
-	Reference ObjectReference `json:"reference,omitempty" description:"the reference to an object in the system"`
+	Reference ObjectReference `json:"reference,omitempty"`
 }
 
 type EventSource struct {
@@ -1814,43 +1832,6 @@ type EventList struct {
 	ListMeta `json:"metadata,omitempty"`
 
 	Items []Event `json:"items"`
-}
-
-// ContainerManifest corresponds to the Container Manifest format, documented at:
-// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-// This is used as the representation of Kubernetes workloads.
-// DEPRECATED: Replaced with Pod
-type ContainerManifest struct {
-	// Required: This must be a supported version string, such as "v1beta1".
-	Version string `json:"version"`
-	// Required: This must be a DNS_SUBDOMAIN.
-	// TODO: ID on Manifest is deprecated and will be removed in the future.
-	ID string `json:"id"`
-	// TODO: UUID on Manifest is deprecated in the future once we are done
-	// with the API refactoring. It is required for now to determine the instance
-	// of a Pod.
-	UUID                          types.UID     `json:"uuid,omitempty"`
-	Volumes                       []Volume      `json:"volumes"`
-	Containers                    []Container   `json:"containers"`
-	RestartPolicy                 RestartPolicy `json:"restartPolicy,omitempty"`
-	TerminationGracePeriodSeconds *int64        `json:"terminationGracePeriodSeconds,omitempty"`
-	ActiveDeadlineSeconds         *int64        `json:"activeDeadlineSeconds,omitempty"`
-	// Required: Set DNS policy.
-	DNSPolicy   DNSPolicy `json:"dnsPolicy"`
-	HostNetwork bool      `json:"hostNetwork,omitempty"`
-	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
-	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
-	// in the case of docker, only DockerConfig type secrets are honored.
-	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling the container images"`
-}
-
-// ContainerManifestList is used to communicate container manifests to kubelet.
-// DEPRECATED: Replaced with Pods
-type ContainerManifestList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
-
-	Items []ContainerManifest `json:"items"`
 }
 
 // List holds a list of objects, which may not be known by the server.
@@ -1998,6 +1979,8 @@ const (
 	ServiceAccountTokenKey = "token"
 	// ServiceAccountKubeconfigKey is the key of the optional kubeconfig data for SecretTypeServiceAccountToken secrets
 	ServiceAccountKubeconfigKey = "kubernetes.kubeconfig"
+	// ServiceAccountRootCAKey is the key of the optional root certificate authority for SecretTypeServiceAccountToken secrets
+	ServiceAccountRootCAKey = "ca.crt"
 
 	// SecretTypeDockercfg contains a dockercfg file that follows the same format rules as ~/.dockercfg
 	//
@@ -2092,32 +2075,32 @@ type ComponentStatusList struct {
 // both the Container AND the SecurityContext will result in an error.
 type SecurityContext struct {
 	// Capabilities are the capabilities to add/drop when running the container
-	Capabilities *Capabilities `json:"capabilities,omitempty" description:"the linux capabilites that should be added or removed"`
+	Capabilities *Capabilities `json:"capabilities,omitempty"`
 
 	// Run the container in privileged mode
-	Privileged *bool `json:"privileged,omitempty" description:"run the container in privileged mode"`
+	Privileged *bool `json:"privileged,omitempty"`
 
 	// SELinuxOptions are the labels to be applied to the container
 	// and volumes
-	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" description:"options that control the SELinux labels applied"`
+	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty"`
 
 	// RunAsUser is the UID to run the entrypoint of the container process.
-	RunAsUser *int64 `json:"runAsUser,omitempty" description:"the user id that runs the first process in the container"`
+	RunAsUser *int64 `json:"runAsUser,omitempty"`
 }
 
 // SELinuxOptions are the labels to be applied to the container.
 type SELinuxOptions struct {
 	// SELinux user label
-	User string `json:"user,omitempty" description:"the user label to apply to the container"`
+	User string `json:"user,omitempty"`
 
 	// SELinux role label
-	Role string `json:"role,omitempty" description:"the role label to apply to the container"`
+	Role string `json:"role,omitempty"`
 
 	// SELinux type label
-	Type string `json:"type,omitempty" description:"the type label to apply to the container"`
+	Type string `json:"type,omitempty"`
 
 	// SELinux level label.
-	Level string `json:"level,omitempty" description:"the level label to apply to the container"`
+	Level string `json:"level,omitempty"`
 }
 
 // RangeAllocation is an opaque API object (not exposed to end users) that can be persisted to record

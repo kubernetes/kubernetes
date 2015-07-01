@@ -28,6 +28,11 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+echo "--------------------------------------------------------------------------------"
+echo "Initial Environment:"
+printenv | sort
+echo "--------------------------------------------------------------------------------"
+
 if [[ "${CIRCLECI:-}" == "true" ]]; then
     JOB_NAME="circleci-${CIRCLE_PROJECT_USERNAME}-${CIRCLE_PROJECT_REPONAME}"
     BUILD_NUMBER=${CIRCLE_BUILD_NUM}
@@ -37,45 +42,127 @@ else
     export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 fi
 
-# Additional parameters that are passed to ginkgo runner.
-GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-""}
+# Additional parameters that are passed to hack/e2e.go
+E2E_OPT=${E2E_OPT:-""}
 
-if [[ "${PERFORMANCE:-}" == "true" ]]; then
-    if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-      export MASTER_SIZE=${MASTER_SIZE:-"m3.xlarge"}
-    else
-      export MASTER_SIZE=${MASTER_SIZE:-"n1-standard-4"}
-      export MINION_SIZE=${MINION_SIZE:-"n1-standard-2"}
-    fi
-    export NUM_MINIONS=${NUM_MINIONS:-"100"}
-    GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-"--ginkgo.focus=\[Performance suite\] "}
-else
-    if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-      export MASTER_SIZE=${MASTER_SIZE:-"t2.small"}
-    else
-      export MASTER_SIZE=${MASTER_SIZE:-"n1-standard-2"}
-      export MINION_SIZE=${MINION_SIZE:-"n1-standard-2"}
-    fi
-    export NUM_MINIONS=${NUM_MINIONS:-"2"}
+# Set environment variables shared for all of the GCE Jenkins projects.
+if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
+  KUBERNETES_PROVIDER="gce"
+  : ${E2E_ZONE:="us-central1-f"}
+  : ${MASTER_SIZE:="n1-standard-2"}
+  : ${MINION_SIZE:="n1-standard-2"}
+  : ${NUM_MINIONS:="2"}
 fi
 
+if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+  if [[ "${PERFORMANCE:-}" == "true" ]]; then
+    : ${MASTER_SIZE:="m3.xlarge"}
+    : ${NUM_MINIONS:="100"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\ssuite\]"}
+  else
+    : ${MASTER_SIZE:="t2.small"}
+    : ${NUM_MINIONS:="2"}
+  fi
+fi
 
-# Unlike the kubernetes-build script, we expect some environment
-# variables to be set. We echo these immediately and presume "set -o
-# nounset" will force the caller to set them: (The first several are
-# Jenkins variables.)
+# Specialized tests which should be skipped by default for projects.
+GCE_DEFAULT_SKIP_TEST_REGEX="Skipped|Density|Reboot|Restart|Example"
+# The following tests are known to be flaky, and are thus run only in their own
+# -flaky- build variants.
+GCE_FLAKY_TEST_REGEX="Addon|Elasticsearch|Nodes.*network\spartition|Shell.*services"
+# Tests which are not able to be run in parallel.
+GCE_PARALLEL_SKIP_TEST_REGEX="${GCE_DEFAULT_SKIP_TEST_REGEX}|Etcd|NetworkingNew|Nodes\sNetwork|Nodes\sResize"
+# Tests which are known to be flaky when run in parallel.
+# TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
+GCE_PARALLEL_FLAKY_TEST_REGEX="Addon|Elasticsearch|Hostdir.*MOD|Networking.*intra|PD|ServiceAccounts|Service\sendpoints\slatency|Services.*change\sthe\stype|Services.*functioning\sexternal\sload\sbalancer|Services.*identically\snamed|Services.*release.*load\sbalancer|Shell|multiport\sendpoints"
 
-echo "JOB_NAME: ${JOB_NAME}"
-echo "BUILD_NUMBER: ${BUILD_NUMBER}"
-echo "WORKSPACE: ${WORKSPACE}"
-echo "KUBERNETES_PROVIDER: ${KUBERNETES_PROVIDER}" # Cloud provider
-echo "E2E_CLUSTER_NAME: ${E2E_CLUSTER_NAME}"       # Name of the cluster (e.g. "e2e-test-jenkins")
-echo "E2E_NETWORK: ${E2E_NETWORK}"                 # Name of the network (e.g. "e2e")
-echo "E2E_ZONE: ${E2E_ZONE}"                       # Name of the GCE zone (e.g. "us-central1-f")
-echo "E2E_OPT: ${E2E_OPT}"                         # hack/e2e.go options
-echo "E2E_SET_CLUSTER_API_VERSION: ${E2E_SET_CLUSTER_API_VERSION:-<not set>}" # optional, for GKE, set CLUSTER_API_VERSION to git hash
-echo "--------------------------------------------------------------------------------"
+# Define environment variables based on the Jenkins project name.
+case ${JOB_NAME} in
+  # Runs all non-flaky tests on GCE, sequentially.
+  kubernetes-e2e-gce)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-gce"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
+    : ${PROJECT:="k8s-jkns-e2e-gce"}
+    ;;
 
+  # Runs the flaky tests on GCE, sequentially.
+  kubernetes-e2e-gce-flaky)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-flaky"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX} --ginkgo.focus=${GCE_FLAKY_TEST_REGEX}"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
+    ;;
+
+  # Runs all non-flaky tests on GCE in parallel.
+  kubernetes-e2e-gce-parallel)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-parallel"}
+    : ${E2E_NETWORK:="e2e-parallel"}
+    : ${GINKGO_PARALLEL:="y"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    # Override GCE defaults.
+    NUM_MINIONS="6"
+    ;;
+
+  # Runs the flaky tests on GCE in parallel.
+  kubernetes-e2e-gce-parallel-flaky)
+    : ${E2E_CLUSTER_NAME:="parallel-flaky"}
+    : ${E2E_NETWORK:="e2e-parallel-flaky"}
+    : ${GINKGO_PARALLEL:="y"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX} --ginkgo.focus=${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
+    # Override GCE defaults.
+    NUM_MINIONS="4"
+    ;;
+
+  # Runs only the reboot tests on GCE.
+  kubernetes-e2e-gce-reboot)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-reboot"}
+    : ${GINKGO_TEST_ARGS:=" --ginkgo.focus=Reboot"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
+  # Runs the performance/scalability tests on GCE. A larger cluster is used.
+  kubernetes-e2e-gce-scalability)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability"}
+    : ${E2E_NETWORK:="e2e-scalability"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Performance\ssuite|should\sbe\sable\sto\shandle"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    # Override GCE defaults.
+    MASTER_SIZE="n1-standard-4"
+    MINION_SIZE="n1-standard-2"
+    MINION_DISK_SIZE="50GB"
+    NUM_MINIONS="100"
+    ;;
+
+  # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
+  kubernetes-pull-build-test-e2e-gce)
+    : ${E2E_CLUSTER_NAME:="jenkins-pull-gce-e2e-${EXECUTOR_NUMBER}"}
+    : ${E2E_NETWORK:="pull-e2e-parallel-${EXECUTOR_NUMBER}"}
+    : ${GINKGO_PARALLEL:="y"}
+    # This list should match the list in kubernetes-e2e-gce-parallel. It
+    # currently also excludes a slow namespace test.
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}|Namespaces\sDelete\s90\spercent\sof\s100\snamespace\sin\s150\sseconds"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
+    : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
+    : ${PROJECT:="kubernetes-jenkins-pull"}
+    # Override GCE defaults.
+    MASTER_SIZE="n1-standard-1"
+    MINION_SIZE="n1-standard-1"
+    NUM_MINIONS="2"
+    ;;
+esac
 
 # AWS variables
 export KUBE_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
@@ -85,11 +172,19 @@ export KUBE_AWS_ZONE=${E2E_ZONE}
 export INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
 export KUBE_GCE_ZONE=${E2E_ZONE}
 export KUBE_GCE_NETWORK=${E2E_NETWORK}
+export KUBE_GCE_INSTANCE_PREFIX=${KUBE_GCE_INSTANCE_PREFIX:-}
+export KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX:-}
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
 export ZONE=${E2E_ZONE}
 export KUBE_GKE_NETWORK=${E2E_NETWORK}
+
+# Shared cluster variables
+export MASTER_SIZE=${MASTER_SIZE:-}
+export MINION_SIZE=${MINION_SIZE:-}
+export NUM_MINIONS=${NUM_MINIONS:-}
+export PROJECT=${PROJECT:-}
 
 export PATH=${PATH}:/usr/local/go/bin
 export KUBE_SKIP_CONFIRMATIONS=y
@@ -98,6 +193,13 @@ export KUBE_SKIP_CONFIRMATIONS=y
 export E2E_UP="${E2E_UP:-true}"
 export E2E_TEST="${E2E_TEST:-true}"
 export E2E_DOWN="${E2E_DOWN:-true}"
+# Used by hack/ginkgo-e2e.sh to enable ginkgo's parallel test runner.
+export GINKGO_PARALLEL=${GINKGO_PARALLEL:-}
+
+echo "--------------------------------------------------------------------------------"
+echo "Test Environment:"
+printenv | sort
+echo "--------------------------------------------------------------------------------"
 
 if [[ "${E2E_UP,,}" == "true" ]]; then
     if [[ ${KUBE_RUN_FROM_OUTPUT:-} =~ ^[yY]$ ]]; then
@@ -236,7 +338,7 @@ fi
 # Jenkins will look at the junit*.xml files for test failures, so don't exit
 # with a nonzero error code if it was only tests that failed.
 if [[ "${E2E_TEST,,}" == "true" ]]; then
-    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS} --ginkgo.noColor" || true
+    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}" || true
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are

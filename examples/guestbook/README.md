@@ -18,7 +18,7 @@ This example shows how to build a simple, multi-tier web application using Kuber
     - [Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)](#using-type-loadbalancer-for-the-frontend-service-cloud-provider-specific)
     - [Create the Frontend Service](#create-the-frontend-service)
     - [Accessing the guestbook site externally](#accessing-the-guestbook-site-externally)
-      - [GCE External Load Balancer Specifics](#gce-external-load-balancer-specifics)
+      - [Google Compute Engine External Load Balancer Specifics](#gce-external-load-balancer-specifics)
   - [Step Seven: Cleanup](#step-seven-cleanup)
   - [Troubleshooting](#troubleshooting)
 
@@ -33,7 +33,7 @@ The web front end interacts with the redis master via javascript redis API calls
 
 ### Step Zero: Prerequisites
 
-This example requires a running Kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started. As noted above, if you have a GKE cluster set up, go [here](https://cloud.google.com/container-engine/docs/tutorials/guestbook) instead.
+This example requires a running Kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started. As noted above, if you have a Google Container Engine cluster set up, go [here](https://cloud.google.com/container-engine/docs/tutorials/guestbook) instead.
 
 ### Step One: Start up the redis master
 
@@ -136,7 +136,7 @@ $ kubectl logs <pod_name>
 
 These logs will usually give you enough information to troubleshoot.
 
-However, if you should want to ssh to the listed host machine, you can inspect various logs there directly as well.  For example, with GCE, using `gcloud`, you can ssh like this:
+However, if you should want to SSH to the listed host machine, you can inspect various logs there directly as well.  For example, with Google Compute Engine, using `gcloud`, you can SSH like this:
 
 ```shell
 me@workstation$ gcloud compute ssh kubernetes-minion-krxw
@@ -442,7 +442,7 @@ spec:
 
 #### Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)
 
-For supported cloud providers, such as GCE/GKE, you can specify to use an external load balancer
+For supported cloud providers, such as Google Compute Engine or Google Container Engine, you can specify to use an external load balancer
 in the service `spec`, to expose the service onto an external load balancer IP.
 To do this, uncomment the `type: LoadBalancer` line in the `frontend-service.yaml` file before you start the service.
 
@@ -495,9 +495,9 @@ You should see a web page that looks something like this (without the messages).
 
 If you are more advanced in the ops arena, you can also manually get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familiar with.
 
-##### GCE External Load Balancer Specifics
+##### Google Compute Engine External Load Balancer Specifics
 
-In GCE, `kubectl` automatically creates forwarding rule for services with `LoadBalancer`.
+In Google Compute Engine, `kubectl` automatically creates forwarding rule for services with `LoadBalancer`.
 
 You can list the forwarding rules like this.  The forwarding rule also indicates the external IP.
 
@@ -507,13 +507,13 @@ NAME                  REGION      IP_ADDRESS     IP_PROTOCOL TARGET
 frontend              us-central1 130.211.188.51 TCP         us-central1/targetPools/frontend
 ```
 
-In GCE, you also may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion` (replace with your tags as appropriate):
+In Google Compute Engine, you also may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion` (replace with your tags as appropriate):
 
 ```shell
 $ gcloud compute firewall-rules create --allow=tcp:80 --target-tags=kubernetes-minion kubernetes-minion-80
 ```
 
-For GCE details about limiting traffic to specific sources, see the [GCE firewall documentation][gce-firewall-docs].
+For Google Compute Engine details about limiting traffic to specific sources, see the [Google Compute Engine firewall documentation][gce-firewall-docs].
 
 [cloud-console]: https://console.developer.google.com
 [gce-firewall-docs]: https://cloud.google.com/compute/docs/networking#firewalls

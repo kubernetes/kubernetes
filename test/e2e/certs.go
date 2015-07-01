@@ -29,14 +29,11 @@ var _ = Describe("MasterCerts", func() {
 		var err error
 		_, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
+
+		SkipUnlessProviderIs("gce", "gke")
 	})
 
 	It("should have all expected certs on the master", func() {
-		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping MasterCerts test for cloud provider %s (only supported for gce and gke)", testContext.Provider))
-			return
-		}
-
 		for _, certFile := range []string{"kubecfg.key", "kubecfg.crt", "ca.crt"} {
 			cmd := exec.Command("gcloud", "compute", "ssh", "--project", testContext.CloudConfig.ProjectID,
 				"--zone", testContext.CloudConfig.Zone, testContext.CloudConfig.MasterName,

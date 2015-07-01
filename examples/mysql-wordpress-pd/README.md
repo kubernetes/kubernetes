@@ -8,7 +8,7 @@ We'll create two Kubernetes [pods](http://docs.k8s.io/pods.md) to run mysql and 
 
 This example demonstrates several useful things, including: how to set up and use persistent disks with Kubernetes pods; how to define Kubernetes services to leverage docker-links-compatible service environment variables; and use of an external load balancer to expose the wordpress service externally and make it transparent to the user if the wordpress pod moves to a different cluster node.
 
-## Get started on Google Compute Engine
+## Get started on Google Compute Engine (GCE)
 
 Because we're using the `GCEPersistentDisk` type of volume for persistent storage, this example is only applicable to [Google Compute Engine](https://cloud.google.com/compute/). Take a look at the [volumes documentation](/docs/volumes.md) for other options.
 
@@ -116,7 +116,7 @@ $ kubectl get pods
 You can take a look at the logs for a pod by using `kubectl.sh log`.  For example:
 
 ```shell
-$ kubectl log mysql
+$ kubectl logs mysql
 ```
 
 If you want to do deeper troubleshooting, e.g. if it seems a container is not staying up, you can also ssh in to the node that a pod is running on.  There, you can run `sudo -s`, then `docker ps -a` to see all the containers.  You can then inspect the logs of containers that have exited, via `docker logs <container_id>`.  (You can also find some relevant logs under `/var/log`, e.g. `docker.log` and `kubelet.log`).

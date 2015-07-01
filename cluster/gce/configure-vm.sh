@@ -266,7 +266,6 @@ cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
 service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
-enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
 enable_cluster_logging: '$(echo "$ENABLE_CLUSTER_LOGGING" | sed -e "s/'/''/g")'
 enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
@@ -548,13 +547,6 @@ function salt-docker-opts() {
 
   if [[ -n "${EXTRA_DOCKER_OPTS-}" ]]; then
     DOCKER_OPTS="${EXTRA_DOCKER_OPTS}"
-  fi
-
-  # Decide whether to enable the cache
-  if [[ "${ENABLE_DOCKER_REGISTRY_CACHE}" == "true" ]]; then
-    REGION=$(echo "${ZONE}" | cut -f 1,2 -d -)
-    echo "Enable docker registry cache at region: " $REGION
-    DOCKER_OPTS="${DOCKER_OPTS} --registry-mirror='https://${REGION}.docker-cache.clustermaster.net'"
   fi
 
   if [[ -n "{DOCKER_OPTS}" ]]; then

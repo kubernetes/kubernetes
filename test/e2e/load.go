@@ -87,7 +87,7 @@ var _ = Describe("Load capacity", func() {
 		}
 
 		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 1*time.Second, util.NewStringSet("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
@@ -157,6 +157,7 @@ func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, cou
 			Client:    c,
 			Name:      groupName + "-" + strconv.Itoa(i),
 			Namespace: ns,
+			Timeout:   10 * time.Minute,
 			Image:     image,
 			Replicas:  size,
 		}

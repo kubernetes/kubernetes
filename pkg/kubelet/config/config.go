@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
+	kubeletUtil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -186,6 +187,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 
 // recordFirstSeenTime records the first seen time of this pod.
 func recordFirstSeenTime(pod *api.Pod) {
+	glog.V(4).Infof("Receiving a new pod %q", kubeletUtil.FormatPodName(pod))
 	pod.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = kubeletTypes.NewTimestamp().GetString()
 }
 

@@ -50,6 +50,36 @@ var _ = Describe("Networking", func() {
 		}
 	})
 
+	It("should provide Internet connection for containers", func() {
+		By("Running container which tries to wget google.com")
+		podName := "wget-test"
+		contName := "wget-test-container"
+		pod := &api.Pod{
+			TypeMeta: api.TypeMeta{
+				Kind: "Pod",
+			},
+			ObjectMeta: api.ObjectMeta{
+				Name: podName,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    contName,
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"wget", "-s", "google.com"},
+					},
+				},
+				RestartPolicy: api.RestartPolicyNever,
+			},
+		}
+		_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
+		expectNoError(err)
+		defer f.Client.Pods(f.Namespace.Name).Delete(podName, nil)
+
+		By("Verify that the pod succeed")
+		expectNoError(waitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name))
+	})
+
 	// First test because it has no dependencies on variables created later on.
 	It("should provide unchanging, static URL paths for kubernetes api services.", func() {
 		tests := []struct {
@@ -73,10 +103,8 @@ var _ = Describe("Networking", func() {
 
 	//Now we can proceed with the test.
 	It("should function for intra-pod communication", func() {
-		if testContext.Provider == "vagrant" {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
-			return
-		}
+		// TODO: support DNS on vagrant #3580
+		SkipIfProviderIs("vagrant")
 
 		By(fmt.Sprintf("Creating a service named %q in namespace %q", svcname, f.Namespace.Name))
 		svc, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
@@ -121,8 +149,19 @@ var _ = Describe("Networking", func() {
 		filterNodes(nodes, func(node api.Node) bool {
 			return isNodeReadySetAsExpected(&node, true)
 		})
-		if len(nodes.Items) < 2 {
-			Failf("Less than two nodes were found Ready.")
+
+		if len(nodes.Items) == 0 {
+			Failf("No Ready nodes found.")
+		}
+		if len(nodes.Items) == 1 {
+			// in general, the test requires two nodes. But for local development, often a one node cluster
+			// is created, for simplicity and speed. (see issue #10012). We permit one-node test
+			// only in some cases
+			if !providerIs("local") {
+				Failf(fmt.Sprintf("The test requires two Ready nodes on %s, but found just one.", testContext.Provider))
+			}
+			Logf("Only one ready node is detected. The test has limited scope in such setting. " +
+				"Rerun it with at least two nodes to get complete coverage.")
 		}
 
 		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.4")

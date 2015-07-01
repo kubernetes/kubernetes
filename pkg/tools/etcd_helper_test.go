@@ -856,3 +856,32 @@ func TestPrefixEtcdKey(t *testing.T) {
 
 	assert.Equal(t, keyBefore, keyAfter, "Prefix incorrectly added by EtcdHelper")
 }
+
+func TestEtcdHealthCheck(t *testing.T) {
+	tests := []struct {
+		data      string
+		expectErr bool
+	}{
+		{
+			data:      "{\"health\": \"true\"}",
+			expectErr: false,
+		},
+		{
+			data:      "{\"health\": \"false\"}",
+			expectErr: true,
+		},
+		{
+			data:      "invalid json",
+			expectErr: true,
+		},
+	}
+	for _, test := range tests {
+		err := EtcdHealthCheck([]byte(test.data))
+		if err != nil && !test.expectErr {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if err == nil && test.expectErr {
+			t.Error("unexpected non-error")
+		}
+	}
+}

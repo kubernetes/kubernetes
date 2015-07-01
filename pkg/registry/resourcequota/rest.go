@@ -73,6 +73,10 @@ func (resourcequotaStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Ob
 	return append(errorList, validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))...)
 }
 
+func (resourcequotaStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 type resourcequotaStatusStrategy struct {
 	resourcequotaStrategy
 }

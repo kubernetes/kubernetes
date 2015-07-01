@@ -69,6 +69,10 @@ func (persistentvolumeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime
 	return append(errorList, validation.ValidatePersistentVolumeUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))...)
 }
 
+func (persistentvolumeStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 type persistentvolumeStatusStrategy struct {
 	persistentvolumeStrategy
 }

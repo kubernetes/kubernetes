@@ -322,11 +322,6 @@ func TestCreateReplica(t *testing.T) {
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
 	podControl.createReplica(ns, controllerSpec)
 
-	manifest := api.ContainerManifest{}
-	if err := api.Scheme.Convert(&controllerSpec.Spec.Template.Spec, &manifest); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Labels:       controllerSpec.Spec.Template.Labels,
@@ -1112,4 +1107,46 @@ func TestRCManagerNotReady(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.syncReplicationController(rcKey)
 	validateSyncReplication(t, &fakePodControl, 1, 0)
+}
+
+// shuffle returns a new shuffled list of container controllers.
+func shuffle(controllers []*api.ReplicationController) []*api.ReplicationController {
+	numControllers := len(controllers)
+	randIndexes := rand.Perm(numControllers)
+	shuffled := make([]*api.ReplicationController, numControllers)
+	for i := 0; i < numControllers; i++ {
+		shuffled[i] = controllers[randIndexes[i]]
+	}
+	return shuffled
+}
+
+func TestOverlappingRCs(t *testing.T) {
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+
+	for i := 0; i < 5; i++ {
+		manager := NewReplicationManager(client, 10)
+		manager.podStoreSynced = alwaysReady
+
+		// Create 10 rcs, shuffled them randomly and insert them into the rc manager's store
+		var controllers []*api.ReplicationController
+		for j := 1; j < 10; j++ {
+			controllerSpec := newReplicationController(1)
+			controllerSpec.CreationTimestamp = util.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
+			controllerSpec.Name = string(util.NewUUID())
+			controllers = append(controllers, controllerSpec)
+		}
+		shuffledControllers := shuffle(controllers)
+		for j := range shuffledControllers {
+			manager.controllerStore.Store.Add(shuffledControllers[j])
+		}
+		// Add a pod and make sure only the oldest rc is synced
+		pods := newPodList(nil, 1, api.PodPending, controllers[0])
+		rcKey := getKey(controllers[0], t)
+
+		manager.addPod(&pods.Items[0])
+		queueRC, _ := manager.queue.Get()
+		if queueRC != rcKey {
+			t.Fatalf("Expected to find key %v in queue, found %v", rcKey, queueRC)
+		}
+	}
 }

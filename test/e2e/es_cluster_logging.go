@@ -34,6 +34,13 @@ import (
 var _ = Describe("Cluster level logging using Elasticsearch", func() {
 	f := NewFramework("es-logging")
 
+	BeforeEach(func() {
+		// TODO: For now assume we are only testing cluster logging with Elasticsearch
+		// on GCE. Once we are sure that Elasticsearch cluster level logging
+		// works for other providers we should widen this scope of this test.
+		SkipUnlessProviderIs("gce")
+	})
+
 	It("should check that logs from pods on all nodes are ingested into Elasticsearch", func() {
 		ClusterLevelLoggingWithElasticsearch(f)
 	})
@@ -55,14 +62,6 @@ func bodyToJSON(body []byte) (map[string]interface{}, error) {
 
 // ClusterLevelLoggingWithElasticsearch is an end to end test for cluster level logging.
 func ClusterLevelLoggingWithElasticsearch(f *Framework) {
-	// TODO: For now assume we are only testing cluster logging with Elasticsearch
-	// on GCE. Once we are sure that Elasticsearch cluster level logging
-	// works for other providers we should widen this scope of this test.
-	if !providerIs("gce") {
-		Logf("Skipping cluster level logging test for provider %s", testContext.Provider)
-		return
-	}
-
 	// graceTime is how long to keep retrying requests for status information.
 	const graceTime = 2 * time.Minute
 	// ingestionTimeout is how long to keep retrying to wait for all the

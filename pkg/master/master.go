@@ -715,7 +715,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 			addr = etcdUrl.Host
 			port = 4001
 		}
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: tools.EtcdHealthCheck}
 	}
 	return serversToValidate
 }
@@ -802,6 +802,8 @@ func (m *Master) Dial(net, addr string) (net.Conn, error) {
 }
 
 func (m *Master) needToReplaceTunnels(addrs []string) bool {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
 	if m.tunnels == nil || m.tunnels.Len() != len(addrs) {
 		return true
 	}
@@ -837,6 +839,8 @@ func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
 	if err := tunnels.Open(); err != nil {
 		return err
 	}
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
 	if m.tunnels != nil {
 		m.tunnels.Close()
 	}
@@ -845,8 +849,6 @@ func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
 }
 
 func (m *Master) loadTunnels(user, keyfile string) error {
-	m.tunnelsLock.Lock()
-	defer m.tunnelsLock.Unlock()
 	addrs, err := m.getNodeAddresses()
 	if err != nil {
 		return err
@@ -861,8 +863,6 @@ func (m *Master) loadTunnels(user, keyfile string) error {
 }
 
 func (m *Master) refreshTunnels(user, keyfile string) error {
-	m.tunnelsLock.Lock()
-	defer m.tunnelsLock.Unlock()
 	addrs, err := m.getNodeAddresses()
 	if err != nil {
 		return err

@@ -110,41 +110,6 @@ func TestReadPodsFromFile(t *testing.T) {
 				},
 			}),
 		},
-		{
-			desc: "Pod without ID",
-			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{
-					Kind:       "Pod",
-					APIVersion: "",
-				},
-				ObjectMeta: api.ObjectMeta{
-					// No name
-					UID: "12345",
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
-				},
-			},
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "12345-" + hostname,
-					UID:       "12345",
-					Namespace: kubelet.NamespaceDefault,
-					SelfLink:  getSelfLink("12345-"+hostname, kubelet.NamespaceDefault),
-				},
-				Spec: api.PodSpec{
-					NodeName:      hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-					Containers: []api.Container{{
-						Name:  "image",
-						Image: "test/image",
-						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "IfNotPresent",
-						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
-				},
-			}),
-		},
 	}
 
 	for _, testCase := range testCases {
@@ -152,7 +117,7 @@ func TestReadPodsFromFile(t *testing.T) {
 			var versionedPod runtime.Object
 			err := testapi.Converter().Convert(&testCase.pod, &versionedPod)
 			if err != nil {
-				t.Fatalf("error in versioning the pod: %s", testCase.desc, err)
+				t.Fatalf("%s: error in versioning the pod: %v", testCase.desc, err)
 			}
 			fileContents, err := testapi.Codec().Encode(versionedPod)
 			if err != nil {

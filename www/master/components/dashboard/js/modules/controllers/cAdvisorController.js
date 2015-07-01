@@ -151,7 +151,7 @@ app.controller('cAdvisorController', [
         var f = fsDataArray[i];
 
         items.push({
-          label: 'FS #' + f.filesystemNumber,
+          label: 'Filesystem #' + f.filesystemNumber,
           stats: f.usageDescription + ' / ' + f.capacityDescription,
           value: f.totalUsage,
           classNames: getColorForIndex(2 + i, f.totalUsage),

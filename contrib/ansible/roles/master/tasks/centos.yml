@@ -1,0 +1,8 @@
+---
+- name: CentOS | Install kubernetes CentOS style
+  yum:
+    pkg=kubernetes-master
+    state=latest
+    enablerepo=virt7-testing
+  notify:
+    - restart daemons

@@ -281,7 +281,6 @@ function kube-up {
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
     echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
-    echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
     echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"

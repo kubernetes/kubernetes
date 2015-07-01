@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
 )
 
@@ -110,6 +111,7 @@ type FakeAWSServices struct {
 
 	ec2      *FakeEC2
 	elb      *FakeELB
+	asg      *FakeASG
 	metadata *FakeMetadata
 }
 
@@ -118,6 +120,7 @@ func NewFakeAWSServices() *FakeAWSServices {
 	s.availabilityZone = "us-east-1a"
 	s.ec2 = &FakeEC2{aws: s}
 	s.elb = &FakeELB{aws: s}
+	s.asg = &FakeASG{aws: s}
 	s.metadata = &FakeMetadata{aws: s}
 
 	s.instanceId = "i-self"
@@ -149,6 +152,10 @@ func (s *FakeAWSServices) Compute(region string) (EC2, error) {
 
 func (s *FakeAWSServices) LoadBalancing(region string) (ELB, error) {
 	return s.elb, nil
+}
+
+func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
+	return s.asg, nil
 }
 
 func (s *FakeAWSServices) Metadata() AWSMetadata {
@@ -393,6 +400,18 @@ func (ec2 *FakeELB) RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWith
 	panic("Not implemented")
 }
 func (ec2 *FakeELB) DeregisterInstancesFromLoadBalancer(*elb.DeregisterInstancesFromLoadBalancerInput) (*elb.DeregisterInstancesFromLoadBalancerOutput, error) {
+	panic("Not implemented")
+}
+
+type FakeASG struct {
+	aws *FakeAWSServices
+}
+
+func (a *FakeASG) UpdateAutoScalingGroup(*autoscaling.UpdateAutoScalingGroupInput) (*autoscaling.UpdateAutoScalingGroupOutput, error) {
+	panic("Not implemented")
+}
+
+func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
 	panic("Not implemented")
 }
 

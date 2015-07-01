@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -37,6 +38,15 @@ func (f *fakeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return f.resp, f.err
 }
 
+func alwaysError([]byte) error { return errors.New("test error") }
+
+func matchError(data []byte) error {
+	if string(data) == "bar" {
+		return errors.New("match error")
+	}
+	return nil
+}
+
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		err            error
@@ -44,10 +54,13 @@ func TestValidate(t *testing.T) {
 		expectedStatus probe.Result
 		code           int
 		expectErr      bool
+		validator      ValidatorFn
 	}{
-		{fmt.Errorf("test error"), "", probe.Unknown, 500 /*ignored*/, true},
-		{nil, "foo", probe.Success, 200, false},
-		{nil, "foo", probe.Failure, 500, true},
+		{fmt.Errorf("test error"), "", probe.Unknown, 500 /*ignored*/, true, nil},
+		{nil, "foo", probe.Success, 200, false, nil},
+		{nil, "foo", probe.Failure, 500, true, nil},
+		{nil, "foo", probe.Failure, 200, true, alwaysError},
+		{nil, "foo", probe.Success, 200, false, matchError},
 	}
 
 	s := Server{Addr: "foo.com", Port: 8080, Path: "/healthz"}
@@ -60,6 +73,7 @@ func TestValidate(t *testing.T) {
 				StatusCode: test.code,
 			},
 		}
+		s.Validate = test.validator
 		status, data, err := s.DoServerCheck(fakeRT)
 		expect := fmt.Sprintf("http://%s:%d/healthz", s.Addr, s.Port)
 		if fakeRT.url != expect {

@@ -22,15 +22,14 @@ spec:
       containers: 
         - image: gcr.io/google_containers/heapster_influxdb:v0.3
           name: influxdb
-          resources:
-            limits:
-              cpu: 300m
-              memory: 2Gi
           ports: 
             - containerPort: 8083
               hostPort: 8083
             - containerPort: 8086
               hostPort: 8086
+          volumeMounts:
+          - name: influxdb-persistent-storage
+            mountPath: /data
         - image: gcr.io/google_containers/heapster_grafana:v0.7
           name: grafana
           env: 
@@ -40,4 +39,7 @@ spec:
               value: monitoring-influxdb
             - name: INFLUXDB_PORT
               value: "8086"
+      volumes:
+      - name: influxdb-persistent-storage
+        emptyDir: {}
 

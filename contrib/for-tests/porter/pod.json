@@ -8,7 +8,7 @@
     "containers": [
       {
         "name": "porter",
-        "image": "gcr.io/google_containers/porter:91d46193649807d1340b46797774d8b2",
+        "image": "gcr.io/google_containers/porter:59ad46ed2c56ba50fa7f1dc176c07c37",
         "env": [
           {
             "name": "SERVE_PORT_80",

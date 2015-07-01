@@ -40,6 +40,8 @@ type RESTUpdateStrategy interface {
 	// ValidateUpdate is invoked after default fields in the object have been filled in before
 	// the object is persisted.
 	ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList
+	// AllowUnconditionalUpdate returns true if the object can be updated unconditionally (irrespective of the latest resource version), when there is no resource version specified in the object.
+	AllowUnconditionalUpdate() bool
 }
 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns

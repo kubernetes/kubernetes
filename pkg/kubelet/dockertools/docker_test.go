@@ -109,7 +109,7 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 	}
 }
 
-func TestContainerManifestNaming(t *testing.T) {
+func TestContainerNaming(t *testing.T) {
 	podUID := "12345678"
 	verifyPackUnpack(t, "file", podUID, "name", "container")
 	verifyPackUnpack(t, "file", podUID, "name-with-dashes", "container")

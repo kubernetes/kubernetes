@@ -132,7 +132,8 @@ function create-provision-scripts {
     echo "SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
     echo "MASTER_USER='${MASTER_USER}'"
     echo "MASTER_PASSWD='${MASTER_PASSWD}'"
-    echo "ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
+    echo "KUBE_USER='${KUBE_USER}'"
+    echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
     echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
@@ -190,7 +191,7 @@ function verify-cluster {
   # verify master has all required daemons
   echo "Validating master"
   local machine="master"
-  local -a required_daemon=("salt-master" "salt-minion" "nginx" "kubelet")
+  local -a required_daemon=("salt-master" "salt-minion" "kubelet")
   local validated="1"
   until [[ "$validated" == "0" ]]; do
     validated="0"

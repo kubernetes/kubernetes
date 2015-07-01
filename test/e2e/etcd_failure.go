@@ -17,13 +17,11 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -32,9 +30,15 @@ import (
 
 var _ = Describe("Etcd failure", func() {
 
+	var skipped bool
 	framework := Framework{BaseName: "etcd-failure"}
 
 	BeforeEach(func() {
+		// These tests requires SSH, so the provider check should be identical to those tests.
+		skipped = true
+		SkipUnlessProviderIs("gce")
+		skipped = false
+
 		framework.beforeEach()
 
 		Expect(RunRC(RCConfig{
@@ -46,14 +50,19 @@ var _ = Describe("Etcd failure", func() {
 		})).NotTo(HaveOccurred())
 	})
 
-	AfterEach(framework.afterEach)
+	AfterEach(func() {
+		if skipped {
+			return
+		}
+
+		framework.afterEach()
+	})
 
 	It("should recover from network partition with master", func() {
 		etcdFailTest(
 			framework,
 			"sudo iptables -A INPUT -p tcp --destination-port 4001 -j DROP",
 			"sudo iptables -D INPUT -p tcp --destination-port 4001 -j DROP",
-			false,
 		)
 	})
 
@@ -62,20 +71,12 @@ var _ = Describe("Etcd failure", func() {
 			framework,
 			"pgrep etcd | xargs -I {} sudo kill -9 {}",
 			"echo 'do nothing. monit should restart etcd.'",
-			true,
 		)
 	})
 })
 
-func etcdFailTest(framework Framework, failCommand, fixCommand string, repeat bool) {
-	// This test requires SSH, so the provider check should be identical to
-	// those tests.
-	if !providerIs("gce") {
-		By(fmt.Sprintf("Skippingt test, which is not implemented for %s", testContext.Provider))
-		return
-	}
-
-	doEtcdFailure(failCommand, fixCommand, repeat)
+func etcdFailTest(framework Framework, failCommand, fixCommand string) {
+	doEtcdFailure(failCommand, fixCommand)
 
 	checkExistingRCRecovers(framework)
 
@@ -89,21 +90,11 @@ func etcdFailTest(framework Framework, failCommand, fixCommand string, repeat bo
 // master and go on to assert that etcd and kubernetes components recover.
 const etcdFailureDuration = 20 * time.Second
 
-func doEtcdFailure(failCommand, fixCommand string, repeat bool) {
+func doEtcdFailure(failCommand, fixCommand string) {
 	By("failing etcd")
 
-	if repeat {
-		stop := make(chan struct{}, 1)
-		go util.Until(func() {
-			defer GinkgoRecover()
-			masterExec(failCommand)
-		}, 1*time.Second, stop)
-		time.Sleep(etcdFailureDuration)
-		stop <- struct{}{}
-	} else {
-		masterExec(failCommand)
-		time.Sleep(etcdFailureDuration)
-	}
+	masterExec(failCommand)
+	time.Sleep(etcdFailureDuration)
 	masterExec(fixCommand)
 }
 
@@ -121,7 +112,7 @@ func checkExistingRCRecovers(f Framework) {
 	rcSelector := labels.Set{"name": "baz"}.AsSelector()
 
 	By("deleting pods from existing replication controller")
-	expectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+	expectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		pods, err := podClient.List(rcSelector, fields.Everything())
 		if err != nil {
 			Logf("apiserver returned error, as expected before recovery: %v", err)
@@ -139,7 +130,7 @@ func checkExistingRCRecovers(f Framework) {
 	}))
 
 	By("waiting for replication controller to recover")
-	expectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+	expectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		pods, err := podClient.List(rcSelector, fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range pods.Items {

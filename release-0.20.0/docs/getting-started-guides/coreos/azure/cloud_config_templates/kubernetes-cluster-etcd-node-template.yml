@@ -1,0 +1,60 @@
+## This file is used as input to deployment script, which ammends it as needed.
+## More specifically, we need to add peer hosts for each but the elected peer.
+
+write_files:
+  - path: /opt/bin/curl-retry.sh
+    permissions: '0755'
+    owner: root
+    content: |
+      #!/bin/sh -x
+      until curl $@
+      do sleep 1
+      done
+
+coreos:
+  units:
+    - name: download-etcd2.service
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        After=network-online.target
+        Before=etcd2.service
+        Description=Download etcd2 Binaries
+        Documentation=https://github.com/coreos/etcd/
+        Requires=network-online.target
+        [Service]
+        Environment=ETCD2_RELEASE_TARBALL=https://github.com/coreos/etcd/releases/download/v2.0.11/etcd-v2.0.11-linux-amd64.tar.gz
+        ExecStartPre=/bin/mkdir -p /opt/bin
+        ExecStart=/opt/bin/curl-retry.sh --silent --location $ETCD2_RELEASE_TARBALL --output /tmp/etcd2.tgz
+        ExecStart=/bin/tar xzvf /tmp/etcd2.tgz -C /opt
+        ExecStartPost=/bin/ln -s /opt/etcd-v2.0.11-linux-amd64/etcd /opt/bin/etcd2
+        ExecStartPost=/bin/ln -s /opt/etcd-v2.0.11-linux-amd64/etcdctl /opt/bin/etcdctl2
+        RemainAfterExit=yes
+        Type=oneshot
+        [Install]
+        WantedBy=multi-user.target
+    - name: etcd2.service
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        After=download-etcd2.service
+        Description=etcd 2
+        Documentation=https://github.com/coreos/etcd/
+        [Service]
+        Environment=ETCD_NAME=%H
+        Environment=ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster
+        Environment=ETCD_INITIAL_ADVERTISE_PEER_URLS=http://%H:2380
+        Environment=ETCD_LISTEN_PEER_URLS=http://%H:2380
+        Environment=ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
+        Environment=ETCD_ADVERTISE_CLIENT_URLS=http://%H:2379,http://%H:4001
+        Environment=ETCD_INITIAL_CLUSTER_STATE=new
+        ExecStart=/opt/bin/etcd2
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=multi-user.target
+  update:
+    group: stable
+    reboot-strategy: off

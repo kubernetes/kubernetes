@@ -93,6 +93,10 @@ func (namespaceStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 	return append(errorList, validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))...)
 }
 
+func (namespaceStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 type namespaceStatusStrategy struct {
 	namespaceStrategy
 }

@@ -16,7 +16,7 @@
 {% endif -%}
 
 # TODO: remove nginx for other cloud providers.
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]  %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]  %}
   {% set api_servers_with_port = api_servers -%}
 {% else -%}
   {% set api_servers_with_port = api_servers + ":6443" -%}
@@ -76,9 +76,14 @@
   {% set cgroup_root = "--cgroup_root=/" -%}
 {% endif -%}
 
+{% set pod_cidr = "" %}
+{% if grains['roles'][0] == 'kubernetes-master' and grains.get('cbr-cidr') %}
+  {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
+{% endif %} 
+
 {% set network_plugin = "" -%}
 {% if grains.network_mode == "calico" and 'kubernetes-pool' in grains.roles -%}
   {% set network_plugin = " --network_plugin=calico" -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{network_plugin}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{network_plugin}}"

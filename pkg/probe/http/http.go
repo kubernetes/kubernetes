@@ -17,11 +17,10 @@ limitations under the License.
 package http
 
 import (
+	"crypto/tls"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -30,12 +29,13 @@ import (
 )
 
 func New() HTTPProber {
-	transport := &http.Transport{}
+	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	return httpProber{transport}
 }
 
 type HTTPProber interface {
-	Probe(host string, port int, path string, timeout time.Duration) (probe.Result, string, error)
+	Probe(url *url.URL, timeout time.Duration) (probe.Result, string, error)
 }
 
 type httpProber struct {
@@ -43,8 +43,8 @@ type httpProber struct {
 }
 
 // Probe returns a ProbeRunner capable of running an http check.
-func (pr httpProber) Probe(host string, port int, path string, timeout time.Duration) (probe.Result, string, error) {
-	return DoHTTPProbe(formatURL(host, port, path), &http.Client{Timeout: timeout, Transport: pr.transport})
+func (pr httpProber) Probe(url *url.URL, timeout time.Duration) (probe.Result, string, error) {
+	return DoHTTPProbe(url, &http.Client{Timeout: timeout, Transport: pr.transport})
 }
 
 type HTTPGetInterface interface {
@@ -55,8 +55,8 @@ type HTTPGetInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Result, string, error) {
-	res, err := client.Get(url)
+func DoHTTPProbe(url *url.URL, client HTTPGetInterface) (probe.Result, string, error) {
+	res, err := client.Get(url.String())
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
 		return probe.Failure, err.Error(), nil
@@ -68,18 +68,9 @@ func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Result, string, err
 	}
 	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
+		glog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
 		return probe.Success, body, nil
 	}
-	glog.V(4).Infof("Probe failed for %s, Response: %v", url, *res)
+	glog.V(4).Infof("Probe failed for %s, Response: %v", url.String(), *res)
 	return probe.Failure, body, nil
-}
-
-// formatURL formats a URL from args.  For testability.
-func formatURL(host string, port int, path string) string {
-	u := url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
-		Path:   path,
-	}
-	return u.String()
 }

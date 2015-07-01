@@ -47,12 +47,6 @@ POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 ALLOCATE_NODE_CIDRS=true
 
-# When set to true, Docker Cache is enabled by default as part of the cluster bring up.
-ENABLE_DOCKER_REGISTRY_CACHE=true
-
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
-
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none           - No cluster monitoring setup 
 #   influxdb       - Heapster, InfluxDB, and Grafana 

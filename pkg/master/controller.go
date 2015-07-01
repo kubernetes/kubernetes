@@ -155,7 +155,7 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP}},
+			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP, TargetPort: util.NewIntOrStringFromInt(servicePort)}},
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),

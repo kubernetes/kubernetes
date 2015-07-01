@@ -19,6 +19,7 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -32,6 +33,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
@@ -157,6 +159,7 @@ type RCConfig struct {
 	Name          string
 	Namespace     string
 	PollInterval  time.Duration
+	Timeout       time.Duration
 	PodStatusFile *os.File
 	Replicas      int
 
@@ -182,10 +185,29 @@ func Failf(format string, a ...interface{}) {
 	Fail(fmt.Sprintf(format, a...), 1)
 }
 
-func providerIs(providers ...string) bool {
-	if testContext.Provider == "" {
-		Fail("testContext.Provider is not defined")
+func Skipf(format string, args ...interface{}) {
+	Skip(fmt.Sprintf(format, args...))
+}
+
+func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
+	if testContext.CloudConfig.NumNodes < minNodeCount {
+		Skipf("Requires at least %d nodes (not %d)", minNodeCount, testContext.CloudConfig.NumNodes)
 	}
+}
+
+func SkipIfProviderIs(unsupportedProviders ...string) {
+	if providerIs(unsupportedProviders...) {
+		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, testContext.Provider)
+	}
+}
+
+func SkipUnlessProviderIs(supportedProviders ...string) {
+	if !providerIs(supportedProviders...) {
+		Skipf("Only supported for providers %v (not %s)", supportedProviders, testContext.Provider)
+	}
+}
+
+func providerIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(testContext.Provider) {
 			return true
@@ -297,12 +319,20 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, timeout time.Duration) error {
 	Logf("Waiting up to %v for service account %s to be provisioned in ns %s", timeout, serviceAccountName, ns)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		_, err := c.ServiceAccounts(ns).Get(serviceAccountName)
-		if err != nil {
+		sa, err := c.ServiceAccounts(ns).Get(serviceAccountName)
+		if apierrs.IsNotFound(err) {
 			Logf("Get service account %s in ns %s failed, ignoring for %v: %v", serviceAccountName, ns, poll, err)
 			continue
 		}
-		Logf("Service account %s in ns %s found. (%v)", serviceAccountName, ns, time.Since(start))
+		if err != nil {
+			Logf("Get service account %s in ns %s failed: %v", serviceAccountName, ns, err)
+			return err
+		}
+		if len(sa.Secrets) == 0 {
+			Logf("Service account %s in ns %s had 0 secrets, ignoring for %v: %v", serviceAccountName, ns, poll, err)
+			continue
+		}
+		Logf("Service account %s in ns %s with secrets found. (%v)", serviceAccountName, ns, time.Since(start))
 		return nil
 	}
 	return fmt.Errorf("Service account %s in namespace %s not ready within %v", serviceAccountName, ns, timeout)
@@ -366,12 +396,21 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 		},
 		Status: api.NamespaceStatus{},
 	}
-	got, err := c.Namespaces().Create(namespaceObj)
-	if err != nil {
-		return got, err
+	// Be robust about making the namespace creation call.
+	var got *api.Namespace
+	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		var err error
+		got, err = c.Namespaces().Create(namespaceObj)
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
 	}
+
 	if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
-		return got, err
+		return nil, err
 	}
 	return got, nil
 }
@@ -495,7 +534,7 @@ func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, er
 	return p, err
 }
 
-// waitForRCPodOnNode returns nil if the pod from the given replication controller (decribed by rcName) no longer exists.
+// waitForRCPodToDisappear returns nil if the pod from the given replication controller (decribed by rcName) no longer exists.
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
@@ -520,9 +559,9 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 	})
 }
 
-// waits until the service appears (exists == true), or disappears (exists == false)
+// waitForService waits until the service appears (exist == true), or disappears (exist == false)
 func waitForService(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	err := wait.Poll(interval, timeout, func() (bool, error) {
 		_, err := c.Services(namespace).Get(name)
 		if err != nil {
 			Logf("Get service %s in namespace %s failed (%v).", name, namespace, err)
@@ -532,11 +571,16 @@ func waitForService(c *client.Client, namespace, name string, exist bool, interv
 			return exist, nil
 		}
 	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
 }
 
-// waits until the RC appears (exists == true), or disappears (exists == false)
+// waitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
 func waitForReplicationController(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	err := wait.Poll(interval, timeout, func() (bool, error) {
 		_, err := c.ReplicationControllers(namespace).Get(name)
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
@@ -546,6 +590,11 @@ func waitForReplicationController(c *client.Client, namespace, name string, exis
 			return exist, nil
 		}
 	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for ReplicationController %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
 }
 
 // Context for checking pods responses by issuing GETs to them and verifying if the answer with pod name.
@@ -784,15 +833,29 @@ func runKubectl(args ...string) string {
 	return strings.TrimSpace(stdout.String())
 }
 
+func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
+	stdout, err = cmd.StdoutPipe()
+	if err != nil {
+		return
+	}
+	stderr, err = cmd.StderrPipe()
+	if err != nil {
+		return
+	}
+	Logf("Asyncronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	err = cmd.Start()
+	return
+}
+
 // testContainerOutput runs testContainerOutputInNamespace with the default namespace.
-func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string) {
-	testContainerOutputInNamespace(scenarioName, c, pod, expectedOutput, api.NamespaceDefault)
+func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string) {
+	testContainerOutputInNamespace(scenarioName, c, pod, containerIndex, expectedOutput, api.NamespaceDefault)
 }
 
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits
-// for the first container in the podSpec to move into the 'Success' status.  It retrieves
-// the container log and searches for lines of expected output.
-func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string, ns string) {
+// for all of the containers in the podSpec to move into the 'Success' status.  It retrieves
+// the exact container log and searches for lines of expected output.
+func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
 	defer c.Pods(ns).Delete(pod.Name, nil)
@@ -800,10 +863,17 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 		Failf("Failed to create pod: %v", err)
 	}
 
-	containerName := pod.Spec.Containers[0].Name
-
 	// Wait for client pod to complete.
-	expectNoError(waitForPodSuccessInNamespace(c, pod.Name, containerName, ns))
+	var containerName string
+	for id, container := range pod.Spec.Containers {
+		expectNoError(waitForPodSuccessInNamespace(c, pod.Name, container.Name, ns))
+		if id == containerIndex {
+			containerName = container.Name
+		}
+	}
+	if containerName == "" {
+		Failf("Invalid container index: %d", containerIndex)
+	}
 
 	// Grab its logs.  Get host first.
 	podStatus, err := c.Pods(ns).Get(pod.Name)
@@ -969,10 +1039,14 @@ func RunRC(config RCConfig) error {
 	if interval <= 0 {
 		interval = 10 * time.Second
 	}
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
 	oldPods := make([]*api.Pod, 0)
 	oldRunning := 0
 	lastChange := time.Now()
-	for oldRunning != config.Replicas && time.Since(lastChange) < 5*time.Minute {
+	for oldRunning != config.Replicas && time.Since(lastChange) < timeout {
 		time.Sleep(interval)
 
 		running := 0

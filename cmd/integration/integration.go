@@ -59,6 +59,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
 	docker "github.com/fsouza/go-dockerclient"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -1000,6 +1001,11 @@ func main() {
 	// parallel and also it schedules extra pods which would change the
 	// above pod counting logic.
 	runSchedulerNoPhantomPodsTest(kubeClient)
+
+	glog.Infof("\n\nLogging high latency metrics from the 10250 kubelet")
+	e2e.HighLatencyKubeletOperations(nil, 1*time.Second, "localhost:10250")
+	glog.Infof("\n\nLogging high latency metrics from the 10251 kubelet")
+	e2e.HighLatencyKubeletOperations(nil, 1*time.Second, "localhost:10251")
 }
 
 // ServeCachedManifestFile serves a file for kubelet to read.

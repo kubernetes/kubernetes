@@ -50,6 +50,12 @@ var _ = Describe("Reboot", func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
+
+		// These tests requires SSH, so the provider check should be identical to there
+		// (the limiting factor is the implementation of util.go's getSigner(...)).
+
+		// Cluster must support node reboot
+		SkipUnlessProviderIs("gce", "aws")
 	})
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
@@ -90,15 +96,6 @@ var _ = Describe("Reboot", func() {
 })
 
 func testReboot(c *client.Client, rebootCmd string) {
-	// This test requires SSH, so the provider check should be identical to
-	// there (the limiting factor is the implementation of util.go's
-	// getSigner(...)).
-	provider := testContext.Provider
-	if !providerIs("aws", "gce") {
-		By(fmt.Sprintf("Skipping reboot test, which is not implemented for %s", provider))
-		return
-	}
-
 	// Get all nodes, and kick off the test on each.
 	nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
 	if err != nil {
@@ -106,7 +103,7 @@ func testReboot(c *client.Client, rebootCmd string) {
 	}
 	result := make(chan bool, len(nodelist.Items))
 	for _, n := range nodelist.Items {
-		go rebootNode(c, provider, n.ObjectMeta.Name, rebootCmd, result)
+		go rebootNode(c, testContext.Provider, n.ObjectMeta.Name, rebootCmd, result)
 	}
 
 	// Wait for all to finish and check the final result.
@@ -174,11 +171,21 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 		return
 	}
 
-	// Get all the pods on the node.
+	// Get all the pods on the node that don't have liveness probe set.
+	// Liveness probe may cause restart of a pod during node reboot, and the pod may not be running.
 	pods := ps.List()
-	podNames := make([]string, len(pods))
-	for i, p := range pods {
-		podNames[i] = p.ObjectMeta.Name
+	podNames := []string{}
+	for _, p := range pods {
+		probe := false
+		for _, c := range p.Spec.Containers {
+			if c.LivenessProbe != nil {
+				probe = true
+				break
+			}
+		}
+		if !probe {
+			podNames = append(podNames, p.ObjectMeta.Name)
+		}
 	}
 	Logf("Node %s has %d pods: %v", name, len(podNames), podNames)
 

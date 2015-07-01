@@ -115,7 +115,7 @@ dns-frontend   10.244.2.9                                         kubernetes-min
 Wait until the pod succeeds, then we can see the output from the client pod:
 
 ```shell
-$ kubectl log dns-frontend
+$ kubectl logs dns-frontend
 2015-05-07T20:13:54.147664936Z 10.0.236.129
 2015-05-07T20:13:54.147721290Z Send request to: http://dns-backend.development.cluster.local:8000
 2015-05-07T20:13:54.147733438Z <Response [200]>
@@ -129,7 +129,7 @@ If we switch to prod namespace with the same pod config, we'll see the same resu
 ```shell
 $ kubectl config use-context prod
 $ kubectl create -f examples/cluster-dns/dns-frontend-pod.yaml
-$ kubectl log dns-frontend
+$ kubectl logs dns-frontend
 2015-05-07T20:13:54.147664936Z 10.0.236.129
 2015-05-07T20:13:54.147721290Z Send request to: http://dns-backend.development.cluster.local:8000
 2015-05-07T20:13:54.147733438Z <Response [200]>
@@ -140,6 +140,41 @@ $ kubectl log dns-frontend
 #### Note about default namespace
 
 If you prefer not using namespace, then all your services can be addressed using `default` namespace, e.g. `http://dns-backend.default.cluster.local:8000`, or shorthand version `http://dns-backend:8000`
+
+
+### tl; dr;
+For those of you who are impatient, here is the summary of the commands we ran in this tutorial. Remember to set first `$CLUSTER_NAME` and `$USER_NAME` to the values found in `~/.kube/config`.
+
+```sh
+# create dev and prod namespaces
+kubectl create -f examples/cluster-dns/namespace-dev.yaml
+kubectl create -f examples/cluster-dns/namespace-prod.yaml
+
+# create two contexts
+kubectl config set-context dev --namespace=development --cluster=${CLUSTER_NAME} --user=${USER_NAME}
+kubectl config set-context prod --namespace=production --cluster=${CLUSTER_NAME} --user=${USER_NAME}
+
+# create two backend replication controllers
+kubectl config use-context dev
+kubectl create -f examples/cluster-dns/dns-backend-rc.yaml
+kubectl config use-context prod
+kubectl create -f examples/cluster-dns/dns-backend-rc.yaml
+
+# create backend services
+kubectl config use-context dev
+kubectl create -f examples/cluster-dns/dns-backend-service.yaml
+kubectl config use-context prod
+kubectl create -f examples/cluster-dns/dns-backend-service.yaml
+
+# create a pod in each namespace and get its output
+kubectl config use-context dev
+kubectl create -f examples/cluster-dns/dns-frontend-pod.yaml
+kubectl logs dns-frontend
+
+kubectl config use-context prod
+kubectl create -f examples/cluster-dns/dns-frontend-pod.yaml
+kubectl logs dns-frontend
+```
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cluster-dns/README.md?pixel)]()

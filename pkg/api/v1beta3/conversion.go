@@ -41,6 +41,8 @@ func addConversionFuncs() {
 		convert_api_StatusDetails_To_v1beta3_StatusDetails,
 		convert_v1beta3_StatusCause_To_api_StatusCause,
 		convert_api_StatusCause_To_v1beta3_StatusCause,
+		convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec,
+		convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -724,5 +726,53 @@ func convert_api_StatusCause_To_v1beta3_StatusCause(in *api.StatusCause, out *St
 	out.Type = CauseType(in.Type)
 	out.Message = in.Message
 	out.Field = in.Field
+	return nil
+}
+
+func convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ReplicationControllerSpec))(in)
+	}
+	out.Replicas = &in.Replicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(PodTemplateSpec)
+		if err := convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *api.ReplicationControllerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ReplicationControllerSpec))(in)
+	}
+	out.Replicas = *in.Replicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(api.PodTemplateSpec)
+		if err := convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
 	return nil
 }

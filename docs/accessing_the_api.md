@@ -3,7 +3,7 @@
 This document describes what ports the kubernetes apiserver
 may serve on and how to reach them.  The audience is
 cluster administrators who want to customize their cluster
-or understand the details. 
+or understand the details.
 
 Most questions about accessing the cluster are covered
 in [Accessing the cluster](../docs/accessing-the-cluster.md).
@@ -16,14 +16,14 @@ there is one of these running on a single kubernetes-master node.
 By default the Kubernetes APIserver serves HTTP on 2 ports:
   1. Localhost Port
     - serves HTTP
-    - default is port 8080, change with `-port` flag.
-    - defaults IP is localhost, change with `-address` flag.
+    - default is port 8080, change with `--insecure-port` flag.
+    - defaults IP is localhost, change with `--insecure-bind-address` flag.
     - no authentication or authorization checks in HTTP
     - protected by need to have host access
   2. Secure Port
-    - default is port 443, change with `-secure_port`
-    - default IP is first non-localhost network interface, change with `-public_address_override`
-    - serves HTTPS.  Set cert with `-tls_cert_file` and key with `-tls_private_key_file`.
+    - default is port 6443, change with `--secure-port` flag.
+    - default IP is first non-localhost network interface, change with `--bind-address` flag.
+    - serves HTTPS.  Set cert with `--tls-cert-file` and key with `--tls-private-key-file` flag.
     - uses token-file or client-certificate based [authentication](./authentication.md).
     - uses policy-based [authorization](./authorization.md).
   3. Removed: ReadOnly Port
@@ -38,7 +38,7 @@ these configurations the secure port is typically set to 6443.
 
 A firewall rule is typically configured to allow external HTTPS access to port 443.
 
-The above are defaults and reflect how Kubernetes is deployed to GCE using
+The above are defaults and reflect how Kubernetes is deployed to Google Compute Engine using
 kube-up.sh.  Other cloud providers may vary.
 
 ## Use Cases vs IP:Ports

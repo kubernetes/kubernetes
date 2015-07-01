@@ -1,5 +1,5 @@
 ---
-- name: Determine if firewalld installed
+- name: RPM | Determine if firewalld installed
   command: "rpm -q firewalld"
   register: s
   changed_when: false

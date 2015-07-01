@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -38,38 +39,65 @@ import (
 const serveHostnameImage = "gcr.io/google_containers/serve_hostname:1.1"
 
 func resizeGroup(size int) error {
-	// TODO: make this hit the compute API directly instread of shelling out to gcloud.
-	output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone,
-		"resize", testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--new-size=%v", size)).CombinedOutput()
-	if err != nil {
-		Logf("Failed to resize node instance group: %v", string(output))
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
+		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone,
+			"resize", testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--new-size=%v", size)).CombinedOutput()
+		if err != nil {
+			Logf("Failed to resize node instance group: %v", string(output))
+		}
+		return err
+	} else {
+		// Supported by aws
+		instanceGroups, ok := testContext.CloudConfig.Provider.(aws_cloud.InstanceGroups)
+		if !ok {
+			return fmt.Errorf("Provider does not support InstanceGroups")
+		}
+		return instanceGroups.ResizeInstanceGroup(testContext.CloudConfig.NodeInstanceGroup, size)
 	}
-	return err
 }
 
 func groupSize() (int, error) {
-	// TODO: make this hit the compute API directly instread of shelling out to gcloud.
-	output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID,
-		"--zone="+testContext.CloudConfig.Zone, "describe", testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
-	if err != nil {
-		return -1, err
-	}
-	pattern := "currentSize: "
-	i := strings.Index(string(output), pattern)
-	if i == -1 {
-		return -1, fmt.Errorf("could not find '%s' in the output '%s'", pattern, output)
-	}
-	truncated := output[i+len(pattern):]
-	j := strings.Index(string(truncated), "\n")
-	if j == -1 {
-		return -1, fmt.Errorf("could not find new line in the truncated output '%s'", truncated)
-	}
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
+		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID,
+			"--zone="+testContext.CloudConfig.Zone, "describe", testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
+		if err != nil {
+			return -1, err
+		}
+		pattern := "currentSize: "
+		i := strings.Index(string(output), pattern)
+		if i == -1 {
+			return -1, fmt.Errorf("could not find '%s' in the output '%s'", pattern, output)
+		}
+		truncated := output[i+len(pattern):]
+		j := strings.Index(string(truncated), "\n")
+		if j == -1 {
+			return -1, fmt.Errorf("could not find new line in the truncated output '%s'", truncated)
+		}
 
-	currentSize, err := strconv.Atoi(string(truncated[:j]))
-	if err != nil {
-		return -1, err
+		currentSize, err := strconv.Atoi(string(truncated[:j]))
+		if err != nil {
+			return -1, err
+		}
+		return currentSize, nil
+	} else {
+		// Supported by aws
+		instanceGroups, ok := testContext.CloudConfig.Provider.(aws_cloud.InstanceGroups)
+		if !ok {
+			return -1, fmt.Errorf("provider does not support InstanceGroups")
+		}
+		instanceGroup, err := instanceGroups.DescribeInstanceGroup(testContext.CloudConfig.NodeInstanceGroup)
+		if err != nil {
+			return -1, fmt.Errorf("error describing instance group: %v", err)
+		}
+		if instanceGroup == nil {
+			return -1, fmt.Errorf("instance group not found: %s", testContext.CloudConfig.NodeInstanceGroup)
+		}
+		return instanceGroup.CurrentSize()
 	}
-	return currentSize, nil
 }
 
 func waitForGroupSize(size int) error {
@@ -266,11 +294,11 @@ func verifyPods(c *client.Client, ns, name string, wantName bool, replicas int) 
 	}
 	e := podsRunning(c, pods)
 	if len(e) > 0 {
-		return fmt.Errorf("Failed to wait for pods running: %v", e)
+		return fmt.Errorf("failed to wait for pods running: %v", e)
 	}
 	err = podsResponding(c, ns, name, wantName, pods)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to wait for pods responding: %v", err)
 	}
 	return nil
 }
@@ -358,8 +386,6 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 }
 
 var _ = Describe("Nodes", func() {
-	supportedProviders := []string{"gce", "gke"}
-	var testName string
 	var c *client.Client
 	var ns string
 
@@ -380,17 +406,20 @@ var _ = Describe("Nodes", func() {
 	})
 
 	Describe("Resize", func() {
+		var skipped bool
+
 		BeforeEach(func() {
-			if !providerIs(supportedProviders...) {
-				Failf("Nodes.Resize test is only supported for providers %v (not %s). You can avoid this failure by using ginkgo.skip=Nodes.Resize in your environment.",
-					supportedProviders, testContext.Provider)
-			}
+			skipped = true
+			SkipUnlessProviderIs("gce", "gke", "aws")
+			SkipUnlessNodeCountIsAtLeast(2)
+			skipped = false
 		})
 
 		AfterEach(func() {
-			if !providerIs(supportedProviders...) {
+			if skipped {
 				return
 			}
+
 			By("restoring the original node instance group size")
 			if err := resizeGroup(testContext.CloudConfig.NumNodes); err != nil {
 				Failf("Couldn't restore the original node instance group size: %v", err)
@@ -403,15 +432,7 @@ var _ = Describe("Nodes", func() {
 			}
 		})
 
-		testName = "should be able to delete nodes."
-		It(testName, func() {
-			Logf("starting test %s", testName)
-
-			if testContext.CloudConfig.NumNodes < 2 {
-				Failf("Failing test %s as it requires at least 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
-				return
-			}
-
+		It("should be able to delete nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
@@ -433,16 +454,8 @@ var _ = Describe("Nodes", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		testName = "should be able to add nodes."
-		It(testName, func() {
-			// TODO: Bug here - testName is not correct
-			Logf("starting test %s", testName)
-
-			if testContext.CloudConfig.NumNodes < 2 {
-				Failf("Failing test %s as it requires at least 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
-				return
-			}
-
+		// TODO: Bug here - testName is not correct
+		It("should be able to add nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
@@ -469,68 +482,62 @@ var _ = Describe("Nodes", func() {
 	})
 
 	Describe("Network", func() {
-		BeforeEach(func() {
-			if !providerIs(supportedProviders...) {
-				Failf("Nodes.Network test is only supported for providers %v (not %s). You can avoid this failure by using ginkgo.skip=Nodes.Network in your environment.",
-					supportedProviders, testContext.Provider)
-			}
-		})
+		Context("when a minion node becomes unreachable", func() {
+			BeforeEach(func() {
+				SkipUnlessProviderIs("gce", "gke", "aws")
+				SkipUnlessNodeCountIsAtLeast(2)
+			})
 
-		// TODO marekbiskup 2015-06-19 #10085
-		// This test has nothing to do with resizing nodes so it should be moved elsewhere.
-		// Two things are tested here:
-		// 1. pods from a uncontactable nodes are rescheduled
-		// 2. when a node joins the cluster, it can host new pods.
-		// Factor out the cases into two separate tests.
+			// TODO marekbiskup 2015-06-19 #10085
+			// This test has nothing to do with resizing nodes so it should be moved elsewhere.
+			// Two things are tested here:
+			// 1. pods from a uncontactable nodes are rescheduled
+			// 2. when a node joins the cluster, it can host new pods.
+			// Factor out the cases into two separate tests.
+			It("[replication controller] recreates pods scheduled on the unreachable minion node "+
+				"AND allows scheduling of pods on a minion after it rejoins the cluster", func() {
 
-		testName = "Uncontactable nodes, have their pods recreated by a replication controller, and can host new pods after rejoining."
-		It(testName, func() {
-			if testContext.CloudConfig.NumNodes < 2 {
-				By(fmt.Sprintf("skipping %s test, which requires at least 2 nodes (not %d)",
-					testName, testContext.CloudConfig.NumNodes))
-				return
-			}
+				// Create a replication controller for a service that serves its hostname.
+				// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+				name := "my-hostname-net"
+				newSVCByName(c, ns, name)
+				replicas := testContext.CloudConfig.NumNodes
+				newRCByName(c, ns, name, replicas)
+				err := verifyPods(c, ns, name, true, replicas)
+				Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
-			// Create a replication controller for a service that serves its hostname.
-			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
-			name := "my-hostname-net"
-			newSVCByName(c, ns, name)
-			replicas := testContext.CloudConfig.NumNodes
-			newRCByName(c, ns, name, replicas)
-			err := verifyPods(c, ns, name, true, replicas)
-			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
-
-			By("choose a node with at least one pod - we will block some network traffic on this node")
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-			pods, err := c.Pods(ns).List(label, fields.Everything()) // list pods after all have been scheduled
-			Expect(err).NotTo(HaveOccurred())
-			nodeName := pods.Items[0].Spec.NodeName
-
-			node, err := c.Nodes().Get(nodeName)
-			Expect(err).NotTo(HaveOccurred())
-
-			By(fmt.Sprintf("block network traffic from node %s", node.Name))
-			performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
-			Logf("Waiting for node %s to be ready", node.Name)
-			waitForNodeToBe(c, node.Name, true, 2*time.Minute)
-
-			By("verify wheter new pods can be created on the re-attached node")
-			// increasing the RC size is not a valid way to test this
-			// since we have no guarantees the pod will be scheduled on our node.
-			additionalPod := "additionalpod"
-			err = newPodOnNode(c, ns, additionalPod, node.Name)
-			Expect(err).NotTo(HaveOccurred())
-			err = verifyPods(c, ns, additionalPod, true, 1)
-			Expect(err).NotTo(HaveOccurred())
-
-			// verify that it is really on the requested node
-			{
-				pod, err := c.Pods(ns).Get(additionalPod)
+				By("choose a node with at least one pod - we will block some network traffic on this node")
+				label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+				pods, err := c.Pods(ns).List(label, fields.Everything()) // list pods after all have been scheduled
 				Expect(err).NotTo(HaveOccurred())
-				if pod.Spec.NodeName != node.Name {
-					Logf("Pod %s found on invalid node: %s instead of %s", pod.Spec.NodeName, node.Name)
+				nodeName := pods.Items[0].Spec.NodeName
+
+				node, err := c.Nodes().Get(nodeName)
+				Expect(err).NotTo(HaveOccurred())
+
+				By(fmt.Sprintf("block network traffic from node %s", node.Name))
+				performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
+				Logf("Waiting for node %s to be ready", node.Name)
+				waitForNodeToBe(c, node.Name, true, 2*time.Minute)
+
+				By("verify wheter new pods can be created on the re-attached node")
+				// increasing the RC size is not a valid way to test this
+				// since we have no guarantees the pod will be scheduled on our node.
+				additionalPod := "additionalpod"
+				err = newPodOnNode(c, ns, additionalPod, node.Name)
+				Expect(err).NotTo(HaveOccurred())
+				err = verifyPods(c, ns, additionalPod, true, 1)
+				Expect(err).NotTo(HaveOccurred())
+
+				// verify that it is really on the requested node
+				{
+					pod, err := c.Pods(ns).Get(additionalPod)
+					Expect(err).NotTo(HaveOccurred())
+					if pod.Spec.NodeName != node.Name {
+						Logf("Pod %s found on invalid node: %s instead of %s", pod.Spec.NodeName, node.Name)
+					}
 				}
-			}
+			})
 		})
 	})
 })

@@ -9,13 +9,19 @@ kubelet \- Processes a container manifest so the containers are launched accordi
 
 # DESCRIPTION
 
-The **kubernetes** kubelet runs on each node. The Kubelet works in terms of a container manifest. A container manifest is a YAML or JSON file that describes a pod. The Kubelet takes a set of manifests that are provided in various mechanisms and ensures that the containers described in those manifests are started and continue running.
+The **kubernetes** kubelet runs on each node.
+
+The Kubelet ensures that pods defined by "container manifests" are running. 
+Container manifests simply refer to the YAML or JSON files which we use to represent pods, but viewed from the perspective of the kubelet.
+Thus, the Kubelet watches for these manifests (which can be provided by different mechanisms) and ensures that the containers described in those manifests are started.
+
+By "watch", we specifically mean, that the Kubelet monitors either an HTTP endpoint, or a directory, a file, or a server. 
 
 There are 3 ways that a container manifest can be provided to the Kubelet:
 
-    File: Path passed as a flag on the command line. This file is rechecked every 20 seconds (configurable with a flag).
+    File: Path to a file OR directory passed as a flag on the command line. This file is rechecked every 20 seconds (configurable with a flag).  See the --config option.
     HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint is checked every 20 seconds (also configurable with a flag).
-    HTTP server: The kubelet can also listen for HTTP and respond to a simple API (underspec'd currently) to submit a new manifest.
+    HTTP server: The kubelet can also listen for HTTP and respond to a simple API submissions of new manifests (currently, this is underspecified).
 
 # OPTIONS
 **--address**=0.0.0.0
@@ -31,7 +37,7 @@ There are 3 ways that a container manifest can be provided to the Kubelet:
 	log to standard error as well as files
 
 **--api-servers**=[]
-	List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.
+	List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.  Although this is a critical argument for common kube deployments, note that kubelets can still run pods from manifests without an api-server.
 
 **--boot_id_file**=/proc/sys/kernel/random/boot_id
 	Comma-separated list of files to check for boot-id. Use the first one that exists.
@@ -58,7 +64,7 @@ There are 3 ways that a container manifest can be provided to the Kubelet:
 	Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains
 
 **--config**=""
-	Path to the config file or directory of files
+	Path to the config file or directory of manifest files.  For example, --config=/foo/ would run .manifest files under /foo on startup of the kubelet (even if no api-server was yet running).
 
 **--configure-cbr0**=false
 	If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.

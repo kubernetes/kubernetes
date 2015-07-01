@@ -1,0 +1,8 @@
+---
+- name: reload and restart kube-addons
+  command: systemctl daemon-reload
+  notify:
+    - restart kube-addons
+
+- name: restart kube-addons
+  service: name=kube-addons state=restarted

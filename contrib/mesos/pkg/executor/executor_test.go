@@ -437,9 +437,9 @@ func TestExecutorStaticPods(t *testing.T) {
 		assert.NoError(t, err)
 		spod := `{
 	"apiVersion": "v1beta3",
-	"name": "%v",
 	"kind": "Pod",
 	"metadata": {
+		"name": "%v",
 		"labels": { "name": "foo", "cluster": "bar" }
 	},
 	"spec": {
@@ -451,7 +451,7 @@ func TestExecutorStaticPods(t *testing.T) {
 				"enabled": true,
 				"type": "http",
 				"initialDelaySeconds": 30,
-				"httpGet": { "path": "/", "port": "80" }
+				"httpGet": { "path": "/", "port": 80 }
 			}
 		}]
 	}

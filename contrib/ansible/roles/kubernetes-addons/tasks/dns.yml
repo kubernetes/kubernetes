@@ -1,0 +1,55 @@
+---
+- name: DNS | Assures {{ kube_config_dir }}/addons/dns dir exists
+  file: path={{ kube_config_dir }}/addons/dns state=directory
+
+- name: DNS | Assures local dns addon dir exists
+  local_action: file
+    path={{ local_temp_addon_dir }}/dns
+    state=directory
+  sudo: no
+
+- name: DNS | Download skydns-rc.yaml file from Kubernetes repo
+  local_action: get_url
+    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/addons/dns/skydns-rc.yaml.in
+    dest="{{ local_temp_addon_dir }}/dns/skydns-rc.yaml.j2"
+    force=yes
+  sudo: no
+
+- name: DNS | Convert pillar vars to ansible vars for skydns-rc.yaml
+  local_action: replace
+    dest="{{ local_temp_addon_dir }}/dns/skydns-rc.yaml.j2"
+    regexp="pillar\[\'(\w*)\'\]"
+    replace="\1"
+  sudo: no
+
+- name: DNS | Install Template from converted saltfile
+  template:
+  args:
+    src: "{{ local_temp_addon_dir }}/dns/skydns-rc.yaml.j2"
+    dest: "{{ kube_config_dir }}/addons/dns/skydns-rc.yaml"
+    mode: 0755
+    owner: root
+    group: root
+
+- name: DNS | Download skydns-svc.yaml file from Kubernetes repo
+  local_action: get_url
+    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/addons/dns/skydns-svc.yaml.in
+    dest="{{ local_temp_addon_dir }}/dns/skydns-svc.yaml.j2"
+    force=yes
+  sudo: no
+
+- name: DNS | Convert pillar vars to ansible vars for skydns-rc.yaml
+  local_action: replace
+    dest="{{ local_temp_addon_dir }}/dns/skydns-svc.yaml.j2"
+    regexp="pillar\[\'(\w*)\'\]"
+    replace="\1"
+  sudo: no
+
+- name: DNS | Install Template from converted saltfile
+  template:
+  args:
+    src: "{{ local_temp_addon_dir }}/dns/skydns-svc.yaml.j2"
+    dest: "{{ kube_config_dir }}/addons/dns/skydns-svc.yaml"
+    mode: 0755
+    owner: root
+    group: root

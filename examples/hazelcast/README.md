@@ -153,7 +153,7 @@ hazelcast-ulkws     10.244.66.2                                        e2e-test-
 To prove that this all works, you can use the `log` command to examine the logs of one pod, for example:
 
 ```sh
-$ kubectl log hazelcast-ulkws hazelcast
+$ kubectl logs hazelcast-ulkws hazelcast
 2015-05-09 22:06:20.016  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Starting Application v0.2-SNAPSHOT on hazelcast-enyli with PID 5 (/bootstrapper.jar started by root in /)
 2015-05-09 22:06:20.071  INFO 5 --- [           main] s.c.a.AnnotationConfigApplicationContext : Refreshing org.springframework.context.annotation.AnnotationConfigApplicationContext@5424f110: startup date [Sat May 09 22:06:20 GMT 2015]; root of context hierarchy
 2015-05-09 22:06:21.511  INFO 5 --- [           main] o.s.j.e.a.AnnotationMBeanExporter        : Registering beans for JMX exposure on startup

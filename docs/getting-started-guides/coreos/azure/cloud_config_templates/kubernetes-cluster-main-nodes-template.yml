@@ -26,10 +26,11 @@ write_files:
       test -n "${healthcheck}"
       test "${healthcheck}" = "ok"
       printf '{
-        "id": "%s",
-        "kind": "Minion",
-        "apiVersion": "v1beta1",
-        "labels": { "environment": "%s" }
+        "apiVersion": "v1",
+        "kind": "Node",
+        "metadata": {
+          "name": "%s",
+          "labels": { "environment": "%s" }
         }' "${minion_id}" "${env_label}" \
         | /opt/bin/kubectl create -s "${master_url}" -f -
 

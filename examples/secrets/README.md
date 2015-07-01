@@ -1,6 +1,7 @@
 # Secrets example
 
 Following this example, you will create a secret and a pod that consumes that secret in a volume.
+You can learn more about secrets [Here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/secrets.md).
 
 ## Step Zero: Prerequisites
 
@@ -24,6 +25,18 @@ You can use `kubectl` to see information about the secret:
 $ kubectl get secrets
 NAME          TYPE      DATA
 test-secret   Opaque    2
+
+$ kubectl describe secret test-secret
+Name:          test-secret
+Labels:        <none>
+Annotations:   <none>
+
+Type:   Opaque
+
+Data
+====
+data-1: 9 bytes
+data-2: 11 bytes
 ```
 
 ## Step Two: Create a pod that consumes a secret
@@ -41,7 +54,7 @@ This pod runs a binary that displays the content of one of the pieces of secret 
 volume: 
 
 ```shell
-$ kubectl log secret-test-pod
+$ kubectl logs secret-test-pod
 2015-04-29T21:17:24.712206409Z content of file "/etc/secret-volume/data-1": value-1
 ```
 

@@ -123,16 +123,16 @@ func certificatesFromFile(file string) ([]*x509.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-	certs, err := certsFromPEM(pemBlock)
+	certs, err := CertsFromPEM(pemBlock)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %s", file, err)
 	}
 	return certs, nil
 }
 
-// certsFromPEM returns the x509.Certificates contained in the given PEM-encoded byte array
+// CertsFromPEM returns the x509.Certificates contained in the given PEM-encoded byte array
 // Returns an error if a certificate could not be parsed, or if the data does not contain any certificates
-func certsFromPEM(pemCerts []byte) ([]*x509.Certificate, error) {
+func CertsFromPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 	ok := false
 	certs := []*x509.Certificate{}
 	for len(pemCerts) > 0 {

@@ -81,6 +81,10 @@ func (podStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fiel
 	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
 }
 
+func (podStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 // CheckGracefulDelete allows a pod to be gracefully deleted.
 func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
 	return false
@@ -245,7 +249,7 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 	nodeHost := pod.Spec.NodeName
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
-		return nil, nil, fmt.Errorf("pod %s does not have a host assigned", name)
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
 	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
 	if err != nil {

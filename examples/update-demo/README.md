@@ -28,11 +28,14 @@ $ ./cluster/kube-up.sh
 
 ### Step One: Turn up the UX for the demo
 
-You can use bash job control to run this in the background (note that you must use the default port -- 8001 -- for the following demonstration to work properly).  This can sometimes spew to the output so you could also run it in a different terminal.
+You can use bash job control to run this in the background (note that you must use the default port -- 8001 -- for the following demonstration to work properly).
+This can sometimes spew to the output so you could also run it in a different terminal. You have to run `kubectl proxy` in the root of the
+Kubernetes repository. Otherwise you will get "404 page not found" errors as the paths will not match. You can find more information about `kubectl proxy`
+[here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl_proxy.md).
 
 ```
-$ ./kubectl proxy --www=examples/update-demo/local/ &
-+ ./kubectl proxy --www=examples/update-demo/local/
+$ kubectl proxy --www=examples/update-demo/local/ &
++ kubectl proxy --www=examples/update-demo/local/
 I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 ```
 
@@ -42,7 +45,7 @@ Now visit the the [demo website](http://localhost:8001/static).  You won't see a
 Now we will turn up two replicas of an image.  They all serve on internal port 80.
 
 ```bash
-$ ./kubectl create -f examples/update-demo/nautilus-rc.yaml
+$ kubectl create -f examples/update-demo/nautilus-rc.yaml
 ```
 
 After pulling the image from the Docker Hub to your worker nodes (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
@@ -52,7 +55,7 @@ After pulling the image from the Docker Hub to your worker nodes (which may take
 Now we will increase the number of replicas from two to four:
 
 ```bash
-$ ./kubectl scale rc update-demo-nautilus --replicas=4
+$ kubectl scale rc update-demo-nautilus --replicas=4
 ```
 
 If you go back to the [demo website](http://localhost:8001/static/index.html) you should eventually see four boxes, one for each pod.
@@ -61,7 +64,7 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```bash
-$ ./kubectl rolling-update update-demo-nautilus --update-period=10s -f examples/update-demo/kitten-rc.yaml
+$ kubectl rolling-update update-demo-nautilus --update-period=10s -f examples/update-demo/kitten-rc.yaml
 ```
 The rolling-update command in kubectl will do 2 things:
 
@@ -73,7 +76,7 @@ Watch the [demo website](http://localhost:8001/static/index.html), it will updat
 ### Step Five: Bring down the pods
 
 ```bash
-$ ./kubectl stop rc update-demo-kitten
+$ kubectl stop rc update-demo-kitten
 ```
 
 This first stops the replication controller by turning the target number of replicas to 0 and then deletes the controller.

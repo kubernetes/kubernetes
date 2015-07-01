@@ -47,6 +47,8 @@ Via a _label selector_, the client/user can identify a set of objects. The label
 The API currently supports two types of selectors: _equality-based_ and _set-based_.
 A label selector can be made of multiple _requirements_ which are comma-separated. In the case of multiple requirements, all must be satisfied so comma separator acts as an AND logical operator.
 
+An empty label selector (that is, one with zero requirements) selects every object in the collection.
+
 ### _Equality-based_ requirement
 
 _Equality-_ or _inequality-based_ requirements allow filtering by label keys and values. Matching objects must have all of the specified labels (both keys and values), though they may have additional labels as well.
@@ -82,8 +84,8 @@ _Set-based_ requirements can be mixed with _equality-based_ requirements. For ex
 
 LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter. Both requirements are permitted:
 
-   * _equality-based_ requirements: `?label-selector=key1%3Dvalue1,key2%3Dvalue2`
-   * _set-based_ requirements: `?label-selector=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3`
+   * _equality-based_ requirements: `?labelSelector=key1%3Dvalue1,key2%3Dvalue2`
+   * _set-based_ requirements: `?labelSelector=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3%29`
 
 Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationcontroller`s:
 

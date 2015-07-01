@@ -1,0 +1,5 @@
+[virt7-testing]
+name=virt7-testing
+baseurl=http://cbs.centos.org/repos/virt7-testing/x86_64/os/
+enabled=0
+gpgcheck=0

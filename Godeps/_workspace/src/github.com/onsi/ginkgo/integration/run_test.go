@@ -217,7 +217,7 @@ var _ = Describe("Running Specs", func() {
 				Eventually(session).Should(gexec.Exit(0))
 				output := string(session.Out.Contents())
 
-				Ω(output).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs - 2 nodes •••• SUCCESS! [\d.µs]+`))
+				Ω(output).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs - 2 nodes •••• SUCCESS! \d+(\.\d+)?[muµ]s`))
 				Ω(output).Should(ContainSubstring("Test Suite Passed"))
 			})
 		})
@@ -232,7 +232,7 @@ var _ = Describe("Running Specs", func() {
 				if nodes > 4 {
 					nodes = nodes - 1
 				}
-				Ω(output).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs - %d nodes •••• SUCCESS! [\d.µs]+`, nodes))
+				Ω(output).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs - %d nodes •••• SUCCESS! \d+(\.\d+)?[muµ]s`, nodes))
 				Ω(output).Should(ContainSubstring("Test Suite Passed"))
 			})
 		})
@@ -272,8 +272,8 @@ var _ = Describe("Running Specs", func() {
 				output := string(session.Out.Contents())
 
 				outputLines := strings.Split(output, "\n")
-				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs •••• SUCCESS! [\d.µs]+ PASS`))
-				Ω(outputLines[1]).Should(MatchRegexp(`\[\d+\] More_ginkgo_tests Suite - 2/2 specs •• SUCCESS! [\d.µs]+ PASS`))
+				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs •••• SUCCESS! \d+(\.\d+)?[muµ]s PASS`))
+				Ω(outputLines[1]).Should(MatchRegexp(`\[\d+\] More_ginkgo_tests Suite - 2/2 specs •• SUCCESS! \d+(\.\d+)?[muµ]s PASS`))
 				Ω(output).Should(ContainSubstring("Test Suite Passed"))
 			})
 		})
@@ -290,7 +290,7 @@ var _ = Describe("Running Specs", func() {
 				output := string(session.Out.Contents())
 
 				outputLines := strings.Split(output, "\n")
-				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs •••• SUCCESS! [\d.µs]+ PASS`))
+				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs •••• SUCCESS! \d+(\.\d+)?[muµ]s PASS`))
 				Ω(outputLines[1]).Should(MatchRegexp(`\[\d+\] Failing_ginkgo_tests Suite - 2/2 specs`))
 				Ω(output).Should(ContainSubstring("• Failure"))
 				Ω(output).ShouldNot(ContainSubstring("More_ginkgo_tests Suite"))
@@ -313,7 +313,7 @@ var _ = Describe("Running Specs", func() {
 				output := string(session.Out.Contents())
 
 				outputLines := strings.Split(output, "\n")
-				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs •••• SUCCESS! [\d.µs]+ PASS`))
+				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs •••• SUCCESS! \d+(\.\d+)?[muµ]s PASS`))
 				Ω(outputLines[1]).Should(ContainSubstring("Failed to compile C:"))
 				Ω(output).ShouldNot(ContainSubstring("More_ginkgo_tests Suite"))
 				Ω(output).Should(ContainSubstring("Test Suite Failed"))
@@ -335,11 +335,11 @@ var _ = Describe("Running Specs", func() {
 				output := string(session.Out.Contents())
 
 				outputLines := strings.Split(output, "\n")
-				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs •••• SUCCESS! [\d.µs]+ PASS`))
+				Ω(outputLines[0]).Should(MatchRegexp(`\[\d+\] Passing_ginkgo_tests Suite - 4/4 specs •••• SUCCESS! \d+(\.\d+)?[muµ]s PASS`))
 				Ω(outputLines[1]).Should(ContainSubstring("Failed to compile B:"))
 				Ω(output).Should(MatchRegexp(`\[\d+\] Failing_ginkgo_tests Suite - 2/2 specs`))
 				Ω(output).Should(ContainSubstring("• Failure"))
-				Ω(output).Should(MatchRegexp(`\[\d+\] More_ginkgo_tests Suite - 2/2 specs •• SUCCESS! [\d.µs]+ PASS`))
+				Ω(output).Should(MatchRegexp(`\[\d+\] More_ginkgo_tests Suite - 2/2 specs •• SUCCESS! \d+(\.\d+)?[muµ]s PASS`))
 				Ω(output).Should(ContainSubstring("Test Suite Failed"))
 			})
 		})

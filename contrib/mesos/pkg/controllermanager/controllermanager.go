@@ -157,9 +157,10 @@ func (s *CMServer) Run(_ []string) error {
 		} else {
 			serviceaccount.NewTokensController(
 				kubeClient,
-				serviceaccount.DefaultTokenControllerOptions(
-					serviceaccount.JWTTokenGenerator(privateKey),
-				),
+				serviceaccount.TokensControllerOptions{
+					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
+					RootCA:         kubeconfig.CAData,
+				},
 			).Run()
 		}
 	}
