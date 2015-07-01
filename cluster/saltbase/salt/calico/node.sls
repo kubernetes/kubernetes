@@ -29,7 +29,6 @@ calico-node:
       - kmod: xt_set
       - service: docker
       - file: calicoctl
-      - container_bridge: cbr0
 
 calico-ip-pool-reset:
   cmd.run:

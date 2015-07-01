@@ -87,3 +87,16 @@ function provision-network {
   }
   echo "Network configuration verified"
 }
+
+function provision-network-calico {
+    echo "Installing, enabling prerequisites"
+    yum install -y bridge-utils
+
+    # create new docker bridge
+    echo "Create a new docker bridge"
+    ip link set dev ${DOCKER_BRIDGE} down || true
+    brctl delbr ${DOCKER_BRIDGE} || true
+    brctl addbr ${DOCKER_BRIDGE}
+    ip link set dev ${DOCKER_BRIDGE} up
+    ifconfig ${DOCKER_BRIDGE} ${CONTAINER_ADDR} netmask ${CONTAINER_NETMASK} up
+}

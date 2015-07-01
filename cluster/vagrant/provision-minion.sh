@@ -103,7 +103,8 @@ if [ $NETWORK_MODE != "calico" ]; then
   echo "Provisioning openvswitch network"
   provision-network
 else
-  echo "Calico network mode selected. Deferring network configuration to salt."
+  echo "Provisioning cbr0 for Calico"
+  provision-network-calico
 fi
 
 # Placeholder for any other manifests that may be per-node.

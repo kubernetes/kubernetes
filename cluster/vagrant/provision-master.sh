@@ -71,12 +71,14 @@ done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 
-# Configure the openvswitch network
 if [ $NETWORK_MODE != "calico" ]; then
+  # Configure the openvswitch network
   echo "Provisioning openvswitch network"
   provision-network
 else
-  echo "Calico network mode selected. Deferring network configuration to salt."
+  # Configure the cbr for Calico networking.
+  echo "Provisioning cbr0 for Calico"
+  provision-network-calico
 fi
 
 # Update salt configuration

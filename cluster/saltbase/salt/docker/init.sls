@@ -30,15 +30,6 @@ docker:
       - pkg: docker-io
     - require:
       - pkg: docker-io
-{% if grains.network_mode == "calico" %}
-      - container_bridge: cbr0
-
-cbr0:
-  container_bridge.ensure:
-    - cidr: {{ grains['cbr-cidr'] }}
-    - mtu: 1460
-
-{% endif %}
 
 {% else %}
 
