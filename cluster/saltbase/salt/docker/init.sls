@@ -9,10 +9,6 @@ bridge-utils:
 
 {% if grains.os_family == 'RedHat' %}
 
-docker-io:
-  pkg:
-    - installed
-
 {{ environment_file }}:
   file.managed:
     - source: salt://docker/default
@@ -22,6 +18,25 @@ docker-io:
     - mode: 644
     - makedirs: true
 
+{% if grains.os == 'Fedora' and grains.osrelease_info[0] >= 22 %}
+
+docker:
+  pkg:
+    - installed
+  service.running:
+    - enable: True
+    - require:
+      - pkg: docker
+    - watch:
+      - file: {{ environment_file }}
+      - pkg: docker
+
+{% else %}
+
+docker-io:
+  pkg:
+    - installed
+
 docker:
   service.running:
     - enable: True
@@ -30,6 +45,8 @@ docker:
     - watch:
       - file: {{ environment_file }}
       - pkg: docker-io
+
+{% endif %}
 
 {% else %}
 
