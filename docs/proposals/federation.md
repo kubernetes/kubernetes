@@ -6,7 +6,7 @@
 ## _by Quinton Hoole ([quinton@google.com](mailto:quinton@google.com))_  
 _Initial revision: 2015-03-05_  
 _Last updated: 2015-03-09_  
-This doc: [tinyurl.com/ubernetes](http://tinyurl.com/ubernetesv2)  
+This doc: [tinyurl.com/ubernetesv2](http://tinyurl.com/ubernetesv2)  
 Slides: [tinyurl.com/ubernetes-slides](http://tinyurl.com/ubernetes-slides)
 
 ## Introduction
