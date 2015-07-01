@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -34,9 +35,8 @@ import (
 )
 
 var _ = Describe("Proxy", func() {
-	for _, version := range []string{"v1beta3", "v1"} {
-		Context("version "+version, func() { proxyContext(version) })
-	}
+	version := testapi.Version()
+	Context("version "+version, func() { proxyContext(version) })
 })
 
 const (
