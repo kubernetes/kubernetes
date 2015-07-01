@@ -930,7 +930,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			if err != nil {
 				t.Fatalf("An error occurred printing object: %#v", err)
 			}
-			matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s/%s", namespaceName, name))
+			matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s", namespaceName))
 			if !matched {
 				t.Errorf("Expect printing object to contain namespace: %#v", test.obj)
 			}

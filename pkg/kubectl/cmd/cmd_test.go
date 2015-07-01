@@ -241,9 +241,9 @@ func stringBody(body string) io.ReadCloser {
 //	}
 //}
 
-func ExamplePrintReplicationController() {
+func ExamplePrintReplicationControllerWithNamespace() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, []string{})
 	tf.Client = &client.FakeRESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -251,8 +251,9 @@ func ExamplePrintReplicationController() {
 	cmd := NewCmdRun(f, os.Stdout)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Name:   "foo",
-			Labels: map[string]string{"foo": "bar"},
+			Name:      "foo",
+			Namespace: "beep",
+			Labels:    map[string]string{"foo": "bar"},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
@@ -277,8 +278,8 @@ func ExamplePrintReplicationController() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
-	// foo          foo            someimage   foo=bar    1
+	// NAMESPACE   CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
+	// beep        foo          foo            someimage   foo=bar    1
 }
 
 func ExamplePrintPodWithWideFormat() {
