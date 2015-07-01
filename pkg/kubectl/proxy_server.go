@@ -22,12 +22,14 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -139,13 +141,12 @@ func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
 type ProxyServer struct {
 	handler http.Handler
-	port    int
 }
 
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
 // 'filter', if non-nil, protects requests to the api only.
-func NewProxyServer(port int, filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *client.Config) (*ProxyServer, error) {
+func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *client.Config) (*ProxyServer, error) {
 	host := cfg.Host
 	if !strings.HasSuffix(host, "/") {
 		host = host + "/"
@@ -174,12 +175,26 @@ func NewProxyServer(port int, filebase string, apiProxyPrefix string, staticPref
 		// serving their working directory by default.
 		mux.Handle(staticPrefix, newFileHandler(staticPrefix, filebase))
 	}
-	return &ProxyServer{handler: mux, port: port}, nil
+	return &ProxyServer{handler: mux}, nil
 }
 
 // Listen is a simple wrapper around net.Listen.
-func (s *ProxyServer) Listen() (net.Listener, error) {
-	return net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", s.port))
+func (s *ProxyServer) Listen(port int) (net.Listener, error) {
+	return net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+}
+
+// ListenUnix does net.Listen for a unix socket
+func (s *ProxyServer) ListenUnix(path string) (net.Listener, error) {
+	// Remove any socket, stale or not, but fall through for other files
+	fi, err := os.Stat(path)
+	if err == nil && (fi.Mode()&os.ModeSocket) != 0 {
+		os.Remove(path)
+	}
+	// Default to only user accessible socket, caller can open up later if desired
+	oldmask, _ := util.Umask(0077)
+	l, err := net.Listen("unix", path)
+	util.Umask(oldmask)
+	return l, err
 }
 
 // Serve starts the server using given listener, loops forever.

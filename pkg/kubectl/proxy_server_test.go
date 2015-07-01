@@ -287,7 +287,7 @@ func TestPathHandling(t *testing.T) {
 
 	for _, item := range table {
 		func() {
-			p, err := NewProxyServer(0, "", item.prefix, "/not/used/for/this/test", nil, cc)
+			p, err := NewProxyServer("", item.prefix, "/not/used/for/this/test", nil, cc)
 			if err != nil {
 				t.Fatalf("%#v: %v", item, err)
 			}
