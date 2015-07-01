@@ -428,6 +428,8 @@ _kubectl_logs()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--container=")
+    two_word_flags+=("-c")
     flags+=("--follow")
     flags+=("-f")
     flags+=("--help")
