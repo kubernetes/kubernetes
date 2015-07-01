@@ -1136,7 +1136,7 @@ func TestOverlappingRCs(t *testing.T) {
 			controllers = append(controllers, controllerSpec)
 		}
 		shuffledControllers := shuffle(controllers)
-		for j, _ := range shuffledControllers {
+		for j := range shuffledControllers {
 			manager.controllerStore.Store.Add(shuffledControllers[j])
 		}
 		// Add a pod and make sure only the oldest rc is synced
