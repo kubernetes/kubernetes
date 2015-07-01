@@ -29,3 +29,11 @@ spec:
             - --sink=influxdb:http://monitoring-influxdb:8086
             - --poll_duration=2m
             - --stats_resolution=1m
+          volumeMounts: 
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+      volumes: 
+        - name: ssl-certs
+          hostPath: 
+            path: "/etc/ssl/certs"
