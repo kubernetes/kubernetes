@@ -49,12 +49,12 @@
                         "image": "gcr.io/google_containers/elasticsearch:1.0",
                         "ports": [
                             {
-                                "name": "es-port",
+                                "name": "db",
                                 "containerPort": 9200,
                                 "protocol": "TCP"
                             },
                             {
-                                "name": "es-transport-port",
+                                "name": "transport",
                                 "containerPort": 9300,
                                 "protocol": "TCP"
                             }

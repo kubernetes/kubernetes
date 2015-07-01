@@ -24,10 +24,10 @@ spec:
         name: elasticsearch-logging         
         ports:
         - containerPort: 9200
-          name: es-port
+          name: db
           protocol: TCP
         - containerPort: 9300
-          name: es-transport-port
+          name: transport
           protocol: TCP
         volumeMounts:
         - name: es-persistent-storage
