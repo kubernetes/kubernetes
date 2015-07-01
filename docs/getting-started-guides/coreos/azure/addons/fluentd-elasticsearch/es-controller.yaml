@@ -27,7 +27,7 @@ spec:
           name: es-port
           protocol: TCP
         - containerPort: 9300
-          name: es-transport-port
+          name: es-transp-port
           protocol: TCP
         volumeMounts:
         - name: es-persistent-storage
