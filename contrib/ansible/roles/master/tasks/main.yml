@@ -27,6 +27,7 @@
   with_items:
     - "system:controller_manager"
     - "system:scheduler"
+    - "system:kubectl"
   register: tokens
   delegate_to: "{{ groups['masters'][0] }}"
 
@@ -34,6 +35,7 @@
   set_fact:
     controller_manager_token: "{{ tokens.results[0].content|b64decode }}"
     scheduler_token: "{{ tokens.results[1].content|b64decode }}"
+    kubectl_token: "{{ tokens.results[2].content|b64decode }}"
 
 - name: write the config file for the controller-manager
   template: src=controller-manager.j2 dest={{ kube_config_dir }}/controller-manager
@@ -60,6 +62,9 @@
 
 - name: Enable scheduler
   service: name=kube-scheduler enabled=yes state=started
+
+- name: write the kubecfg (auth) file for kubectl
+  template: src=kubectl.kubeconfig.j2 dest={{ kube_config_dir }}/kubectl.kubeconfig
 
 - include: firewalld.yml
   when: has_firewalld
