@@ -22,6 +22,10 @@ spec:
       containers:
         - image: gcr.io/google_containers/heapster:v0.15.0
           name: heapster
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
           command:
             - /heapster
             - --source=kubernetes:''
