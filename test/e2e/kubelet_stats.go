@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -171,15 +172,19 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 	return badMetrics, nil
 }
 
-// Retrieve metrics from the kubelet server of the given node.
-func getKubeletMetricsThroughProxy(c *client.Client, node string) (string, error) {
-	metric, err := c.Get().
+// Performs a get on a node proxy endpoint given the nodename and rest client.
+func nodeProxyRequest(c *client.Client, node, endpoint string) client.Result {
+	return c.Get().
 		Prefix("proxy").
 		Resource("nodes").
 		Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
-		Suffix("metrics").
-		Do().
-		Raw()
+		Suffix(endpoint).
+		Do()
+}
+
+// Retrieve metrics from the kubelet server of the given node.
+func getKubeletMetricsThroughProxy(c *client.Client, node string) (string, error) {
+	metric, err := nodeProxyRequest(c, node, "metrics").Raw()
 	if err != nil {
 		return "", err
 	}
@@ -199,4 +204,15 @@ func getKubeletMetricsThroughNode(nodeName string) (string, error) {
 		return "", err
 	}
 	return string(body), nil
+}
+
+// GetKubeletPods retrieves the list of running pods on the kubelet. The pods
+// includes necessary information (e.g., UID, name, namespace for
+// pods/containers), but do not contain the full spec.
+func GetKubeletPods(c *client.Client, node string) (*api.PodList, error) {
+	result := &api.PodList{}
+	if err := nodeProxyRequest(c, node, "runningpods").Into(result); err != nil {
+		return &api.PodList{}, err
+	}
+	return result, nil
 }
