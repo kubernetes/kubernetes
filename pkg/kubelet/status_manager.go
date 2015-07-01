@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
+	kubeletUtil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -125,7 +126,7 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 		s.podStatuses[podFullName] = status
 		s.podStatusChannel <- podStatusSyncRequest{pod, status}
 	} else {
-		glog.V(3).Infof("Ignoring same pod status for %q - old: %+v new: %+v", podFullName, oldStatus, status)
+		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", kubeletUtil.FormatPodName(pod), status)
 	}
 }
 
@@ -165,7 +166,7 @@ func (s *statusManager) syncBatch() error {
 		_, err = s.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
 		// TODO: handle conflict as a retry, make that easier too.
 		if err == nil {
-			glog.V(3).Infof("Status for pod %q updated successfully", pod.Name)
+			glog.V(3).Infof("Status for pod %q updated successfully", kubeletUtil.FormatPodName(pod))
 			return nil
 		}
 	}
@@ -178,5 +179,5 @@ func (s *statusManager) syncBatch() error {
 	// to clear the channel. Even if this delete never runs subsequent container
 	// changes on the node should trigger updates.
 	go s.DeletePodStatus(podFullName)
-	return fmt.Errorf("error updating status for pod %q: %v", pod.Name, err)
+	return fmt.Errorf("error updating status for pod %q: %v", kubeletUtil.FormatPodName(pod), err)
 }

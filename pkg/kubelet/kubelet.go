@@ -51,6 +51,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/rkt"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
+	kubeletUtil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -1401,7 +1402,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncP
 	// Handles pod admission.
 	pods := kl.admitPods(allPods, podSyncTypes)
 
-	glog.V(4).Infof("Desired: %#v", pods)
+	glog.V(4).Infof("Desired pods: %s", kubeletUtil.FormatPodNames(pods))
 	var err error
 	desiredPods := make(map[types.UID]empty)
 
