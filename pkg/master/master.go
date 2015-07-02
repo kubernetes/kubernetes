@@ -147,6 +147,9 @@ type Config struct {
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
 	ServiceClusterIPRange *net.IPNet
 
+	// The IP address for the master service (must be inside ServiceClusterIPRange
+	ServiceReadWriteIP net.IP
+
 	// The range of ports to be assigned to services with type=NodePort or greater
 	ServiceNodePortRange util.PortRange
 
@@ -245,6 +248,15 @@ func setDefaults(c *Config) {
 		}
 		c.ServiceClusterIPRange = serviceClusterIPRange
 	}
+	if c.ServiceReadWriteIP == nil {
+		// Select the first valid IP from ServiceClusterIPRange to use as the master service IP.
+		serviceReadWriteIP, err := ipallocator.GetIndexedIP(c.ServiceClusterIPRange, 1)
+		if err != nil {
+			glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
+		}
+		glog.V(4).Infof("Setting master service IP to %q (read-write).", serviceReadWriteIP)
+		c.ServiceReadWriteIP = serviceReadWriteIP
+	}
 	if c.ServiceNodePortRange.Size == 0 {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
@@ -311,13 +323,6 @@ func New(c *Config) *Master {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")
 	}
 
-	// Select the first valid IP from serviceClusterIPRange to use as the master service IP.
-	serviceReadWriteIP, err := ipallocator.GetIndexedIP(c.ServiceClusterIPRange, 1)
-	if err != nil {
-		glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
-	}
-	glog.V(4).Infof("Setting master service IP to %q (read-write).", serviceReadWriteIP)
-
 	m := &Master{
 		serviceClusterIPRange: c.ServiceClusterIPRange,
 		serviceNodePortRange:  c.ServiceNodePortRange,
@@ -343,7 +348,7 @@ func New(c *Config) *Master {
 		externalHost:        c.ExternalHost,
 		clusterIP:           c.PublicAddress,
 		publicReadWritePort: c.ReadWritePort,
-		serviceReadWriteIP:  serviceReadWriteIP,
+		serviceReadWriteIP:  c.ServiceReadWriteIP,
 		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
 		serviceReadWritePort: 443,
 

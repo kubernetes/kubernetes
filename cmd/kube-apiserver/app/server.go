@@ -449,7 +449,7 @@ func (s *APIServer) Run(_ []string) error {
 					s.TLSCertFile = path.Join(s.CertDirectory, "apiserver.crt")
 					s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "apiserver.key")
 					// TODO (cjcullen): Is PublicAddress the right address to sign a cert with?
-					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
+					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile, config.ServiceReadWriteIP); err != nil {
 						glog.Errorf("Unable to generate self signed cert: %v", err)
 					} else {
 						glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)

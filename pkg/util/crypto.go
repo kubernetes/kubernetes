@@ -38,7 +38,7 @@ import (
 // The certificate will be created with file mode 0644. The key will be created with file mode 0600.
 // If the certificate or key files already exist, they will be overwritten.
 // Any parent directories of the certPath or keyPath will be created as needed with file mode 0755.
-func GenerateSelfSignedCert(host, certPath, keyPath string) error {
+func GenerateSelfSignedCert(host, certPath, keyPath string, ServiceReadWriteIP net.IP) error {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return err
@@ -62,6 +62,15 @@ func GenerateSelfSignedCert(host, certPath, keyPath string) error {
 	} else {
 		template.DNSNames = append(template.DNSNames, host)
 	}
+
+	if ServiceReadWriteIP != nil {
+		template.IPAddresses = append(template.IPAddresses, ServiceReadWriteIP)
+	}
+	// It would be nice to have the next line, but only the kubelets know the fqdn, the apiserver is clueless
+	// template.DNSNames = append(template.DNSNames, "kubernetes.default.svc.CLUSTER.DNS.NAME")
+	template.DNSNames = append(template.DNSNames, "kubernetes.default.svc")
+	template.DNSNames = append(template.DNSNames, "kubernetes.default")
+	template.DNSNames = append(template.DNSNames, "kubernetes")
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
