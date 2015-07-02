@@ -309,7 +309,7 @@ func milliCPUToShares(milliCPU int64) int64 {
 		// Docker converts zero milliCPU to unset, which maps to kernel default
 		// for unset: 1024. Return 2 here to really match kernel default for
 		// zero milliCPU.
-		return 2
+		return minShares
 	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
 	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
