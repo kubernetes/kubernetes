@@ -126,7 +126,8 @@ func TestPoints(t *testing.T) {
 	testJSONPath(pointsTests, t)
 }
 
-func TestKubenatesNodes(t *testing.T) {
+// TestKubenates tests some use cases from kubenates
+func TestKubenates(t *testing.T) {
 	var input = []byte(`{
 	  "kind": "List",
 	  "items":[
@@ -146,6 +147,16 @@ func TestKubenatesNodes(t *testing.T) {
 			"addresses":[{"type": "LegacyHostIP", "address":"127.0.0.2"}]
 		  }
 		}
+	  ],
+	  "users":[
+	    {
+	      "name": "myself",
+	      "user": {}
+	    },
+	    {
+	      "name": "e2e",
+	      "user": {"username": "admin", "password": "secret"}
+	  	}
 	  ]
 	}`)
 	var nodesData interface{}
@@ -154,8 +165,10 @@ func TestKubenatesNodes(t *testing.T) {
 		t.Error(err)
 	}
 	nodesTests := []jsonpathTest{
+		{"item name", "${.items[*].metadata.name}", nodesData, `127.0.0.1 127.0.0.2`},
 		{"nodes capacity", "${.items[*]['metadata.name', 'status.capacity']}", nodesData,
 			`[127.0.0.1, {cpu: 4}] [127.0.0.2, {cpu: 8}]`},
+		{"user passowrd", `${.users[?(@.name=="e2e")].user.password}`, nodesData, "secret"},
 	}
 	testJSONPath(nodesTests, t)
 }

@@ -22,6 +22,8 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/template"
 )
 
 type JSONPath struct {
@@ -266,6 +268,9 @@ func (j *JSONPath) evalRecursive(input []reflect.Value, node *RecursiveNode) ([]
 func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflect.Value, error) {
 	results := []reflect.Value{}
 	for _, value := range input {
+		if value.Kind() == reflect.Interface {
+			value = reflect.ValueOf(value.Interface())
+		}
 		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 			return input, fmt.Errorf("%v is not array or slice", value)
 		}
@@ -279,28 +284,33 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 					return input, err
 				}
 			}
-			left := lefts[0]
+			var left, right interface{}
+			if lefts[0].IsValid() {
+				left = lefts[0].Interface()
+			}
 			rights, err := j.evalList(temp, node.Right)
 			if err != nil {
 				return input, err
 			}
-			right := rights[0]
+			if rights[0].IsValid() {
+				right = rights[0].Interface()
+			}
 			pass := false
 			switch node.Operator {
 			case "<":
-				pass, err = less(left, right)
+				pass, err = template.Less(left, right)
 			case ">":
-				pass, err = greater(left, right)
+				pass, err = template.Greater(left, right)
 			case "==":
-				pass, err = equal(left, right)
+				pass, err = template.Equal(left, right)
 			case "!=":
-				pass, err = notEqual(left, right)
+				pass, err = template.NotEqual(left, right)
 			case "<=":
-				pass, err = lessEqual(left, right)
+				pass, err = template.LessEqual(left, right)
 			case ">=":
-				pass, err = greaterEqual(left, right)
+				pass, err = template.GreaterEqual(left, right)
 			case "exists":
-				pass = left.IsValid()
+				pass = lefts[0].IsValid()
 			default:
 				return results, fmt.Errorf("unrecognized filter operator %s", node.Operator)
 			}
