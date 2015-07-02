@@ -3,7 +3,7 @@ kind: ReplicationController
 metadata:
   name: monitoring-heapster-v5
   namespace: kube-system
-  labels: 
+  labels:
     k8s-app: heapster
     version: v5
     kubernetes.io/cluster-service: "true"

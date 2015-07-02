@@ -74,7 +74,7 @@ contexts:
 - context:
     cluster: local
     user: ${username}
-    namespace: ${SYSTEM_NAMESPACE} 
+    namespace: ${SYSTEM_NAMESPACE}
   name: service-account-context
 current-context: service-account-context
 EOF

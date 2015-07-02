@@ -201,7 +201,7 @@ var _ = Describe("DNS", func() {
 
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
-		// TODO: Should these be changed to kubernetes.kube-system etc. ?
+		// kubernetes service is in the default namespace, not in kube-system
 		namesToResolve := []string{
 			"kubernetes.default",
 			"kubernetes.default.svc",

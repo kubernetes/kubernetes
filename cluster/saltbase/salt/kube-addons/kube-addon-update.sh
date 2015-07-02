@@ -497,4 +497,3 @@ fi
 
 addon_path=$1
 update-addons ${addon_path}
-

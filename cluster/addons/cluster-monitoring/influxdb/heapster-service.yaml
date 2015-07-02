@@ -1,9 +1,9 @@
 kind: Service
 apiVersion: v1
-metadata:
+metadata: 
   name: monitoring-heapster
   namespace: kube-system
-  labels:
+  labels: 
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "Heapster"
 spec: 

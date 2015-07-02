@@ -1,7 +1,7 @@
 kind: Service
 apiVersion: v1beta1
 id: kube-dns
-namespace: default
+namespace: kube-system
 protocol: UDP
 port: 53
 portalIP: {{ pillar['dns_server'] }}
