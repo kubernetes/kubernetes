@@ -76,7 +76,6 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 
 func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	port := cmdutil.GetFlagInt(cmd, "port")
-	fmt.Fprintf(out, "Starting to serve on localhost:%d", port)
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
@@ -107,6 +106,12 @@ func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
-	glog.Fatal(server.Serve(port))
+	err = server.ListenPort(port)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "Listening on localhost:%d\n", port)
+	glog.Fatal(server.Serve())
 	return nil
 }
