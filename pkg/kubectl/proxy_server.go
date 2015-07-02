@@ -106,8 +106,17 @@ func (f *FilterServer) HandlerFor(delegate http.Handler) *FilterServer {
 	return &f2
 }
 
+// Get host from a host header value like "localhost" or "localhost:8080"
+func extractHost(header string) (host string) {
+	host, _, err := net.SplitHostPort(header)
+	if err != nil {
+		host = header
+	}
+	return host
+}
+
 func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	host, _, _ := net.SplitHostPort(req.Host)
+	host := extractHost(req.Host)
 	if f.accept(req.Method, req.URL.Path, host) {
 		f.delegate.ServeHTTP(rw, req)
 		return
