@@ -77,7 +77,7 @@ Every object kind MUST have the following metadata in a nested object field call
 
 * namespace: a namespace is a DNS compatible subdomain that objects are subdivided into. The default namespace is 'default'.  See [namespaces.md](namespaces.md) for more.
 * name: a string that uniquely identifies this object within the current namespace (see [identifiers.md](identifiers.md)). This value is used in the path when retrieving an individual object.
-* uid: a unique in time and space value (typically an RFC 4122 generated identifier, see [identifiers.md](identifiers.md)) used to distinguish between objects with the same name that have been deleted and recreated
+* uid: a unique in time and space value (typically an RFC 4122 generated identifier, see [identifiers.md](identifiers.md)) used to distinguish between objects with the same name that have been deleted and recreated. Objects with a different kind may have the same uid.
 
 Every object SHOULD have the following metadata in a nested object field called "metadata":
 
