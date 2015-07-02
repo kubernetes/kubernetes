@@ -115,15 +115,20 @@ func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper
 	if err != nil {
 		return err
 	}
+	isFound := false
 	for ix := range infos {
 		info := infos[ix]
 		if strings.HasPrefix(info.Name, prefix) {
+			isFound = true
 			s, err := describer.Describe(info.Namespace, info.Name)
 			if err != nil {
 				return err
 			}
 			fmt.Fprintf(out, "%s\n", s)
 		}
+	}
+	if !isFound {
+		return fmt.Errorf("%v %q not found", rsrc, prefix)
 	}
 	return nil
 }
