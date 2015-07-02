@@ -321,9 +321,11 @@ func NewMainKubelet(
 	}
 	klet.containerManager = containerManager
 
-	// Start syncing node status immediately, this may set up things the runtime needs to run.
 	go util.Until(klet.syncNetworkStatus, 30*time.Second, util.NeverStop)
-	go klet.syncNodeStatus()
+	if klet.kubeClient != nil {
+		// Start syncing node status immediately, this may set up things the runtime needs to run.
+		go util.Until(klet.syncNodeStatus, klet.nodeStatusUpdateFrequency, util.NeverStop)
+	}
 
 	// Wait for the runtime to be up with a timeout.
 	if err := waitUntilRuntimeIsUp(klet.containerRuntime, maxWaitForContainerRuntime); err != nil {
@@ -399,6 +401,8 @@ type Kubelet struct {
 
 	// Set to true to have the node register itself with the apiserver.
 	registerNode bool
+	// for internal book keeping; access only from within registerWithApiserver
+	registrationCompleted bool
 
 	// Set to true if the kubelet is in standalone mode (i.e. setup without an apiserver)
 	standaloneMode bool
@@ -763,8 +767,13 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	return node, nil
 }
 
-// registerWithApiserver registers the node with the cluster master.
+// registerWithApiserver registers the node with the cluster master. It is safe
+// to call multiple times, but not concurrently (kl.registrationCompleted is
+// not locked).
 func (kl *Kubelet) registerWithApiserver() {
+	if kl.registrationCompleted {
+		return
+	}
 	step := 100 * time.Millisecond
 	for {
 		time.Sleep(step)
@@ -780,45 +789,54 @@ func (kl *Kubelet) registerWithApiserver() {
 		}
 		glog.V(2).Infof("Attempting to register node %s", node.Name)
 		if _, err := kl.kubeClient.Nodes().Create(node); err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				currentNode, err := kl.kubeClient.Nodes().Get(kl.nodeName)
-				if err != nil {
-					glog.Errorf("error getting node %q: %v", kl.nodeName, err)
-					continue
-				}
-				if currentNode == nil {
-					glog.Errorf("no node instance returned for %q", kl.nodeName)
-					continue
-				}
-				if currentNode.Spec.ExternalID == node.Spec.ExternalID {
-					glog.Infof("Node %s was previously registered", node.Name)
-					return
-				}
+			if !apierrors.IsAlreadyExists(err) {
+				glog.V(2).Infof("Unable to register %s with the apiserver: %v", node.Name, err)
+				continue
 			}
-			glog.V(2).Infof("Unable to register %s with the apiserver: %v", node.Name, err)
+			currentNode, err := kl.kubeClient.Nodes().Get(kl.nodeName)
+			if err != nil {
+				glog.Errorf("error getting node %q: %v", kl.nodeName, err)
+				continue
+			}
+			if currentNode == nil {
+				glog.Errorf("no node instance returned for %q", kl.nodeName)
+				continue
+			}
+			if currentNode.Spec.ExternalID == node.Spec.ExternalID {
+				glog.Infof("Node %s was previously registered", node.Name)
+				kl.registrationCompleted = true
+				return
+			}
+			glog.Errorf(
+				"Previously %q had externalID %q; now it is %q; will delete and recreate.",
+				kl.nodeName, node.Spec.ExternalID, currentNode.Spec.ExternalID,
+			)
+			if err := kl.kubeClient.Nodes().Delete(node.Name); err != nil {
+				glog.Errorf("Unable to delete old node: %v", err)
+			} else {
+				glog.Errorf("Deleted old node object %q", kl.nodeName)
+			}
 			continue
 		}
 		glog.Infof("Successfully registered node %s", node.Name)
+		kl.registrationCompleted = true
 		return
 	}
 }
 
-// syncNodeStatus periodically synchronizes node status to master.
+// syncNodeStatus should be called periodically from a goroutine.
+// It synchronizes node status to master, registering the kubelet first if
+// necessary.
 func (kl *Kubelet) syncNodeStatus() {
 	if kl.kubeClient == nil {
 		return
 	}
 	if kl.registerNode {
+		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithApiserver()
 	}
-	glog.Infof("Starting node status updates")
-	for {
-		select {
-		case <-time.After(kl.nodeStatusUpdateFrequency):
-			if err := kl.updateNodeStatus(); err != nil {
-				glog.Errorf("Unable to update node status: %v", err)
-			}
-		}
+	if err := kl.updateNodeStatus(); err != nil {
+		glog.Errorf("Unable to update node status: %v", err)
 	}
 }
 
