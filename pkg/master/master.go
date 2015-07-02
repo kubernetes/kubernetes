@@ -71,6 +71,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	nodeutil "github.com/GoogleCloudPlatform/kubernetes/pkg/util/node"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
@@ -412,7 +413,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	podStorage := podetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
+	podStorage := podetcd.NewStorage(c.EtcdHelper, c.KubeletClient, m)
 	podRegistry := pod.NewRegistry(podStorage.Pod)
 
 	podTemplateStorage := podtemplateetcd.NewREST(c.EtcdHelper)
@@ -831,6 +832,18 @@ func (m *Master) getNodeAddresses() ([]string, error) {
 		addrs = append(addrs, addr)
 	}
 	return addrs, nil
+}
+
+func (m *Master) GetMinionHost(nodeName string) (string, error) {
+	node, err := m.nodeRegistry.GetMinion(api.NewDefaultContext(), nodeName)
+	if err != nil {
+		return "", err
+	}
+	hostIP, err := nodeutil.GetNodeHostIP(node)
+	if err != nil {
+		return "", err
+	}
+	return hostIP.String(), nil
 }
 
 func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {

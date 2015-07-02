@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
@@ -187,7 +188,7 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.U
 
 // LogLocation returns a the log URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
-func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodLogOptions) (*url.URL, http.RoundTripper, error) {
+func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, nodeInfo minion.MinionHostGetter, ctx api.Context, name string, opts *api.PodLogOptions) (*url.URL, http.RoundTripper, error) {
 
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
@@ -203,11 +204,16 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
-	nodeHost := pod.Spec.NodeName
-	if len(nodeHost) == 0 {
+	nodeName := pod.Spec.NodeName
+	if len(nodeName) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
 	}
+	nodeHost, err := nodeInfo.GetMinionHost(nodeName)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
 	if err != nil {
 		return nil, nil, err
@@ -230,7 +236,7 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 
 // ExecLocation returns the exec URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
-func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodExecOptions) (*url.URL, http.RoundTripper, error) {
+func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, nodeInfo minion.MinionHostGetter, ctx api.Context, name string, opts *api.PodExecOptions) (*url.URL, http.RoundTripper, error) {
 
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
@@ -246,10 +252,14 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
-	nodeHost := pod.Spec.NodeName
-	if len(nodeHost) == 0 {
+	nodeName := pod.Spec.NodeName
+	if len(nodeName) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+	}
+	nodeHost, err := nodeInfo.GetMinionHost(nodeName)
+	if err != nil {
+		return nil, nil, err
 	}
 	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
 	if err != nil {
@@ -281,17 +291,21 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 }
 
 // PortForwardLocation returns a the port-forward URL for a pod.
-func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
+func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, nodeInfo minion.MinionHostGetter, ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
 
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	nodeHost := pod.Spec.NodeName
-	if len(nodeHost) == 0 {
+	nodeName := pod.Spec.NodeName
+	if len(nodeName) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+	}
+	nodeHost, err := nodeInfo.GetMinionHost(nodeName)
+	if err != nil {
+		return nil, nil, err
 	}
 	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
 	if err != nil {
