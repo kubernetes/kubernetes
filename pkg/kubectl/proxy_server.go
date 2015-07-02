@@ -118,7 +118,8 @@ func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
 type ProxyServer struct {
-	handler http.Handler
+	handler  http.Handler
+	listener net.Listener
 }
 
 // NewProxyServer creates and installs a new ProxyServer.
@@ -156,13 +157,19 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 	return &ProxyServer{handler: mux}, nil
 }
 
-// Serve starts the server (http.DefaultServeMux) on given port, loops forever.
-func (s *ProxyServer) Serve(port int) error {
+// Start listening on the given port
+func (s *ProxyServer) ListenPort(port int) error {
+	var err error
+	s.listener, err = net.Listen("tcp", fmt.Sprintf(":%d", port))
+	return err
+}
+
+// Serve starts the server (http.DefaultServeMux), loops forever.
+func (s *ProxyServer) Serve() error {
 	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
 		Handler: s.handler,
 	}
-	return server.ListenAndServe()
+	return server.Serve(s.listener)
 }
 
 func newProxy(target *url.URL) *httputil.ReverseProxy {
