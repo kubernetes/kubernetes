@@ -313,7 +313,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string)
 			if found {
 				data, err := ioutil.ReadFile(path)
 				if err != nil {
-					glog.Errorf("Error on reading termination-log %s: %v", path, err)
+					result.status.State.Terminated.Message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
 				} else {
 					result.status.State.Terminated.Message = string(data)
 				}
