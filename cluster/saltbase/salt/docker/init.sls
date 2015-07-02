@@ -25,10 +25,10 @@ docker-io:
 docker:
   service.running:
     - enable: True
+    - require:
+      - pkg: docker-io
     - watch:
       - file: {{ environment_file }}
-      - pkg: docker-io
-    - require:
       - pkg: docker-io
 
 {% else %}
