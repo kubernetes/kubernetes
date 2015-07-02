@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	stop_long = `Gracefully shut down a resource by id or filename.
+	stop_long = `Gracefully shut down a resource by name or filename.
 
 Attempts to shut down and delete a resource that supports graceful termination.
 If the resource is scalable it will be scaled to 0 before deletion.`
@@ -49,8 +49,8 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Filenames util.StringList
 	}{}
 	cmd := &cobra.Command{
-		Use:     "stop (-f FILENAME | RESOURCE (ID | -l label | --all))",
-		Short:   "Gracefully shut down a resource by id or filename.",
+		Use:     "stop (-f FILENAME | RESOURCE (NAME | -l label | --all))",
+		Short:   "Gracefully shut down a resource by name or filename.",
 		Long:    stop_long,
 		Example: stop_example,
 		Run: func(cmd *cobra.Command, args []string) {
