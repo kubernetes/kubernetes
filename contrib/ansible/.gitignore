@@ -1,2 +1,4 @@
 myinventory
+group_vars/all.yml
+inventory
 *.swp
