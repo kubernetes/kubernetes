@@ -39,9 +39,9 @@ func calculateScore(requested, capacity int64, node string) int {
 	return int(((capacity - requested) * 10) / capacity)
 }
 
-// Calculate the occupancy on a node.  'node' has information about the resources on the node.
+// Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
+func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
 	for _, existingPod := range pods {
@@ -89,7 +89,42 @@ func LeastRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, minionL
 
 	list := algorithm.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateOccupancy(pod, node, podsToMachines[node.Name]))
+		list = append(list, calculateResourceOccupancy(pod, node, podsToMachines[node.Name]))
+	}
+	return list, nil
+}
+
+func min(l, r int64) (m int64) {
+	m = r
+	if l < r {
+		m = l
+	}
+	return m
+}
+
+// See comment for DumbSpreadingPriority()
+const dumbSpreadingDenominator int64 = 10
+
+// DumbSpreadingPriority is a priority function that favors nodes with fewer pods.
+// It works like LeastRequestedPeriority but instead of using 10 * percentage of machine free by resource,
+// it uses 10 * percentage of machine free by pod, with "percentage of machine free by pod" claculated as
+// (dumbSpreadingDenominator - number of pods already on the node + 1) / dumbSpreadingDenominator.
+// dumbSpreadingDenominator serves like the machine capacity in LeasRequestedPriority but is chosen
+// so that we equate one pod with a reasonable amount of resources when we combine all the scores together.
+func DumbSpreadingPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+	nodes, err := minionLister.List()
+	if err != nil {
+		return algorithm.HostPriorityList{}, err
+	}
+	podsToMachines, err := predicates.MapPodsToMachines(podLister)
+
+	list := algorithm.HostPriorityList{}
+	for _, node := range nodes.Items {
+		npods := int64(len(podsToMachines[node.Name]))
+		list = append(list, algorithm.HostPriority{
+			Host:  node.Name,
+			Score: calculateScore(min(npods+1, dumbSpreadingDenominator), dumbSpreadingDenominator, node.Name),
+		})
 	}
 	return list, nil
 }
