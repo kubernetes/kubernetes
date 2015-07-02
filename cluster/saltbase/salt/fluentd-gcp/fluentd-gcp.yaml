@@ -9,6 +9,7 @@ spec:
     resources:
       limits:
         cpu: 100m
+        memory: 200Mi
     env:
     - name: "FLUENTD_ARGS"
       value: "-qq"
