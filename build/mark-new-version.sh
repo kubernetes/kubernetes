@@ -40,8 +40,8 @@ VERSION_MAJOR="${BASH_REMATCH[1]}"
 VERSION_MINOR="${BASH_REMATCH[2]}"
 VERSION_PATCH="${BASH_REMATCH[3]}"
 
-if ! git diff-index --quiet --cached HEAD; then
-  echo "!!! You must not have any changes in your index when running this command"
+if ! git diff HEAD --quiet; then
+  echo "!!! You must not have any uncommitted changes when running this command"
   exit 1
 fi
 
