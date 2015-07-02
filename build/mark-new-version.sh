@@ -89,23 +89,20 @@ if ! ("$SED" --version 2>&1 | grep -q GNU); then
   echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
 fi
 
+echo "+++ Versioning documentation and examples"
+
+# Update the docs to match this version.
+perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" docs/README.md
+perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" examples/README.md
+
+# Update API descriptions to match this version.
+perl -pi -e "s|(releases.k8s.io)/HEAD|\$1/${NEW_VERSION}|" pkg/api/v[0-9]*/types.go
+
+${KUBE_ROOT}/hack/run-gendocs.sh
+${KUBE_ROOT}/hack/update-swagger-spec.sh
+git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+
 VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
-
-if [[ "${VERSION_PATCH}" == "0" ]]; then
-  RELEASE_DIR=release-${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
-  echo "+++ Cloning documentation and examples into ${RELEASE_DIR}/..."
-  mkdir ${RELEASE_DIR}
-  cp -r docs ${RELEASE_DIR}/docs
-  cp -r examples ${RELEASE_DIR}/examples
-
-  # Update the docs to match this version.
-  perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" ${RELEASE_DIR}/docs/README.md
-  perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" ${RELEASE_DIR}/examples/README.md
-
-  ${KUBE_ROOT}/hack/run-gendocs.sh
-  git add ${RELEASE_DIR}
-  git commit -m "Cloning docs for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
-fi
 
 GIT_MINOR="${VERSION_MINOR}.${VERSION_PATCH}"
 echo "+++ Updating to ${NEW_VERSION}"
