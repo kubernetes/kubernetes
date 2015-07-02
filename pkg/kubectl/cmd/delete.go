@@ -82,7 +82,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(filenames...).
+		FilenameParam(enforceNamespace, filenames...).
 		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
 		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).

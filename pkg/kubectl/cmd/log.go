@@ -100,7 +100,7 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return cmdutil.UsageError(cmd, "log POD [CONTAINER]")
 	}
 
-	namespace, err := f.DefaultNamespace()
+	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

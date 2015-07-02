@@ -87,9 +87,12 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 }
 
 // FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
+// If enforceNamespace is false, namespaces in the specs will be allowed to
+// override the default namespace. If it is true, namespaces that don't match
+// will cause an error.
 // If ContinueOnError() is set prior to this method, objects on the path that are not
 // recognized will be ignored (but logged at V(2)).
-func (b *Builder) FilenameParam(paths ...string) *Builder {
+func (b *Builder) FilenameParam(enforceNamespace bool, paths ...string) *Builder {
 	for _, s := range paths {
 		switch {
 		case s == "-":
@@ -105,6 +108,11 @@ func (b *Builder) FilenameParam(paths ...string) *Builder {
 			b.Path(s)
 		}
 	}
+
+	if enforceNamespace {
+		b.RequireNamespace()
+	}
+
 	return b
 }
 

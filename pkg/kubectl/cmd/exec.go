@@ -104,7 +104,7 @@ func extractPodAndContainer(cmd *cobra.Command, argsIn []string, p *execParams) 
 
 func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cmdErr io.Writer, p *execParams, argsIn []string, re remoteExecutor) error {
 	podName, containerName, args, err := extractPodAndContainer(cmd, argsIn, p)
-	namespace, err := f.DefaultNamespace()
+	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

@@ -77,7 +77,7 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		return err
 	}
 
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -95,8 +95,8 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		Schema(schema).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).RequireNamespace().
-		FilenameParam(filenames...).
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, filenames...).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -126,7 +126,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		return err
 	}
 
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(filenames...).
+		FilenameParam(enforceNamespace, filenames...).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
@@ -159,8 +159,8 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	r = resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		Schema(schema).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).RequireNamespace().
-		FilenameParam(filenames...).
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, filenames...).
 		Flatten().
 		Do()
 	err = r.Err()

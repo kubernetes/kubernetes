@@ -180,7 +180,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

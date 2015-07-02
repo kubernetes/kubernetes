@@ -59,7 +59,7 @@ $ kubectl describe po -l name=myLabel`,
 
 func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

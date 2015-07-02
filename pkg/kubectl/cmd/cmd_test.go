@@ -146,8 +146,8 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Validator: func() (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
-		DefaultNamespace: func() (string, error) {
-			return t.Namespace, t.Err
+		DefaultNamespace: func() (string, bool, error) {
+			return t.Namespace, false, t.Err
 		},
 		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
@@ -200,8 +200,8 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Validator: func() (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
-		DefaultNamespace: func() (string, error) {
-			return t.Namespace, t.Err
+		DefaultNamespace: func() (string, bool, error) {
+			return t.Namespace, false, t.Err
 		},
 		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
