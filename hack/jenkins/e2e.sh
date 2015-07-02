@@ -153,7 +153,7 @@ case ${JOB_NAME} in
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce-parallel. It
     # currently also excludes a slow namespace test.
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}|Namespaces\sDelete\s90\spercent\sof\s100\snamespace\sin\s150\sseconds"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
