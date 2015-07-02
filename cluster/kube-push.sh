@@ -25,7 +25,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function usage() {
   echo "${0} [-m|-n <node id>] <version>"
