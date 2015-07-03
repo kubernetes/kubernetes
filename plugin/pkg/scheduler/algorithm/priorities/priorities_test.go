@@ -109,6 +109,9 @@ func TestDumbSpreading(t *testing.T) {
 		list, err := scheduler.PrioritizeNodes(
 			test.pod,
 			algorithm.FakePodLister(test.pods),
+			// This should match the configuration in defaultPriorities() in
+			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
+			// to test what's actually in production.
 			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: DumbSpreadingPriority, Weight: 2}, {Function: NewServiceSpreadPriority(algorithm.FakeServiceLister([]api.Service{})), Weight: 1}},
 			algorithm.FakeMinionLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
