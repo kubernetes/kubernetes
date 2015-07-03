@@ -53,16 +53,20 @@ kube-proxy:
     - group: root
     - mode: 755
 
+{% endif %}
+
 kube-proxy-service:
   service.running:
     - name: kube-proxy
     - enable: True
     - watch:
       - file: {{ environment_file }}
+{% if pillar.get('is_systemd') %}
+      - file: {{ pillar.get('systemd_system_path') }}/kube-proxy.service
+{% else %}
       - file: /etc/init.d/kube-proxy
-      - file: /var/lib/kube-proxy/kubeconfig
-
 {% endif %}
+      - file: /var/lib/kube-proxy/kubeconfig
 
 /var/lib/kube-proxy/kubeconfig:
   file.managed:
