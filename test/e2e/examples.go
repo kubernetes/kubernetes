@@ -224,6 +224,56 @@ var _ = Describe("Examples e2e", func() {
 			})
 		})
 	})
+
+	Describe("[Skipped][Example]Storm", func() {
+		It("should create and stop Zookeeper, Nimbus and Storm worker servers", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "storm", file)
+			}
+			zookeeperServiceJson := mkpath("zookeeper-service.json")
+			zookeeperPodJson := mkpath("zookeeper.json")
+			nimbusServiceJson := mkpath("storm-nimbus-service.json")
+			nimbusPodJson := mkpath("storm-nimbus.json")
+			workerControllerJson := mkpath("storm-worker-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			zookeeperPod := "zookeeper"
+
+			By("starting Zookeeper")
+			runKubectl("create", "-f", zookeeperPodJson, nsFlag)
+			runKubectl("create", "-f", zookeeperServiceJson, nsFlag)
+			err := waitForPodRunningInNamespace(c, zookeeperPod, ns)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking if zookeeper is up and running")
+			_, err = lookForStringInLog(ns, zookeeperPod, "zookeeper", "binding to port", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("starting Nimbus")
+			runKubectl("create", "-f", nimbusPodJson, nsFlag)
+			runKubectl("create", "-f", nimbusServiceJson, nsFlag)
+			err = waitForPodRunningInNamespace(c, "nimbus", ns)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("starting workers")
+			runKubectl("create", "-f", workerControllerJson, nsFlag)
+			forEachPod(c, ns, "name", "storm-worker", func(pod api.Pod) {
+				//do nothing, just wait for the pod to be running
+			})
+			// TODO: Add logging configuration to nimbus & workers images and then
+			// look for a string instead of sleeping.
+			time.Sleep(20 * time.Second)
+
+			By("checking if there are established connections to Zookeeper")
+			_, err = lookForStringInLog(ns, zookeeperPod, "zookeeper", "Established session", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking if Nimbus responds to requests")
+			lookForString("No topologies running.", time.Minute, func() string {
+				return runKubectl("exec", "nimbus", nsFlag, "--", "bin/storm", "list")
+			})
+		})
+	})
+
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {

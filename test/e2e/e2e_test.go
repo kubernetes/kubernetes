@@ -116,7 +116,7 @@ func TestE2E(t *testing.T) {
 		}
 	}
 
-	// Disable density test unless it's explicitly requested.
+	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
 		config.GinkgoConfig.SkipString = "Skipped"
 	}
