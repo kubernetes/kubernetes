@@ -1,5 +1,5 @@
 {% set daemon_args = "$DAEMON_ARGS" -%}
-{% if pillar.get('is_systemd') -%}
+{% if grains['os_family'] == 'RedHat' -%}
   {% set daemon_args = "" -%}
 {% endif -%}
 
