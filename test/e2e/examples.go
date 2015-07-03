@@ -75,13 +75,6 @@ var _ = Describe("Examples e2e", func() {
 
 			By("starting redis bootstrap")
 			runKubectl("create", "-f", bootstrapYaml, nsFlag)
-			cleanupBootstrap := true
-			defer func() {
-				if cleanupBootstrap {
-					cleanup(bootstrapYaml, ns, "name=redis", "name=redis-sentinel")
-				}
-			}()
-
 			err := waitForPodRunningInNamespace(c, bootstrapPodName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -92,11 +85,8 @@ var _ = Describe("Examples e2e", func() {
 
 			By("setting up services and controllers")
 			runKubectl("create", "-f", sentinelServiceYaml, nsFlag)
-			defer cleanup(sentinelServiceYaml, ns, "name=redis-sentinel")
 			runKubectl("create", "-f", sentinelControllerYaml, nsFlag)
-			defer cleanup(sentinelControllerYaml, ns, "name=redis-sentinel")
 			runKubectl("create", "-f", controllerYaml, nsFlag)
-			defer cleanup(controllerYaml, ns, "name=redis")
 
 			By("scaling up the deployment")
 			runKubectl("scale", "rc", redisRC, "--replicas=3", nsFlag)
@@ -121,10 +111,8 @@ var _ = Describe("Examples e2e", func() {
 
 			By("turning down bootstrap")
 			runKubectl("delete", "-f", bootstrapYaml, nsFlag)
-			cleanupBootstrap = false
 			err = waitForRCPodToDisappear(c, ns, redisRC, bootstrapPodName)
 			Expect(err).NotTo(HaveOccurred())
-
 			By("waiting for the new master election")
 			checkAllLogs()
 		})
@@ -143,17 +131,13 @@ var _ = Describe("Examples e2e", func() {
 
 			By("starting rabbitmq")
 			runKubectl("create", "-f", rabbitmqServiceYaml, nsFlag)
-			defer cleanup(rabbitmqServiceYaml, ns, "component=rabbitmq")
 			runKubectl("create", "-f", rabbitmqControllerYaml, nsFlag)
-			defer cleanup(rabbitmqControllerYaml, ns, "component=rabbitmq")
 			forEachPod(c, ns, "component", "rabbitmq", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "rabbitmq", "Server startup complete", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
 			})
-
 			By("starting celery")
 			runKubectl("create", "-f", celeryControllerYaml, nsFlag)
-			defer cleanup(celeryControllerYaml, ns, "component=celery")
 			forEachPod(c, ns, "component", "celery", func(pod api.Pod) {
 				_, err := lookForStringInFile(ns, pod.Name, "celery", "/data/celery.log", " ready.", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -161,7 +145,6 @@ var _ = Describe("Examples e2e", func() {
 
 			By("starting flower")
 			runKubectl("create", "-f", flowerControllerYaml, nsFlag)
-			defer cleanup(flowerControllerYaml, ns, "component=flower")
 			forEachPod(c, ns, "component", "flower", func(pod api.Pod) {
 				//TODO: Do a http request after a flower service is added to the example.
 			})
