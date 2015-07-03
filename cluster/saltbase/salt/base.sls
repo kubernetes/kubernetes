@@ -10,4 +10,5 @@ pkg-core:
       - apt-transport-https
       - python-apt
       - glusterfs-client
+      - socat
 {% endif %}
