@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -964,7 +965,7 @@ func (self *awsInstanceType) getEBSMountDevices() []string {
 	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
 	devices := []string{}
 	for c := 'f'; c <= 'p'; c++ {
-		devices = append(devices, fmt.Sprintf("/dev/sd%c", c))
+		devices = append(devices, fmt.Sprintf("%c", c))
 	}
 	return devices
 }
@@ -1021,9 +1022,9 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 	return instances[0], nil
 }
 
-// Assigns an unused mount device for the specified volume.
-// If the volume is already assigned, this will return the existing mount device and true
-func (self *awsInstance) assignMountDevice(volumeID string) (mountDevice string, alreadyAttached bool, err error) {
+// Assigns an unused mountpoint (device) for the specified volume.
+// If the volume is already assigned, this will return the existing mountpoint and true
+func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
@@ -1043,16 +1044,23 @@ func (self *awsInstance) assignMountDevice(volumeID string) (mountDevice string,
 		}
 		deviceMappings := map[string]string{}
 		for _, blockDevice := range info.BlockDeviceMappings {
-			deviceMappings[orEmpty(blockDevice.DeviceName)] = orEmpty(blockDevice.EBS.VolumeID)
+			mountpoint := orEmpty(blockDevice.DeviceName)
+			if strings.HasPrefix(mountpoint, "/dev/sd") {
+				mountpoint = mountpoint[7:]
+			}
+			if strings.HasPrefix(mountpoint, "/dev/xvd") {
+				mountpoint = mountpoint[8:]
+			}
+			deviceMappings[mountpoint] = orEmpty(blockDevice.EBS.VolumeID)
 		}
 		self.deviceMappings = deviceMappings
 	}
 
 	// Check to see if this volume is already assigned a device on this machine
-	for deviceName, mappingVolumeID := range self.deviceMappings {
+	for mountpoint, mappingVolumeID := range self.deviceMappings {
 		if volumeID == mappingVolumeID {
-			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", deviceName, mappingVolumeID)
-			return deviceName, true, nil
+			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountpoint, mappingVolumeID)
+			return mountpoint, true, nil
 		}
 	}
 
@@ -1277,20 +1285,29 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountDevice, alreadyAttached, err := awsInstance.assignMountDevice(disk.awsID)
+	mountpoint, alreadyAttached, err := awsInstance.assignMountpoint(disk.awsID)
 	if err != nil {
 		return "", err
+	}
+
+	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
+	hostDevice := "/dev/xvd" + mountpoint
+	// In the EC2 API, it is sometimes is /dev/sdX and sometimes /dev/xvdX
+	// We are running on the node here, so we check if /dev/xvda exists to determine this
+	ec2Device := "/dev/xvd" + mountpoint
+	if _, err := os.Stat("/dev/xvda"); os.IsNotExist(err) {
+		ec2Device = "/dev/sd" + mountpoint
 	}
 
 	attached := false
 	defer func() {
 		if !attached {
-			awsInstance.releaseMountDevice(disk.awsID, mountDevice)
+			awsInstance.releaseMountDevice(disk.awsID, ec2Device)
 		}
 	}()
 
 	if !alreadyAttached {
-		attachResponse, err := aws.ec2.AttachVolume(disk.awsID, awsInstance.awsID, mountDevice)
+		attachResponse, err := aws.ec2.AttachVolume(disk.awsID, awsInstance.awsID, ec2Device)
 		if err != nil {
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
@@ -1306,11 +1323,6 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 
 	attached = true
 
-	hostDevice := mountDevice
-	if strings.HasPrefix(hostDevice, "/dev/sd") {
-		// Inside the instance, the mountpoint /dev/sdf looks like /dev/xvdf
-		hostDevice = "/dev/xvd" + hostDevice[7:]
-	}
 	return hostDevice, nil
 }
 
