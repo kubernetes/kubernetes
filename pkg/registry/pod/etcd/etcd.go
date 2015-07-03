@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	genericrest "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -55,7 +56,7 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter) PodStorage {
+func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter, m minion.MinionHostGetter) PodStorage {
 	prefix := "/pods"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
@@ -92,10 +93,10 @@ func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter) PodStorage {
 		Pod:         &REST{*store},
 		Binding:     &BindingREST{store: store},
 		Status:      &StatusREST{store: &statusStore},
-		Log:         &LogREST{store: store, kubeletConn: k},
+		Log:         &LogREST{store: store, kubeletConn: k, minionHostGetter: m},
 		Proxy:       &ProxyREST{store: store},
-		Exec:        &ExecREST{store: store, kubeletConn: k},
-		PortForward: &PortForwardREST{store: store, kubeletConn: k},
+		Exec:        &ExecREST{store: store, kubeletConn: k, minionHostGetter: m},
+		PortForward: &PortForwardREST{store: store, kubeletConn: k, minionHostGetter: m},
 	}
 }
 
@@ -205,8 +206,9 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 
 // LogREST implements the log endpoint for a Pod
 type LogREST struct {
-	store       *etcdgeneric.Etcd
-	kubeletConn client.ConnectionInfoGetter
+	store            *etcdgeneric.Etcd
+	kubeletConn      client.ConnectionInfoGetter
+	minionHostGetter minion.MinionHostGetter
 }
 
 // LogREST implements GetterWithOptions
@@ -224,7 +226,7 @@ func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtim
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.LogLocation(r.store, r.kubeletConn, ctx, name, logOpts)
+	location, transport, err := pod.LogLocation(r.store, r.kubeletConn, r.minionHostGetter, ctx, name, logOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -285,8 +287,9 @@ var upgradeableMethods = []string{"GET", "POST"}
 
 // ExecREST implements the exec subresource for a Pod
 type ExecREST struct {
-	store       *etcdgeneric.Etcd
-	kubeletConn client.ConnectionInfoGetter
+	store            *etcdgeneric.Etcd
+	kubeletConn      client.ConnectionInfoGetter
+	minionHostGetter minion.MinionHostGetter
 }
 
 // Implement Connecter
@@ -303,7 +306,7 @@ func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object) (r
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.ExecLocation(r.store, r.kubeletConn, ctx, name, execOpts)
+	location, transport, err := pod.ExecLocation(r.store, r.kubeletConn, r.minionHostGetter, ctx, name, execOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -322,8 +325,9 @@ func (r *ExecREST) ConnectMethods() []string {
 
 // PortForwardREST implements the portforward subresource for a Pod
 type PortForwardREST struct {
-	store       *etcdgeneric.Etcd
-	kubeletConn client.ConnectionInfoGetter
+	store            *etcdgeneric.Etcd
+	kubeletConn      client.ConnectionInfoGetter
+	minionHostGetter minion.MinionHostGetter
 }
 
 // Implement Connecter
@@ -346,7 +350,7 @@ func (r *PortForwardREST) ConnectMethods() []string {
 
 // Connect returns a handler for the pod portforward proxy
 func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Object) (rest.ConnectHandler, error) {
-	location, transport, err := pod.PortForwardLocation(r.store, r.kubeletConn, ctx, name)
+	location, transport, err := pod.PortForwardLocation(r.store, r.kubeletConn, r.minionHostGetter, ctx, name)
 	if err != nil {
 		return nil, err
 	}

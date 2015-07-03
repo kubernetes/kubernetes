@@ -34,6 +34,11 @@ type Registry interface {
 	WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
+// MinionHostGetter is an interface for mapping a NodeName to an (internal) host name
+type MinionHostGetter interface {
+	GetMinionHost(nodeName string) (host string, err error)
+}
+
 // storage puts strong typing around storage calls
 type storage struct {
 	rest.StandardStorage
