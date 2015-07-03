@@ -330,7 +330,15 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	// and cause it to fail if DNS is absent or broken.
 	// Use the IP address instead.
 
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", testContext.CloudConfig.MasterName)
+	destination := testContext.CloudConfig.MasterName
+	if providerIs("aws") {
+		// This is the (internal) IP address used on AWS for the master
+		// TODO: Use IP address for all clouds?
+		// TODO: Avoid hard-coding this
+		destination = "172.20.0.9"
+	}
+
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", destination)
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
