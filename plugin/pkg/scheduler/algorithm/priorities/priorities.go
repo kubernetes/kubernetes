@@ -62,7 +62,8 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
-	glog.V(10).Infof(
+//	glog.V(10).Infof(
+	glog.Infof(
 		"%v -> %v: Least Requested Priority, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d, %d)",
 		pod.Name, node.Name,
 		totalMilliCPU, totalMemory,
@@ -121,9 +122,15 @@ func DumbSpreadingPriority(pod *api.Pod, podLister algorithm.PodLister, minionLi
 	list := algorithm.HostPriorityList{}
 	for _, node := range nodes.Items {
 		npods := int64(len(podsToMachines[node.Name]))
+		score := calculateScore(min(npods+1, dumbSpreadingDenominator), dumbSpreadingDenominator, node.Name)
+//		glog.V(10).Infof(
+		glog.Infof(
+			"%v -> %v: DumbSpreadPriority, Old # pods (%d) Score: (%d)",
+			pod.Name, node.Name, npods, score,
+		)
 		list = append(list, algorithm.HostPriority{
 			Host:  node.Name,
-			Score: calculateScore(min(npods+1, dumbSpreadingDenominator), dumbSpreadingDenominator, node.Name),
+			Score: score,
 		})
 	}
 	return list, nil
@@ -225,7 +232,8 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 		diff := math.Abs(cpuFraction - memoryFraction)
 		score = int(10 - diff*10)
 	}
-	glog.V(10).Infof(
+//	glog.V(10).Infof(
+	glog.Infof(
 		"%v -> %v: Balanced Resource Allocation, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d)",
 		pod.Name, node.Name,
 		totalMilliCPU, totalMemory,

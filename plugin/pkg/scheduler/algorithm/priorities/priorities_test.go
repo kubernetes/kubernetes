@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
@@ -37,6 +38,88 @@ func makeMinion(node string, milliCPU, memory int64) api.Node {
 		},
 	}
 }
+
+func TestDumbSpreading(t *testing.T) {
+	noResources := api.PodSpec{
+		Containers: []api.Container{},
+	}
+	small := api.PodSpec{
+		NodeName: "machine1",
+		Containers: []api.Container{
+			{
+				Resources: api.ResourceRequirements{
+					Limits: api.ResourceList{
+						"cpu": resource.MustParse("100m"),
+						"memory": resource.MustParse("1000"),
+					},
+				},
+			},
+		},
+	}
+	large := api.PodSpec{
+		NodeName: "machine2",
+		Containers: []api.Container{
+			{
+				Resources: api.ResourceRequirements{
+					Limits: api.ResourceList{
+						"cpu": resource.MustParse("600m"),
+						"memory": resource.MustParse("6000"),
+					},
+				},
+			},
+		},
+	}
+	tests := []struct {
+		pod          *api.Pod
+		pods         []*api.Pod
+		nodes        []api.Node
+		expectedList algorithm.HostPriorityList
+		test         string
+	}{
+		{
+			/* Minion1 CPU capacity 1000m, free 700m/7000, 3 pods
+                           LeastRequestedPriority score 7
+                           BalancedResourceAllocation score 10
+                           ServiceSpreadingPriority score 10
+                           DumbSpreadingPriority score 6
+                           Total: 7 + 10 + 10 + 2*6 = 39
+
+                           Minion2 CPU capacity 1000m, free 400m/4000, 1 pod
+                           LeastRequestedPriority score 4
+                           BalancedResourceAllocation score 10
+                           ServiceSpreadingPriority score 10 
+                           DumbSpreadingPriority score 8
+                           Total: 4 + 10 + 10 + 2*8 = 40
+
+                           Moral of the story: We prefer the machine that is more heavily loaded,
+                           because it has fewer pods.
+                         */
+			pod:          &api.Pod{Spec: noResources},
+			nodes:        []api.Node{makeMinion("machine1", 1000, 10000), makeMinion("machine2", 1000, 10000)},
+			expectedList: []algorithm.HostPriority{{"machine1", 39}, {"machine2", 40}},
+			test:         "nothing scheduled, nothing requested",
+			pods: []*api.Pod {
+				{Spec: small}, {Spec: small}, {Spec: small},
+				{Spec: large},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		list, err := scheduler.PrioritizeNodes(
+			test.pod,
+			algorithm.FakePodLister(test.pods),
+			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: DumbSpreadingPriority, Weight: 2}, {Function: NewServiceSpreadPriority(algorithm.FakeServiceLister([]api.Service{})), Weight: 1}},
+			algorithm.FakeMinionLister(api.NodeList{Items: test.nodes}))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(test.expectedList, list) {
+			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+		}
+	}
+}
+
 
 func TestLeastRequested(t *testing.T) {
 	labels1 := map[string]string{
