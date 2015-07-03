@@ -770,6 +770,13 @@ function kube-up {
   # Get or create master persistent volume
   ensure-master-pd
 
+  # Determine extra certificate names for master
+  octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
+  ((octets[3]+=1))
+  service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
+  MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
+
+
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
     echo "#! /bin/bash"
@@ -800,6 +807,7 @@ function kube-up {
     echo "readonly KUBELET_TOKEN='${KUBELET_TOKEN}'"
     echo "readonly KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN}'"
     echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
+    echo "readonly MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
