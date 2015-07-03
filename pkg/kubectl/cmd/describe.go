@@ -112,7 +112,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	infos, err := r.Infos()
 	if err != nil {
 		if apierrors.IsNotFound(err) && len(args) == 2 {
-			return DescribeMatchingResources(mapper, typer, describer, f, cmdNamespace, args[0], args[1], out)
+			return DescribeMatchingResources(mapper, typer, describer, f, cmdNamespace, args[0], args[1], out, err)
 		}
 		return err
 	}
@@ -128,7 +128,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	return nil
 }
 
-func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, describer kubectl.Describer, f *cmdutil.Factory, namespace, rsrc, prefix string, out io.Writer) error {
+func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, describer kubectl.Describer, f *cmdutil.Factory, namespace, rsrc, prefix string, out io.Writer, originalError error) error {
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(true, rsrc).
@@ -152,7 +152,7 @@ func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper
 		}
 	}
 	if !isFound {
-		return fmt.Errorf("%v %q not found", rsrc, prefix)
+		return originalError
 	}
 	return nil
 }
