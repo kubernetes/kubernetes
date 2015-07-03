@@ -151,5 +151,6 @@ kube-addons:
     - watch:
 {% if pillar.get('is_systemd') %}
       - file: {{ pillar.get('systemd_system_path') }}/kube-addons.service
+{% else %}
+      - file: /etc/init.d/kube-addons
 {% endif %}
-
