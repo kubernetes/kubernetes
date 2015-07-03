@@ -138,7 +138,7 @@ func (s *Scheduler) scheduleOne() {
 	}
 
 	// We want to add the pod to the model iff the bind succeeds, but we don't want to race
-	// with any deletions, which happen asyncronously.
+	// with any deletions, which happen asynchronously.
 	s.config.Modeler.LockedAction(func() {
 		bindingStart := time.Now()
 		err := s.config.Binder.Bind(b)
