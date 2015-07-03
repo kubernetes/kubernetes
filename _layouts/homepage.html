@@ -4,6 +4,22 @@ layout: default
 
 <h1 class="offscreen">Kubernetes by Google</h1>
 <div class="what">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-8 col-sm-8 col-lg-offset-2 col-md-offset-2 col-sm-offset-2">
+        <h2 class="text-blue underline">
+          {{page.announce.title}}
+        </h2>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-lg-8 col-md-8 col-sm-8 col-lg-offset-2 col-md-offset-2 col-sm-offset-2">
+        <a href="{{page.announce.buttons.button_1.url}}" class="button alt" {% if true == page.announce.buttons.button_1.external %}onclick="trackOutboundLink('{{page.announce.buttons.button_1.url}}'); return false;"{% endif %}>{{page.announce.buttons.button_1.label}}</a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="what">
  <div class="container">
   <div class="row">
    <div class="col-lg-8 col-md-8 col-sm-8 col-lg-offset-2 col-md-offset-2 col-sm-offset-2">
