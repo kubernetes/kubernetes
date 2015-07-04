@@ -15,10 +15,10 @@ coreos:
         [Service]
         ExecStart=/opt/kubernetes/bin/kubelet \
         --address=0.0.0.0 \
-        --hostname_override=${MINION_IPS[$i]} \
-        --api_servers=http://${MASTER_IP}:8080 \
-        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster_dns=${DNS_SERVER_IP}" ) \
-        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster_domain=${DNS_DOMAIN}" ) \
+        --hostname-override=${MINION_IPS[$i]} \
+        --api-servers=http://${MASTER_IP}:8080 \
+        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-dns=${DNS_SERVER_IP}" ) \
+        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-domain=${DNS_DOMAIN}" ) \
         --config=/opt/kubernetes/manifests
         Restart=always
         RestartSec=2

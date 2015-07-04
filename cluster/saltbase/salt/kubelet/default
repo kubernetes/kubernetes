@@ -4,15 +4,15 @@
 {% endif -%}
 
 {% if grains.api_servers is defined -%}
-  {% set api_servers = "--api_servers=https://" + grains.api_servers -%}
+  {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
 {% elif grains.apiservers is defined -%} # TODO(remove after 0.16.0): Deprecated form
-  {% set api_servers = "--api_servers=https://" + grains.apiservers -%}
+  {% set api_servers = "--api-servers=https://" + grains.apiservers -%}
 {% elif grains['roles'][0] == 'kubernetes-master' -%}
   {% set master_ipv4 = salt['grains.get']('fqdn_ip4')[0] -%}
-  {% set api_servers = "--api_servers=https://" + master_ipv4 -%}
+  {% set api_servers = "--api-servers=https://" + master_ipv4 -%}
 {% else -%}
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-  {% set api_servers = "--api_servers=https://" + ips[0][0] -%}
+  {% set api_servers = "--api-servers=https://" + ips[0][0] -%}
 {% endif -%}
 
 # TODO: remove nginx for other cloud providers.
@@ -44,7 +44,7 @@
 
 {% set cloud_provider = "" -%}
 {% if grains.cloud is defined -%}
-  {% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
+  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 {% endif -%}
 
 {% set config = "--config=/etc/kubernetes/manifests" -%}
@@ -56,24 +56,24 @@
 
 {% set hostname_override = "" -%}
 {% if grains.hostname_override is defined -%}
-  {% set hostname_override = " --hostname_override=" + grains.hostname_override -%}
+  {% set hostname_override = " --hostname-override=" + grains.hostname_override -%}
 {% endif -%}
 
 {% set cluster_dns = "" %}
 {% set cluster_domain = "" %}
 {% if pillar.get('enable_cluster_dns', '').lower() == 'true' %}
-  {% set cluster_dns = "--cluster_dns=" + pillar['dns_server'] %}
-  {% set cluster_domain = "--cluster_domain=" + pillar['dns_domain'] %}
+  {% set cluster_dns = "--cluster-dns=" + pillar['dns_server'] %}
+  {% set cluster_domain = "--cluster-domain=" + pillar['dns_domain'] %}
 {% endif %}
 
 {% set docker_root = "" -%}
 {% if grains.docker_root is defined -%}
-  {% set docker_root = " --docker_root=" + grains.docker_root -%}
+  {% set docker_root = " --docker-root=" + grains.docker_root -%}
 {% endif -%}
 
 {% set kubelet_root = "" -%}
 {% if grains.kubelet_root is defined -%}
-  {% set kubelet_root = " --root_dir=" + grains.kubelet_root -%}
+  {% set kubelet_root = " --root-dir=" + grains.kubelet_root -%}
 {% endif -%}
 
 {% set configure_cbr0 = "" -%}
@@ -86,10 +86,10 @@
 {% set cgroup_root = "" -%}
 {% if grains['os_family'] == 'Debian' -%}
   {% set system_container = "--system-container=/system" -%}
-  {% set cgroup_root = "--cgroup_root=/" -%}
+  {% set cgroup_root = "--cgroup-root=/" -%}
 {% endif -%}
 {% if grains['oscodename'] == 'vivid' -%}
-  {% set cgroup_root = "--cgroup_root=docker" -%}
+  {% set cgroup_root = "--cgroup-root=docker" -%}
 {% endif -%}
 
 {% set pod_cidr = "" %}
@@ -103,4 +103,4 @@
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{test_args}}"

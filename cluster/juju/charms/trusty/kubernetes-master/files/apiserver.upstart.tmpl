@@ -9,7 +9,7 @@ kill timeout 30 # wait 30s between SIGTERM and SIGKILL.
 
 exec /usr/local/bin/apiserver \
      --address=%(api_bind_address)s \
-     --etcd_servers=%(etcd_servers)s \
+     --etcd-servers=%(etcd_servers)s \
      --logtostderr=true \
      --service-cluster-ip-range=10.244.240.0/20
 

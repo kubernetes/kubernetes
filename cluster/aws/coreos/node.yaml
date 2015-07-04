@@ -65,12 +65,12 @@ coreos:
         ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/run/setup-auth.sh
         ExecStart=/opt/kubernetes/server/bin/kubelet \
-        --api_servers=https://${MASTER_IP} \
+        --api-servers=https://${MASTER_IP} \
         --config=/etc/kubernetes/manifests \
-        --allow_privileged=False \
+        --allow-privileged=False \
         --v=2 \
-        --cluster_dns=10.0.0.10 \
-        --cluster_domain=${DNS_DOMAIN} \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
         --hostname-override=${HOSTNAME_OVERRIDE} \
         --container-runtime=${KUBERNETES_CONTAINER_RUNTIME}
