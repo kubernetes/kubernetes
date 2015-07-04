@@ -99,29 +99,29 @@ kube::log::status "Running kubectl with no options"
 
 kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
-  --really_crash_for_testing=true \
-  --root_dir=/tmp/kubelet.$$ \
-  --cert_dir="${TMPDIR:-/tmp/}" \
-  --docker_endpoint="fake://" \
-  --hostname_override="127.0.0.1" \
+  --really-crash-for-testing=true \
+  --root-dir=/tmp/kubelet.$$ \
+  --cert-dir="${TMPDIR:-/tmp/}" \
+  --docker-endpoint="fake://" \
+  --hostname-override="127.0.0.1" \
   --address="127.0.0.1" \
   --port="$KUBELET_PORT" \
-  --healthz_port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
+  --healthz-port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
 KUBELET_PID=$!
 kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet(masterless)"
 kill ${KUBELET_PID} 1>&2 2>/dev/null
 
 kube::log::status "Starting kubelet in masterful mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
-  --really_crash_for_testing=true \
-  --root_dir=/tmp/kubelet.$$ \
-  --cert_dir="${TMPDIR:-/tmp/}" \
-  --docker_endpoint="fake://" \
-  --hostname_override="127.0.0.1" \
+  --really-crash-for-testing=true \
+  --root-dir=/tmp/kubelet.$$ \
+  --cert-dir="${TMPDIR:-/tmp/}" \
+  --docker-endpoint="fake://" \
+  --hostname-override="127.0.0.1" \
   --address="127.0.0.1" \
-  --api_servers="${API_HOST}:${API_PORT}" \
+  --api-servers="${API_HOST}:${API_PORT}" \
   --port="$KUBELET_PORT" \
-  --healthz_port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
+  --healthz-port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
 KUBELET_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet"
@@ -130,13 +130,13 @@ kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kub
 kube::log::status "Starting kube-apiserver"
 KUBE_API_VERSIONS="v1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
-  --public_address_override="127.0.0.1" \
+  --public-address-override="127.0.0.1" \
   --port="${API_PORT}" \
-  --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-  --public_address_override="127.0.0.1" \
-  --kubelet_port=${KUBELET_PORT} \
-  --runtime_config=api/v1 \
-  --cert_dir="${TMPDIR:-/tmp/}" \
+  --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
+  --public-address-override="127.0.0.1" \
+  --kubelet-port=${KUBELET_PORT} \
+  --runtime-config=api/v1 \
+  --cert-dir="${TMPDIR:-/tmp/}" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
