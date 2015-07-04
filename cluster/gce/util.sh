@@ -544,9 +544,9 @@ function write-node-env {
 function create-certs {
   local -r cert_ip="${1}"
 
-  local octects=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
-  ((octects[3]+=1))
-  local -r service_ip=$(echo "${octects[*]}" | sed 's/ /./g')
+  local octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
+  ((octets[3]+=1))
+  local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   local -r sans="IP:${cert_ip},IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
   # Note: This was heavily cribbed from make-ca-cert.sh

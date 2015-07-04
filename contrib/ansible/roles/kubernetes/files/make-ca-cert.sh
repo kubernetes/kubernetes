@@ -76,9 +76,9 @@ cd "${tmpdir}"
 # distributed.
 
 # Calculate the first ip address in the service range
-octects=($(echo "${service_range}" | sed -e 's|/.*||' -e 's/\./ /g'))
-((octects[3]+=1))
-service_ip=$(echo "${octects[*]}" | sed 's/ /./g')
+octets=($(echo "${service_range}" | sed -e 's|/.*||' -e 's/\./ /g'))
+((octets[3]+=1))
+service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
 
 # Determine appropriete subject alt names
 sans="IP:${cert_ip},IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${dns_domain},DNS:${master_name}"
