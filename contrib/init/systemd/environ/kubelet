@@ -8,10 +8,10 @@ KUBELET_ADDRESS="--address=127.0.0.1"
 # KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
-KUBELET_HOSTNAME="--hostname_override=127.0.0.1"
+KUBELET_HOSTNAME="--hostname-override=127.0.0.1"
 
 # location of the api-server
-KUBELET_API_SERVER="--api_servers=http://127.0.0.1:8080"
+KUBELET_API_SERVER="--api-servers=http://127.0.0.1:8080"
 
 # Add your own!
 KUBELET_ARGS=""
