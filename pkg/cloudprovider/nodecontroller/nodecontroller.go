@@ -408,6 +408,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 					continue
 				}
 				if _, err := instances.ExternalID(node.Name); err != nil && err == cloudprovider.InstanceNotFound {
+					glog.Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
 					if err := nc.kubeClient.Nodes().Delete(node.Name); err != nil {
 						glog.Errorf("Unable to delete node %s: %v", node.Name, err)
 						continue

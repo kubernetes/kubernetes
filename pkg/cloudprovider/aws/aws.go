@@ -660,7 +660,7 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (aws *AWSCloud) ExternalID(name string) (string, error) {
 	// We must verify that the instance still exists
-	instance, err := aws.getInstanceByNodeName(name)
+	instance, err := aws.findInstanceByNodeName(name)
 	if err != nil {
 		return "", err
 	}
@@ -2253,7 +2253,8 @@ func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance,
 }
 
 // Returns the instance with the specified node name
-func (a *AWSCloud) getInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
+// Returns nil if it does not exist
+func (a *AWSCloud) findInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
 	filters := []*ec2.Filter{
 		newEc2Filter("private-dns-name", nodeName),
 	}
@@ -2267,12 +2268,22 @@ func (a *AWSCloud) getInstanceByNodeName(nodeName string) (*ec2.Instance, error)
 		return nil, err
 	}
 	if len(instances) == 0 {
-		return nil, fmt.Errorf("no instances found for name: %s", nodeName)
+		return nil, nil
 	}
 	if len(instances) > 1 {
 		return nil, fmt.Errorf("multiple instances found for name: %s", nodeName)
 	}
 	return instances[0], nil
+}
+
+// Returns the instance with the specified node name
+// Like findInstanceByNodeName, but returns error if node not found
+func (a *AWSCloud) getInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
+	instance, err := a.findInstanceByNodeName(nodeName)
+	if err == nil && instance == nil {
+		return nil, fmt.Errorf("no instances found for name: %s", nodeName)
+	}
+	return instance, err
 }
 
 // Add additional filters, to match on our tags
