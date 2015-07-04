@@ -1734,23 +1734,24 @@ func validateEndpointSubsets(subsets []api.EndpointSubset) errs.ValidationErrorL
 	return allErrs
 }
 
-var linkLocalNet *net.IPNet
-
 func validateEndpointAddress(address *api.EndpointAddress) errs.ValidationErrorList {
-	if linkLocalNet == nil {
-		var err error
-		_, linkLocalNet, err = net.ParseCIDR("169.254.0.0/16")
-		if err != nil {
-			glog.Errorf("Failed to parse link-local CIDR: %v", err)
-		}
-	}
-
 	allErrs := errs.ValidationErrorList{}
 	if !util.IsValidIPv4(address.IP) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "invalid IPv4 address"))
+		return allErrs
 	}
-	if linkLocalNet.Contains(net.ParseIP(address.IP)) {
+	// We disallow some IPs as endpoints.  Specifically, loopback addresses are
+	// nonsensical and link-local addresses tend to be used for node-centric
+	// purposes (e.g. metadata service).
+	ip := net.ParseIP(address.IP)
+	if ip.IsLoopback() {
+		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "may not be in the loopback range (127.0.0.0/8)"))
+	}
+	if ip.IsLinkLocalUnicast() {
 		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "may not be in the link-local range (169.254.0.0/16)"))
+	}
+	if ip.IsLinkLocalMulticast() {
+		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "may not be in the link-local multicast range (224.0.0.0/24)"))
 	}
 	return allErrs
 }
