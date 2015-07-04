@@ -39,6 +39,11 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
 	namespace, err := createTestingNS("pods-liveness", c)
 	Expect(err).NotTo(HaveOccurred())
 	ns := namespace.Name
+	defer func() {
+		if err := c.Namespaces().Delete(ns); err != nil {
+			Failf("Couldn't delete ns %q: %s", namespace, err)
+		}
+	}()
 
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
 	_, err = c.Pods(ns).Create(podDescr)
@@ -90,6 +95,11 @@ func testHostIP(c *client.Client, pod *api.Pod) {
 	namespace, err := createTestingNS("pods-host-ip", c)
 	Expect(err).NotTo(HaveOccurred())
 	ns := namespace.Name
+	defer func() {
+		if err := c.Namespaces().Delete(ns); err != nil {
+			Failf("Couldn't delete ns %q: %s", namespace, err)
+		}
+	}()
 
 	podClient := c.Pods(ns)
 	By("creating pod")
