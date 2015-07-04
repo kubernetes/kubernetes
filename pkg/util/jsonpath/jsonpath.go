@@ -27,13 +27,21 @@ import (
 )
 
 type JSONPath struct {
-	name   string
-	parser *Parser
+	name       string
+	parser     *Parser
+	stack      [][]reflect.Value //push and pop values in different scopes
+	cur        []reflect.Value   //current scope values
+	beginRange bool
+	inRange    bool
+	endRange   bool
 }
 
 func NewJSONPath(n string) *JSONPath {
 	return &JSONPath{
-		name: n,
+		name:       n,
+		beginRange: false,
+		inRange:    false,
+		endRange:   false,
 	}
 }
 
@@ -48,10 +56,36 @@ func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 	if j.parser == nil {
 		return fmt.Errorf("%s is an incomplete jsonpath template", j.name)
 	}
-	for _, node := range j.parser.Root.Nodes {
-		results, err := j.walk([]reflect.Value{reflect.ValueOf(data)}, node)
+
+	j.cur = []reflect.Value{reflect.ValueOf(data)}
+	nodes := j.parser.Root.Nodes
+	for i := 0; i < len(nodes); i++ {
+		node := nodes[i]
+		results, err := j.walk(j.cur, node)
 		if err != nil {
 			return err
+		}
+		//encounter a end node
+		if j.endRange {
+			j.endRange = false
+			break
+		}
+		//encounter a range node
+		if j.beginRange {
+			j.beginRange = false
+			j.parser.Root.Nodes = nodes[i+1:]
+			j.inRange = true
+			for k, value := range results {
+				if k == len(results)-1 {
+					j.inRange = false
+				}
+				err := j.Execute(wr, value.Interface())
+				if err != nil {
+					return err
+				}
+
+			}
+			break
 		}
 		err = j.PrintResults(wr, results)
 		if err != nil {
@@ -101,6 +135,8 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 		return j.evalRecursive(value, node)
 	case *UnionNode:
 		return j.evalUnion(value, node)
+	case *IdentifierNode:
+		return j.evalIdentifier(value, node)
 	default:
 		return value, fmt.Errorf("unexpect Node %v", node)
 	}
@@ -135,6 +171,30 @@ func (j *JSONPath) evalList(value []reflect.Value, node *ListNode) ([]reflect.Va
 		}
 	}
 	return curValue, nil
+}
+
+// evalIdentifier evaluates IdentifierNode
+func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) ([]reflect.Value, error) {
+	results := []reflect.Value{}
+	switch node.Name {
+	case "range":
+		j.stack = append(j.stack, j.cur)
+		j.beginRange = true
+		results = input
+	case "end":
+		if j.inRange {
+			j.endRange = true
+		} else {
+			if len(j.stack) > 0 {
+				j.cur, j.stack = j.stack[len(j.stack)-1], j.stack[:len(j.stack)-1]
+			} else {
+				return results, fmt.Errorf("not in range, nothing to end")
+			}
+		}
+	default:
+		return input, fmt.Errorf("unrecongnize identifier %v", node.Name)
+	}
+	return results, nil
 }
 
 // evalArray evaluates ArrayNode

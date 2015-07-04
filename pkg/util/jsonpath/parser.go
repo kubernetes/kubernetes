@@ -28,7 +28,7 @@ import (
 const eof = -1
 
 const (
-	leftDelim  = "${"
+	leftDelim  = "{"
 	rightDelim = "}"
 )
 
@@ -50,17 +50,17 @@ func Parse(name, text string) (*Parser, error) {
 	return p, p.Parse(text)
 }
 
-// ParseAction parsed the expression inside delimiter
-func ParseAction(name, text string) (*Parser, error) {
-	p, err := Parse(name, fmt.Sprintf("${%s}", text))
-	p.Root = p.Root.Nodes[0].(*ListNode)
-	return p, err
-}
-
 func NewParser(name string) *Parser {
 	return &Parser{
 		Name: name,
 	}
+}
+
+// parseAction parsed the expression inside delimiter
+func parseAction(name, text string) (*Parser, error) {
+	p, err := Parse(name, fmt.Sprintf("{%s}", text))
+	p.Root = p.Root.Nodes[0].(*ListNode)
+	return p, err
 }
 
 func (p *Parser) Parse(text string) error {
@@ -143,6 +143,8 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 	switch r := p.next(); {
 	case r == eof || isEndOfLine(r):
 		return fmt.Errorf("unclosed action")
+	case r == ' ':
+		p.consumeText()
 	case r == '@': //the current object, just pass it
 		p.consumeText()
 	case r == '[':
@@ -154,7 +156,9 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 	case r == '+' || r == '-' || unicode.IsDigit(r):
 		p.backup()
 		return p.parseNumber(cur)
-
+	case isAlphaNumeric(r):
+		p.backup()
+		return p.parseIdentifier(cur)
 	default:
 		return fmt.Errorf("unrecognized charactor in action: %#U", r)
 	}
@@ -167,6 +171,21 @@ func (p *Parser) parseRightDelim(cur *ListNode) error {
 	p.consumeText()
 	cur = p.Root
 	return p.parseText(cur)
+}
+
+// parseIdentifier scans build-in keywords like "range" "end"
+func (p *Parser) parseIdentifier(cur *ListNode) error {
+	var r rune
+	for {
+		r = p.next()
+		if isTerminator(r) {
+			p.backup()
+			break
+		}
+	}
+	value := p.consumeText()
+	cur.append(newIdentifier(value))
+	return p.parseInsideAction(cur)
 }
 
 // parseRecursive scans the recursive desent operator ..
@@ -229,7 +248,7 @@ Loop:
 	if len(strs) > 1 {
 		union := []*ListNode{}
 		for _, str := range strs {
-			parser, err := ParseAction("union", fmt.Sprintf("[%s]", strings.Trim(str, " ")))
+			parser, err := parseAction("union", fmt.Sprintf("[%s]", strings.Trim(str, " ")))
 			if err != nil {
 				return err
 			}
@@ -243,7 +262,7 @@ Loop:
 	reg := regexp.MustCompile(`^'([^']*)'$`)
 	value := reg.FindStringSubmatch(text)
 	if value != nil {
-		parser, err := ParseAction("arraydict", fmt.Sprintf(".%s", value[1]))
+		parser, err := parseAction("arraydict", fmt.Sprintf(".%s", value[1]))
 		if err != nil {
 			return err
 		}
@@ -307,17 +326,17 @@ Loop:
 	text = string(text[:len(text)-2])
 	value := reg.FindStringSubmatch(text)
 	if value == nil {
-		parser, err := Parse("text", fmt.Sprintf("${%s}", text))
+		parser, err := Parse("text", fmt.Sprintf("{%s}", text))
 		if err != nil {
 			return err
 		}
 		cur.append(newFilter(parser.Root, newList(), "exists"))
 	} else {
-		leftParser, err := Parse("left", fmt.Sprintf("${%s}", value[1]))
+		leftParser, err := Parse("left", fmt.Sprintf("{%s}", value[1]))
 		if err != nil {
 			return err
 		}
-		rightParser, err := Parse("right", fmt.Sprintf("${%s}", value[3]))
+		rightParser, err := Parse("right", fmt.Sprintf("{%s}", value[3]))
 		if err != nil {
 			return err
 		}
@@ -368,7 +387,7 @@ func isTerminator(r rune) bool {
 		return true
 	}
 	switch r {
-	case eof, '.', ',', '[', ']', '$', '@':
+	case eof, '.', ',', '[', ']', '$', '@', '{', '}':
 		return true
 	}
 	return false

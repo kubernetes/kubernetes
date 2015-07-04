@@ -28,44 +28,50 @@ type parserTest struct {
 
 var parserTests = []parserTest{
 	{"plain", `hello jsonpath`, []Node{newText("hello jsonpath")}},
-	{"variable", `hello ${.jsonpath}`,
+	{"variable", `hello {.jsonpath}`,
 		[]Node{newText("hello "), newList(), newField("jsonpath")}},
-	{"arrayfiled", `hello ${['jsonpath']}`,
+	{"arrayfiled", `hello {['jsonpath']}`,
 		[]Node{newText("hello "), newList(), newField("jsonpath")}},
-	{"quote", `${"${"}`, []Node{newList(), newText("${")}},
-	{"array", `${[1:3]}`, []Node{newList(),
+	{"quote", `{"{"}`, []Node{newList(), newText("{")}},
+	{"array", `{[1:3]}`, []Node{newList(),
 		newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
-	{"allarray", `${.book[*].author}`,
+	{"allarray", `{.book[*].author}`,
 		[]Node{newList(), newField("book"),
 			newArray([3]ParamsEntry{{0, false}, {0, false}, {0, false}}), newField("author")}},
-	{"wildcard", `${.bicycle.*}`,
+	{"wildcard", `{.bicycle.*}`,
 		[]Node{newList(), newField("bicycle"), newWildcard()}},
-	{"filter", `${[?(@.price<3)]}`,
+	{"filter", `{[?(@.price<3)]}`,
 		[]Node{newList(), newFilter(newList(), newList(), "<"), newList(),
 			newList(), newField("price"), newList(), newList(), newInt(3)}},
-	{"recursive", `${..}`, []Node{newList(), newRecursive()}},
-	{"recurField", `${..price}`,
+	{"recursive", `{..}`, []Node{newList(), newRecursive()}},
+	{"recurField", `{..price}`,
 		[]Node{newList(), newRecursive(), newField("price")}},
-	{"arraydict", `${['book.price']}`, []Node{newList(),
+	{"arraydict", `{['book.price']}`, []Node{newList(),
 		newField("book"), newField("price"),
 	}},
-	{"union", `${['bicycle.price', 3, 'book.price']}`, []Node{newList(), newUnion([]*ListNode{}),
+	{"union", `{['bicycle.price', 3, 'book.price']}`, []Node{newList(), newUnion([]*ListNode{}),
 		newList(), newField("bicycle"), newField("price"),
 		newList(), newArray([3]ParamsEntry{{3, true}, {4, true}, {0, false}}),
 		newList(), newField("book"), newField("price"),
+	}},
+	{"range", `{range .items}{.name},{end}`, []Node{
+		newList(), newIdentifier("range"), newField("items"),
+		newList(), newField("name"), newText(","),
+		newList(), newIdentifier("end"),
 	}},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {
 	nodes = append(nodes, cur)
-	if cur.Type() == NodeList {
+	switch cur.Type() {
+	case NodeList:
 		for _, node := range cur.(*ListNode).Nodes {
 			nodes = collectNode(nodes, node)
 		}
-	} else if cur.Type() == NodeFilter {
+	case NodeFilter:
 		nodes = collectNode(nodes, cur.(*FilterNode).Left)
 		nodes = collectNode(nodes, cur.(*FilterNode).Right)
-	} else if cur.Type() == NodeUnion {
+	case NodeUnion:
 		for _, node := range cur.(*UnionNode).Nodes {
 			nodes = collectNode(nodes, node)
 		}

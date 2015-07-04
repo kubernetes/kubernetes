@@ -35,6 +35,7 @@ const (
 	NodeArray
 	NodeList
 	NodeField
+	NodeIdentifier
 	NodeFilter
 	NodeInt
 	NodeFloat
@@ -44,16 +45,17 @@ const (
 )
 
 var NodeTypeName = map[NodeType]string{
-	NodeText:      "NodeText",
-	NodeArray:     "NodeArray",
-	NodeList:      "NodeList",
-	NodeField:     "NodeField",
-	NodeFilter:    "NodeFilter",
-	NodeInt:       "NodeInt",
-	NodeFloat:     "NodeFloat",
-	NodeWildcard:  "NodeWildcard",
-	NodeRecursive: "NodeRecursive",
-	NodeUnion:     "NodeUnion",
+	NodeText:       "NodeText",
+	NodeArray:      "NodeArray",
+	NodeList:       "NodeList",
+	NodeField:      "NodeField",
+	NodeIdentifier: "NodeIdentifier",
+	NodeFilter:     "NodeFilter",
+	NodeInt:        "NodeInt",
+	NodeFloat:      "NodeFloat",
+	NodeWildcard:   "NodeWildcard",
+	NodeRecursive:  "NodeRecursive",
+	NodeUnion:      "NodeUnion",
 }
 
 type Node interface {
@@ -105,6 +107,23 @@ func newField(value string) *FieldNode {
 
 func (f *FieldNode) String() string {
 	return fmt.Sprintf("%s: %s", f.Type(), f.Value)
+}
+
+// IdentifierNode holds an identifier
+type IdentifierNode struct {
+	NodeType
+	Name string
+}
+
+func newIdentifier(value string) *IdentifierNode {
+	return &IdentifierNode{
+		NodeType: NodeIdentifier,
+		Name:     value,
+	}
+}
+
+func (f *IdentifierNode) String() string {
+	return fmt.Sprintf("%s: %s", f.Type(), f.Name)
 }
 
 // ParamsEntry holds param information for ArrayNode
