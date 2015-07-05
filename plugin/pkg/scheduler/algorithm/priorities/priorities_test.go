@@ -19,6 +19,7 @@ package priorities
 import (
 	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -39,72 +40,83 @@ func makeMinion(node string, milliCPU, memory int64) api.Node {
 	}
 }
 
-func TestDumbSpreading(t *testing.T) {
+func TestZeroLimit(t *testing.T) {
+	// A pod with no resources. We expect spreading to count it as having the default resources.
 	noResources := api.PodSpec{
-		Containers: []api.Container{},
+		Containers: []api.Container{
+			{},
+		},
 	}
+	noResources1 := noResources
+	noResources1.NodeName = "machine1"
+	// A pod with the same resources as a 0-limit pod gets by default as its resources (for spreading).
 	small := api.PodSpec{
-		NodeName: "machine1",
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
-						"cpu": resource.MustParse("100m"),
-						"memory": resource.MustParse("1000"),
+						"cpu": resource.MustParse(
+							strconv.FormatInt(defaultMilliCpuLimit, 10) + "m"),
+						"memory": resource.MustParse(
+							strconv.FormatInt(defaultMemoryLimit, 10)),
 					},
 				},
 			},
 		},
 	}
+	small2 := small
+	small2.NodeName = "machine2"
+	// A larger pod.
 	large := api.PodSpec{
-		NodeName: "machine2",
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
-						"cpu": resource.MustParse("600m"),
-						"memory": resource.MustParse("6000"),
+						"cpu": resource.MustParse(
+							strconv.FormatInt(defaultMilliCpuLimit * 3, 10) + "m"),
+						"memory": resource.MustParse(
+							strconv.FormatInt(defaultMemoryLimit * 3, 10)),
 					},
 				},
 			},
 		},
 	}
+	large1 := large
+	large1.NodeName = "machine1"
+	large2 := large
+	large2.NodeName = "machine2"
 	tests := []struct {
 		pod          *api.Pod
 		pods         []*api.Pod
 		nodes        []api.Node
-		expectedList algorithm.HostPriorityList
 		test         string
 	}{
+		// The point of these tests is to show you get the same priority for a zero-limit pod
+		// as for a pod with the defaults limits, both when the zero-limit pod is already on the machine
+		// and when the zero-limit pod is the one being scheduled.
 		{
-			/* Minion1 CPU capacity 1000m, free 700m/7000, 3 pods
-                           LeastRequestedPriority score 7
-                           BalancedResourceAllocation score 10
-                           ServiceSpreadingPriority score 10
-                           DumbSpreadingPriority score 6
-                           Total: 7 + 10 + 10 + 2*6 = 39
-
-                           Minion2 CPU capacity 1000m, free 400m/4000, 1 pod
-                           LeastRequestedPriority score 4
-                           BalancedResourceAllocation score 10
-                           ServiceSpreadingPriority score 10 
-                           DumbSpreadingPriority score 8
-                           Total: 4 + 10 + 10 + 2*8 = 40
-
-                           Moral of the story: We prefer the machine that is more heavily loaded,
-                           because it has fewer pods.
-                         */
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeMinion("machine1", 1000, 10000), makeMinion("machine2", 1000, 10000)},
-			expectedList: []algorithm.HostPriority{{"machine1", 39}, {"machine2", 40}},
-			test:         "nothing scheduled, nothing requested",
+			// match current f1-micro on GCE
+			nodes:        []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit * 10), makeMinion("machine2", 1000, defaultMemoryLimit * 10)},
+			test:         "test priority of zero-limit pod with machine with zero-limit pod",
 			pods: []*api.Pod {
-				{Spec: small}, {Spec: small}, {Spec: small},
-				{Spec: large},
+				{Spec: large1}, {Spec: noResources1},
+				{Spec: large2}, {Spec: small2},
+			},
+		},
+		{
+			pod:          &api.Pod{Spec: small},
+			// match current f1-micro on GCE
+			nodes:        []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit * 10), makeMinion("machine2", 1000, defaultMemoryLimit * 10)},
+			test:         "test priority of nonzero-limit pod with machine with zero-limit pod",
+			pods: []*api.Pod {
+				{Spec: large1}, {Spec: noResources1},
+				{Spec: large2}, {Spec: small2},
 			},
 		},
 	}
 
+	const expectedPriority int = 25
 	for _, test := range tests {
 		list, err := scheduler.PrioritizeNodes(
 			test.pod,
@@ -112,13 +124,15 @@ func TestDumbSpreading(t *testing.T) {
 			// This should match the configuration in defaultPriorities() in
 			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 			// to test what's actually in production.
-			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: DumbSpreadingPriority, Weight: 2}, {Function: NewServiceSpreadPriority(algorithm.FakeServiceLister([]api.Service{})), Weight: 1}},
+			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewServiceSpreadPriority(algorithm.FakeServiceLister([]api.Service{})), Weight: 1}},
 			algorithm.FakeMinionLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+		for _, hp := range list {
+			if (hp.Score != expectedPriority) {
+				t.Errorf("%s: expected 25 for all priorities, got list %#v", list)
+			}
 		}
 	}
 }
@@ -149,6 +163,7 @@ func TestLeastRequested(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu": resource.MustParse("1000m"),
+						"memory": resource.MustParse("0"),
 					},
 				},
 			},
@@ -156,6 +171,7 @@ func TestLeastRequested(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu": resource.MustParse("2000m"),
+						"memory": resource.MustParse("0"),
 					},
 				},
 			},
@@ -479,6 +495,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu": resource.MustParse("1000m"),
+						"memory": resource.MustParse("0"),
 					},
 				},
 			},
@@ -486,6 +503,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu": resource.MustParse("2000m"),
+						"memory": resource.MustParse("0"),
 					},
 				},
 			},
