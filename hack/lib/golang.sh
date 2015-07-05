@@ -68,6 +68,7 @@ kube::golang::test_targets() {
     cmd/genbashcomp
     cmd/genconversion
     cmd/gendeepcopy
+    cmd/genswaggertypedocs
     examples/k8petstore/web-server
     github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test

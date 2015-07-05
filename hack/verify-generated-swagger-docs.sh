@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,8 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+
 "${KUBE_ROOT}/hack/build-go.sh" cmd/genswaggertypedocs
 
-"${KUBE_ROOT}/hack/after-build/verify-description.sh" "$@"
-
-# ex: ts=2 sw=2 et filetype=sh
+"${KUBE_ROOT}/hack/after-build/verify-generated-swagger-docs.sh" "$@"
