@@ -842,7 +842,7 @@ func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	if err != nil {
 		return
 	}
-	Logf("Asyncronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	Logf("Asynchronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	err = cmd.Start()
 	return
 }

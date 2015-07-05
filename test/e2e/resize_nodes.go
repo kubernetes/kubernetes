@@ -520,7 +520,7 @@ var _ = Describe("Nodes", func() {
 				Logf("Waiting for node %s to be ready", node.Name)
 				waitForNodeToBe(c, node.Name, true, 2*time.Minute)
 
-				By("verify wheter new pods can be created on the re-attached node")
+				By("verify whether new pods can be created on the re-attached node")
 				// increasing the RC size is not a valid way to test this
 				// since we have no guarantees the pod will be scheduled on our node.
 				additionalPod := "additionalpod"

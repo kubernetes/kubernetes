@@ -90,7 +90,7 @@ var (
 type SyncHandler interface {
 
 	// Syncs current state to match the specified pods. SyncPodType specified what
-	// type of sync is occuring per pod. StartTime specifies the time at which
+	// type of sync is occurring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
 	SyncPods(pods []*api.Pod, podSyncTypes map[types.UID]SyncPodType, mirrorPods map[string]*api.Pod,
 		startTime time.Time) error
@@ -417,7 +417,7 @@ type Kubelet struct {
 	serviceLister          serviceLister
 	nodeLister             nodeLister
 
-	// Last timestamp when runtime responsed on ping.
+	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
 	runtimeMutex           sync.Mutex
 	runtimeUpThreshold     time.Duration
@@ -479,7 +479,7 @@ type Kubelet struct {
 	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
 	//    The constant must be less than podEvictionTimeout.
 	// 2. nodeStatusUpdateFrequency needs to be large enough for kubelet to generate node
-	//    status. Kubelet may fail to update node status reliablly if the value is too small,
+	//    status. Kubelet may fail to update node status reliably if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
 
@@ -669,7 +669,7 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 	return nil, fmt.Errorf("node %v not found", nodeName)
 }
 
-// Starts garbage collection theads.
+// Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
 	go util.Forever(func() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
@@ -932,7 +932,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	)
 
 	// Get all service resources from the master (via a cache),
-	// and populate them into service enviroment variables.
+	// and populate them into service environment variables.
 	if kl.serviceLister == nil {
 		// Kubelets without masters (e.g. plain GCE ContainerVM) don't set env vars.
 		return m, nil

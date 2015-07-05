@@ -769,7 +769,7 @@ function kube-down {
   echo "Bringing down cluster"
   set +e  # Do not stop on error
 
-  # The gcloud APIs don't return machine parsable error codes/retry information. Therefore the best we can
+  # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
   if gcloud preview managed-instance-groups --project "${PROJECT}" --zone "${ZONE}" describe "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
     deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
@@ -777,7 +777,7 @@ function kube-down {
       --quiet \
       "${NODE_INSTANCE_PREFIX}-group")
     if [[ "$deleteCmdOutput" != ""  ]]; then
-      # Managed instance group deletion is done asyncronously, we must wait for it to complete, or subsequent steps fail
+      # Managed instance group deletion is done asynchronously, we must wait for it to complete, or subsequent steps fail
       deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:[[:space:]]*\([^[:space:]]*\).*/\1/g")
       if [[ "$deleteCmdOperationId" != ""  ]]; then
         deleteCmdStatus="PENDING"
