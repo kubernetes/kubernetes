@@ -1,20 +1,11 @@
 package upid
 
 import (
-	"math/rand"
-	"strings"
 	"testing"
+	"testing/quick"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func generateRandomString() string {
-	b := make([]byte, rand.Intn(1024))
-	for i := range b {
-		b[i] = byte(rand.Int())
-	}
-	return strings.Replace(string(b), "@", "", -1)
-}
 
 func TestUPIDParse(t *testing.T) {
 	u, err := Parse("mesos@foo:bar")
@@ -29,17 +20,10 @@ func TestUPIDParse(t *testing.T) {
 	assert.Nil(t, u)
 	assert.Error(t, err)
 
-	// Simple fuzzy test.
-	for i := 0; i < 100000; i++ {
-		ra := generateRandomString()
-		u, err = Parse(ra)
-		if u != nil {
-			println(ra)
-		}
-		assert.Nil(t, u)
-		assert.Error(t, err)
-	}
-
+	assert.Nil(t, quick.Check(func(s string) bool {
+		u, err := Parse(s)
+		return u == nil && err != nil
+	}, &quick.Config{MaxCount: 100000}))
 }
 
 func TestUPIDString(t *testing.T) {

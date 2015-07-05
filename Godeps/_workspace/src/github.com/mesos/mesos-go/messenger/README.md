@@ -1,7 +1,7 @@
 ####Benchmark of the messenger.
 
 ```shell
-$ go test -v -run=Benckmark* -bench=.
+$ go test -v -run=Benckmark* -bench=. 
 PASS
 BenchmarkMessengerSendSmallMessage	   50000	     70568 ns/op
 BenchmarkMessengerSendMediumMessage	   50000	     70265 ns/op
@@ -29,7 +29,7 @@ BenchmarkMessengerSendRecvLargeMessage-4	   50000	     45472 ns/op
 BenchmarkMessengerSendRecvMixedMessage-4	   50000	     47393 ns/op
 ok  	github.com/mesos/mesos-go/messenger	105.173s
 ```
-
+ 
 ####environment:
 
 ```
