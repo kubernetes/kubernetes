@@ -337,7 +337,9 @@ function kube::build::build_image() {
   kube::build::build_image_cross
 
   mkdir -p "${build_context_dir}"
-  tar czf "${build_context_dir}/kube-source.tar.gz" $(kube::build::source_targets)
+
+  # exclude ._* files with Apple tar by setting COPYFILE_DISABLE=1
+  COPYFILE_DISABLE=1 tar czf "${build_context_dir}/kube-source.tar.gz" $(kube::build::source_targets)
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
