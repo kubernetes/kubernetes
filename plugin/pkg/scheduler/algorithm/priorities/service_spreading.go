@@ -84,7 +84,7 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorith
 		}
 		result = append(result, algorithm.HostPriority{Host: minion.Name, Score: int(fScore)})
 		glog.V(10).Infof(
-			"%v -> %v: ServiceSpreadPriority, Sore: (%d)", pod.Name, minion.Name, int(fScore),
+			"%v -> %v: ServiceSpreadPriority, Score: (%d)", pod.Name, minion.Name, int(fScore),
 		)
 	}
 	return result, nil
