@@ -34,7 +34,7 @@ func calculateScore(requested int64, capacity int64, node string) int {
 		return 0
 	}
 	if requested > capacity {
-		glog.Infof("Combined requested resources %d from existing pods exceeds capacity %d on minion: %s",
+		glog.Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
 			requested, capacity, node)
 		return 0
 	}
@@ -52,7 +52,7 @@ const defaultMemoryLimit int64 = 60 * 1024 * 1024  // 60 MB
 
 // TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
 // as an additional argument here) rather than using constants
-func toNonzeroLimits(limits *api.ResourceList) (int64, int64) {
+func getNonzeroLimits(limits *api.ResourceList) (int64, int64) {
 	var out_millicpu, out_memory int64
 	// Override if un-set, but not if explicitly set to zero
 	if (*limits.Cpu() == resource.Quantity{}) {
@@ -79,7 +79,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := toNonzeroLimits(&container.Resources.Limits)
+			cpu, memory := getNonzeroLimits(&container.Resources.Limits)
 			totalMilliCPU += cpu
 			totalMemory += memory
 		}
@@ -87,7 +87,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
 	for _, container := range pod.Spec.Containers {
-		cpu, memory := toNonzeroLimits(&container.Resources.Limits)
+		cpu, memory := getNonzeroLimits(&container.Resources.Limits)
 		totalMilliCPU += cpu
 		totalMemory += memory
 	}
@@ -195,7 +195,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	score := int(0)
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := toNonzeroLimits(&container.Resources.Limits)
+			cpu, memory := getNonzeroLimits(&container.Resources.Limits)
 			totalMilliCPU += cpu
 			totalMemory += memory
 		}
@@ -203,7 +203,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
 	for _, container := range pod.Spec.Containers {
-		cpu, memory := toNonzeroLimits(&container.Resources.Limits)
+		cpu, memory := getNonzeroLimits(&container.Resources.Limits)
 		totalMilliCPU += cpu
 		totalMemory += memory
 	}
