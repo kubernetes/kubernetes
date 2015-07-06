@@ -35,7 +35,7 @@ If you want to use custom binaries or pure open source Kubernetes, please contin
 1. Make sure that gcloud is set to use the Google Cloud Platform project you want. You can check the current project using `gcloud config list project` and change it via `gcloud config set project <project-id>`.
 1. Make sure you have credentials for GCloud by running ` gcloud auth login`.
 1. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/instances/#startinstancegcloud) part of the GCE Quickstart.
-1. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/gce.md) part of the GCE Quickstart.
+1. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://cloud.google.com/compute/docs/instances/#sshing) part of the GCE Quickstart.
 
 ### Starting a cluster
 
