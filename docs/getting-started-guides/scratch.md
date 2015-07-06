@@ -120,7 +120,7 @@ You need to select an address range for the Pod IPs.
 Kubernetes also allocates an IP to each [service](../services.md).  However, service IPs do not necessarily
 need to be routable.  The kube-proxy takes care of translating Service IPs to Pod IPs before traffic leaves
 the node.  You do need to Allocate a block of IPs for services.  Call this `SERVICE_CLUSTER_IP_RANGE`.
-For example, you could set `SERVICE_CLUSTER_IP_RANGE="10.1.0.0/16"`, allowing ~67840 distinct services to be active at once.
+For example, you could set `SERVICE_CLUSTER_IP_RANGE="10.1.0.0/16"`, allowing 65534 distinct services to be active at once.
 Note that you can grow the bounds of this range, but you cannot move it without disrupting the services that already use it.
  
 
