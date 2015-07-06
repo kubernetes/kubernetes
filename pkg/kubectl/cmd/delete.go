@@ -61,7 +61,7 @@ $ kubectl delete pods --all`
 func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
-		Use:     "delete ([-f FILENAME] | (RESOURCE [(NAME | -l label | --all)]",
+		Use:     "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		Short:   "Delete resources by filenames, stdin, resources and names, or by resources and label selector.",
 		Long:    delete_long,
 		Example: delete_example,

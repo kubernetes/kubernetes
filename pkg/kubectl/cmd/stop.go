@@ -29,7 +29,7 @@ import (
 const (
 	stop_long = `Deprecated: Gracefully shut down a resource by name or filename.
 
-stop command is deprecated, all its functionalities are covered by delete command.
+The stop command is deprecated, all its functionalities are covered by delete command.
 See 'kubectl delete --help' for more details.
 
 Attempts to shut down and delete a resource that supports graceful termination.
@@ -52,7 +52,7 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Filenames util.StringList
 	}{}
 	cmd := &cobra.Command{
-		Use:     "stop (-f FILENAME | RESOURCE (NAME | -l label | --all))",
+		Use:     "stop (-f FILENAME | TYPE (NAME | -l label | --all))",
 		Short:   "Deprecated: Gracefully shut down a resource by name or filename.",
 		Long:    stop_long,
 		Example: stop_example,
