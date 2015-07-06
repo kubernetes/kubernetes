@@ -144,7 +144,10 @@ func TestKubenates(t *testing.T) {
 		  "metadata":{"name":"127.0.0.2"},
 		  "status":{
 			"capacity":{"cpu":"8"},
-			"addresses":[{"type": "LegacyHostIP", "address":"127.0.0.2"}]
+			"addresses":[
+			  {"type": "LegacyHostIP", "address":"127.0.0.2"},
+			  {"type": "another", "address":"127.0.0.3"}
+			]
 		  }
 		}
 	  ],
@@ -166,6 +169,10 @@ func TestKubenates(t *testing.T) {
 	}
 	nodesTests := []jsonpathTest{
 		{"range item", "{range .items[*]}{.metadata.name}, {end}{.kind}", nodesData, `127.0.0.1, 127.0.0.2, List`},
+		{"range addresss", "{.items[*].status.addresses[*].address}", nodesData,
+			`127.0.0.1 127.0.0.2 127.0.0.3`},
+		{"two range", "{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}", nodesData,
+			`127.0.0.1, 127.0.0.2, 127.0.0.3, `},
 		{"item name", "{.items[*].metadata.name}", nodesData, `127.0.0.1 127.0.0.2`},
 		{"nodes capacity", "{.items[*]['metadata.name', 'status.capacity']}", nodesData,
 			`[127.0.0.1, {cpu: 4}] [127.0.0.2, {cpu: 8}]`},

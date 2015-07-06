@@ -31,17 +31,17 @@ type JSONPath struct {
 	parser     *Parser
 	stack      [][]reflect.Value //push and pop values in different scopes
 	cur        []reflect.Value   //current scope values
-	beginRange bool
-	inRange    bool
-	endRange   bool
+	beginRange int
+	inRange    int
+	endRange   int
 }
 
 func NewJSONPath(n string) *JSONPath {
 	return &JSONPath{
 		name:       n,
-		beginRange: false,
-		inRange:    false,
-		endRange:   false,
+		beginRange: 0,
+		inRange:    0,
+		endRange:   0,
 	}
 }
 
@@ -65,19 +65,20 @@ func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 		if err != nil {
 			return err
 		}
-		//encounter a end node
-		if j.endRange {
-			j.endRange = false
+
+		//encounter a end node, one loop ended
+		if j.endRange > 0 && j.endRange <= j.inRange {
+			j.endRange -= 1
 			break
 		}
-		//encounter a range node
-		if j.beginRange {
-			j.beginRange = false
-			j.parser.Root.Nodes = nodes[i+1:]
-			j.inRange = true
+		//encounter a range node, start a range loop
+		if j.beginRange > 0 {
+			j.beginRange -= 1
+			j.inRange += 1
 			for k, value := range results {
+				j.parser.Root.Nodes = nodes[i+1:]
 				if k == len(results)-1 {
-					j.inRange = false
+					j.inRange -= 1
 				}
 				err := j.Execute(wr, value.Interface())
 				if err != nil {
@@ -179,12 +180,12 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 	switch node.Name {
 	case "range":
 		j.stack = append(j.stack, j.cur)
-		j.beginRange = true
+		j.beginRange += 1
 		results = input
 	case "end":
-		if j.inRange {
-			j.endRange = true
-		} else {
+		if j.endRange < j.inRange { //inside a loop, this loop end
+			j.endRange += 1
+		} else { // the loop is about to end, pop value and continue the following execuation
 			if len(j.stack) > 0 {
 				j.cur, j.stack = j.stack[len(j.stack)-1], j.stack[:len(j.stack)-1]
 			} else {
