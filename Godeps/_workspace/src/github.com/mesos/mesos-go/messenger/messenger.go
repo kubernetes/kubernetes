@@ -76,41 +76,62 @@ type MesosMessenger struct {
 	tr                Transporter
 }
 
-// create a new default messenger (HTTP). If a non-nil, non-wildcard bindingAddress is
-// specified then it will be used for both the UPID and Transport binding address. Otherwise
-// hostname is resolved to an IP address and the UPID.Host is set to that address and the
-// bindingAddress is passed through to the Transport.
+// ForHostname creates a new default messenger (HTTP), using UPIDBindingAddress to
+// determine the binding-address used for both the UPID.Host and Transport binding address.
 func ForHostname(proc *process.Process, hostname string, bindingAddress net.IP, port uint16) (Messenger, error) {
 	upid := &upid.UPID{
 		ID:   proc.Label(),
 		Port: strconv.Itoa(int(port)),
 	}
+	host, err := UPIDBindingAddress(hostname, bindingAddress)
+	if err != nil {
+		return nil, err
+	}
+	upid.Host = host
+	return NewHttpWithBindingAddress(upid, bindingAddress), nil
+}
+
+// UPIDBindingAddress determines the value of UPID.Host that will be used to build
+// a Transport. If a non-nil, non-wildcard bindingAddress is specified then it will be used
+// for both the UPID and Transport binding address. Otherwise hostname is resolved to an IP
+// address and the UPID.Host is set to that address and the bindingAddress is passed through
+// to the Transport.
+func UPIDBindingAddress(hostname string, bindingAddress net.IP) (string, error) {
+	upidHost := ""
 	if bindingAddress != nil && "0.0.0.0" != bindingAddress.String() {
-		upid.Host = bindingAddress.String()
+		upidHost = bindingAddress.String()
 	} else {
-		ips, err := net.LookupIP(hostname)
-		if err != nil {
-			return nil, err
+		if hostname == "" || hostname == "0.0.0.0" {
+			return "", fmt.Errorf("invalid hostname (%q) specified with binding address %v", hostname, bindingAddress)
 		}
-		// try to find an ipv4 and use that
-		ip := net.IP(nil)
-		for _, addr := range ips {
-			if ip = addr.To4(); ip != nil {
-				break
-			}
+		ip := net.ParseIP(hostname)
+		if ip != nil {
+			ip = ip.To4()
 		}
 		if ip == nil {
-			// no ipv4? best guess, just take the first addr
-			if len(ips) > 0 {
-				ip = ips[0]
-				log.Warningf("failed to find an IPv4 address for '%v', best guess is '%v'", hostname, ip)
-			} else {
-				return nil, fmt.Errorf("failed to determine IP address for host '%v'", hostname)
+			ips, err := net.LookupIP(hostname)
+			if err != nil {
+				return "", err
+			}
+			// try to find an ipv4 and use that
+			for _, addr := range ips {
+				if ip = addr.To4(); ip != nil {
+					break
+				}
+			}
+			if ip == nil {
+				// no ipv4? best guess, just take the first addr
+				if len(ips) > 0 {
+					ip = ips[0]
+					log.Warningf("failed to find an IPv4 address for '%v', best guess is '%v'", hostname, ip)
+				} else {
+					return "", fmt.Errorf("failed to determine IP address for host '%v'", hostname)
+				}
 			}
 		}
-		upid.Host = ip.String()
+		upidHost = ip.String()
 	}
-	return NewHttpWithBindingAddress(upid, bindingAddress), nil
+	return upidHost, nil
 }
 
 // NewMesosMessenger creates a new mesos messenger.

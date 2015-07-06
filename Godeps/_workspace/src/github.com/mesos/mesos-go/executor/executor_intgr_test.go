@@ -193,7 +193,7 @@ func TestExecutorDriverExecutorRegisteredEvent(t *testing.T) {
 	}
 	c := testutil.NewMockMesosClient(t, server.PID)
 	c.SendMessage(driver.self, pbMsg)
-	assert.True(t, driver.connected)
+	assert.True(t, driver.Connected())
 	select {
 	case <-ch:
 	case <-time.After(time.Millisecond * 2):

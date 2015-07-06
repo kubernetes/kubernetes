@@ -3,6 +3,7 @@ package messenger
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -430,4 +431,36 @@ func BenchmarkMessengerSendRecvMixedMessage(b *testing.B) {
 		m1.Send(context.TODO(), upid2, messages[i%1000])
 	}
 	globalWG.Wait()
+}
+
+func TestUPIDBindingAddress(t *testing.T) {
+	tt := []struct {
+		hostname string
+		binding  net.IP
+		expected string
+	}{
+		{"", nil, ""},
+		{"", net.IPv4(1, 2, 3, 4), "1.2.3.4"},
+		{"", net.IPv4(0, 0, 0, 0), ""},
+		{"localhost", nil, "127.0.0.1"},
+		{"localhost", net.IPv4(5, 6, 7, 8), "5.6.7.8"},
+		{"localhost", net.IPv4(0, 0, 0, 0), "127.0.0.1"},
+		{"0.0.0.0", nil, ""},
+		{"7.8.9.1", nil, "7.8.9.1"},
+		{"7.8.9.1", net.IPv4(0, 0, 0, 0), "7.8.9.1"},
+		{"7.8.9.1", net.IPv4(8, 9, 1, 2), "8.9.1.2"},
+	}
+
+	for i, tc := range tt {
+		actual, err := UPIDBindingAddress(tc.hostname, tc.binding)
+		if err != nil && tc.expected != "" {
+			t.Fatalf("test case %d failed; expected %q instead of error %v", i+1, tc.expected, err)
+		}
+		if err == nil && actual != tc.expected {
+			t.Fatalf("test case %d failed; expected %q instead of %q", i+1, tc.expected, actual)
+		}
+		if err != nil {
+			t.Logf("test case %d; received expected error %v", i+1, err)
+		}
+	}
 }
