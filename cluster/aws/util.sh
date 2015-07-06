@@ -678,8 +678,9 @@ function kube-up {
 
   import-public-key ${AWS_SSH_KEY_NAME} ${AWS_SSH_KEY}.pub
 
-  VPC_ID=$(get_vpc_id)
-
+  if [[ -z "${VPC_ID:-}" ]]; then
+    VPC_ID=$(get_vpc_id)
+  fi
   if [[ -z "$VPC_ID" ]]; then
 	  echo "Creating vpc."
 	  VPC_ID=$($AWS_CMD create-vpc --cidr-block $INTERNAL_IP_BASE.0/16 | json_val '["Vpc"]["VpcId"]')
@@ -691,7 +692,9 @@ function kube-up {
 
   echo "Using VPC $VPC_ID"
 
-  SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
+  if [[ -z "${SUBNET_ID:-}" ]]; then
+    SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
+  fi
   if [[ -z "$SUBNET_ID" ]]; then
     echo "Creating subnet."
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
