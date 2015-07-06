@@ -73,9 +73,9 @@ func TestZeroLimit(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu": resource.MustParse(
-							strconv.FormatInt(defaultMilliCpuLimit * 3, 10) + "m"),
+							strconv.FormatInt(defaultMilliCpuLimit*3, 10) + "m"),
 						"memory": resource.MustParse(
-							strconv.FormatInt(defaultMemoryLimit * 3, 10)),
+							strconv.FormatInt(defaultMemoryLimit*3, 10)),
 					},
 				},
 			},
@@ -86,30 +86,30 @@ func TestZeroLimit(t *testing.T) {
 	large2 := large
 	large2.NodeName = "machine2"
 	tests := []struct {
-		pod          *api.Pod
-		pods         []*api.Pod
-		nodes        []api.Node
-		test         string
+		pod   *api.Pod
+		pods  []*api.Pod
+		nodes []api.Node
+		test  string
 	}{
 		// The point of these tests is to show you get the same priority for a zero-limit pod
 		// as for a pod with the defaults limits, both when the zero-limit pod is already on the machine
 		// and when the zero-limit pod is the one being scheduled.
 		{
-			pod:          &api.Pod{Spec: noResources},
+			pod: &api.Pod{Spec: noResources},
 			// match current f1-micro on GCE
-			nodes:        []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit * 10), makeMinion("machine2", 1000, defaultMemoryLimit * 10)},
-			test:         "test priority of zero-limit pod with machine with zero-limit pod",
-			pods: []*api.Pod {
+			nodes: []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit*10), makeMinion("machine2", 1000, defaultMemoryLimit*10)},
+			test:  "test priority of zero-limit pod with machine with zero-limit pod",
+			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
 		},
 		{
-			pod:          &api.Pod{Spec: small},
+			pod: &api.Pod{Spec: small},
 			// match current f1-micro on GCE
-			nodes:        []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit * 10), makeMinion("machine2", 1000, defaultMemoryLimit * 10)},
-			test:         "test priority of nonzero-limit pod with machine with zero-limit pod",
-			pods: []*api.Pod {
+			nodes: []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit*10), makeMinion("machine2", 1000, defaultMemoryLimit*10)},
+			test:  "test priority of nonzero-limit pod with machine with zero-limit pod",
+			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
@@ -130,13 +130,12 @@ func TestZeroLimit(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		for _, hp := range list {
-			if (hp.Score != expectedPriority) {
+			if hp.Score != expectedPriority {
 				t.Errorf("%s: expected 25 for all priorities, got list %#v", list)
 			}
 		}
 	}
 }
-
 
 func TestLeastRequested(t *testing.T) {
 	labels1 := map[string]string{
@@ -162,7 +161,7 @@ func TestLeastRequested(t *testing.T) {
 			{
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
-						"cpu": resource.MustParse("1000m"),
+						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("0"),
 					},
 				},
@@ -170,7 +169,7 @@ func TestLeastRequested(t *testing.T) {
 			{
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
-						"cpu": resource.MustParse("2000m"),
+						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("0"),
 					},
 				},
@@ -494,7 +493,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			{
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
-						"cpu": resource.MustParse("1000m"),
+						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("0"),
 					},
 				},
@@ -502,7 +501,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			{
 				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
-						"cpu": resource.MustParse("2000m"),
+						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("0"),
 					},
 				},
