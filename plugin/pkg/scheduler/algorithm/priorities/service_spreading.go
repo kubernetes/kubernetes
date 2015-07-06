@@ -20,6 +20,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"github.com/golang/glog"
 )
 
 type ServiceSpread struct {
@@ -82,6 +83,9 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorith
 			fScore = 10 * (float32(maxCount-counts[minion.Name]) / float32(maxCount))
 		}
 		result = append(result, algorithm.HostPriority{Host: minion.Name, Score: int(fScore)})
+		glog.V(10).Infof(
+			"%v -> %v: ServiceSpreadPriority, Score: (%d)", pod.Name, minion.Name, int(fScore),
+		)
 	}
 	return result, nil
 }
