@@ -124,6 +124,11 @@ func waitForClusterSize(c *client.Client, size int) error {
 			Logf("Failed to list nodes: %v", err)
 			continue
 		}
+		// Filter out not-ready nodes.
+		filterNodes(nodes, func(node api.Node) bool {
+			return isNodeReadySetAsExpected(&node, true)
+		})
+
 		if len(nodes.Items) == size {
 			Logf("Cluster has reached the desired size %d", size)
 			return nil
