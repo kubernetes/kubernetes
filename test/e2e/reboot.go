@@ -85,13 +85,17 @@ var _ = Describe("Reboot", func() {
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
-		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A INPUT -j DROP && sleep 120 && sudo iptables -D INPUT -j DROP' >/dev/null 2>&1 &")
+		// We still accept packages send from localhost to prevent monit from restarting kubelet.
+		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A INPUT -s 127.0.0.1 -j ACCEPT && sudo iptables -A INPUT -j DROP && "+
+			" sleep 120 && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 
 	It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
-		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A OUTPUT -j DROP && sleep 120 && sudo iptables -D OUTPUT -j DROP' >/dev/null 2>&1 &")
+		// We still accept packages send to localhost to prevent monit from restarting kubelet.
+		testReboot(c, "nohup sh -c 'sleep 10 &&  sudo iptables -A OUTPUT -s 127.0.0.1 -j ACCEPT && sudo iptables -A OUTPUT -j DROP && "+
+			" sleep 120 && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 })
 
