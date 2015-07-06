@@ -20,8 +20,8 @@ import (
 	"math"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"github.com/golang/glog"
@@ -47,8 +47,8 @@ func calculateScore(requested int64, capacity int64, node string) int {
 // pods will not all be scheduled to the machine with the smallest in-use limit,
 // and that when scheduling regular pods, such pods will not see zero-limit pods as
 // consuming no resources whatsoever.
-const defaultMilliCpuLimit int64 = 100  // 0.1 core
-const defaultMemoryLimit int64 = 60 * 1024 * 1024  // 60 MB
+const defaultMilliCpuLimit int64 = 100            // 0.1 core
+const defaultMemoryLimit int64 = 60 * 1024 * 1024 // 60 MB
 
 // TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
 // as an additional argument here) rather than using constants
