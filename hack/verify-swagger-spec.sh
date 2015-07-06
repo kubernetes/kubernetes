@@ -30,7 +30,6 @@ _tmp="${KUBE_ROOT}/_tmp"
 mkdir -p "${_tmp}"
 cp -a "${SPECROOT}" "${TMP_SPECROOT}"
 
-"${KUBE_ROOT}/hack/build-go.sh"
 "${KUBE_ROOT}/hack/update-swagger-spec.sh"
 echo "diffing ${SPECROOT} against freshly generated swagger spec"
 ret=0
