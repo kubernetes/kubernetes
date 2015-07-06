@@ -39,6 +39,7 @@ libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](../../docs/g
 oVirt                |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)                             |             | Community (@simon3z)        |
 Rackspace            | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/rackspace.md)                         |             | Community (@doublerr)       | use k8s version 0.18.0
 
+Don't see anything above that meets your needs?  See our [Getting Started from Scratch](../../docs/getting-started-guides/scratch.md) guide.
 
 *Note*: The above table is ordered by version test/used in notes followed by support level.
 
