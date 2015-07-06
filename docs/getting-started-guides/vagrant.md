@@ -18,7 +18,7 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
     - [I want to change the number of nodes!](#i-want-to-change-the-number-of-nodes)
     - [I want my VMs to have more memory!](#i-want-my-vms-to-have-more-memory)
     - [I ran vagrant suspend and nothing works!](#i-ran-vagrant-suspend-and-nothing-works)
-
+    - [I want vagrant to sync folders via nfs!](#i-want-vagrant-to-sync-folders-via-nfs)
 
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
@@ -329,6 +329,14 @@ export KUBERNETES_MINION_MEMORY=2048
 
 #### I ran vagrant suspend and nothing works!
 ```vagrant suspend``` seems to mess up the network.  This is not supported at this time.
+
+#### I want vagrant to sync folders via nfs!
+
+You can ensure that vagrant uses nfs to sync folders with virtual machines by setting the KUBERNETES_VAGRANT_USE_NFS environment variable to 'true'. nfs is faster than virtualbox or vmware's 'shared folders' and does not require guest additions. See the [vagrant docs](http://docs.vagrantup.com/v2/synced-folders/nfs.html) for details on configuring nfs on the host. This setting will have no effect on the libvirt provider, which uses nfs by default. For example:
+
+```sh
+export KUBERNETES_VAGRANT_USE_NFS=true
+```
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/vagrant.md?pixel)]()
