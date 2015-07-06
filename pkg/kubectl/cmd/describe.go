@@ -42,10 +42,10 @@ $ kubectl describe RESOURCE NAME_PREFIX
 will first check for an exact match on RESOURCE and NAME_PREFIX. If no such resource
 exists, it will output details for every resource that has a name prefixed with NAME_PREFIX
 
-Possible resources include pods (po), replicationcontrollers (rc), services
-(svc), nodes (no), events (ev), componentstatuses (cs), limitRanges (limits),
-persistentVolumes (pv), persistentVolumeClaims (pvc), resourceQuotas (quota)
-or secrets.`
+Possible resources include (case insensitive): pods (po), services (svc),
+replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
+limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
+resourcequotas (quota) or secrets.`
 	describe_example = `// Describe a node
 $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
