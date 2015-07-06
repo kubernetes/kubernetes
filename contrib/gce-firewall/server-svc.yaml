@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gce-firewall-service
+  namespace: default
+spec:
+  selector:
+    name: gce-firewall-server
+  ports:
+  - name: listen
+    port: 8080
+  type: LoadBalancer

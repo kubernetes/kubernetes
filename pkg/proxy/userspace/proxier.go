@@ -222,7 +222,7 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 		}
 	}
 	args = []string{"-m", "comment", "--comment", "Ensure that non-local NodePort traffic can flow"}
-	if err := ipt.DeleteRule(iptables.TableFilter, iptables.ChainInput, append(args, "-j", string(iptablesNonLocalNodePortChain))...); err != nil {
+	if err := ipt.DeleteRule(iptables.TableFILTER, iptables.ChainInput, append(args, "-j", string(iptablesNonLocalNodePortChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
 			glog.Errorf("Error removing userspace rule: %v", err)
 			encounteredError = true
@@ -232,7 +232,7 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 	// flush and delete chains.
 	tableChains := map[iptables.Table][]iptables.Chain{
 		iptables.TableNAT:    {iptablesContainerPortalChain, iptablesHostPortalChain, iptablesHostNodePortChain, iptablesContainerNodePortChain},
-		iptables.TableFilter: {iptablesNonLocalNodePortChain},
+		iptables.TableFILTER: {iptablesNonLocalNodePortChain},
 	}
 	for table, chains := range tableChains {
 		for _, c := range chains {
@@ -652,7 +652,7 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 	}
 
 	args = proxier.iptablesNonLocalNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableFilter, iptablesNonLocalNodePortChain, args...)
+	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableFILTER, iptablesNonLocalNodePortChain, args...)
 	if err != nil {
 		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesNonLocalNodePortChain, name)
 		return err
@@ -748,7 +748,7 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 
 	// Handle traffic not local to the host
 	args = proxier.iptablesNonLocalNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableFilter, iptablesNonLocalNodePortChain, args...); err != nil {
+	if err := proxier.iptables.DeleteRule(iptables.TableFILTER, iptablesNonLocalNodePortChain, args...); err != nil {
 		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesNonLocalNodePortChain, name)
 		el = append(el, err)
 	}
@@ -845,10 +845,10 @@ func iptablesInit(ipt iptables.Interface) error {
 	// traffic to work around default-deny iptables configurations
 	// that would otherwise reject such traffic.
 	args = []string{"-m", "comment", "--comment", "Ensure that non-local NodePort traffic can flow"}
-	if _, err := ipt.EnsureChain(iptables.TableFilter, iptablesNonLocalNodePortChain); err != nil {
+	if _, err := ipt.EnsureChain(iptables.TableFILTER, iptablesNonLocalNodePortChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.Prepend, iptables.TableFilter, iptables.ChainInput, append(args, "-j", string(iptablesNonLocalNodePortChain))...); err != nil {
+	if _, err := ipt.EnsureRule(iptables.Prepend, iptables.TableFILTER, iptables.ChainInput, append(args, "-j", string(iptablesNonLocalNodePortChain))...); err != nil {
 		return err
 	}
 
@@ -871,7 +871,7 @@ func iptablesFlush(ipt iptables.Interface) error {
 	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostNodePortChain); err != nil {
 		el = append(el, err)
 	}
-	if err := ipt.FlushChain(iptables.TableFilter, iptablesNonLocalNodePortChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableFILTER, iptablesNonLocalNodePortChain); err != nil {
 		el = append(el, err)
 	}
 	if len(el) != 0 {

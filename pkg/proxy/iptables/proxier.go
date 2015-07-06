@@ -228,7 +228,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		table utiliptables.Table
 		chain utiliptables.Chain
 	}{
-		{utiliptables.TableFilter, utiliptables.ChainOutput},
+		{utiliptables.TableFILTER, utiliptables.ChainOutput},
 		{utiliptables.TableNAT, utiliptables.ChainOutput},
 		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
 	}
@@ -294,8 +294,8 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		writeLine(filterBuf, fmt.Sprintf("-X %s", kubeServicesChain))
 		writeLine(filterBuf, "COMMIT")
 		// Write it.
-		if err := ipt.Restore(utiliptables.TableFilter, filterBuf.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
-			glog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableFilter, err)
+		if err := ipt.Restore(utiliptables.TableFILTER, filterBuf.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
+			glog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableFILTER, err)
 			encounteredError = true
 		}
 	}
@@ -562,7 +562,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Create and link the kube services chain.
 	{
-		tablesNeedServicesChain := []utiliptables.Table{utiliptables.TableFilter, utiliptables.TableNAT}
+		tablesNeedServicesChain := []utiliptables.Table{utiliptables.TableFILTER, utiliptables.TableNAT}
 		for _, table := range tablesNeedServicesChain {
 			if _, err := proxier.iptables.EnsureChain(table, kubeServicesChain); err != nil {
 				glog.Errorf("Failed to ensure that %s chain %s exists: %v", table, kubeServicesChain, err)
@@ -574,7 +574,7 @@ func (proxier *Proxier) syncProxyRules() {
 			table utiliptables.Table
 			chain utiliptables.Chain
 		}{
-			{utiliptables.TableFilter, utiliptables.ChainOutput},
+			{utiliptables.TableFILTER, utiliptables.ChainOutput},
 			{utiliptables.TableNAT, utiliptables.ChainOutput},
 			{utiliptables.TableNAT, utiliptables.ChainPrerouting},
 		}
@@ -606,11 +606,11 @@ func (proxier *Proxier) syncProxyRules() {
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingFilterChains := make(map[utiliptables.Chain]string)
-	iptablesSaveRaw, err := proxier.iptables.Save(utiliptables.TableFilter)
+	iptablesSaveRaw, err := proxier.iptables.Save(utiliptables.TableFILTER)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingFilterChains = getChainLines(utiliptables.TableFilter, iptablesSaveRaw)
+		existingFilterChains = getChainLines(utiliptables.TableFILTER, iptablesSaveRaw)
 	}
 
 	existingNATChains := make(map[utiliptables.Chain]string)

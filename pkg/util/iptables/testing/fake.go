@@ -29,6 +29,10 @@ func (*fake) GetVersion() (string, error) {
 	return "0.0.0", nil
 }
 
+func (*fake) ListChain(table iptables.Table, chain iptables.Chain) (string, error) {
+	return "", nil
+}
+
 func (*fake) EnsureChain(table iptables.Table, chain iptables.Chain) (bool, error) {
 	return true, nil
 }
@@ -46,6 +50,10 @@ func (*fake) EnsureRule(position iptables.RulePosition, table iptables.Table, ch
 }
 
 func (*fake) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
+	return nil
+}
+
+func (*fake) DeleteRuleNumber(table iptables.Table, chain iptables.Chain, ruleNumber int) error {
 	return nil
 }
 
