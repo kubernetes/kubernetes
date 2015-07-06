@@ -8,6 +8,11 @@
     {
     "name": "nginx",
     "image": "gcr.io/google-containers/nginx:v1",
+    "resources": {
+      "limits": {
+        "cpu": "200m"
+      }
+    },
     "command": [
               "nginx",
 	      "-g",
