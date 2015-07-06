@@ -40,7 +40,7 @@ const serveHostnameImage = "gcr.io/google_containers/serve_hostname:1.1"
 
 func resizeGroup(size int) error {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
-		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
+		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
 		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone,
 			"resize", testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--new-size=%v", size)).CombinedOutput()
@@ -60,7 +60,7 @@ func resizeGroup(size int) error {
 
 func groupSize() (int, error) {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
-		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
+		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
 		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID,
 			"--zone="+testContext.CloudConfig.Zone, "describe", testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
@@ -381,7 +381,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	// The command will block all outgoing network traffic from the node to the master
 	// When multi-master is implemented, this test will have to be improved to block
 	// network traffic to all masters.
-	// We could also block network traffic from the master(s)s to this node,
+	// We could also block network traffic from the master(s) to this node,
 	// but blocking it one way is sufficient for this test.
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
 	if _, _, code, err := SSH(dropCmd, host, testContext.Provider); code != 0 || err != nil {
@@ -399,7 +399,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	err := verifyPods(c, ns, rcName, true, replicas)
 	Expect(err).NotTo(HaveOccurred())
 
-	// network traffic is unblocked in a defered function
+	// network traffic is unblocked in a deferred function
 }
 
 var _ = Describe("Nodes", func() {
@@ -455,7 +455,7 @@ var _ = Describe("Nodes", func() {
 
 		It("should be able to delete nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
-			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
 			replicas := testContext.CloudConfig.NumNodes
 			newRCByName(c, ns, name, replicas)
@@ -478,7 +478,7 @@ var _ = Describe("Nodes", func() {
 		// TODO: Bug here - testName is not correct
 		It("should be able to add nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
-			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
 			newSVCByName(c, ns, name)
 			replicas := testContext.CloudConfig.NumNodes
@@ -519,7 +519,7 @@ var _ = Describe("Nodes", func() {
 				"AND allows scheduling of pods on a minion after it rejoins the cluster", func() {
 
 				// Create a replication controller for a service that serves its hostname.
-				// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+				// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 				name := "my-hostname-net"
 				newSVCByName(c, ns, name)
 				replicas := testContext.CloudConfig.NumNodes
