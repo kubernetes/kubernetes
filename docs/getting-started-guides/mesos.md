@@ -223,7 +223,9 @@ In addition the service template at [cluster/addons/dns/skydns-svc.yaml.in][12] 
 To do this automatically:
 
 ```bash
-sed -e "s/{{ pillar\['dns_replicas'\] }}/1/g;s,\(command = \"/kube2sky\"\),\\1\\"$'\n'"        - --kube_master_url=${KUBERNETES_MASTER},;s/{{ pillar\['dns_domain'\] }}/cluster.local/g" \
+sed -e "s/{{ pillar\['dns_replicas'\] }}/1/g;"\
+"s,\(command = \"/kube2sky\"\),\\1\\"$'\n'"        - --kube_master_url=${KUBERNETES_MASTER},;"\
+"s/{{ pillar\['dns_domain'\] }}/cluster.local/g" \
   cluster/addons/dns/skydns-rc.yaml.in > skydns-rc.yaml
 sed -e "s/{{ pillar\['dns_server'\] }}/10.10.10.10/g" \
   cluster/addons/dns/skydns-svc.yaml.in > skydns-svc.yaml
