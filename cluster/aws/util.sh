@@ -78,10 +78,6 @@ function get_subnet_id {
   python -c "import json,sys; lst = [str(subnet['SubnetId']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1' and subnet['AvailabilityZone'] == '$2']; print ''.join(lst)"
 }
 
-function get_cidr {
-  python -c "import json,sys; lst = [str(subnet['CidrBlock']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1' and subnet['AvailabilityZone'] == '$2']; print ''.join(lst)"
-}
-
 function get_igw_id {
   python -c "import json,sys; lst = [str(igw['InternetGatewayId']) for igw in json.load(sys.stdin)['InternetGateways'] for attachment in igw['Attachments'] if attachment['VpcId'] == '$1']; print ''.join(lst)"
 }
@@ -697,7 +693,7 @@ function kube-up {
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
     add-tag $SUBNET_ID KubernetesCluster ${CLUSTER_ID}
   else
-    EXISTING_CIDR=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_cidr $VPC_ID $ZONE)
+    EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock --output text)
     echo "Using existing CIDR $EXISTING_CIDR"
     INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
     MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
