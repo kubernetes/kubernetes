@@ -894,29 +894,28 @@ func validatePortsOrFail(endpoints map[string][]int, expectedEndpoints map[strin
 	}
 }
 
-func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedEndpoints map[string][]int) {
-	By(fmt.Sprintf("Validating endpoints %v with on service %s/%s", expectedEndpoints, ns, serviceName))
-	for {
-		endpoints, err := c.Endpoints(ns).Get(serviceName)
-		if err == nil {
-			By(fmt.Sprintf("Found endpoints %v", endpoints))
-
-			portsByIp := getPortsByIp(endpoints.Subsets)
-
-			By(fmt.Sprintf("Found ports by ip %v", portsByIp))
-			if len(portsByIp) == len(expectedEndpoints) {
-				expectedPortsByIp := translatePodNameToIpOrFail(c, ns, expectedEndpoints)
-				validatePortsOrFail(portsByIp, expectedPortsByIp)
-				break
-			} else {
-				By(fmt.Sprintf("Unexpected number of endpoints: found %v, expected %v (ignoring for 1 second)", portsByIp, expectedEndpoints))
-			}
-		} else {
-			By(fmt.Sprintf("Failed to get endpoints: %v (ignoring for 1 second)", err))
+func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, expectedEndpoints map[string][]int) {
+	By(fmt.Sprintf("Waiting up to %v for service %s in namespace %s to expose endpoints %v", serviceStartTimeout, serviceName, namespace, expectedEndpoints))
+	for start := time.Now(); time.Since(start) < serviceStartTimeout; time.Sleep(5 * time.Second) {
+		endpoints, err := c.Endpoints(namespace).Get(serviceName)
+		if err != nil {
+			Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
+			continue
 		}
-		time.Sleep(time.Second)
+		Logf("Found endpoints %v", endpoints)
+
+		portsByIp := getPortsByIp(endpoints.Subsets)
+		Logf("Found ports by ip %v", portsByIp)
+
+		if len(portsByIp) == len(expectedEndpoints) {
+			expectedPortsByIp := translatePodNameToIpOrFail(c, namespace, expectedEndpoints)
+			validatePortsOrFail(portsByIp, expectedPortsByIp)
+			By(fmt.Sprintf("Successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, time.Since(start)))
+			return
+		}
+		Logf("Unexpected number of endpoints: found %v, expected %v (%v elapsed, ignoring for 5s)", portsByIp, expectedEndpoints, time.Since(start))
 	}
-	By(fmt.Sprintf("successfully validated endpoints %v with on service %s/%s", expectedEndpoints, ns, serviceName))
+	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, serviceStartTimeout)
 }
 
 func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {

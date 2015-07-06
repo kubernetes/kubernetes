@@ -59,6 +59,9 @@ const (
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
 
+	// How long to wait for a service endpoint to be resolvable.
+	serviceStartTimeout = 1 * time.Minute
+
 	// String used to mark pod deletion
 	nonExist = "NonExist"
 
