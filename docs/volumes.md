@@ -90,6 +90,7 @@ For example, [nfs-web-pod.yaml](https://github.com/GoogleCloudPlatform/kubernete
 In this example one can see that a `volumeMount` called "nfs" is being mounted onto `/var/www/html` in the container "web".
 The volume "nfs" is defined as type `nfs`, with the NFS server serving from `nfs-server.default.kube.local` and exporting directory `/` as the share.
 The mount being created in this example is not read only.
+NB! nfs-client has to be installed in host node!
 
 ### Secrets
 
