@@ -24,7 +24,6 @@
                        $location.path(newValue);
                      }
                    });
-
                    $scope.subpages = [
                      {
                        category: 'dashboard',
@@ -69,6 +68,7 @@
             customClass: '=customClass',
             thumbs: '=',
             count: '=',
+            reverse: '=',
             doSelect: '&onSelect'
           },
           transclude: true,
@@ -87,7 +87,11 @@
               $scope.content = orderBy($scope.content, predicate, reverse);
               $scope.predicate = predicate;
             };
-            $scope.order($scope.sortable[0], false);
+            var reverse = false;
+            if($scope.reverse)
+              reverse = $scope.reverse;
+
+            $scope.order($scope.sortable[0], reverse);
             $scope.getNumber = function(num) { return new Array(num); };
             $scope.goToPage = function(page) { $scope.currentPage = page; };
             $scope.showMore = function() { return angular.isDefined($scope.moreClick);}

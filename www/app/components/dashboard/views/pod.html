@@ -18,7 +18,7 @@
           <tr>
             <td class="name">Status</td>
             <td class="value">
-              {{pod.status.phase}} on <a ng-href="#/dashboard/groups/host/selector/host={{pod.spec.host}}">{{pod.spec.host}}</a>
+              {{pod.status.phase}} on <a ng-href="#/dashboard/groups/host/selector/host={{pod.spec.nodeName}}">{{pod.spec.nodeName}}</a>
             </td>
           </tr>
 
@@ -32,7 +32,7 @@
           <tr>
             <td class="name">Host Networking</td>
             <td class="value">
-              {{pod.spec.host}}/{{pod.status.hostIP}}
+              {{pod.spec.nodeName}}/{{pod.status.hostIP}}
             </td>
           </tr>
 
