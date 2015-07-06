@@ -376,7 +376,9 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	}()
 
 	Logf("Waiting for node %s to be ready", node.Name)
-	waitForNodeToBe(c, node.Name, true, 2*time.Minute)
+	if !waitForNodeToBe(c, node.Name, true, 2*time.Minute) {
+		Failf("Node did not become ready")
+	}
 
 	// The command will block all outgoing network traffic from the node to the master
 	// When multi-master is implemented, this test will have to be improved to block
@@ -390,13 +392,16 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	}
 
 	Logf("Waiting for node %s to be not ready", node.Name)
-	waitForNodeToBe(c, node.Name, false, 2*time.Minute)
+	if !waitForNodeToBe(c, node.Name, false, 2*time.Minute) {
+		Failf("Node did not become not-ready")
+	}
 
 	Logf("Waiting for pod %s to be removed", podNameToDisappear)
-	waitForRCPodToDisappear(c, ns, rcName, podNameToDisappear)
+	err := waitForRCPodToDisappear(c, ns, rcName, podNameToDisappear)
+	Expect(err).NotTo(HaveOccurred())
 
 	By("verifying whether the pod from the unreachable node is recreated")
-	err := verifyPods(c, ns, rcName, true, replicas)
+	err = verifyPods(c, ns, rcName, true, replicas)
 	Expect(err).NotTo(HaveOccurred())
 
 	// network traffic is unblocked in a deferred function
@@ -539,7 +544,9 @@ var _ = Describe("Nodes", func() {
 				By(fmt.Sprintf("block network traffic from node %s", node.Name))
 				performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
 				Logf("Waiting for node %s to be ready", node.Name)
-				waitForNodeToBe(c, node.Name, true, 2*time.Minute)
+				if !waitForNodeToBe(c, node.Name, true, 2*time.Minute) {
+					Failf("Node did not become ready")
+				}
 
 				By("verify whether new pods can be created on the re-attached node")
 				// increasing the RC size is not a valid way to test this
