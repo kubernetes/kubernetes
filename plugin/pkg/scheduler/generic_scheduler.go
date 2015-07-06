@@ -41,12 +41,15 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 // implementation of the error interface
 func (f *FitError) Error() string {
-	predicates := util.NewStringSet()
+	var reason string
+	// We iterate over all nodes for logging purposes, even though we only return one reason from one node
 	for node, predicateList := range f.FailedPredicates {
-		predicates = predicates.Union(predicateList)
 		glog.Infof("failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
+		if len(reason) == 0 {
+			reason, _ = predicateList.PopAny()
+		}
 	}
-	return fmt.Sprintf("For each of these fitness predicates, pod %v failed on at least one node: %v.", f.Pod.Name, strings.Join(predicates.List(), ","))
+	return fmt.Sprintf("Failed for reason %s and possibly others", reason)
 }
 
 type genericScheduler struct {
