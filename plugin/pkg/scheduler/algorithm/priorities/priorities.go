@@ -39,26 +39,45 @@ func calculateScore(requested, capacity int64, node string) int {
 	return int(((capacity - requested) * 10) / capacity)
 }
 
+// scoreHostByPodCount scores the given node based on the fraction of total pods allowed on the node/number of pods currently on it.
+func scoreHostByPodCount(node api.Node, podsOnNode []*api.Pod) algorithm.HostPriority {
+	return algorithm.HostPriority{
+		Host:  node.Name,
+		Score: calculateScore(int64(len(podsOnNode)+1), node.Status.Capacity.Pods().Value(), node.Name),
+	}
+}
+
 // Calculate the occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
 func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
-	totalMilliCPU := int64(0)
-	totalMemory := int64(0)
+	totalMilliCPUWithoutPod := int64(0)
+	totalMemoryWithoutPod := int64(0)
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
-			totalMemory += container.Resources.Limits.Memory().Value()
+			totalMilliCPUWithoutPod += container.Resources.Limits.Cpu().MilliValue()
+			totalMemoryWithoutPod += container.Resources.Limits.Memory().Value()
 		}
 	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
+	totalMilliCPU := totalMilliCPUWithoutPod
+	totalMemory := totalMemoryWithoutPod
 	for _, container := range pod.Spec.Containers {
 		totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
 		totalMemory += container.Resources.Limits.Memory().Value()
 	}
+	// We don't know how much cpu and memory this pod needs, fall back to a simple counting strategy.
+	if totalMilliCPU == totalMilliCPUWithoutPod && totalMemory == totalMemoryWithoutPod {
+		glog.V(4).Infof("No resource information available for containers of pod %v, scoring node %v based on pod count; %d pods currently on node.",
+			pod.Name, node.Name, len(pods))
+		return scoreHostByPodCount(node, pods)
+	}
 
 	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
 	capacityMemory := node.Status.Capacity.Memory().Value()
+
+	glog.V(4).Infof("Scoring pod %v. Current resource consumption on node %v: cpu %v memory %v; total available: cpu %v memory %v",
+		pod.Name, node.Name, totalMilliCPUWithoutPod, totalMemoryWithoutPod, capacityMilliCPU, capacityMemory)
 
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
@@ -158,20 +177,26 @@ func BalancedResourceAllocation(pod *api.Pod, podLister algorithm.PodLister, min
 }
 
 func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
-	totalMilliCPU := int64(0)
-	totalMemory := int64(0)
+	totalMilliCPUWithoutPod := int64(0)
+	totalMemoryWithoutPod := int64(0)
 	score := int(0)
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
-			totalMemory += container.Resources.Limits.Memory().Value()
+			totalMilliCPUWithoutPod += container.Resources.Limits.Cpu().MilliValue()
+			totalMemoryWithoutPod += container.Resources.Limits.Memory().Value()
 		}
 	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
+	totalMilliCPU := totalMilliCPUWithoutPod
+	totalMemory := totalMemoryWithoutPod
 	for _, container := range pod.Spec.Containers {
 		totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
 		totalMemory += container.Resources.Limits.Memory().Value()
+	}
+	// We don't know how much cpu and memory this pod needs, fall back to a simple counting strategy.
+	if totalMilliCPU == totalMilliCPUWithoutPod && totalMemory == totalMemoryWithoutPod {
+		return scoreHostByPodCount(node, pods)
 	}
 
 	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
