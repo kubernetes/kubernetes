@@ -1046,7 +1046,7 @@ func RunRC(config RCConfig) error {
 	oldPods := make([]*api.Pod, 0)
 	oldRunning := 0
 	lastChange := time.Now()
-	for oldRunning != config.Replicas && time.Since(lastChange) < timeout {
+	for oldRunning != config.Replicas {
 		time.Sleep(interval)
 
 		running := 0
@@ -1104,12 +1104,52 @@ func RunRC(config RCConfig) error {
 		}
 		oldPods = pods
 		oldRunning = running
+
+		if time.Since(lastChange) > timeout {
+			dumpPodDebugInfo(config.Client, pods)
+			break
+		}
 	}
 
 	if oldRunning != config.Replicas {
 		return fmt.Errorf("Only %d pods started out of %d", oldRunning, config.Replicas)
 	}
 	return nil
+}
+
+func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
+	badNodes := util.NewStringSet()
+	for _, p := range pods {
+		if p.Status.Phase != api.PodRunning {
+			if p.Spec.NodeName != "" {
+				Logf("Pod %v assigned to host %v (IP: %v) in %v", p.Name, p.Spec.NodeName, p.Status.HostIP, p.Status.Phase)
+				badNodes.Insert(p.Spec.NodeName)
+			} else {
+				Logf("Pod %v still unassigned", p.Name)
+			}
+		}
+	}
+	dumpNodeDebugInfo(c, badNodes.List())
+}
+
+func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
+	for _, n := range nodeNames {
+		Logf("\nLogging pods the kubelet thinks is on node %v", n)
+		podList, err := GetKubeletPods(c, n)
+		if err != nil {
+			Logf("Unable to retrieve kubelet pods for node %v", n)
+			continue
+		}
+		for _, p := range podList.Items {
+			Logf("%v started at %v (%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.ContainerStatuses))
+			for _, c := range p.Status.ContainerStatuses {
+				Logf("\tContainer %v ready: %v, restart count %v",
+					c.Name, c.Ready, c.RestartCount)
+			}
+		}
+		HighLatencyKubeletOperations(c, 10*time.Second, n)
+		// TODO: Log node resource info
+	}
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint) error {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"sort"
 	"strconv"
 	"sync"
@@ -66,6 +67,20 @@ func printLatencies(latencies []podLatencyData, header string) {
 	Logf("perc50: %v, perc90: %v, perc99: %v", perc50, perc90, perc99)
 }
 
+// List nodes via gcloud. We don't rely on the apiserver because we really want the node ips
+// and sometimes the node controller is slow to populate them.
+func gcloudListNodes() {
+	Logf("Listing nodes via gcloud:")
+	output, err := exec.Command("gcloud", "compute", "instances", "list",
+		"--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone).CombinedOutput()
+	if err != nil {
+		Logf("Failed to list nodes: %v, %v", err)
+		return
+	}
+	Logf(string(output))
+	return
+}
+
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -101,6 +116,7 @@ var _ = Describe("Density", func() {
 		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "before"))
+		gcloudListNodes()
 	})
 
 	AfterEach(func() {
