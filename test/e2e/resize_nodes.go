@@ -375,6 +375,9 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 		}
 	}()
 
+	Logf("Waiting for node %s to be ready", node.Name)
+	waitForNodeToBe(c, node.Name, true, 2*time.Minute)
+
 	// The command will block all outgoing network traffic from the node to the master
 	// When multi-master is implemented, this test will have to be improved to block
 	// network traffic to all masters.
