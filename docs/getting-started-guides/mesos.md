@@ -146,6 +146,8 @@ $ km scheduler \
   --etcd-servers=http://${KUBERNETES_MASTER_IP}:4001 \
   --mesos-user=root \
   --api-servers=${KUBERNETES_MASTER_IP}:8888 \
+  --cluster-dns=10.10.10.10 \
+  --cluster-domain=cluster.local \
   --v=2 >scheduler.log 2>&1 &
 ```
 
@@ -213,6 +215,93 @@ Verify that the pod task is running in the Mesos web GUI. Click on the
 Kubernetes framework. The next screen should show the running Mesos task that
 started the Kubernetes pod.
 
+## Launching kube-dns
+
+Kube-dns is an addon for Kubernetes which adds service discovery to the cluster. For a detailed explanation see [DNS in Kubernetes][4].
+
+The kube-dns addon runs as a pod inside the cluster. The pod consists of three co-located containers:
+- a local etcd instance
+- the [skydns][11] DNS server
+- the kube2sky process to glue skydns to the state of the Kubernetes cluster.
+
+The skydns container offers DNS service via port 53 to the cluster. The etcd communication works via local 127.0.0.1 communication
+
+We assume that kube-dns will use
+- the service IP `10.10.10.10`
+- and the `cluster.local` domain.
+
+Note that we have passed these two values already as parameter to the apiserver above.
+
+A template for an replication controller spinning up the pod with the 3 containers can be found at [cluster/addons/dns/skydns-rc.yaml.in][11] in the repository. The following steps are necessary in order to get a valid replication controller yaml file:
+
+- replace `{{ pillar['dns_replicas'] }}`  with `1`
+- replace `{{ pillar['dns_domain'] }}` with `cluster.local.`
+- add `--kube_master_url=${KUBERNETES_MASTER}` parameter to the kube2sky container command.
+
+In addition the service template at [cluster/addons/dns/skydns-svc.yaml.in][12] needs the following replacement:
+
+- `{{ pillar['dns_server'] }}` with `10.10.10.10`.
+
+To do this automatically:
+
+```bash
+sed -e "s/{{ pillar\['dns_replicas'\] }}/1/g;s,\(command = \"/kube2sky\"\),\\1\\"$'\n'"        - --kube_master_url=${KUBERNETES_MASTER},;s/{{ pillar\['dns_domain'\] }}/cluster.local/g" \
+  cluster/addons/dns/skydns-rc.yaml.in > skydns-rc.yaml
+sed -e "s/{{ pillar\['dns_server'\] }}/10.10.10.10/g" \
+  cluster/addons/dns/skydns-svc.yaml.in > skydns-svc.yaml
+```
+
+Now the kube-dns pod and service are ready to be launched:
+
+```bash
+kubectl create -f skydns-rc.yaml
+kubectl create -f skydns-svc.yaml
+```
+
+Check with `kubectl get pods` that 3/3 containers of the pods are eventually up and running.
+
+To check that the new DNS service in the cluster works, we start a busybox pod and use that to do a DNS lookup. First create the `busybox.yaml` pod spec:
+
+```bash
+cat <<EOF >busybox.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+  namespace: default
+spec:
+  containers:
+  - image: busybox
+    command:
+      - sleep
+      - "3600"
+    imagePullPolicy: IfNotPresent
+    name: busybox
+  restartPolicy: Always
+EOF
+```
+
+Then start the pod:
+
+```bash
+kubectl create -f busybox.yaml
+```
+
+When the pod is up and running, start a lookup:
+
+```bash
+kubectl  exec busybox -- nslookup kubernetes
+```
+
+If everything works fine, you will get this output:
+```
+Server:    10.10.10.10
+Address 1: 10.10.10.10
+
+Name:      kubernetes
+Address 1: 10.10.10.1
+```
+
 ## What next?
 
 Try out some of the standard [Kubernetes examples][9].
@@ -225,12 +314,15 @@ Future work will add instructions to this guide to enable support for Kubernetes
 [1]: http://mesosphere.com/docs/tutorials/run-hadoop-on-mesos-using-installer
 [2]: http://mesosphere.com/docs/tutorials/run-spark-on-mesos
 [3]: http://mesosphere.com/docs/tutorials/run-chronos-on-mesos
+[4]: ../../cluster/addons/dns/README.md
 [5]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/
 [6]: http://mesos.apache.org/
 [7]: https://github.com/mesosphere/kubernetes-mesos/blob/master/docs/issues.md
 [8]: https://github.com/mesosphere/kubernetes-mesos/issues
 [9]: ../../examples/
 [10]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/#vpn-setup
+[11]: ../../cluster/addons/dns/skydns-rc.yaml.in
+[12]: ../../cluster/addons/dns/skydns-svc.yaml.in
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
