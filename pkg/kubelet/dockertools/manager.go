@@ -945,7 +945,8 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 		glog.V(2).Infof("StartExec With error: %v", err)
 		return nil, err
 	}
-	tick := time.Tick(2 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
 	for {
 		inspect, err2 := dm.client.InspectExec(execObj.ID)
 		if err2 != nil {
@@ -959,7 +960,7 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 			}
 			break
 		}
-		<-tick
+		<-ticker.C
 	}
 
 	return buf.Bytes(), err
