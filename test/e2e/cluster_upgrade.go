@@ -19,8 +19,10 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -440,20 +442,22 @@ func retryCmd(command string, args ...string) (string, string, error) {
 	return stdout, stderr, err
 }
 
-// runCmd runs cmd using args and returns stdout and stderr.
+// runCmd runs cmd using args and returns its stdout and stderr. It also outputs
+// cmd's stdout and stderr to their respective OS streams.
 func runCmd(command string, args ...string) (string, string, error) {
 	Logf("Running %s %v", command, args)
 	var bout, berr bytes.Buffer
 	cmd := exec.Command(command, args...)
-	cmd.Stdout, cmd.Stderr = &bout, &berr
+	// We also output to the OS stdout/stderr to aid in debugging in case cmd
+	// hangs and never retruns before the test gets killed.
+	cmd.Stdout = io.MultiWriter(os.Stdout, &bout)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &berr)
 	err := cmd.Run()
 	stdout, stderr := bout.String(), berr.String()
 	if err != nil {
 		return "", "", fmt.Errorf("error running %s %v; got error %v, stdout %q, stderr %q",
 			command, args, err, stdout, stderr)
 	}
-	Logf("stdout: %s", stdout)
-	Logf("stderr: %s", stderr)
 	return stdout, stderr, nil
 }
 
