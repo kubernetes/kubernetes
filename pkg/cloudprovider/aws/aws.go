@@ -1106,7 +1106,10 @@ type awsDisk struct {
 	az string
 }
 
-func newAWSDisk(ec2 EC2, name string) (*awsDisk, error) {
+func newAWSDisk(aws *AWSCloud, name string) (*awsDisk, error) {
+	if !strings.HasPrefix(name, "aws://") {
+		name = "aws://" + aws.availabilityZone + "/" + name
+	}
 	// name looks like aws://availability-zone/id
 	url, err := url.Parse(name)
 	if err != nil {
@@ -1133,7 +1136,7 @@ func newAWSDisk(ec2 EC2, name string) (*awsDisk, error) {
 	if az == "" {
 		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
 	}
-	disk := &awsDisk{ec2: ec2, name: name, awsID: awsID, az: az}
+	disk := &awsDisk{ec2: aws.ec2, name: name, awsID: awsID, az: az}
 	return disk, nil
 }
 
@@ -1261,7 +1264,7 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 
 // Implements Volumes.AttachDisk
 func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
-	disk, err := newAWSDisk(aws.ec2, diskName)
+	disk, err := newAWSDisk(aws, diskName)
 	if err != nil {
 		return "", err
 	}
@@ -1316,7 +1319,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 
 // Implements Volumes.DetachDisk
 func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
-	disk, err := newAWSDisk(aws.ec2, diskName)
+	disk, err := newAWSDisk(aws, diskName)
 	if err != nil {
 		return err
 	}
@@ -1370,7 +1373,7 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 
 // Implements Volumes.DeleteVolume
 func (aws *AWSCloud) DeleteVolume(volumeName string) error {
-	awsDisk, err := newAWSDisk(aws.ec2, volumeName)
+	awsDisk, err := newAWSDisk(aws, volumeName)
 	if err != nil {
 		return err
 	}
