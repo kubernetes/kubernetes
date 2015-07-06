@@ -65,7 +65,7 @@ Some important differences between v1beta1/2 and v1beta3:
 * The `labels` query parameter has been renamed to `labelSelector`.
 * The `fields` query parameter has been renamed to `fieldSelector`.
 * The container `entrypoint` has been renamed to `command`, and `command` has been renamed to `args`.
-* Container, volume, and node resources are expressed as nested maps (e.g., `resources{cpu:1}`) rather than as individual fields, and resource values support [scaling suffixes](resources.md#resource-quantities) rather than fixed scales (e.g., milli-cores).
+* Container, volume, and node resources are expressed as nested maps (e.g., `resources{cpu:1}`) rather than as individual fields, and resource values support [scaling suffixes](compute_resources.md#specifying-resource-quantities) rather than fixed scales (e.g., milli-cores).
 * Restart policy is represented simply as a string (e.g., `"Always"`) rather than as a nested map (`always{}`).
 * Pull policies changed from `PullAlways`, `PullNever`, and `PullIfNotPresent` to `Always`, `Never`, and `IfNotPresent`.
 * The volume `source` is inlined into `volume` rather than nested.
