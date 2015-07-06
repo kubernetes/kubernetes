@@ -73,14 +73,15 @@ func TestReplicationControllerScale(t *testing.T) {
 	name := "foo"
 	scaler.Scale("default", name, count, &preconditions, nil, nil)
 
-	if len(fake.Actions) != 2 {
-		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
+	actions := fake.Actions()
+	if len(actions) != 2 {
+		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
-		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
+	if actions[0].Action != "get-replicationController" || actions[0].Value != name {
+		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
-	if fake.Actions[1].Action != "update-replicationController" || fake.Actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
-		t.Errorf("unexpected action %v, expected update-replicationController with replicas = %d", fake.Actions[1], count)
+	if actions[1].Action != "update-replicationController" || actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
+		t.Errorf("unexpected action %v, expected update-replicationController with replicas = %d", actions[1], count)
 	}
 }
 
@@ -96,11 +97,12 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	name := "foo"
 	scaler.Scale("default", name, count, &preconditions, nil, nil)
 
-	if len(fake.Actions) != 1 {
-		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
+	actions := fake.Actions()
+	if len(actions) != 1 {
+		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
-		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
+	if actions[0].Action != "get-replicationController" || actions[0].Value != name {
+		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
 }
 

@@ -693,7 +693,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	numReplicas := 10
 	updateReplicaCount(fakeRCClient, *rc, numReplicas)
 	updates, gets := 0, 0
-	for _, a := range fakeClient.Actions {
+	for _, a := range fakeClient.Actions() {
 		switch a.Action {
 		case testclient.GetControllerAction:
 			gets++

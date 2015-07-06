@@ -158,7 +158,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
-	usage := kubeClient.Actions[1].Value.(*api.ResourceQuota)
+	usage := kubeClient.Actions()[1].Value.(*api.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -216,7 +216,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
-	usage := kubeClient.Actions[1].Value.(*api.ResourceQuota)
+	usage := kubeClient.Actions()[1].Value.(*api.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -263,7 +263,8 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
-	if len(kubeClient.Actions) != 1 && kubeClient.Actions[0].Action != "list-pods" {
+	actions := kubeClient.Actions()
+	if len(actions) != 1 && actions[0].Action != "list-pods" {
 		t.Errorf("SyncResourceQuota made an unexpected client action when state was not dirty: %v", kubeClient.Actions)
 	}
 }

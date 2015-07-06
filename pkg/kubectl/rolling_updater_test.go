@@ -74,19 +74,19 @@ func (c *fakeRc) Get(name string) (*api.ReplicationController, error) {
 	if len(c.responses) == 0 {
 		return nil, fmt.Errorf("Unexpected Action: %s", action)
 	}
-	c.Fake.Actions = append(c.Fake.Actions, action)
+	c.Fake.Invokes(action, nil)
 	result := c.responses[0]
 	c.responses = c.responses[1:]
 	return result.controller, result.err
 }
 
 func (c *fakeRc) Create(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	c.Fake.Actions = append(c.Fake.Actions, testclient.FakeAction{Action: "create-controller", Value: controller.ObjectMeta.Name})
+	c.Fake.Invokes(testclient.FakeAction{Action: "create-controller", Value: controller.ObjectMeta.Name}, nil)
 	return controller, nil
 }
 
 func (c *fakeRc) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	c.Fake.Actions = append(c.Fake.Actions, testclient.FakeAction{Action: "update-controller", Value: controller.ObjectMeta.Name})
+	c.Fake.Invokes(testclient.FakeAction{Action: "update-controller", Value: controller.ObjectMeta.Name}, nil)
 	return controller, nil
 }
 
