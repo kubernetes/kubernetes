@@ -355,6 +355,8 @@ so that kube-proxy can manage iptables instead of docker.
 You may want to increase the number of open files for docker:
    - `DOCKER_NOFILE=1000000`
 
+Where this config goes depends on your node OS.  For example, GCE's Debian-based distro uses `/etc/default/docker`.
+
 Ensure docker is working correctly on your system before proceeding with the rest of the
 installation, by following examples given in the Docker documentation.
 
