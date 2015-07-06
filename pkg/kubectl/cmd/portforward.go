@@ -117,7 +117,7 @@ func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw po
 		close(stopCh)
 	}()
 
-	req := client.RESTClient.Get().
+	req := client.RESTClient.Post().
 		Resource("pods").
 		Namespace(namespace).
 		Name(pod.Name).

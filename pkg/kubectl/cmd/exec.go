@@ -169,7 +169,7 @@ func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cm
 		return err
 	}
 
-	req := client.RESTClient.Get().
+	req := client.RESTClient.Post().
 		Resource("pods").
 		Name(pod.Name).
 		Namespace(namespace).
