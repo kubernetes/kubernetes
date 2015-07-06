@@ -5,7 +5,7 @@
 .PHONY: all container push clean
 
 # Keep this at dev, so no one accidentally blows away the latest published version.
-TAG = dev # current version: v1
+TAG = dev # current version: v1.1
 PREFIX = gcr.io/google_containers
 
 all: push
