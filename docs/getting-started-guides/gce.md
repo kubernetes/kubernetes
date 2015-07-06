@@ -115,7 +115,7 @@ should show a set of [services](../services.md) that look something like this:
 NAME                    LABELS                                                                                              SELECTOR                        IP(S)            PORT(S)
 elasticsearch-logging   k8s-app=elasticsearch-logging,kubernetes.io/cluster-service=true,kubernetes.io/name=Elasticsearch   k8s-app=elasticsearch-logging   10.0.198.255     9200/TCP
 kibana-logging          k8s-app=kibana-logging,kubernetes.io/cluster-service=true,kubernetes.io/name=Kibana                 k8s-app=kibana-logging          10.0.56.44       5601/TCP
-kube-dns                k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS                      k8s-app=kube-dns                10.0.0.10        53/UDP
+kubernetes-dns          k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS                      k8s-app=kube-dns                10.0.0.10        53/UDP
 kubernetes              component=apiserver,provider=kubernetes                                                             <none>                          10.0.0.1         443/TCP
 ```
 

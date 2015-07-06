@@ -163,7 +163,7 @@ $ kubectl cluster-info
   Kubernetes master is running at https://104.197.5.247
   elasticsearch-logging is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging
   kibana-logging is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/kibana-logging
-  kube-dns is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/kube-dns
+  kubernetes-dns is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/kubernetes-dns
   grafana is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/monitoring-grafana
   heapster is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/monitoring-heapster
 ```
