@@ -309,7 +309,7 @@ func ExamplePrintPodWithWideFormat() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      READY     REASON     RESTARTS   AGE       NODE
+	// NAME      READY     STATUS     RESTARTS   AGE       NODE
 	// test1     1/2       podPhase   6          292y      kubernetes-minion-abcd
 }
 
