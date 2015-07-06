@@ -96,24 +96,16 @@ outbound internet access.  A linux bridge (called `cbr0`) is configured to exist
 on that subnet, and is passed to docker's `--bridge` flag.
 
 We start Docker with:
-
 ```
-    DOCKER_OPTS="--bridge cbr0 --iptables=false --ip-masq=false"
-```
-
-We set up this bridge on each node with SaltStack, in
-[container_bridge.py](../cluster/saltbase/salt/_states/container_bridge.py).
-
-```
-cbr0:
-  container_bridge.ensure:
-    - cidr: {{ grains['cbr-cidr'] }}
-    - mtu: 1460
+    DOCKER_OPTS="--bridge=cbr0 --iptables=false --ip-masq=false"
 ```
 
-Docker will now allocate `Pod` IPs from the `cbr-cidr` block.  Containers
-can reach each other and `Nodes` over the `cbr0` bridge.  Those IPs are all
-routable within the GCE project network.
+This bridge is created by Kubelet (controlled by the `--configure-cbr0=true`
+flag) according to the `Node`'s `spec.podCIDR`.
+
+Docker will now allocate IPs from the `cbr-cidr` block.  Containers can reach
+each other and `Nodes` over the `cbr0` bridge.  Those IPs are all routable
+within the GCE project network.
 
 GCE itself does not know anything about these IPs, though, so it will not NAT
 them for outbound internet traffic.  To achieve that we use an iptables rule to
