@@ -81,6 +81,52 @@ spec:
       pdName: test
       fsType: ext4
 ```
+
+### AWSElasticBlockStore
+__Important: You must create an EBS volume using ```aws ec2 create-volume``` or the AWS API before you can use it__
+
+A Volume with an awsElasticBlockStore property allows access to files on a AWS
+[EBS volume](http://aws.amazon.com/ebs/)
+
+There are some restrictions when using an awsElasticBlockStore volume:
+
+* the nodes (what the kubelet runs on) need to be AWS EC2 instances
+* those instances need to be in the same region and availability-zone as the EBS volume
+* EBS only supports a single EC2 instance mounting a volume
+
+#### Creating an EBS volume
+Before you can use a EBS volume with a pod, you need to create it.
+
+```sh
+aws ec2 create-volume --availability-zone eu-west-1a --size 10 --volume-type gp2
+```
+
+Make sure the zone matches the zone you brought up your cluster in.  (And also check that the size and EBS volume
+type are suitable for your use!)
+
+#### AWS EBS Example configuration:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testpd
+spec:
+  containers:
+  - image: kubernetes/pause
+    name: testcontainer
+    volumeMounts:
+    - mountPath: /testpd
+      name: testvolume
+  volumes:
+  - name: testvolume
+    # This AWS EBS volume must already exist.
+    awsElasticBlockStore:
+      volumeID: aws://<availability-zone>/<volume-id>
+      fsType: ext4
+```
+
+(Note: the syntax of volumeID is currently awkward; #10181 fixes it)
+
 ### NFS
 
 Kubernetes NFS volumes allow an existing NFS share to be made available to containers within a pod.
