@@ -26,6 +26,9 @@
 {% set proxy_ssh_options = "" -%}
 {% if grains.proxy_ssh_user is defined -%}
   {% set proxy_ssh_options = "--ssh-user=" + grains.proxy_ssh_user + " --ssh-keyfile=/srv/sshproxy/.sshkeyfile" -%}
+  {# Append 40 characters onto command to work around #9822. #}
+  {# If mount list changes, this may also need to change. #}
+  {% set proxy_ssh_options = proxy_ssh_options + "                                        " -%}
 {% endif -%}
 
 {% set address = "--address=127.0.0.1" -%}
