@@ -3,10 +3,12 @@
 **Note**
 This documentation is current for HEAD.
 
-Documentation for previous releases is available in their respective branches:
-   * [v0.19.0](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/release-0.19.0/docs)
-   * [v0.18.1](https://github.com/GoogleCloudPlatform/kubernetes/tree/release-0.18/docs)
-   * [v0.17.1](https://github.com/GoogleCloudPlatform/kubernetes/tree/release-0.17/docs)
+Documentation for previous releases is available at
+http://releases.k8s.io/vX.Y.Z/docs.
+   * [releases.k8s.io/v0.20.0](http://releases.k8s.io/v0.20.0/docs)
+   * [releases.k8s.io/v0.19.0](http://releases.k8s.io/v0.19.0/docs)
+   * [releases.k8s.io/v0.18.1](http://releases.k8s.io/v0.18.1/docs)
+   * [releases.k8s.io/v0.17.1](http://releases.k8s.io/v0.17.1/docs)
 
 * The [User's guide](user-guide.md) is for anyone who wants to run programs and services on an existing Kubernetes cluster.
 
