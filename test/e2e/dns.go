@@ -128,7 +128,7 @@ func createProbeCommand(namesToResolve []string, fileNamePrefix string) (string,
 func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *client.Client) {
 	var failed []string
 
-	expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+	expectNoError(wait.Poll(time.Second*2, time.Minute*5, func() (bool, error) {
 		failed = []string{}
 		for _, fileName := range fileNames {
 			if _, err := client.Get().
