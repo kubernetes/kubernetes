@@ -85,6 +85,11 @@ func (f *Framework) afterEach() {
 		// you may or may not see the killing/deletion/cleanup events.
 	}
 
+	// Check whether all nodes are ready after the test.
+	if err := allNodesReady(f.Client); err != nil {
+		Failf("All nodes should be ready after test, %v", err)
+	}
+
 	By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
 	if err := f.Client.Namespaces().Delete(f.Namespace.Name); err != nil {
 		Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
