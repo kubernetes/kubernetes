@@ -43,7 +43,7 @@ To show the health check is actually working, first create the pods:
 Check the status of the pods once they are created:
 ```
 # kubectl get pods
-NAME                                           READY     REASON       RESTARTS   AGE
+NAME                                           READY     STATUS       RESTARTS   AGE
 [...]
 liveness-exec                                  1/1       Running      0          13s
 liveness-http                                  1/1       Running      0          13s
@@ -52,7 +52,7 @@ Check the status half a minute later, you will see the container restart count b
 ```
 # kubectl get pods
 mwielgus@mwielgusd:~/test/k2/kubernetes/examples/liveness$ kubectl get pods
-NAME                                           READY     REASON       RESTARTS   AGE
+NAME                                           READY     STATUS       RESTARTS   AGE
 [...]
 liveness-exec                                  1/1       Running      1          36s
 liveness-http                                  1/1       Running      1          36s

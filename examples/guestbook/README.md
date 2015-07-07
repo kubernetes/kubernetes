@@ -94,7 +94,7 @@ You'll see all pods in the cluster, including the redis master pod, and the stat
 The name of the redis master will look similar to that in the following list:
 
 ```shell
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                           READY     STATUS    RESTARTS   AGE
 ...
 redis-master-dz33o                             1/1       Running   0          2h
 ```
@@ -267,7 +267,7 @@ Once the replication controller is up, you can list the pods in the cluster, to 
 
 ```shell
 $ kubectl get pods
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                           READY     STATUS    RESTARTS   AGE
 ...
 redis-master-dz33o                             1/1       Running   0          2h
 redis-slave-35mer                              1/1       Running   0          2h
@@ -363,7 +363,7 @@ Once it's up (again, it may take up to thirty seconds to create the pods) you ca
 
 ```shell
 $ kubectl get pods
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                           READY     STATUS    RESTARTS   AGE
 ...
 frontend-4o11g                                 1/1       Running   0          2h
 frontend-u9aq6                                 1/1       Running   0          2h
