@@ -87,42 +87,54 @@ on how flags are set on various components.
 ### Network
 Kubernetes has a distinctive [networking model](../networking.md).
 
-Kubernetes allocates an IP address to each pod and creates a virtual ethernet device for each
-Pod.  When creating a cluster, you need to allocate a block of IPs for Kubernetes to use
-as Pod IPs.  The normal approach is to allocate a different block to each node in the cluster
-as the node is added.  A process in one pod should be able to communicate with another pod
-using the IP of the second pod.  This connectivity can be accomplished in two ways:
+Kubernetes allocates an IP address to each pod.  When creating a cluster, you
+need to allocate a block of IPs for Kubernetes to use as Pod IPs.  The simplest
+approach is to allocate a different block of IPs to each node in the cluster as
+the node is added.  A process in one pod should be able to communicate with
+another pod using the IP of the second pod.  This connectivity can be
+accomplished in two ways:
 - Configure network to route Pod IPs
   - Harder to setup from scratch.
-  - The Google Compute Engine ([GCE](gce.md)) and [AWS](aws.md) guides use this approach.
+  - Google Compute Engine ([GCE](gce.md)) and [AWS](aws.md) guides use this approach.
   - Need to make the Pod IPs routable by programming routers, switches, etc.
   - Can be configured external to kubernetes, or can implement in the "Routes" interface of a Cloud Provider module.
+  - Generally highest performance.
 - Create an Overlay network
   - Easier to setup
   - Traffic is encapsulated, so per-pod IPs are routable.
   - Examples:
-    - [Flannel](https://github.com/coreos/flannel) 
+    - [Flannel](https://github.com/coreos/flannel)
     - [Weave](http://weave.works/)
     - [Open vSwitch (OVS)](http://openvswitch.org/)
   - Does not require "Routes" portion of Cloud Provider module.
+  - Reduced performance (exactly how much depends on your solution).
 
-You need to select an address range for the Pod IPs. 
+You need to select an address range for the Pod IPs.
 - Various approaches:
-  - GCE: each project has own `10.0.0.0/8`.  Carve off a `/16` from that.  Room for several clusters in there.
-  - AWS: use one VPC for whole organization, carve off a chunk for each cluster.  Or use different VPC for different clusters.
-  - IPv6 not supported yet.
-- Allocate one CIDR for PodIPs for each node, or a large CIDR from which
-  smaller CIDRs are automatically allocated to each node (if nodes are dynamically added).
-  - You need Max-pods-per-node * max-number-of-nodes-expected IPs.  `/24` per node supports 254 pods per machine and is a common choice.  If IPs are scarce, a /27 may be sufficient (30 pods per machine).
-  - e.g. use 10.240.0.0/16 as the range for the cluster, with up to 256 nodes using 10.240.0.0/24 through 10.240.255.0/24, respectively.
+  - GCE: each project has its own `10.0.0.0/8`.  Carve off a `/16` for each
+    Kubernetes cluster from that space, which leaves room for several clusters.
+    Each node gets a further subdivision of this space.
+  - AWS: use one VPC for whole organization, carve off a chunk for each
+    cluster, or use different VPC for different clusters.
+  - IPv6 is not supported yet.
+- Allocate one CIDR subnet for each node's PodIPs, or a single large CIDR
+  from which smaller CIDRs are automatically allocated to each node (if nodes
+  are dynamically added).
+  - You need max-pods-per-node * max-number-of-nodes IPs in total. A `/24` per
+    node supports 254 pods per machine and is a common choice.  If IPs are
+    scarce, a `/26` (62 pods per machine) or even a `/27` (30 pods) may be sufficient.
+  - e.g. use `10.10.0.0/16` as the range for the cluster, with up to 256 nodes
+    using `10.10.0.0/24` through `10.10.255.0/24`, respectively.
   - Need to make these routable or connect with overlay.
 
-Kubernetes also allocates an IP to each [service](../services.md).  However, service IPs do not necessarily
-need to be routable.  The kube-proxy takes care of translating Service IPs to Pod IPs before traffic leaves
-the node.  You do need to Allocate a block of IPs for services.  Call this `SERVICE_CLUSTER_IP_RANGE`.
-For example, you could set `SERVICE_CLUSTER_IP_RANGE="10.1.0.0/16"`, allowing ~67840 distinct services to be active at once.
-Note that you can grow the bounds of this range, but you cannot move it without disrupting the services that already use it.
- 
+Kubernetes also allocates an IP to each [service](../services.md).  However,
+service IPs do not necessarily need to be routable.  The kube-proxy takes care
+of translating Service IPs to Pod IPs before traffic leaves the node.  You do
+need to Allocate a block of IPs for services.  Call this
+`SERVICE_CLUSTER_IP_RANGE`.  For example, you could set
+`SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"`, allowing 65534 distinct services to
+be active at once.  Note that you can grow the end of this range, but you
+cannot move it without disrupting the services and pods that already use it.
 
 Also, you need to pick a static IP for master node.
 - Call this `MASTER_IP`.
@@ -343,6 +355,8 @@ so that kube-proxy can manage iptables instead of docker.
 You may want to increase the number of open files for docker:
    - `DOCKER_NOFILE=1000000`
 
+Where this config goes depends on your node OS.  For example, GCE's Debian-based distro uses `/etc/default/docker`.
+
 Ensure docker is working correctly on your system before proceeding with the rest of the
 installation, by following examples given in the Docker documentation.
 
@@ -383,12 +397,16 @@ Arguments to consider:
   - Otherwise, if taking the firewall-based security approach
     - `--api-servers=http://$MASTER_IP`
 
-### Networking 
+### Networking
 Each node needs to be allocated its own CIDR range for pod networking.
-Call this $NODE_X_POD_CIDR.
+Call this `NODE_X_POD_CIDR`.
 
 A bridge called `cbr0` needs to be created on each node.  The bridge is explained
-further in the [networking documentation](../networking.md).
+further in the [networking documentation](../networking.md).  The bridge itself
+needs an address from `$NODE_X_POD_CIDR` - by convention the first IP.  Call
+this `NODE_X_BRIDGE_ADDR`.  For example, if `NODE_X_POD_CIDR` is `10.0.0.0/16`,
+then `NODE_X_BRIDGE_ADDR` is `10.0.0.1/16`.  NOTE: this retains the `/16` suffix
+because of how this is used later.
 
 - Recommended, automatic approach:
   1. Set `--configure-cbr0=true` option in kubelet init script and restart kubelet service.  Kubelet will configure cbr0 automatically.
@@ -399,21 +417,25 @@ further in the [networking documentation](../networking.md).
   1. Create a bridge
   - e.g. `brctl addbr cbr0`.
   1. Set appropriate MTU
-  - `ip link set dev cbr0 mtu 1460`
+  - `ip link set dev cbr0 mtu 1460` (NOTE: the actual value of MTU will depend on your network environment)
   1. Add the clusters network to the bridge (docker will go on other side of bridge).
-  - e.g. `ip addr add $CLUSTER_CIDR dev eth0`
+  - e.g. `ip addr add $NODE_X_BRIDGE_ADDR dev eth0`
   1. Turn it on
   - e.g. `ip link set dev cbr0 up`
 
-If you have turned off docker ip masquerading to allow pods to talk to each
+If you have turned off Docker's IP masquerading to allow pods to talk to each
 other, then you may need to do masquerading just for destination IPs outside
 the cluster network.  For example:
-```iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE \! -d ${CONTAINER_SUBNET}```
-will rewrite the source address from
+```iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE \! -d ${CLUSTER_SUBNET}```
+This will rewrite the source address from
 the PodIP to the Node IP for traffic bound outside the cluster, and kernel
-[connection tracking](http://www.iptables.info/en/connection-state.html#UDPCONNECTIONS)
+[connection tracking](http://www.iptables.info/en/connection-state.html)
 will ensure that responses destined to the node still reach
 the pod.
+
+NOTE: This is environment specific.  Some environments will not need
+any masquerading at all.  Others, such as GCE, will not allow pod IPs to send
+traffic to the internet, but have no problem with them inside your GCE Project.
 
 ### Other 
 - Enable auto-upgrades for your OS package manager, if desired.
