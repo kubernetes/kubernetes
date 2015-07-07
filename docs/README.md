@@ -1,14 +1,17 @@
-# Kubernetes Documentation
+# Kubernetes Documentation: HEAD
 
-**Note**
-This documentation is current for HEAD.
+<!-- BEGIN STRIP_FOR_RELEASE -->
 
-Documentation for previous releases is available at
-http://releases.k8s.io/vX.Y.Z/docs.
-   * [releases.k8s.io/v0.20.0](http://releases.k8s.io/v0.20.0/docs)
-   * [releases.k8s.io/v0.19.0](http://releases.k8s.io/v0.19.0/docs)
-   * [releases.k8s.io/v0.18.1](http://releases.k8s.io/v0.18.1/docs)
-   * [releases.k8s.io/v0.17.1](http://releases.k8s.io/v0.17.1/docs)
+<h1>*** PLEASE NOTE: This documentation applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+## Where to start
 
 * The [User's guide](user-guide.md) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
