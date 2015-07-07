@@ -69,12 +69,12 @@ fi
 GCE_DEFAULT_SKIP_TEST_REGEX="Skipped|Density|Reboot|Restart|Example"
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TEST_REGEX="Addon|Elasticsearch|Nodes.*network\spartition|Shell.*services|MaxPods.*"
+GCE_FLAKY_TEST_REGEX="Addon|Elasticsearch|Nodes.*network\spartition|Proxy.*logs|Shell.*services|MaxPods.*"
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TEST_REGEX="${GCE_DEFAULT_SKIP_TEST_REGEX}|Etcd|NetworkingNew|Nodes\sNetwork|Nodes\sResize|MaxPods"
 # Tests which are known to be flaky when run in parallel.
 # TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
-GCE_PARALLEL_FLAKY_TEST_REGEX="Addon|Elasticsearch|Hostdir.*MOD|Networking.*intra|PD|ServiceAccounts|Service\sendpoints\slatency|Services.*change\sthe\stype|Services.*functioning\sexternal\sload\sbalancer|Services.*identically\snamed|Services.*release.*load\sbalancer|Shell|multiport\sendpoints"
+GCE_PARALLEL_FLAKY_TEST_REGEX="Addon|Elasticsearch|Hostdir.*MOD|Networking.*intra|PD|Proxy.*logs|ServiceAccounts|Service\sendpoints\slatency|Services.*change\sthe\stype|Services.*functioning\sexternal\sload\sbalancer|Services.*identically\snamed|Services.*release.*load\sbalancer|Shell|multiport\sendpoints"
 
 # Define environment variables based on the Jenkins project name.
 case ${JOB_NAME} in
