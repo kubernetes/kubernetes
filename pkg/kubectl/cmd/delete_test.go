@@ -179,6 +179,86 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	}
 }
 
+func TestDeleteAllNotFound(t *testing.T) {
+	_, svc, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+
+	// Add an item to the list which will result in a 404 on delete
+	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	notFoundError := &errors.NewNotFound("Service", "foo").(*errors.StatusError).ErrStatus
+
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/services" && m == "GET":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil
+			case p == "/namespaces/test/services/foo" && m == "DELETE":
+				return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+			case p == "/namespaces/test/services/baz" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdDelete(f, buf)
+	cmd.Flags().Set("all", "true")
+	cmd.Flags().Set("cascade", "false")
+	// Make sure we can explicitly choose to fail on NotFound errors, even with --all
+	cmd.Flags().Set("ignore-not-found", "false")
+
+	err := RunDelete(f, buf, cmd, []string{"services"}, nil)
+	if err == nil || !errors.IsNotFound(err) {
+		t.Errorf("unexpected error: expected NotFound, got %v", err)
+	}
+}
+
+func TestDeleteAllIgnoreNotFound(t *testing.T) {
+	_, svc, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+
+	// Add an item to the list which will result in a 404 on delete
+	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	notFoundError := &errors.NewNotFound("Service", "foo").(*errors.StatusError).ErrStatus
+
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/services" && m == "GET":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil
+			case p == "/namespaces/test/services/foo" && m == "DELETE":
+				return &http.Response{StatusCode: 404, Body: objBody(codec, notFoundError)}, nil
+			case p == "/namespaces/test/services/baz" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdDelete(f, buf)
+	cmd.Flags().Set("all", "true")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Run(cmd, []string{"services"})
+
+	if buf.String() != "services/baz\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
 func TestDeleteMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
