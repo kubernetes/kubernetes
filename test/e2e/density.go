@@ -43,6 +43,9 @@ import (
 // NodeStartupThreshold is a rough estimate of the time allocated for a pod to start on a node.
 const NodeStartupThreshold = 4 * time.Second
 
+// Maximum container failures this test tolerates before failing.
+var MaxContainerFailures = 0
+
 // podLatencyData encapsulates pod startup latency information.
 type podLatencyData struct {
 	// Name of the pod
@@ -190,14 +193,14 @@ var _ = Describe("Density", func() {
 			fileHndl, err := os.Create(fmt.Sprintf(testContext.OutputDir+"/%s/pod_states.csv", uuid))
 			expectNoError(err)
 			defer fileHndl.Close()
-
 			config := RCConfig{Client: c,
-				Image:         "gcr.io/google_containers/pause:go",
-				Name:          RCName,
-				Namespace:     ns,
-				PollInterval:  itArg.interval,
-				PodStatusFile: fileHndl,
-				Replicas:      totalPods,
+				Image:                "gcr.io/google_containers/pause:go",
+				Name:                 RCName,
+				Namespace:            ns,
+				PollInterval:         itArg.interval,
+				PodStatusFile:        fileHndl,
+				Replicas:             totalPods,
+				MaxContainerFailures: &MaxContainerFailures,
 			}
 
 			// Create a listener for events.
