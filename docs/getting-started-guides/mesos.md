@@ -260,7 +260,7 @@ kubectl create -f skydns-rc.yaml
 kubectl create -f skydns-svc.yaml
 ```
 
-Check with `kubectl get pods` that 3/3 containers of the pods are eventually up and running.
+Check with `kubectl get pods --namespace=kube-system` that 3/3 containers of the pods are eventually up and running. Note that the kube-dns pods run in the `kube-system` namespace, not in  `default`.
 
 To check that the new DNS service in the cluster works, we start a busybox pod and use that to do a DNS lookup. First create the `busybox.yaml` pod spec:
 
