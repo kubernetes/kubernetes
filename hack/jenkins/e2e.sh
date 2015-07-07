@@ -217,6 +217,9 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
         # other.
         export KUBE_SKIP_UPDATE=y
         sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update -q" || true
+        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update preview -q" || true
+        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update alpha -q" || true
+        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update beta -q" || true
 
         if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
             # Use an explicit pinned version like "ci/v0.10.0-101-g6c814c4" or
