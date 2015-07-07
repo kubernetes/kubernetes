@@ -178,6 +178,10 @@ type RCConfig struct {
 	// Pointer to a list of pods; if non-nil, will be set to a list of pods
 	// created by this RC by RunRC.
 	CreatedPods *[]*api.Pod
+
+	// Maximum allowable container failures. If exceeded, RunRC returns an error.
+	// Defaults to replicas*0.1 if unspecified.
+	MaxContainerFailures *int
 }
 
 func Logf(format string, a ...interface{}) {
@@ -984,7 +988,15 @@ func Diff(oldPods []*api.Pod, curPods []*api.Pod) PodDiff {
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling cleanup).
 func RunRC(config RCConfig) error {
-	maxContainerFailures := int(math.Max(1.0, float64(config.Replicas)*.01))
+
+	// Don't force tests to fail if they don't care about containers restarting.
+	var maxContainerFailures int
+	if config.MaxContainerFailures == nil {
+		maxContainerFailures = int(math.Max(1.0, float64(config.Replicas)*.01))
+	} else {
+		maxContainerFailures = *config.MaxContainerFailures
+	}
+
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 
 	By(fmt.Sprintf("%v Creating replication controller %s", time.Now(), config.Name))
@@ -1058,6 +1070,8 @@ func RunRC(config RCConfig) error {
 		unknown := 0
 		inactive := 0
 		failedContainers := 0
+		containerRestartNodes := util.NewStringSet()
+
 		pods := podStore.List()
 		if config.CreatedPods != nil {
 			*config.CreatedPods = pods
@@ -1067,6 +1081,7 @@ func RunRC(config RCConfig) error {
 				running++
 				for _, v := range FailedContainers(p) {
 					failedContainers = failedContainers + v.restarts
+					containerRestartNodes.Insert(p.Spec.NodeName)
 				}
 			} else if p.Status.Phase == api.PodPending {
 				if p.Spec.NodeName == "" {
@@ -1088,6 +1103,7 @@ func RunRC(config RCConfig) error {
 		}
 
 		if failedContainers > maxContainerFailures {
+			dumpNodeDebugInfo(config.Client, containerRestartNodes.List())
 			return fmt.Errorf("%d containers failed which is more than allowed %d", failedContainers, maxContainerFailures)
 		}
 		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
@@ -1137,6 +1153,11 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 
 func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 	for _, n := range nodeNames {
+		Logf("\nLogging kubelet events for node %v", n)
+		for _, e := range getNodeEvents(c, n) {
+			Logf("source %v message %v reason %v first ts %v last ts %v, involved obj %+v",
+				e.Source, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
+		}
 		Logf("\nLogging pods the kubelet thinks is on node %v", n)
 		podList, err := GetKubeletPods(c, n)
 		if err != nil {
@@ -1153,6 +1174,25 @@ func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 		HighLatencyKubeletOperations(c, 10*time.Second, n)
 		// TODO: Log node resource info
 	}
+}
+
+// logNodeEvents logs kubelet events from the given node. This includes kubelet
+// restart and node unhealthy events. Note that listing events like this will mess
+// with latency metrics, beware of calling it during a test.
+func getNodeEvents(c *client.Client, nodeName string) []api.Event {
+	events, err := c.Events(api.NamespaceDefault).List(
+		labels.Everything(),
+		fields.Set{
+			"involvedObject.kind":      "Node",
+			"involvedObject.name":      nodeName,
+			"involvedObject.namespace": api.NamespaceAll,
+			"source":                   "kubelet",
+		}.AsSelector())
+	if err != nil {
+		Logf("Unexpected error retrieving node events %v", err)
+		return []api.Event{}
+	}
+	return events.Items
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint) error {
