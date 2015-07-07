@@ -107,9 +107,8 @@ Once that's up you can list the pod in the cluster:
 
 ```shell
 $ kubectl get pods dns-frontend
-POD            IP           CONTAINER(S)   IMAGE(S)               HOST                                    LABELS              STATUS    CREATED     MESSAGE
-dns-frontend   10.244.2.9                                         kubernetes-minion-sswf/104.154.55.211   name=dns-frontend   Running   3 seconds
-                            dns-frontend   ddysher/dns-frontend                                                               Running   2 seconds
+NAME           READY     STATUS       RESTARTS   AGE
+dns-frontend   0/1       ExitCode:0   0          1m
 ```
 
 Wait until the pod succeeds, then we can see the output from the client pod:
