@@ -1,8 +1,7 @@
 # Kubernetes Ansible
 
-This playbook helps you to set up a Kubernetes cluster on machines where you
-can't or don't want to use the salt scripts and cluster up/down tools. They
-can be real hardware, VMs, things in a public cloud, etc.
+This playbook and set of roles set up a Kubernetes cluster onto machines. They
+can be real hardware, VMs, things in a public cloud, etc. Anything that you can connect to via SSH.
 
 ## Before starting
 
@@ -11,45 +10,50 @@ can be real hardware, VMs, things in a public cloud, etc.
 * Record the IP addresses/hostname of the machines you want to be your nodes. (the master can also be a node)
 * Make sure your ansible running machine has ansible 1.9 and python-netaddr installed.
 
-### Configure the inventory file
+## Setup
 
-Stick the system information gathered above into the 'inventory' file.
+### Configure inventory
 
-### Configure your cluster
+Add the system information gathered above into the 'inventory' file, or create a new inventory file for the cluster.
 
-You will want to look though all of the options in `group_vars/all.yml` and
-set the variables to reflect your needs. The options should be described there
+### Configure Cluster options
+
+Look though all of the options in `group_vars/all.yml` and
+set the variables to reflect your needs. The options are described there
 in full detail.
 
-### Set up the actual kubernetes cluster
+## Running the playbook
 
-Now run the setup:
+After going through the setup, run the setup script provided:
 
 `$ ./setup.sh`
 
-In generel this will work on very recent Fedora, rawhide or F21.  Future work to
-support RHEL7, CentOS, and possible other distros should be forthcoming.
-
-### You can just set up certain parts instead of doing it all
-
-Only etcd:
-
-`$ ./setup.sh --tags=etcd`
-
-Only the kubernetes master:
-
-`$ ./setup.sh --tags=masters`
-
-Only the kubernetes nodes:
-
-`$ ./setup.sh --tags=nodes`
-
-### You may overwrite the inventory file by doing
+You may override the inventory file by doing:
 
 `INVENTORY=myinventory ./setup.sh`
 
-Only flannel:
 
-    $ ./setup.sh --tags=flannel
+In general this will work on very recent Fedora, rawhide or F21.  Future work to
+support RHEL7, CentOS, and possible other distros should be forthcoming.
+
+### Targeted runs
+
+You can just setup certain parts instead of doing it all.
+
+#### etcd
+
+`$ ./setup.sh --tags=etcd`
+
+#### Kubernetes master
+
+`$ ./setup.sh --tags=masters`
+
+#### kubernetes nodes
+
+`$ ./setup.sh --tags=nodes`
+
+### flannel
+
+`$ ./setup.sh --tags=flannel`
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/ansible/README.md?pixel)]()
