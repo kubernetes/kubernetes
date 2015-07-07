@@ -100,6 +100,13 @@ var _ = Describe("MaxPods", func() {
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster and trying to start a new one", podsNeededForSaturation))
 		expectNoError(RunRC(config))
 
+		// Log the amount of pods running in the cluster.
+		// TODO: remove when test is fixed.
+		pods, err = c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Set{
+			"status.phase": "Running",
+		}.AsSelector())
+		Logf("Observed %v running Pods. Need %v to fully saturate the cluster.", len(pods.Items), totalPodCapacity)
+
 		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind: "Pod",
