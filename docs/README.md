@@ -1,12 +1,7 @@
-# Kubernetes Documentation
+# Kubernetes Documentation: v0.21.1
 
-**Note**
-This documentation is current for 0.21.0.
 
-Documentation for previous releases is available in their respective branches:
-   * [v0.19.0](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/release-0.19.0/docs)
-   * [v0.18.1](https://github.com/GoogleCloudPlatform/kubernetes/tree/release-0.18/docs)
-   * [v0.17.1](https://github.com/GoogleCloudPlatform/kubernetes/tree/release-0.17/docs)
+## Where to start
 
 * The [User's guide](user-guide.md) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.

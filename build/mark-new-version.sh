@@ -92,8 +92,13 @@ fi
 echo "+++ Versioning documentation and examples"
 
 # Update the docs to match this version.
-$SED -ri -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" docs/README.md
-$SED -ri -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" examples/README.md
+DOCS_TO_EDIT=(docs/README.md examples/README.md)
+for DOC in "${DOCS_TO_EDIT[@]}"; do
+  $SED -ri \
+      -e "s/HEAD/${NEW_VERSION}/" \
+      -e "/<!-- BEGIN STRIP_FOR_RELEASE -->/,/<!-- END STRIP_FOR_RELEASE -->/d" \
+      "${DOC}"
+done
 
 # Update API descriptions to match this version.
 $SED -ri -e "s|(releases.k8s.io)/HEAD|\1/${NEW_VERSION}|" pkg/api/v[0-9]*/types.go
