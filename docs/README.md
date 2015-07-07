@@ -1,7 +1,7 @@
 # Kubernetes Documentation
 
 **Note**
-This documentation is current for 0.21.0.
+This documentation is current for HEAD.
 
 Documentation for previous releases is available in their respective branches:
    * [v0.19.0](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/release-0.19.0/docs)
