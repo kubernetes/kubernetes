@@ -128,6 +128,7 @@ func createProbeCommand(namesToResolve []string, fileNamePrefix string) (string,
 func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *client.Client) {
 	var failed []string
 
+	start := time.Now()
 	expectNoError(wait.Poll(time.Second*2, time.Minute*5, func() (bool, error) {
 		failed = []string{}
 		for _, fileName := range fileNames {
@@ -148,6 +149,7 @@ func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *
 		Logf("Lookups using %s failed for: %v\n", pod.Name, failed)
 		return false, nil
 	}))
+	Logf("Reading files from pods took %v\n", time.Since(start))
 	Expect(len(failed)).To(Equal(0))
 }
 
