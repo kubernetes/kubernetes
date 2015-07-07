@@ -91,12 +91,11 @@ func TestZeroLimit(t *testing.T) {
 		nodes []api.Node
 		test  string
 	}{
-		// The point of these tests is to show you get the same priority for a zero-limit pod
+		// The point of these next two tests is to show you get the same priority for a zero-limit pod
 		// as for a pod with the defaults limits, both when the zero-limit pod is already on the machine
 		// and when the zero-limit pod is the one being scheduled.
 		{
-			pod: &api.Pod{Spec: noResources},
-			// match current f1-micro on GCE
+			pod:   &api.Pod{Spec: noResources},
 			nodes: []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit*10), makeMinion("machine2", 1000, defaultMemoryLimit*10)},
 			test:  "test priority of zero-limit pod with machine with zero-limit pod",
 			pods: []*api.Pod{
@@ -105,10 +104,19 @@ func TestZeroLimit(t *testing.T) {
 			},
 		},
 		{
-			pod: &api.Pod{Spec: small},
-			// match current f1-micro on GCE
+			pod:   &api.Pod{Spec: small},
 			nodes: []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit*10), makeMinion("machine2", 1000, defaultMemoryLimit*10)},
 			test:  "test priority of nonzero-limit pod with machine with zero-limit pod",
+			pods: []*api.Pod{
+				{Spec: large1}, {Spec: noResources1},
+				{Spec: large2}, {Spec: small2},
+			},
+		},
+		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
+		{
+			pod:   &api.Pod{Spec: large},
+			nodes: []api.Node{makeMinion("machine1", 1000, defaultMemoryLimit*10), makeMinion("machine2", 1000, defaultMemoryLimit*10)},
+			test:  "test priority of larger pod with machine with zero-limit pod",
 			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
@@ -130,8 +138,14 @@ func TestZeroLimit(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		for _, hp := range list {
-			if hp.Score != expectedPriority {
-				t.Errorf("%s: expected 25 for all priorities, got list %#v", list)
+			if test.test == "test priority of larger pod with machine with zero-limit pod" {
+				if hp.Score == expectedPriority {
+					t.Error("%s: expected non-%d for all priorities, got list %#v", expectedPriority, list)
+				}
+			} else {
+				if hp.Score != expectedPriority {
+					t.Errorf("%s: expected %d for all priorities, got list %#v", expectedPriority, list)
+				}
 			}
 		}
 	}

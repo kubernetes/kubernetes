@@ -46,9 +46,10 @@ func calculateScore(requested int64, capacity int64, node string) int {
 // of computing priority only. This ensures that when scheduling zero-limit pods, such
 // pods will not all be scheduled to the machine with the smallest in-use limit,
 // and that when scheduling regular pods, such pods will not see zero-limit pods as
-// consuming no resources whatsoever.
-const defaultMilliCpuLimit int64 = 100            // 0.1 core
-const defaultMemoryLimit int64 = 60 * 1024 * 1024 // 60 MB
+// consuming no resources whatsoever. We chose these values to be similar to the
+// resources that we give to cluster addon pods (#10653). But they are pretty arbitrary.
+const defaultMilliCpuLimit int64 = 100             // 0.1 core
+const defaultMemoryLimit int64 = 200 * 1024 * 1024 // 200 MB
 
 // TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
 // as an additional argument here) rather than using constants
