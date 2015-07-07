@@ -13,22 +13,22 @@ down:	logger-down logger10-down
 
 
 logger-up:
-	-${KUBECTL} create -f synthetic_0_25lps.yaml
+	-${KUBECTL} create -f synthetic_0_25lps.yaml --namespace=kube-system
 
 logger-down:
-	-${KUBECTL} delete pods synthetic-logger-0.25lps-pod
+	-${KUBECTL} delete pods synthetic-logger-0.25lps-pod --namespace=kube-system
 
 logger10-up:
-	-${KUBECTL} create -f synthetic_10lps.yaml
+	-${KUBECTL} create -f synthetic_10lps.yaml --namespace=kube-system
 
 logger10-down:
-	-${KUBECTL} delete pods synthetic-logger-10lps-pod
+	-${KUBECTL} delete pods synthetic-logger-10lps-pod --namespace=kube-system
 
 get:	
-	${KUBECTL} get pods
-	${KUBECTL} get replicationControllers
-	${KUBECTL} get services
+	${KUBECTL} get pods --namespace=kube-system
+	${KUBECTL} get replicationControllers --namespace=kube-system
+	${KUBECTL} get services --namespace=kube-system
 
 net:	
-	${KUBECTL} get services elasticsearch-logging -o json
-	${KUBECTL} get services kibana-logging -o json
+	${KUBECTL} get services elasticsearch-logging --namespace=kube-system -o json
+	${KUBECTL} get services kibana-logging --namespace=kube-system -o json
