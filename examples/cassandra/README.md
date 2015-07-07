@@ -257,7 +257,6 @@ kubectl scale rc cassandra --replicas=4
 
 ### Seed Provider Source
 
-See
-[here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/cassandra/java/src/io/k8s/cassandra/KubernetesSeedProvider.java).
+See [here](./java/src/io/k8s/cassandra/KubernetesSeedProvider.java).
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cassandra/README.md?pixel)]()

@@ -178,7 +178,7 @@ We can add minion units like so:
 
 ## Launch the "k8petstore" example app
 
-The [k8petstore example](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/k8petstore) is available as a
+The [k8petstore example](../../examples/k8petstore) is available as a
 [juju action](https://jujucharms.com/docs/devel/actions).
 
     juju action do kubernetes-master/0
