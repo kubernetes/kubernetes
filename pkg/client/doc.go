@@ -21,6 +21,11 @@ and deleting pods, replication controllers, services, and minions.
 
 Most consumers should use the Config object to create a Client:
 
+    import (
+    "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+    "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+    "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+    )
     config := &client.Config{
       Host:     "http://localhost:8080",
       Username: "test",
@@ -30,7 +35,7 @@ Most consumers should use the Config object to create a Client:
     if err != nil {
       // handle error
     }
-    client.Pods(ns).List()
+    client.Pods(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
 
 More advanced consumers may wish to provide their own transport via a http.RoundTripper:
 
