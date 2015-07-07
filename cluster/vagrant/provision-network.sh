@@ -93,10 +93,13 @@ function provision-network-calico {
     yum install -y bridge-utils
 
     # create new docker bridge
-    echo "Create a new docker bridge"
+    echo "Delete old docker bridge if it exists"
     ip link set dev ${DOCKER_BRIDGE} down || true
     brctl delbr ${DOCKER_BRIDGE} || true
+    echo "Create a new docker bridge ${DOCKER_BRIDGE} with IP ${CONTAINER_ADDR} netmask ${CONTAINER_NETMASK}"
     brctl addbr ${DOCKER_BRIDGE}
     ip link set dev ${DOCKER_BRIDGE} up
     ifconfig ${DOCKER_BRIDGE} ${CONTAINER_ADDR} netmask ${CONTAINER_NETMASK} up
+    echo "Created docker bridge:"
+    ip addr show dev ${DOCKER_BRIDGE}
 }
