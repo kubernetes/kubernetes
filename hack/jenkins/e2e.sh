@@ -69,7 +69,7 @@ fi
 GCE_DEFAULT_SKIP_TEST_REGEX="Skipped|Density|Reboot|Restart|Example"
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TEST_REGEX="Addon|Elasticsearch|Nodes.*network\spartition|Proxy.*logs|Shell.*services|MaxPods.*"
+GCE_FLAKY_TEST_REGEX="Elasticsearch|Proxy.*logs|Shell.*services|MaxPods.*"
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TEST_REGEX="${GCE_DEFAULT_SKIP_TEST_REGEX}|Etcd|NetworkingNew|Nodes\sNetwork|Nodes\sResize|MaxPods"
 # Tests which are known to be flaky when run in parallel.
