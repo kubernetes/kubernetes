@@ -15,7 +15,7 @@ calico-network-plugin:
   file.managed:
     - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico
     - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.8/calico_kubernetes
-    - source_hash: sha512=a1a887ac06b6050bfd170c36b7af27e244d19ee64747224d99a167f6d48dc44b36e41c8c801a2d70301988157db52df5b1d90921677b747d6414b280f17eee75
+    - source_hash: sha512=36959621229b97bf5660ebbaa27d765b56ce165b2826a48c7942ab39167980bd698ec5956f73897fee7968c1cb7324e4176a78de1895a884abd7c595cda5fd0f
     - makedirs: True
     - mode: 744
 
@@ -55,41 +55,5 @@ ip6_tables:
 
 xt_set:
   kmod.present
-
-python-pip:
-  pkg.installed
-
-python-devel:
-  pkg.installed:
-    - require:
-      - pkg: gcc
-      - pkg: openssl-devel
-
-libffi-devel:
-  pkg.installed:
-    - require:
-      - pkg: gcc
-      - pkg: openssl-devel
-
-gcc:
-  pkg.installed
-
-openssl-devel:
-  pkg.installed
-
-python-etcd:
-  pip.installed:
-    - reload_modules: True
-    - require:
-      - pkg: python-pip
-      - pkg: python-devel
-      - pkg: libffi-devel
-
-python-sh:
-  pip.installed:
-    - name: sh
-    - reload_modules: True
-    - require:
-      - pkg: python-pip
 
 {% endif %}
