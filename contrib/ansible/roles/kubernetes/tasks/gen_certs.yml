@@ -15,12 +15,12 @@
 # FIXME This only generates a cert for one master...
 - name: Run create cert script on master
   command:
-    "{{ kube_script_dir }}/make-ca-cert.sh {{ inventory_hostname }}"
+    "{{ kube_script_dir }}/make-ca-cert.sh"
   args:
     creates: "{{ kube_cert_dir }}/server.crt"
   environment:
     MASTER_IP: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
-    MASTER_NAME: "kubernetes"
+    MASTER_NAME: "{{ inventory_hostname }}"
     DNS_DOMAIN: "{{ dns_domain }}"
     SERVICE_CLUSTER_IP_RANGE: "{{ kube_service_addresses }}"
     CERT_DIR: "{{ kube_cert_dir }}"
