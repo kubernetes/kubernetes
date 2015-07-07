@@ -102,6 +102,8 @@ ${KUBE_ROOT}/hack/run-gendocs.sh
 ${KUBE_ROOT}/hack/update-swagger-spec.sh
 git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 
+dochash=$(git log -n1 --format=%H)
+
 VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
 
 GIT_MINOR="${VERSION_MINOR}.${VERSION_PATCH}"
@@ -128,6 +130,26 @@ echo "+++ Committing version change"
 git add "${VERSION_FILE}"
 git commit -m "Kubernetes version ${NEW_VERSION}-dev"
 
+echo "+++ Constructing backmerge branches"
+
+function return_to_kansas {
+  git checkout -f "${current_branch}"
+}
+trap return_to_kansas EXIT
+
+backmerge="v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}-merge-to-master"
+backmergetmp="${backmerge}-tmp-$(date +%s)"
+
+# Now we create a temporary branch to revert the doc commit, then
+# create the backmerge branch for the convenience of the user.
+git checkout -b "${backmergetmp}"
+git revert "${dochash}" --no-edit
+git checkout -b "${backmerge}" "${fetch_remote}/master"
+git merge -s recursive -X ours "${backmergetmp}" -m "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH} merge to master"
+
+git checkout "${current_branch}"
+git branch -D "${backmergetmp}"
+
 echo ""
 echo "Success you must now:"
 echo ""
@@ -140,38 +162,25 @@ echo "       Either delete this tag and give up, fix the tag before your next PR
 echo "       or find someone who can help solve the tag problem!"
 echo ""
 
-if [[ "${VERSION_PATCH}" == "0" ]]; then
-  echo "- Send branch: ${current_branch} as a PR to master"
+if [[ "${VERSION_PATCH}" != "0" ]]; then
+  echo "- Send branch: ${current_branch} as a PR to ${release_branch} <-- NOTE THIS"
   echo "- Get someone to review and merge that PR"
+  echo ""
+fi
+
+echo "- I created the branch ${backmerge} for you. What I don't know is if this is"
+echo "  the latest version. If it is, AND ONLY IF IT IS, submit this branch as a pull"
+echo "  request to master:"
+echo ""
+echo "   git push <personal> ${backmerge}"
+echo ""
+echo "  and get someone to approve that PR. I know this branch looks odd. The purpose of this"
+echo "  branch is to get the tag for the version onto master for things like 'git describe'."
+echo ""
+echo "  IF THIS IS NOT THE LATEST VERSION YOU WILL CAUSE TIME TO GO BACKWARDS. DON'T DO THAT, PLEASE."
+echo ""
+
+if [[ "${VERSION_PATCH}" == "0" ]]; then
   echo "- Push the new release branch"
   echo "   git push ${push_url} ${current_branch}:${release_branch}"
-else
-  echo "- Send branch: ${current_branch} as a PR to ${release_branch}"
-  echo "- Get someone to review and merge that PR"
-  echo ""
-  echo "Now you need to back merge the release branch into master. This should"
-  echo "only be done if you are committing to the latest release branch. If the"
-  echo "latest release branch is, for example, release-0.10 and you are adding"
-  echo "a commit to release-0.9, you may skip the remaining instructions"
-  echo ""
-  echo "We do this back merge so that master will always show the latest version."
-  echo "The version in master would, for exampe show v0.10.2+ instead of v0.10.0+"
-  echo "It is not enough to just edit the version file in pkg/version/base.go in a"
-  echo "seperate PR. Doing it this way means that git will see the tag you just"
-  echo "pushed as an ancestor of master, even though the tag is on on a release"
-  echo "branch. The tag will thus be found by tools like git describe"
-  echo ""
-  echo "- Update so you see that merge in ${fetch_remote}"
-  echo "   git remote update"
-  echo "- Create and check out a new branch based on master"
-  echo "   git checkout -b merge-${release_branch}-to-master ${fetch_remote}/master"
-  echo "- Merge the ${release_branch} into your merge-${release_branch}-to-master branch:"
-  echo "   git merge -s recursive -X ours ${fetch_remote}/${release_branch}"
-  echo "   - It's possible you have merge conflicts that weren't resolved by the merge strategy."
-  echo "     - You will almost always want to take what is in HEAD"
-  echo "   - If you are not SURE how to solve these correctly, ask for help."
-  echo "   - It is possible to break other people's work if you didn't understand why"
-  echo "     the conflict happened and the correct way to solve it."
-  echo "- Send merge-${release_branch}-to-master as a PR to master"
-  echo "- Take the afternoon off"
 fi
