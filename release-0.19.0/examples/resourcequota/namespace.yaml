@@ -1,0 +1,4 @@
+apiVersion: v1beta3
+kind: Namespace
+metadata:
+  name: quota-example

@@ -1,0 +1,14 @@
+apiVersion: v1beta3
+kind: Service
+metadata: 
+  labels: 
+    name: wpfrontend
+  name: wpfrontend
+spec: 
+  createExternalLoadBalancer: true
+  ports:
+    # the port that this service should serve on
+    - port: 80
+  # label keys and values that must match in order to receive traffic for this service
+  selector: 
+    name: wordpress

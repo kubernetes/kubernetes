@@ -1,0 +1,21 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "meteor"
+  },
+  "spec": {
+    "ports": [
+      {
+        "protocol": "TCP",
+        "port": 80,
+        "targetPort": "http-server"
+      }
+    ],
+    "selector": {
+      "name": "meteor"
+    },
+    "createExternalLoadBalancer": true,
+    "sessionAffinity": "ClientIP"
+  }
+}

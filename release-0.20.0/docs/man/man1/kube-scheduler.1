@@ -1,0 +1,98 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Scott Collier" "October 2014"  ""
+
+.SH NAME
+.PP
+kube\-scheduler \- Schedules containers on hosts.
+
+.SH SYNOPSIS
+.PP
+\fBkube\-scheduler\fP [OPTIONS]
+
+.SH DESCRIPTION
+.PP
+The \fBkubernetes\fP scheduler is a policy\-rich, topology\-aware, workload\-specific function that significantly impacts availability, performance, and capacity. The scheduler needs to take into account individual and collective resource requirements, quality of service requirements, hardware/software/policy constraints, affinity and anti\-affinity specifications, data locality, inter\-workload interference, deadlines, and so on. Workload\-specific requirements will be exposed through the API as necessary.
+
+.PP
+The kube\-scheduler can take several options.
+
+.SH OPTIONS
+.PP
+\fB\-\-address\fP=127.0.0.1
+    The IP address to serve on (set to 0.0.0.0 for all interfaces)
+
+.PP
+\fB\-\-algorithm\-provider\fP="DefaultProvider"
+    The scheduling algorithm provider to use, one of: DefaultProvider
+
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to kubeconfig file with authorization and master location information.
+
+.PP
+\fB\-\-log\_backtrace\_at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\_dir\fP=
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\_flush\_frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-master\fP=""
+    The address of the Kubernetes API server (overrides any value in kubeconfig)
+
+.PP
+\fB\-\-policy\-config\-file\fP=""
+    File with scheduler policy configuration
+
+.PP
+\fB\-\-port\fP=10251
+    The port that the scheduler's http service runs on
+
+.PP
+\fB\-\-profiling\fP=true
+    Enable profiling via web interface host:port/debug/pprof/
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-version\fP=false
+    Print version information and quit
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+.SH EXAMPLES
+.PP
+.RS
+
+.nf
+/usr/bin/kube\-scheduler \-\-logtostderr=true \-\-v=0 \-\-master=127.0.0.1:8080
+
+.fi
+
+.SH HISTORY
+.PP
+October 2014, Originally compiled by Scott Collier (scollier@redhat.com) based
+ on the kubernetes source material and internal work.
+
+.PP
+[]()

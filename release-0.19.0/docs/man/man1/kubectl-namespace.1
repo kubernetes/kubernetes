@@ -1,0 +1,133 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl namespace \- SUPERCEDED: Set and view the current Kubernetes namespace
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl namespace\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
+
+.PP
+namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set\-context \-\-help' for more details.
+
+
+.SH OPTIONS
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for namespace
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-version\fP=""
+    The API version to use when talking to the server
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-client\-certificate\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-client\-key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-cluster\fP=""
+    The name of the kubeconfig cluster to use
+
+.PP
+\fB\-\-context\fP=""
+    The name of the kubeconfig context to use
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to the kubeconfig file to use for CLI requests.
+
+.PP
+\fB\-\-log\-backtrace\-at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\-dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\-flush\-frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-match\-server\-version\fP=false
+    Require server version to match client version
+
+.PP
+\fB\-\-namespace\fP=""
+    If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-password\fP=""
+    Password for basic authentication to the API server.
+
+.PP
+\fB\-s\fP, \fB\-\-server\fP=""
+    The address and port of the Kubernetes API server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-token\fP=""
+    Bearer token for authentication to the API server.
+
+.PP
+\fB\-\-user\fP=""
+    The name of the kubeconfig user to use
+
+.PP
+\fB\-\-username\fP=""
+    Username for basic authentication to the API server.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-validate\fP=false
+    If true, use a schema to validate the input before sending it
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

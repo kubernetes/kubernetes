@@ -40,8 +40,8 @@ VERSION_MAJOR="${BASH_REMATCH[1]}"
 VERSION_MINOR="${BASH_REMATCH[2]}"
 VERSION_PATCH="${BASH_REMATCH[3]}"
 
-if ! git diff HEAD --quiet; then
-  echo "!!! You must not have any uncommitted changes when running this command"
+if ! git diff-index --quiet --cached HEAD; then
+  echo "!!! You must not have any changes in your index when running this command"
   exit 1
 fi
 
@@ -85,30 +85,33 @@ SED=sed
 if which gsed &>/dev/null; then
   SED=gsed
 fi
-if ! ($SED --version 2>&1 | grep -q GNU); then
+if ! ("$SED" --version 2>&1 | grep -q GNU); then
   echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
 fi
 
-echo "+++ Versioning documentation and examples"
-
-# Update the docs to match this version.
-$SED -ri -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" docs/README.md
-$SED -ri -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" examples/README.md
-
-# Update API descriptions to match this version.
-$SED -ri -e "s|(releases.k8s.io)/HEAD|\1/${NEW_VERSION}|" pkg/api/v[0-9]*/types.go
-
-${KUBE_ROOT}/hack/run-gendocs.sh
-${KUBE_ROOT}/hack/update-swagger-spec.sh
-git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
-
 VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
+
+if [[ "${VERSION_PATCH}" == "0" ]]; then
+  RELEASE_DIR=release-${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
+  echo "+++ Cloning documentation and examples into ${RELEASE_DIR}/..."
+  mkdir ${RELEASE_DIR}
+  cp -r docs ${RELEASE_DIR}/docs
+  cp -r examples ${RELEASE_DIR}/examples
+
+  # Update the docs to match this version.
+  perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" ${RELEASE_DIR}/docs/README.md
+  perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" ${RELEASE_DIR}/examples/README.md
+
+  ${KUBE_ROOT}/hack/run-gendocs.sh
+  git add ${RELEASE_DIR}
+  git commit -m "Cloning docs for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+fi
 
 GIT_MINOR="${VERSION_MINOR}.${VERSION_PATCH}"
 echo "+++ Updating to ${NEW_VERSION}"
-$SED -ri -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
-$SED -ri -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\"/" "${VERSION_FILE}"
-$SED -ri -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION\"/" "${VERSION_FILE}"
+"$SED" -r -i -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
+"$SED" -r -i -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\"/" "${VERSION_FILE}"
+"$SED" -r -i -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION\"/" "${VERSION_FILE}"
 gofmt -s -w "${VERSION_FILE}"
 
 echo "+++ Committing version change"
@@ -119,9 +122,9 @@ echo "+++ Tagging version"
 git tag -a -m "Kubernetes version $NEW_VERSION" "${NEW_VERSION}"
 
 echo "+++ Updating to ${NEW_VERSION}-dev"
-$SED -ri -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
-$SED -ri -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\+\"/" "${VERSION_FILE}"
-$SED -ri -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION-dev\"/" "${VERSION_FILE}"
+"$SED" -r -i -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
+"$SED" -r -i -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\+\"/" "${VERSION_FILE}"
+"$SED" -r -i -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION-dev\"/" "${VERSION_FILE}"
 gofmt -s -w "${VERSION_FILE}"
 
 echo "+++ Committing version change"
