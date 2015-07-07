@@ -475,9 +475,16 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer, withNamespace bool, wid
 	}
 
 	// Lay out all the other containers on separate lines.
+	extraLinePrefix := "\t"
+	if withNamespace {
+		extraLinePrefix = "\t\t"
+	}
 	for _, container := range containers {
-		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "")
+		_, err := fmt.Fprintf(w, "%s%s\t%s\t%s", extraLinePrefix, container.Name, container.Image, "")
 		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(w, appendLabelTabs(columnLabels)); err != nil {
 			return err
 		}
 	}
@@ -522,9 +529,16 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 	}
 
 	// Lay out all the other containers on separate lines.
+	extraLinePrefix := "\t"
+	if withNamespace {
+		extraLinePrefix = "\t\t"
+	}
 	for _, container := range containers {
-		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "", "")
+		_, err := fmt.Fprintf(w, "%s%s\t%s\t%s\t%s", extraLinePrefix, container.Name, container.Image, "", "")
 		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(w, appendLabelTabs(columnLabels)); err != nil {
 			return err
 		}
 	}
@@ -566,6 +580,10 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 		return err
 	}
 
+	extraLinePrefix := "\t\t\t"
+	if withNamespace {
+		extraLinePrefix = "\t\t\t\t"
+	}
 	count := len(svc.Spec.Ports)
 	if len(ips) > count {
 		count = len(ips)
@@ -580,7 +598,10 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 			port = fmt.Sprintf("%d/%s", svc.Spec.Ports[i].Port, svc.Spec.Ports[i].Protocol)
 		}
 		// Lay out additional ports.
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", "", "", ip, port); err != nil {
+		if _, err := fmt.Fprintf(w, "%s%s\t%s", extraLinePrefix, ip, port); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(w, appendLabelTabs(columnLabels)); err != nil {
 			return err
 		}
 	}
@@ -626,7 +647,7 @@ func printNamespace(item *api.Namespace, w io.Writer, withNamespace bool, wide b
 	if withNamespace {
 		return fmt.Errorf("namespace is not namespaced")
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", item.Name, formatLabels(item.Labels), item.Status.Phase); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", item.Name, formatLabels(item.Labels), item.Status.Phase); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
@@ -939,6 +960,19 @@ func appendLabels(itemLabels map[string]string, columnLabels []string) string {
 		} else {
 			buffer.WriteString("<n/a>")
 		}
+	}
+	buffer.WriteString("\n")
+
+	return buffer.String()
+}
+
+// Append a set of tabs for each label column.  We need this in the case where
+// we have extra lines so that the tabwriter will still line things up.
+func appendLabelTabs(columnLabels []string) string {
+	var buffer bytes.Buffer
+
+	for range columnLabels {
+		buffer.WriteString("\t")
 	}
 	buffer.WriteString("\n")
 
