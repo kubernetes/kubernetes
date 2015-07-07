@@ -895,6 +895,7 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
 	for time.Now().Sub(start) < (60 * time.Second) {
+		err = nil
 		logs, err = c.Get().
 			Prefix("proxy").
 			Resource("nodes").
@@ -902,14 +903,17 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 			Suffix("containerLogs", ns, podStatus.Name, containerName).
 			Do().
 			Raw()
-		fmt.Sprintf("pod logs:%v\n", string(logs))
-		By(fmt.Sprintf("pod logs:%v\n", string(logs)))
-		if strings.Contains(string(logs), "Internal Error") {
-			By(fmt.Sprintf("Failed to get logs from node %q pod %q container %q: %v",
-				podStatus.Spec.NodeName, podStatus.Name, containerName, string(logs)))
+		if err == nil && strings.Contains(string(logs), "Internal Error") {
+			err = fmt.Errorf("Fetched log contains \"Internal Error\": %q.", string(logs))
+		}
+		if err != nil {
+			By(fmt.Sprintf("Warning: Failed to get logs from node %q pod %q container %q. %v",
+				podStatus.Spec.NodeName, podStatus.Name, containerName, err))
 			time.Sleep(5 * time.Second)
 			continue
+
 		}
+		By(fmt.Sprintf("Succesfully fetched pod logs:%v\n", string(logs)))
 		break
 	}
 
