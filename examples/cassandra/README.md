@@ -91,7 +91,7 @@ After a few moments, you should be able to see the pod running, plus its single 
 
 ```sh
 $ kubectl get pods cassandra
-NAME        READY     REASON    RESTARTS   AGE
+NAME        READY     STATUS    RESTARTS   AGE
 cassandra   1/1       Running   0          55s
 ```
 
@@ -192,7 +192,7 @@ Now if you list the pods in your cluster, and filter to the label ```name=cassan
 
 ```sh
 $ kubectl get pods -l="name=cassandra"
-NAME              READY     REASON    RESTARTS   AGE
+NAME              READY     STATUS    RESTARTS   AGE
 cassandra         1/1       Running   0          3m
 cassandra-af6h5   1/1       Running   0          28s
 ```

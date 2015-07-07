@@ -43,7 +43,7 @@ Use the `examples/guestbook-go/redis-master-controller.json` file to create a [r
 3. To verify that the redis-master pod is running, list all the pods in cluster with the `kubectl get pods` command:
     ```shell
     $ kubectl get pods
-    NAME                        READY     REASON    RESTARTS   AGE
+    NAME                        READY     STATUS    RESTARTS   AGE
     redis-master-xx4uv          1/1       Running   0          1m
     ...
     ```
@@ -108,7 +108,7 @@ The Redis master we created earlier is a single pod (REPLICAS = 1), while the Re
 2. To verify that the Redis master and slaves pods are running, run the `kubectl get pods` command:
     ```shell
     $ kubectl get pods
-    NAME                          READY     REASON    RESTARTS   AGE
+    NAME                          READY     STATUS    RESTARTS   AGE
     redis-master-xx4uv            1/1       Running   0          18m
     redis-slave-b6wj4             1/1       Running   0          1m
     redis-slave-iai40             1/1       Running   0          1m
@@ -161,7 +161,7 @@ This is a simple Go `net/http` ([negroni](https://github.com/codegangsta/negroni
 3. To verify that the guestbook pods are running (it might take up to thirty seconds to create the pods), list all the pods in cluster with the `kubectl get pods` command:
     ```shell
     $ kubectl get pods
-    NAME                           READY     REASON    RESTARTS   AGE
+    NAME                           READY     STATUS    RESTARTS   AGE
     guestbook-3crgn                1/1       Running   0          2m
     guestbook-gv7i6                1/1       Running   0          2m
     guestbook-x405a                1/1       Running   0          2m
