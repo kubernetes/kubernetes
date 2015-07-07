@@ -242,13 +242,19 @@ echo "Test Environment:"
 printenv | sort
 echo "--------------------------------------------------------------------------------"
 
-if [[ "${E2E_UP,,}" == "true" ]]; then
+# We get the Kubernetes tarballs on either cluster creation or when we want to
+# replace existing ones in a multi-step job (e.g. a cluster upgrade).
+if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; then
     if [[ ${KUBE_RUN_FROM_OUTPUT:-} =~ ^[yY]$ ]]; then
         echo "Found KUBE_RUN_FROM_OUTPUT=y; will use binaries from _output"
         cp _output/release-tars/kubernetes*.tar.gz .
     else
         echo "Pulling binaries from GCS"
-        if [[ $(find . | wc -l) != 1 ]]; then
+        # In a multi-step job, clean up just the kubernetes build files.
+        # Otherwise, we want a completely empty directory.
+        if [[ "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; then
+            rm -rf kubernetes*
+        elif [[ $(find . | wc -l) != 1 ]]; then
             echo $PWD not empty, bailing!
             exit 1
         fi
