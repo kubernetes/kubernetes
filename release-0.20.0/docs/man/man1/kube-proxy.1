@@ -1,0 +1,98 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Scott Collier" "October 2014"  ""
+
+.SH NAME
+.PP
+kube\-proxy \- Provides network proxy services.
+
+.SH SYNOPSIS
+.PP
+\fBkube\-proxy\fP [OPTIONS]
+
+.SH DESCRIPTION
+.PP
+The \fBkubernetes\fP network proxy runs on each node. This reflects services as defined in the Kubernetes API on each node and can do simple TCP stream forwarding or round robin TCP forwarding across a set of backends. Service endpoints are currently found through Docker\-links\-compatible environment variables specifying ports opened by the service proxy. Currently the user must select a port to expose the service on on the proxy, as well as the container's port to target.
+
+.PP
+The kube\-proxy takes several options.
+
+.SH OPTIONS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-bind\-address\fP=0.0.0.0
+    The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)
+
+.PP
+\fB\-\-healthz\-bind\-address\fP=127.0.0.1
+    The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
+
+.PP
+\fB\-\-healthz\-port\fP=10249
+    The port to bind the health check server. Use 0 to disable.
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to kubeconfig file with authorization information (the master location is set by the master flag).
+
+.PP
+\fB\-\-log\_backtrace\_at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\_dir\fP=
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\_flush\_frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-master\fP=""
+    The address of the Kubernetes API server (overrides any value in kubeconfig)
+
+.PP
+\fB\-\-oom\-score\-adj\fP=\-899
+    The oom\_score\_adj value for kube\-proxy process. Values must be within the range [\-1000, 1000]
+
+.PP
+\fB\-\-resource\-container\fP="/kube\-proxy"
+    Absolute name of the resource\-only container to create and run the Kube\-proxy in (Default: /kube\-proxy).
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-version\fP=false
+    Print version information and quit
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+.SH EXAMPLES
+.PP
+.RS
+
+.nf
+/usr/bin/kube\-proxy \-\-logtostderr=true \-\-v=0 \-\-master=http://127.0.0.1:8080
+
+.fi
+
+.SH HISTORY
+.PP
+October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
+ on the kubernetes source material and internal work.
+
+.PP
+[]()

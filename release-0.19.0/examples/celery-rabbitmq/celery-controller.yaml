@@ -1,0 +1,25 @@
+apiVersion: v1beta3
+kind: ReplicationController
+metadata:
+  labels:
+    name: celery
+  name: celery-controller
+spec:
+  replicas: 1
+  selector:
+    component: celery
+  template:
+    metadata:
+      labels:
+        app: taskQueue
+        component: celery
+    spec:
+      containers:
+      - image: endocode/celery-app-add
+        name: celery
+        ports:
+        - containerPort: 5672
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m

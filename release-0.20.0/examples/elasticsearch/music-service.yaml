@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: music-server
+  namespace: mytunes
+  labels:
+    name: music-db
+spec:
+  selector:
+    name: music-db
+  ports:
+  - name: db
+    port: 9200
+    targetPort: es
+  type: LoadBalancer
