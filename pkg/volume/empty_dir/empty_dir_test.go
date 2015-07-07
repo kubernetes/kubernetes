@@ -17,6 +17,7 @@ limitations under the License.
 package empty_dir
 
 import (
+	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -25,13 +26,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/util"
 )
 
-// The dir where volumes will be stored.
-const basePath = "/tmp/fake"
-
 // Construct an instance of a plugin, by name.
-func makePluginUnderTest(t *testing.T, plugName string) volume.VolumePlugin {
+func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(basePath, nil, nil))
 
@@ -43,7 +42,7 @@ func makePluginUnderTest(t *testing.T, plugName string) volume.VolumePlugin {
 }
 
 func TestCanSupport(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", "/tmp/fake")
 
 	if plug.Name() != "kubernetes.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.Name())
@@ -65,77 +64,132 @@ func (fake *fakeMountDetector) GetMountMedium(path string) (storageMedium, bool,
 	return fake.medium, fake.isMount, nil
 }
 
-func TestPlugin(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+type fakeChconRequest struct {
+	dir     string
+	context string
+}
 
-	spec := &api.Volume{
-		Name:         "vol1",
-		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumDefault}},
-	}
-	mounter := mount.FakeMounter{}
-	mountDetector := fakeMountDetector{}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), pod, &mounter, &mountDetector, volume.VolumeOptions{""})
-	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
-	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder")
-	}
+type fakeChconRunner struct {
+	requests []fakeChconRequest
+}
 
-	volPath := builder.GetPath()
-	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
-		t.Errorf("Got unexpected path: %s", volPath)
-	}
+func newFakeChconRunner() *fakeChconRunner {
+	return &fakeChconRunner{}
+}
 
-	if err := builder.SetUp(); err != nil {
-		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(volPath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", volPath)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
-	}
-	if len(mounter.Log) != 0 {
-		t.Errorf("Expected 0 mounter calls, got %#v", mounter.Log)
-	}
-	mounter.ResetLog()
+func (f *fakeChconRunner) SetContext(dir, context string) error {
+	f.requests = append(f.requests, fakeChconRequest{dir, context})
 
-	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mounter, &fakeMountDetector{})
-	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
-	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner")
+	return nil
+}
+
+func TestPluginEmptyRootContext(t *testing.T) {
+	doTestPlugin(t, pluginTestConfig{
+		medium:                 api.StorageMediumDefault,
+		rootContext:            "",
+		expectedChcons:         0,
+		expectedSetupMounts:    0,
+		expectedTeardownMounts: 0})
+}
+
+func TestPluginRootContextSet(t *testing.T) {
+	if !selinuxEnabled() {
+		return
 	}
 
-	if err := cleaner.TearDown(); err != nil {
-		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(volPath); err == nil {
-		t.Errorf("TearDown() failed, volume path still exists: %s", volPath)
-	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
-	}
-	if len(mounter.Log) != 0 {
-		t.Errorf("Expected 0 mounter calls, got %#v", mounter.Log)
-	}
-	mounter.ResetLog()
+	doTestPlugin(t, pluginTestConfig{
+		medium:                 api.StorageMediumDefault,
+		rootContext:            "user:role:type:range",
+		expectedSELinuxContext: "user:role:type:range",
+		expectedChcons:         1,
+		expectedSetupMounts:    0,
+		expectedTeardownMounts: 0})
 }
 
 func TestPluginTmpfs(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
-
-	spec := &api.Volume{
-		Name:         "vol1",
-		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}},
+	if !selinuxEnabled() {
+		return
 	}
-	mounter := mount.FakeMounter{}
-	mountDetector := fakeMountDetector{}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), pod, &mounter, &mountDetector, volume.VolumeOptions{""})
+
+	doTestPlugin(t, pluginTestConfig{
+		medium:                        api.StorageMediumMemory,
+		rootContext:                   "user:role:type:range",
+		expectedSELinuxContext:        "user:role:type:range",
+		expectedChcons:                1,
+		expectedSetupMounts:           1,
+		shouldBeMountedBeforeTeardown: true,
+		expectedTeardownMounts:        1})
+}
+
+type pluginTestConfig struct {
+	medium                        api.StorageMedium
+	rootContext                   string
+	SELinuxOptions                *api.SELinuxOptions
+	idempotent                    bool
+	expectedSELinuxContext        string
+	expectedChcons                int
+	expectedSetupMounts           int
+	shouldBeMountedBeforeTeardown bool
+	expectedTeardownMounts        int
+}
+
+// doTestPlugin sets up a volume and tears it back down.
+func doTestPlugin(t *testing.T, config pluginTestConfig) {
+	basePath, err := ioutil.TempDir("/tmp", "emptydir_volume_test")
+	if err != nil {
+		t.Fatalf("can't make a temp rootdir")
+	}
+
+	var (
+		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
+		metadataDir = path.Join(basePath, "pods/poduid/plugins/kubernetes.io~empty-dir/test-volume")
+
+		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+		volumeName = "test-volume"
+		spec       = &api.Volume{
+			Name:         volumeName,
+			VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: config.medium}},
+		}
+
+		mounter       = mount.FakeMounter{}
+		mountDetector = fakeMountDetector{}
+		pod           = &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+		fakeChconRnr  = &fakeChconRunner{}
+	)
+
+	// Set up the SELinux options on the pod
+	if config.SELinuxOptions != nil {
+		pod.Spec = api.PodSpec{
+			Containers: []api.Container{
+				{
+					SecurityContext: &api.SecurityContext{
+						SELinuxOptions: config.SELinuxOptions,
+					},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name: volumeName,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	if config.idempotent {
+		mounter.MountPoints = []mount.MountPoint{
+			{
+				Path: volumePath,
+			},
+		}
+		util.SetReady(metadataDir)
+	}
+
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec),
+		pod,
+		&mounter,
+		&mountDetector,
+		volume.VolumeOptions{config.rootContext},
+		fakeChconRnr)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -144,30 +198,62 @@ func TestPluginTmpfs(t *testing.T) {
 	}
 
 	volPath := builder.GetPath()
-	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
+	if volPath != volumePath {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 
 	if err := builder.SetUp(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(volPath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", volPath)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
+
+	// Stat the directory and check the permission bits
+	fileinfo, err := os.Stat(volPath)
+	if !config.idempotent {
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("SetUp() failed, volume path not created: %s", volPath)
+			} else {
+				t.Errorf("SetUp() failed: %v", err)
+			}
+		}
+		if e, a := perm, fileinfo.Mode().Perm(); e != a {
+			t.Errorf("Unexpected file mode for %v: expected: %v, got: %v", volPath, e, a)
+		}
+	} else if err == nil {
+		// If this test is for idempotency and we were able
+		// to stat the volume path, it's an error.
+		t.Errorf("Volume directory was created unexpectedly")
+	}
+
+	// Check the number of chcons during setup
+	if e, a := config.expectedChcons, len(fakeChconRnr.requests); e != a {
+		t.Errorf("Expected %v chcon calls, got %v", e, a)
+	}
+	if config.expectedChcons == 1 {
+		if e, a := config.expectedSELinuxContext, fakeChconRnr.requests[0].context; e != a {
+			t.Errorf("Unexpected chcon context argument; expected: %v, got: %v", e, a)
+		}
+		if e, a := volPath, fakeChconRnr.requests[0].dir; e != a {
+			t.Errorf("Unexpected chcon path argument: expected: %v, got: %v", e, a)
 		}
 	}
-	if len(mounter.Log) != 1 {
-		t.Errorf("Expected 1 mounter call, got %#v", mounter.Log)
-	} else {
-		if mounter.Log[0].Action != mount.FakeActionMount || mounter.Log[0].FSType != "tmpfs" {
-			t.Errorf("Unexpected mounter action: %#v", mounter.Log[0])
-		}
+
+	// Check the number of mounts performed during setup
+	if e, a := config.expectedSetupMounts, len(mounter.Log); e != a {
+		t.Errorf("Expected %v mounter calls during setup, got %v", e, a)
+	} else if config.expectedSetupMounts == 1 &&
+		(mounter.Log[0].Action != mount.FakeActionMount || mounter.Log[0].FSType != "tmpfs") {
+		t.Errorf("Unexpected mounter action during setup: %#v", mounter.Log[0])
 	}
 	mounter.ResetLog()
 
-	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mounter, &fakeMountDetector{mediumMemory, true})
+	// Make a cleaner for the volume
+	teardownMedium := mediumUnknown
+	if config.medium == api.StorageMediumMemory {
+		teardownMedium = mediumMemory
+	}
+	cleanerMountDetector := &fakeMountDetector{medium: teardownMedium, isMount: config.shouldBeMountedBeforeTeardown}
+	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal(volumeName, types.UID("poduid"), &mounter, cleanerMountDetector)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -175,6 +261,7 @@ func TestPluginTmpfs(t *testing.T) {
 		t.Errorf("Got a nil Cleaner")
 	}
 
+	// Tear down the volume
 	if err := cleaner.TearDown(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
@@ -183,18 +270,19 @@ func TestPluginTmpfs(t *testing.T) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
-	if len(mounter.Log) != 1 {
-		t.Errorf("Expected 1 mounter call, got %d (%v)", len(mounter.Log), mounter.Log)
-	} else {
-		if mounter.Log[0].Action != mount.FakeActionUnmount {
-			t.Errorf("Unexpected mounter action: %#v", mounter.Log[0])
-		}
+
+	// Check the number of mounter calls during tardown
+	if e, a := config.expectedTeardownMounts, len(mounter.Log); e != a {
+		t.Errorf("Expected %v mounter calls during teardown, got %v", e, a)
+	} else if config.expectedTeardownMounts == 1 && mounter.Log[0].Action != mount.FakeActionUnmount {
+		t.Errorf("Unexpected mounter action during teardown: %#v", mounter.Log[0])
 	}
 	mounter.ResetLog()
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+	basePath := "/tmp/fake"
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 
 	spec := &api.Volume{
 		Name: "vol1",
