@@ -17,7 +17,7 @@ spec:
         role: replicas
     spec:
       containers:
-      - image: antmanler/rethinkdb:1.16.0
+      - image: gcr.io/crested_analogy_671/rethink:1
         name: rethinkdb
         ports:
         - containerPort: 8080

@@ -12,14 +12,17 @@ Quick start
 -----------
 **Step 0**
 
-change the namespace of the current context to "rethinkdb"
+change the namespace of the current context to "rethinkdb", and create this
+namespace. (Note: the namespace is currently baked into the example image, so
+this is mandatory!)
 ```
 $kubectl config view -o template --template='{{index . "current-context"}}' | xargs -I {} kubectl config set-context {} --namespace=rethinkdb
+$kubectl create -f ns.yaml
 ```
 
 **Step 1**
 
-antmanler/rethinkdb will discover peer using endpoints provided by kubernetes_ro service,
+antmanler/rethinkdb will discover peer using endpoints provided by kubernetes service,
 so first create a service so the following pod can query its endpoint
 
 ```shell
@@ -36,7 +39,7 @@ rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
 
 **Step 2**
 
-start fist server in cluster
+start first server in cluster
 
 ```shell
 $kubectl create -f rc.yaml
