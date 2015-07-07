@@ -46,7 +46,7 @@ Documentation for other releases can be found at
     - [Node Info](#node-info)
   - [Node Management](#node-management)
     - [Node Controller](#node-controller)
-    - [Self-Registration of nodes](#self-registration-of-nodes)
+    - [Self-Registration of Nodes](#self-registration-of-nodes)
       - [Manual Node Administration](#manual-node-administration)
     - [Node capacity](#node-capacity)
 
@@ -177,7 +177,7 @@ join a node to a Kubernetes cluster, you as an admin need to make sure proper se
 running in the node. In the future, we plan to automatically provision some node
 services.
 
-### Self-Registration of nodes
+### Self-Registration of Nodes
 
 When kubelet flag `--register-node` is true (the default), the kubelet will attempt to
 register itself with the API server.  This is the preferred pattern, used by most distros.
@@ -190,6 +190,16 @@ For self-registration, the kubelet is started with the following options:
 
 Currently, any kubelet is authorized to create/modify any node resource, but in practice it only creates/modifies
 its own.  (In the future, we plan to limit authorization to only allow a kubelet to modify its own Node resource.)
+
+If your cluster runs short on resources you can easily add more machines to it if your cluster is running in Node self-registration mode. If you're using GCE or GKE it's done by resizing Instance Group managing your Nodes. It can be accomplished by modifying number of instances on `Compute > Compute Engine > Instance groups > your group > Edit group` [Google Cloud Console page](https://console.developers.google.com) or using gcloud CLI:
+
+```
+gcloud preview managed-instance-groups --zone compute-zone resize my-cluster-minon-group --new-size 42
+```
+
+Instance Group will take care of putting appropriate image on new machines and start them, while Kubelet will register its Node with API server to make it available for scheduling. If you scale the instance group down, system will randomly choose Nodes to kill.
+
+In other environments you may need to configure the machine yourself and tell the Kubelet on which machine API server is running.
 
 #### Manual Node Administration
 

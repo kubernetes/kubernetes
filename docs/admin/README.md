@@ -70,7 +70,7 @@ uses OpenVSwitch to set up networking between pods across
   Kubernetes nodes.
 
 If you are modifying an existing guide which uses Salt, this document explains [how Salt is used in the Kubernetes
-project.](salt.md).
+project](salt.md).
 
 ## Managing a cluster, including upgrades
 
