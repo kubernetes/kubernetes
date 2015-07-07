@@ -480,8 +480,6 @@ func (m *Master) init(c *Config) {
 		"replicationControllers": controllerStorage,
 		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, c.ClusterName),
 		"endpoints":              endpointsStorage,
-		"minions":                nodeStorage,
-		"minions/status":         nodeStatusStorage,
 		"nodes":                  nodeStorage,
 		"nodes/status":           nodeStatusStorage,
 		"events":                 event.NewStorage(eventRegistry),
@@ -748,9 +746,6 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
-		if k == "minions" || k == "minions/status" {
-			continue
-		}
 		storage[strings.ToLower(k)] = v
 	}
 	version := m.defaultAPIGroupVersion()
@@ -764,9 +759,6 @@ func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
 func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
-		if k == "minions" || k == "minions/status" {
-			continue
-		}
 		storage[strings.ToLower(k)] = v
 	}
 	version := m.defaultAPIGroupVersion()

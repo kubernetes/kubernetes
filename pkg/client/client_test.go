@@ -164,26 +164,19 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 // buildResourcePath is a convenience function for knowing if a namespace should be in a path param or not
 func buildResourcePath(namespace, resource string) string {
 	if len(namespace) > 0 {
-		if !(testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2") {
-			return path.Join("namespaces", namespace, resource)
-		}
+		return path.Join("namespaces", namespace, resource)
 	}
 	return resource
 }
 
 // buildQueryValues is a convenience function for knowing if a namespace should be in a query param or not
-func buildQueryValues(namespace string, query url.Values) url.Values {
+func buildQueryValues(query url.Values) url.Values {
 	v := url.Values{}
 	if query != nil {
 		for key, values := range query {
 			for _, value := range values {
 				v.Add(key, value)
 			}
-		}
-	}
-	if len(namespace) > 0 {
-		if api.PreV1Beta3(testapi.Version()) {
-			v.Set("namespace", namespace)
 		}
 	}
 	return v

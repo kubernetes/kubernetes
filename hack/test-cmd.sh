@@ -467,7 +467,6 @@ runTests() {
 
   ### Printing pod templates works
   kubectl get podtemplates "${kube_flags[@]}"
-  ### Display of an object which doesn't existing in v1beta1 and v1beta2 works
   [[ "$(kubectl get podtemplates -o yaml "${kube_flags[@]}" | grep nginx)" ]]
 
   ### Delete nginx pod template by name
@@ -732,20 +731,6 @@ __EOF__
   kubectl patch "${kube_flags[@]}" nodes "127.0.0.1" -p='{"spec":{"unschedulable":null}}'
   # Post-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-
-  ###########
-  # Nodes #
-  ###########
-
-  if [[ "${version}" = "v1beta1" ]] || [[ "${version}" = "v1beta2" ]]; then
-    kube::log::status "Testing kubectl(${version}:nodes)"
-
-    kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
-
-    kube::test::get_object_assert nodes '{{.kind}}' 'List'
-
-    kube::test::describe_object_assert nodes "127.0.0.1" "Name:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
-  fi
 
 
   #####################
