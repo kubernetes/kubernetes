@@ -1,7 +1,8 @@
-apiVersion: "v1beta3"
+apiVersion: "v1"
 kind: "LimitRange"
 metadata:
   name: "limits"
+  namespace: default
 spec:
   limits:
     - type: "Container"

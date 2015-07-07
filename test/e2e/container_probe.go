@@ -31,7 +31,7 @@ import (
 var _ = Describe("Probing container", func() {
 	framework := Framework{BaseName: "container-probe"}
 	var podClient client.PodInterface
-	probe := nginxProbeBuilder{}
+	probe := webserverProbeBuilder{}
 
 	BeforeEach(func() {
 		framework.beforeEach()
@@ -45,13 +45,18 @@ var _ = Describe("Probing container", func() {
 		expectNoError(err)
 		startTime := time.Now()
 
-		expectNoError(wait.Poll(poll, 90*time.Second, func() (bool, error) {
+		Expect(wait.Poll(poll, 90*time.Second, func() (bool, error) {
 			p, err := podClient.Get(p.Name)
 			if err != nil {
 				return false, err
 			}
-			return api.IsPodReady(p), nil
-		}))
+			ready := api.IsPodReady(p)
+			if !ready {
+				Logf("pod is not yet ready; pod has phase %q.", p.Status.Phase)
+				return false, nil
+			}
+			return true, nil
+		})).NotTo(HaveOccurred(), "pod never became ready")
 
 		if time.Since(startTime) < 30*time.Second {
 			Failf("Pod became ready before it's initial delay")
@@ -62,9 +67,10 @@ var _ = Describe("Probing container", func() {
 
 		isReady, err := podRunningReady(p)
 		expectNoError(err)
-		Expect(isReady).To(BeTrue())
+		Expect(isReady).To(BeTrue(), "pod should be ready")
 
-		Expect(getRestartCount(p) == 0).To(BeTrue())
+		restartCount := getRestartCount(p)
+		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	It("with readiness probe that fails should never be ready and never restart", func() {
@@ -86,9 +92,10 @@ var _ = Describe("Probing container", func() {
 		expectNoError(err)
 
 		isReady, err := podRunningReady(p)
-		Expect(isReady).NotTo(BeTrue())
+		Expect(isReady).NotTo(BeTrue(), "pod should be not ready")
 
-		Expect(getRestartCount(p) == 0).To(BeTrue())
+		restartCount := getRestartCount(p)
+		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 })
@@ -103,12 +110,12 @@ func getRestartCount(p *api.Pod) int {
 
 func makePodSpec(readinessProbe, livenessProbe *api.Probe) *api.Pod {
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "nginx-" + string(util.NewUUID())},
+		ObjectMeta: api.ObjectMeta{Name: "test-webserver-" + string(util.NewUUID())},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:           "nginx",
-					Image:          "nginx",
+					Name:           "test-webserver",
+					Image:          "gcr.io/google_containers/test-webserver",
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				},
@@ -118,22 +125,22 @@ func makePodSpec(readinessProbe, livenessProbe *api.Probe) *api.Pod {
 	return pod
 }
 
-type nginxProbeBuilder struct {
+type webserverProbeBuilder struct {
 	failing      bool
 	initialDelay bool
 }
 
-func (b nginxProbeBuilder) withFailing() nginxProbeBuilder {
+func (b webserverProbeBuilder) withFailing() webserverProbeBuilder {
 	b.failing = true
 	return b
 }
 
-func (b nginxProbeBuilder) withInitialDelay() nginxProbeBuilder {
+func (b webserverProbeBuilder) withInitialDelay() webserverProbeBuilder {
 	b.initialDelay = true
 	return b
 }
 
-func (b nginxProbeBuilder) build() *api.Probe {
+func (b webserverProbeBuilder) build() *api.Probe {
 	probe := &api.Probe{
 		Handler: api.Handler{
 			HTTPGet: &api.HTTPGetAction{

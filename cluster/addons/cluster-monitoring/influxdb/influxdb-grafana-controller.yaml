@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   name: monitoring-influx-grafana-v1
-  namespace: default 
+  namespace: kube-system
   labels: 
     k8s-app: influxGrafana
     version: v1
@@ -22,6 +22,10 @@ spec:
       containers: 
         - image: gcr.io/google_containers/heapster_influxdb:v0.3
           name: influxdb
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
           ports: 
             - containerPort: 8083
               hostPort: 8083
@@ -32,9 +36,13 @@ spec:
             mountPath: /data
         - image: gcr.io/google_containers/heapster_grafana:v0.7
           name: grafana
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
           env: 
             - name: INFLUXDB_EXTERNAL_URL
-              value: /api/v1beta3/proxy/namespaces/default/services/monitoring-influxdb:api/db/
+              value: /api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:api/db/
             - name: INFLUXDB_HOST
               value: monitoring-influxdb
             - name: INFLUXDB_PORT

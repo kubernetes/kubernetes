@@ -1,9 +1,9 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   name: blog-service
 spec:
-  createExternalLoadBalancer: true
+  type: "LoadBalancer"
   ports:
   - port: 80
   selector:

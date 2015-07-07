@@ -53,7 +53,7 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

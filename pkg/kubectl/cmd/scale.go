@@ -45,7 +45,7 @@ $ kubectl scale --current-replicas=2 --replicas=3 replicationcontrollers foo`
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
 func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT RESOURCE ID",
+		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT RESOURCE NAME",
 		// resize is deprecated
 		Aliases: []string{"resize"},
 		Short:   "Set a new size for a Replication Controller.",
@@ -71,10 +71,10 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 	count := cmdutil.GetFlagInt(cmd, "replicas")
 	if count < 0 {
-		return cmdutil.UsageError(cmd, "--replicas=COUNT RESOURCE ID")
+		return cmdutil.UsageError(cmd, "--replicas=COUNT RESOURCE NAME")
 	}
 
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

@@ -333,39 +333,44 @@ func TestNegotiateVersion(t *testing.T) {
 	tests := []struct {
 		name, version, expectedVersion string
 		serverVersions                 []string
+		clientVersions                 []string
 		config                         *Config
 		expectErr                      bool
 	}{
 		{
 			name:            "server supports client default",
-			version:         "v1",
-			expectedVersion: "v1",
+			version:         "version1",
 			config:          &Config{},
-			serverVersions:  []string{"v1beta3", "v1"},
+			serverVersions:  []string{"version1", testapi.Version()},
+			clientVersions:  []string{"version1", testapi.Version()},
+			expectedVersion: "version1",
 			expectErr:       false,
 		},
 		{
 			name:            "server falls back to client supported",
-			version:         "v1",
-			expectedVersion: "v1beta3",
+			version:         testapi.Version(),
 			config:          &Config{},
-			serverVersions:  []string{"v1beta3"},
+			serverVersions:  []string{"version1"},
+			clientVersions:  []string{"version1", testapi.Version()},
+			expectedVersion: "version1",
 			expectErr:       false,
 		},
 		{
 			name:            "explicit version supported",
 			version:         "",
-			expectedVersion: "v1",
-			config:          &Config{Version: "v1"},
-			serverVersions:  []string{"v1beta3", "v1"},
+			config:          &Config{Version: testapi.Version()},
+			serverVersions:  []string{"version1", testapi.Version()},
+			clientVersions:  []string{"version1", testapi.Version()},
+			expectedVersion: testapi.Version(),
 			expectErr:       false,
 		},
 		{
 			name:            "explicit version not supported",
 			version:         "",
+			config:          &Config{Version: testapi.Version()},
+			serverVersions:  []string{"version1"},
+			clientVersions:  []string{"version1", testapi.Version()},
 			expectedVersion: "",
-			config:          &Config{Version: "v1"},
-			serverVersions:  []string{"v1beta3"},
 			expectErr:       true,
 		},
 	}
@@ -384,7 +389,7 @@ func TestNegotiateVersion(t *testing.T) {
 		}
 		c := NewOrDie(test.config)
 		c.Client = fakeClient.Client
-		response, err := NegotiateVersion(c, test.config, test.version)
+		response, err := NegotiateVersion(c, test.config, test.version, test.clientVersions)
 		if err == nil && test.expectErr {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}

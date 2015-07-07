@@ -84,7 +84,7 @@ func TestBadSecurityContextConversion(t *testing.T) {
 		c   *versioned.Container
 		err string
 	}{
-		// this use case must use true for the container and false for the sc.  Otherwise the defaulter
+		// this use case must use true for the container and false for the sc. Otherwise the defaulter
 		// will assume privileged was left undefined (since it is the default value) and copy the
 		// sc setting upwards
 		"mismatched privileged": {

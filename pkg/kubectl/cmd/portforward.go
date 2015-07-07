@@ -83,7 +83,7 @@ func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw po
 		return cmdutil.UsageError(cmd, "at least 1 PORT is required for port-forward")
 	}
 
-	namespace, err := f.DefaultNamespace()
+	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw po
 		close(stopCh)
 	}()
 
-	req := client.RESTClient.Get().
+	req := client.RESTClient.Post().
 		Resource("pods").
 		Namespace(namespace).
 		Name(pod.Name).

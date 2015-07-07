@@ -22,7 +22,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman cmd/genbashcomp
 
 gendocs=$(kube::util::find-binary "gendocs")
 genman=$(kube::util::find-binary "genman")

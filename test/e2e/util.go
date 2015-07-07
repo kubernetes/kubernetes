@@ -59,6 +59,9 @@ const (
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
 
+	// How long to wait for a service endpoint to be resolvable.
+	serviceStartTimeout = 1 * time.Minute
+
 	// String used to mark pod deletion
 	nonExist = "NonExist"
 
@@ -175,6 +178,10 @@ type RCConfig struct {
 	// Pointer to a list of pods; if non-nil, will be set to a list of pods
 	// created by this RC by RunRC.
 	CreatedPods *[]*api.Pod
+
+	// Maximum allowable container failures. If exceeded, RunRC returns an error.
+	// Defaults to replicas*0.1 if unspecified.
+	MaxContainerFailures *int
 }
 
 func Logf(format string, a ...interface{}) {
@@ -842,7 +849,7 @@ func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	if err != nil {
 		return
 	}
-	Logf("Asyncronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	Logf("Asynchronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	err = cmd.Start()
 	return
 }
@@ -981,7 +988,15 @@ func Diff(oldPods []*api.Pod, curPods []*api.Pod) PodDiff {
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling cleanup).
 func RunRC(config RCConfig) error {
-	maxContainerFailures := int(math.Max(1.0, float64(config.Replicas)*.01))
+
+	// Don't force tests to fail if they don't care about containers restarting.
+	var maxContainerFailures int
+	if config.MaxContainerFailures == nil {
+		maxContainerFailures = int(math.Max(1.0, float64(config.Replicas)*.01))
+	} else {
+		maxContainerFailures = *config.MaxContainerFailures
+	}
+
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 
 	By(fmt.Sprintf("%v Creating replication controller %s", time.Now(), config.Name))
@@ -1046,7 +1061,7 @@ func RunRC(config RCConfig) error {
 	oldPods := make([]*api.Pod, 0)
 	oldRunning := 0
 	lastChange := time.Now()
-	for oldRunning != config.Replicas && time.Since(lastChange) < timeout {
+	for oldRunning != config.Replicas {
 		time.Sleep(interval)
 
 		running := 0
@@ -1055,6 +1070,8 @@ func RunRC(config RCConfig) error {
 		unknown := 0
 		inactive := 0
 		failedContainers := 0
+		containerRestartNodes := util.NewStringSet()
+
 		pods := podStore.List()
 		if config.CreatedPods != nil {
 			*config.CreatedPods = pods
@@ -1064,6 +1081,7 @@ func RunRC(config RCConfig) error {
 				running++
 				for _, v := range FailedContainers(p) {
 					failedContainers = failedContainers + v.restarts
+					containerRestartNodes.Insert(p.Spec.NodeName)
 				}
 			} else if p.Status.Phase == api.PodPending {
 				if p.Spec.NodeName == "" {
@@ -1085,6 +1103,7 @@ func RunRC(config RCConfig) error {
 		}
 
 		if failedContainers > maxContainerFailures {
+			dumpNodeDebugInfo(config.Client, containerRestartNodes.List())
 			return fmt.Errorf("%d containers failed which is more than allowed %d", failedContainers, maxContainerFailures)
 		}
 		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
@@ -1104,12 +1123,76 @@ func RunRC(config RCConfig) error {
 		}
 		oldPods = pods
 		oldRunning = running
+
+		if time.Since(lastChange) > timeout {
+			dumpPodDebugInfo(config.Client, pods)
+			break
+		}
 	}
 
 	if oldRunning != config.Replicas {
 		return fmt.Errorf("Only %d pods started out of %d", oldRunning, config.Replicas)
 	}
 	return nil
+}
+
+func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
+	badNodes := util.NewStringSet()
+	for _, p := range pods {
+		if p.Status.Phase != api.PodRunning {
+			if p.Spec.NodeName != "" {
+				Logf("Pod %v assigned to host %v (IP: %v) in %v", p.Name, p.Spec.NodeName, p.Status.HostIP, p.Status.Phase)
+				badNodes.Insert(p.Spec.NodeName)
+			} else {
+				Logf("Pod %v still unassigned", p.Name)
+			}
+		}
+	}
+	dumpNodeDebugInfo(c, badNodes.List())
+}
+
+func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
+	for _, n := range nodeNames {
+		Logf("\nLogging kubelet events for node %v", n)
+		for _, e := range getNodeEvents(c, n) {
+			Logf("source %v message %v reason %v first ts %v last ts %v, involved obj %+v",
+				e.Source, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
+		}
+		Logf("\nLogging pods the kubelet thinks is on node %v", n)
+		podList, err := GetKubeletPods(c, n)
+		if err != nil {
+			Logf("Unable to retrieve kubelet pods for node %v", n)
+			continue
+		}
+		for _, p := range podList.Items {
+			Logf("%v started at %v (%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.ContainerStatuses))
+			for _, c := range p.Status.ContainerStatuses {
+				Logf("\tContainer %v ready: %v, restart count %v",
+					c.Name, c.Ready, c.RestartCount)
+			}
+		}
+		HighLatencyKubeletOperations(c, 10*time.Second, n)
+		// TODO: Log node resource info
+	}
+}
+
+// logNodeEvents logs kubelet events from the given node. This includes kubelet
+// restart and node unhealthy events. Note that listing events like this will mess
+// with latency metrics, beware of calling it during a test.
+func getNodeEvents(c *client.Client, nodeName string) []api.Event {
+	events, err := c.Events(api.NamespaceDefault).List(
+		labels.Everything(),
+		fields.Set{
+			"involvedObject.kind":      "Node",
+			"involvedObject.name":      nodeName,
+			"involvedObject.namespace": api.NamespaceAll,
+			"source":                   "kubelet",
+		}.AsSelector())
+	if err != nil {
+		Logf("Unexpected error retrieving node events %v", err)
+		return []api.Event{}
+	}
+	return events.Items
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint) error {
@@ -1376,6 +1459,22 @@ func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time
 	}
 	Logf("Node %s didn't reach desired readiness (%t) within %v", name, wantReady, timeout)
 	return false
+}
+
+// checks whether all registered nodes are ready
+func allNodesReady(c *client.Client) error {
+	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	Expect(err).NotTo(HaveOccurred())
+	var notReady []api.Node
+	for _, node := range nodes.Items {
+		if isNodeReadySetAsExpected(&node, false) {
+			notReady = append(notReady, node)
+		}
+	}
+	if len(notReady) > 0 {
+		return fmt.Errorf("Not ready nodes: %v", notReady)
+	}
+	return nil
 }
 
 // Filters nodes in NodeList in place, removing nodes that do not

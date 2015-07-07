@@ -449,7 +449,11 @@ func (s *APIServer) Run(_ []string) error {
 					s.TLSCertFile = path.Join(s.CertDirectory, "apiserver.crt")
 					s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "apiserver.key")
 					// TODO (cjcullen): Is PublicAddress the right address to sign a cert with?
-					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
+					alternateIPs := []net.IP{config.ServiceReadWriteIP}
+					alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
+					// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
+					// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
+					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
 						glog.Errorf("Unable to generate self signed cert: %v", err)
 					} else {
 						glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)

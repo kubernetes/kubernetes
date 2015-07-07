@@ -10,7 +10,7 @@
   environment:
     TOKEN_DIR: "{{ kube_token_dir }}"
   with_nested:
-    - [ "system:controller_manager", "system:scheduler" ]
+    - [ "system:controller_manager", "system:scheduler", "system:kubectl" ]
     - "{{ groups['masters'] }}"
   register: gentoken
   changed_when: "'Added' in gentoken.stdout"

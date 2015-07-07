@@ -130,7 +130,7 @@ func CreateMasterInfo(pid *upid.UPID) *mesos.MasterInfo {
 		// This is needed for the people cross-compiling from macos to linux.
 		// The cross-compiled version of net.LookupIP() fails to handle plain IPs.
 		// See https://github.com/mesos/mesos-go/pull/117
-        } else if addrs, err := net.LookupIP(pid.Host); err == nil {
+	} else if addrs, err := net.LookupIP(pid.Host); err == nil {
 		for _, ip := range addrs {
 			if ip = ip.To4(); ip != nil {
 				ipv4 = ip

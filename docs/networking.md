@@ -1,18 +1,25 @@
 # Networking in Kubernetes
 
+Kubernetes approaches networking somewhat differently than Docker does by
+default.  There are 4 distinct networking problems to solve:
+1. Highly-coupled container-to-container communications: this is solved by
+   [pods](pods.md) and `localhost` communications.
+2. Pod-to-Pod communications: this is the primary focus of this document.
+3. Pod-to-Service communications: this is covered by [services](services.md).
+4. External-to-Service communications: this is covered by [services](services.md).
+
 ## Summary
 
-Kubernetes approaches networking somewhat differently that Docker's defaults.
-We give every pod its own IP address allocated from an internal network, so you
-do not need to explicitly create links between communicating pods.  To do this,
-you must set up your cluster networking correctly.
+Kubernetes assumes that pods can communicate with other pods, regardless of
+which host they land on.  We give every pod its own IP address so you do not
+need to explicitly create links between pods and you almost never need to deal
+with mapping container ports to host ports.  This creates a clean,
+backwards-compatible model where pods can be treated much like VMs or physical
+hosts from the perspectives of port allocation, naming, service discovery, load
+balancing, application configuration, and migration.
 
-Since pods can fail and be replaced with new pods with different IP addresses
-on different nodes, we do not recommend having a pod directly talk to the IP
-address of another Pod.  Instead, if a pod, or collection of pods, provide some
-service, then you should create a `service` object spanning those pods, and
-clients should connect to the IP of the service object.  See
-[services](services.md).
+To achieve this we must impose some requirements on how you set up your cluster
+networking.
 
 ## Docker model
 
@@ -96,24 +103,16 @@ outbound internet access.  A linux bridge (called `cbr0`) is configured to exist
 on that subnet, and is passed to docker's `--bridge` flag.
 
 We start Docker with:
-
 ```
-    DOCKER_OPTS="--bridge cbr0 --iptables=false --ip-masq=false"
-```
-
-We set up this bridge on each node with SaltStack, in
-[container_bridge.py](../cluster/saltbase/salt/_states/container_bridge.py).
-
-```
-cbr0:
-  container_bridge.ensure:
-    - cidr: {{ grains['cbr-cidr'] }}
-    - mtu: 1460
+    DOCKER_OPTS="--bridge=cbr0 --iptables=false --ip-masq=false"
 ```
 
-Docker will now allocate `Pod` IPs from the `cbr-cidr` block.  Containers
-can reach each other and `Nodes` over the `cbr0` bridge.  Those IPs are all
-routable within the GCE project network.
+This bridge is created by Kubelet (controlled by the `--configure-cbr0=true`
+flag) according to the `Node`'s `spec.podCIDR`.
+
+Docker will now allocate IPs from the `cbr-cidr` block.  Containers can reach
+each other and `Nodes` over the `cbr0` bridge.  Those IPs are all routable
+within the GCE project network.
 
 GCE itself does not know anything about these IPs, though, so it will not NAT
 them for outbound internet traffic.  To achieve that we use an iptables rule to

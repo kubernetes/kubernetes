@@ -8,12 +8,22 @@ KUBE_HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0"
 
 exit_code=0
 
+echo -ne "Checking that it builds... "
+if ! OUT=$("hack/build-go.sh" 2>&1); then
+  echo
+  echo "${red}${OUT}"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 echo -ne "Checking for files that need gofmt... "
 files_need_gofmt=()
 files=($(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "third_party" -e "Godeps"))
 for file in "${files[@]}"; do
   # Check for files that fail gofmt.
-  diff="$(git show ":${file}" | gofmt -s -d)"
+  diff="$(git show ":${file}" | gofmt -s -d 2>&1)"
   if [[ -n "$diff" ]]; then
     files_need_gofmt+=("${file}")
   fi
@@ -135,4 +145,7 @@ else
 fi
 echo "${reset}"
 
-exit $exit_code
+if [[ "${exit_code}" != 0 ]]; then
+  echo "${red}Aborting commit${reset}"
+fi
+exit ${exit_code}

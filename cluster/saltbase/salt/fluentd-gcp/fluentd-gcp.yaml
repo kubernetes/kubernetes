@@ -1,14 +1,16 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: fluentd-cloud-logging
+  namespace: kube-system
 spec:
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.7
+    image: gcr.io/google_containers/fluentd-gcp:1.8
     resources:
       limits:
         cpu: 100m
+        memory: 200Mi
     env:
     - name: "FLUENTD_ARGS"
       value: "-qq"

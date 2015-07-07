@@ -34,7 +34,7 @@ var Version string
 
 // OldestVersion is the string that represents the oldest server version supported,
 // for client code that wants to hardcode the lowest common denominator.
-const OldestVersion = "v1beta3"
+var OldestVersion string
 
 // Versions is the list of versions that are recognized in code. The order provided
 // may be assumed to be least feature rich to most feature rich, and clients may
@@ -67,6 +67,7 @@ var userResources = []string{"rc", "svc", "pods", "pvc"}
 func init() {
 	// Use the first API version in the list of registered versions as the latest.
 	Version = registered.RegisteredVersions[0]
+	OldestVersion = registered.RegisteredVersions[len(registered.RegisteredVersions)-1]
 	Codec = runtime.CodecFor(api.Scheme, Version)
 	// Put the registered versions in Versions in reverse order.
 	versions := registered.RegisteredVersions

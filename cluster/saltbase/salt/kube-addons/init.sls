@@ -11,6 +11,13 @@ addon-dir-create:
     - require:
         - file: addon-dir-delete
 
+/etc/kubernetes/addons/namespace.yaml:
+  file.managed:
+    - source: salt://kube-addons/namespace.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+
 {% if pillar.get('enable_cluster_monitoring', '').lower() == 'influxdb' %}
 /etc/kubernetes/addons/cluster-monitoring/influxdb:
   file.recurse:
@@ -80,6 +87,17 @@ addon-dir-create:
 /etc/kubernetes/addons/fluentd-elasticsearch:
   file.recurse:
     - source: salt://kube-addons/fluentd-elasticsearch
+    - include_pat: E@^.+\.yaml$
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
+{% if pillar.get('enable_cluster_ui', 'true').lower() == 'true' %}
+/etc/kubernetes/addons/kube-ui:
+  file.recurse:
+    - source: salt://kube-addons/kube-ui
     - include_pat: E@^.+\.yaml$
     - user: root
     - group: root

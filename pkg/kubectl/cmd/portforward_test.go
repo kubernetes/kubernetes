@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
@@ -38,6 +39,7 @@ func (f *fakePortForwarder) ForwardPorts(req *client.Request, config *client.Con
 }
 
 func TestPortForward(t *testing.T) {
+	version := testapi.Version()
 
 	tests := []struct {
 		name, version, podPath, pfPath, container string
@@ -45,32 +47,17 @@ func TestPortForward(t *testing.T) {
 		pfErr                                     bool
 	}{
 		{
-			name:    "v1beta3 - pod portforward",
-			version: "v1beta3",
-			podPath: "/api/v1beta3/namespaces/test/pods/foo",
-			pfPath:  "/api/v1beta3/namespaces/test/pods/foo/portforward",
+			name:    "pod portforward",
+			version: version,
+			podPath: "/api/" + version + "/namespaces/test/pods/foo",
+			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
 			pod:     execPod(),
 		},
 		{
-			name:    "v1beta3 - pod portforward error",
-			version: "v1beta3",
-			podPath: "/api/v1beta3/namespaces/test/pods/foo",
-			pfPath:  "/api/v1beta3/namespaces/test/pods/foo/portforward",
-			pod:     execPod(),
-			pfErr:   true,
-		},
-		{
-			name:    "v1 - pod portforward",
-			version: "v1",
-			podPath: "/api/v1/namespaces/test/pods/foo",
-			pfPath:  "/api/v1/namespaces/test/pods/foo/portforward",
-			pod:     execPod(),
-		},
-		{
-			name:    "v1 - pod portforward error",
-			version: "v1",
-			podPath: "/api/v1/namespaces/test/pods/foo",
-			pfPath:  "/api/v1/namespaces/test/pods/foo/portforward",
+			name:    "pod portforward error",
+			version: version,
+			podPath: "/api/" + version + "/namespaces/test/pods/foo",
+			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
 			pod:     execPod(),
 			pfErr:   true,
 		},

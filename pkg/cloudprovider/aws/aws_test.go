@@ -108,6 +108,7 @@ type FakeAWSServices struct {
 	availabilityZone string
 	instances        []*ec2.Instance
 	instanceId       string
+	privateDnsName   string
 
 	ec2      *FakeEC2
 	elb      *FakeELB
@@ -124,8 +125,10 @@ func NewFakeAWSServices() *FakeAWSServices {
 	s.metadata = &FakeMetadata{aws: s}
 
 	s.instanceId = "i-self"
+	s.privateDnsName = "ip-172-20-0-100.ec2.internal"
 	var selfInstance ec2.Instance
 	selfInstance.InstanceID = &s.instanceId
+	selfInstance.PrivateDNSName = &s.privateDnsName
 	s.instances = []*ec2.Instance{&selfInstance}
 
 	var tag ec2.Tag
@@ -310,6 +313,8 @@ func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
 		return []byte(self.aws.availabilityZone), nil
 	} else if key == "instance-id" {
 		return []byte(self.aws.instanceId), nil
+	} else if key == "local-hostname" {
+		return []byte(self.aws.privateDnsName), nil
 	} else {
 		return nil, nil
 	}
@@ -448,6 +453,7 @@ func TestList(t *testing.T) {
 	}
 	instance0.Tags = []*ec2.Tag{&tag0}
 	instance0.InstanceID = aws.String("instance0")
+	instance0.PrivateDNSName = aws.String("instance0.ec2.internal")
 	state0 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -460,6 +466,7 @@ func TestList(t *testing.T) {
 	}
 	instance1.Tags = []*ec2.Tag{&tag1}
 	instance1.InstanceID = aws.String("instance1")
+	instance1.PrivateDNSName = aws.String("instance1.ec2.internal")
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -472,6 +479,7 @@ func TestList(t *testing.T) {
 	}
 	instance2.Tags = []*ec2.Tag{&tag2}
 	instance2.InstanceID = aws.String("instance2")
+	instance2.PrivateDNSName = aws.String("instance2.ec2.internal")
 	state2 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -484,6 +492,7 @@ func TestList(t *testing.T) {
 	}
 	instance3.Tags = []*ec2.Tag{&tag3}
 	instance3.InstanceID = aws.String("instance3")
+	instance3.PrivateDNSName = aws.String("instance3.ec2.internal")
 	state3 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -497,8 +506,8 @@ func TestList(t *testing.T) {
 		expect []string
 	}{
 		{"blahonga", []string{}},
-		{"quux", []string{"instance3"}},
-		{"a", []string{"instance1", "instance2"}},
+		{"quux", []string{"instance3.ec2.internal"}},
+		{"a", []string{"instance1.ec2.internal", "instance2.ec2.internal"}},
 	}
 
 	for _, item := range table {
@@ -529,6 +538,7 @@ func TestNodeAddresses(t *testing.T) {
 
 	//0
 	instance0.InstanceID = aws.String("instance-same")
+	instance0.PrivateDNSName = aws.String("instance-same.ec2.internal")
 	instance0.PrivateIPAddress = aws.String("192.168.0.1")
 	instance0.PublicIPAddress = aws.String("1.2.3.4")
 	instance0.InstanceType = aws.String("c3.large")
@@ -539,6 +549,7 @@ func TestNodeAddresses(t *testing.T) {
 
 	//1
 	instance1.InstanceID = aws.String("instance-same")
+	instance1.PrivateDNSName = aws.String("instance-same.ec2.internal")
 	instance1.PrivateIPAddress = aws.String("192.168.0.2")
 	instance1.InstanceType = aws.String("c3.large")
 	state1 := ec2.InstanceState{
@@ -549,19 +560,19 @@ func TestNodeAddresses(t *testing.T) {
 	instances := []*ec2.Instance{&instance0, &instance1}
 
 	aws1 := mockInstancesResp([]*ec2.Instance{})
-	_, err1 := aws1.NodeAddresses("instance-mismatch")
+	_, err1 := aws1.NodeAddresses("instance-mismatch.ec2.internal")
 	if err1 == nil {
 		t.Errorf("Should error when no instance found")
 	}
 
 	aws2 := mockInstancesResp(instances)
-	_, err2 := aws2.NodeAddresses("instance-same")
+	_, err2 := aws2.NodeAddresses("instance-same.ec2.internal")
 	if err2 == nil {
 		t.Errorf("Should error when multiple instances found")
 	}
 
 	aws3 := mockInstancesResp(instances[0:1])
-	addrs3, err3 := aws3.NodeAddresses("instance-same")
+	addrs3, err3 := aws3.NodeAddresses("instance-same.ec2.internal")
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
@@ -598,6 +609,7 @@ func TestGetResources(t *testing.T) {
 
 	//0
 	instance0.InstanceID = aws.String("m3.medium")
+	instance0.PrivateDNSName = aws.String("m3-medium.ec2.internal")
 	instance0.InstanceType = aws.String("m3.medium")
 	state0 := ec2.InstanceState{
 		Name: aws.String("running"),
@@ -606,6 +618,7 @@ func TestGetResources(t *testing.T) {
 
 	//1
 	instance1.InstanceID = aws.String("r3.8xlarge")
+	instance1.PrivateDNSName = aws.String("r3-8xlarge.ec2.internal")
 	instance1.InstanceType = aws.String("r3.8xlarge")
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),
@@ -614,6 +627,7 @@ func TestGetResources(t *testing.T) {
 
 	//2
 	instance2.InstanceID = aws.String("unknown.type")
+	instance2.PrivateDNSName = aws.String("unknown-type.ec2.internal")
 	instance2.InstanceType = aws.String("unknown.type")
 	state2 := ec2.InstanceState{
 		Name: aws.String("running"),
@@ -624,7 +638,7 @@ func TestGetResources(t *testing.T) {
 
 	aws1 := mockInstancesResp(instances)
 
-	res1, err1 := aws1.GetNodeResources("m3.medium")
+	res1, err1 := aws1.GetNodeResources("m3-medium.ec2.internal")
 	if err1 != nil {
 		t.Errorf("Should not error when instance type found: %v", err1)
 	}
@@ -638,7 +652,7 @@ func TestGetResources(t *testing.T) {
 		t.Errorf("Expected %v, got %v", e1, res1)
 	}
 
-	res2, err2 := aws1.GetNodeResources("r3.8xlarge")
+	res2, err2 := aws1.GetNodeResources("r3-8xlarge.ec2.internal")
 	if err2 != nil {
 		t.Errorf("Should not error when instance type found: %v", err2)
 	}
@@ -652,7 +666,7 @@ func TestGetResources(t *testing.T) {
 		t.Errorf("Expected %v, got %v", e2, res2)
 	}
 
-	res3, err3 := aws1.GetNodeResources("unknown.type")
+	res3, err3 := aws1.GetNodeResources("unknown-type.ec2.internal")
 	if err3 != nil {
 		t.Errorf("Should not error when unknown instance type")
 	}

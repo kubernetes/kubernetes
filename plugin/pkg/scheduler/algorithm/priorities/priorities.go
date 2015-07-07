@@ -20,6 +20,7 @@ import (
 	"math"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -28,37 +29,69 @@ import (
 
 // the unused capacity is calculated on a scale of 0-10
 // 0 being the lowest priority and 10 being the highest
-func calculateScore(requested, capacity int64, node string) int {
+func calculateScore(requested int64, capacity int64, node string) int {
 	if capacity == 0 {
 		return 0
 	}
 	if requested > capacity {
-		glog.Infof("Combined requested resources from existing pods exceeds capacity on minion: %s", node)
+		glog.Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
+			requested, capacity, node)
 		return 0
 	}
 	return int(((capacity - requested) * 10) / capacity)
 }
 
-// Calculate the occupancy on a node.  'node' has information about the resources on the node.
+// For each of these resources, a pod that doesn't request the resource explicitly
+// will be treated as having requested the amount indicated below, for the purpose
+// of computing priority only. This ensures that when scheduling zero-limit pods, such
+// pods will not all be scheduled to the machine with the smallest in-use limit,
+// and that when scheduling regular pods, such pods will not see zero-limit pods as
+// consuming no resources whatsoever. We chose these values to be similar to the
+// resources that we give to cluster addon pods (#10653). But they are pretty arbitrary.
+const defaultMilliCpuLimit int64 = 100             // 0.1 core
+const defaultMemoryLimit int64 = 200 * 1024 * 1024 // 200 MB
+
+// TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
+// as an additional argument here) rather than using constants
+func getNonzeroLimits(limits *api.ResourceList) (int64, int64) {
+	var out_millicpu, out_memory int64
+	// Override if un-set, but not if explicitly set to zero
+	if (*limits.Cpu() == resource.Quantity{}) {
+		out_millicpu = defaultMilliCpuLimit
+	} else {
+		out_millicpu = limits.Cpu().MilliValue()
+	}
+	// Override if un-set, but not if explicitly set to zero
+	if (*limits.Memory() == resource.Quantity{}) {
+		out_memory = defaultMemoryLimit
+	} else {
+		out_memory = limits.Memory().Value()
+	}
+	return out_millicpu, out_memory
+}
+
+// Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
+func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
+	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
+	capacityMemory := node.Status.Capacity.Memory().Value()
+
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
-			totalMemory += container.Resources.Limits.Memory().Value()
+			cpu, memory := getNonzeroLimits(&container.Resources.Limits)
+			totalMilliCPU += cpu
+			totalMemory += memory
 		}
 	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
 	for _, container := range pod.Spec.Containers {
-		totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
-		totalMemory += container.Resources.Limits.Memory().Value()
+		cpu, memory := getNonzeroLimits(&container.Resources.Limits)
+		totalMilliCPU += cpu
+		totalMemory += memory
 	}
-
-	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
-	capacityMemory := node.Status.Capacity.Memory().Value()
 
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
@@ -89,7 +122,7 @@ func LeastRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, minionL
 
 	list := algorithm.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateOccupancy(pod, node, podsToMachines[node.Name]))
+		list = append(list, calculateResourceOccupancy(pod, node, podsToMachines[node.Name]))
 	}
 	return list, nil
 }
@@ -163,15 +196,17 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	score := int(0)
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
-			totalMemory += container.Resources.Limits.Memory().Value()
+			cpu, memory := getNonzeroLimits(&container.Resources.Limits)
+			totalMilliCPU += cpu
+			totalMemory += memory
 		}
 	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
 	for _, container := range pod.Spec.Containers {
-		totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
-		totalMemory += container.Resources.Limits.Memory().Value()
+		cpu, memory := getNonzeroLimits(&container.Resources.Limits)
+		totalMilliCPU += cpu
+		totalMemory += memory
 	}
 
 	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()

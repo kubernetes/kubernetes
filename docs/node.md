@@ -61,10 +61,9 @@ Describes the resources available on the node: CPUs, memory and the maximum
 number of pods that can be scheduled on this node.
 
 ### Node Info
-General information about the node, for instance kernel version, kubernetes
-version, docker version (if used), OS name. The information is gathered by 
-Kubernetes from the node.
-
+General information about the node, for instance kernel version, kubernetes version
+(kubelet version, kube-proxy version), docker version (if used), OS name. 
+The information is gathered by Kubernetes from the node.
 
 ## Node Management
 

@@ -17,20 +17,22 @@ limitations under the License.
 package runtime_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestDecodeUnstructured(t *testing.T) {
+	version := testapi.Version()
+	rawJson := fmt.Sprintf(`{"kind":"Pod","apiVersion":"%s","metadata":{"name":"test"}}`, version)
 	pl := &api.List{
 		Items: []runtime.Object{
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: "v1beta3"}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"v1beta3","metadata":{"name":"test"}}`)},
-			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "", APIVersion: "v1beta3"}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"v1beta3","metadata":{"name":"test"}}`)},
-			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: "v1"}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"test"}}`)},
-			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "", APIVersion: "v1"}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"test"}}`)},
+			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: version}, RawJSON: []byte(rawJson)},
+			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "", APIVersion: version}, RawJSON: []byte(rawJson)},
 			&runtime.Unstructured{TypeMeta: runtime.TypeMeta{Kind: "Foo", APIVersion: "Bar"}, Object: map[string]interface{}{"test": "value"}},
 		},
 	}

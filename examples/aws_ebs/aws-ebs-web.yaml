@@ -16,6 +16,6 @@ spec:
   volumes:
     - name: html-volume
       awsElasticBlockStore:
-        # Enter the volume region and ID below
-        volumeID: aws://{region}/{volume ID}
+        # Enter the volume ID below
+        volumeID: volume_ID
         fsType: ext4

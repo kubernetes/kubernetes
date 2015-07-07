@@ -125,7 +125,7 @@ kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kub
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
-"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1,v1beta3" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public_address_override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -134,6 +134,7 @@ kube::log::status "Starting kube-apiserver"
   --kubelet_port=${KUBELET_PORT} \
   --runtime_config=api/v1beta3 \
   --runtime_config=api/v1 \
+  --runtime_config=api/v1beta3 \
   --cert_dir="${TMPDIR:-/tmp/}" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
@@ -148,17 +149,14 @@ kube::log::status "Starting controller-manager"
 CTLRMGR_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
-kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta3/nodes/127.0.0.1" "apiserver(nodes)"
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1/nodes/127.0.0.1" "apiserver(nodes)"
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
 
-kube_api_versions=(
-  ""
-  v1beta3
-  v1
-)
-for version in "${kube_api_versions[@]}"; do
+runTests() {
+  version="$1"
+  echo "Testing api version: $1"
   if [[ -z "${version}" ]]; then
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"
@@ -377,7 +375,7 @@ for version in "${kube_api_versions[@]}"; do
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
- 
+
   ## Patch pod can change image
   # Command
   kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
@@ -523,7 +521,7 @@ for version in "${kube_api_versions[@]}"; do
   kubectl create -f - "${kube_flags[@]}" << __EOF__
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "service-${version}-test"
   },
@@ -784,6 +782,15 @@ __EOF__
   fi
 
   kube::test::clear_all
+}
+
+kube_api_versions=(
+  ""
+  v1beta3
+  v1
+)
+for version in "${kube_api_versions[@]}"; do
+  KUBE_API_VERSIONS="v1,v1beta3" runTests "${version}"
 done
 
 kube::log::status "TEST PASSED"

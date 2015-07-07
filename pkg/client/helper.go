@@ -31,7 +31,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -174,7 +173,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 //   stderr and try client's registered versions in order of preference.
 // - If version is config default, and the server does not support it,
 //   return an error.
-func NegotiateVersion(client *Client, c *Config, version string) (string, error) {
+func NegotiateVersion(client *Client, c *Config, version string, clientRegisteredVersions []string) (string, error) {
 	var err error
 	if client == nil {
 		client, err = New(c)
@@ -183,7 +182,7 @@ func NegotiateVersion(client *Client, c *Config, version string) (string, error)
 		}
 	}
 	clientVersions := util.StringSet{}
-	for _, v := range registered.RegisteredVersions {
+	for _, v := range clientRegisteredVersions {
 		clientVersions.Insert(v)
 	}
 	apiVersions, err := client.ServerAPIVersions()
@@ -214,7 +213,7 @@ func NegotiateVersion(client *Client, c *Config, version string) (string, error)
 		}
 	}
 
-	for _, clientVersion := range registered.RegisteredVersions {
+	for _, clientVersion := range clientRegisteredVersions {
 		if serverVersions.Has(clientVersion) {
 			// Version was not explicitly requested in command config (--api-version).
 			// Ok to fall back to a supported version with a warning.
@@ -225,7 +224,7 @@ func NegotiateVersion(client *Client, c *Config, version string) (string, error)
 		}
 	}
 	return "", fmt.Errorf("Failed to negotiate an api version. Server supports: %v. Client supports: %v.",
-		serverVersions, registered.RegisteredVersions)
+		serverVersions, clientRegisteredVersions)
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.

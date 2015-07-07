@@ -29,8 +29,8 @@ app.controller('ListServicesCtrl', [
       port: 'grey',
       labels: 'grey'
     };
-    $scope.sortable = ['name', 'ip', 'port'];
-    $scope.count = 10;
+    $scope.sortable = ['name', 'ip', 'port', 'labels', 'selector'];
+    $scope.count = 50;
 
     $scope.go = function(data) { $location.path('/dashboard/services/' + data.name); };
 
@@ -70,7 +70,7 @@ app.controller('ListServicesCtrl', [
             var _labels = '';
 
             if (service.metadata.labels) {
-              _labels = _.map(service.metadata.labels, function(v, k) { return k + '=' + v }).join(', ');
+              _labels = _.map(service.metadata.labels, function(v, k) { return k + ': ' + v }).join(', ');
             }
 
             var _selectors = '';
@@ -93,7 +93,7 @@ app.controller('ListServicesCtrl', [
 
             $scope.content.push({
               name: service.metadata.name,
-              ip: service.spec.portalIP,
+              ip: service.spec.clusterIP,
               port: _ports,
               selector: _selectors,
               labels: _labels

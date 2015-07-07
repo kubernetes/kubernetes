@@ -50,7 +50,7 @@ You can report the running pods, [replication controllers](../../docs/replicatio
 ```
 $ make get
 ../../cluster/kubectl.sh get pods
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                           READY     STATUS    RESTARTS   AGE
 elasticsearch-logging-v1-gzknt                 1/1       Running   0          11m
 elasticsearch-logging-v1-swgzc                 1/1       Running   0          11m
 fluentd-elasticsearch-kubernetes-minion-1rtv   1/1       Running   0          11m

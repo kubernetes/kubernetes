@@ -94,7 +94,7 @@ for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv 
 * **Services and firewalls** ([services-firewalls.md](services-firewalls.md)): How
   to use firewalls.
 
-* **The Kubernetes Resource Model** ([resources.md](resources.md)):
+* **Compute Resources** ([compute_resources.md](compute_resources.md)):
   Provides resource information such as size, type, and quantity to assist in
   assigning Kubernetes resources appropriately.
 

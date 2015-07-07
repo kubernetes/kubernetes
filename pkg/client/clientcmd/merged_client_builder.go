@@ -94,10 +94,10 @@ func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error)
 }
 
 // Namespace implements KubeConfig
-func (config DeferredLoadingClientConfig) Namespace() (string, error) {
+func (config DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 	mergedKubeConfig, err := config.createClientConfig()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	return mergedKubeConfig.Namespace()

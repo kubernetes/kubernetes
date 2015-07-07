@@ -69,9 +69,9 @@ fi
 GCE_DEFAULT_SKIP_TEST_REGEX="Skipped|Density|Reboot|Restart|Example"
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TEST_REGEX="Addon|Elasticsearch|Nodes.*network\spartition|Shell.*services"
+GCE_FLAKY_TEST_REGEX="Elasticsearch|Shell.*services|MaxPods.*"
 # Tests which are not able to be run in parallel.
-GCE_PARALLEL_SKIP_TEST_REGEX="${GCE_DEFAULT_SKIP_TEST_REGEX}|Etcd|NetworkingNew|Nodes\sNetwork|Nodes\sResize"
+GCE_PARALLEL_SKIP_TEST_REGEX="${GCE_DEFAULT_SKIP_TEST_REGEX}|Etcd|NetworkingNew|Nodes\sNetwork|Nodes\sResize|MaxPods"
 # Tests which are known to be flaky when run in parallel.
 # TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
 GCE_PARALLEL_FLAKY_TEST_REGEX="Addon|Elasticsearch|Hostdir.*MOD|Networking.*intra|PD|ServiceAccounts|Service\sendpoints\slatency|Services.*change\sthe\stype|Services.*functioning\sexternal\sload\sbalancer|Services.*identically\snamed|Services.*release.*load\sbalancer|Shell|multiport\sendpoints"
@@ -153,7 +153,7 @@ case ${JOB_NAME} in
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce-parallel. It
     # currently also excludes a slow namespace test.
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}|Namespaces\sDelete\s90\spercent\sof\s100\snamespace\sin\s150\sseconds"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
@@ -338,7 +338,12 @@ fi
 # Jenkins will look at the junit*.xml files for test failures, so don't exit
 # with a nonzero error code if it was only tests that failed.
 if [[ "${E2E_TEST,,}" == "true" ]]; then
-    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}" || true
+    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}" && exitcode=0 || exitcode=$?
+    if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${githash:-} ]]; then
+        echo "publish githash to ci/latest-green.txt: ${githash}"
+        echo "${githash}" > ${WORKSPACE}/githash.txt
+        gsutil cp ${WORKSPACE}/githash.txt gs://kubernetes-release/ci/latest-green.txt
+    fi
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are

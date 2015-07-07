@@ -81,6 +81,52 @@ spec:
       pdName: test
       fsType: ext4
 ```
+
+### AWSElasticBlockStore
+__Important: You must create an EBS volume using ```aws ec2 create-volume``` or the AWS API before you can use it__
+
+A Volume with an awsElasticBlockStore property allows access to files on a AWS
+[EBS volume](http://aws.amazon.com/ebs/)
+
+There are some restrictions when using an awsElasticBlockStore volume:
+
+* the nodes (what the kubelet runs on) need to be AWS EC2 instances
+* those instances need to be in the same region and availability-zone as the EBS volume
+* EBS only supports a single EC2 instance mounting a volume
+
+#### Creating an EBS volume
+Before you can use a EBS volume with a pod, you need to create it.
+
+```sh
+aws ec2 create-volume --availability-zone eu-west-1a --size 10 --volume-type gp2
+```
+
+Make sure the zone matches the zone you brought up your cluster in.  (And also check that the size and EBS volume
+type are suitable for your use!)
+
+#### AWS EBS Example configuration:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testpd
+spec:
+  containers:
+  - image: kubernetes/pause
+    name: testcontainer
+    volumeMounts:
+    - mountPath: /testpd
+      name: testvolume
+  volumes:
+  - name: testvolume
+    # This AWS EBS volume must already exist.
+    awsElasticBlockStore:
+      volumeID: aws://<availability-zone>/<volume-id>
+      fsType: ext4
+```
+
+(Note: the syntax of volumeID is currently awkward; #10181 fixes it)
+
 ### NFS
 
 Kubernetes NFS volumes allow an existing NFS share to be made available to containers within a pod.
@@ -102,6 +148,6 @@ pods that mount these volumes. Secrets are described [here](secrets.md).
 The storage media (Disk, SSD, or memory) of an EmptyDir volume is determined by the media of the filesystem holding the kubelet root dir (typically `/var/lib/kubelet`).
 There is no limit on how much space an EmptyDir or HostPath volume can consume, and no isolation between containers or between pods.
 
-In the future, we expect that EmptyDir and HostPath volumes will be able to request a certain amount of space using a [resource](./resources.md) specification, and to select the type of media to use, for clusters that have several media types.
+In the future, we expect that EmptyDir and HostPath volumes will be able to request a certain amount of space using a [compute resource](./compute_resources.md) specification, and to select the type of media to use, for clusters that have several media types.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/volumes.md?pixel)]()

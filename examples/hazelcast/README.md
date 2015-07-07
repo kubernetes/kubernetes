@@ -143,11 +143,9 @@ Now if you list the pods in your cluster, you should see two hazelcast pods:
 
 ```sh
 $ kubectl get pods
-POD                 IP            CONTAINER(S)   IMAGE(S)              HOST                                 LABELS           STATUS    CREATED      MESSAGE
-hazelcast-pkyzd     10.244.90.3                                        e2e-test-minion-vj7k/104.197.8.214   name=hazelcast   Running   14 seconds
-                                  hazelcast      quay.io/pires/hazelcast-kubernetes:0.3.1                                                         Running   2 seconds
-hazelcast-ulkws     10.244.66.2                                        e2e-test-minion-2x1f/146.148.62.37   name=hazelcast   Running   7 seconds    
-                                  hazelcast      quay.io/pires/hazelcast-kubernetes:0.3.1                                                         Running   6 seconds
+NAME              READY     STATUS    RESTARTS   AGE
+hazelcast-1vmnv   1/1       Running   0          34s
+hazelcast-ezs01   1/1       Running   0          43s
 ```
 
 To prove that this all works, you can use the `log` command to examine the logs of one pod, for example:

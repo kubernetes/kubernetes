@@ -47,8 +47,10 @@ type ClientConfig interface {
 	RawConfig() (clientcmdapi.Config, error)
 	// ClientConfig returns a complete client config
 	ClientConfig() (*client.Config, error)
-	// Namespace returns the namespace resulting from the merged result of all overrides
-	Namespace() (string, error)
+	// Namespace returns the namespace resulting from the merged
+	// result of all overrides and a boolean indicating if it was
+	// overridden
+	Namespace() (string, bool, error)
 }
 
 // DirectClientConfig is a ClientConfig interface that is backed by a clientcmdapi.Config, options overrides, and an optional fallbackReader for auth information
@@ -207,17 +209,22 @@ func canIdentifyUser(config client.Config) bool {
 }
 
 // Namespace implements KubeConfig
-func (config DirectClientConfig) Namespace() (string, error) {
+func (config DirectClientConfig) Namespace() (string, bool, error) {
 	if err := config.ConfirmUsable(); err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	configContext := config.getContext()
 
 	if len(configContext.Namespace) == 0 {
-		return api.NamespaceDefault, nil
+		return api.NamespaceDefault, false, nil
 	}
-	return configContext.Namespace, nil
+
+	overridden := false
+	if config.overrides != nil && config.overrides.Context.Namespace != "" {
+		overridden = true
+	}
+	return configContext.Namespace, overridden, nil
 }
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,

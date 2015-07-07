@@ -50,7 +50,7 @@ func main() {
 	// Look for endpoints associated with the Elasticsearch loggging service.
 	// First wait for the service to become available.
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		elasticsearch, err = c.Services(api.NamespaceDefault).Get("elasticsearch-logging")
+		elasticsearch, err = c.Services(api.NamespaceSystem).Get("elasticsearch-logging")
 		if err == nil {
 			break
 		}
@@ -67,7 +67,7 @@ func main() {
 	// Wait for some endpoints.
 	count := 0
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		endpoints, err = c.Endpoints(api.NamespaceDefault).Get("elasticsearch-logging")
+		endpoints, err = c.Endpoints(api.NamespaceSystem).Get("elasticsearch-logging")
 		if err != nil {
 			continue
 		}

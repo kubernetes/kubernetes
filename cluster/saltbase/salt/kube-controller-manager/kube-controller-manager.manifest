@@ -37,7 +37,7 @@
 {% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + cloud_provider  + " " + cloud_config + service_account_key + pillar['log_level'] + " " + root_ca_file -%}
 
 {
-"apiVersion": "v1beta3",
+"apiVersion": "v1",
 "kind": "Pod",
 "metadata": {"name":"kube-controller-manager"},
 "spec":{
@@ -46,6 +46,11 @@
     {
     "name": "kube-controller-manager",
     "image": "gcr.io/google_containers/kube-controller-manager:{{pillar['kube-controller-manager_docker_tag']}}",
+    "resources": {
+      "limits": {
+        "cpu": "200m"
+      }
+    },
     "command": [
                  "/bin/sh",
                  "-c",

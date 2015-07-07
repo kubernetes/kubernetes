@@ -90,7 +90,7 @@ var (
 type SyncHandler interface {
 
 	// Syncs current state to match the specified pods. SyncPodType specified what
-	// type of sync is occuring per pod. StartTime specifies the time at which
+	// type of sync is occurring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
 	SyncPods(pods []*api.Pod, podSyncTypes map[types.UID]SyncPodType, mirrorPods map[string]*api.Pod,
 		startTime time.Time) error
@@ -321,9 +321,11 @@ func NewMainKubelet(
 	}
 	klet.containerManager = containerManager
 
-	// Start syncing node status immediately, this may set up things the runtime needs to run.
 	go util.Until(klet.syncNetworkStatus, 30*time.Second, util.NeverStop)
-	go klet.syncNodeStatus()
+	if klet.kubeClient != nil {
+		// Start syncing node status immediately, this may set up things the runtime needs to run.
+		go util.Until(klet.syncNodeStatus, klet.nodeStatusUpdateFrequency, util.NeverStop)
+	}
 
 	// Wait for the runtime to be up with a timeout.
 	if err := waitUntilRuntimeIsUp(klet.containerRuntime, maxWaitForContainerRuntime); err != nil {
@@ -399,6 +401,8 @@ type Kubelet struct {
 
 	// Set to true to have the node register itself with the apiserver.
 	registerNode bool
+	// for internal book keeping; access only from within registerWithApiserver
+	registrationCompleted bool
 
 	// Set to true if the kubelet is in standalone mode (i.e. setup without an apiserver)
 	standaloneMode bool
@@ -413,7 +417,7 @@ type Kubelet struct {
 	serviceLister          serviceLister
 	nodeLister             nodeLister
 
-	// Last timestamp when runtime responsed on ping.
+	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
 	runtimeMutex           sync.Mutex
 	runtimeUpThreshold     time.Duration
@@ -475,7 +479,7 @@ type Kubelet struct {
 	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
 	//    The constant must be less than podEvictionTimeout.
 	// 2. nodeStatusUpdateFrequency needs to be large enough for kubelet to generate node
-	//    status. Kubelet may fail to update node status reliablly if the value is too small,
+	//    status. Kubelet may fail to update node status reliably if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
 
@@ -665,7 +669,7 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 	return nil, fmt.Errorf("node %v not found", nodeName)
 }
 
-// Starts garbage collection theads.
+// Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
 	go util.Forever(func() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
@@ -763,8 +767,13 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	return node, nil
 }
 
-// registerWithApiserver registers the node with the cluster master.
+// registerWithApiserver registers the node with the cluster master. It is safe
+// to call multiple times, but not concurrently (kl.registrationCompleted is
+// not locked).
 func (kl *Kubelet) registerWithApiserver() {
+	if kl.registrationCompleted {
+		return
+	}
 	step := 100 * time.Millisecond
 	for {
 		time.Sleep(step)
@@ -780,45 +789,54 @@ func (kl *Kubelet) registerWithApiserver() {
 		}
 		glog.V(2).Infof("Attempting to register node %s", node.Name)
 		if _, err := kl.kubeClient.Nodes().Create(node); err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				currentNode, err := kl.kubeClient.Nodes().Get(kl.nodeName)
-				if err != nil {
-					glog.Errorf("error getting node %q: %v", kl.nodeName, err)
-					continue
-				}
-				if currentNode == nil {
-					glog.Errorf("no node instance returned for %q", kl.nodeName)
-					continue
-				}
-				if currentNode.Spec.ExternalID == node.Spec.ExternalID {
-					glog.Infof("Node %s was previously registered", node.Name)
-					return
-				}
+			if !apierrors.IsAlreadyExists(err) {
+				glog.V(2).Infof("Unable to register %s with the apiserver: %v", node.Name, err)
+				continue
 			}
-			glog.V(2).Infof("Unable to register %s with the apiserver: %v", node.Name, err)
+			currentNode, err := kl.kubeClient.Nodes().Get(kl.nodeName)
+			if err != nil {
+				glog.Errorf("error getting node %q: %v", kl.nodeName, err)
+				continue
+			}
+			if currentNode == nil {
+				glog.Errorf("no node instance returned for %q", kl.nodeName)
+				continue
+			}
+			if currentNode.Spec.ExternalID == node.Spec.ExternalID {
+				glog.Infof("Node %s was previously registered", node.Name)
+				kl.registrationCompleted = true
+				return
+			}
+			glog.Errorf(
+				"Previously %q had externalID %q; now it is %q; will delete and recreate.",
+				kl.nodeName, node.Spec.ExternalID, currentNode.Spec.ExternalID,
+			)
+			if err := kl.kubeClient.Nodes().Delete(node.Name); err != nil {
+				glog.Errorf("Unable to delete old node: %v", err)
+			} else {
+				glog.Errorf("Deleted old node object %q", kl.nodeName)
+			}
 			continue
 		}
 		glog.Infof("Successfully registered node %s", node.Name)
+		kl.registrationCompleted = true
 		return
 	}
 }
 
-// syncNodeStatus periodically synchronizes node status to master.
+// syncNodeStatus should be called periodically from a goroutine.
+// It synchronizes node status to master, registering the kubelet first if
+// necessary.
 func (kl *Kubelet) syncNodeStatus() {
 	if kl.kubeClient == nil {
 		return
 	}
 	if kl.registerNode {
+		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithApiserver()
 	}
-	glog.Infof("Starting node status updates")
-	for {
-		select {
-		case <-time.After(kl.nodeStatusUpdateFrequency):
-			if err := kl.updateNodeStatus(); err != nil {
-				glog.Errorf("Unable to update node status: %v", err)
-			}
-		}
+	if err := kl.updateNodeStatus(); err != nil {
+		glog.Errorf("Unable to update node status: %v", err)
 	}
 }
 
@@ -914,7 +932,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	)
 
 	// Get all service resources from the master (via a cache),
-	// and populate them into service enviroment variables.
+	// and populate them into service environment variables.
 	if kl.serviceLister == nil {
 		// Kubelets without masters (e.g. plain GCE ContainerVM) don't set env vars.
 		return m, nil
@@ -1849,6 +1867,23 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 // pods.
 func (kl *Kubelet) GetPods() []*api.Pod {
 	return kl.podManager.GetPods()
+}
+
+// GetRunningPods returns all pods running on kubelet from looking at the
+// container runtime cache. This function converts kubecontainer.Pod to
+// api.Pod, so only the fields that exist in both kubecontainer.Pod and
+// api.Pod are considered meaningful.
+func (kl *Kubelet) GetRunningPods() ([]*api.Pod, error) {
+	pods, err := kl.runtimeCache.GetPods()
+	if err != nil {
+		return nil, err
+	}
+
+	apiPods := make([]*api.Pod, 0, len(pods))
+	for _, pod := range pods {
+		apiPods = append(apiPods, pod.ToAPIPod())
+	}
+	return apiPods, nil
 }
 
 func (kl *Kubelet) GetPodByFullName(podFullName string) (*api.Pod, bool) {

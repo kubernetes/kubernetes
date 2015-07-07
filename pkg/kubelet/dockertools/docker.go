@@ -306,8 +306,10 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 
 func milliCPUToShares(milliCPU int64) int64 {
 	if milliCPU == 0 {
-		// zero milliCPU means unset. Use kernel default.
-		return 0
+		// Docker converts zero milliCPU to unset, which maps to kernel default
+		// for unset: 1024. Return 2 here to really match kernel default for
+		// zero milliCPU.
+		return minShares
 	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
 	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
