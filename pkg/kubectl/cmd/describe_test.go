@@ -48,3 +48,36 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
+
+func TestDescribeObject(t *testing.T) {
+	_, _, rc := testData()
+	f, tf, codec := NewAPIFactory()
+	d := &testDescriber{Output: "test output"}
+	tf.Describer = d
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdDescribe(f, buf)
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Run(cmd, []string{})
+
+	if d.Name != "redis-master" || d.Namespace != "test" {
+		t.Errorf("unexpected describer: %#v", d)
+	}
+
+	if buf.String() != fmt.Sprintf("%s\n\n", d.Output) {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
