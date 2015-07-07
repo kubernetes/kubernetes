@@ -69,7 +69,7 @@ the required predependencies to get started with Juju, additionally it will
 launch a curses based configuration utility allowing you to select your cloud
 provider and enter the proper access credentials.
 
-Next it will deploy the kubernetes master, etcd, 2 minions with flannel based
+Next it will deploy the kubernetes master, etcd, 2 nodes with flannel based
 Software Defined Networking.
 
 
@@ -143,7 +143,7 @@ Get info on the pod:
     kubectl get pods
 
 
-To test the hello app, we need to locate which minion is hosting
+To test the hello app, we need to locate which node is hosting
 the container. Better tooling for using juju to introspect container
 is in the works but we can use `juju run` and `juju status` to find
 our hello app.
@@ -172,7 +172,7 @@ Finally delete the pod:
 
 ## Scale out cluster
 
-We can add minion units like so:
+We can add node units like so:
 
     juju add-unit docker # creates unit docker/2, kubernetes/2, docker-flannel/2
 

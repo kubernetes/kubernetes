@@ -11,12 +11,12 @@ Kubernetes Deployment On Bare-metal Ubuntu Nodes
 
 ## Introduction
 
-This document describes how to deploy kubernetes on ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
+This document describes how to deploy kubernetes on ubuntu nodes, including 1 kubernetes master and 3 kubernetes nodes, and people uses this approach can scale to **any number of nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
 
 [Cloud team from Zhejiang University](https://github.com/ZJU-SEL) will maintain this work.
 
 ## Prerequisites
-*1 The minion nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge* 
+*1 The nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge* 
 
 *2 All machines can communicate with each other, no need to connect Internet (should use private docker registry in this case)*
 
@@ -46,9 +46,9 @@ An example cluster is listed as below:
 
 | IP Address|Role |      
 |---------|------|
-|10.10.103.223|   minion   |
-|10.10.103.162|   minion   |
-|10.10.103.250| both master and minion|
+|10.10.103.223|   node   |
+|10.10.103.162|   node   |
+|10.10.103.250| both master and node|
 
 First configure the cluster information in cluster/ubuntu/config-default.sh, below is a simple sample.
 
@@ -68,7 +68,7 @@ export FLANNEL_NET=172.16.0.0/16
 
 The first variable `nodes` defines all your cluster nodes, MASTER node comes first and separated with blank space like `<user_1@ip_1> <user_2@ip_2> <user_3@ip_3> `
 
-Then the `roles ` variable defines the role of above machine in the same order, "ai" stands for machine acts as both master and minion, "a" stands for master, "i" stands for minion. So they are just defined the k8s cluster as the table above described.
+Then the `roles ` variable defines the role of above machine in the same order, "ai" stands for machine acts as both master and node, "a" stands for master, "i" stands for node. So they are just defined the k8s cluster as the table above described.
 
 The `NUM_MINIONS` variable defines the total number of minions.
 
@@ -105,7 +105,7 @@ If all things goes right, you will see the below message from console
 
 You can also use `kubectl` command to see if the newly created k8s is working correctly. The `kubectl` binary is under the `cluster/ubuntu/binaries` directory. You can move it into your PATH. Then you can use the below command smoothly. 
 
-For example, use `$ kubectl get nodes` to see if all your minion nodes are in ready status. It may take some time for the minions ready to use like below. 
+For example, use `$ kubectl get nodes` to see if all your nodes are in ready status. It may take some time for the nodes ready to use like below. 
 
 ```
 
