@@ -412,6 +412,10 @@ var _ = Describe("Nodes", func() {
 	})
 
 	AfterEach(func() {
+		By("checking whether all nodes are healthy")
+		if err := allNodesReady(c); err != nil {
+			Failf("Not all nodes are ready: %v", err)
+		}
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
 		if err := c.Namespaces().Delete(ns); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)

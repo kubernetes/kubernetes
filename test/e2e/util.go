@@ -1461,6 +1461,22 @@ func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time
 	return false
 }
 
+// checks whether all registered nodes are ready
+func allNodesReady(c *client.Client) error {
+	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	Expect(err).NotTo(HaveOccurred())
+	var notReady []api.Node
+	for _, node := range nodes.Items {
+		if isNodeReadySetAsExpected(&node, false) {
+			notReady = append(notReady, node)
+		}
+	}
+	if len(notReady) > 0 {
+		return fmt.Errorf("Not ready nodes: %v", notReady)
+	}
+	return nil
+}
+
 // Filters nodes in NodeList in place, removing nodes that do not
 // satisfy the given condition
 // TODO: consider merging with pkg/client/cache.NodeLister
