@@ -11,11 +11,11 @@ KUBELET_ADDRESS="--address=0.0.0.0"
 KUBELET_HOSTNAME="--hostname_override={{ inventory_hostname }}"
 
 # location of the api-server
-KUBELET_API_SERVER="--api_servers=https://{{ groups['masters'][0]}}:443"
+KUBELET_API_SERVER="--api_servers=https://{{ groups['masters'][0] }}:{{ kube_master_api_port }}"
 
 # Add your own!
 {% if dns_setup %}
 KUBELET_ARGS="--cluster_dns={{ dns_server }} --cluster_domain={{ dns_domain }} --kubeconfig={{ kube_config_dir}}/kubelet.kubeconfig --config={{ kube_manifest_dir }}"
 {% else %}
-KUBELET_ARGS="--kubeconfig={{ kube_config_dir}}/kubelet.kubeconfig --config={{ kube_manifest_dir }}"
+KUBELET_ARGS="--kubeconfig={{ kube_config_dir }}/kubelet.kubeconfig --config={{ kube_manifest_dir }}"
 {% endif %}

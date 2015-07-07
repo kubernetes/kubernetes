@@ -8,7 +8,7 @@
 KUBE_API_ADDRESS="--insecure-bind-address=127.0.0.1"
 
 # The port on the local server to listen on.
-KUBE_API_PORT="--secure-port=443"
+KUBE_API_PORT="--secure-port={{ kube_master_api_port }}"
 
 # Port nodes listen on
 # KUBELET_PORT="--kubelet_port=10250"
