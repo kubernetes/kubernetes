@@ -1,6 +1,6 @@
 ---
-- name: Assures /etc/kubernetes/addons/ dir exists
-  file: path=/etc/kubernetes/addons/ state=directory
+- name: Assures addons dir exists
+  file: path={{ kube_addons_dir }} state=directory
 
 - include: generic-install.yml
   when: not is_atomic
