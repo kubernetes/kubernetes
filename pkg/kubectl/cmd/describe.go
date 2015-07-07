@@ -23,17 +23,18 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	var filenames util.StringList
 	cmd := &cobra.Command{
-		Use:   "describe (RESOURCE NAME | RESOURCE/NAME)",
+		Use:   "describe ([-f FILENAME] | RESOURCE NAME | RESOURCE/NAME)",
 		Short: "Show details of a specific resource",
 		Long: `Show details of a specific resource.
 
@@ -45,21 +46,26 @@ $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 // Describe a pod
 $ kubectl describe pods/nginx
 
+// Describe a pod using the data in pod.json.
+$ kubectl describe -f pod.json
+
 // Describe pods by label name=myLabel
 $ kubectl describe po -l name=myLabel`,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunDescribe(f, out, cmd, args)
+			err := RunDescribe(f, out, cmd, args, filenames)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs: kubectl.DescribableResources(),
 	}
+	usage := "Filename, directory, or URL to a file containing the resource to describe"
+	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd
 }
 
-func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
-	cmdNamespace, _, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -68,6 +74,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
@@ -76,29 +83,27 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
-	mapping, err := r.ResourceMapping()
-	if err != nil {
-		return err
-	}
 
-	describer, err := f.Describer(mapping)
-	if err != nil {
-		return err
-	}
-	infos, err := r.Infos()
-	if err != nil {
-		if errors.IsNotFound(err) && len(args) == 2 {
-			return DescribeMatchingResources(mapper, typer, describer, f, cmdNamespace, args[0], args[1], out)
+	count := 0
+	err = r.Visit(func(info *resource.Info) error {
+		count++
+		mapping := info.ResourceMapping()
+		describer, err := f.Describer(mapping)
+		if err != nil {
+			return err
 		}
-		return err
-	}
-
-	for _, info := range infos {
 		s, err := describer.Describe(info.Namespace, info.Name)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintf(out, "%s\n\n", s)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("no objects passed to describe")
 	}
 
 	return nil
