@@ -337,9 +337,9 @@ svc1_pods=$(query_pods "${svc1_name}" "${svc1_count}")
 svc2_pods=$(query_pods "${svc2_name}" "${svc2_count}")
 
 # Get the VIP IPs.
-svc1_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc1_name}" --api-version=v1)
+svc1_ip=$(${KUBECTL} get services -o template '--template={{.spec.clusterIP}}' "${svc1_name}" --api-version=v1)
 test -n "${svc1_ip}" || error "Service1 IP is blank"
-svc2_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc2_name}" --api-version=v1)
+svc2_ip=$(${KUBECTL} get services -o template '--template={{.spec.clusterIP}}' "${svc2_name}" --api-version=v1)
 test -n "${svc2_ip}" || error "Service2 IP is blank"
 if [[ "${svc1_ip}" == "${svc2_ip}" ]]; then
   error "VIPs conflict: ${svc1_ip}"
@@ -409,7 +409,7 @@ wait_for_pods "${svc3_name}" "${svc3_count}"
 svc3_pods=$(query_pods "${svc3_name}" "${svc3_count}")
 
 # Get the VIP.
-svc3_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc3_name}" --api-version=v1)
+svc3_ip=$(${KUBECTL} get services -o template '--template={{.spec.clusterIP}}' "${svc3_name}" --api-version=v1)
 test -n "${svc3_ip}" || error "Service3 IP is blank"
 
 echo "Verifying the VIPs from the host"
@@ -464,7 +464,7 @@ wait_for_pods "${svc4_name}" "${svc4_count}"
 svc4_pods=$(query_pods "${svc4_name}" "${svc4_count}")
 
 # Get the VIP.
-svc4_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc4_name}" --api-version=v1)
+svc4_ip=$(${KUBECTL} get services -o template '--template={{.spec.clusterIP}}' "${svc4_name}" --api-version=v1)
 test -n "${svc4_ip}" || error "Service4 IP is blank"
 if [[ "${svc4_ip}" == "${svc2_ip}" || "${svc4_ip}" == "${svc3_ip}" ]]; then
   error "VIPs conflict: ${svc4_ip}"
