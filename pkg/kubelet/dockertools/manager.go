@@ -1207,7 +1207,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	// labels for Cloud Logging.
 	podFullName := kubecontainer.GetPodFullName(pod)
 	containerLogFile := path.Join(dm.dockerRoot, "containers", id, fmt.Sprintf("%s-json.log", id))
-	symlinkFile := path.Join(dm.containerLogsDir, fmt.Sprintf("%s_%s-%s.log", podFullName, container.Name, id))
+	symlinkFile := LogSymlink(dm.containerLogsDir, podFullName, container.Name, id)
 	if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
 		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", podFullName, container.Name, err)
 	}

@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -42,6 +43,7 @@ const (
 	PodInfraContainerName  = leaky.PodInfraContainerName
 	DockerPrefix           = "docker://"
 	PodInfraContainerImage = "gcr.io/google_containers/pause:0.8.0"
+	LogSuffix              = "log"
 )
 
 const (
@@ -274,6 +276,10 @@ func ParseDockerName(name string) (dockerName *KubeletContainerName, hash uint64
 	podUID := types.UID(parts[4])
 
 	return &KubeletContainerName{podFullName, podUID, containerName}, hash, nil
+}
+
+func LogSymlink(containerLogsDir, podFullName, containerName, dockerId string) string {
+	return path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s.%s", podFullName, containerName, dockerId, LogSuffix))
 }
 
 // Get a docker endpoint, either from the string passed in, or $DOCKER_HOST environment variables
