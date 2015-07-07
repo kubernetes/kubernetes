@@ -3,8 +3,7 @@ kind: ReplicationController
 metadata:
   labels:
     db: rethinkdb
-  name: rethinkdb-rc-1.16.0
-  namespace: rethinkdb
+  name: rethinkdb-rc
 spec:
   replicas: 1
   selector:
@@ -17,8 +16,13 @@ spec:
         role: replicas
     spec:
       containers:
-      - image: antmanler/rethinkdb:1.16.0
+      - image: gcr.io/google_containes/rethinkdb:1.16.0_1
         name: rethinkdb
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         ports:
         - containerPort: 8080
           name: admin-port

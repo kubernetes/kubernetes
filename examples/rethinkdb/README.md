@@ -10,16 +10,10 @@ Setting up a [rethinkdb](http://rethinkdb.com/) cluster on [kubernetes](http://k
 
 Quick start
 -----------
-**Step 0**
-
-change the namespace of the current context to "rethinkdb"
-```
-$kubectl config view -o template --template='{{index . "current-context"}}' | xargs -I {} kubectl config set-context {} --namespace=rethinkdb
-```
 
 **Step 1**
 
-antmanler/rethinkdb will discover peer using endpoints provided by kubernetes_ro service,
+Rethinkdb will discover peer using endpoints provided by kubernetes service,
 so first create a service so the following pod can query its endpoint
 
 ```shell
@@ -29,8 +23,9 @@ $kubectl create -f driver-service.yaml
 check out:
 
 ```shell
-$kubectl get se
+$kubectl get services
 NAME               LABELS        SELECTOR       IP(S)         PORT(S)
+[...]
 rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
 ```
 
@@ -47,10 +42,10 @@ Actually, you can start servers as many as you want at one time, just modify the
 check out again:
 
 ```shell
-$kubectl get po
-POD                         IP        CONTAINER(S)   IMAGE(S)                     HOST                      LABELS                       STATUS    CREATED      MESSAGE
-rethinkdb-rc-1.16.0-6odi0                                                         kubernetes-minion-s59e/   db=rethinkdb,role=replicas   Pending   11 seconds
-                                      rethinkdb      antmanler/rethinkdb:1.16.0
+$kubectl get pods
+NAME                                                  READY     REASON    RESTARTS   AGE
+[...]
+rethinkdb-rc-r4tb0                                    1/1       Running   0          1m
 ```
 
 **Done!**
@@ -65,16 +60,15 @@ You can scale up you cluster using `kubectl scale`, and new pod will join to exs
 
 
 ```shell
-$kubectl scale rc rethinkdb-rc-1.16.0 --replicas=3
+$kubectl scale rc rethinkdb-rc --replicas=3
 scaled
-$kubectl get po
-POD                         IP           CONTAINER(S)   IMAGE(S)                     HOST                                   LABELS                       STATUS    CREATED          MESSAGE
-rethinkdb-rc-1.16.0-6odi0   10.244.3.3                                               kubernetes-minion-s59e/104.197.79.42   db=rethinkdb,role=replicas   Running   About a minute
-                                         rethinkdb      antmanler/rethinkdb:1.16.0                                                                       Running   About a minute
-rethinkdb-rc-1.16.0-e3mxv                                                            kubernetes-minion-d7ub/                db=rethinkdb,role=replicas   Pending   6 seconds
-                                         rethinkdb      antmanler/rethinkdb:1.16.0
-rethinkdb-rc-1.16.0-manu6                                                            kubernetes-minion-cybz/                db=rethinkdb,role=replicas   Pending   6 seconds
-                                         rethinkdb      antmanler/rethinkdb:1.16.0
+
+$kubectl get pods
+NAME                                                  READY     REASON    RESTARTS   AGE
+[...]
+rethinkdb-rc-f32c5                                    1/1       Running   0          1m
+rethinkdb-rc-m4d50                                    1/1       Running   0          1m
+rethinkdb-rc-r4tb0                                    1/1       Running   0          3m
 ```
 
 Admin
@@ -92,6 +86,7 @@ find the service
 ```shell
 $kubectl get se
 NAME               LABELS        SELECTOR                  IP(S)            PORT(S)
+[...]
 rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080/TCP
                                                            104.197.19.120
 rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      28015/TCP
@@ -123,8 +118,6 @@ since the ui is not stateless when playing with Web Admin UI will cause `Connect
 - - -
 
 **BTW**
-
-  * All services and pods are placed under namespace `rethinkdb`.
 
   * `gen_pod.sh` is using to generate pod templates for my local cluster,
 the generated pods which is using `nodeSelector` to force k8s to schedule containers to my designate nodes, for I need to access persistent data on my host dirs. Note that one needs to label the node before 'nodeSelector' can work, see this [tutorial](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/node-selection)
