@@ -31,6 +31,10 @@ const (
 	proxy_example = `// Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 $ kubectl proxy --port=8011 --www=./local/www/
 
+// Run a proxy to kubernetes apiserver on an arbitrary local port.
+// The chosen port for the server will be output to stdout.
+$ kubectl proxy --port=0
+
 // Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
 // This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
 $ kubectl proxy --api-prefix=/k8s-api`
@@ -69,14 +73,13 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
 	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
 	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
-	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy.")
+	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy. Set to 0 to pick a random port.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks.  Use with caution.")
 	return cmd
 }
 
 func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	port := cmdutil.GetFlagInt(cmd, "port")
-	fmt.Fprintf(out, "Starting to serve on localhost:%d", port)
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
@@ -102,11 +105,18 @@ func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		filter = nil
 	}
 
-	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, filter, clientConfig)
+	server, err := kubectl.NewProxyServer(port, cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, filter, clientConfig)
 	if err != nil {
 		return err
 	}
 
-	glog.Fatal(server.Serve(port))
+	// Separate listening from serving so we can report the bound port
+	// when it is chosen by os (port == 0)
+	l, err := server.Listen()
+	if err != nil {
+		glog.Fatal(err)
+	}
+	fmt.Fprintf(out, "Starting to serve on %s", l.Addr().String())
+	glog.Fatal(server.ServeOnListener(l))
 	return nil
 }
