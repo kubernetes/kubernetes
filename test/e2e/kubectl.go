@@ -22,8 +22,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +57,7 @@ const (
 
 var (
 	portForwardRegexp = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
+	proxyRegexp       = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 )
 
 var _ = Describe("Kubectl client", func() {
@@ -165,11 +168,7 @@ var _ = Describe("Kubectl client", func() {
 		It("should support port-forward", func() {
 			By("forwarding the container port to a local port")
 			cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), "-p", simplePodName, fmt.Sprintf(":%d", simplePodPort))
-			defer func() {
-				if err := cmd.Process.Kill(); err != nil {
-					Logf("ERROR failed to kill kubectl port-forward command! The process may leak")
-				}
-			}()
+			defer tryKill(cmd)
 			// This is somewhat ugly but is the only way to retrieve the port that was picked
 			// by the port-forward command. We don't want to hard code the port as we have no
 			// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
@@ -195,6 +194,7 @@ var _ = Describe("Kubectl client", func() {
 			By("curling local port output")
 			localAddr := fmt.Sprintf("http://localhost:%s", match[1])
 			body, err := curl(localAddr)
+			Logf("got: %s", body)
 			if err != nil {
 				Failf("Failed http.Get of forwarded port (%s): %v", localAddr, err)
 			}
@@ -523,6 +523,27 @@ var _ = Describe("Kubectl client", func() {
 				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", image, len(pods))
 			}
 		})
+
+	})
+
+	Describe("Proxy server", func() {
+		// TODO: test proxy options (static, prefix, etc)
+		It("should support proxy with --port 0", func() {
+			By("starting the proxy server")
+			port, cmd, err := startProxyServer()
+			if cmd != nil {
+				defer tryKill(cmd)
+			}
+			if err != nil {
+				Failf("Failed to start proxy server: %v", err)
+			}
+			By("curling proxy /api/ output")
+			localAddr := fmt.Sprintf("http://localhost:%d/api/", port)
+			apiVersions, err := getAPIVersions(localAddr)
+			if len(apiVersions.Versions) < 1 {
+				Failf("Expected at least one supported apiversion, got %v", apiVersions)
+			}
+		})
 	})
 
 })
@@ -544,6 +565,42 @@ func checkOutput(output string, required [][]string) {
 			}
 		}
 	}
+}
+
+func getAPIVersions(apiEndpoint string) (*api.APIVersions, error) {
+	body, err := curl(apiEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("Failed http.Get of %s: %v", apiEndpoint, err)
+	}
+	var apiVersions api.APIVersions
+	if err := json.Unmarshal([]byte(body), &apiVersions); err != nil {
+		return nil, fmt.Errorf("Failed to parse /api output %s: %v", body, err)
+	}
+	return &apiVersions, nil
+}
+
+func startProxyServer() (int, *exec.Cmd, error) {
+	// Specifying port 0 indicates we want the os to pick a random port.
+	cmd := kubectlCmd("proxy", "-p", "0")
+	stdout, stderr, err := startCmdAndStreamOutput(cmd)
+	if err != nil {
+		return -1, nil, err
+	}
+	defer stdout.Close()
+	defer stderr.Close()
+	buf := make([]byte, 128)
+	var n int
+	if n, err = stdout.Read(buf); err != nil {
+		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %v", err)
+	}
+	output := string(buf[:n])
+	match := proxyRegexp.FindStringSubmatch(output)
+	if len(match) == 2 {
+		if port, err := strconv.Atoi(match[1]); err == nil {
+			return port, cmd, nil
+		}
+	}
+	return -1, cmd, fmt.Errorf("Failed to parse port from proxy stdout: %s", output)
 }
 
 func curl(addr string) (string, error) {
