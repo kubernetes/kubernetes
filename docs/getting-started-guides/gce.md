@@ -106,40 +106,42 @@ potential issues with client/server version skew.
 Once `kubectl` is in your path, you can use it to look at your cluster. E.g., running:
 
 ```shell
-$ kubectl get services
+$ kubectl get --all-namespaces services
 ```
 
 should show a set of [services](../services.md) that look something like this:
 
 ```shell
-NAME                    LABELS                                                                                              SELECTOR                        IP(S)            PORT(S)
-elasticsearch-logging   k8s-app=elasticsearch-logging,kubernetes.io/cluster-service=true,kubernetes.io/name=Elasticsearch   k8s-app=elasticsearch-logging   10.0.198.255     9200/TCP
-kibana-logging          k8s-app=kibana-logging,kubernetes.io/cluster-service=true,kubernetes.io/name=Kibana                 k8s-app=kibana-logging          10.0.56.44       5601/TCP
-kube-dns                k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS                      k8s-app=kube-dns                10.0.0.10        53/UDP
-kubernetes              component=apiserver,provider=kubernetes                                                             <none>                          10.0.0.1         443/TCP
-```
+NAMESPACE     NAME                  LABELS                                                                           SELECTOR                IP(S)       PORT(S)
+default       kubernetes            component=apiserver,provider=kubernetes                                          <none>                  10.0.0.1    443/TCP
+kube-system   kube-dns              k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS   k8s-app=kube-dns        10.0.0.10   53/UDP
+                                                                                                                                                         53/TCP
+kube-system   kube-ui               k8s-app=kube-ui,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeUI     k8s-app=kube-ui         10.0.59.25     80/TCP
+kube-system   monitoring-grafana    kubernetes.io/cluster-service=true,kubernetes.io/name=Grafana                    k8s-app=influxGrafana   10.0.41.246    80/TCP
+kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernetes.io/name=Heapster                   k8s-app=heapster        10.0.59.48     80/TCP
+kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
+                                                                                                                                                            8086/TCP```
 
 Similarly, you can take a look at the set of [pods](../pods.md) that were created during cluster startup.
 You can do this via the
 
 ```shell
-$ kubectl get pods
+$ kubectl get --all-namespaces pods
 ```
 command.
 
 You'll see see a list of pods that looks something like this (the name specifics will be different):
 
 ```shell
-NAME                                           READY     REASON    RESTARTS   AGE
-elasticsearch-logging-v1-ab87r                 1/1       Running   0          1m
-elasticsearch-logging-v1-v9lqa                 1/1       Running   0          1m
-fluentd-elasticsearch-kubernetes-minion-419y   1/1       Running   0          12s
-fluentd-elasticsearch-kubernetes-minion-k0xh   1/1       Running   0          1m
-fluentd-elasticsearch-kubernetes-minion-oa8l   1/1       Running   0          1m
-fluentd-elasticsearch-kubernetes-minion-xuj5   1/1       Running   0          1m
-kibana-logging-v1-cx2p8                        1/1       Running   0          1m
-kube-dns-v3-pa3w9                              3/3       Running   0          1m
-monitoring-heapster-v1-m1xkz                   1/1       Running   0          1m
+NAMESPACE     NAME                                           READY     STATUS    RESTARTS   AGE
+kube-system   fluentd-cloud-logging-kubernetes-minion-63uo   1/1       Running   0          14m
+kube-system   fluentd-cloud-logging-kubernetes-minion-c1n9   1/1       Running   0          14m
+kube-system   fluentd-cloud-logging-kubernetes-minion-c4og   1/1       Running   0          14m
+kube-system   fluentd-cloud-logging-kubernetes-minion-ngua   1/1       Running   0          14m
+kube-system   kube-dns-v5-7ztia                              3/3       Running   0          15m
+kube-system   kube-ui-v1-curt1                               1/1       Running   0          15m
+kube-system   monitoring-heapster-v5-ex4u3                   1/1       Running   1          15m
+kube-system   monitoring-influx-grafana-v1-piled             2/2       Running   0          15m
 ```
 
 Some of the pods may take a few seconds to start up (during this time they'll show `Pending`), but check that they all show as `Running` after a short period.
