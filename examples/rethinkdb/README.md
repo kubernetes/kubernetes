@@ -127,7 +127,7 @@ since the ui is not stateless when playing with Web Admin UI will cause `Connect
   * All services and pods are placed under namespace `rethinkdb`.
 
   * `gen_pod.sh` is using to generate pod templates for my local cluster,
-the generated pods which is using `nodeSelector` to force k8s to schedule containers to my designate nodes, for I need to access persistent data on my host dirs. Note that one needs to label the node before 'nodeSelector' can work, see this [tutorial](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/node-selection)
+the generated pods which is using `nodeSelector` to force k8s to schedule containers to my designate nodes, for I need to access persistent data on my host dirs. Note that one needs to label the node before 'nodeSelector' can work, see this [tutorial](../node-selection/)
 
   * see [antmanler/rethinkdb-k8s](https://github.com/antmanler/rethinkdb-k8s) for detail
 

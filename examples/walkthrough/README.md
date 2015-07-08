@@ -108,8 +108,8 @@ Finally, we have also introduced an environment variable to the ```git-monitor``
 
 
 ### What's next?
-Continue on to [Kubernetes 201](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough/k8s201.md) or
-for a complete application see the [guestbook example](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook/README.md)
+Continue on to [Kubernetes 201](../walkthrough/k8s201.md) or
+for a complete application see the [guestbook example](../guestbook/README.md)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/walkthrough/README.md?pixel)]()

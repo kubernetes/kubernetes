@@ -31,7 +31,7 @@ The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
 ```
 The Kubelet sends a HTTP request to the specified path and port to perform the health check. If you take a look at image/server.go, you will see the server starts to respond with an error code 500 after 10 seconds, so the check fails.
 
-This [guide](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/walkthrough/k8s201.md#health-checking) has more information on health checks.
+This [guide](../walkthrough/k8s201.md#health-checking) has more information on health checks.
 
 ## Get your hands dirty
 To show the health check is actually working, first create the pods:
