@@ -42,9 +42,9 @@ import (
 const validEtcdVersion = "etcd 2.0.9"
 
 type TestResource struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata"`
-	Value          int `json:"value"`
+	runtime.TypeMeta `json:",inline"`
+	api.ObjectMeta   `json:"metadata"`
+	Value            int `json:"value"`
 }
 
 func (*TestResource) IsAnAPIObject() {}
@@ -53,9 +53,9 @@ var scheme *runtime.Scheme
 var codec runtime.Codec
 
 func init() {
-	scheme = runtime.NewScheme()
-	scheme.AddKnownTypes("", &TestResource{})
-	scheme.AddKnownTypes(testapi.Version(), &TestResource{})
+	scheme = runtime.NewScheme(api.Group)
+	scheme.AddKnownTypes(api.Group, "", &TestResource{})
+	scheme.AddKnownTypes(api.Group, testapi.Version(), &TestResource{})
 	codec = runtime.CodecFor(scheme, testapi.Version())
 	scheme.AddConversionFuncs(
 		func(in *TestResource, out *TestResource, s conversion.Scope) error {

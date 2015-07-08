@@ -22,24 +22,27 @@ import (
 	"fmt"
 )
 
-func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version, kind string, err error) {
-	version, kind, err = s.DataVersionAndKind(data)
+func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, group, version, kind string, err error) {
+	group, version, kind, err = s.DataTypeMeta(data)
 	if err != nil {
 		return
 	}
 	if version == "" && s.InternalVersion != "" {
-		return nil, "", "", fmt.Errorf("version not set in '%s'", string(data))
+		return nil, "", "", "", fmt.Errorf("version not set in '%s'", string(data))
 	}
 	if kind == "" {
-		return nil, "", "", fmt.Errorf("kind not set in '%s'", string(data))
+		return nil, "", "", "", fmt.Errorf("kind not set in '%s'", string(data))
 	}
-	obj, err = s.NewObject(version, kind)
+	if group == "" {
+		return nil, "", "", "", fmt.Errorf("group not set in '%s'", string(data))
+	}
+	obj, err = s.NewObject(group, version, kind)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 
 	if err := json.Unmarshal(data, obj); err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 	return
 }
@@ -50,18 +53,18 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version,
 // s.InternalVersion type before being returned. Decode will not decode
 // objects without version set unless InternalVersion is also "".
 func (s *Scheme) Decode(data []byte) (interface{}, error) {
-	obj, version, kind, err := s.DecodeToVersionedObject(data)
+	obj, group, version, kind, err := s.DecodeToVersionedObject(data)
 	if err != nil {
 		return nil, err
 	}
 	// Version and Kind should be blank in memory.
-	if err := s.SetVersionAndKind("", "", obj); err != nil {
+	if err := s.SetTypeMeta("", "", "", obj); err != nil {
 		return nil, err
 	}
 
 	// Convert if needed.
 	if s.InternalVersion != version {
-		objOut, err := s.NewObject(s.InternalVersion, kind)
+		objOut, err := s.NewObject(group, s.InternalVersion, kind)
 		if err != nil {
 			return nil, err
 		}
@@ -83,11 +86,11 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	if len(data) == 0 {
 		return errors.New("empty input")
 	}
-	dataVersion, dataKind, err := s.DataVersionAndKind(data)
+	dataGroup, dataVersion, dataKind, err := s.DataTypeMeta(data)
 	if err != nil {
 		return err
 	}
-	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
+	objGroup, objVersion, objKind, err := s.ObjectTypeMeta(obj)
 	if err != nil {
 		return err
 	}
@@ -101,8 +104,13 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 		// correct type.
 		dataVersion = objVersion
 	}
+	if dataGroup == "" {
+		// Assume objects with unset Group fields are being unmarshalled into the
+		// correct type.
+		dataGroup = objGroup
+	}
 
-	external, err := s.NewObject(dataVersion, dataKind)
+	external, err := s.NewObject(dataGroup, dataVersion, dataKind)
 	if err != nil {
 		return err
 	}
@@ -115,5 +123,5 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	}
 
 	// Version and Kind should be blank in memory.
-	return s.SetVersionAndKind("", "", obj)
+	return s.SetTypeMeta("", "", "", obj)
 }

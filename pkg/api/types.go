@@ -254,8 +254,8 @@ type PersistentVolumeClaimVolumeSource struct {
 }
 
 type PersistentVolume struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	//Spec defines a persistent volume owned by the cluster
 	Spec PersistentVolumeSpec `json:"spec,omitempty"`
@@ -305,15 +305,15 @@ type PersistentVolumeStatus struct {
 }
 
 type PersistentVolumeList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
-	Items    []PersistentVolume `json:"items,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
+	Items            []PersistentVolume `json:"items,omitempty"`
 }
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaim struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the volume requested by a pod author
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
@@ -323,9 +323,9 @@ type PersistentVolumeClaim struct {
 }
 
 type PersistentVolumeClaimList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
-	Items    []PersistentVolumeClaim `json:"items,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
+	Items            []PersistentVolumeClaim `json:"items,omitempty"`
 }
 
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
@@ -865,8 +865,8 @@ const (
 
 // PodList is a list of Pods.
 type PodList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []Pod `json:"items"`
 }
@@ -951,8 +951,8 @@ type PodStatus struct {
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
 type PodStatusResult struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 	// Status represents the current information about a pod. This data may not be up
 	// to date.
 	Status PodStatus `json:"status,omitempty"`
@@ -960,8 +960,8 @@ type PodStatusResult struct {
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodSpec `json:"spec,omitempty"`
@@ -982,8 +982,8 @@ type PodTemplateSpec struct {
 
 // PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplate struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Template defines the pods that will be created from this pod template
 	Template PodTemplateSpec `json:"template,omitempty"`
@@ -991,8 +991,8 @@ type PodTemplate struct {
 
 // PodTemplateList is a list of PodTemplates.
 type PodTemplateList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []PodTemplate `json:"items"`
 }
@@ -1031,8 +1031,8 @@ type ReplicationControllerStatus struct {
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the desired behavior of this replication controller.
 	Spec ReplicationControllerSpec `json:"spec,omitempty"`
@@ -1044,8 +1044,8 @@ type ReplicationController struct {
 
 // ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []ReplicationController `json:"items"`
 }
@@ -1058,8 +1058,8 @@ const (
 
 // ServiceList holds a list of services.
 type ServiceList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []Service `json:"items"`
 }
@@ -1178,8 +1178,8 @@ type ServicePort struct {
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 type Service struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a service.
 	Spec ServiceSpec `json:"spec,omitempty"`
@@ -1193,8 +1193,8 @@ type Service struct {
 // * a principal that can be authenticated and authorized
 // * a set of secrets
 type ServiceAccount struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount
 	Secrets []ObjectReference `json:"secrets"`
@@ -1207,8 +1207,8 @@ type ServiceAccount struct {
 
 // ServiceAccountList is a list of ServiceAccount objects
 type ServiceAccountList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []ServiceAccount `json:"items"`
 }
@@ -1226,8 +1226,8 @@ type ServiceAccountList struct {
 //     },
 //  ]
 type Endpoints struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// The set of all endpoints is the union of all subsets.
 	Subsets []EndpointSubset
@@ -1273,8 +1273,8 @@ type EndpointPort struct {
 
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []Endpoints `json:"items"`
 }
@@ -1403,8 +1403,8 @@ type ResourceList map[ResourceName]resource.Quantity
 // Node is a worker node in Kubernetes
 // The name of the node according to etcd is in ObjectMeta.Name.
 type Node struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a node.
 	Spec NodeSpec `json:"spec,omitempty"`
@@ -1415,8 +1415,8 @@ type Node struct {
 
 // NodeList is a list of nodes.
 type NodeList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []Node `json:"items"`
 }
@@ -1453,8 +1453,8 @@ const (
 // A namespace provides a scope for Names.
 // Use of multiple namespaces is optional
 type Namespace struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of the Namespace.
 	Spec NamespaceSpec `json:"spec,omitempty"`
@@ -1465,15 +1465,15 @@ type Namespace struct {
 
 // NamespaceList is a list of Namespaces.
 type NamespaceList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []Namespace `json:"items"`
 }
 
 // Binding ties one object to another - for example, a pod is bound to a node by a scheduler.
 type Binding struct {
-	TypeMeta `json:",inline"`
+	runtime.TypeMeta `json:",inline"`
 	// ObjectMeta describes the object that is being bound.
 	ObjectMeta `json:"metadata,omitempty"`
 
@@ -1483,7 +1483,7 @@ type Binding struct {
 
 // DeleteOptions may be provided when deleting an API object
 type DeleteOptions struct {
-	TypeMeta `json:",inline"`
+	runtime.TypeMeta `json:",inline"`
 
 	// Optional duration in seconds before the object should be deleted. Value must be non-negative integer.
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
@@ -1494,7 +1494,7 @@ type DeleteOptions struct {
 // ListOptions is the query options to a standard REST list call, and has future support for
 // watch calls.
 type ListOptions struct {
-	TypeMeta `json:",inline"`
+	runtime.TypeMeta `json:",inline"`
 
 	// A selector based on labels
 	LabelSelector labels.Selector
@@ -1508,7 +1508,7 @@ type ListOptions struct {
 
 // PodLogOptions is the query options for a Pod's logs REST call
 type PodLogOptions struct {
-	TypeMeta
+	runtime.TypeMeta
 
 	// Container for which to return logs
 	Container string
@@ -1522,7 +1522,7 @@ type PodLogOptions struct {
 
 // PodExecOptions is the query options to a Pod's remote exec call
 type PodExecOptions struct {
-	TypeMeta
+	runtime.TypeMeta
 
 	// Stdin if true indicates that stdin is to be redirected for the exec call
 	Stdin bool
@@ -1545,7 +1545,7 @@ type PodExecOptions struct {
 
 // PodProxyOptions is the query options to a Pod's proxy call
 type PodProxyOptions struct {
-	TypeMeta
+	runtime.TypeMeta
 
 	// Path is the URL path to use for the current proxy request
 	Path string
@@ -1555,8 +1555,8 @@ type PodProxyOptions struct {
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
 type Status struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	// One of: "Success" or "Failure"
 	Status string `json:"status,omitempty"`
@@ -1785,8 +1785,8 @@ type LocalObjectReference struct {
 }
 
 type SerializedReference struct {
-	TypeMeta  `json:",inline"`
-	Reference ObjectReference `json:"reference,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	Reference        ObjectReference `json:"reference,omitempty"`
 }
 
 type EventSource struct {
@@ -1799,8 +1799,8 @@ type EventSource struct {
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Required. The object that this event is about.
 	InvolvedObject ObjectReference `json:"involvedObject,omitempty"`
@@ -1818,7 +1818,7 @@ type Event struct {
 	// Optional. The component reporting this event. Should be a short machine understandable string.
 	Source EventSource `json:"source,omitempty"`
 
-	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
+	// The time at which the event was first recorded. (Time of server receipt is in runtime.TypeMeta.)
 	FirstTimestamp util.Time `json:"firstTimestamp,omitempty"`
 
 	// The time at which the most recent occurance of this event was recorded.
@@ -1830,16 +1830,16 @@ type Event struct {
 
 // EventList is a list of events.
 type EventList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []Event `json:"items"`
 }
 
 // List holds a list of objects, which may not be known by the server.
 type List struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []runtime.Object `json:"items"`
 }
@@ -1874,8 +1874,8 @@ type LimitRangeSpec struct {
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
 type LimitRange struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the limits enforced
 	Spec LimitRangeSpec `json:"spec,omitempty"`
@@ -1883,8 +1883,8 @@ type LimitRange struct {
 
 // LimitRangeList is a list of LimitRange items.
 type LimitRangeList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	// Items is a list of LimitRange objects
 	Items []LimitRange `json:"items"`
@@ -1922,8 +1922,8 @@ type ResourceQuotaStatus struct {
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Spec defines the desired quota
 	Spec ResourceQuotaSpec `json:"spec,omitempty"`
@@ -1934,8 +1934,8 @@ type ResourceQuota struct {
 
 // ResourceQuotaList is a list of ResourceQuota items
 type ResourceQuotaList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	// Items is a list of ResourceQuota objects
 	Items []ResourceQuota `json:"items"`
@@ -1944,8 +1944,8 @@ type ResourceQuotaList struct {
 // Secret holds secret data of a certain type.  The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
 type Secret struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN
 	// or leading dot followed by valid DNS_SUBDOMAIN.
@@ -1995,8 +1995,8 @@ const (
 )
 
 type SecretList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []Secret `json:"items"`
 }
@@ -2058,15 +2058,15 @@ type ComponentCondition struct {
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 type ComponentStatus struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 
 	Conditions []ComponentCondition `json:"conditions,omitempty"`
 }
 
 type ComponentStatusList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ListMeta         `json:"metadata,omitempty"`
 
 	Items []ComponentStatus `json:"items"`
 }
@@ -2113,8 +2113,8 @@ type SELinuxOptions struct {
 // data encoding hints). A range allocation should *ALWAYS* be recreatable at any time by observation
 // of the cluster, thus the object is less strongly typed than most.
 type RangeAllocation struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ObjectMeta       `json:"metadata,omitempty"`
 	// A string representing a unique label for a range of resources, such as a CIDR "10.0.0.0/8" or
 	// port range "10000-30000". Range is not strongly schema'd here. The Range is expected to define
 	// a start and end unless there is an implicit end.

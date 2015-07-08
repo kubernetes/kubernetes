@@ -50,6 +50,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	kuberuntime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -496,7 +497,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 
 func runAtomicPutTest(c *client.Client) {
 	svcBody := api.Service{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: kuberuntime.TypeMeta{
 			APIVersion: c.APIVersion(),
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -578,7 +579,7 @@ func runPatchTest(c *client.Client) {
 	name := "patchservice"
 	resource := "services"
 	svcBody := api.Service{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: kuberuntime.TypeMeta{
 			APIVersion: c.APIVersion(),
 		},
 		ObjectMeta: api.ObjectMeta{

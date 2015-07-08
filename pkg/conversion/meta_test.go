@@ -23,89 +23,98 @@ import (
 
 func TestSimpleMetaFactoryInterpret(t *testing.T) {
 	factory := SimpleMetaFactory{}
-	version, kind, err := factory.Interpret([]byte(`{"apiVersion":"1","kind":"object"}`))
+	group, version, kind, err := factory.Interpret([]byte(`{"apiGroup":"0","apiVersion":"1","kind":"object"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if version != "1" || kind != "object" {
-		t.Errorf("unexpected interpret: %s %s", version, kind)
+	if group != "0" || version != "1" || kind != "object" {
+		t.Errorf("unexpected interpret: %s %s %s", group, version, kind)
 	}
 
 	// no kind or version
-	version, kind, err = factory.Interpret([]byte(`{}`))
+	group, version, kind, err = factory.Interpret([]byte(`{}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if version != "" || kind != "" {
-		t.Errorf("unexpected interpret: %s %s", version, kind)
+	if group != "" || version != "" || kind != "" {
+		t.Errorf("unexpected interpret: %s %s %s", group, version, kind)
 	}
 
 	// unparsable
-	version, kind, err = factory.Interpret([]byte(`{`))
+	_, _, _, err = factory.Interpret([]byte(`{`))
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestSimpleMetaFactoryUpdate(t *testing.T) {
-	factory := SimpleMetaFactory{VersionField: "V", KindField: "K"}
+	factory := SimpleMetaFactory{GroupField: "G", VersionField: "V", KindField: "K"}
 
 	obj := struct {
+		G string
 		V string
 		K string
-	}{"1", "2"}
+	}{"0", "1", "2"}
 
 	// must pass a pointer
-	if err := factory.Update("test", "other", obj); err == nil {
+	if err := factory.Update("first", "test", "other", obj); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if obj.V != "1" || obj.K != "2" {
+	if obj.G != "0" || obj.V != "1" || obj.K != "2" {
 		t.Errorf("unexpected update: %v", obj)
 	}
 
 	// updates
-	if err := factory.Update("test", "other", &obj); err != nil {
+	if err := factory.Update("first", "test", "other", &obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if obj.V != "test" || obj.K != "other" {
+	if obj.G != "first" || obj.V != "test" || obj.K != "other" {
 		t.Errorf("unexpected update: %v", obj)
 	}
 }
 
 func TestSimpleMetaFactoryUpdateStruct(t *testing.T) {
-	factory := SimpleMetaFactory{BaseFields: []string{"Test"}, VersionField: "V", KindField: "K"}
+	factory := SimpleMetaFactory{
+		BaseFields:   []string{"Test"},
+		GroupField:   "G",
+		VersionField: "V",
+		KindField:    "K",
+	}
 
 	type Inner struct {
+		G string
 		V string
 		K string
 	}
 	obj := struct {
 		Test Inner
-	}{Test: Inner{"1", "2"}}
+	}{Test: Inner{"0", "1", "2"}}
 
 	// updates
-	if err := factory.Update("test", "other", &obj); err != nil {
+	if err := factory.Update("first", "test", "other", &obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if obj.Test.V != "test" || obj.Test.K != "other" {
+	if obj.Test.G != "first" || obj.Test.V != "test" || obj.Test.K != "other" {
 		t.Errorf("unexpected update: %v", obj)
 	}
 }
 
 func TestMetaValues(t *testing.T) {
 	type InternalSimple struct {
+		APIGroup   string `json:"apiGroup,omitempty"`
 		APIVersion string `json:"apiVersion,omitempty"`
 		Kind       string `json:"kind,omitempty"`
 		TestString string `json:"testString"`
 	}
 	type ExternalSimple struct {
+		APIGroup   string `json:"apiGroup,omitempty"`
 		APIVersion string `json:"apiVersion,omitempty"`
 		Kind       string `json:"kind,omitempty"`
 		TestString string `json:"testString"`
 	}
-	s := NewScheme()
-	s.AddKnownTypeWithName("", "Simple", &InternalSimple{})
-	s.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
+	s := NewScheme("")
+	s.AddKnownTypeWithName("myapi", "", "Simple", &InternalSimple{})
+	s.AddKnownTypeWithName("myapi", "externalVersion", "Simple", &ExternalSimple{})
 
 	internalToExternalCalls := 0
 	externalToInternalCalls := 0
@@ -194,16 +203,18 @@ func TestMetaValues(t *testing.T) {
 
 func TestMetaValuesUnregisteredConvert(t *testing.T) {
 	type InternalSimple struct {
+		Group      string `json:"apiGroup,omitempty"`
 		Version    string `json:"apiVersion,omitempty"`
 		Kind       string `json:"kind,omitempty"`
 		TestString string `json:"testString"`
 	}
 	type ExternalSimple struct {
+		Group      string `json:"apiGroup,omitempty"`
 		Version    string `json:"apiVersion,omitempty"`
 		Kind       string `json:"kind,omitempty"`
 		TestString string `json:"testString"`
 	}
-	s := NewScheme()
+	s := NewScheme("")
 	s.InternalVersion = ""
 	// We deliberately don't register the types.
 

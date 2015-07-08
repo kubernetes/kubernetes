@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -75,7 +76,7 @@ func testPodWithVolume(path string, source *api.EmptyDirVolumeSource) *api.Pod {
 	podName := "pod-" + string(util.NewUUID())
 
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: latest.Version,
 		},

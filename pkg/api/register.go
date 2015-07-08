@@ -20,11 +20,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
+const Group string = "api"
+
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
-var Scheme = runtime.NewScheme()
+var Scheme = runtime.NewScheme(Group)
 
 func init() {
-	Scheme.AddKnownTypes("",
+	Scheme.AddKnownTypes(Group, "",
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
@@ -68,8 +70,8 @@ func init() {
 		&RangeAllocation{},
 	)
 	// Legacy names are supported
-	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
-	Scheme.AddKnownTypeWithName("", "MinionList", &NodeList{})
+	Scheme.AddKnownTypeWithName(Group, "", "Minion", &Node{})
+	Scheme.AddKnownTypeWithName(Group, "", "MinionList", &NodeList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}

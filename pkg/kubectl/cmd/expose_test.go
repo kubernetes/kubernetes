@@ -49,7 +49,7 @@ func TestRunExposeService(t *testing.T) {
 			},
 			input: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   runtime.TypeMeta{Kind: "Service", APIVersion: "v1"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
@@ -57,7 +57,7 @@ func TestRunExposeService(t *testing.T) {
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test"},
 			output: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "12", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   runtime.TypeMeta{Kind: "Service", APIVersion: "v1"},
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{
 						{
@@ -81,7 +81,7 @@ func TestRunExposeService(t *testing.T) {
 			},
 			input: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "mayor", Namespace: "default", ResourceVersion: "12"},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   runtime.TypeMeta{Kind: "Service", APIVersion: "v1"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{"run": "this"},
 				},
@@ -90,7 +90,7 @@ func TestRunExposeService(t *testing.T) {
 			flags: map[string]string{"selector": "run=this", "port": "80", "labels": "runas=amayor"},
 			output: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "mayor", Namespace: "default", ResourceVersion: "12", Labels: map[string]string{"runas": "amayor"}},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   runtime.TypeMeta{Kind: "Service", APIVersion: "v1"},
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{
 						{
@@ -114,7 +114,7 @@ func TestRunExposeService(t *testing.T) {
 			},
 			input: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   runtime.TypeMeta{Kind: "Service", APIVersion: "v1"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
@@ -122,7 +122,7 @@ func TestRunExposeService(t *testing.T) {
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "create-external-load-balancer": "true"},
 			output: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "12", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   runtime.TypeMeta{Kind: "Service", APIVersion: "v1"},
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{
 						{

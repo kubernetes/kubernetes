@@ -63,7 +63,7 @@ func main() {
 		vals := strings.Split(overwrite, "=")
 		generator.OverwritePackage(vals[0], vals[1])
 	}
-	for _, knownType := range api.Scheme.KnownTypes(knownVersion) {
+	for _, knownType := range api.Scheme.KnownTypes(api.Group, knownVersion) {
 		if err := generator.AddType(knownType); err != nil {
 			glog.Errorf("error while generating deep copy functions for %v: %v", knownType, err)
 		}

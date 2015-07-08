@@ -37,7 +37,7 @@ import (
 func generateConversions(t *testing.T, version string) bytes.Buffer {
 	g := runtime.NewConversionGenerator(api.Scheme.Raw())
 	g.OverwritePackage(version, "")
-	for _, knownType := range api.Scheme.KnownTypes(version) {
+	for _, knownType := range api.Scheme.KnownTypes(api.Group, version) {
 		if err := g.GenerateConversionsForType(version, knownType); err != nil {
 			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
 		}

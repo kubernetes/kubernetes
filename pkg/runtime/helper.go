@@ -158,7 +158,7 @@ func DecodeList(objects []Object, decoders ...ObjectDecoder) []error {
 		switch t := obj.(type) {
 		case *Unknown:
 			for _, decoder := range decoders {
-				if !decoder.Recognizes(t.APIVersion, t.Kind) {
+				if !decoder.Recognizes(t.TypeMeta) {
 					continue
 				}
 				obj, err := decoder.Decode(t.RawJSON)
@@ -179,9 +179,9 @@ type MultiObjectTyper []ObjectTyper
 
 var _ ObjectTyper = MultiObjectTyper{}
 
-func (m MultiObjectTyper) DataVersionAndKind(data []byte) (version, kind string, err error) {
+func (m MultiObjectTyper) DataTypeMeta(data []byte) (tm TypeMeta, err error) {
 	for _, t := range m {
-		version, kind, err = t.DataVersionAndKind(data)
+		tm, err = t.DataTypeMeta(data)
 		if err == nil {
 			return
 		}
@@ -189,9 +189,9 @@ func (m MultiObjectTyper) DataVersionAndKind(data []byte) (version, kind string,
 	return
 }
 
-func (m MultiObjectTyper) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
+func (m MultiObjectTyper) ObjectTypeMeta(obj Object) (tm TypeMeta, err error) {
 	for _, t := range m {
-		version, kind, err = t.ObjectVersionAndKind(obj)
+		tm, err = t.ObjectTypeMeta(obj)
 		if err == nil {
 			return
 		}
@@ -199,9 +199,9 @@ func (m MultiObjectTyper) ObjectVersionAndKind(obj Object) (version, kind string
 	return
 }
 
-func (m MultiObjectTyper) Recognizes(version, kind string) bool {
+func (m MultiObjectTyper) Recognizes(tm TypeMeta) bool {
 	for _, t := range m {
-		if t.Recognizes(version, kind) {
+		if t.Recognizes(tm) {
 			return true
 		}
 	}

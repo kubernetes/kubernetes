@@ -51,12 +51,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.APIVersion = ""
 			j.Kind = ""
 		},
-		func(j *api.TypeMeta, c fuzz.Continue) {
-			// We have to customize the randomization of TypeMetas because their
-			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = ""
-			j.Kind = ""
-		},
 		func(j *api.ObjectMeta, c fuzz.Continue) {
 			j.Name = c.RandString()
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)

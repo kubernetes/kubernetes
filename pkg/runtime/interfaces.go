@@ -71,28 +71,28 @@ type ObjectEncoder interface {
 type ObjectConvertor interface {
 	Convert(in, out interface{}) error
 	ConvertToVersion(in Object, outVersion string) (out Object, err error)
-	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
+	ConvertFieldLabel(group, version, kind, label, value string) (string, string, error)
 }
 
 // ObjectTyper contains methods for extracting the APIVersion and Kind
 // of objects.
 type ObjectTyper interface {
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
+	// DataTypeMeta returns the version and kind of the provided data, or an error
 	// if another problem is detected. In many cases this method can be as expensive to
 	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// ObjectVersionAndKind returns the version and kind of the provided object, or an
+	DataTypeMeta([]byte) (TypeMeta, error)
+	// ObjectTypeMeta returns the version and kind of the provided object, or an
 	// error if the object is not recognized (IsNotRegisteredError will return true).
-	ObjectVersionAndKind(Object) (version, kind string, err error)
-	// Recognizes returns true if the scheme is able to handle the provided version and kind,
+	ObjectTypeMeta(Object) (TypeMeta, error)
+	// Recognizes returns true if the scheme is able to handle the provided TypeMeta,
 	// or more precisely that the provided version is a possible conversion or decoding
 	// target.
-	Recognizes(version, kind string) bool
+	Recognizes(tm TypeMeta) bool
 }
 
 // ObjectCreater contains methods for instantiating an object by kind and version.
 type ObjectCreater interface {
-	New(version, kind string) (out Object, err error)
+	New(group, version, kind string) (Object, error)
 }
 
 // ObjectDecoder is a convenience interface for identifying serialized versions of objects
@@ -100,13 +100,13 @@ type ObjectCreater interface {
 // Decoder for use in decode only paths.
 type ObjectDecoder interface {
 	Decoder
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
+	// DataTypeMeta returns the version and kind of the provided data, or an error
 	// if another problem is detected. In many cases this method can be as expensive to
 	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// Recognizes returns true if the scheme is able to handle the provided version and kind
-	// of an object.
-	Recognizes(version, kind string) bool
+	DataTypeMeta([]byte) (TypeMeta, error)
+	// Recognizes returns true if the scheme is able to handle the provided TypeMeta of an
+	// object.
+	Recognizes(tm TypeMeta) bool
 }
 
 // ResourceVersioner provides methods for setting and retrieving

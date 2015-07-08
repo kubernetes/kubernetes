@@ -110,7 +110,7 @@ func init() {
 
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources.
 	for _, version := range versions {
-		for kind := range api.Scheme.KnownTypes(version) {
+		for kind := range api.Scheme.KnownTypes(api.Group, version) {
 			if ignoredKinds.Has(kind) {
 				continue
 			}

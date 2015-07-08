@@ -17,11 +17,11 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 type Policy struct {
-	api.TypeMeta `json:",inline"`
+	runtime.TypeMeta `json:",inline"`
 	// Holds the information to configure the fit predicate functions
 	Predicates []PredicatePolicy `json:"predicates"`
 	// Holds the information to configure the priority functions

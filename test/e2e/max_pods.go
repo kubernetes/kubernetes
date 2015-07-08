@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -108,7 +109,7 @@ var _ = Describe("MaxPods", func() {
 		Logf("Observed %v running Pods. Need %v to fully saturate the cluster.", len(pods.Items), totalPodCapacity)
 
 		_, err = c.Pods(ns).Create(&api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: runtime.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{

@@ -57,16 +57,16 @@ func TestExtractInvalidPods(t *testing.T) {
 	}{
 		{
 			desc: "No version",
-			pod:  &api.Pod{TypeMeta: api.TypeMeta{APIVersion: ""}},
+			pod:  &api.Pod{TypeMeta: runtime.TypeMeta{APIVersion: ""}},
 		},
 		{
 			desc: "Invalid version",
-			pod:  &api.Pod{TypeMeta: api.TypeMeta{APIVersion: "v1betta2"}},
+			pod:  &api.Pod{TypeMeta: runtime.TypeMeta{APIVersion: "v1betta2"}},
 		},
 		{
 			desc: "Invalid volume name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: runtime.TypeMeta{APIVersion: testapi.Version()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "_INVALID_"}},
 				},
@@ -75,7 +75,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: runtime.TypeMeta{APIVersion: testapi.Version()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -84,7 +84,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: runtime.TypeMeta{APIVersion: testapi.Version()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: ""}},
 				},
@@ -93,7 +93,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				TypeMeta: runtime.TypeMeta{APIVersion: testapi.Version()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
@@ -130,7 +130,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		{
 			desc: "Single pod",
 			pods: &api.Pod{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: runtime.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},
@@ -170,7 +170,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		{
 			desc: "Multiple pods",
 			pods: &api.PodList{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: runtime.TypeMeta{
 					Kind:       "PodList",
 					APIVersion: "",
 				},

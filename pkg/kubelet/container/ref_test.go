@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestFieldPath(t *testing.T) {
@@ -64,7 +65,7 @@ func TestFieldPath(t *testing.T) {
 func TestGenerateContainerRef(t *testing.T) {
 	var (
 		okPod = api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: runtime.TypeMeta{
 				Kind:       "Pod",
 				APIVersion: testapi.Version(),
 			},

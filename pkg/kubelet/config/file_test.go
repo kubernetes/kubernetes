@@ -77,7 +77,7 @@ func TestReadPodsFromFile(t *testing.T) {
 		{
 			desc: "Simple pod",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: runtime.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},

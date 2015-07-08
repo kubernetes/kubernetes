@@ -35,6 +35,7 @@ var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
 // Test a weird version/kind embedding format.
 type MyWeirdCustomEmbeddedVersionKindField struct {
 	ID         string `json:"ID,omitempty"`
+	APIGroup   string `json:"myGroupKey,omitempty"`
 	APIVersion string `json:"myVersionKey,omitempty"`
 	ObjectKind string `json:"myKindKey,omitempty"`
 	Z          string `json:"Z,omitempty"`
@@ -100,6 +101,7 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 	func(j *MyWeirdCustomEmbeddedVersionKindField, c fuzz.Continue) {
 		// We have to customize the randomization of MyWeirdCustomEmbeddedVersionKindFields because their
 		// APIVersion and Kind must remain blank in memory.
+		j.APIGroup = ""
 		j.APIVersion = ""
 		j.ObjectKind = ""
 		j.ID = c.RandString()
@@ -108,16 +110,16 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() *Scheme {
-	s := NewScheme()
+	s := NewScheme("")
 	// Ordinarily, we wouldn't add TestType2, but because this is a test and
 	// both types are from the same package, we need to get it into the system
 	// so that converter will match it with ExternalType2.
-	s.AddKnownTypes("", &TestType1{}, &TestType2{}, &ExternalInternalSame{})
-	s.AddKnownTypes("v1", &ExternalInternalSame{})
-	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
-	s.AddKnownTypeWithName("v1", "TestType2", &ExternalTestType2{})
-	s.AddKnownTypeWithName("", "TestType3", &TestType1{})
-	s.AddKnownTypeWithName("v1", "TestType3", &ExternalTestType1{})
+	s.AddKnownTypes("testapi", "", &TestType1{}, &TestType2{}, &ExternalInternalSame{})
+	s.AddKnownTypes("testapi", "v1", &ExternalInternalSame{})
+	s.AddKnownTypeWithName("testapi", "v1", "TestType1", &ExternalTestType1{})
+	s.AddKnownTypeWithName("testapi", "v1", "TestType2", &ExternalTestType2{})
+	s.AddKnownTypeWithName("testapi", "", "TestType3", &TestType1{})
+	s.AddKnownTypeWithName("testapi", "v1", "TestType3", &ExternalTestType1{})
 	s.InternalVersion = ""
 	s.MetaFactory = testMetaFactory{}
 	return s
@@ -125,22 +127,23 @@ func GetTestScheme() *Scheme {
 
 type testMetaFactory struct{}
 
-func (testMetaFactory) Interpret(data []byte) (version, kind string, err error) {
+func (testMetaFactory) Interpret(data []byte) (string, string, string, error) {
 	findKind := struct {
+		APIGroup   string `json:"myGroupKey,omitempty"`
 		APIVersion string `json:"myVersionKey,omitempty"`
 		ObjectKind string `json:"myKindKey,omitempty"`
 	}{}
 	// yaml is a superset of json, so we use it to decode here. That way,
 	// we understand both.
-	err = yaml.Unmarshal(data, &findKind)
+	err := yaml.Unmarshal(data, &findKind)
 	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
+		return "", "", "", fmt.Errorf("couldn't get group/version/kind: %v", err)
 	}
-	return findKind.APIVersion, findKind.ObjectKind, nil
+	return findKind.APIGroup, findKind.APIVersion, findKind.ObjectKind, nil
 }
 
-func (testMetaFactory) Update(version, kind string, obj interface{}) error {
-	return UpdateVersionAndKind(nil, "APIVersion", version, "ObjectKind", kind, obj)
+func (testMetaFactory) Update(group, version, kind string, obj interface{}) error {
+	return UpdateTypeMeta(nil, "APIGroup", group, "APIVersion", version, "ObjectKind", kind, obj)
 }
 
 func objDiff(a, b interface{}) string {
@@ -210,7 +213,7 @@ func TestTypes(t *testing.T) {
 func TestMultipleNames(t *testing.T) {
 	s := GetTestScheme()
 
-	obj, err := s.Decode([]byte(`{"myKindKey":"TestType3","myVersionKey":"v1","A":"value"}`))
+	obj, err := s.Decode([]byte(`{"myKindKey":"TestType3","myVersionKey":"v1","myGroupKey":"testapi","A":"value"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -229,19 +232,21 @@ func TestMultipleNames(t *testing.T) {
 }
 
 func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
-	s := NewScheme()
+	s := NewScheme("")
 	// create two names internally, with TestType1 being preferred
-	s.AddKnownTypeWithName("", "TestType1", &TestType1{})
-	s.AddKnownTypeWithName("", "OtherType1", &TestType1{})
+	s.AddKnownTypeWithName("tapi", "", "TestType1", &TestType1{})
+	s.AddKnownTypeWithName("tapi", "", "OtherType1", &TestType1{})
 	// create two names externally, with TestType1 being preferred
-	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
-	s.AddKnownTypeWithName("v1", "OtherType1", &ExternalTestType1{})
+	s.AddKnownTypeWithName("tapi", "v1", "TestType1", &ExternalTestType1{})
+	s.AddKnownTypeWithName("tapi", "v1", "OtherType1", &ExternalTestType1{})
 	s.MetaFactory = testMetaFactory{}
 
 	ext := &ExternalTestType1{}
+	ext.APIGroup = "tapi"
 	ext.APIVersion = "v1"
 	ext.ObjectKind = "OtherType1"
 	ext.A = "test"
+
 	data, err := json.Marshal(ext)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -267,11 +272,11 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 
 func TestKnownTypes(t *testing.T) {
 	s := GetTestScheme()
-	if len(s.KnownTypes("v2")) != 0 {
+	if len(s.KnownTypes("testapi", "v2")) != 0 {
 		t.Errorf("should have no known types for v2")
 	}
 
-	types := s.KnownTypes("v1")
+	types := s.KnownTypes("testapi", "v1")
 	for _, s := range []string{"TestType1", "TestType2", "TestType3", "ExternalInternalSame"} {
 		if _, ok := types[s]; !ok {
 			t.Errorf("missing type %q", s)

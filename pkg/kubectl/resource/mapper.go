@@ -44,17 +44,17 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to parse %q: %v", source, err)
 	}
 	data = json
-	version, kind, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
+	tm, err := runtime.UnstructuredJSONScheme.DataTypeMeta(data)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
 	}
-	if ok := registered.IsRegisteredAPIVersion(version); !ok {
-		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", version, source, registered.RegisteredVersions)
+	if ok := registered.IsRegisteredAPIVersion(tm.APIVersion); !ok {
+		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", tm.APIVersion, source, registered.RegisteredVersions)
 	}
-	if kind == "" {
+	if tm.Kind == "" {
 		return nil, fmt.Errorf("kind not set in %q", source)
 	}
-	mapping, err := m.RESTMapping(kind, version)
+	mapping, err := m.RESTMapping(tm.Kind, tm.APIVersion)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
 	}
@@ -72,7 +72,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 
 	var versionedObject interface{}
 
-	if vo, _, _, err := api.Scheme.Raw().DecodeToVersionedObject(data); err == nil {
+	if vo, _, _, _, err := api.Scheme.Raw().DecodeToVersionedObject(data); err == nil {
 		versionedObject = vo
 	}
 	return &Info{
@@ -91,13 +91,13 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForObject(obj runtime.Object) (*Info, error) {
-	version, kind, err := m.ObjectVersionAndKind(obj)
+	tm, err := m.ObjectTypeMeta(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
 	}
-	mapping, err := m.RESTMapping(kind, version)
+	mapping, err := m.RESTMapping(tm.Kind, tm.APIVersion)
 	if err != nil {
-		return nil, fmt.Errorf("unable to recognize %q: %v", kind, err)
+		return nil, fmt.Errorf("unable to recognize %q: %v", tm.Kind, err)
 	}
 	client, err := m.ClientForMapping(mapping)
 	if err != nil {

@@ -25,13 +25,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
+type groupVersion struct {
+	group   string
+	version string
+}
+
 // Scheme defines methods for serializing and deserializing API objects. It
 // is an adaptation of conversion's Scheme for our API objects.
 type Scheme struct {
 	raw *conversion.Scheme
-	// Map from version and resource to the corresponding func to convert
+	// Map from groupVersion and resource to the corresponding func to convert
 	// resource field labels in that version to internal version.
-	fieldLabelConversionFuncs map[string]map[string]FieldLabelConversionFunc
+	fieldLabelConversionFuncs map[groupVersion]map[string]FieldLabelConversionFunc
 }
 
 // Function to convert a field selector to internal representation.
@@ -66,13 +71,13 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 
 	// Figure out the type and kind of the output object.
 	_, outVersion, scheme := self.fromScope(s)
-	_, kind, err := scheme.raw.ObjectVersionAndKind(in.Object)
+	group, _, kind, err := scheme.raw.ObjectTypeMeta(in.Object)
 	if err != nil {
 		return err
 	}
 
 	// Manufacture an object of this type and kind.
-	outObj, err := scheme.New(outVersion, kind)
+	outObj, err := scheme.New(group, outVersion, kind)
 	if err != nil {
 		return err
 	}
@@ -113,14 +118,14 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 	}
 	// Figure out the type and kind of the output object.
 	inVersion, outVersion, scheme := self.fromScope(s)
-	_, kind, err := scheme.raw.DataVersionAndKind(in.RawJSON)
+	group, _, kind, err := scheme.raw.DataTypeMeta(in.RawJSON)
 	if err != nil {
 		return err
 	}
 
 	// We have to make this object ourselves because we don't store the version field for
 	// plugin objects.
-	inObj, err := scheme.New(inVersion, kind)
+	inObj, err := scheme.New(group, inVersion, kind)
 	if err != nil {
 		return err
 	}
@@ -131,7 +136,7 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 	}
 
 	// Make the desired internal version, and do the conversion.
-	outObj, err := scheme.New(outVersion, kind)
+	outObj, err := scheme.New(group, outVersion, kind)
 	if err != nil {
 		return err
 	}
@@ -177,7 +182,7 @@ func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExt
 		default:
 			version := outVersion
 			// if the object exists
-			if inVersion, _, err := scheme.ObjectVersionAndKind(src[i]); err == nil && len(inVersion) != 0 {
+			if _, inVersion, _, err := scheme.raw.ObjectTypeMeta(src[i]); err == nil && len(inVersion) != 0 {
 				version = inVersion
 			}
 			data, err := scheme.EncodeToVersion(src[i], version)
@@ -201,7 +206,7 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 
 	for i := range src {
 		data := src[i].RawJSON
-		version, kind, err := scheme.raw.DataVersionAndKind(data)
+		_, version, kind, err := scheme.raw.DataTypeMeta(data)
 		if err != nil {
 			return err
 		}
@@ -218,10 +223,15 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 }
 
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
-func NewScheme() *Scheme {
-	s := &Scheme{conversion.NewScheme(), map[string]map[string]FieldLabelConversionFunc{}}
+func NewScheme(defGroup string) *Scheme {
+	s := &Scheme{conversion.NewScheme(defGroup), map[groupVersion]map[string]FieldLabelConversionFunc{}}
 	s.raw.InternalVersion = ""
-	s.raw.MetaFactory = conversion.SimpleMetaFactory{BaseFields: []string{"TypeMeta"}, VersionField: "APIVersion", KindField: "Kind"}
+	s.raw.MetaFactory = conversion.SimpleMetaFactory{
+		BaseFields:   []string{"TypeMeta"},
+		GroupField:   "APIGroup",
+		VersionField: "APIVersion",
+		KindField:    "Kind",
+	}
 	if err := s.raw.AddConversionFuncs(
 		s.embeddedObjectToRawExtension,
 		s.rawExtensionToEmbeddedObject,
@@ -245,48 +255,50 @@ func NewScheme() *Scheme {
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.
 // Encode() refuses the object unless its type is registered with AddKnownTypes.
-func (s *Scheme) AddKnownTypes(version string, types ...Object) {
+func (s *Scheme) AddKnownTypes(group, version string, types ...Object) {
 	interfaces := make([]interface{}, len(types))
 	for i := range types {
 		interfaces[i] = types[i]
 	}
-	s.raw.AddKnownTypes(version, interfaces...)
+	s.raw.AddKnownTypes(group, version, interfaces...)
 }
 
 // AddKnownTypeWithName is like AddKnownTypes, but it lets you specify what this type should
 // be encoded as. Useful for testing when you don't want to make multiple packages to define
 // your structs.
-func (s *Scheme) AddKnownTypeWithName(version, kind string, obj Object) {
-	s.raw.AddKnownTypeWithName(version, kind, obj)
+func (s *Scheme) AddKnownTypeWithName(group, version, kind string, obj Object) {
+	s.raw.AddKnownTypeWithName(group, version, kind, obj)
 }
 
 // KnownTypes returns the types known for the given version.
 // Return value must be treated as read-only.
-func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
-	return s.raw.KnownTypes(version)
+func (s *Scheme) KnownTypes(group, version string) map[string]reflect.Type {
+	return s.raw.KnownTypes(group, version)
 }
 
-// DataVersionAndKind will return the APIVersion and Kind of the given wire-format
+// DataTypeMeta will return the APIVersion and Kind of the given wire-format
 // encoding of an API Object, or an error.
-func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
-	return s.raw.DataVersionAndKind(data)
+func (s *Scheme) DataTypeMeta(data []byte) (TypeMeta, error) {
+	group, version, kind, err := s.raw.DataTypeMeta(data)
+	return TypeMeta{group, version, kind}, err
 }
 
-// ObjectVersionAndKind returns the version and kind of the given Object.
-func (s *Scheme) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
-	return s.raw.ObjectVersionAndKind(obj)
+// ObjectTypeMeta returns the version and kind of the given Object.
+func (s *Scheme) ObjectTypeMeta(obj Object) (TypeMeta, error) {
+	group, version, kind, err := s.raw.ObjectTypeMeta(obj)
+	return TypeMeta{group, version, kind}, err
 }
 
 // Recognizes returns true if the scheme is able to handle the provided version and kind
 // of an object.
-func (s *Scheme) Recognizes(version, kind string) bool {
-	return s.raw.Recognizes(version, kind)
+func (s *Scheme) Recognizes(tm TypeMeta) bool {
+	return s.raw.Recognizes(tm.APIGroup, tm.APIVersion, tm.Kind)
 }
 
 // New returns a new API object of the given version ("" for internal
 // representation) and name, or an error if it hasn't been registered.
-func (s *Scheme) New(versionName, typeName string) (Object, error) {
-	obj, err := s.raw.NewObject(versionName, typeName)
+func (s *Scheme) New(group, version, kind string) (Object, error) {
+	obj, err := s.raw.NewObject(group, version, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -336,12 +348,13 @@ func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
 
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
-func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFunc FieldLabelConversionFunc) error {
-	if s.fieldLabelConversionFuncs[version] == nil {
-		s.fieldLabelConversionFuncs[version] = map[string]FieldLabelConversionFunc{}
+func (s *Scheme) AddFieldLabelConversionFunc(group, version, kind string, conversionFunc FieldLabelConversionFunc) error {
+	gv := groupVersion{group, version}
+	if s.fieldLabelConversionFuncs[gv] == nil {
+		s.fieldLabelConversionFuncs[gv] = map[string]FieldLabelConversionFunc{}
 	}
 
-	s.fieldLabelConversionFuncs[version][kind] = conversionFunc
+	s.fieldLabelConversionFuncs[gv][kind] = conversionFunc
 	return nil
 }
 
@@ -374,11 +387,12 @@ func (s *Scheme) Convert(in, out interface{}) error {
 
 // Converts the given field label and value for an kind field selector from
 // versioned representation to an unversioned one.
-func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
-	if s.fieldLabelConversionFuncs[version] == nil {
+func (s *Scheme) ConvertFieldLabel(group, version, kind, label, value string) (string, string, error) {
+	gv := groupVersion{group, version}
+	if s.fieldLabelConversionFuncs[gv] == nil {
 		return "", "", fmt.Errorf("No field label conversion function found for version: %s", version)
 	}
-	conversionFunc, ok := s.fieldLabelConversionFuncs[version][kind]
+	conversionFunc, ok := s.fieldLabelConversionFuncs[gv][kind]
 	if !ok {
 		return "", "", fmt.Errorf("No field label conversion function found for version %s and kind %s", version, kind)
 	}

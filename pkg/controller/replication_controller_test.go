@@ -98,7 +98,7 @@ func getKey(rc *api.ReplicationController, t *testing.T) string {
 
 func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+		TypeMeta: runtime.TypeMeta{APIVersion: testapi.Version()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             util.NewUUID(),
 			Name:            "foobar",

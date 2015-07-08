@@ -404,7 +404,7 @@ func createRunningPod(wg *sync.WaitGroup, c *client.Client, name, ns, image stri
 	defer GinkgoRecover()
 	defer wg.Done()
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			Kind: "Pod",
 		},
 		ObjectMeta: api.ObjectMeta{

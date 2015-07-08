@@ -218,7 +218,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		// transform fields
 		// TODO: queryToObject should do this.
 		fn := func(label, value string) (newLabel, newValue string, err error) {
-			return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
+			return scope.Convertor.ConvertFieldLabel(api.Group, scope.APIVersion, scope.Kind, label, value)
 		}
 		if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
 			// TODO: allow bad request to set field causes based on query parameters
@@ -592,7 +592,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 // to use it.
 // TODO: add appropriate structured error responses
 func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.Object, error) {
-	versioned, err := scope.Creater.New(scope.ServerAPIVersion, kind)
+	versioned, err := scope.Creater.New(api.Group, scope.ServerAPIVersion, kind)
 	if err != nil {
 		// programmer error
 		return nil, err
@@ -641,14 +641,14 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 
 // transformDecodeError adds additional information when a decode fails.
 func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, body []byte) error {
-	_, kind, err := typer.ObjectVersionAndKind(into)
+	tm, err := typer.ObjectTypeMeta(into)
 	if err != nil {
 		return err
 	}
-	if version, dataKind, err := typer.DataVersionAndKind(body); err == nil && len(dataKind) > 0 {
-		return errors.NewBadRequest(fmt.Sprintf("%s in version %s cannot be handled as a %s: %v", dataKind, version, kind, baseErr))
+	if dataTM, err := typer.DataTypeMeta(body); err == nil && len(dataTM.Kind) > 0 {
+		return errors.NewBadRequest(fmt.Sprintf("%s in version %s cannot be handled as a %s: %v", dataTM.Kind, dataTM.APIVersion, tm.Kind, baseErr))
 	}
-	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", kind, baseErr))
+	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", tm.Kind, baseErr))
 }
 
 // setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request

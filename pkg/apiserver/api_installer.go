@@ -114,11 +114,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	hasSubresource := len(subresource) > 0
 
 	object := storage.New()
-	_, kind, err := a.group.Typer.ObjectVersionAndKind(object)
+	tm, err := a.group.Typer.ObjectTypeMeta(object)
+	kind := tm.Kind
 	if err != nil {
 		return err
 	}
-	versionedPtr, err := a.group.Creater.New(a.group.Version, kind)
+	versionedPtr, err := a.group.Creater.New(api.Group, a.group.Version, kind)
 	if err != nil {
 		return err
 	}
@@ -136,11 +137,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
 		}
 		parentObject := parentStorage.New()
-		_, parentKind, err := a.group.Typer.ObjectVersionAndKind(parentObject)
+		parentTM, err := a.group.Typer.ObjectTypeMeta(parentObject)
 		if err != nil {
 			return err
 		}
-		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.Version)
+		parentMapping, err := a.group.Mapper.RESTMapping(parentTM.Kind, a.group.Version)
 		if err != nil {
 			return err
 		}
@@ -172,15 +173,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedList interface{}
 	if isLister {
 		list := lister.NewList()
-		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
+		listTM, err := a.group.Typer.ObjectTypeMeta(list)
+		versionedListPtr, err := a.group.Creater.New(api.Group, a.group.Version, listTM.Kind)
 		if err != nil {
 			return err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
-	versionedListOptions, err := a.group.Creater.New(serverVersion, "ListOptions")
+	versionedListOptions, err := a.group.Creater.New(api.Group, serverVersion, "ListOptions")
 	if err != nil {
 		return err
 	}
@@ -188,7 +189,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedDeleterObject interface{}
 	switch {
 	case isGracefulDeleter:
-		objectPtr, err := a.group.Creater.New(serverVersion, "DeleteOptions")
+		objectPtr, err := a.group.Creater.New(api.Group, serverVersion, "DeleteOptions")
 		if err != nil {
 			return err
 		}
@@ -198,20 +199,20 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		gracefulDeleter = rest.GracefulDeleteAdapter{deleter}
 	}
 
-	versionedStatusPtr, err := a.group.Creater.New(serverVersion, "Status")
+	versionedStatusPtr, err := a.group.Creater.New(api.Group, serverVersion, "Status")
 	if err != nil {
 		return err
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var (
-		getOptions     runtime.Object
-		getOptionsKind string
-		getSubpath     bool
-		getSubpathKey  string
+		getOptions    runtime.Object
+		getOptionsTM  runtime.TypeMeta
+		getSubpath    bool
+		getSubpathKey string
 	)
 	if isGetterWithOptions {
 		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
-		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
+		getOptionsTM, err = a.group.Typer.ObjectTypeMeta(getOptions)
 		if err != nil {
 			return err
 		}
@@ -219,15 +220,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var (
-		connectOptions     runtime.Object
-		connectOptionsKind string
-		connectSubpath     bool
-		connectSubpathKey  string
+		connectOptions    runtime.Object
+		connectOptionsTM  runtime.TypeMeta
+		connectSubpath    bool
+		connectSubpathKey string
 	)
 	if isConnecter {
 		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
 		if connectOptions != nil {
-			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
+			connectOptionsTM, err = a.group.Typer.ObjectTypeMeta(connectOptions)
 			if err != nil {
 				return err
 			}
@@ -370,7 +371,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind, getSubpath, getSubpathKey)
+				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsTM.Kind, getSubpath, getSubpathKey)
 			} else {
 				handler = GetResource(getter, reqScope)
 			}
@@ -551,7 +552,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
 				route := ws.Method(method).Path(action.Path).
-					To(ConnectResource(connecter, reqScope, admit, connectOptionsKind, path, connectSubpath, connectSubpathKey)).
+					To(ConnectResource(connecter, reqScope, admit, connectOptionsTM.Kind, path, connectSubpath, connectSubpathKey)).
 					Filter(m).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + kind + strings.Title(subresource)).

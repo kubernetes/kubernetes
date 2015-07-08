@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 
 	"github.com/ghodss/yaml"
@@ -32,7 +33,7 @@ func noDefault(*api.Pod) error { return nil }
 
 func TestDecodeSinglePod(t *testing.T) {
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			APIVersion: "",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -92,7 +93,7 @@ func TestDecodeSinglePod(t *testing.T) {
 
 func TestDecodePodList(t *testing.T) {
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			APIVersion: "",
 		},
 		ObjectMeta: api.ObjectMeta{

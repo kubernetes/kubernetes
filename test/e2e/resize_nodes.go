@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
@@ -211,7 +212,7 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 	// Add "name": name to the labels, overwriting if it exists.
 	labels["name"] = name
 	return &api.ReplicationController{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			Kind:       "ReplicationController",
 			APIVersion: latest.Version,
 		},

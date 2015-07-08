@@ -191,7 +191,7 @@ func (lw *MockPodsListWatch) Delete(pod *api.Pod, notify bool) {
 func NewTestPod(i int) *api.Pod {
 	name := fmt.Sprintf("pod%d", i)
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+		TypeMeta: runtime.TypeMeta{APIVersion: testapi.Version()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: "default",

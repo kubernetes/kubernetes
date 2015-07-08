@@ -419,7 +419,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(expected, out) {
-		t.Errorf("unexpected output: %#v", out)
+		t.Errorf("unexpected output: \n%#v\n%#v", expected, out)
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"os"
 	"path"
@@ -115,7 +116,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 	podName := "pod-" + string(util.NewUUID())
 
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: latest.Version,
 		},

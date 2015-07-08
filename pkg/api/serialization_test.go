@@ -100,7 +100,7 @@ func TestSpecificKind(t *testing.T) {
 	defer api.Scheme.Log(nil)
 
 	kind := "PodList"
-	item, err := api.Scheme.New("", kind)
+	item, err := api.Scheme.New(api.Group, "", kind)
 	if err != nil {
 		t.Errorf("Couldn't make a %v? %v", kind, err)
 		return
@@ -113,7 +113,7 @@ func TestList(t *testing.T) {
 	defer api.Scheme.Log(nil)
 
 	kind := "List"
-	item, err := api.Scheme.New("", kind)
+	item, err := api.Scheme.New(api.Group, "", kind)
 	if err != nil {
 		t.Errorf("Couldn't make a %v? %v", kind, err)
 		return
@@ -129,13 +129,13 @@ func TestRoundTripTypes(t *testing.T) {
 	// api.Scheme.Log(t)
 	// defer api.Scheme.Log(nil)
 
-	for kind := range api.Scheme.KnownTypes("") {
+	for kind := range api.Scheme.KnownTypes(api.Group, "") {
 		if nonRoundTrippableTypes.Has(kind) {
 			continue
 		}
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
-			item, err := api.Scheme.New("", kind)
+			item, err := api.Scheme.New(api.Group, "", kind)
 			if err != nil {
 				t.Fatalf("Couldn't make a %v? %v", kind, err)
 			}
