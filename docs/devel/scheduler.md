@@ -47,4 +47,4 @@ If you want to get a global picture of how the scheduler works, you can start in
 [plugin/cmd/kube-scheduler/app/server.go](../../plugin/cmd/kube-scheduler/app/server.go)
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/scheduler.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/scheduler.md?pixel)]()
