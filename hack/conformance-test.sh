@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# When run as described below, the conformance test tests whether a cluster is
+# When run as described below, the conformance test tests whether a cluster
 # supports key features for Kubernetes version 1.0.
 
 # Instructions:
@@ -26,7 +26,12 @@
 #  - Specify the location of the master with, e.g.:
 #    declare -x KUBE_MASTER_IP="1.2.3.4"
 #  - Make sure only essential pods are running and there are no failed/pending pods.
-#  - Make binaries needed by e2e, e.g.:
+#  - Go to a git tree that contains the kubernetes source.
+#    - git clone git://github.com/GoogleCloudPlatform/kubernetes.git
+#  - Checkout the upstream/conformance-test-v1 branch
+#    - git checkout upstream/conformance-test-v1
+#    - The working tree will be in a "detached HEAD" state.
+#  - Make binaries needed by e2e
 #      make clean
 #      make quick-release
 #  - Run the test and capture output:
@@ -51,22 +56,9 @@
 #    - tests of optional features, such as volume types.
 #    - tests of performance, scale, or reliability
 #    - known flaky tests.
-
-# The conformance test should be run from a github repository at
-# commit TBDCOMMITNUMBER.  Otherwise, it may not include the right
-# set of tests.
-# e.g.:
-#   cd /new/directory
-#   git clone git://github.com/GoogleCloudPlatform/kubernetes.git
-#   cd kubernetes
-#   git checkout TBDCOMMITNUMBER.
-# The working tree will be in a "detached HEAD" state.
-#
-# When run as described above, the conformance test tests whether a cluster is
-# supports key features for Kubernetes version 1.0.
-#
 # TODO: when preparing to release a new major or minor version of Kubernetes,
-# then update above commit number, reevaluate the set of e2e tests,
+# create a new conformance-test-vX.Y branch, update mentions of that branch in this file,
+# reevaluate the set of e2e tests,
 # update documentation at docs/getting-started-guides/README.md to have
 # a new column for conformance at that new version, and notify
 # community.
