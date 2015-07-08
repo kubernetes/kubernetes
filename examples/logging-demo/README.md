@@ -1,3 +1,6 @@
+#Prerequisites
+This example requires the elasticsearch logging service running. If your Kubernetes cluster is running on GCE, you need to set the LOGGING_DESTINATION option in cluster/gce/config-default.sh to elasticsearch and then use cluster/kube-down.sh and cluster/kube-up.sh to restart the cluster. Elasticsearch is enabled by default if your Kubernetes cluster is running on Azure or AWS.
+
 # Elasticsearch/Kibana Logging Demonstration
 This directory contains two [pod](../../docs/pods.md) specifications which can be used as synthetic
 logging sources. The pod specification in [synthetic_0_25lps.yaml](synthetic_0_25lps.yaml)
@@ -37,9 +40,9 @@ spec:
 The other YAML file [synthetic_10lps.yaml](synthetic_10lps.yaml) specifies a similar synthetic logger that emits 10 log messages every second. To run both synthetic loggers:
 ```
 $ make up
-../../cluster/kubectl.sh create -f synthetic_0_25lps.yaml
+../../cluster/kubectl.sh create -f synthetic_0_25lps.yaml --namespace=kube-system
 pods/synthetic-logger-0.25lps-pod
-../../cluster/kubectl.sh create -f synthetic_10lps.yaml
+../../cluster/kubectl.sh create -f synthetic_10lps.yaml --namespace=kube-system
 pods/synthetic-logger-10lps-pod
 ```
 
@@ -49,50 +52,59 @@ Visiting the Kibana dashboard should make it clear that logs are being collected
 You can report the running pods, [replication controllers](../../docs/replication-controller.md), and [services](../../docs/services.md) with another Makefile rule:
 ```
 $ make get
-../../cluster/kubectl.sh get pods
+../../cluster/kubectl.sh get pods --namespace=kube-system
 NAME                                           READY     STATUS    RESTARTS   AGE
-elasticsearch-logging-v1-gzknt                 1/1       Running   0          11m
-elasticsearch-logging-v1-swgzc                 1/1       Running   0          11m
-fluentd-elasticsearch-kubernetes-minion-1rtv   1/1       Running   0          11m
-fluentd-elasticsearch-kubernetes-minion-6bob   1/1       Running   0          10m
-fluentd-elasticsearch-kubernetes-minion-98g3   1/1       Running   0          10m
-fluentd-elasticsearch-kubernetes-minion-qduc   1/1       Running   0          10m
-kibana-logging-v1-1w44h                        1/1       Running   0          11m
-kube-dns-v3-i8u9s                              3/3       Running   0          11m
-monitoring-heapster-v1-mles8                   0/1       Running   11         11m
-synthetic-logger-0.25lps-pod                   1/1       Running   0          42s
-synthetic-logger-10lps-pod                     1/1       Running   0          41s
-../../cluster/kubectl.sh get replicationControllers
-CONTROLLER                 CONTAINER(S)            IMAGE(S)                                         SELECTOR                                   REPLICAS
-elasticsearch-logging-v1   elasticsearch-logging   gcr.io/google_containers/elasticsearch:1.4       k8s-app=elasticsearch-logging,version=v1   2
-kibana-logging-v1          kibana-logging          gcr.io/google_containers/kibana:1.3              k8s-app=kibana-logging,version=v1          1
-kube-dns-v3                etcd                    gcr.io/google_containers/etcd:2.0.9              k8s-app=kube-dns,version=v3                1
-                           kube2sky                gcr.io/google_containers/kube2sky:1.9                                                       
-                           skydns                  gcr.io/google_containers/skydns:2015-03-11-001                                              
-monitoring-heapster-v1     heapster                gcr.io/google_containers/heapster:v0.13.0        k8s-app=heapster,version=v1                1
-../../cluster/kubectl.sh get services
+elasticsearch-logging-v1-5igxm                 1/1       Running   0          9m
+elasticsearch-logging-v1-uacpm                 1/1       Running   0          9m
+fluentd-elasticsearch-kubernetes-minion-evev   1/1       Running   0          8m
+fluentd-elasticsearch-kubernetes-minion-m30y   1/1       Running   0          8m
+fluentd-elasticsearch-kubernetes-minion-oizg   1/1       Running   0          8m
+fluentd-elasticsearch-kubernetes-minion-r4s0   1/1       Running   0          8m
+kibana-logging-v1-g91gn                        1/1       Running   0          9m
+kube-dns-v5-h4pt4                              3/3       Running   0          9m
+kube-ui-v1-rf5q2                               1/1       Running   0          9m
+monitoring-heapster-v5-8zecd                   1/1       Running   2          9m
+monitoring-influx-grafana-v1-8r8ej             2/2       Running   0          9m
+synthetic-logger-0.25lps-pod                   1/1       Running   0          3m
+synthetic-logger-10lps-pod                     1/1       Running   0          3m
+../../cluster/kubectl.sh get replicationControllers --namespace=kube-system
+CONTROLLER                     CONTAINER(S)            IMAGE(S)                                          SELECTOR                                   REPLICAS
+elasticsearch-logging-v1       elasticsearch-logging   gcr.io/google_containers/elasticsearch:1.7        k8s-app=elasticsearch-logging,version=v1   2
+kibana-logging-v1              kibana-logging          gcr.io/google_containers/kibana:1.3               k8s-app=kibana-logging,version=v1          1
+kube-dns-v5                    etcd                    gcr.io/google_containers/etcd:2.0.9               k8s-app=kube-dns,version=v5                1
+                               kube2sky                gcr.io/google_containers/kube2sky:1.11                                                       
+                               skydns                  gcr.io/google_containers/skydns:2015-03-11-001                                               
+kube-ui-v1                     kube-ui                 gcr.io/google_containers/kube-ui:v1               k8s-app=kube-ui,version=v1                 1
+monitoring-heapster-v5         heapster                gcr.io/google_containers/heapster:v0.15.0         k8s-app=heapster,version=v5                1
+monitoring-influx-grafana-v1   influxdb                gcr.io/google_containers/heapster_influxdb:v0.3   k8s-app=influxGrafana,version=v1           1
+                               grafana                 gcr.io/google_containers/heapster_grafana:v0.7                                               
+../../cluster/kubectl.sh get services --namespace=kube-system
 NAME                    LABELS                                                                                              SELECTOR                        IP(S)          PORT(S)
-elasticsearch-logging   k8s-app=elasticsearch-logging,kubernetes.io/cluster-service=true,kubernetes.io/name=Elasticsearch   k8s-app=elasticsearch-logging   10.0.145.125   9200/TCP
-kibana-logging          k8s-app=kibana-logging,kubernetes.io/cluster-service=true,kubernetes.io/name=Kibana                 k8s-app=kibana-logging          10.0.189.192   5601/TCP
+elasticsearch-logging   k8s-app=elasticsearch-logging,kubernetes.io/cluster-service=true,kubernetes.io/name=Elasticsearch   k8s-app=elasticsearch-logging   10.0.8.247     9200/TCP
+kibana-logging          k8s-app=kibana-logging,kubernetes.io/cluster-service=true,kubernetes.io/name=Kibana                 k8s-app=kibana-logging          10.0.150.159   5601/TCP
 kube-dns                k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS                      k8s-app=kube-dns                10.0.0.10      53/UDP
                                                                                                                                                                            53/TCP
-kubernetes              component=apiserver,provider=kubernetes                                                             <none>                          10.0.0.1       443/TCP
+kube-ui                 k8s-app=kube-ui,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeUI                        k8s-app=kube-ui                 10.0.230.177   80/TCP
+monitoring-grafana      kubernetes.io/cluster-service=true,kubernetes.io/name=Grafana                                       k8s-app=influxGrafana           10.0.47.83     80/TCP
+monitoring-heapster     kubernetes.io/cluster-service=true,kubernetes.io/name=Heapster                                      k8s-app=heapster                10.0.210.133   80/TCP
+monitoring-influxdb     kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                                      k8s-app=influxGrafana           10.0.152.249   8083/TCP
+                                                                                                                                                                           8086/TCP
 ```
 
 The `net` rule in the Makefile will report information about the Elasticsearch and Kibana services including the public IP addresses of each service.
 ```
 $ make net
-../../cluster/kubectl.sh get services elasticsearch-logging -o json
+../../cluster/kubectl.sh get services elasticsearch-logging --namespace=kube-system -o json
 {
     "kind": "Service",
     "apiVersion": "v1",
     "metadata": {
         "name": "elasticsearch-logging",
-        "namespace": "default",
-        "selfLink": "/api/v1/namespaces/default/services/elasticsearch-logging",
-        "uid": "e056e116-0fb4-11e5-9243-42010af0d13a",
-        "resourceVersion": "23",
-        "creationTimestamp": "2015-06-10T21:08:43Z",
+        "namespace": "kube-system",
+        "selfLink": "/api/v1/namespaces/kube-system/services/elasticsearch-logging",
+        "uid": "71dbab22-24fe-11e5-a410-42010af0019e",
+        "resourceVersion": "82",
+        "creationTimestamp": "2015-07-07T23:18:10Z",
         "labels": {
             "k8s-app": "elasticsearch-logging",
             "kubernetes.io/cluster-service": "true",
@@ -104,14 +116,14 @@ $ make net
             {
                 "protocol": "TCP",
                 "port": 9200,
-                "targetPort": "es-port",
+                "targetPort": "db",
                 "nodePort": 0
             }
         ],
         "selector": {
             "k8s-app": "elasticsearch-logging"
         },
-        "clusterIP": "10.0.145.125",
+        "clusterIP": "10.0.8.247",
         "type": "ClusterIP",
         "sessionAffinity": "None"
     },
@@ -119,17 +131,17 @@ $ make net
         "loadBalancer": {}
     }
 }
-../../cluster/kubectl.sh get services kibana-logging -o json
+../../cluster/kubectl.sh get services kibana-logging --namespace=kube-system -o json
 {
     "kind": "Service",
     "apiVersion": "v1",
     "metadata": {
         "name": "kibana-logging",
-        "namespace": "default",
-        "selfLink": "/api/v1/namespaces/default/services/kibana-logging",
-        "uid": "e05c7dae-0fb4-11e5-9243-42010af0d13a",
-        "resourceVersion": "30",
-        "creationTimestamp": "2015-06-10T21:08:43Z",
+        "namespace": "kube-system",
+        "selfLink": "/api/v1/namespaces/kube-system/services/kibana-logging",
+        "uid": "71e163e9-24fe-11e5-a410-42010af0019e",
+        "resourceVersion": "101",
+        "creationTimestamp": "2015-07-07T23:18:10Z",
         "labels": {
             "k8s-app": "kibana-logging",
             "kubernetes.io/cluster-service": "true",
@@ -141,14 +153,14 @@ $ make net
             {
                 "protocol": "TCP",
                 "port": 5601,
-                "targetPort": "kibana-port",
+                "targetPort": "ui",
                 "nodePort": 0
             }
         ],
         "selector": {
             "k8s-app": "kibana-logging"
         },
-        "clusterIP": "10.0.189.192",
+        "clusterIP": "10.0.150.159",
         "type": "ClusterIP",
         "sessionAffinity": "None"
     },
