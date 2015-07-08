@@ -51,7 +51,7 @@ Definition of columns:
   - **Networking** is what implements the [networking model](../../docs/networking.md).  Those with networking type
     _none_ may not support more than one node, or may support multiple VM nodes only in the same physical node.
   - **Conformance** indicates whether a cluster created with this configuration has passed the project's conformance
-    tests. 
+    tests for supporting the API and base features of Kubernetes v1.0.0. 
   - Support Levels
     - **Project**:  Kubernetes Committers regularly use this configuration, so it usually works with the latest release
       of Kubernetes.
