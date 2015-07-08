@@ -255,38 +255,6 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
             bucket="${varr[0]}"
             githash="${varr[1]}"
             echo "$bucket / $githash"
-        elif [[ ${JENKINS_USE_SERVER_VERSION:-} =~ ^[yY]$ ]]; then
-            # For GKE, we can get the server-specified version.
-            # We'll pull our TARs for tests from the release bucket.
-            bucket="release"
-
-            # Get the latest available API version from the GKE apiserver.
-            # Trim whitespace out of the error message. This gives us something
-            # like: ERROR:(gcloud.alpha.container.clusters.create)ResponseError:
-            #       code=400,message=cluster.cluster_api_versionmustbeoneof:
-            #       0.15.0,0.16.0.
-            # The command should error, so we throw an || true on there.
-            create_args=(
-              "this-wont-work"
-              "--zone=us-central1-f"
-            )
-            if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
-              create_args+=("--cluster-version=0.0.0")
-            else
-              create_args+=("--cluster-api-version=0.0.0")
-            fi
-            msg=$(gcloud ${CMD_GROUP:-alpha} container clusters create "${create_args[@]}" 2>&1 \
-                | tr -d '[[:space:]]') || true
-            # Strip out everything before the final colon, which gives us just
-            # the allowed versions; something like "0.15.0,0.16.0." or "0.16.0."
-            msg=${msg##*:}
-            # Take off the final period, which gives us just comma-separated
-            # allowed versions; something like "0.15.0,0.16.0" or "0.16.0"
-            msg=${msg%%\.}
-            # Split the version string by comma and read into an array, using
-            # the last element as the githash, which will be like "v0.16.0".
-            IFS=',' read -a varr <<< "${msg}"
-            githash="v${varr[${#varr[@]} - 1]}"
         else
             # The "ci" bucket is for builds like "v0.15.0-468-gfa648c1"
             bucket="ci"
