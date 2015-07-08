@@ -45,7 +45,7 @@ $ kubectl port-forward -p mypod 0:5000`
 
 func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "port-forward -p POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
+		Use:     "port-forward -p POD_NAME [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		Short:   "Forward one or more local ports to a pod.",
 		Long:    "Forward one or more local ports to a pod.",
 		Example: portforward_example,
@@ -77,7 +77,7 @@ func (*defaultPortForwarder) ForwardPorts(req *client.Request, config *client.Co
 func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw portForwarder) error {
 	podName := cmdutil.GetFlagString(cmd, "pod")
 	if len(podName) == 0 {
-		return cmdutil.UsageError(cmd, "POD is required for exec")
+		return cmdutil.UsageError(cmd, "POD_NAME is required for port-forward")
 	}
 	if len(args) < 1 {
 		return cmdutil.UsageError(cmd, "at least 1 PORT is required for port-forward")
