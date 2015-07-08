@@ -1149,125 +1149,24 @@
 .swagger-section .api-popup-actions {
   padding-top: 10px;
 }
-.swagger-section .access {
-  float: right;
-}
-.swagger-section .auth {
-  float: right;
-}
-.swagger-section #api_information_panel {
-  position: absolute;
-  background: #FFF;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+#header {
   display: none;
-  font-size: 13px;
-  max-width: 300px;
-  line-height: 30px;
-  color: black;
-  padding: 5px;
 }
-.swagger-section #api_information_panel p .api-msg-enabled {
-  color: green;
+.swagger-section .swagger-ui-wrap .model-signature pre {
+  max-height: none;
 }
-.swagger-section #api_information_panel p .api-msg-disabled {
-  color: red;
+.swagger-section .swagger-ui-wrap .body-textarea {
+  width: 100px;
 }
-.swagger-section .api-ic {
-  height: 18px;
-  vertical-align: middle;
-  display: inline-block;
-  background: url(../images/explorer_icons.png) no-repeat;
+.swagger-section .swagger-ui-wrap input.parameter {
+  width: 100px;
 }
-.swagger-section .ic-info {
-  background-position: 0 0;
-  width: 18px;
-  margin-top: -7px;
-  margin-left: 4px;
+.swagger-section .swagger-ui-wrap ul#resources li.resource div.heading ul.options {
+  display: none;
 }
-.swagger-section .ic-warning {
-  background-position: -60px 0;
-  width: 18px;
-  margin-top: -7px;
-  margin-left: 4px;
+.swagger-section .swagger-ui-wrap ul#resources li.resource ul.endpoints {
+  display: block !important;
 }
-.swagger-section .ic-error {
-  background-position: -30px 0;
-  width: 18px;
-  margin-top: -7px;
-  margin-left: 4px;
-}
-.swagger-section .ic-off {
-  background-position: -90px 0;
-  width: 58px;
-  margin-top: -4px;
-  cursor: pointer;
-}
-.swagger-section .ic-on {
-  background-position: -160px 0;
-  width: 58px;
-  margin-top: -4px;
-  cursor: pointer;
-}
-.swagger-section #header {
-  background-color: #89bf04;
-  padding: 14px;
-}
-.swagger-section #header a#logo {
-  font-size: 1.5em;
-  font-weight: bold;
-  text-decoration: none;
-  background: transparent url(../images/logo_small.png) no-repeat left center;
-  padding: 20px 0 20px 40px;
-  color: white;
-}
-.swagger-section #header form#api_selector {
-  display: block;
-  clear: none;
-  float: right;
-}
-.swagger-section #header form#api_selector .input {
-  display: block;
-  clear: none;
-  float: left;
-  margin: 0 10px 0 0;
-}
-.swagger-section #header form#api_selector .input input#input_apiKey {
-  width: 200px;
-}
-.swagger-section #header form#api_selector .input input#input_baseUrl {
-  width: 400px;
-}
-.swagger-section #header form#api_selector .input a#explore {
-  display: block;
-  text-decoration: none;
-  font-weight: bold;
-  padding: 6px 8px;
-  font-size: 0.9em;
-  color: white;
-  background-color: #547f00;
-  -moz-border-radius: 4px;
-  -webkit-border-radius: 4px;
-  -o-border-radius: 4px;
-  -ms-border-radius: 4px;
-  -khtml-border-radius: 4px;
-  border-radius: 4px;
-}
-.swagger-section #header form#api_selector .input a#explore:hover {
-  background-color: #547f00;
-}
-.swagger-section #header form#api_selector .input input {
-  font-size: 0.9em;
-  padding: 3px;
-  margin: 0;
-}
-.swagger-section #content_message {
-  margin: 10px 15px;
-  font-style: italic;
-  color: #999999;
-}
-.swagger-section #message-bar {
-  min-height: 30px;
-  text-align: center;
-  padding-top: 10px;
+.swagger-section .swagger-ui-wrap ul#resources li.resource ul.endpoints li.endpoint ul.operations li.operation div.content {
+  display: block !important;
 }
