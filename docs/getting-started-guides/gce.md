@@ -120,8 +120,8 @@ kube-system   kube-ui               k8s-app=kube-ui,kubernetes.io/cluster-servic
 kube-system   monitoring-grafana    kubernetes.io/cluster-service=true,kubernetes.io/name=Grafana                    k8s-app=influxGrafana   10.0.41.246    80/TCP
 kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernetes.io/name=Heapster                   k8s-app=heapster        10.0.59.48     80/TCP
 kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
-                                                                                                                                                            8086/TCP```
-
+                                                                                                                                                            8086/TCP
+```
 Similarly, you can take a look at the set of [pods](../pods.md) that were created during cluster startup.
 You can do this via the
 
