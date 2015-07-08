@@ -228,7 +228,8 @@ function wait_for_service_up() {
   local i
   local found_pods
   echo "waiting for $1 at $2:$3"
-  for i in $(seq 1 5); do
+  # TODO: Reduce this interval once we have a sense for the latency distribution.
+  for i in $(seq 1 10); do
     results=($(ssh-to-node "${test_node}" "
         set -e;
         for i in $(seq -s' ' 1 $(($4*3))); do
@@ -237,12 +238,12 @@ function wait_for_service_up() {
         done | sort -n | uniq
         "))
 
-    found_pods=$(sort_args "${results[@]:+${results[@]}}")
+    found_pods=$(sort_args "${results[@]}")
     if [[ "${found_pods}" == "$5" ]]; then
       return
     fi
     echo "expected '$5', got '${found_pods}': will try again"
-    sleep 3  # wait for endpoints to propagate
+    sleep 5  # wait for endpoints to propagate
   done
   error "$1: failed to verify portal from host"
 }
@@ -269,33 +270,29 @@ function wait_for_service_down() {
 #   $4: pod count
 #   $5: pod IDs (sorted)
 function verify_from_container() {
+  local i
+  local found_pods
   echo "waiting for $1 at $2:$3"
   # TODO: Reduce this interval once we have a sense for the latency distribution.
-  for x in {0..9}; do
+  for i in $(seq 1 10); do
     results=($(ssh-to-node "${test_node}" "
         set -e;
         sudo docker pull gcr.io/google_containers/busybox >/dev/null;
         sudo docker run gcr.io/google_containers/busybox sh -c '
             for i in $(seq -s' ' 1 $(($4*3))); do
-              if wget -q -T 3 -O - http://$2:$3; then
-                echo
-              else
-                exit 1
-              fi
+              wget -q -T 1 -O - http://$2:$3;
+              echo;
             done
-        '" | sort -r -n | uniq)) \
-        || error "testing $1 VIP from container failed"
+        '" | sort -n | uniq))
+
     found_pods=$(sort_args "${results[@]}")
     if [[ "${found_pods}" == "$5" ]]; then
-      break
+      return
     fi
-    echo "waiting for services iteration $x"
-    sleep 5
+    echo "expected '$5', got '${found_pods}': will try again"
+    sleep 5  # wait for endpoints to propagate
   done
-  if [[ "${found_pods}" != "$5" ]]; then
-    echo "expected '$5', got '${found_pods}'"
-    error "$1: failed to verify VIP from container"
-  fi
+  error "$1: failed to verify portal from host"
 }
 
 trap do_teardown EXIT
