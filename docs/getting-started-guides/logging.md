@@ -6,7 +6,7 @@ Cluster level logging for Kubernetes allows us to collect logs which persist bey
 
 ```
 $ kubectl get pods
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                           READY     STATUS    RESTARTS   AGE
 fluentd-cloud-logging-kubernetes-minion-0f64   1/1       Running   0          32m
 fluentd-cloud-logging-kubernetes-minion-27gf   1/1       Running   0          32m
 fluentd-cloud-logging-kubernetes-minion-pk22   1/1       Running   0          31m
@@ -45,7 +45,7 @@ This pod specification has one container which runs a bash script when the conta
 We can observe the running pod:
 ```
 $ kubectl get pods
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                           READY     STATUS    RESTARTS   AGE
 counter                                        1/1       Running   0          5m
 fluentd-cloud-logging-kubernetes-minion-0f64   1/1       Running   0          55m
 fluentd-cloud-logging-kubernetes-minion-27gf   1/1       Running   0          55m

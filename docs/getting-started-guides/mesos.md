@@ -137,7 +137,7 @@ Interact with the kubernetes-mesos framework via `kubectl`:
 
 ```bash
 $ kubectl get pods
-NAME      READY     REASON    RESTARTS   AGE
+NAME      READY     STATUS    RESTARTS   AGE
 ```
 
 ```bash
@@ -183,7 +183,7 @@ We can use the `kubectl` interface to monitor the status of our pod:
 
 ```bash
 $ kubectl get pods
-NAME      READY     REASON    RESTARTS   AGE
+NAME      READY     STATUS    RESTARTS   AGE
 nginx     1/1       Running   0          14s
 ```
 
