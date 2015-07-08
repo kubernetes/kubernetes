@@ -76,7 +76,8 @@ Example\
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TEST_REGEX="\
-Elasticsearch\
+Docker\sContainers.*docker\
+|Elasticsearch\
 |Shell.*services\
 |MaxPods.*\
 "
@@ -93,6 +94,7 @@ ${GCE_DEFAULT_SKIP_TEST_REGEX}\
 # TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
 GCE_PARALLEL_FLAKY_TEST_REGEX="\
 Addon\
+|Docker\sContainers.*docker\
 |Elasticsearch\
 |Hostdir.*MOD\
 |Networking.*intra|PD\
