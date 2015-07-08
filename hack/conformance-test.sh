@@ -96,16 +96,17 @@ echo "Conformance test checking conformance with Kubernetes version 1.0"
 #  Restart: node management.
 #  Scale: performance
 #  Services.*load balancer: not all cloud providers have a load balancer.
-#  Services.*NodePort: flaky
-#  Services.*nodeport: flaky
+#  Services.*NodePort: requires you to open the firewall yourself, so not covered.
+#  Services.*nodeport: requires you to open the firewall yourself, so not covered.
 #  Shell: replies on optional ssh access to nodes.
 #  SSH: optional feature.
-#  Volumes.*: contained only skipped tests.
+#  Addon\supdate: requires SSH
+#  Volumes: contained only skipped tests.
 #  Clean\sup\spods\son\snode: performance
 #  MaxPods\slimit\snumber\sof\spods: not sure why this wasn't working on GCE but it wasn't.
 #  Kubectl\sclient\sSimple\spod: not sure why this wasn't working on GCE but it wasn't
 #  DNS: not sure why this wasn't working on GCE but it wasn't
-export CONFORMANCE_TEST_SKIP_REGEX="Cadvisor|MasterCerts|Density|Cluster\slevel\slogging|Etcd\sfailure|Load\sCapacity|Monitoring|Namespaces.*seconds|Pod\sdisks|Reboot|Restart|Nodes|Scale|Services.*load\sbalancer|Services.*NodePort|Services.*nodeport|Shell|SSH|Volumes|Clean\sup\spods\son\snode|Skipped|skipped|MaxPods\slimit\snumber\sof\spods|Kubectl\sclient\sSimple\spod|DNS"
+export CONFORMANCE_TEST_SKIP_REGEX="Cadvisor|MasterCerts|Density|Cluster\slevel\slogging|Etcd\sfailure|Load\sCapacity|Monitoring|Namespaces.*seconds|Pod\sdisks|Reboot|Restart|Nodes|Scale|Services.*load\sbalancer|Services.*NodePort|Services.*nodeport|Shell|SSH|Addon\supdate|Volumes|Clean\sup\spods\son\snode|Skipped|skipped|MaxPods\slimit\snumber\sof\spods|Kubectl\sclient\sSimple\spod|DNS"
 
 declare -x KUBERNETES_CONFORMANCE_TEST="y"
 declare -x NUM_MINIONS=4
