@@ -64,7 +64,7 @@ And we added a reference to that volume to our container:
 
 In Kubernetes, ```emptyDir``` Volumes live for the lifespan of the Pod, which is longer than the lifespan of any one container, so if the container fails and is restarted, our persistent storage will live on.
 
-If you want to mount a directory that already exists in the file system (e.g. ```/var/logs```) you can use the ```hostDir``` directive.
+If you want to mount a directory that already exists in the file system (e.g. ```/var/logs```) you can use the ```hostPath``` directive.
 
 See [volumes](../../docs/volumes.md) for more details.
 
