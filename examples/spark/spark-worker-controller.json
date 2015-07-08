@@ -23,7 +23,7 @@
         "containers": [
           {
             "name": "spark-worker",
-            "image": "mattf/spark-worker",
+            "image": "gcr.io/google_containers/spark-worker",
             "ports": [
               {
                 "hostPort": 8888,
