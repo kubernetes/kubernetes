@@ -220,6 +220,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/celery-rabbitmq": {
 			"celery-controller":   &api.ReplicationController{},
 			"flower-controller":   &api.ReplicationController{},
+			"flower-service":      &api.Service{},
 			"rabbitmq-controller": &api.ReplicationController{},
 			"rabbitmq-service":    &api.Service{},
 		},

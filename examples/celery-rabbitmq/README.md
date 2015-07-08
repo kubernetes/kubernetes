@@ -172,7 +172,33 @@ The question now is, how do you see what's going on?
 
 Flower is a web-based tool for monitoring and administrating Celery clusters. By connecting to the node that contains Celery, you can see the behaviour of all the workers and their tasks in real-time.
 
-To bring up the frontend, run this command `$ kubectl create -f examples/celery-rabbitmq/flower-controller.yaml`. This controller is defined as so:
+First, start the flower service with `$ kubectl create -f examples/celery-rabbitmq/flower-service.yaml`. The service is defined as below:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: flower
+  name: flower-service
+spec:
+  ports:
+  - port: 5555
+  selector:
+    app: taskQueue
+    component: flower
+  type: LoadBalancer
+```
+
+It is marked as external (LoadBalanced). However on many platforms you will have to add an explicit firewall rule to open port 5555.
+On GCE this can be done with:
+
+```
+ $ gcloud compute firewall-rules create --allow=tcp:5555 --target-tags=kubernetes-minion kubernetes-minion-5555
+```
+Please remember to delete the rule after you are done with the example (on GCE: `$ gcloud compute firewall-rules delete kubernetes-minion-5555`)
+ 
+To bring up the pods, run this command `$ kubectl create -f examples/celery-rabbitmq/flower-controller.yaml`. This controller is defined as so:
 
 ```yaml
 apiVersion: v1
@@ -213,17 +239,22 @@ Again, it uses the Kubernetes-provided environment variable to obtain the addres
 Once all pods are up and running, running `kubectl get pods` will display something like this:
 
 ```
-POD                         IP                  CONTAINER(S)        IMAGE(S)                           HOST                    LABELS                                                STATUS
-celery-controller-h3x9k     10.246.1.11         celery              endocode/celery-app-add            10.245.1.3/10.245.1.3   app=taskQueue,name=celery                             Running
-flower-controller-cegta     10.246.2.17         flower              endocode/flower                    10.245.1.4/10.245.1.4   app=taskQueue,name=flower                             Running
-kube-dns-fplln              10.246.1.3          etcd                quay.io/coreos/etcd:latest         10.245.1.3/10.245.1.3   k8s-app=kube-dns,kubernetes.io/cluster-service=true   Running
-                                                kube2sky            kubernetes/kube2sky:1.0                                                                                          
-                                                skydns              kubernetes/skydns:2014-12-23-001                                                                                 
-rabbitmq-controller-pjzb3   10.246.2.16         rabbitmq            library/rabbitmq                   10.245.1.4/10.245.1.4   app=taskQueue,name=rabbitmq                           Running
-
+NAME                                           READY     REASON       RESTARTS   AGE
+celery-controller-wqkz1                        1/1       Running      0          8m
+flower-controller-7bglc                        1/1       Running      0          7m
+rabbitmq-controller-5eb2l                      1/1       Running      0          13m
 ```
 
-Now you know on which host Flower is running (in this case, 10.245.1.4), you can open your browser and enter the address (e.g. `http://10.245.1.4:5555`. If you click on the tab called "Tasks", you should see an ever-growing list of tasks called "celery_conf.add" which the run\_tasks.py script is dispatching.
+`kubectl get service flower-service` will help you to get the external IP addresses of the flower service.
+
+```
+NAME             LABELS        SELECTOR                         IP(S)            PORT(S)
+flower-service   name=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
+                                                                162.222.181.180
+```
+
+Point your internet browser to the appropriate flower-service address, port 5555 (in our case http://162.222.181.180:5555).
+If you click on the tab called "Tasks", you should see an ever-growing list of tasks called "celery_conf.add" which the run\_tasks.py script is dispatching.
 
 
 
