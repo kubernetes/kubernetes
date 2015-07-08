@@ -484,7 +484,7 @@ To run the apiserver:
 
 Here are some apiserver flags you may need to set:
   - `--cloud-provider=`
-  - `--cloud-config=` if cloud provider requires a config file (GCE, AWS). If so, need to put config file into apiserver image or mount through hostDir.
+  - `--cloud-config=` if cloud provider requires a config file (GCE, AWS). If so, need to put config file into apiserver image or mount through hostPath.
   - `--address=${MASTER_IP}`.  
    - or `--bind-address=127.0.0.1` and `--address=127.0.0.1` if you want to run a proxy on the master node.
   - `--cluster-name=$CLUSTER_NAME`

@@ -54,7 +54,7 @@ Automated process users fall into the following categories:
   * are less focused on application security. Focused on operating system security.
   * protect the node from bad actors in containers, and properly-configured innocent containers from bad actors in other containers.
   * comfortable reasoning about the security properties of a system at the level of detail of Linux Capabilities, SELinux, AppArmor, etc.
-  * decides who can use which Linux Capabilities, run privileged containers, use hostDir, etc.
+  * decides who can use which Linux Capabilities, run privileged containers, use hostPath, etc.
     * e.g. a team that manages Ceph or a mysql server might be trusted to have raw access to storage devices in some organizations, but teams that develop the applications at higher layers would not.
 
 
