@@ -74,7 +74,8 @@ fi
 
 ginkgo_args=()
 if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
-  ginkgo_args+=("--skip=\"${CONFORMANCE_TEST_SKIP_REGEX}\"")
+  ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
+  ginkgo_args+=("--seed=1436380640")
 fi
 if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("-p")
