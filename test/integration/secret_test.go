@@ -66,6 +66,7 @@ func TestSecrets(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
+		EnableV1Beta3:         true,
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
