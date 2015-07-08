@@ -156,7 +156,7 @@ done
 * Check to make sure the cluster can see the minion (on centos-master)
 
 ```
-kubectl get minions
+kubectl get nodes
 NAME                   LABELS            STATUS
 centos-minion          <none>            Ready
 ```
