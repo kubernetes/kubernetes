@@ -82,3 +82,9 @@ DNS_REPLICAS=1
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
 #RUNTIME_CONFIG=""
 RUNTIME_CONFIG="api/v1"
+
+# Determine extra certificate names for master
+octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
+((octets[3]+=1))
+service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
+MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
