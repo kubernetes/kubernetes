@@ -91,14 +91,13 @@ kubectl get pods --watch
 
 Eventually you should see:
 ```
-POD                            IP             CONTAINER(S)    IMAGE(S)                                 HOST                  LABELS                                       STATUS
-frontend-controller-0133o      10.2.1.14      php-redis       kubernetes/example-guestbook-php-redis   kube-01/172.18.0.13   name=frontend,uses=redisslave,redis-master   Running
-frontend-controller-ls6k1      10.2.3.10      php-redis       kubernetes/example-guestbook-php-redis   <unassigned>          name=frontend,uses=redisslave,redis-master   Running
-frontend-controller-oh43e      10.2.2.15      php-redis       kubernetes/example-guestbook-php-redis   kube-02/172.18.0.14   name=frontend,uses=redisslave,redis-master   Running
-redis-master                   10.2.1.3       master          redis                                    kube-01/172.18.0.13   name=redis-master                            Running
-redis-slave-controller-fplln   10.2.2.3       slave           brendanburns/redis-slave                 kube-02/172.18.0.14   name=redisslave,uses=redis-master            Running
-redis-slave-controller-gziey   10.2.1.4       slave           brendanburns/redis-slave                 kube-01/172.18.0.13   name=redisslave,uses=redis-master            Running
-
+NAME                 READY     STATUS    RESTARTS   AGE
+frontend-8anh8       1/1       Running   0          1m
+frontend-8pq5r       1/1       Running   0          1m
+frontend-v7tbq       1/1       Running   0          1m
+redis-master-u0my3   1/1       Running   0          1m
+redis-slave-4eznf    1/1       Running   0          1m
+redis-slave-hf40f    1/1       Running   0          1m
 ```
 
 ## Scaling
@@ -170,11 +169,11 @@ You now will have more instances of front-end Guestbook apps and Redis slaves; a
 
 ```
 core@kube-00 ~/guestbook-example $ kubectl get pods -l name=frontend
-POD                         IP         CONTAINER(S)  IMAGE(S)                                 HOST                  LABELS                                       STATUS
-frontend-controller-0133o   10.2.1.19  php-redis     kubernetes/example-guestbook-php-redis   kube-01/172.18.0.13   name=frontend,uses=redisslave,redis-master   Running
-frontend-controller-i7hvs   10.2.4.5   php-redis     kubernetes/example-guestbook-php-redis   kube-04/172.18.0.21   name=frontend,uses=redisslave,redis-master   Running
-frontend-controller-ls6k1   10.2.3.18  php-redis     kubernetes/example-guestbook-php-redis   kube-03/172.18.0.20   name=frontend,uses=redisslave,redis-master   Running
-frontend-controller-oh43e   10.2.2.22  php-redis     kubernetes/example-guestbook-php-redis   kube-02/172.18.0.14   name=frontend,uses=redisslave,redis-master   Running
+NAME             READY     STATUS    RESTARTS   AGE
+frontend-8anh8   1/1       Running   0          3m
+frontend-8pq5r   1/1       Running   0          3m
+frontend-oz8uo   1/1       Running   0          51s
+frontend-v7tbq   1/1       Running   0          3m
 ```
 
 ## Exposing the app to the outside world

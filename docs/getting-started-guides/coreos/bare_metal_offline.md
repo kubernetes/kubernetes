@@ -32,7 +32,7 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 3. Update the DHCP config to reflect the host needing deployment
 4. Setup nodes to deploy CoreOS creating a etcd cluster. 
 5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/). 
-6. Installing the CoreOS slaves to become Kubernetes minions.
+6. Installing the CoreOS slaves to become Kubernetes nodes.
 
 ## This Guides variables
 | Node Description              | MAC               | IP          |
@@ -649,7 +649,7 @@ Check system status of services on a minion node:
 List Kubernetes
 
     kubectl get pods
-    kubectl get minions
+    kubectl get nodes
 
 
 Kill all pods:

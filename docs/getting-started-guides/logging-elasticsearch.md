@@ -41,7 +41,7 @@ viewer should be running soon after the cluster comes to life.
 
 ```
 $ kubectl get pods
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                           READY     STATUS    RESTARTS   AGE
 elasticsearch-logging-v1-78nog                 1/1       Running   0          2h
 elasticsearch-logging-v1-nj2nb                 1/1       Running   0          2h
 fluentd-elasticsearch-kubernetes-minion-5oq0   1/1       Running   0          2h
