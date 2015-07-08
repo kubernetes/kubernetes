@@ -111,15 +111,6 @@ disks. Create the MongoDB disk by running:
 gcloud compute disks create --size=200GB mongo-disk
 ```
 
-You also need to format the disk before you can use it:
-> Note: This uses the `kubernetes-master` machine. Any node in the cluster could be used instead.
-
-```
-gcloud compute instances attach-disk --disk=mongo-disk --device-name temp-data kubernetes-master
-gcloud compute ssh kubernetes-master --command "sudo mkdir /mnt/tmp && sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
-gcloud compute instances detach-disk --disk mongo-disk kubernetes-master
-```
-
 Now you can start Mongo using that disk:
 ```
 kubectl create -f mongo-pod.json
