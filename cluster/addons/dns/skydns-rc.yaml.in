@@ -1,22 +1,22 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v6
+  name: kube-dns-v7
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v6
+    version: v7
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: {{ pillar['dns_replicas'] }}
   selector:
     k8s-app: kube-dns
-    version: v6
+    version: v7
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v6
+        version: v7
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
@@ -60,5 +60,24 @@ spec:
           protocol: UDP
         - containerPort: 53
           name: dns-tcp
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+      - name: healthz
+        image: gcr.io/google_containers/exechealthz:1.0
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+        args:
+        - -cmd=nslookup kubernetes.default.svc.{{ pillar['dns_domain'] }} localhost >/dev/null
+        - -port=8080
+        ports:
+        - containerPort: 8080
           protocol: TCP
       dnsPolicy: Default  # Don't use cluster DNS.
