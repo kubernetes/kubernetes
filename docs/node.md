@@ -39,6 +39,7 @@ scheduling Pods. For a node to be considered a scheduling candidate, it
 must have appropriate conditions, see below.
 
 ### Node Condition
+
 Node Condition describes the conditions of `Running` nodes. (However,
 it can be present also when node status is different, e.g. `Unknown`)
 Current valid condition is `Ready`. In the future, we plan to add more.
@@ -61,8 +62,9 @@ Describes the resources available on the node: CPUs, memory and the maximum
 number of pods that can be scheduled on this node.
 
 ### Node Info
+
 General information about the node, for instance kernel version, kubernetes version
-(kubelet version, kube-proxy version), docker version (if used), OS name. 
+(kubelet version, kube-proxy version), docker version (if used), OS name.
 The information is gathered by Kubernetes from the node.
 
 ## Node Management
@@ -105,14 +107,14 @@ and single node life-cycle management.
 
 Node controller has a sync loop that creates/deletes Nodes from Kubernetes
 based on all matching VM instances listed from cloud provider. The sync period
-can be controlled via flag `--node_sync_period`. If a new instance
+can be controlled via flag `--node-sync-period`. If a new instance
 gets created, Node Controller creates a representation for it. If an existing
 instance gets deleted, Node Controller deletes the representation. Note however,
 Node Controller is unable to provision the node for you, i.e. it won't install
 any binary; therefore, to
 join Kubernetes cluster, you as an admin need to make sure proper services are
 running in the node. In the future, we plan to automatically provision some node
-services. 
+services.
 
 ### Self-Registration of nodes
 
@@ -120,9 +122,9 @@ When kubelet flag `--register-node` is true (the default), then the kubelet will
 register itself with the API server.  This is the preferred pattern, used by most distros.
 
 For self-registration, the kubelet is started with the following options:
-  - `--apiservers=` tells the kubelet the location of the apiserver.
+  - `--api-servers=` tells the kubelet the location of the apiserver.
   - `--kubeconfig` tells kubelet where to find credentials to authenticate itself to the apiserver.
-  - `--cloud_provider=` tells the kubelet how to talk to a cloud provider to read metadata about itself.
+  - `--cloud-provider=` tells the kubelet how to talk to a cloud provider to read metadata about itself.
   - `--register-node` tells the kubelet to create its own node resource.
 
 Currently, any kubelet is authorized to create/modify any node resource, but in practice it only creates/modifies
