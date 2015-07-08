@@ -24,6 +24,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -35,6 +36,7 @@ import (
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type internalType struct {
@@ -291,8 +293,11 @@ func ExamplePrintPodWithWideFormat() {
 	}
 	nodeName := "kubernetes-minion-abcd"
 	cmd := NewCmdRun(f, os.Stdout)
-	ctrl := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "test1"},
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "test1",
+			CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
+		},
 		Spec: api.PodSpec{
 			Containers: make([]api.Container, 2),
 			NodeName:   nodeName,
@@ -305,13 +310,13 @@ func ExamplePrintPodWithWideFormat() {
 			},
 		},
 	}
-	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
 	// NAME      READY     STATUS     RESTARTS   AGE       NODE
-	// test1     1/2       podPhase   6          292y      kubernetes-minion-abcd
+	// test1     1/2       podPhase   6          10y       kubernetes-minion-abcd
 }
 
 func TestNormalizationFuncGlobalExistance(t *testing.T) {
