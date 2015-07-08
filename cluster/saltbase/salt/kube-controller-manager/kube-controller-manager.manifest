@@ -30,7 +30,7 @@
 
 {% set root_ca_file = "" -%}
 
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]    %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]    %}
    {% set root_ca_file = "--root_ca_file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
 
