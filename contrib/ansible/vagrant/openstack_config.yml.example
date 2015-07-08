@@ -1,0 +1,12 @@
+os_username: eparis
+os_password: password
+os_tenant: "RH US Business Group"
+os_auth_url: "http://os1-public.osop.rhcloud.com:5000/v2.0"
+os_region_name: "OS1Public"
+os_ssh_key_name: "eparis"
+os_flavor: "m1.small"
+os_image: "Fedora 22 Cloud Base x86_64 (final)"
+os_security_groups:
+  - "default"
+ #- some_other_group
+os_floating_ip_pool: "os1_public"

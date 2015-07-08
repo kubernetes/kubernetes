@@ -2,38 +2,46 @@
 
 This deployer sets up a vagrant cluster and installs kubernetes with flannel on it.
 
-The URI's in the Vagrantfile may need to be changed depending on the exact version of openstack which you have.
-
 ## Before you start !
 
-If running the openstack provider, then of course, you need to modify the key credentials and so on to match your particular openstack credentials.
-
-At the time of this writing (july 2 2015) no other providers are supported, but this recipe is pretty easy to port to virtualbox, kvm, and so on if you want.
+You will need a functioning vagrant provider. Currently supported are openstack.
 
 ## USAGE
 
-To use, first modify the Vagrantfile to reflect the machines you want.
+In general all that should be needed it to run
 
-This is easy: You just change the number of nodes.
+```
+vagrant up
+```
 
-Then, update the kubernetes ansible data structure to include more nodes if you want them.
+If you export an env variable such as
+```
+export NUM_MINIONS=4
+```
 
-## Provider
+The system will create that number of nodes. Default is 2.
 
-Now make sure to install openstack provider for vagrant.
+## Provider Specific Information
+Vagrant tries to be intelligent and pick the first provider supported by your installation. If you want to specify a provider you can do so by running vagrant like so:
+```
+vagrant up --provider=openstack
+```
 
-`vagrant plugin install vagrant-openstack-provider`
-
+### OpenStack
+Make sure to install the openstack provider for vagrant.
+```
+vagrant plugin install vagrant-openstack-provider --plugin-version ">= 0.6.1"
+```
 NOTE This is a more up-to-date provider than the similar  `vagrant-openstack-plugin`.
 
-# Now, vagrant up!
+Also note that current (required) versions of `vagrant-openstack-provider` are not compatible with ruby 2.2.
+https://github.com/ggiamarchi/vagrant-openstack-provider/pull/237
+So make sure you get at least version 0.6.1.
 
-Now lets run it.  Again, make sure you look at your openstack dashboard to see the URLs and security groups and tokens that you want.  In general, you want an open security group (i.e. for port 8080 and so on) and you want an SSH key that is named that you can use to ssh into all machines, and make sure you set those in the Vagrantfile correctly.  ESPECIALLY also make sure you set your tenant-name is right.
+To use the vagrant openstack provider you will need
+- Copy `openstack_config.yml.example` to `openstack_config.yml`
+- Edit `openstack_config.yml` to include your relevant details.
 
-`VAGRANT_LOG=info vagrant up --provision-with=shell ; vagrant provision provision-with=ansible` 
+For vagrant (1.7.2) does not seem to ever want to pick openstack as the provider. So you will need to tell it to use openstack explicitly.
 
-This will run a first pass provisioning, which sets up the raw machines, followed by a second pass,
-
-which sets up kuberentes, etcd, and so on.
-
-
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/ansible/vagrant/README.md?pixel)]()
