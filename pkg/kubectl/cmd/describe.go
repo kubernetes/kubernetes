@@ -31,22 +31,36 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "describe (RESOURCE NAME | RESOURCE/NAME)",
-		Short: "Show details of a specific resource",
-		Long: `Show details of a specific resource.
+const (
+	describe_long = `Show details of a specific resource or group of resources.
 
 This command joins many API calls together to form a detailed description of a
-given resource.`,
-		Example: `// Describe a node
+given resource or group of resources.
+
+$ kubectl describe RESOURCE NAME_PREFIX
+
+will first check for an exact match on RESOURCE and NAME_PREFIX. If no such resource
+exists, it will output details for every resource that has a name prefixed with NAME_PREFIX`
+	describe_example = `// Describe a node
 $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
 // Describe a pod
 $ kubectl describe pods/nginx
 
 // Describe pods by label name=myLabel
-$ kubectl describe po -l name=myLabel`,
+$ kubectl describe po -l name=myLabel
+
+// Describe all pods managed by the 'frontend' replication controller (rc-created pods
+// get the name of the rc as a prefix in the pod the name).
+$ kubectl describe pods frontend`
+)
+
+func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "describe (RESOURCE NAME_PREFIX | RESOURCE/NAME)",
+		Short:   "Show details of a specific resource or group of resources",
+		Long:    describe_long,
+		Example: describe_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunDescribe(f, out, cmd, args)
 			cmdutil.CheckErr(err)
