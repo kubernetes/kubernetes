@@ -238,16 +238,12 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 // evalUnion evaluates UnionNode
 func (j *JSONPath) evalUnion(input []reflect.Value, node *UnionNode) ([]reflect.Value, error) {
 	result := []reflect.Value{}
-	for _, value := range input {
-		unionValue := []interface{}{}
-		for _, listNode := range node.Nodes {
-			temp, err := j.evalList([]reflect.Value{value}, listNode)
-			if err != nil {
-				return input, err
-			}
-			unionValue = append(unionValue, temp[0].Interface())
+	for _, listNode := range node.Nodes {
+		temp, err := j.evalList(input, listNode)
+		if err != nil {
+			return input, err
 		}
-		result = append(result, reflect.ValueOf(unionValue))
+		result = append(result, temp...)
 	}
 	return result, nil
 }

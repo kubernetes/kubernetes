@@ -88,7 +88,7 @@ func TestStoreData(t *testing.T) {
 		{"recursive", "{..}", []int{1, 2, 3}, "[1, 2, 3]"},
 		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3"},
 		{"quote", `{"{"}`, nil, "{"},
-		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "[1, 3, 4]"},
+		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4"},
 		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},
 		{"variable", "hello {.Name}", storeData, "hello jsonpath"},
 		{"dict/", "{.Labels.web/html}", storeData, "15"},
@@ -174,8 +174,10 @@ func TestKubenates(t *testing.T) {
 		{"two range", "{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}", nodesData,
 			`127.0.0.1, 127.0.0.2, 127.0.0.3, `},
 		{"item name", "{.items[*].metadata.name}", nodesData, `127.0.0.1 127.0.0.2`},
-		{"nodes capacity", "{.items[*]['metadata.name', 'status.capacity']}", nodesData,
-			`[127.0.0.1, {cpu: 4}] [127.0.0.2, {cpu: 8}]`},
+		{"union nodes capacity", "{.items[*]['metadata.name', 'status.capacity']}", nodesData,
+			`127.0.0.1 127.0.0.2 {cpu: 4} {cpu: 8}`},
+		{"range nodes capacity", "{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}", nodesData,
+			`[127.0.0.1, {cpu: 4}] [127.0.0.2, {cpu: 8}] `},
 		{"user passowrd", `{.users[?(@.name=="e2e")].user.password}`, nodesData, "secret"},
 	}
 	testJSONPath(nodesTests, t)
