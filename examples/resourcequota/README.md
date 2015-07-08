@@ -42,17 +42,18 @@ namespace.
 
 ```
 $ kubectl describe quota quota --namespace=quota-example
-Name:     quota
-Resource    Used  Hard
---------    ----  ----
-cpu     0m  20
-memory      0m  1Gi
-persistentvolumeclaims  0m  10
-pods      0m  10
-replicationcontrollers  0m  20
-resourcequotas    1 1
-secrets     1 10
-services    0m  5
+Name:                   quota
+Namespace:              quota-example
+Resource                Used    Hard
+--------                ----    ----
+cpu                     0       20
+memory                  0       1Gi
+persistentvolumeclaims  0       10
+pods                    0       10
+replicationcontrollers  0       20
+resourcequotas          1       1
+secrets                 1       10
+services                0       5
 ```
 
 Step 3: Applying default resource limits
@@ -74,7 +75,7 @@ Now let's look at the pods that were created.
 
 ```shell
 $ kubectl get pods --namespace=quota-example
-POD       IP        CONTAINER(S)   IMAGE(S)   HOST      LABELS    STATUS    CREATED   MESSAGE
+NAME      READY     STATUS    RESTARTS   AGE
 ```
 
 What happened?  I have no pods!  Let's describe the replication controller to get a view of what is happening.
@@ -101,11 +102,12 @@ So let's set some default limits for the amount of cpu and memory a pod can cons
 $ kubectl create -f limits.yaml --namespace=quota-example
 limitranges/limits
 $ kubectl describe limits limits --namespace=quota-example
-Name:   limits
-Type    Resource  Min Max Default
-----    --------  --- --- ---
-Container cpu   - - 100m
-Container memory    - - 512Mi
+Name:           limits
+Namespace:      quota-example
+Type            Resource        Min     Max     Default
+----            --------        ---     ---     ---
+Container       memory          -       -       512Mi
+Container       cpu             -       -       100m
 ```
 
 Now any time a pod is created in this namespace, if it has not specified any resource limits, the default
@@ -116,26 +118,26 @@ create its pods.
 
 ```shell
 $ kubectl get pods --namespace=quota-example
-POD           IP         CONTAINER(S)   IMAGE(S)   HOST                    LABELS      STATUS    CREATED     MESSAGE
-nginx-t40zm   10.0.0.2                             10.245.1.3/10.245.1.3   run=nginx   Running   2 minutes
-                         nginx          nginx                                          Running   2 minutes
+NAME          READY     STATUS    RESTARTS   AGE
+nginx-t9cap   1/1       Running   0          49s
 ```
 
 And if we print out our quota usage in the namespace:
 
 ```shell
 kubectl describe quota quota --namespace=quota-example
-Name:     quota
-Resource    Used    Hard
---------    ----    ----
-cpu     100m    20
-memory      536870912 1Gi
-persistentvolumeclaims  0m    10
-pods      1   10
-replicationcontrollers  1   20
-resourcequotas    1   1
-secrets     1   10
-services    0m    5
+Name:                   quota
+Namespace:              default
+Resource                Used            Hard
+--------                ----            ----
+cpu                     100m            20
+memory                  536870912       1Gi
+persistentvolumeclaims  0               10
+pods                    1               10
+replicationcontrollers  1               20
+resourcequotas          1               1
+secrets                 1               10
+services                0               5
 ```
 
 You can now see the pod that was created is consuming explicit amounts of resources, and the usage is being
