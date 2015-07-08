@@ -1,4 +1,4 @@
-{% if grains['os_family'] == 'RedHat' %}
+{% if pillar.get('is_systemd') %}
 {% set environment_file = '/etc/sysconfig/docker' %}
 {% else %}
 {% set environment_file = '/etc/default/docker' %}
@@ -116,6 +116,36 @@ lxc-docker-{{ override_docker_ver }}:
       - file: /var/cache/docker-install/{{ override_deb }}
 {% endif %} # end override_docker_ver != ''
 
+# Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
+{% if pillar.get('is_systemd') %}
+
+{{ pillar.get('systemd_system_path') }}/docker.service:
+  file.managed:
+    - source: salt://docker/docker.service
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - defaults:
+        environment_file: {{ environment_file }}
+
+# The docker service.running block below doesn't work reliably
+# Instead we run our script which e.g. does a systemd daemon-reload
+# But we keep the service block below, so it can be used by dependencies
+# TODO: Fix this
+fix-service-docker:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce docker
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/docker.service
+      - file: {{ environment_file }}
+{% if override_docker_ver != '' %}
+    - require:
+      - pkg: lxc-docker-{{ override_docker_ver }}
+{% endif %}
+
+{% endif %}
+
 docker:
   service.running:
 # Starting Docker is racy on aws for some reason.  To be honest, since Monit
@@ -129,6 +159,9 @@ docker:
 {% endif %}
     - watch:
       - file: {{ environment_file }}
+{% if pillar.get('is_systemd') %}
+      - file: {{ pillar.get('systemd_system_path') }}/docker.service
+{% endif %}
 {% if override_docker_ver != '' %}
     - require:
       - pkg: lxc-docker-{{ override_docker_ver }}
