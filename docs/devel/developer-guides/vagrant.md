@@ -36,14 +36,14 @@ Vagrant will provision each machine in the cluster with all the necessary compon
 
 By default, each VM in the cluster is running Fedora, and all of the Kubernetes services are installed into systemd.
 
-To access the master or any minion:
+To access the master or any node:
 
 ```sh
 vagrant ssh master
 vagrant ssh minion-1
 ```
 
-If you are running more than one minion, you can access the others by:
+If you are running more than one nodes, you can access the others by:
 
 ```sh
 vagrant ssh minion-2
@@ -97,12 +97,12 @@ Once your Vagrant machines are up and provisioned, the first thing to do is to c
 You may need to build the binaries first, you can do this with ```make```
 
 ```sh
-$ ./cluster/kubectl.sh get minions
+$ ./cluster/kubectl.sh get nodes
 
-NAME                LABELS
-10.245.1.4          <none>
-10.245.1.5          <none>
-10.245.1.3          <none>
+NAME                     LABELS                                          STATUS
+kubernetes-minion-0whl   kubernetes.io/hostname=kubernetes-minion-0whl   Ready
+kubernetes-minion-4jdf   kubernetes.io/hostname=kubernetes-minion-4jdf   Ready
+kubernetes-minion-epbe   kubernetes.io/hostname=kubernetes-minion-epbe   Ready
 ```
 
 ### Interacting with your Kubernetes cluster with the `kube-*` scripts.
@@ -153,23 +153,23 @@ cat ~/.kubernetes_vagrant_auth
 }
 ```
 
-You should now be set to use the `cluster/kubectl.sh` script. For example try to list the minions that you have started with:
+You should now be set to use the `cluster/kubectl.sh` script. For example try to list the nodes that you have started with:
 
 ```sh
-./cluster/kubectl.sh get minions
+./cluster/kubectl.sh get nodes
 ```
 
 ### Running containers
 
-Your cluster is running, you can list the minions in your cluster:
+Your cluster is running, you can list the nodes in your cluster:
 
 ```sh
-$ ./cluster/kubectl.sh get minions
+$ ./cluster/kubectl.sh get nodes
 
-NAME                 LABELS
-10.245.2.4           <none>
-10.245.2.3           <none>
-10.245.2.2           <none>
+NAME                     LABELS                                          STATUS
+kubernetes-minion-0whl   kubernetes.io/hostname=kubernetes-minion-0whl   Ready
+kubernetes-minion-4jdf   kubernetes.io/hostname=kubernetes-minion-4jdf   Ready
+kubernetes-minion-epbe   kubernetes.io/hostname=kubernetes-minion-epbe   Ready
 ```
 
 Now start running some containers!
@@ -179,29 +179,31 @@ Before starting a container there will be no pods, services and replication cont
 
 ```
 $ cluster/kubectl.sh get pods
-NAME   IMAGE(S)   HOST   LABELS   STATUS
+NAME  READY   STATUS    RESTARTS    AGE
 
 $ cluster/kubectl.sh get services
-NAME   LABELS   SELECTOR   IP   PORT
+NAME  LABELS   SELECTOR    IP(S)    PORT(S)
 
-$ cluster/kubectl.sh get replicationcontrollers
-NAME   IMAGE(S   SELECTOR   REPLICAS
+$ cluster/kubectl.sh get rc
+CONTROLLER  CONTAINER(S)   IMAGE(S)    SELECTOR    REPLICAS
 ```
 
 Start a container running nginx with a replication controller and three replicas
 
 ```
 $ cluster/kubectl.sh run my-nginx --image=nginx --replicas=3 --port=80
+CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR       REPLICAS
+my-nginx     my-nginx       nginx      run=my-nginx   3
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
 
 ```
 $ cluster/kubectl.sh get pods
-NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-781191ff-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.4/10.245.2.4   name=myNginx   Waiting
-7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Waiting
-78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Waiting
+NAME              READY     STATUS    RESTARTS   AGE
+my-nginx-389da    1/1       Waiting   0          33s
+my-nginx-kqdjk    1/1       Waiting   0          33s
+my-nginx-nyj3x    1/1       Waiting   0          33s
 ```
 
 You need to wait for the provisioning to complete, you can monitor the minions by doing:
@@ -228,17 +230,17 @@ Going back to listing the pods, services and replicationcontrollers, you now hav
 
 ```
 $ cluster/kubectl.sh get pods
-NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-781191ff-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.4/10.245.2.4   name=myNginx   Running
-7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Running
+NAME              READY     STATUS    RESTARTS   AGE
+my-nginx-389da    1/1       Running   0          33s
+my-nginx-kqdjk    1/1       Running   0          33s
+my-nginx-nyj3x    1/1       Running   0          33s
 
 $ cluster/kubectl.sh get services
-NAME   LABELS   SELECTOR   IP   PORT
+NAME   LABELS   SELECTOR   IP(S)   PORT(S)
 
-$ cluster/kubectl.sh get replicationcontrollers
-NAME      IMAGE(S            SELECTOR       REPLICAS
-myNginx   nginx              name=my-nginx   3
+$ cluster/kubectl.sh get rc
+NAME        IMAGE(S)          SELECTOR       REPLICAS
+my-nginx    nginx             run=my-nginx   3
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
@@ -248,9 +250,9 @@ You can already play with scaling the replicas with:
 ```sh
 $ ./cluster/kubectl.sh scale rc my-nginx --replicas=2
 $ ./cluster/kubectl.sh get pods
-NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Running
+NAME              READY     STATUS    RESTARTS   AGE
+my-nginx-kqdjk    1/1       Running   0          13m
+my-nginx-nyj3x    1/1       Running   0          13m
 ```
 
 Congratulations!
