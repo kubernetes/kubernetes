@@ -85,6 +85,22 @@ fi
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
 # Add path for things like running kubectl binary.
+echo export PATH=$(dirname "${e2e_test}"):"${PATH}"
+echo "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+  "${auth_config[@]:+${auth_config[@]}}" \
+  --host="https://${KUBE_MASTER_IP-}" \
+  --provider="${KUBERNETES_PROVIDER}" \
+  --gce-project="${PROJECT:-}" \
+  --gce-zone="${ZONE:-}" \
+  --gke-cluster="${CLUSTER_NAME:-}" \
+  --kube-master="${KUBE_MASTER:-}" \
+  --cluster-tag="${CLUSTER_ID:-}" \
+  --repo-root="${KUBE_VERSION_ROOT}" \
+  --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
+  --num-nodes="${NUM_MINIONS:-}" \
+  --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
+  ${E2E_REPORT_DIR+"--report-dir=${E2E_REPORT_DIR}"} \
+  "${@:-}"
 export PATH=$(dirname "${e2e_test}"):"${PATH}"
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \

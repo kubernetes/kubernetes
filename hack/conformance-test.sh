@@ -14,6 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# When run as described below, the conformance test tests whether a cluster is
+# supports key features for Kubernetes version 1.0.
+
+# Instructions:
+#  - Setup a Kubernetes cluster with $NUM_MINIONS nodes (defined below).
+#  - Provide a Kubeconfig file whose current context is set to the
+#    cluster to be tested, and with suitable auth setting.
+#  - Specify the location of that kubeconfig with, e.g.:
+#    declare -x KUBECONFIG="$HOME/.kube/config"
+#  - Specify the location of the master with, e.g.:
+#    declare -x KUBE_MASTER_IP="1.2.3.4"
+#  - Make sure only essential pods are running and there are no failed/pending pods.
+#  - Make binaries needed by e2e, e.g.:
+#      make clean
+#      make quick-release
+#  - Run the test and capture output:
+#      hack/conformance-test.sh 2>&1 | tee conformance.$(date +%FT%T%z).log
+#
+
+# About the conformance test:
 # The conformance test checks whether a kubernetes cluster supports
 # a minimum set of features to be called "Kubernetes".  It is similar
 # to `hack/e2e-test.sh` but it differs in that:
@@ -51,20 +71,6 @@
 # a new column for conformance at that new version, and notify
 # community.
 
-# Instructions:
-#  - Setup a Kubernetes cluster with $NUM_MINIONS nodes (defined below).
-#  - Provide a Kubeconfig file whose current context is set to the
-#    cluster to be tested, and with suitable auth setting.
-#  - Specify the location of that kubeconfig with, e.g.:
-#    declare -x KUBECONFIG="$HOME/.kube/config"
-#  - Specify the location of the master with, e.g.:
-#    declare -x KUBE_MASTER_IP="1.2.3.4"
-#  - Make sure only essential pods are running and there are no failed/pending pods.
-#  - Make binaries needed by e2e, e.g.:
-#      make clean
-#      make quick-release
-#  - Run the test and capture output:
-#      hack/conformance-test.sh 2>&1 | tee conformance.$(date +%FT%T%z).log
 
 : ${KUBECONFIG:?"Must set KUBECONFIG before running conformance test."}
 : ${KUBE_MASTER_IP:?"Must set KUBE_MASTER_IP before running conformance test."}
