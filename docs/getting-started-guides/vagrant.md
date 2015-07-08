@@ -181,13 +181,13 @@ Before starting a container there will be no pods, services and replication cont
 
 ```sh
 $ ./cluster/kubectl.sh get pods
-NAME   IMAGE(S)   HOST   LABELS   STATUS
+NAME        READY     STATUS    RESTARTS   AGE
 
 $ ./cluster/kubectl.sh get services
-NAME   LABELS   SELECTOR   IP   PORT
+NAME   LABELS   SELECTOR   IP(S)   PORT(S)
 
 $ ./cluster/kubectl.sh get replicationcontrollers
-NAME   IMAGE(S   SELECTOR   REPLICAS
+CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR   REPLICAS
 ```
 
 Start a container running nginx with a replication controller and three replicas
@@ -200,10 +200,10 @@ When listing the pods, you will see that three containers have been started and 
 
 ```sh
 $ ./cluster/kubectl.sh get pods
-NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-781191ff-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.4/10.245.2.4   name=myNginx   Waiting
-7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Waiting
-78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Waiting
+NAME             READY     STATUS    RESTARTS   AGE
+my-nginx-5kq0g   0/1       Pending   0          10s
+my-nginx-gr3hh   0/1       Pending   0          10s
+my-nginx-xql4j   0/1       Pending   0          10s
 ```
 
 You need to wait for the provisioning to complete, you can monitor the nodes by doing:
@@ -233,17 +233,17 @@ Going back to listing the pods, services and replicationcontrollers, you now hav
 
 ```sh
 $ ./cluster/kubectl.sh get pods
-NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-781191ff-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.4/10.245.2.4   name=myNginx   Running
-7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Running
+NAME             READY     STATUS    RESTARTS   AGE
+my-nginx-5kq0g   1/1       Running   0          1m
+my-nginx-gr3hh   1/1       Running   0          1m
+my-nginx-xql4j   1/1       Running   0          1m
 
 $ ./cluster/kubectl.sh get services
-NAME   LABELS   SELECTOR   IP   PORT
+NAME   LABELS   SELECTOR   IP(S)   PORT(S)
 
 $ ./cluster/kubectl.sh get replicationcontrollers
-NAME      IMAGE(S            SELECTOR       REPLICAS
-myNginx   nginx              name=my-nginx   3
+CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR       REPLICAS
+my-nginx     my-nginx       nginx      run=my-nginx   3
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
@@ -253,9 +253,9 @@ You can already play with scaling the replicas with:
 ```sh
 $ ./cluster/kubectl.sh scale rc my-nginx --replicas=2
 $ ./cluster/kubectl.sh get pods
-NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Running
+NAME             READY     STATUS    RESTARTS   AGE
+my-nginx-5kq0g   1/1       Running   0          2m
+my-nginx-gr3hh   1/1       Running   0          2m
 ```
 
 Congratulations!
