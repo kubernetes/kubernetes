@@ -102,7 +102,7 @@ KUBERNETES_MASTER to point at the ip of `kubernetes-master/0`.
 No pods will be available before starting a container:
 
     kubectl get pods
-    POD  CONTAINER(S)   IMAGE(S)   HOST  LABELS  STATUS
+    NAME             READY     STATUS    RESTARTS   AGE
 
     kubectl get replicationcontrollers
     CONTROLLER  CONTAINER(S)  IMAGE(S)  SELECTOR  REPLICAS
