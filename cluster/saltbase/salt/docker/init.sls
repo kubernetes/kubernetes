@@ -114,11 +114,19 @@ lxc-docker-{{ override_docker_ver }}:
       - lxc-docker-{{ override_docker_ver }}: /var/cache/docker-install/{{ override_deb }}
     - require:
       - file: /var/cache/docker-install/{{ override_deb }}
-{% endif %}
+{% endif %} # end override_docker_ver != ''
 
 docker:
   service.running:
+# Starting Docker is racy on aws for some reason.  To be honest, since Monit
+# is managing Docker restart we should probably just delete this whole thing
+# but the kubernetes components use salt 'require' to set up a dag, and that
+# complicated and scary to unwind.
+{% if grains.cloud is defined and grains.cloud == 'aws' %}
+    - enable: False
+{% else %}
     - enable: True
+{% endif %}
     - watch:
       - file: {{ environment_file }}
 {% if override_docker_ver != '' %}
@@ -126,4 +134,4 @@ docker:
       - pkg: lxc-docker-{{ override_docker_ver }}
 {% endif %}
 
-{% endif %}
+{% endif %} # end grains.os_family != 'RedHat'
