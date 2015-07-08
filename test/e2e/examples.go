@@ -127,6 +127,7 @@ var _ = Describe("Examples e2e", func() {
 			rabbitmqControllerYaml := mkpath("rabbitmq-controller.yaml")
 			celeryControllerYaml := mkpath("celery-controller.yaml")
 			flowerControllerYaml := mkpath("flower-controller.yaml")
+			flowerServiceYaml := mkpath("flower-service.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting rabbitmq")
@@ -144,13 +145,31 @@ var _ = Describe("Examples e2e", func() {
 			})
 
 			By("starting flower")
+			runKubectl("create", "-f", flowerServiceYaml, nsFlag)
 			runKubectl("create", "-f", flowerControllerYaml, nsFlag)
 			forEachPod(c, ns, "component", "flower", func(pod api.Pod) {
-				//TODO: Do a http request after a flower service is added to the example.
+				// Do nothing. just wait for it to be up and running.
 			})
+			content, err := makeHttpRequestToService(c, ns, "flower-service", "/")
+			Expect(err).NotTo(HaveOccurred())
+			if !strings.Contains(content, "<title>Celery Flower</title>") {
+				Failf("Flower HTTP request failed")
+			}
 		})
 	})
 })
+
+func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {
+	result, err := c.Get().
+		Prefix("proxy").
+		Namespace(ns).
+		Resource("services").
+		Name(service).
+		Suffix(path).
+		Do().
+		Raw()
+	return string(result), err
+}
 
 func forEachPod(c *client.Client, ns, selectorKey, selectorValue string, fn func(api.Pod)) {
 	var pods *api.PodList
