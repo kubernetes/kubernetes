@@ -15,7 +15,7 @@ calico-network-plugin:
   file.managed:
     - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico
     - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.8/calico_kubernetes
-    - source_hash: sha512=36959621229b97bf5660ebbaa27d765b56ce165b2826a48c7942ab39167980bd698ec5956f73897fee7968c1cb7324e4176a78de1895a884abd7c595cda5fd0f
+    - source_hash: sha512=50a8b9ca38d6813a4793c76959acc80d2d38002547a0f5aa0f974fc88407dd7c09abfb6ec1c30ae76690740cf36910cd89d1a1b9786679929f65bd0538fa292f
     - makedirs: True
     - mode: 744
 
