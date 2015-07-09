@@ -144,7 +144,6 @@ coreos:
         ExecStart=/opt/kubernetes/server/bin/kubelet \
         --api_servers=https://${KUBERNETES_MASTER_NAME}.c.${PROJECT_ID}.internal \
         --config=/etc/kubernetes/manifests \
-        --allow_privileged=False \
         --v=2 \
         --cluster_dns=10.0.0.10 \
         --cluster_domain=cluster.local \

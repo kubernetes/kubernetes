@@ -86,7 +86,6 @@ coreos:
         --port=10250 \
         --hostname_override=${DEFAULT_IPV4} \
         --api_servers=<master-private-ip>:8080 \
-        --allow_privileged=true \
         --logtostderr=true \
         --cadvisor_port=4194 \
         --healthz_bind_address=0.0.0.0 \
