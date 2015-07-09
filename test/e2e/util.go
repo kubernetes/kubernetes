@@ -1688,3 +1688,21 @@ func writePerfData(c *client.Client, dirName string, postfix string) error {
 	}
 	return nil
 }
+
+// parseKVLines parses output that looks like lines containing "<key>: <val>"
+// and returns <val> if <key> is found. Otherwise, it returns the empty string.
+func parseKVLines(output, key string) string {
+	delim := ":"
+	key = key + delim
+	for _, line := range strings.Split(output, "\n") {
+		pieces := strings.SplitAfterN(line, delim, 2)
+		if len(pieces) != 2 {
+			continue
+		}
+		k, v := pieces[0], pieces[1]
+		if k == key {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}

@@ -18,8 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -223,6 +221,26 @@ func restartNodes(provider string, nt time.Duration) error {
 	}
 }
 
+// TODO(mbforbes): Switch this to MIG recreate-instances. This can be done
+// with the following bash, but needs to be written in Go:
+//
+//   # Step 1: Get instance names.
+//   list=$(gcloud preview instance-groups --project=${PROJECT} --zone=${ZONE} instances --group=${GROUP} list)
+//   i=""
+//   for l in $list; do
+// 	  i="${l##*/},${i}"
+//   done
+//
+//   # Step 2: Start the recreate.
+//   output=$(gcloud preview managed-instance-groups --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
+//   op=${output##*:}
+//
+//   # Step 3: Wait until it's complete.
+//   status=""
+//   while [[ "${status}" != "DONE" ]]; do
+// 	  output=$(gcloud preview managed-instance-groups --zone="${ZONE}" get-operation ${op} | grep status)
+// 	  status=${output##*:}
+//   done
 func migRollingUpdateSelf(nt time.Duration) error {
 	By("getting the name of the template for the managed instance group")
 	tmpl, err := migTemplate()
@@ -230,172 +248,4 @@ func migRollingUpdateSelf(nt time.Duration) error {
 		return fmt.Errorf("couldn't get MIG template name: %v", err)
 	}
 	return migRollingUpdate(tmpl, nt)
-}
-
-// migRollingUpdate starts a MIG rolling update, upgrading the nodes to a new
-// instance template named tmpl, and waits up to nt times the nubmer of nodes
-// for it to complete.
-func migRollingUpdate(tmpl string, nt time.Duration) error {
-	By(fmt.Sprintf("starting the MIG rolling update to %s", tmpl))
-	id, err := migRollingUpdateStart(tmpl, nt)
-	if err != nil {
-		return fmt.Errorf("couldn't start the MIG rolling update: %v", err)
-	}
-
-	By(fmt.Sprintf("polling the MIG rolling update (%s) until it completes", id))
-	if err := migRollingUpdatePoll(id, nt); err != nil {
-		return fmt.Errorf("err waiting until update completed: %v", err)
-	}
-
-	return nil
-}
-
-// migTemlate (GCE/GKE-only) returns the name of the MIG template that the
-// nodes of the cluster use.
-func migTemplate() (string, error) {
-	var errLast error
-	var templ string
-	key := "instanceTemplate"
-	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
-	if wait.Poll(poll, singleCallTimeout, func() (bool, error) {
-		// TODO(mbforbes): make this hit the compute API directly instead of
-		// shelling out to gcloud.
-		o, err := exec.Command("gcloud", "preview", "managed-instance-groups",
-			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
-			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
-			"describe",
-			testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
-		if err != nil {
-			errLast = fmt.Errorf("gcloud preview managed-instance-groups describe call failed with err: %v", err)
-			return false, nil
-		}
-		output := string(o)
-
-		// The 'describe' call probably succeeded; parse the output and try to
-		// find the line that looks like "instanceTemplate: url/to/<templ>" and
-		// return <templ>.
-		if val := parseKVLines(output, key); len(val) > 0 {
-			url := strings.Split(val, "/")
-			templ = url[len(url)-1]
-			Logf("MIG group %s using template: %s", testContext.CloudConfig.NodeInstanceGroup, templ)
-			return true, nil
-		}
-		errLast = fmt.Errorf("couldn't find %s in output to get MIG template. Output: %s", key, output)
-		return false, nil
-	}) != nil {
-		return "", fmt.Errorf("migTemplate() failed with last error: %v", errLast)
-	}
-	return templ, nil
-}
-
-// migRollingUpdateStart (GCE/GKE-only) starts a MIG rolling update using templ
-// as the new template, waiting up to nt per node, and returns the ID of that
-// update.
-func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
-	var errLast error
-	var id string
-	prefix, suffix := "Started [", "]."
-	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
-	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
-		// TODO(mbforbes): make this hit the compute API directly instead of
-		//                 shelling out to gcloud.
-		// NOTE(mbforbes): If you are changing this gcloud command, update
-		//                 cluster/gce/upgrade.sh to match this EXACTLY.
-		o, err := exec.Command("gcloud", "preview", "rolling-updates",
-			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
-			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
-			"start",
-			// Required args.
-			fmt.Sprintf("--group=%s", testContext.CloudConfig.NodeInstanceGroup),
-			fmt.Sprintf("--template=%s", templ),
-			// Optional args to fine-tune behavior.
-			fmt.Sprintf("--instance-startup-timeout=%ds", int(nt.Seconds())),
-			// NOTE: We can speed up this process by increasing
-			//       --max-num-concurrent-instances.
-			fmt.Sprintf("--max-num-concurrent-instances=%d", 1),
-			fmt.Sprintf("--max-num-failed-instances=%d", 0),
-			fmt.Sprintf("--min-instance-update-time=%ds", 0)).CombinedOutput()
-		if err != nil {
-			errLast = fmt.Errorf("gcloud preview rolling-updates call failed with err: %v", err)
-			return false, nil
-		}
-		output := string(o)
-
-		// The 'start' call probably succeeded; parse the output and try to find
-		// the line that looks like "Started [url/to/<id>]." and return <id>.
-		for _, line := range strings.Split(output, "\n") {
-			// As a sanity check, ensure the line starts with prefix and ends
-			// with suffix.
-			if strings.Index(line, prefix) != 0 || strings.Index(line, suffix) != len(line)-len(suffix) {
-				continue
-			}
-			url := strings.Split(strings.TrimSuffix(strings.TrimPrefix(line, prefix), suffix), "/")
-			id = url[len(url)-1]
-			Logf("Started MIG rolling update; ID: %s", id)
-			return true, nil
-		}
-		errLast = fmt.Errorf("couldn't find line like '%s ... %s' in output to MIG rolling-update start. Output: %s",
-			prefix, suffix, output)
-		return false, nil
-	}); err != nil {
-		return "", fmt.Errorf("migRollingUpdateStart() failed with last error: %v", errLast)
-	}
-	return id, nil
-}
-
-// migRollingUpdatePoll (CKE/GKE-only) polls the progress of the MIG rolling
-// update with ID id until it is complete. It returns an error if this takes
-// longer than nt times the number of nodes.
-func migRollingUpdatePoll(id string, nt time.Duration) error {
-	// Two keys and a val.
-	status, progress, done := "status", "statusMessage", "ROLLED_OUT"
-	start, timeout := time.Now(), nt*time.Duration(testContext.CloudConfig.NumNodes)
-	var errLast error
-	Logf("Waiting up to %v for MIG rolling update to complete.", timeout)
-	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
-	if wait.Poll(restartPoll, timeout, func() (bool, error) {
-		o, err := exec.Command("gcloud", "preview", "rolling-updates",
-			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
-			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
-			"describe",
-			id).CombinedOutput()
-		if err != nil {
-			errLast = fmt.Errorf("Error calling rolling-updates describe %s: %v", id, err)
-			Logf("%v", errLast)
-			return false, nil
-		}
-		output := string(o)
-
-		// The 'describe' call probably succeeded; parse the output and try to
-		// find the line that looks like "status: <status>" and see whether it's
-		// done.
-		Logf("Waiting for MIG rolling update: %s (%v elapsed)",
-			parseKVLines(output, progress), time.Since(start))
-		if st := parseKVLines(output, status); st == done {
-			return true, nil
-		}
-		return false, nil
-	}) != nil {
-		return fmt.Errorf("timeout waiting %v for MIG rolling update to complete. Last error: %v", timeout, errLast)
-	}
-	Logf("MIG rolling update complete after %v", time.Since(start))
-	return nil
-}
-
-// parseKVLines parses output that looks like lines containing "<key>: <val>"
-// and returns <val> if <key> is found. Otherwise, it returns the empty string.
-func parseKVLines(output, key string) string {
-	delim := ":"
-	key = key + delim
-	for _, line := range strings.Split(output, "\n") {
-		pieces := strings.SplitAfterN(line, delim, 2)
-		if len(pieces) != 2 {
-			continue
-		}
-		k, v := pieces[0], pieces[1]
-		if k == key {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
 }
