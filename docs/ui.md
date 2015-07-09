@@ -1,16 +1,13 @@
-# Kubernetes UI Instructions
-
-## Kubernetes User Interface
-Kubernetes has a web-based user interface that displays the current cluster state graphically. 
+# Kubernetes User Interface
+Kubernetes has a web-based user interface that displays the current cluster state graphically. It is accessible via `https://<kubernetes-master>/ui`, which redirects to `https://<kubernetes-master>/api/v1/proxy/namespaces/kube-system/services/kube-ui/#/dashboard/`.
 
 ## Accessing the UI
-By default, the Kubernetes UI is deployed remotely as a cluster addon. To access it, visit `/ui` on your master server, which redirects to `/api/v1/proxy/namespaces/kube-system/services/kube-ui/#/dashboard/`.
+By default, the Kubernetes UI is deployed remotely as a cluster addon. To access it, visit `https://<kubernetes-master>/ui`, which redirects to `https://<kubernetes-master>/api/v1/proxy/namespaces/kube-system/services/kube-ui/#/dashboard/`.
 
-If the UI cluster addon isn't running, you can start it manually with the following commands.
-```shell
-cd cluster/addons/kube-ui/image
-make kube-ui
-make push 
+If the [`kube-addons.sh`](../cluster/saltbase/salt/kube-addons/kube-addons.sh) script is not running, the kube-ui service will not be started. In this case, it can be started manually with:
+```sh
+kubectl create -f cluster/addons/kube-ui/kube-ui-rc.yaml
+kubectl create -f cluster/addons/kube-ui/kube-ui-svc.yaml
 ```
 
 ## Using the UI
@@ -38,6 +35,6 @@ Other views (Pods, Nodes, Replication Controllers, Services, and Events) simply 
 ![kubernetes UI - Nodes](k8s-ui-nodes.png)
 
 ## More Information 
-For more information, See the [README](../www/README.md) in the www directory.
+For more information, see the [Kubernetes UI development document](../www/README.md) in the www directory.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/ui.md?pixel)]()
