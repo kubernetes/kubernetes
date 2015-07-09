@@ -413,7 +413,7 @@ var _ = Describe("Nodes", func() {
 
 	AfterEach(func() {
 		By("checking whether all nodes are healthy")
-		if err := allNodesReady(c); err != nil {
+		if err := allNodesReady(c, time.Minute); err != nil {
 			Failf("Not all nodes are ready: %v", err)
 		}
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))

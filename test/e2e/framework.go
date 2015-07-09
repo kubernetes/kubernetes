@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -86,7 +87,7 @@ func (f *Framework) afterEach() {
 	}
 
 	// Check whether all nodes are ready after the test.
-	if err := allNodesReady(f.Client); err != nil {
+	if err := allNodesReady(f.Client, time.Minute); err != nil {
 		Failf("All nodes should be ready after test, %v", err)
 	}
 
