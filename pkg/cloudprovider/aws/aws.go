@@ -1702,12 +1702,37 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 	tagRequest := &ec2.CreateTagsInput{}
 	tagRequest.Resources = []*string{&groupID}
 	tagRequest.Tags = tags
-	_, err = s.ec2.CreateTags(tagRequest)
+	_, err = s.createTags(tagRequest)
 	if err != nil {
 		// Not clear how to recover fully from this; we're OK because we don't match on tags, but that is a little odd
 		return "", fmt.Errorf("error tagging security group: %v", err)
 	}
 	return groupID, nil
+}
+
+// createTags calls EC2 CreateTags, but adds retry-on-failure logic
+// We retry mainly because if we create an object, we cannot tag it until it is "fully created" (eventual consistency)
+// The error code varies though (depending on what we are tagging), so we simply retry on all errors
+func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
+	attempt := 0
+	maxAttempts := 60
+
+	for {
+		response, err := s.ec2.CreateTags(request)
+		if err == nil {
+			return response, err
+		}
+
+		// We could check that the error is retryable, but the error code changes based on what we are tagging
+		// SecurityGroup: InvalidGroup.NotFound
+		attempt++
+		if attempt > maxAttempts {
+			glog.Warningf("Failed to create tags (too many attempts): %v", err)
+			return response, err
+		}
+		glog.V(2).Infof("Failed to create tags; will retry.  Error was %v", err)
+		time.Sleep(1 * time.Second)
+	}
 }
 
 // CreateTCPLoadBalancer implements TCPLoadBalancer.CreateTCPLoadBalancer
