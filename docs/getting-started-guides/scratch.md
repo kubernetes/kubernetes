@@ -509,61 +509,75 @@ If you are using the HTTPS approach, then set:
 *TODO* document proxy-ssh setup.
 
 #### Apiserver pod template
-*TODO*: convert to version v1.
 
 ```json
 {
-"apiVersion": "v1beta3",
-"kind": "Pod",
-"metadata": {"name":"kube-apiserver"},
-"spec":{
-"hostNetwork": true,
-"containers":[
-    {
-    "name": "kube-apiserver",
-    "image": "${APISERVER_IMAGE}",
-    "command": [
-                 "/bin/sh",
-                 "-c",
-                 "/usr/local/bin/kube-apiserver $ARGS"
-               ],
-    "livenessProbe": {
-      "httpGet": {
-        "path": "/healthz",
-        "port": 8080
-      },
-      "initialDelaySeconds": 15,
-      "timeoutSeconds": 15
-    },
-    "ports":[
-      { "name": "https",
-        "containerPort": 443,
-        "hostPort": 443},
-      { "name": "local",
-        "containerPort": 8080,
-        "hostPort": 8080}
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-apiserver"
+  },
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "kube-apiserver",
+        "image": "${APISERVER_IMAGE}",
+        "command": [
+          "/bin/sh",
+          "-c",
+          "/usr/local/bin/kube-apiserver $ARGS"
         ],
-    "volumeMounts": [
-        { "name": "srvkube",
-        "mountPath": "/srv/kubernetes",
-        "readOnly": true},
-        { "name": "etcssl",
-        "mountPath": "/etc/ssl",
-        "readOnly": true},
-      ]
-    }
-],
-"volumes":[
-  { "name": "srvkube",
-    "hostPath": {
-        "path": "/srv/kubernetes"}
-  },
-  { "name": "etcssl",
-    "hostPath": {
-        "path": "/etc/ssl"}
-  },
-]
-}}
+        "ports": [
+          {
+            "name": "https",
+            "hostPort": 443,
+            "containerPort": 443
+          },
+          {
+            "name": "local",
+            "hostPort": 8080,
+            "containerPort": 8080
+          }
+        ],
+        "volumeMounts": [
+          {
+            "name": "srvkube",
+            "mountPath": "/srv/kubernetes",
+            "readOnly": true
+          },
+          {
+            "name": "etcssl",
+            "mountPath": "/etc/ssl",
+            "readOnly": true
+          }
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 8080
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ],
+    "volumes": [
+      {
+        "name": "srvkube",
+        "hostPath": {
+          "path": "/srv/kubernetes"
+        }
+      },
+      {
+        "name": "etcssl",
+        "hostPath": {
+          "path": "/etc/ssl"
+        }
+      }
+    ]
+  }
+}
 ```
 
 The `/etc/ssl` mount allows the apiserver to find the SSL root certs so it can
@@ -604,36 +618,37 @@ Otherwise, you will need to manually create node objects.
 
 ### Scheduler
 
-*TODO*: convert to version v1.
-
 Complete this template for the scheduler pod:
-```
+```json
 {
-"apiVersion": "v1beta3",
-"kind": "Pod",
-"metadata": {"name":"kube-scheduler"},
-"spec":{
-"hostNetwork": true,
-"containers":[
-    {
-    "name": "kube-scheduler",
-    "image": "$SCHEDULER_IMAGE",
-    "command": [
-                 "/bin/sh",
-                 "-c",
-                 "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080"
-               ],
-    "livenessProbe": {
-      "httpGet": {
-        "path": "/healthz",
-        "port": 10251
-      },
-      "initialDelaySeconds": 15,
-      "timeoutSeconds": 15
-    },
-    }
-],
-}}
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-scheduler"
+  },
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "kube-scheduler",
+        "image": "$SCHEDULER_IMAGE",
+        "command": [
+          "/bin/sh",
+          "-c",
+          "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080"
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 10251
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ]
+  }
+}
 ```
 Optionally, you may want to mount `/var/log` as well and redirect output there.
 
@@ -656,51 +671,62 @@ Flags to consider using with controller manager.
  - `--master=127.0.0.1:8080`
 
 Template for controller manager pod:
-```
+```json
 {
-"apiVersion": "v1beta3",
-"kind": "Pod",
-"metadata": {"name":"kube-controller-manager"},
-"spec":{
-"hostNetwork": true,
-"containers":[
-    {
-    "name": "kube-controller-manager",
-    "image": "$CNTRLMNGR_IMAGE",
-    "command": [
-                 "/bin/sh",
-                 "-c",
-                 "/usr/local/bin/kube-controller-manager $ARGS"
-               ],
-    "livenessProbe": {
-      "httpGet": {
-        "path": "/healthz",
-        "port": 10252
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-controller-manager"
+  },
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "kube-controller-manager",
+        "image": "$CNTRLMNGR_IMAGE",
+        "command": [
+          "/bin/sh",
+          "-c",
+          "/usr/local/bin/kube-controller-manager $ARGS"
+        ],
+        "volumeMounts": [
+          {
+            "name": "srvkube",
+            "mountPath": "/srv/kubernetes",
+            "readOnly": true
+          },
+          {
+            "name": "etcssl",
+            "mountPath": "/etc/ssl",
+            "readOnly": true
+          }
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 10252
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ],
+    "volumes": [
+      {
+        "name": "srvkube",
+        "hostPath": {
+          "path": "/srv/kubernetes"
+        }
       },
-      "initialDelaySeconds": 15,
-      "timeoutSeconds": 15
-    },
-    "volumeMounts": [
-        { "name": "srvkube",
-        "mountPath": "/srv/kubernetes",
-        "readOnly": true},
-        { "name": "etcssl",
-        "mountPath": "/etc/ssl",
-        "readOnly": true},
-      ]
-    }
-],
-"volumes":[
-  { "name": "srvkube",
-    "hostPath": {
-        "path": "/srv/kubernetes"}
-  },
-  { "name": "etcssl",
-    "hostPath": {
-        "path": "/etc/ssl"}
-  },
-]
-}}
+      {
+        "name": "etcssl",
+        "hostPath": {
+          "path": "/etc/ssl"
+        }
+      }
+    ]
+  }
+}
 ```
 
 
