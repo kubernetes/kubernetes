@@ -92,7 +92,7 @@ func Test_updateTOC(t *testing.T) {
 			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN GENERATED TOC -->\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n<!-- END GENERATED TOC -->\n## Section Heading\ndolor sit amet\n"},
 	}
 	for _, c := range cases {
-		actual, err := updateTOC([]byte(c.in))
+		actual, err := updateTOC("filename.md", []byte(c.in))
 		assert.NoError(t, err)
 		if c.out != string(actual) {
 			t.Errorf("Expected TOC '%v' but got '%v'", c.out, string(actual))
