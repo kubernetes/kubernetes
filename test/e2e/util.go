@@ -513,10 +513,6 @@ func waitForPodRunningInNamespace(c *client.Client, podName string, namespace st
 	})
 }
 
-func waitForPodRunning(c *client.Client, podName string) error {
-	return waitForPodRunningInNamespace(c, podName, api.NamespaceDefault)
-}
-
 // waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	return waitForPodCondition(c, ns, podName, "!pending", podStartTimeout, func(pod *api.Pod) (bool, error) {
@@ -891,11 +887,6 @@ func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	Logf("Asynchronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	err = cmd.Start()
 	return
-}
-
-// testContainerOutput runs testContainerOutputInNamespace with the default namespace.
-func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	testContainerOutputInNamespace(scenarioName, c, pod, containerIndex, expectedOutput, api.NamespaceDefault)
 }
 
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits

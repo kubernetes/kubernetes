@@ -37,22 +37,18 @@ import (
 
 var _ = Describe("Pod Disks", func() {
 	var (
-		c         *client.Client
 		podClient client.PodInterface
 		host0Name string
 		host1Name string
 	)
+	framework := NewFramework("pod-disks")
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-
 		SkipUnlessNodeCountIsAtLeast(2)
 
-		podClient = c.Pods(api.NamespaceDefault)
+		podClient = framework.Client.Pods(framework.Namespace.Name)
 
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err, "Failed to list nodes for e2e cluster.")
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
@@ -86,12 +82,12 @@ var _ = Describe("Pod Disks", func() {
 		_, err = podClient.Create(host0Pod)
 		expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
-		expectNoError(waitForPodRunning(c, host0Pod.Name))
+		expectNoError(framework.WaitForPodRunning(host0Pod.Name))
 
 		testFile := "/testpd/tracker"
 		testFileContents := fmt.Sprintf("%v", math_rand.Int())
 
-		expectNoError(writeFileOnPod(c, host0Pod.Name, testFile, testFileContents))
+		expectNoError(writeFileOnPod(framework.Client, host0Pod.Name, testFile, testFileContents))
 		Logf("Wrote value: %v", testFileContents)
 
 		By("deleting host0Pod")
@@ -101,9 +97,9 @@ var _ = Describe("Pod Disks", func() {
 		_, err = podClient.Create(host1Pod)
 		expectNoError(err, "Failed to create host1Pod")
 
-		expectNoError(waitForPodRunning(c, host1Pod.Name))
+		expectNoError(framework.WaitForPodRunning(host1Pod.Name))
 
-		v, err := readFileOnPod(c, host1Pod.Name, testFile)
+		v, err := readFileOnPod(framework.Client, host1Pod.Name, testFile)
 		expectNoError(err)
 		Logf("Read value: %v", v)
 
@@ -153,7 +149,7 @@ var _ = Describe("Pod Disks", func() {
 		By("submitting rwPod to ensure PD is formatted")
 		_, err = podClient.Create(rwPod)
 		expectNoError(err, "Failed to create rwPod")
-		expectNoError(waitForPodRunning(c, rwPod.Name))
+		expectNoError(framework.WaitForPodRunning(rwPod.Name))
 		expectNoError(podClient.Delete(rwPod.Name, nil), "Failed to delete host0Pod")
 
 		By("submitting host0ROPod to kubernetes")
@@ -164,9 +160,9 @@ var _ = Describe("Pod Disks", func() {
 		_, err = podClient.Create(host1ROPod)
 		expectNoError(err, "Failed to create host1ROPod")
 
-		expectNoError(waitForPodRunning(c, host0ROPod.Name))
+		expectNoError(framework.WaitForPodRunning(host0ROPod.Name))
 
-		expectNoError(waitForPodRunning(c, host1ROPod.Name))
+		expectNoError(framework.WaitForPodRunning(host1ROPod.Name))
 
 		By("deleting host0ROPod")
 		expectNoError(podClient.Delete(host0ROPod.Name, nil), "Failed to delete host0ROPod")
