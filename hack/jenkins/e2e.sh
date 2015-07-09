@@ -45,7 +45,7 @@ fi
 # Additional parameters that are passed to hack/e2e.go
 E2E_OPT=${E2E_OPT:-""}
 
-# Set environment variables shared for all of the GCE Jenkins projects.
+# Set shared environment variables.
 if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
   : ${E2E_ZONE:="us-central1-f"}
@@ -53,7 +53,13 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   : ${MINION_SIZE:="n1-standard-2"}
   : ${NUM_MINIONS:="2"}
 fi
-
+if [[ ${JOB_NAME} =~ ^kubernetes-.*-gke ]]; then
+  KUBERNETES_PROVIDER="gke"
+  : ${E2E_ZONE:="us-central1-f"}
+  : ${MASTER_SIZE:="n1-standard-2"}
+  : ${MINION_SIZE:="n1-standard-2"}
+  : ${NUM_MINIONS:="2"}
+fi
 if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
   if [[ "${PERFORMANCE:-}" == "true" ]]; then
     : ${MASTER_SIZE:="m3.xlarge"}
@@ -65,12 +71,17 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
   fi
 fi
 
-# Specialized tests which should be skipped by default for projects.
+# Specialized tests which should be skipped by default for projects, with the
+# exception of the reboot tests, which can be useful to run with other tests.
+GCE_SKIP_KEEP_REBOOT_TEST_REGEX="\
+Skipped\
+|Restart\
+|Example\
+"
+# The full list of standardly skipped tests.
 GCE_DEFAULT_SKIP_TEST_REGEX="\
-Skipped|\
-Reboot|\
-Restart|\
-Example\
+${GCE_SKIP_KEEP_REBOOT_TEST_REGEX}\
+|Reboot\
 "
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
@@ -106,6 +117,9 @@ Elasticsearch\
 
 # Define environment variables based on the Jenkins project name.
 case ${JOB_NAME} in
+  # GCE
+  # ---
+
   # Runs all non-flaky tests on GCE, sequentially.
   kubernetes-e2e-gce)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
@@ -189,6 +203,194 @@ case ${JOB_NAME} in
     MASTER_SIZE="n1-standard-1"
     MINION_SIZE="n1-standard-1"
     NUM_MINIONS="2"
+    ;;
+
+  # GCE master+node upgrade step 1: deploy a cluster at latest release.
+  kubernetes-upgrade-gce-step1-deploy)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade"}
+    : ${E2E_NETWORK:="gce-upgrade"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_TEST:="false"}
+    : ${JENKINS_USE_RELEASE_TARS:="y"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-upgrade"}
+    : ${PROJECT:="k8s-jkns-gce-living-upgrades"}
+    ;;
+
+  # GCE master+node upgrade step 2: upgrade the cluster from step 1 to the
+  # latest CI version using the latest CI verion's upgrade code.
+  kubernetes-upgrade-gce-step2-upgrade)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade"}
+    : ${E2E_NETWORK:="gce-upgrade"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    : ${E2E_UP:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster"}
+    : ${JENKINS_FORCE_GET_TARS:="y"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-upgrade"}
+    : ${PROJECT:="k8s-jkns-gce-living-upgrades"}
+    ;;
+
+  # GCE master+node upgrade step 3: run the standard set of non-flaky tests,
+  # using the tests at the version of the code retrieved in step 2.
+  kubernetes-upgrade-gce-step3-e2e)
+    : ${E2E_CLUSTER_NAME:="gce-upgrade"}
+    : ${E2E_NETWORK:="gce-upgrade"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    : ${E2E_UP:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-upgrade"}
+    : ${PROJECT:="k8s-jkns-gce-living-upgrades"}
+    ;;
+
+  # GKE
+  # ---
+
+  # Launch a GKE cluster at latest CI, run all non-flaky tests sequentially.
+  kubernetes-e2e-gke-ci)
+    : ${CMD_GROUP:="beta"}
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci"}
+    : ${E2E_NETWORK:="e2e-gke-ci"}
+    : ${E2E_SET_CLUSTER_API_VERSION:="y"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    ;;
+
+  # Launch a GKE cluster at latest CI, run the reboot tests and the non-flaky
+  # tests sequentially.
+  kubernetes-e2e-gke-ci-reboot)
+    : ${CMD_GROUP:="beta"}
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-e2e-ci-reboot"}
+    : ${E2E_NETWORK:="e2e-gke-ci"}
+    : ${E2E_SET_CLUSTER_API_VERSION:="y"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_SKIP_KEEP_REBOOT_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    ;;
+
+  # Launch a GKE cluster in test, run non-flaky tests sequentially.
+  kubernetes-e2e-gke-test)
+    : ${CMD_GROUP:="beta"}
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test"}
+    : ${E2E_NETWORK:="e2e-gke-test"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${JENKINS_USE_RELEASE_TARS:="y"}
+    # TODO(mbforbes): Do we need to set PATH here?
+    : ${PATH="/usr/local/share/google/google-cloud-sdk/bin:${PATH}"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    # TODO(mbforbes): Do we need to set CLOUDSDK_CORE_PROJECT here?
+    : ${CLOUDSDK_CORE_PROJECT:="${PROJECT}"}
+    ;;
+
+  # Launch a GKE cluster in staging, run non-flaky tests sequentially.
+  kubernetes-e2e-gke-staging)
+    : ${CMD_GROUP:="beta"}
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-e2e-staging"}
+    : ${E2E_NETWORK:="e2e-gke-staging"}
+    # TODO(mbforbes): Do we need to set E2E_SET_CLUSTER_API_VERSION here?
+    : ${E2E_SET_CLUSTER_API_VERSION:="y"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${JENKINS_EXPLICIT_VERSION:="release/v0.21.0"}
+    # TODO(mbforbes): Do we need to set PATH here?
+    : ${PATH="/usr/local/share/google/google-cloud-sdk/bin:${PATH}"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    # TODO(mbforbes): Do we need to set CLOUDSDK_CORE_PROJECT here?
+    : ${CLOUDSDK_CORE_PROJECT:="${PROJECT}"}
+    ;;
+
+  # Launch a GKE cluster in prod, run non-flaky tests sequentially.
+  kubernetes-e2e-gke-prod)
+    : ${CMD_GROUP:="beta"}
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-prod"}
+    : ${E2E_NETWORK:="e2e-gke-prod"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${JENKINS_EXPLICIT_VERSION:="release/v0.19.3"}
+    # TODO(mbforbes): Do we need to set PATH here?
+    : ${PATH="/usr/local/share/google/google-cloud-sdk/bin:${PATH}"}
+    : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
+    # TODO(mbforbes): Do we need to set CLOUDSDK_CORE_PROJECT here?
+    : ${CLOUDSDK_CORE_PROJECT:="${PROJECT}"}
+    ;;
+
+  # GKE master+node upgrade step 1: deploy a cluster at latest release.
+  kubernetes-upgrade-gke-step1-deploy)
+    : ${CLOUDSDK_CONFIG:="/var/lib/jenkins/.config/gcloud"}
+    : ${CMD_GROUP:="beta"}
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gke-upgrade"}
+    : ${E2E_TEST:="false"}
+    : ${JENKINS_USE_RELEASE_TARS:="y"}
+    # TODO(mbforbes): Do we need to set PATH here?
+    : ${PATH="${HOME}/cloudsdk/google-cloud-sdk/bin:${PATH}"}
+    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    ;;
+
+  # GKE master+node upgrade step 2: upgrade the cluster from step 1 to the
+  # latest CI version using the latest CI verion's upgrade code.
+  kubernetes-upgrade-gke-step2-upgrade)
+    : ${CLOUDSDK_CONFIG:="/var/lib/jenkins/.config/gcloud"}
+    : ${CMD_GROUP:="beta"}
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gke-upgrade"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    : ${E2E_UP:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Skipped.*Cluster\supgrade.*upgrade-cluster"}
+    : ${JENKINS_FORCE_GET_TARS:="y"}
+    # TODO(mbforbes): Do we need to set PATH here?
+    : ${PATH="${HOME}/cloudsdk/google-cloud-sdk/bin:${PATH}"}
+    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    ;;
+
+  # GKE master+node upgrade step 3: run the standard set of non-flaky tests,
+  # using the tests at the version of the code retrieved in step 2.
+  kubernetes-upgrade-gke-step3-e2e)
+    : ${CLOUDSDK_CONFIG:="/var/lib/jenkins/.config/gcloud"}
+    : ${CMD_GROUP:="beta"}
+    : ${DOGFOOD_GCLOUD:="true"}
+    : ${E2E_CLUSTER_NAME:="gke-upgrade"}
+    : ${E2E_NETWORK:="gke-upgrade"}
+    : ${E2E_OPT:="--check_version_skew=false"}
+    : ${E2E_UP:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    # TODO(mbforbes): Do we need to set PATH here?
+    : ${PATH="${HOME}/cloudsdk/google-cloud-sdk/bin:${PATH}"}
+    : ${PROJECT:="kubernetes-jenkins-gke-upgrade"}
+    ;;
+
+  # Deploy Kubernetes to a GKE soak cluster using the staging GKE Kubernetes
+  # build.
+  kubernetes-soak-weekly-deploy-gke)
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-soak-weekly"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gke-soak-weekly"}
+    : ${E2E_TEST:="false"}
+    # TODO(mbforbes): Do we need to set PATH here?
+    : ${PATH="/usr/local/share/google/google-cloud-sdk/bin:${PATH}"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    # TODO(mbforbes): Do we need to set CLOUDSDK_CORE_PROJECT here?
+    : ${CLOUDSDK_CORE_PROJECT:="${PROJECT}"}
+    ;;
+
+  # Run non-flaky tests sequentially against the GKE soak cluster from
+  # kubernetes-soak-weekly-deploy-gke.
+  kubernetes-soak-continuous-e2e-gke)
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-soak-weekly"}
+    : ${E2E_NETWORK:="gke-soak-weekly"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_UP:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    # TODO(mbforbes): Do we need to set PATH here?
+    : ${PATH="/usr/local/share/google/google-cloud-sdk/bin:${PATH}"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    # TODO(mbforbes): Do we need to set CLOUDSDK_CORE_PROJECT here?
+    : ${CLOUDSDK_CORE_PROJECT:="${PROJECT}"}
     ;;
 esac
 
@@ -311,9 +513,9 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
     tar -xzf kubernetes-test.tar.gz
 
     # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
-    if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
+    if [[ "${E2E_SET_CLUSTER_API_VERSION:-}" =~ ^[yY]$ ]]; then
         export CLUSTER_API_VERSION=$(echo ${githash} | cut -c 2-)
-    elif [[ ${JENKINS_USE_RELEASE_TARS:-} =~ ^[yY]$ ]]; then
+    elif [[ "${JENKINS_USE_RELEASE_TARS:-}" =~ ^[yY]$ ]]; then
         release=$(gsutil cat gs://kubernetes-release/release/${version_file}.txt | cut -c 2-)
         export CLUSTER_API_VERSION=${release}
     fi
