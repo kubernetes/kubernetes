@@ -55,7 +55,7 @@ First configure the cluster information in cluster/ubuntu/config-default.sh, bel
 ```
 export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 
-export roles=("ai" "i" "i")
+export roles="ai i i"
 
 export NUM_MINIONS=${NUM_MINIONS:-3}
 
