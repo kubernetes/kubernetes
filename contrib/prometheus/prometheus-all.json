@@ -21,8 +21,8 @@
             "spec": {
                 "containers": [
                     {
-                        "name":"kube-promdash",
                         "image": "prom/promdash",
+                        "name": "kube-promdash",
                         "env": [
                             {
                                 "name": "DATABASE_URL",
@@ -44,15 +44,14 @@
                         ]
                     },
                     {
-                        "command": ["./run_prometheus.sh", "-t", "KUBERNETES_RO", "-d", "/var/prometheus/"],
                         "image": "jayunit100/kube-prometheus",
                         "name": "kube-prometheus",
-                        "ports": [
-                            {
-                                "containerPort": 9090,
-                                "hostPort": 9090,
-                                "protocol": "TCP"
-                            }
+                        "command": [
+                            "./run_prometheus.sh",
+                            "-t",
+                            "KUBERNETES_RO,PUSHGATEWAY",
+                            "-d",
+                            "/var/prometheus/"
                         ],
                         "env": [
                             {
@@ -62,6 +61,21 @@
                             {
                                 "name": "KUBERNETES_RO_SERVICE_PORT",
                                 "value": "8001"
+                            },
+                            {
+                                "name": "PUSHGATEWAY_SERVICE_HOST",
+                                "value": "localhost"
+                            },
+                            {
+                                "name": "PUSHGATEWAY_SERVICE_PORT",
+                                "value": "9091"
+                            }
+                        ],
+                        "ports": [
+                            {
+                                "containerPort": 9090,
+                                "hostPort": 9090,
+                                "protocol": "TCP"
                             }
                         ],
                         "volumeMounts": [
@@ -72,12 +86,26 @@
                         ]
                     },
                     {
-                        "name": "kubectl",
-                        "image": "gcr.io/google_containers/kubectl:v0.18.0-350-gfb3305edcf6c1a",
-                        "args": [
-                            "proxy", "-p", "8001", "--api-prefix=/"
+                        "image": "jayunit100/prompush:0.2.0",
+                        "name": "pushgateway",
+                        "ports": [
+                            {
+                                "containerPort": 9091,
+                                "hostPort": 9091,
+                                "protocol": "TCP"
+                            }
                         ]
-                    }
+                    },
+                    {
+                        "image": "gcr.io/google_containers/kubectl:v0.18.0-350-gfb3305edcf6c1a",
+                        "name": "kubectl",
+                        "args": [
+                            "proxy",
+                            "-p",
+                            "8001",
+                            "--api-prefix=/"
+                        ]
+                     }
                 ],
                 "volumes": [
                     {

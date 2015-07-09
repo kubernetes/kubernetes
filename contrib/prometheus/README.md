@@ -29,17 +29,22 @@ Looks open enough :).
 
 ## Prometheus 
 
-You can launch prometheus easily, by simply running.
+You can launch prometheus, promdash, and pushgateway easily, by simply running.
 
 `kubectl create -f contrib/prometheus/prometheus-all.json`
 
-Then (edit the publicIP field in prometheus-service to be a public ip on one of your kubelets), 
+This will launch the pushgateway such that prometheus is collecting metrics from it automatically.
 
-and run 
+NOTE: If you plan to use the push gateway to push metrics (for example, we use it in e2e tests) 
 
-`kubectl create -f contrib/prometheus/prometheus-service.json`
+you will want to have a stable IP that you can provide the push gateway from, and you may need to modify the NodePort stuff for your cloud provider.   
+
+And then, create corresponding services, like this.. note that the pushgateway service may/may not be functional, but we leave it in for good measure.
+
+`kubectl create -f contrib/prometheus/prometheus-service.json ; kubectl create -f contrib/prometheus/pushgateway-service.json`
 
 Now, you can access the service `wget 10.0.1.89:9090`, and build graphs.
+
 
 ## How it works
 
@@ -73,7 +78,6 @@ at port 9090.
 
 - We should publish this image into the kube/ namespace.
 - Possibly use postgre or mysql as a promdash database.
-- push gateway (https://github.com/prometheus/pushgateway) setup.
 - stop using kubectl to make a local proxy faking the old RO port and build in
   real auth capabilities.
 
