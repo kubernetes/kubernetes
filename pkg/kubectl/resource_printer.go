@@ -476,10 +476,16 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer, withNamespace bool, wid
 
 	// Lay out all the other containers on separate lines.
 	for _, container := range containers {
-		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "")
-		if err != nil {
-			return err
+		if withNamespace {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", "", container.Name, container.Image, ""); err != nil {
+				return err
+			}
+		} else {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", "", container.Name, container.Image, ""); err != nil {
+				return err
+			}
 		}
+
 	}
 	return nil
 }
@@ -523,10 +529,16 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 
 	// Lay out all the other containers on separate lines.
 	for _, container := range containers {
-		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "", "")
-		if err != nil {
-			return err
+		if withNamespace {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", "", "", container.Name, container.Image, "", ""); err != nil {
+				return err
+			}
+		} else {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "", ""); err != nil {
+				return err
+			}
 		}
+
 	}
 	return nil
 }
@@ -580,8 +592,14 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 			port = fmt.Sprintf("%d/%s", svc.Spec.Ports[i].Port, svc.Spec.Ports[i].Protocol)
 		}
 		// Lay out additional ports.
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", "", "", ip, port); err != nil {
-			return err
+		if withNamespace {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", "", "", "", "", ip, port); err != nil {
+				return err
+			}
+		} else {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", "", "", ip, port); err != nil {
+				return err
+			}
 		}
 	}
 
