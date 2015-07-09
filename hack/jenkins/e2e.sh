@@ -190,6 +190,19 @@ case ${JOB_NAME} in
     MINION_SIZE="n1-standard-1"
     NUM_MINIONS="2"
     ;;
+
+  # Runs non-flaky tests on GCE on the release-latest branch,
+  # sequentially. As a reminder, if you need to change the skip list
+  # or flaky test list on the release branch, you'll need to propose a
+  # pull request directly to the release branch itself.
+  kubernetes-e2e-gce-release)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-gce-release"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-release"}
+    ;;
 esac
 
 # AWS variables
