@@ -1,19 +1,17 @@
 # Kubernetes UI Instructions
 
 ## Kubernetes User Interface
-Kubernetes has an extensible user interface with default functionality that describes the current cluster. 
+Kubernetes has a web-based user interface that displays the current cluster state graphically. 
 
-### Running remotely
-When Kubernetes is deployed remotely, the UI is deployed as a cluster addon. To access it, visit `/ui`, which redirects to `/api/v1/proxy/namespaces/default/services/kube-ui/#/dashboard/`, on your master server.
+## Accessing the UI
+By default, the Kubernetes UI is deployed remotely as a cluster addon. To access it, visit `/ui` on your master server, which redirects to `/api/v1/proxy/namespaces/kube-system/services/kube-ui/#/dashboard/`.
 
-### Running locally
-Assuming that you have a cluster running locally at `localhost:8080`, as described [here](getting-started-guides/locally.md), you can run the UI against it with kubectl:
-
-```sh
-kubectl proxy --www=www/app --www-prefix=/
+If the UI cluster addon isn't running, you can start it manually with the following commands.
+```shell
+cd cluster/addons/kube-ui/image
+make kube-ui
+make push 
 ```
-
-You should now be able to access it by visiting [localhost:8001](http://localhost:8001/).
 
 ## Using the UI
 The Kubernetes UI can be used to introspect your current cluster, such as checking how resources are used, or looking at error messages. You cannot, however, use the UI to modify your cluster. 
