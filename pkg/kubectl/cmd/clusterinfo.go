@@ -46,7 +46,7 @@ func NewCmdClusterInfo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	if os.Args[1] == "clusterinfo" {
+	if len(os.Args) > 1 && os.Args[1] == "clusterinfo" {
 		printDeprecationWarning("cluster-info", "clusterinfo")
 	}
 

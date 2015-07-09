@@ -70,7 +70,7 @@ func NewCmdRun(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func Run(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if os.Args[1] == "run-container" {
+	if len(os.Args) > 1 && os.Args[1] == "run-container" {
 		printDeprecationWarning("run", "run-container")
 	}
 
