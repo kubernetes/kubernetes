@@ -17,7 +17,7 @@ certainly want the docs that go with that version.</h1>
 The developer guide is for anyone wanting to either write code which directly accesses the
 kubernetes API, or to contribute directly to the kubernetes project.
 It assumes some familiarity with concepts in the [User Guide](user-guide.md) and the [Cluster Admin
-Guide](cluster-admin-guide.md).
+Guide](admin/README.md).
 
 
 ## Developing against the Kubernetes API
@@ -35,10 +35,10 @@ Guide](cluster-admin-guide.md).
 
 ## Writing Plugins
 
-* **Authentication Plugins** ([authentication.md](authentication.md)):
+* **Authentication Plugins** ([admin/authentication.md](admin/authentication.md)):
   The current and planned states of authentication tokens.
 
-* **Authorization Plugins** ([authorization.md](authorization.md)):
+* **Authorization Plugins** ([admin/authorization.md](admin/authorization.md)):
   Authorization applies to all HTTP requests on the main apiserver port.
   This doc explains the available authorization implementations.
 

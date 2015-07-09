@@ -20,7 +20,7 @@ Overall API conventions are described in the [API conventions doc](api-conventio
 
 Complete API details are documented via [Swagger](http://swagger.io/). The Kubernetes apiserver (aka "master") exports an API that can be used to retrieve the [Swagger spec](https://github.com/swagger-api/swagger-spec/tree/master/schemas/v1.2) for the Kubernetes API, by default at `/swaggerapi`, and a UI you can use to browse the API documentation at `/swagger-ui`. We also periodically update a [statically generated UI](http://kubernetes.io/third_party/swagger-ui/).
 
-Remote access to the API is discussed in the [access doc](accessing_the_api.md).
+Remote access to the API is discussed in the [access doc](admin/accessing-the-api.md).
 
 The Kubernetes API also serves as the foundation for the declarative configuration schema for the system. The [Kubectl](user-guide/kubectl/kubectl.md) command-line tool can be used to create, update, delete, and get API objects.
 
@@ -48,7 +48,7 @@ As of June 4, 2015, the Kubernetes v1 API has been enabled by default. The v1bet
 
 ### v1 conversion tips (from v1beta3)
 
-We're working to convert all documentation and examples to v1. A simple [API conversion tool](cluster_management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
+We're working to convert all documentation and examples to v1. A simple [API conversion tool](admin/cluster-management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
 
 Changes to services are the most significant difference between v1beta3 and v1.
 

@@ -129,7 +129,7 @@ a pod tries to egress beyond GCE's project the packets must be SNAT'ed
 
 With the primary aim of providing IP-per-pod-model, other implementations exist
 to serve the purpose outside of GCE.
-  - [OpenVSwitch with GRE/VxLAN](../ovs-networking.md)
+  - [OpenVSwitch with GRE/VxLAN](../admin/ovs-networking.md)
   - [Flannel](https://github.com/coreos/flannel#flannel)
   - [L2 networks](http://blog.oddbit.com/2014/08/11/four-ways-to-connect-a-docker/)
     ("With Linux Bridge devices" section)
