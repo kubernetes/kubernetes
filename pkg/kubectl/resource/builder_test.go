@@ -114,6 +114,10 @@ func testData() (*api.PodList, *api.ServiceList) {
 		Items: []api.Service{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: api.ServiceSpec{
+					Type:            "ClusterIP",
+					SessionAffinity: "None",
+				},
 			},
 		},
 	}
@@ -374,7 +378,7 @@ func TestResourceByName(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 	if !reflect.DeepEqual(&pods.Items[0], test.Objects()[0]) {
-		t.Errorf("unexpected object: %#v", test.Objects())
+		t.Errorf("unexpected object: %#v", test.Objects()[0])
 	}
 
 	mapping, err := b.Do().ResourceMapping()
@@ -415,6 +419,34 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 
 	if _, err := b.Do().ResourceMapping(); err == nil {
 		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestResourceNames(t *testing.T) {
+	pods, svc := testData()
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+		"/namespaces/test/services/baz": runtime.EncodeOrDie(latest.Codec, &svc.Items[0]),
+	})).
+		NamespaceParam("test")
+
+	test := &testVisitor{}
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	b.ResourceNames("pods", "foo", "services/baz")
+
+	err := b.Do().Visit(test.Handle)
+	if err != nil || len(test.Infos) != 2 {
+		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
+	}
+	if !reflect.DeepEqual(&pods.Items[0], test.Objects()[0]) {
+		t.Errorf("unexpected object: \n%#v, expected: \n%#v", test.Objects()[0], &pods.Items[0])
+	}
+	if !reflect.DeepEqual(&svc.Items[0], test.Objects()[1]) {
+		t.Errorf("unexpected object: \n%#v, expected: \n%#v", test.Objects()[1], &svc.Items[0])
 	}
 }
 
