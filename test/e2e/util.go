@@ -1274,6 +1274,21 @@ waitLoop:
 	return nil
 }
 
+// Wait up to 10 minutes for getting pods with certain label
+func waitForPodsWithLabel(c *client.Client, ns string, label labels.Selector) (pods *api.PodList, err error) {
+	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
+		pods, err = c.Pods(ns).List(label, fields.Everything())
+		Expect(err).NotTo(HaveOccurred())
+		if len(pods.Items) > 0 {
+			break
+		}
+	}
+	if pods == nil || len(pods.Items) == 0 {
+		err = fmt.Errorf("Timeout while waiting for pods with label %v", label)
+	}
+	return
+}
+
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
 	By(fmt.Sprintf("%v Deleting replication controller %s in namespace %s", time.Now(), name, ns))
