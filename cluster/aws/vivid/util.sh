@@ -15,62 +15,63 @@
 # limitations under the License.
 
 
-# A library of helper functions for Wheezy.
-
 source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
 
-SSH_USER=admin
+SSH_USER=ubuntu
 
-# Detects the AMI to use for wheezy (considering the region)
-# Source: https://wiki.debian.org/Cloud/AmazonEC2Image/Wheezy
+
+# Detects the AMI to use for ubuntu (considering the region)
 #
 # Vars set:
 #   AWS_IMAGE
-function detect-wheezy-image () {
+function detect-vivid-image () {
+  # This is the ubuntu 15.04 image for <region>, amd64, hvm:ebs-ssd
+  # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
+  # This will need to be updated from time to time as amis are deprecated
   if [[ -z "${AWS_IMAGE-}" ]]; then
     case "${AWS_REGION}" in
       ap-northeast-1)
-        AWS_IMAGE=ami-b25d44b3
+        AWS_IMAGE=ami-907fa690
         ;;
 
       ap-southeast-1)
-        AWS_IMAGE=ami-aeb49ffc
-        ;;
-
-      ap-southeast-2)
-        AWS_IMAGE=ami-6b770351
+        AWS_IMAGE=ami-b4a79de6
         ;;
 
       eu-central-1)
-        AWS_IMAGE=ami-98043785
+        AWS_IMAGE=ami-e8635bf5
         ;;
 
       eu-west-1)
-        AWS_IMAGE=ami-61e56916
+        AWS_IMAGE=ami-0fd0ae78
         ;;
 
       sa-east-1)
-        AWS_IMAGE=ami-3d8b3720
+        AWS_IMAGE=ami-f9f675e4
         ;;
 
       us-east-1)
-        AWS_IMAGE=ami-e0efab88
+        AWS_IMAGE=ami-f57b8f9e
         ;;
 
       us-west-1)
-        AWS_IMAGE=ami-b4869ff1
-        ;;
-
-      us-west-2)
-        AWS_IMAGE=ami-431a4273
-        ;;
-
-      us-gov-west-1)
-        AWS_IMAGE=ami-d13455f2
+        AWS_IMAGE=ami-87b643c3
         ;;
 
       cn-north-1)
-        AWS_IMAGE=ami-48029071
+        AWS_IMAGE=ami-3abf2203
+        ;;
+
+      #us-gov-west-1)
+      #  AWS_IMAGE=?Not available?
+      #  ;;
+
+      ap-southeast-2)
+        AWS_IMAGE=ami-1bb9c221
+        ;;
+
+      us-west-2)
+        AWS_IMAGE=ami-33566d03
         ;;
 
       *)
@@ -79,3 +80,4 @@ function detect-wheezy-image () {
     esac
   fi
 }
+

@@ -75,6 +75,9 @@
   {% set system_container = "--system-container=/system" -%}
   {% set cgroup_root = "--cgroup_root=/" -%}
 {% endif -%}
+{% if grains['oscodename'] == 'vivid' -%}
+  {% set cgroup_root = "--cgroup_root=docker" -%}
+{% endif -%}
 
 {% set pod_cidr = "" %}
 {% if grains['roles'][0] == 'kubernetes-master' and grains.get('cbr-cidr') %}

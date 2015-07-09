@@ -15,62 +15,62 @@
 # limitations under the License.
 
 
-# A library of helper functions for Wheezy.
+# A library of helper functions for Jessie.
 
 source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
 
 SSH_USER=admin
 
-# Detects the AMI to use for wheezy (considering the region)
-# Source: https://wiki.debian.org/Cloud/AmazonEC2Image/Wheezy
+# Detects the AMI to use for jessie (considering the region)
+# Source: https://wiki.debian.org/Cloud/AmazonEC2Image/Jessie
 #
 # Vars set:
 #   AWS_IMAGE
-function detect-wheezy-image () {
+function detect-jessie-image () {
   if [[ -z "${AWS_IMAGE-}" ]]; then
     case "${AWS_REGION}" in
       ap-northeast-1)
-        AWS_IMAGE=ami-b25d44b3
+        AWS_IMAGE=ami-e624fbe6
         ;;
 
       ap-southeast-1)
-        AWS_IMAGE=ami-aeb49ffc
+        AWS_IMAGE=ami-ac360cfe
         ;;
 
       ap-southeast-2)
-        AWS_IMAGE=ami-6b770351
+        AWS_IMAGE=ami-bbc5bd81
         ;;
 
       eu-central-1)
-        AWS_IMAGE=ami-98043785
+        AWS_IMAGE=ami-02b78e1f
         ;;
 
       eu-west-1)
-        AWS_IMAGE=ami-61e56916
+        AWS_IMAGE=ami-e31a6594
         ;;
 
       sa-east-1)
-        AWS_IMAGE=ami-3d8b3720
+        AWS_IMAGE=ami-0972f214
         ;;
 
       us-east-1)
-        AWS_IMAGE=ami-e0efab88
+        AWS_IMAGE=ami-116d857a
         ;;
 
       us-west-1)
-        AWS_IMAGE=ami-b4869ff1
+        AWS_IMAGE=ami-05cf2541
         ;;
 
       us-west-2)
-        AWS_IMAGE=ami-431a4273
-        ;;
-
-      us-gov-west-1)
-        AWS_IMAGE=ami-d13455f2
+        AWS_IMAGE=ami-818eb7b1
         ;;
 
       cn-north-1)
-        AWS_IMAGE=ami-48029071
+        AWS_IMAGE=ami-888815b1
+        ;;
+
+      us-gov-west-1)
+        AWS_IMAGE=ami-35b5d516
         ;;
 
       *)

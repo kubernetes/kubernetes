@@ -15,9 +15,7 @@
 # limitations under the License.
 
 
-# A library of helper functions for Ubuntu.
-
-source "${KUBE_ROOT}/cluster/aws/ubuntu/common.sh"
+source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
 
 # TODO: Move image detection in here once it is no longer shared with CoreOS
 

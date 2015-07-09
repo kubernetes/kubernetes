@@ -76,8 +76,13 @@ If your machines don't have any ephemeral disks, this will default to the aufs d
 
 **KUBE_OS_DISTRIBUTION**
 
-The distribution to use.  Valid options: `wheezy`, `ubuntu`, `coreos`.
+The distribution to use.  Valid options: `trusty`, `vivid`, `coreos`, `wheezy`, `jessie`
 
-Defaults to wheezy (Debian Wheezy), which is the same as is used by default on GCE.
+Defaults to vivid (Ubuntu Vivid Vervet), which has a modern kernel and does not require updating or a reboot.
+
+`coreos` is also a good option.
+
+Other options may require reboots, updates or configuration, and should be used only if you have a compelling
+requirement to do so.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()
