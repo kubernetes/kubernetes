@@ -21,7 +21,7 @@
 - name: Enable apiserver
   service: name=kube-apiserver enabled=yes state=started
 
-- name: Get the node token values
+- name: Get the master token values
   slurp:
     src: "{{ kube_token_dir }}/{{ item }}-{{ inventory_hostname }}.token"
   with_items:
