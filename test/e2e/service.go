@@ -327,6 +327,9 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should be able to change the type and nodeport settings of a service", func() {
+		// requires ExternalLoadBalancer
+		SkipUnlessProviderIs("gce", "gke", "aws")
+
 		serviceName := "mutability-service-test"
 		ns := namespaces[0]
 
@@ -490,6 +493,9 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should release the load balancer when Type goes from LoadBalancer -> NodePort", func() {
+		// requires ExternalLoadBalancer
+		SkipUnlessProviderIs("gce", "gke", "aws")
+
 		serviceName := "service-release-lb"
 		ns := namespaces[0]
 
