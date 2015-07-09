@@ -23,16 +23,18 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+# Find binary
 gendocs=$(kube::util::find-binary "gendocs")
 genman=$(kube::util::find-binary "genman")
 genbashcomp=$(kube::util::find-binary "genbashcomp")
+mungedocs=$(kube::util::find-binary "mungedocs")
 
-if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" ]]; then
+if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" || ! -x "$mungedocs" ]]; then
   {
-    echo "It looks as if you don't have a compiled gendocs, genman, or genbashcomp binary"
+    echo "It looks as if you don't have a compiled gendocs, genman, genbashcomp or mungedocs binary"
     echo
     echo "If you are running from a clone of the git repo, please run"
-    echo "'./hack/build-go.sh cmd/gendocs cmd/genman cmd/genbashcomp'."
+    echo "'./hack/build-go.sh cmd/gendocs cmd/genman cmd/genbashcomp cmd/mungedocs'."
   } >&2
   exit 1
 fi
@@ -43,6 +45,17 @@ _tmp="${KUBE_ROOT}/_tmp"
 
 mkdir -p "${_tmp}"
 cp -a "${DOCROOT}" "${TMP_DOCROOT}"
+
+"${mungedocs}" "--verify=true" "--root-dir=${TMP_DOCROOT}"
+ret=$?
+if [[ $ret -eq 1 ]]; then
+  echo "${DOCROOT} is out of date. Please run hack/run-gendocs.sh"
+  exit 1
+fi
+if [[ $ret -eq 2 ]]; then
+  echo "Error running mungedocs"
+  exit 1
+fi
 
 kube::util::gen-doc "${genman}" "${TMP_DOCROOT}/man/man1/"
 kube::util::gen-doc "${gendocs}" "${TMP_DOCROOT}"

@@ -22,20 +22,31 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman cmd/genbashcomp
+"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman cmd/genbashcomp cmd/mungedocs
 
 # Find binary
 gendocs=$(kube::util::find-binary "gendocs")
 genman=$(kube::util::find-binary "genman")
 genbashcomp=$(kube::util::find-binary "genbashcomp")
+mungedocs=$(kube::util::find-binary "mungedocs")
 
-if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" ]]; then
+if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" || ! -x "$mungedocs" ]]; then
   {
-    echo "It looks as if you don't have a compiled gendocs, genman, or genbashcomp binary"
+    echo "It looks as if you don't have a compiled gendocs, genman, genbashcomp or mungedocs binary"
     echo
     echo "If you are running from a clone of the git repo, please run"
-    echo "'./hack/build-go.sh cmd/gendocs cmd/genman cmd/genbashcomp'."
+    echo "'./hack/build-go.sh cmd/gendocs cmd/genman cmd/genbashcomp cmd/mungedocs'."
   } >&2
+  exit 1
+fi
+
+"${mungedocs}" "--root-dir=${KUBE_ROOT}/docs/" 
+ret=$?
+if [[ $ret -eq 1 ]]; then
+  echo "${KUBE_ROOT}/docs/ requires manual changes.  See proceeding errors."
+  exit 1
+elif [[ $ret -eq 2 ]]; then
+  echo "Error running mungedocs."
   exit 1
 fi
 
