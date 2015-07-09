@@ -70,7 +70,6 @@ var _ = Describe("Services", func() {
 		}
 	})
 
-	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 	It("should provide secure master service", func() {
 		_, err := c.Services(api.NamespaceDefault).Get("kubernetes")
 		Expect(err).NotTo(HaveOccurred())
@@ -989,6 +988,75 @@ func updateService(c *client.Client, namespace, serviceName string, update func(
 	return service, err
 }
 
+var _ = Describe("Services", func() {
+	f := NewFramework("services-temp")
+
+	var t *explorerTest
+	BeforeEach(func() {
+		t = newDefaultExplorerTest(f.Client, f.Namespace.Name)
+	})
+
+	It("should serve round-robin services round-robin", func() {
+		_, _, svc := t.setup()
+
+		nodeName := getFirstNodeNameOrDie(f.Client)
+
+		h := histogram{}
+		var previousHostname string
+		sampleSize := 20
+		for i := 0; i < sampleSize; i++ {
+			// we have to ssh in order to view the cluster through the lense of a Pod,
+			// i.e. this is the easiest way to only proxy through a single kube-proxy.
+			// unfortunately we can't use the apiserver proxy for this.
+			stdout, stderr, code, err := SSH("curl --silent http://"+svc.Spec.ClusterIP+"/hostname/", nodeName, testContext.Provider)
+			Expect(err).NotTo(HaveOccurred(), "error executing ssh: %v", err)
+			Expect(code == 0).To(BeTrue(), "error code of curling service IP was expected to be 0, but was %d: %s", code, stderr)
+
+			hostname := strings.Trim(stdout, " ")
+			Expect(hostname == previousHostname).To(BeFalse(), "this hostname should not have been the last hostname")
+			h.observe(hostname)
+		}
+		for _, count := range h {
+			Expect(count == sampleSize/2).To(BeTrue(), "expected count to be half of sample size %v but was %v", sampleSize, count)
+		}
+	})
+
+	It("should be unaffected by pod death", func() {
+		_, pods, svc := t.setup()
+
+		nodeName := getFirstNodeNameOrDie(f.Client)
+
+		podToKill := pods.Items[0]
+
+		Logf("killing one pod in rc")
+		_, err := f.Client.RESTClient.Get().
+			AbsPath("api/v1/proxy/namespaces", f.Namespace.Name, "pods", podToKill.Name, "quit").
+			DoRaw()
+		Expect(err).NotTo(HaveOccurred(), "error deleteing pod: %v", err)
+
+		Logf("checking service")
+		Expect(wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+			stdin, stderr, code, err := SSH("curl --fail --silent http://"+svc.Spec.ClusterIP+"/hostname/", nodeName, testContext.Provider)
+			if err != nil {
+				return false, fmt.Errorf("error executing ssh: %v", err)
+			}
+			if code != 0 {
+				return false, fmt.Errorf("error code was expected to be 0, but was %d: %s", code, stderr)
+
+			}
+			hostname := strings.Trim(stdin, " ")
+			Logf("recieved response from pod: %s", hostname)
+			if hostname != podToKill.Name {
+				// not done waiting for pod
+				return false, nil
+			}
+			Logf("killed pod came back without service disruption")
+			return true, nil
+		})).NotTo(HaveOccurred(), "error waiting for the pod to come back up")
+
+	})
+})
+
 func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string) (*api.Service, error) {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	const timeout = 20 * time.Minute
@@ -1249,9 +1317,6 @@ func testReachable(ip string, port int) {
 		}
 		if resp.StatusCode != 200 {
 			return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s", resp.Status, url, string(body))
-		}
-		if !strings.Contains(string(body), "test-webserver") {
-			return false, fmt.Errorf("received response body without expected substring 'test-webserver': %s", string(body))
 		}
 		Logf("Successfully reached %v", url)
 		return true, nil
@@ -1550,4 +1615,135 @@ func (t *WebserverTest) Cleanup() []error {
 	}
 
 	return errs
+}
+
+func getFirstNodeNameOrDie(c *client.Client) string {
+	nodeNames, err := NodeSSHHosts(c)
+	Expect(err).NotTo(HaveOccurred(), "error retrieving node names for ssh: %v", err)
+	Expect(len(nodeNames) > 0).To(BeTrue(), "NodeSSHHosts returned no node names")
+	return nodeNames[0]
+}
+
+type histogram map[string]int
+
+func (h histogram) observe(record string) {
+	h[record] = h[record] + 1
+}
+
+func newDefaultExplorerTest(c *client.Client, namespace string) *explorerTest {
+	return &explorerTest{
+		replicas: 2,
+		labels: map[string]string{
+			"foo": "bar",
+			"baz": "quix",
+		},
+		Client:    c,
+		namespace: namespace,
+		svcName:   "service",
+		rcName:    "replication-controller",
+	}
+}
+
+type explorerTest struct {
+	*client.Client
+	replicas        int
+	labels          map[string]string
+	namespace       string
+	svcName, rcName string
+}
+
+func (et *explorerTest) setup() (*api.ReplicationController, *api.PodList, *api.Service) {
+	rc, pods, err := et.createRC()
+	Expect(err).NotTo(HaveOccurred(), "rc failed to come up: %v", err)
+	svc, err := et.createSvc()
+	Expect(err).NotTo(HaveOccurred(), "svc failed to come up: %v", err)
+	err = et.waitForEndpoints()
+	Expect(err).NotTo(HaveOccurred(), "failed to wait for endpoints: %v", err)
+	Logf("default explorer test setup compelete")
+	return rc, pods, svc
+}
+
+func (et *explorerTest) createRC() (*api.ReplicationController, *api.PodList, error) {
+	rc, err := et.ReplicationControllers(et.namespace).Create(&api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{Name: et.rcName},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: et.replicas,
+			Selector: et.labels,
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: et.labels,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "explorer",
+							Image: "gcr.io/google_containers/explorer:1.0",
+							Args:  []string{"-port", "80"},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var pods *api.PodList
+
+	err = wait.Poll(poll, podStartTimeout, func() (bool, error) {
+		pods, err = et.Pods(et.namespace).List(labels.Set(et.labels).AsSelector(), fields.Everything())
+		if et.replicas != len(pods.Items) {
+			Logf("wrong number of running pods, expected %v. got %v", et.replicas, len(pods.Items))
+			return false, nil
+		}
+		for i, pod := range pods.Items {
+			if !api.IsPodReady(&pod) {
+				Logf("pod %v not ready, phase:%q", i, pod.Status.Phase)
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return rc, pods, nil
+}
+
+func (et *explorerTest) createSvc() (*api.Service, error) {
+	svc, err := et.Services(et.namespace).Create(&api.Service{
+		ObjectMeta: api.ObjectMeta{Name: et.svcName},
+		Spec: api.ServiceSpec{
+			Selector: et.labels,
+			Ports: []api.ServicePort{
+				{
+					Port:       80,
+					TargetPort: util.NewIntOrStringFromInt(80),
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return svc, nil
+}
+
+func (et *explorerTest) waitForEndpoints() error {
+	return wait.Poll(poll, podStartTimeout, func() (bool, error) {
+		es, err := et.Endpoints(et.namespace).Get(et.svcName)
+		if err != nil {
+			Logf("error waiting for endpoints: %v", err)
+			return false, nil
+		}
+		for _, s := range es.Subsets {
+			if len(s.Addresses) != et.replicas {
+				Logf("only %d replicas have joined the endpoints pool", len(s.Addresses))
+				return false, nil
+			}
+		}
+		Logf("endpoints are ready")
+		return true, nil
+	})
 }
