@@ -190,16 +190,14 @@ $ kubectl run snowflake --image=kubernetes/serve_hostname --replicas=2
 We have just created a replication controller whose replica size is 2 that is running the pod called snowflake with a basic container that just serves the hostname.
 
 ```shell
-kubectl get rc
-CONTROLLER          CONTAINER(S)        IMAGE(S)                    SELECTOR                  REPLICAS
-snowflake           snowflake           kubernetes/serve_hostname   run=snowflake   2
+$ kubectl get rc
+CONTROLLER   CONTAINER(S)   IMAGE(S)                    SELECTOR        REPLICAS
+snowflake    snowflake      kubernetes/serve_hostname   run=snowflake   2
 
 $ kubectl get pods
-POD               IP           CONTAINER(S)   IMAGE(S)                    HOST                                   LABELS                    STATUS    CREATED         MESSAGE
-snowflake-mbrfi   10.244.2.4                                              kubernetes-minion-ilqx/104.197.8.214   run=snowflake             Running   About an hour
-                               snowflake      kubernetes/serve_hostname                                                                    Running   About an hour
-snowflake-p78ev   10.244.2.5                                              kubernetes-minion-ilqx/104.197.8.214   run=snowflake             Running   About an hour
-                               snowflake      kubernetes/serve_hostname                                                                    Running   About an hour
+NAME              READY     STATUS    RESTARTS   AGE
+snowflake-8w0qn   1/1       Running   0          22s
+snowflake-jrpzb   1/1       Running   0          22s
 ```
 
 And this is great, developers are able to do what they want, and they do not have to worry about affecting content in the production namespace.
@@ -214,10 +212,10 @@ The production namespace should be empty.
 
 ```shell
 $ kubectl get rc
-CONTROLLER          CONTAINER(S)        IMAGE(S)            SELECTOR            REPLICAS
+CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR   REPLICAS
 
 $ kubectl get pods
-POD                 IP                  CONTAINER(S)        IMAGE(S)            HOST                LABELS              STATUS          CREATED       MESSAGE
+NAME      READY     STATUS    RESTARTS   AGE
 ```
 
 Production likes to run cattle, so let's create some cattle pods.
@@ -226,21 +224,16 @@ Production likes to run cattle, so let's create some cattle pods.
 $ kubectl run cattle --image=kubernetes/serve_hostname --replicas=5
 
 $ kubectl get rc
-CONTROLLER          CONTAINER(S)        IMAGE(S)                    SELECTOR               REPLICAS
-cattle              cattle              kubernetes/serve_hostname   run=cattle             5
+CONTROLLER   CONTAINER(S)   IMAGE(S)                    SELECTOR     REPLICAS
+cattle       cattle         kubernetes/serve_hostname   run=cattle   5
 
 $ kubectl get pods
-POD            IP           CONTAINER(S)   IMAGE(S)                    HOST                                    LABELS                 STATUS    CREATED         MESSAGE
-cattle-1kyvj   10.244.0.4                                              kubernetes-minion-7s1y/23.236.54.97     run=cattle             Running   About an hour
-                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour
-cattle-kobrk   10.244.1.4                                              kubernetes-minion-cfs6/104.154.61.231   run=cattle             Running   About an hour
-                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour
-cattle-l1v9t   10.244.0.5                                              kubernetes-minion-7s1y/23.236.54.97     run=cattle             Running   About an hour
-                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour
-cattle-ne2sj   10.244.3.7                                              kubernetes-minion-x8gx/104.154.47.83    run=cattle             Running   About an hour
-                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour
-cattle-qrk4x   10.244.0.6                                              kubernetes-minion-7s1y/23.236.54.97     run=cattle             Running   About an hour
-                            cattle         kubernetes/serve_hostname  
+NAME           READY     STATUS    RESTARTS   AGE
+cattle-97rva   1/1       Running   0          12s
+cattle-i9ojn   1/1       Running   0          12s
+cattle-qj3yv   1/1       Running   0          12s
+cattle-yc7vn   1/1       Running   0          12s
+cattle-zz7ea   1/1       Running   0          12s
 ```
 
 At this point, it should be clear that the resources users create in one namespace are hidden from the other namespace.
