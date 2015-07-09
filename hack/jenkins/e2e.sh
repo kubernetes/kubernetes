@@ -75,8 +75,7 @@ Example\
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TEST_REGEX="\
-Shell.*services\
-|MaxPods.*\
+MaxPods.*\
 "
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TEST_REGEX="\
@@ -100,7 +99,6 @@ Elasticsearch\
 |Services.*functioning\sexternal\sload\sbalancer\
 |Services.*identically\snamed\
 |Services.*release.*load\sbalancer\
-|Shell\
 |multiport\sendpoints\
 "
 
