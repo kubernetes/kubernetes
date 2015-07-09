@@ -18,6 +18,9 @@ package kubelet
 
 import (
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -55,6 +58,9 @@ type realContainerGC struct {
 
 	// Policy for garbage collection.
 	policy ContainerGCPolicy
+
+	// The path to the symlinked docker logs
+	containerLogsDir string
 }
 
 // New containerGC instance with the specified policy.
@@ -64,8 +70,9 @@ func newContainerGC(dockerClient dockertools.DockerInterface, policy ContainerGC
 	}
 
 	return &realContainerGC{
-		dockerClient: dockerClient,
-		policy:       policy,
+		dockerClient:     dockerClient,
+		policy:           policy,
+		containerLogsDir: containerLogsDir,
 	}, nil
 }
 
@@ -79,6 +86,13 @@ type containerGCInfo struct {
 
 	// Creation time for the container.
 	createTime time.Time
+
+	// Full pod name, including namespace in the format `namespace_podName`.
+	// This comes from dockertools.ParseDockerName(...)
+	podNameWithNamespace string
+
+	// Container name in pod
+	containerName string
 }
 
 // Containers are considered for eviction as units of (UID, container name) pair.
@@ -157,6 +171,18 @@ func (cgc *realContainerGC) GarbageCollect() error {
 		}
 	}
 
+	// Remove dead symlinks - should only happen on upgrade
+	// from a k8s version without proper log symlink cleanup
+	logSymlinks, _ := filepath.Glob(path.Join(cgc.containerLogsDir, fmt.Sprintf("*.%s", dockertools.LogSuffix)))
+	for _, logSymlink := range logSymlinks {
+		if _, err = os.Stat(logSymlink); os.IsNotExist(err) {
+			err = os.Remove(logSymlink)
+			if err != nil {
+				glog.Warningf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -178,6 +204,11 @@ func (cgc *realContainerGC) removeOldestN(containers []containerGCInfo, toRemove
 		err := cgc.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containers[i].id})
 		if err != nil {
 			glog.Warningf("Failed to remove dead container %q: %v", containers[i].name, err)
+		}
+		symlinkPath := dockertools.LogSymlink(cgc.containerLogsDir, containers[i].podNameWithNamespace, containers[i].containerName, containers[i].id)
+		err = os.Remove(symlinkPath)
+		if !os.IsNotExist(err) {
+			glog.Warningf("Failed to remove container %q log symlink %q: %v", containers[i].name, symlinkPath, err)
 		}
 	}
 
@@ -223,6 +254,8 @@ func (cgc *realContainerGC) evictableContainers() (containersByEvictUnit, []cont
 				uid:  containerName.PodUID,
 				name: containerName.ContainerName,
 			}
+			containerInfo.podNameWithNamespace = containerName.PodFullName
+			containerInfo.containerName = containerName.ContainerName
 			evictUnits[key] = append(evictUnits[key], containerInfo)
 		}
 	}
