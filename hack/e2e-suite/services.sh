@@ -233,12 +233,12 @@ function wait_for_service_up() {
     results=($(ssh-to-node "${test_node}" "
         set -e;
         for i in $(seq -s' ' 1 $(($4*3))); do
-          curl -s --connect-timeout 1 http://$2:$3;
+          wget -q -T 1 -O - http://$2:$3 || true;
           echo;
         done | sort -n | uniq
         "))
 
-    found_pods=$(sort_args "${results[@]}")
+    found_pods=$(sort_args "${results[@]:+${results[@]}}")
     if [[ "${found_pods}" == "$5" ]]; then
       return
     fi
@@ -280,12 +280,12 @@ function verify_from_container() {
         sudo docker pull gcr.io/google_containers/busybox >/dev/null;
         sudo docker run gcr.io/google_containers/busybox sh -c '
             for i in $(seq -s' ' 1 $(($4*3))); do
-              wget -q -T 1 -O - http://$2:$3;
+              wget -q -T 1 -O - http://$2:$3 || true;
               echo;
             done
         '" | sort -n | uniq))
 
-    found_pods=$(sort_args "${results[@]}")
+    found_pods=$(sort_args "${results[@]:+${results[@]}}")
     if [[ "${found_pods}" == "$5" ]]; then
       return
     fi
