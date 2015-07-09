@@ -80,8 +80,10 @@ func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		EnableProfiling:       true,
 		EnableUISupport:       false,
 		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
+		// Enable v1beta3 if we are testing that version.
+		EnableV1Beta3:    testapi.Version() == "v1beta3",
+		Authorizer:       apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl: admit.NewAlwaysAdmit(),
 	})
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

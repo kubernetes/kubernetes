@@ -66,8 +66,10 @@ func TestSecrets(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:      admit.NewAlwaysAdmit(),
+		// Enable v1beta3 if we are testing that version.
+		EnableV1Beta3:    testapi.Version() == "v1beta3",
+		Authorizer:       apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl: admit.NewAlwaysAdmit(),
 	})
 
 	framework.DeleteAllEtcdKeys()
