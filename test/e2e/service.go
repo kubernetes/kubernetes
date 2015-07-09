@@ -245,8 +245,12 @@ var _ = Describe("Services", func() {
 			}
 		}()
 
+		inboundPort := 3000
+
 		service := t.BuildServiceSpec()
 		service.Spec.Type = api.ServiceTypeLoadBalancer
+		service.Spec.Ports[0].Port = inboundPort
+		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
 
 		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
 		result, err := t.CreateService(service)
@@ -278,7 +282,7 @@ var _ = Describe("Services", func() {
 		testReachable(pickMinionIP(c), port.NodePort)
 
 		By("hitting the pod through the service's external load balancer")
-		testLoadBalancerReachable(ingress, 80)
+		testLoadBalancerReachable(ingress, inboundPort)
 	})
 
 	It("should be able to create a functioning NodePort service", func() {
