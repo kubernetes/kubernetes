@@ -30,7 +30,7 @@ spec:
     resources:
       limits:
         cpu: "0.5"
-    image: gcr.io/google_containers/cassandra:v4
+    image: gcr.io/google_containers/cassandra:v5
     name: cassandra
     ports:
     - name: cql
@@ -166,7 +166,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v4
+          image: gcr.io/google_containers/cassandra:v5
           name: cassandra
           ports:
             - containerPort: 9042
