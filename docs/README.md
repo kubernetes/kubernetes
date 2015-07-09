@@ -17,7 +17,7 @@ certainly want the docs that go with that version.</h1>
 * The [User's guide](user-guide.md) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
 
-* The [Cluster Admin's guide](cluster-admin-guide.md) is for anyone setting up
+* The [Cluster Admin's guide](admin/README.md) is for anyone setting up
   a Kubernetes cluster or administering it.
 
 * The [Developer guide](developer-guide.md) is for anyone wanting to write

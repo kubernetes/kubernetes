@@ -86,7 +86,7 @@ distinguish distinct entities, and reference particular entities across operatio
 
 A *Namespace* provides an authorization scope for accessing content associated with the *Namespace*.
 
-See [Authorization plugins](../authorization.md)
+See [Authorization plugins](../admin/authorization.md)
 
 ### Limit Resource Consumption
 

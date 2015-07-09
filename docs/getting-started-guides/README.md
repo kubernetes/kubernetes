@@ -62,7 +62,7 @@ Definition of columns:
   - **OS** is the base operating system of the nodes.
   - **Config. Mgmt** is the configuration management system that helps install and maintain kubernetes software on the
     nodes.
-  - **Networking** is what implements the [networking model](../../docs/networking.md).  Those with networking type
+  - **Networking** is what implements the [networking model](../../docs/admin/networking.md).  Those with networking type
     _none_ may not support more than one node, or may support multiple VM nodes only in the same physical node.
   - **Conformance** indicates whether a cluster created with this configuration has passed the project's conformance
     tests for supporting the API and base features of Kubernetes v1.0.0. 
