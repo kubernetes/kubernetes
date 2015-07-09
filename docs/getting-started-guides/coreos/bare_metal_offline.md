@@ -4,20 +4,20 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 
 **Table of Contents**
 
-- [Prerequisites](#prerequisites)
-- [High Level Design](#high-level-design)
-- [This Guides variables](#this-guides-variables)
-- [Setup PXELINUX CentOS](#setup-pxelinux-centos)
-- [Adding CoreOS to PXE](#adding-coreos-to-pxe)
-- [DHCP configuration](#dhcp-configuration)
-- [Kubernetes](#kubernetes)
-- [Cloud Configs](#cloud-configs)
-    - [master.yml](#masteryml)
-    - [node.yml](#nodeyml)
-- [New pxelinux.cfg file](#new-pxelinuxcfg-file)
-- [Specify the pxelinux targets](#specify-the-pxelinux-targets)
-- [Creating test pod](#creating-test-pod)
-- [Helping commands for debugging](#helping-commands-for-debugging)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#prerequisites)
+- [High Level Design](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#high-level-design)
+- [This Guides variables](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#this-guides-variables)
+- [Setup PXELINUX CentOS](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#setup-pxelinux-centos)
+- [Adding CoreOS to PXE](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#adding-coreos-to-pxe)
+- [DHCP configuration](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#dhcp-configuration)
+- [Kubernetes](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#kubernetes)
+- [Cloud Configs](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#cloud-configs)
+    - [master.yml](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#masteryml)
+    - [node.yml](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#nodeyml)
+- [New pxelinux.cfg file](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#new-pxelinuxcfg-file)
+- [Specify the pxelinux targets](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#specify-the-pxelinux-targets)
+- [Creating test pod](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#creating-test-pod)
+- [Helping commands for debugging](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/#helping-commands-for-debugging)
 
 
 ## Prerequisites
@@ -213,7 +213,7 @@ Now for the good stuff!
 ## Cloud Configs
 The following config files are tailored for the OFFLINE version of a Kubernetes deployment.
 
-These are based on the work found here: [master.yml](./cloud-configs/master.yaml), [node.yml](./cloud-configs/node.yaml)
+These are based on the work found here: [master.yml](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/./cloud-configs/master.yaml), [node.yml](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/./cloud-configs/node.yaml)
 
 To make the setup work, you need to replace a few placeholders:
 
@@ -620,9 +620,9 @@ Reboot these servers to get the images PXEd and ready for running containers!
 ## Creating test pod
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-See [a simple nginx example](../../../examples/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/../../../examples/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../../examples).
+For more complete applications, please look in the [examples directory](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/../../../examples).
 
 ## Helping commands for debugging
 

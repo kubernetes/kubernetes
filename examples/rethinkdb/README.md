@@ -92,7 +92,7 @@ rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080
 rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      28015/TCP
 ```
 
-We request for an external load balancer in the [admin-service.yaml](admin-service.yaml) file:
+We request for an external load balancer in the [admin-service.yaml](http://releases.k8s.io/HEAD/examples/rethinkdb/admin-service.yaml) file:
 
 ```
 type: LoadBalancer
@@ -120,7 +120,7 @@ since the ui is not stateless when playing with Web Admin UI will cause `Connect
 **BTW**
 
   * `gen_pod.sh` is using to generate pod templates for my local cluster,
-the generated pods which is using `nodeSelector` to force k8s to schedule containers to my designate nodes, for I need to access persistent data on my host dirs. Note that one needs to label the node before 'nodeSelector' can work, see this [tutorial](../node-selection/)
+the generated pods which is using `nodeSelector` to force k8s to schedule containers to my designate nodes, for I need to access persistent data on my host dirs. Note that one needs to label the node before 'nodeSelector' can work, see this [tutorial](http://releases.k8s.io/HEAD/examples/rethinkdb/../node-selection/)
 
   * see [antmanler/rethinkdb-k8s](https://github.com/antmanler/rethinkdb-k8s) for detail
 

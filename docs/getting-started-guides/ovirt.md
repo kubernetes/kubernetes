@@ -3,10 +3,10 @@ Getting started on oVirt
 
 **Table of Contents**
 
-- [What is oVirt](#what-is-ovirt)
-- [oVirt Cloud Provider Deployment](#ovirt-cloud-provider-deployment)
-- [Using the oVirt Cloud Provider](#using-the-ovirt-cloud-provider)
-- [oVirt Cloud Provider Screencast](#ovirt-cloud-provider-screencast)
+- [What is oVirt](http://releases.k8s.io/HEAD/docs/getting-started-guides/#what-is-ovirt)
+- [oVirt Cloud Provider Deployment](http://releases.k8s.io/HEAD/docs/getting-started-guides/#ovirt-cloud-provider-deployment)
+- [Using the oVirt Cloud Provider](http://releases.k8s.io/HEAD/docs/getting-started-guides/#using-the-ovirt-cloud-provider)
+- [oVirt Cloud Provider Screencast](http://releases.k8s.io/HEAD/docs/getting-started-guides/#ovirt-cloud-provider-screencast)
 
 ## What is oVirt
 

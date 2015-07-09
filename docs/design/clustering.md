@@ -49,7 +49,7 @@ The building blocks of an easier solution:
 
 In this sequence diagram there is out of band admin entity that is creating all certificates and distributing them.  It is also making sure that the kubelets know where to find the master.  This provides for a lot of control but is more difficult to set up as lots of information must be communicated outside of Kubernetes.
 
-![Static Sequence Diagram](clustering/static.png)
+![Static Sequence Diagram](http://releases.k8s.io/HEAD/docs/design/clustering/static.png)
 
 ### Dynamic Clustering
 
@@ -57,7 +57,7 @@ This diagram dynamic clustering using the bootstrap API endpoint.  That API endp
 
 This flow has the admin manually approving the kubelet signing requests.  This is the `queue` policy defined above.This manual intervention could be replaced by code that can verify the signing requests via other means.
 
-![Dynamic Sequence Diagram](clustering/dynamic.png)
+![Dynamic Sequence Diagram](http://releases.k8s.io/HEAD/docs/design/clustering/dynamic.png)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/clustering.md?pixel)]()

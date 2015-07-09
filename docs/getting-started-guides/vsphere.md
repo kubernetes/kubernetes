@@ -8,10 +8,10 @@ convenient).
 
 **Table of Contents**
 
-- [Prerequisites](#prerequisites)
-- [Setup](#setup)
-- [Starting a cluster](#starting-a-cluster)
-- [Extra: debugging deployment failure](#extra-debugging-deployment-failure)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+- [Setup](http://releases.k8s.io/HEAD/docs/getting-started-guides/#setup)
+- [Starting a cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#starting-a-cluster)
+- [Extra: debugging deployment failure](http://releases.k8s.io/HEAD/docs/getting-started-guides/#extra-debugging-deployment-failure)
 
 ### Prerequisites
 
@@ -31,7 +31,7 @@ convenient).
    go get github.com/vmware/govmomi/govc
    ```
 
-5. Get or build a [binary release](binary_release.md)
+5. Get or build a [binary release](http://releases.k8s.io/HEAD/docs/getting-started-guides/binary_release.md)
 
 ### Setup
 

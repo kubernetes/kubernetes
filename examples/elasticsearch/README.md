@@ -3,18 +3,18 @@
 This directory contains the source for a Docker image that creates an instance
 of [Elasticsearch](https://www.elastic.co/products/elasticsearch) 1.5.2 which can 
 be used to automatically form clusters when used
-with [replication controllers](../../docs/replication-controller.md). This will not work with the library Elasticsearch image
+with [replication controllers](http://releases.k8s.io/HEAD/examples/elasticsearch/../../docs/replication-controller.md). This will not work with the library Elasticsearch image
 because multicast discovery will not find the other pod IPs needed to form a cluster. This
-image detects other Elasticsearch [pods](../../docs/pods.md) running in a specified [namespace](../../docs/namespaces.md) with a given
+image detects other Elasticsearch [pods](http://releases.k8s.io/HEAD/examples/elasticsearch/../../docs/pods.md) running in a specified [namespace](http://releases.k8s.io/HEAD/examples/elasticsearch/../../docs/namespaces.md) with a given
 label selector. The detected instances are used to form a list of peer hosts which
 are used as part of the unicast discovery mechansim for Elasticsearch. The detection
 of the peer nodes is done by a program which communicates with the Kubernetes API
 server to get a list of matching Elasticsearch pods. To enable authenticated
-communication this image needs a [secret](../../docs/secrets.md) to be mounted at `/etc/apiserver-secret`
+communication this image needs a [secret](http://releases.k8s.io/HEAD/examples/elasticsearch/../../docs/secrets.md) to be mounted at `/etc/apiserver-secret`
 with the basic authentication username and password.
 
 Here is an example replication controller specification that creates 4 instances of Elasticsearch which is in the file
-[music-rc.yaml](music-rc.yaml).
+[music-rc.yaml](http://releases.k8s.io/HEAD/examples/elasticsearch/music-rc.yaml).
 ```
 apiVersion: v1
 kind: ReplicationController
@@ -66,7 +66,7 @@ to be used to search for Elasticsearch pods and this should be the same as the n
 for the replication controller (in this case `mytunes`). 
 
 Before creating pods with the replication controller a secret containing the bearer authentication token
-should be set up. A template is provided in the file [apiserver-secret.yaml](apiserver-secret.yaml):
+should be set up. A template is provided in the file [apiserver-secret.yaml](http://releases.k8s.io/HEAD/examples/elasticsearch/apiserver-secret.yaml):
 ```
 apiVersion: v1
 kind: Secret
@@ -113,8 +113,8 @@ $ kubectl create -f music-rc.yaml --namespace=mytunes
 replicationcontrollers/music-db
 
 ```
-It's also useful to have a [service](../../docs/services.md) with an load balancer for accessing the Elasticsearch
-cluster which can be found in the file [music-service.yaml](music-service.yaml).
+It's also useful to have a [service](http://releases.k8s.io/HEAD/examples/elasticsearch/../../docs/services.md) with an load balancer for accessing the Elasticsearch
+cluster which can be found in the file [music-service.yaml](http://releases.k8s.io/HEAD/examples/elasticsearch/music-service.yaml).
 ```
 apiVersion: v1
 kind: Service

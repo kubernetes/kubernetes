@@ -3,15 +3,15 @@ Getting started with Kubernetes on Mesos
 
 **Table of Contents**
 
-- [About Kubernetes on Mesos](#about-kubernetes-on-mesos)
-    - [Prerequisites](#prerequisites)
-    - [Deploy Kubernetes-Mesos](#deploy-kubernetes-mesos)
-    - [Deploy etcd](#deploy-etcd)
-    - [Start Kubernetes-Mesos Services](#start-kubernetes-mesos-services)
-        - [Validate KM Services](#validate-km-services)
-- [Spin up a pod](#spin-up-a-pod)
-- [Run the Example Guestbook App](#run-the-example-guestbook-app)
-        - [Test Guestbook App](#test-guestbook-app)
+- [About Kubernetes on Mesos](http://releases.k8s.io/HEAD/docs/getting-started-guides/#about-kubernetes-on-mesos)
+    - [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+    - [Deploy Kubernetes-Mesos](http://releases.k8s.io/HEAD/docs/getting-started-guides/#deploy-kubernetes-mesos)
+    - [Deploy etcd](http://releases.k8s.io/HEAD/docs/getting-started-guides/#deploy-etcd)
+    - [Start Kubernetes-Mesos Services](http://releases.k8s.io/HEAD/docs/getting-started-guides/#start-kubernetes-mesos-services)
+        - [Validate KM Services](http://releases.k8s.io/HEAD/docs/getting-started-guides/#validate-km-services)
+- [Spin up a pod](http://releases.k8s.io/HEAD/docs/getting-started-guides/#spin-up-a-pod)
+- [Run the Example Guestbook App](http://releases.k8s.io/HEAD/docs/getting-started-guides/#run-the-example-guestbook-app)
+        - [Test Guestbook App](http://releases.k8s.io/HEAD/docs/getting-started-guides/#test-guestbook-app)
 
 ## About Kubernetes on Mesos
 <!-- TODO: Update, clean up. -->

@@ -2,7 +2,7 @@
 
 This guide is to help users debug applications that are deployed into Kubernetes and not behaving correctly.
 This is *not* a guide for people who want to debug their cluster.  For that you should check out
-[this guide](cluster-troubleshooting.md)
+[this guide](http://releases.k8s.io/HEAD/docs/cluster-troubleshooting.md)
 
 ## FAQ
 Users are highly encouraged to check out our [FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
@@ -10,9 +10,9 @@ Users are highly encouraged to check out our [FAQ](https://github.com/GoogleClou
 ## Diagnosing the problem
 The first step in troubleshooting is triage.  What is the problem?  Is it your Pods, your Replication Controller or
 your Service?
-   * [Debugging Pods](#debugging-pods)
-   * [Debugging Replication Controllers](#debugging-replication-controllers)
-   * [Debugging Services](#debugging-services)
+   * [Debugging Pods](http://releases.k8s.io/HEAD/docs/#debugging-pods)
+   * [Debugging Replication Controllers](http://releases.k8s.io/HEAD/docs/#debugging-replication-controllers)
+   * [Debugging Services](http://releases.k8s.io/HEAD/docs/#debugging-services)
 
 ### Debugging Pods
 The first step in debugging a Pod is taking a look at it.  For the purposes of example, imagine we have a pod
@@ -28,9 +28,9 @@ kubectl describe pods ${POD_NAME}
 Look at the state of the containers in the pod.  Are they all ```Running```?  Have there been recent restarts?
 
 Depending on the state of the pod, you may want to:
-   * [Debug a pending pod](#debugging-pending-pods)
-   * [Debug a waiting pod](#debugging-waiting-pods)
-   * [Debug a crashing pod](#debugging-crashing-pods-or-otherwise-unhealthy-pods)
+   * [Debug a pending pod](http://releases.k8s.io/HEAD/docs/#debugging-pending-pods)
+   * [Debug a waiting pod](http://releases.k8s.io/HEAD/docs/#debugging-waiting-pods)
+   * [Debug a crashing pod](http://releases.k8s.io/HEAD/docs/#debugging-crashing-pods-or-otherwise-unhealthy-pods)
 
 #### Debuging Pending Pods
 If a Pod is stuck in ```Pending``` it means that it can not be scheduled onto a node.  Generally this is because
@@ -86,7 +86,7 @@ feature request on GitHub describing your use case and why these tools are insuf
 
 ### Debugging Replication Controllers
 Replication controllers are fairly straightforward.  They can either create Pods or they can't.  If they can't
-create pods, then please refer to the [instructions above](#debugging-pods)
+create pods, then please refer to the [instructions above](http://releases.k8s.io/HEAD/docs/#debugging-pods)
 
 You can also use ```kubectl describe rc ${CONTROLLER_NAME}``` to introspect events related to the replication
 controller.
@@ -138,7 +138,7 @@ in the endpoints list, it's likely that the proxy can't contact your pods.
 
 There are three things to
 check:
-   * Are your pods working correctly?  Look for restart count, and [debug pods](#debugging-pods)
+   * Are your pods working correctly?  Look for restart count, and [debug pods](http://releases.k8s.io/HEAD/docs/#debugging-pods)
    * Can you connect to your pods directly?  Get the IP address for the Pod, and try to connect directly to that IP
    * Is your application serving on the port that you configured?  Kubernetes doesn't do port remapping, so if your application serves on 8080, the ```containerPort``` field needs to be 8080.
 

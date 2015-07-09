@@ -8,7 +8,7 @@ You will setup an [Apache ZooKeeper](http://zookeeper.apache.org/)
 service, a Storm master service (a.k.a. Nimbus server), and a set of
 Storm workers (a.k.a. supervisors).
 
-For the impatient expert, jump straight to the [tl;dr](#tldr)
+For the impatient expert, jump straight to the [tl;dr](http://releases.k8s.io/HEAD/examples/storm/#tldr)
 section.
 
 ### Sources
@@ -27,17 +27,17 @@ instructions for your platform.
 
 ## Step One: Start your ZooKeeper service
 
-ZooKeeper is a distributed coordination [service](../../docs/services.md) that Storm uses as a
+ZooKeeper is a distributed coordination [service](http://releases.k8s.io/HEAD/examples/storm/../../docs/services.md) that Storm uses as a
 bootstrap and for state storage.
 
-Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a [pod](../../docs/pods.md) running
+Use the [`examples/storm/zookeeper.json`](http://releases.k8s.io/HEAD/examples/storm/zookeeper.json) file to create a [pod](http://releases.k8s.io/HEAD/examples/storm/../../docs/pods.md) running
 the ZooKeeper service.
 
 ```shell
 $ kubectl create -f examples/storm/zookeeper.json
 ```
 
-Then, use the [`examples/storm/zookeeper-service.json`](zookeeper-service.json) file to create a
+Then, use the [`examples/storm/zookeeper-service.json`](http://releases.k8s.io/HEAD/examples/storm/zookeeper-service.json) file to create a
 logical service endpoint that Storm can use to access the ZooKeeper
 pod.
 
@@ -73,14 +73,14 @@ imok
 The Nimbus service is the master (or head) service for a Storm
 cluster. It depends on a functional ZooKeeper service.
 
-Use the [`examples/storm/storm-nimbus.json`](storm-nimbus.json) file to create a pod running
+Use the [`examples/storm/storm-nimbus.json`](http://releases.k8s.io/HEAD/examples/storm/storm-nimbus.json) file to create a pod running
 the Nimbus service.
 
 ```shell
 $ kubectl create -f examples/storm/storm-nimbus.json
 ```
 
-Then, use the [`examples/storm/storm-nimbus-service.json`](storm-nimbus-service.json) file to
+Then, use the [`examples/storm/storm-nimbus-service.json`](http://releases.k8s.io/HEAD/examples/storm/storm-nimbus-service.json) file to
 create a logical service endpoint that Storm workers can use to access
 the Nimbus pod.
 
@@ -113,8 +113,8 @@ the Nimbus service.
 The Storm workers need both the ZooKeeper and Nimbus services to be
 running.
 
-Use the [`examples/storm/storm-worker-controller.json`](storm-worker-controller.json) file to create a
-[replication controller](../../docs/replication-controller.md) that manages the worker pods.
+Use the [`examples/storm/storm-worker-controller.json`](http://releases.k8s.io/HEAD/examples/storm/storm-worker-controller.json) file to create a
+[replication controller](http://releases.k8s.io/HEAD/examples/storm/../../docs/replication-controller.md) that manages the worker pods.
 
 ```shell
 $ kubectl create -f examples/storm/storm-worker-controller.json
@@ -129,11 +129,11 @@ ZooKeeper service about how many clients it has.
 $  echo stat | nc 10.254.139.141 2181; echo
 Zookeeper version: 3.4.6--1, built on 10/23/2014 14:18 GMT
 Clients:
- /192.168.48.0:44187[0](queued=0,recved=1,sent=0)
- /192.168.45.0:39568[1](queued=0,recved=14072,sent=14072)
- /192.168.86.1:57591[1](queued=0,recved=34,sent=34)
- /192.168.8.0:50375[1](queued=0,recved=34,sent=34)
- /192.168.45.0:39576[1](queued=0,recved=34,sent=34)
+ /192.168.48.0:44187[0](http://releases.k8s.io/HEAD/examples/storm/queued=0,recved=1,sent=0)
+ /192.168.45.0:39568[1](http://releases.k8s.io/HEAD/examples/storm/queued=0,recved=14072,sent=14072)
+ /192.168.86.1:57591[1](http://releases.k8s.io/HEAD/examples/storm/queued=0,recved=34,sent=34)
+ /192.168.8.0:50375[1](http://releases.k8s.io/HEAD/examples/storm/queued=0,recved=34,sent=34)
+ /192.168.45.0:39576[1](http://releases.k8s.io/HEAD/examples/storm/queued=0,recved=34,sent=34)
 
 Latency min/avg/max: 0/2/2570
 Received: 23199

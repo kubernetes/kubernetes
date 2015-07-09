@@ -1,12 +1,12 @@
 # Kubernetes Cluster Admin Guide
 
 The cluster admin guide is for anyone creating or administering a Kubernetes cluster.
-It assumes some familiarity with concepts in the [User Guide](user-guide.md).
+It assumes some familiarity with concepts in the [User Guide](http://releases.k8s.io/HEAD/docs/user-guide.md).
 
 ## Planning a cluster
 
 There are many different examples of how to setup a kubernetes cluster.  Many of them are listed in this
-[matrix](getting-started-guides/README.md).  We call each of the combinations in this matrix a *distro*.
+[matrix](http://releases.k8s.io/HEAD/docs/getting-started-guides/README.md).  We call each of the combinations in this matrix a *distro*.
 
 Before choosing a particular guide, here are some things to consider:
  - Are you just looking to try out Kubernetes on your laptop, or build a high-availability many-node cluster? Both
@@ -23,14 +23,14 @@ Before choosing a particular guide, here are some things to consider:
    Kubernetes.
  - If you are configuring kubernetes on-premises, you will need to consider what [networking
    model](networking.md) fits best.
- - If you are designing for very [high-availability](availability.md), you may want multiple clusters in multiple zones.
+ - If you are designing for very [high-availability](http://releases.k8s.io/HEAD/docs/availability.md), you may want multiple clusters in multiple zones.
 
 ## Setting up a cluster
 
-Pick one of the Getting Started Guides from the [matrix](getting-started-guides/README.md) and follow it.
+Pick one of the Getting Started Guides from the [matrix](http://releases.k8s.io/HEAD/docs/getting-started-guides/README.md) and follow it.
 If none of the Getting Started Guides fits, you may want to pull ideas from several of the guides.
 
-One option for custom networking is *OpenVSwitch GRE/VxLAN networking* ([ovs-networking.md](ovs-networking.md)), which
+One option for custom networking is *OpenVSwitch GRE/VxLAN networking* ([ovs-networking.md](http://releases.k8s.io/HEAD/docs/ovs-networking.md)), which
 uses OpenVSwitch to set up networking between pods across
   Kubernetes nodes.
 
@@ -38,39 +38,39 @@ If you are modifying an existing guide which uses Salt, this document explains [
 project.](salt.md).
 
 ## Upgrading a cluster
-[Upgrading a cluster](cluster_management.md).
+[Upgrading a cluster](http://releases.k8s.io/HEAD/docs/cluster_management.md).
 
 ## Managing nodes
 
-[Managing nodes](node.md).
+[Managing nodes](http://releases.k8s.io/HEAD/docs/node.md).
 
 ## Optional Cluster Services
 
-* **DNS Integration with SkyDNS** ([dns.md](dns.md)):
+* **DNS Integration with SkyDNS** ([dns.md](http://releases.k8s.io/HEAD/docs/dns.md)):
   Resolving a DNS name directly to a Kubernetes service.
 
-* **Logging** with [Kibana](logging.md)
+* **Logging** with [Kibana](http://releases.k8s.io/HEAD/docs/logging.md)
 
 ## Multi-tenant support
 
-* **Namespaces** ([namespaces.md](namespaces.md)): Namespaces help different
+* **Namespaces** ([namespaces.md](http://releases.k8s.io/HEAD/docs/namespaces.md)): Namespaces help different
   projects, teams, or customers to share a kubernetes cluster.
 
-* **Resource Quota** ([resource_quota_admin.md](resource_quota_admin.md)) 
+* **Resource Quota** ([resource_quota_admin.md](http://releases.k8s.io/HEAD/docs/resource_quota_admin.md)) 
 
 ## Security
 
-* **Kubernetes Container Environment** ([container-environment.md](container-environment.md)):
+* **Kubernetes Container Environment** ([container-environment.md](http://releases.k8s.io/HEAD/docs/container-environment.md)):
   Describes the environment for Kubelet managed containers on a Kubernetes
   node.
 
-* **Securing access to the API Server** [accessing the api]( accessing_the_api.md)
+* **Securing access to the API Server** [accessing the api](http://releases.k8s.io/HEAD/docs/ accessing_the_api.md)
 
-* **Authentication**  [authentication]( authentication.md)
+* **Authentication**  [authentication](http://releases.k8s.io/HEAD/docs/ authentication.md)
 
-* **Authorization** [authorization]( authorization.md)
+* **Authorization** [authorization](http://releases.k8s.io/HEAD/docs/ authorization.md)
 
-* **Admission Controllers** [admission_controllers]( admission_controllers.md)
+* **Admission Controllers** [admission_controllers](http://releases.k8s.io/HEAD/docs/ admission_controllers.md)
 
 
 

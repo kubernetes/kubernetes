@@ -2,17 +2,17 @@ Running Multi-Node Kubernetes Using Docker
 ------------------------------------------
 
 _Note_:
-These instructions are somewhat significantly more advanced than the [single node](docker.md) instructions.  If you are
+These instructions are somewhat significantly more advanced than the [single node](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker.md) instructions.  If you are
 interested in just starting to explore Kubernetes, we recommend that you start there.
 
 **Table of Contents**
 
-- [Prerequisites](#prerequisites)
-- [Overview](#overview)
-  - [Bootstrap Docker](#bootstrap-docker)
-- [Master Node](#master-node)
-- [Adding a worker node](#adding-a-worker-node)
-- [Testing your cluster](#testing-your-cluster)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+- [Overview](http://releases.k8s.io/HEAD/docs/getting-started-guides/#overview)
+  - [Bootstrap Docker](http://releases.k8s.io/HEAD/docs/getting-started-guides/#bootstrap-docker)
+- [Master Node](http://releases.k8s.io/HEAD/docs/getting-started-guides/#master-node)
+- [Adding a worker node](http://releases.k8s.io/HEAD/docs/getting-started-guides/#adding-a-worker-node)
+- [Testing your cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#testing-your-cluster)
 
 ## Prerequisites
 1. You need a machine with docker installed.
@@ -23,7 +23,7 @@ and a _worker_ node which receives work from the master.  You can repeat the pro
 times to create larger clusters.
 
 Here's a diagram of what the final result will look like:
-![Kubernetes Single Node on Docker](k8s-docker.png)
+![Kubernetes Single Node on Docker](http://releases.k8s.io/HEAD/docs/getting-started-guides/k8s-docker.png)
 
 ### Bootstrap Docker
 This guide also uses a pattern of running two instances of the Docker daemon
@@ -37,19 +37,19 @@ it is still useful to use containers for deployment and management, so we create
 ## Master Node
 The first step in the process is to initialize the master node.
 
-See [here](docker-multinode/master.md) for detailed instructions.
+See [here](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/master.md) for detailed instructions.
 
 ## Adding a worker node
 
 Once your master is up and running you can add one or more workers on different machines.
 
-See [here](docker-multinode/worker.md) for detailed instructions.
+See [here](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/worker.md) for detailed instructions.
 
 ## Testing your cluster
 
-Once your cluster has been created you can [test it out](docker-multinode/testing.md)
+Once your cluster has been created you can [test it out](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/testing.md)
 
-For more complete applications, please look in the [examples directory](../../examples)
+For more complete applications, please look in the [examples directory](http://releases.k8s.io/HEAD/docs/getting-started-guides/../../examples)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode.md?pixel)]()

@@ -10,7 +10,7 @@ A guide refers to scripts, Configuration Management files, and/or binary assets 
 the combination of all these things needed to run on a particular type of infrastructure a
 **distro**.
 
-[The Matrix](../../docs/getting-started-guides/README.md) lists the distros.  If there is already a guide
+[The Matrix](http://releases.k8s.io/HEAD/docs/devel/../../docs/getting-started-guides/README.md) lists the distros.  If there is already a guide
 which is similar to the one you have planned, consider improving that one.
 
 
@@ -29,9 +29,9 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
    search for uses of flags by guides.
  - We may ask that you host binary assets or large amounts of code in our `contrib` directory or on your
    own repo.
- - Setup a cluster and run the [conformance test](../../docs/devel/conformance-test.md) against it, and report the
+ - Setup a cluster and run the [conformance test](http://releases.k8s.io/HEAD/docs/devel/../../docs/devel/conformance-test.md) against it, and report the
    results in your PR.
- - Add or update a row in [The Matrix](../../docs/getting-started-guides/README.md).
+ - Add or update a row in [The Matrix](http://releases.k8s.io/HEAD/docs/devel/../../docs/getting-started-guides/README.md).
  - State the binary version of kubernetes that you tested clearly in your Guide doc and in The Matrix.
  - Even if you are just updating the binary version used, please still do a conformance test.
      - If it worked before and now fails, you can ask on IRC, 

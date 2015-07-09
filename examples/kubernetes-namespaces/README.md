@@ -1,10 +1,10 @@
 ## Kubernetes Namespaces
 
-Kubernetes _[namespaces](../../docs/namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
+Kubernetes _[namespaces](http://releases.k8s.io/HEAD/examples/kubernetes-namespaces/../../docs/namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
 
 It does this by providing the following:
 
-1. A scope for [Names](../../docs/identifiers.md).
+1. A scope for [Names](http://releases.k8s.io/HEAD/examples/kubernetes-namespaces/../../docs/identifiers.md).
 2. A mechanism to attach authorization and policy to a subsection of the cluster.
 
 Use of multiple namespaces is optional.
@@ -15,8 +15,8 @@ This example demonstrates how to use Kubernetes namespaces to subdivide your clu
 
 This example assumes the following:
 
-1. You have an [existing Kubernetes cluster](../../docs/getting-started-guides).
-2. You have a basic understanding of Kubernetes _[pods](../../docs/pods.md)_, _[services](../../docs/services.md)_, and _[replication controllers](../../docs/replication-controller.md)_.
+1. You have an [existing Kubernetes cluster](http://releases.k8s.io/HEAD/examples/kubernetes-namespaces/../../docs/getting-started-guides).
+2. You have a basic understanding of Kubernetes _[pods](http://releases.k8s.io/HEAD/examples/kubernetes-namespaces/../../docs/pods.md)_, _[services](http://releases.k8s.io/HEAD/examples/kubernetes-namespaces/../../docs/services.md)_, and _[replication controllers](http://releases.k8s.io/HEAD/examples/kubernetes-namespaces/../../docs/replication-controller.md)_.
 
 ### Step One: Understand the default namespace
 
@@ -48,7 +48,7 @@ One pattern this organization could follow is to partition the Kubernetes cluste
 
 Let's create two new namespaces to hold our work.
 
-Use the file [`examples/kubernetes-namespaces/namespace-dev.json`](namespace-dev.json) which describes a development namespace:
+Use the file [`examples/kubernetes-namespaces/namespace-dev.json`](http://releases.k8s.io/HEAD/examples/kubernetes-namespaces/namespace-dev.json) which describes a development namespace:
 
 ```js
 {

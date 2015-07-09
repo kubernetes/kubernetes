@@ -1,6 +1,6 @@
 # Persistent Volumes and Claims
 
-This document describes the current state of `PersistentVolumes` in Kubernetes.  Familiarity with [volumes](./volumes.md) is suggested.
+This document describes the current state of `PersistentVolumes` in Kubernetes.  Familiarity with [volumes](http://releases.k8s.io/HEAD/docs/./volumes.md) is suggested.
 
 Managing storage is a distinct problem from managing compute. The `PersistentVolume` subsystem provides an API for users and administrators that abstracts details of how storage is provided from how it is consumed.  To do this we introduce two new API resources:  `PersistentVolume` and `PersistentVolumeClaim`.
 
@@ -8,7 +8,7 @@ A `PersistentVolume` (PV) is a piece of networked storage in the cluster that ha
 
 A `PersistentVolumeClaim` (PVC) is a request for storage by a user.  It is similar to a pod.  Pods consume node resources and PVCs consume PV resources.  Pods can request specific levels of resources (CPU and Memory).  Claims can request specific size and access modes (e.g, can be mounted once read/write or many times read-only).  
 
-Please see the [detailed walkthrough with working examples](../examples/persistent-volumes).
+Please see the [detailed walkthrough with working examples](http://releases.k8s.io/HEAD/docs/../examples/persistent-volumes).
 
 
 ## Lifecycle of a volume and claim
@@ -29,7 +29,7 @@ Claims will remain unbound indefinitely if a matching volume does not exist.  Cl
 
 Pods use claims as volumes. The cluster inspects the claim to find the bound volume and mounts that volume for a pod.  For those volumes that support multiple access modes, the user specifies which mode desired when using their claim as a volume in a pod.
 
-Once a user has a claim and that claim is bound, the bound PV belongs to the user for as long as she needs it. Users schedule Pods and access their their claimed PVs by including a persistentVolumeClaim in their Pod's volumes block. [See below for syntax details](#claims-as-volumes).
+Once a user has a claim and that claim is bound, the bound PV belongs to the user for as long as she needs it. Users schedule Pods and access their their claimed PVs by including a persistentVolumeClaim in their Pod's volumes block. [See below for syntax details](http://releases.k8s.io/HEAD/docs/#claims-as-volumes).
 
 ### Releasing
 
@@ -77,7 +77,7 @@ Each PV contains a spec and status, which is the specification and status of the
 
 ### Capacity
 
-Generally, a PV will have a specific storage capacity.  This is set using the PV's `capacity` attribute.  See the Kubernetes [Resource Model](./design/resources.md) to understand the units expected by `capacity`.
+Generally, a PV will have a specific storage capacity.  This is set using the PV's `capacity` attribute.  See the Kubernetes [Resource Model](http://releases.k8s.io/HEAD/docs/./design/resources.md) to understand the units expected by `capacity`.
 
 Currently, storage size is the only resource that can be set or requested.  Future attributes may include IOPS, throughput, etc.
 
@@ -145,7 +145,7 @@ Claims use the same conventions as volumes when requesting storage with specific
 
 ### Resources
 
-Claims, like pods, can request specific quantities of a resource.  In this case, the request is for storage.  The same [resource model](./design/resources.md) applies to both volumes and claims.
+Claims, like pods, can request specific quantities of a resource.  In this case, the request is for storage.  The same [resource model](http://releases.k8s.io/HEAD/docs/./design/resources.md) applies to both volumes and claims.
 
 ## <a name="claims-as-volumes"></a> Claims As Volumes
 

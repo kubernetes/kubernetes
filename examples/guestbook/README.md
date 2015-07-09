@@ -6,21 +6,21 @@ This example shows how to build a simple, multi-tier web application using Kuber
 
 **Table of Contents**
 
-  - [Step Zero: Prerequisites](#step-zero-prerequisites)
-  - [Step One: Start up the redis master](#step-one-start-up-the-redis-master)
-    - [Optional Interlude](#optional-interlude)
-  - [Step Two: Fire up the redis master service](#step-two-fire-up-the-redis-master-service)
-    - [Finding a service](#finding-a-service)
-  - [Step Three: Fire up the replicated slave pods](#step-three-fire-up-the-replicated-slave-pods)
-  - [Step Four: Create the redis slave service](#step-four-create-the-redis-slave-service)
-  - [Step Five: Create the frontend replicated pods](#step-five-create-the-frontend-replicated-pods)
-  - [Step Six: Set up the guestbook frontend service.](#step-six-set-up-the-guestbook-frontend-service)
-    - [Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)](#using-type-loadbalancer-for-the-frontend-service-cloud-provider-specific)
-    - [Create the Frontend Service](#create-the-frontend-service)
-    - [Accessing the guestbook site externally](#accessing-the-guestbook-site-externally)
-      - [Google Compute Engine External Load Balancer Specifics](#gce-external-load-balancer-specifics)
-  - [Step Seven: Cleanup](#step-seven-cleanup)
-  - [Troubleshooting](#troubleshooting)
+  - [Step Zero: Prerequisites](http://releases.k8s.io/HEAD/examples/guestbook/#step-zero-prerequisites)
+  - [Step One: Start up the redis master](http://releases.k8s.io/HEAD/examples/guestbook/#step-one-start-up-the-redis-master)
+    - [Optional Interlude](http://releases.k8s.io/HEAD/examples/guestbook/#optional-interlude)
+  - [Step Two: Fire up the redis master service](http://releases.k8s.io/HEAD/examples/guestbook/#step-two-fire-up-the-redis-master-service)
+    - [Finding a service](http://releases.k8s.io/HEAD/examples/guestbook/#finding-a-service)
+  - [Step Three: Fire up the replicated slave pods](http://releases.k8s.io/HEAD/examples/guestbook/#step-three-fire-up-the-replicated-slave-pods)
+  - [Step Four: Create the redis slave service](http://releases.k8s.io/HEAD/examples/guestbook/#step-four-create-the-redis-slave-service)
+  - [Step Five: Create the frontend replicated pods](http://releases.k8s.io/HEAD/examples/guestbook/#step-five-create-the-frontend-replicated-pods)
+  - [Step Six: Set up the guestbook frontend service.](http://releases.k8s.io/HEAD/examples/guestbook/#step-six-set-up-the-guestbook-frontend-service)
+    - [Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)](http://releases.k8s.io/HEAD/examples/guestbook/#using-type-loadbalancer-for-the-frontend-service-cloud-provider-specific)
+    - [Create the Frontend Service](http://releases.k8s.io/HEAD/examples/guestbook/#create-the-frontend-service)
+    - [Accessing the guestbook site externally](http://releases.k8s.io/HEAD/examples/guestbook/#accessing-the-guestbook-site-externally)
+      - [Google Compute Engine External Load Balancer Specifics](http://releases.k8s.io/HEAD/examples/guestbook/#gce-external-load-balancer-specifics)
+  - [Step Seven: Cleanup](http://releases.k8s.io/HEAD/examples/guestbook/#step-seven-cleanup)
+  - [Troubleshooting](http://releases.k8s.io/HEAD/examples/guestbook/#troubleshooting)
 
 The example consists of:
 
@@ -33,15 +33,15 @@ The web front end interacts with the redis master via javascript redis API calls
 
 ### Step Zero: Prerequisites
 
-This example requires a running Kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started. As noted above, if you have a Google Container Engine cluster set up, go [here](https://cloud.google.com/container-engine/docs/tutorials/guestbook) instead.
+This example requires a running Kubernetes cluster.  See the [Getting Started guides](http://releases.k8s.io/HEAD/examples/guestbook/../../docs/getting-started-guides) for how to get started. As noted above, if you have a Google Container Engine cluster set up, go [here](https://cloud.google.com/container-engine/docs/tutorials/guestbook) instead.
 
 ### Step One: Start up the redis master
 
 **Note**: The redis master in this example is *not* highly available.  Making it highly available would be an interesting, but intricate exercise— redis doesn't actually support multi-master deployments at this point in time, so high availability would be a somewhat tricky thing to implement, and might involve periodic serialization to disk, and so on.
 
-To start the redis master, use the file `examples/guestbook/redis-master-controller.yaml`, which describes a single [pod](../../docs/pods.md) running a redis key-value server in a container.
+To start the redis master, use the file `examples/guestbook/redis-master-controller.yaml`, which describes a single [pod](http://releases.k8s.io/HEAD/examples/guestbook/../../docs/pods.md) running a redis key-value server in a container.
 
-Although we have a single instance of our redis master, we are using a [replication controller](../../docs/replication-controller.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the replication controller will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
+Although we have a single instance of our redis master, we are using a [replication controller](http://releases.k8s.io/HEAD/examples/guestbook/../../docs/replication-controller.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the replication controller will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
 
 Here is `redis-master-controller.yaml`:
 
@@ -159,10 +159,10 @@ $ docker logs <container_id>
 
 ### Step Two: Fire up the redis master service
 
-A Kubernetes [service](../../docs/services.md) is a named load balancer that proxies traffic to one or more containers. This is done using the [labels](../../docs/labels.md) metadata that we defined in the `redis-master` pod above.  As mentioned, we have only one redis master, but we nevertheless want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
+A Kubernetes [service](http://releases.k8s.io/HEAD/examples/guestbook/../../docs/services.md) is a named load balancer that proxies traffic to one or more containers. This is done using the [labels](http://releases.k8s.io/HEAD/examples/guestbook/../../docs/labels.md) metadata that we defined in the `redis-master` pod above.  As mentioned, we have only one redis master, but we nevertheless want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
 
 Services find the pods to load balance based on the pods' labels.
-The pod that you created in [Step One](#step-one-start-up-the-redis-master) has the label `name=redis-master`.
+The pod that you created in [Step One](http://releases.k8s.io/HEAD/examples/guestbook/#step-one-start-up-the-redis-master) has the label `name=redis-master`.
 The selector field of the service description determines which pods will receive the traffic sent to the service, and the `port` and `targetPort` information defines what port the service proxy will run at.
 
 The file `examples/guestbook/redis-master-service.yaml` defines the redis master service:
@@ -213,7 +213,7 @@ Kubernetes supports two primary modes of finding a service— environment variab
 The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#environment-variables).
 
 An alternative is to use the [cluster's DNS service](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the service name.
-We'll use the DNS service for this example.  E.g., you can see the service name, `redis-master`, accessed as a `host` value in the PHP script in [Step 5](#step-five-create-the-frontend-replicated-pods).
+We'll use the DNS service for this example.  E.g., you can see the service name, `redis-master`, accessed as a `host` value in the PHP script in [Step 5](http://releases.k8s.io/HEAD/examples/guestbook/#step-five-create-the-frontend-replicated-pods).
 
 **Note**: **If your cluster does not have the DNS service enabled, then this example will not work out of the box.** You will need to edit `examples/guestbook/php-redis/index.php` to use environment variables for service discovery instead, then rebuild the container image from the `Dockerfile` in that directory.  (However, this is unlikely to be necessary. You can check for the DNS service in the list of the clusters' services.)
 
@@ -446,7 +446,7 @@ For supported cloud providers, such as Google Compute Engine or Google Container
 in the service `spec`, to expose the service onto an external load balancer IP.
 To do this, uncomment the `type: LoadBalancer` line in the `frontend-service.yaml` file before you start the service.
 
-[See the section below](#accessing-the-guestbook-site-externally) on accessing the guestbook site externally for more details.
+[See the section below](http://releases.k8s.io/HEAD/examples/guestbook/#accessing-the-guestbook-site-externally) on accessing the guestbook site externally for more details.
 
 
 #### Create the Frontend Service ####
@@ -537,7 +537,7 @@ $ <kubernetes>/cluster/kube-down.sh
 
 If you are having trouble bringing up your guestbook app, double check that your external IP is properly defined for your frontend service, and that the firewall for your cluster nodes is open to port 80.
 
-Then, see the [troubleshooting documentation](../../docs/troubleshooting.md) for a further list of common issues and how you can diagnose them.
+Then, see the [troubleshooting documentation](http://releases.k8s.io/HEAD/examples/guestbook/../../docs/troubleshooting.md) for a further list of common issues and how you can diagnose them.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook/README.md?pixel)]()
 

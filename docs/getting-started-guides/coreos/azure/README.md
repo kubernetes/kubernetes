@@ -3,14 +3,14 @@ Kubernetes on Azure with CoreOS and [Weave](http://weave.works)
 
 **Table of Contents**
 
-- [Introduction](#introduction)
-- [Prerequisites](#prerequisites)
-- [Let's go!](#lets-go)
-- [Deploying the workload](#deploying-the-workload)
-- [Scaling](#scaling)
-- [Exposing the app to the outside world](#exposing-the-app-to-the-outside-world)
-- [Next steps](#next-steps)
-- [Tear down...](#tear-down)
+- [Introduction](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/#introduction)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/#prerequisites)
+- [Let's go!](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/#lets-go)
+- [Deploying the workload](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/#deploying-the-workload)
+- [Scaling](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/#scaling)
+- [Exposing the app to the outside world](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/#exposing-the-app-to-the-outside-world)
+- [Next steps](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/#next-steps)
+- [Tear down...](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/#tear-down)
 
 ## Introduction
 
@@ -44,7 +44,7 @@ Now, all you need to do is:
 
 This script will provision a cluster suitable for production use, where there is a ring of 3 dedicated etcd nodes, Kubernetes master and 2 nodes. The `kube-00` VM will be the master, your work loads are only to be deployed on the minion nodes, `kube-01` and `kube-02`. Initially, all VMs are single-core, to ensure a user of the free tier can reproduce it without paying extra. I will show how to add more bigger VMs later.
 
-![VMs in Azure](initial_cluster.png)
+![VMs in Azure](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/initial_cluster.png)
 
 Once the creation of Azure VMs has finished, you should see the following:
 
@@ -180,7 +180,7 @@ frontend-v7tbq   1/1       Running   0          3m
 
 To makes sure the app is working, you probably want to load it in the browser. For accessing the Guestbook service from the outside world, an Azure endpoint needs to be created like shown on the picture below.
 
-![Creating an endpoint](external_access.png)
+![Creating an endpoint](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/external_access.png)
 
 You then should be able to access it from anywhere via the Azure virtual IP for `kube-01`, i.e. `http://104.40.211.194:8000/` as per screenshot.
 
@@ -188,7 +188,7 @@ You then should be able to access it from anywhere via the Azure virtual IP for 
 
 You now have a full-blow cluster running in Azure, congrats!
 
-You should probably try deploy other [example apps](../../../../examples) or write your own ;)
+You should probably try deploy other [example apps](http://releases.k8s.io/HEAD/docs/getting-started-guides/coreos/azure/../../../../examples) or write your own ;)
 
 ## Tear down...
 

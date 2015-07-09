@@ -31,7 +31,7 @@ You should already have turned up a Kubernetes cluster. To get the most of this 
 
 The Celery task queue will need to communicate with the RabbitMQ broker. RabbitMQ will eventually appear on a separate pod, but since pods are ephemeral we need a service that can transparently route requests to RabbitMQ.
 
-Use the file [`examples/celery-rabbitmq/rabbitmq-service.yaml`](rabbitmq-service.yaml):
+Use the file [`examples/celery-rabbitmq/rabbitmq-service.yaml`](http://releases.k8s.io/HEAD/examples/celery-rabbitmq/rabbitmq-service.yaml):
 
 ```yaml
 apiVersion: v1
@@ -59,7 +59,7 @@ This service allows other pods to connect to the rabbitmq. To them, it will be s
 
 ## Step 2: Fire up RabbitMQ
 
-A RabbitMQ broker can be turned up using the file [`examples/celery-rabbitmq/rabbitmq-controller.yaml`](rabbitmq-controller.yaml):
+A RabbitMQ broker can be turned up using the file [`examples/celery-rabbitmq/rabbitmq-controller.yaml`](http://releases.k8s.io/HEAD/examples/celery-rabbitmq/rabbitmq-controller.yaml):
 
 ```yaml
 apiVersion: v1

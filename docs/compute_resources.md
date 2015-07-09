@@ -2,14 +2,14 @@
 
 ** Table of Contents**
 - Compute Resources
-  - [Container and Pod Resource Limits](#container-and-pod-resource-limits)
-  - [How Pods with Resource Limits are Scheduled](#how-pods-with-resource-limits-are-scheduled)
-  - [How Pods with Resource Limits are Run](#how-pods-with-resource-limits-are-run)
-  - [Monitoring Compute Resource Usage](#monitoring-compute-resource-usage)
-  - [Troubleshooting](#troubleshooting)
-  - [Planned Improvements](#planned-improvements)
+  - [Container and Pod Resource Limits](http://releases.k8s.io/HEAD/docs/#container-and-pod-resource-limits)
+  - [How Pods with Resource Limits are Scheduled](http://releases.k8s.io/HEAD/docs/#how-pods-with-resource-limits-are-scheduled)
+  - [How Pods with Resource Limits are Run](http://releases.k8s.io/HEAD/docs/#how-pods-with-resource-limits-are-run)
+  - [Monitoring Compute Resource Usage](http://releases.k8s.io/HEAD/docs/#monitoring-compute-resource-usage)
+  - [Troubleshooting](http://releases.k8s.io/HEAD/docs/#troubleshooting)
+  - [Planned Improvements](http://releases.k8s.io/HEAD/docs/#planned-improvements)
 
-When specifying a [pod](./pods.md), you can optionally specify how much CPU and memory (RAM) each
+When specifying a [pod](http://releases.k8s.io/HEAD/docs/./pods.md), you can optionally specify how much CPU and memory (RAM) each
 container needs.  When containers have resource limits, the scheduler is able to make better
 decisions about which nodes to place pods on, and contention for resources can be handled in a
 consistent manner.
@@ -19,8 +19,8 @@ in units of cores.  Memory is specified in units of bytes.
 
 CPU and RAM are collectively refered to as *compute resources*, or just *resources*.  Compute
 resources are measureable quantities which can be requested, allocated, and consumed.  They are
-distinct from [API resources](./working_with_resources.md).  API resources, such as pods and
-[services](./services.md) are objects that can be written to and retrieved from the Kubernetes API
+distinct from [API resources](http://releases.k8s.io/HEAD/docs/./working_with_resources.md).  API resources, such as pods and
+[services](http://releases.k8s.io/HEAD/docs/./services.md) are objects that can be written to and retrieved from the Kubernetes API
 server.
 
 ## Container and Pod Resource Limits
@@ -110,7 +110,7 @@ However, it will not be killed for excessive CPU usage.
 
 The resource usage of a pod is reported as part of the Pod status.
 
-If [optional monitoring](../cluster/addons/monitoring/README.md) is configured for your cluster,
+If [optional monitoring](http://releases.k8s.io/HEAD/docs/../cluster/addons/monitoring/README.md) is configured for your cluster,
 then pod resource usage can be retrieved from the monitoring system.
 
 ## Troubleshooting
@@ -136,7 +136,7 @@ Here are some example command lines that extract just the necessary information:
 - `kubectl get nodes -o yaml | grep '\sname\|cpu\|memory'`
 - `kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, cap: .status.capacity}'`
 
-The [resource quota](./resource_quota_admin.md) feature can be configured
+The [resource quota](http://releases.k8s.io/HEAD/docs/./resource_quota_admin.md) feature can be configured
 to limit the total amount of resources that can be consumed.  If used in conjunction
 with namespaces, it can prevent one team from hogging all the resources.
 
@@ -144,11 +144,11 @@ with namespaces, it can prevent one team from hogging all the resources.
 
 The current system only allows resource quantities to be specified on a container.
 It is planned to improve accounting for resources which are shared by all containers in a pod,
-such as [EmptyDir volumes](./volumes.md#emptydir).
+such as [EmptyDir volumes](http://releases.k8s.io/HEAD/docs/./volumes.md#emptydir).
 
 The current system only supports container limits for CPU and Memory.
 It is planned to add new resource types, including a node disk space
-resource, and a framework for adding custom [resource types](./design/resources.md#resource-types).
+resource, and a framework for adding custom [resource types](http://releases.k8s.io/HEAD/docs/./design/resources.md#resource-types).
 
 The current system does not facilitate overcommitment of resources because resources reserved
 with container limits are assured.  It is planned to support multiple levels of [Quality of

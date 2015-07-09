@@ -4,9 +4,9 @@
 
 `Node` is a worker machine in Kubernetes, previously known as `Minion`. Node
 may be a VM or physical machine, depending on the cluster. Each node has
-the services necessary to run [Pods](pods.md) and be managed from the master
+the services necessary to run [Pods](http://releases.k8s.io/HEAD/docs/pods.md) and be managed from the master
 systems. The services include docker, kubelet and network proxy. See
-[The Kubernetes Node](design/architecture.md#the-kubernetes-node) section in design
+[The Kubernetes Node](http://releases.k8s.io/HEAD/docs/design/architecture.md#the-kubernetes-node) section in design
 doc for more details.
 
 ## Node Status
@@ -69,7 +69,7 @@ The information is gathered by Kubernetes from the node.
 
 ## Node Management
 
-Unlike [Pods](pods.md) and [Services](services.md), a Node is not inherently
+Unlike [Pods](http://releases.k8s.io/HEAD/docs/pods.md) and [Services](http://releases.k8s.io/HEAD/docs/services.md), a Node is not inherently
 created by Kubernetes: it is either created from cloud providers like Google Compute Engine,
 or from your physical or virtual machines. What this means is that when
 Kubernetes creates a node, it only creates a representation for the node.
@@ -154,7 +154,7 @@ kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": tr
 
 The capacity of the node (number of cpus and amount of memory) is part of the node resource.
 Normally, nodes register themselves and report their capacity when creating the node resource.  If
-you are doing [manual node administration](#manual-node-administration), then you need to set node
+you are doing [manual node administration](http://releases.k8s.io/HEAD/docs/#manual-node-administration), then you need to set node
 capacity when adding a node.
 
 The kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It

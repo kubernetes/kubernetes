@@ -2,8 +2,8 @@
 We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine is ```${MASTER_IP}```
 
 There are two main phases to installing the master:
-   * [Setting up ```flanneld``` and ```etcd```](#setting-up-flanneld-and-etcd)
-   * [Starting the Kubernetes master components](#starting-the-kubernetes-master)
+   * [Setting up ```flanneld``` and ```etcd```](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/#setting-up-flanneld-and-etcd)
+   * [Starting the Kubernetes master components](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/#starting-the-kubernetes-master)
 
 
 ## Setting up flanneld and etcd
@@ -140,7 +140,7 @@ If all else fails, ask questions on IRC at #google-containers.
 
 
 ### Next steps
-Move on to [adding one or more workers](worker.md)
+Move on to [adding one or more workers](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/worker.md)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/master.md?pixel)]()

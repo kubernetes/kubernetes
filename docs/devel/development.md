@@ -2,7 +2,7 @@
 
 # Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](../../build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/docs/devel/../../build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -13,7 +13,7 @@ Kubernetes is written in [Go](http://golang.org) programming language. If you ha
 Below, we outline one of the more common git workflows that core developers use. Other git workflows are also valid.
 
 ### Visual overview
-![Git workflow](git_workflow.png)
+![Git workflow](http://releases.k8s.io/HEAD/docs/devel/git_workflow.png)
 
 ### Fork the main repository
 
@@ -268,16 +268,16 @@ go run hack/e2e.go -v -ctl='delete pod foobar'
 ## Conformance testing
 End-to-end testing, as described above, is for [development
 distributions](../../docs/devel/writing-a-getting-started-guide.md).  A conformance test is used on
-a [versioned distro](../../docs/devel/writing-a-getting-started-guide.md).
+a [versioned distro](http://releases.k8s.io/HEAD/docs/devel/../../docs/devel/writing-a-getting-started-guide.md).
 
 The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not
 require support for up/push/down and other operations.  To run a conformance test, you need to know the
 IP of the master for your cluster and the authorization arguments to use.  The conformance test is
 intended to run against a cluster at a specific binary release of Kubernetes.
-See [conformance-test.sh](../../hack/conformance-test.sh).
+See [conformance-test.sh](http://releases.k8s.io/HEAD/docs/devel/../../hack/conformance-test.sh).
 
 ## Testing out flaky tests
-[Instructions here](flaky-tests.md)
+[Instructions here](http://releases.k8s.io/HEAD/docs/devel/flaky-tests.md)
 
 ## Regenerating the CLI documentation
 

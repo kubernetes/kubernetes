@@ -3,15 +3,15 @@ Getting started on AWS EC2
 
 **Table of Contents**
 
-- [Prerequisites](#prerequisites)
-- [Cluster turnup](#cluster-turnup)
-    - [Supported procedure: `get-kube`](#supported-procedure-get-kube)
-    - [Alternatives](#alternatives)
-- [Getting started with your cluster](#getting-started-with-your-cluster)
-    - [Command line administration tool: `kubectl`](#command-line-administration-tool-kubectl)
-    - [Examples](#examples)
-- [Tearing down the cluster](#tearing-down-the-cluster)
-- [Further reading](#further-reading)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+- [Cluster turnup](http://releases.k8s.io/HEAD/docs/getting-started-guides/#cluster-turnup)
+    - [Supported procedure: `get-kube`](http://releases.k8s.io/HEAD/docs/getting-started-guides/#supported-procedure-get-kube)
+    - [Alternatives](http://releases.k8s.io/HEAD/docs/getting-started-guides/#alternatives)
+- [Getting started with your cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#getting-started-with-your-cluster)
+    - [Command line administration tool: `kubectl`](http://releases.k8s.io/HEAD/docs/getting-started-guides/#command-line-administration-tool-kubectl)
+    - [Examples](http://releases.k8s.io/HEAD/docs/getting-started-guides/#examples)
+- [Tearing down the cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#tearing-down-the-cluster)
+- [Further reading](http://releases.k8s.io/HEAD/docs/getting-started-guides/#further-reading)
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ If these already exist, make sure you want them to be used here.
 NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS_SSH_KEY` key to point to your private key.
 
 ### Alternatives
-A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
+A contributed [example](http://releases.k8s.io/HEAD/docs/getting-started-guides/aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
 AWS CloudFormation or EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
@@ -77,11 +77,11 @@ By default, `kubectl` will use the `kubeconfig` file generated during the cluste
 For more information, please read [kubeconfig files](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubeconfig-file.md)
 
 ### Examples
-See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](http://releases.k8s.io/HEAD/docs/getting-started-guides/../../examples/simple-nginx.md) to try out your new cluster.
 
-The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook)
+The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](http://releases.k8s.io/HEAD/docs/getting-started-guides/../../examples/guestbook)
 
-For more complete applications, please look in the [examples directory](../../examples)
+For more complete applications, please look in the [examples directory](http://releases.k8s.io/HEAD/docs/getting-started-guides/../../examples)
 
 ## Tearing down the cluster
 Make sure the environment variables you used to provision your cluster are still exported, then call the following script inside the

@@ -6,7 +6,7 @@ The example combines a web frontend and an external service that provides MySQL 
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes [services](../../docs/services.md) and that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides):
+This example assumes that you have a basic understanding of kubernetes [services](http://releases.k8s.io/HEAD/examples/phabricator/../../docs/services.md) and that you have forked the repository and [turned up a Kubernetes cluster](http://releases.k8s.io/HEAD/examples/phabricator/../../docs/getting-started-guides):
 
 ```shell
 $ cd kubernetes
@@ -21,7 +21,7 @@ In the remaining part of this example we will assume that your instance is named
 
 ### Step Two: Turn up the phabricator
 
-To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](phabricator-controller.json) which describes a [replication controller](../../docs/replication-controller.md) with a single [pod](../../docs/pods.md) running an Apache server with Phabricator PHP source:
+To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](http://releases.k8s.io/HEAD/examples/phabricator/phabricator-controller.json) which describes a [replication controller](http://releases.k8s.io/HEAD/examples/phabricator/../../docs/replication-controller.md) with a single [pod](http://releases.k8s.io/HEAD/examples/phabricator/../../docs/pods.md) running an Apache server with Phabricator PHP source:
 
 ```js
 {
@@ -113,7 +113,7 @@ This is because the host on which this container is running is not authorized in
 gcloud sql instances patch phabricator-db --authorized-networks 130.211.141.151
 ```
 
-To automate this process and make sure that a proper host is authorized even if pod is rescheduled to a new machine we need a separate pod that periodically lists pods and authorizes hosts. Use the file [`examples/phabricator/authenticator-controller.json`](authenticator-controller.json):
+To automate this process and make sure that a proper host is authorized even if pod is rescheduled to a new machine we need a separate pod that periodically lists pods and authorizes hosts. Use the file [`examples/phabricator/authenticator-controller.json`](http://releases.k8s.io/HEAD/examples/phabricator/authenticator-controller.json):
 
 ```js
 {
@@ -158,7 +158,7 @@ $ kubectl create -f examples/phabricator/authenticator-controller.json
 
 ### Step Four: Turn up the phabricator service
 
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](../../docs/services.md) before proceeding.
+A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](http://releases.k8s.io/HEAD/examples/phabricator/../../docs/services.md) before proceeding.
 
 The pod that you created in Step One has the label `name=phabricator`. The selector field of the service determines which pods will receive the traffic sent to the service. Since we are setting up a service for an external application we also need to request external static IP address (otherwise it will be assigned dynamically):
 
@@ -169,7 +169,7 @@ NAME         REGION      ADDRESS        STATUS
 phabricator  us-central1 107.178.210.6  RESERVED
 ```
 
-Use the file [`examples/phabricator/phabricator-service.json`](phabricator-service.json):
+Use the file [`examples/phabricator/phabricator-service.json`](http://releases.k8s.io/HEAD/examples/phabricator/phabricator-service.json):
 
 ```js
 {

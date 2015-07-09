@@ -7,24 +7,24 @@ services has been deployed.
 
 **Table of Contents**
 
-- [Prerequisites](#prerequisites)
-   - [On Ubuntu](#on-ubuntu)
-   - [With Docker](#with-docker)
-- [Launch Kubernetes cluster](#launch-kubernetes-cluster)
-- [Exploring the cluster](#exploring-the-cluster)
-- [Run some containers!](#run-some-containers)
-- [Scale out cluster](#scale-out-cluster)
-- [Launch the "k8petstore" example app](#launch-the-k8petstore-example-app)
-- [Tear down cluster](#tear-down-cluster)
-- [More Info](#more-info)
-    - [Cloud compatibility](#cloud-compatibility)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+   - [On Ubuntu](http://releases.k8s.io/HEAD/docs/getting-started-guides/#on-ubuntu)
+   - [With Docker](http://releases.k8s.io/HEAD/docs/getting-started-guides/#with-docker)
+- [Launch Kubernetes cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#launch-kubernetes-cluster)
+- [Exploring the cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#exploring-the-cluster)
+- [Run some containers!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#run-some-containers)
+- [Scale out cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#scale-out-cluster)
+- [Launch the "k8petstore" example app](http://releases.k8s.io/HEAD/docs/getting-started-guides/#launch-the-k8petstore-example-app)
+- [Tear down cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#tear-down-cluster)
+- [More Info](http://releases.k8s.io/HEAD/docs/getting-started-guides/#more-info)
+    - [Cloud compatibility](http://releases.k8s.io/HEAD/docs/getting-started-guides/#cloud-compatibility)
 
 
 ## Prerequisites
 
 > Note: If you're running kube-up, on ubuntu - all of the dependencies
 > will be handled for you. You may safely skip to the section:
-> [Launch Kubernetes Cluster](#launch-kubernetes-cluster)
+> [Launch Kubernetes Cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#launch-kubernetes-cluster)
 
 ### On Ubuntu
 
@@ -178,7 +178,7 @@ We can add minion units like so:
 
 ## Launch the "k8petstore" example app
 
-The [k8petstore example](../../examples/k8petstore) is available as a
+The [k8petstore example](http://releases.k8s.io/HEAD/docs/getting-started-guides/../../examples/k8petstore) is available as a
 [juju action](https://jujucharms.com/docs/devel/actions).
 
     juju action do kubernetes-master/0

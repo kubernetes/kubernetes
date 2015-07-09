@@ -4,7 +4,7 @@ This is a toy example demonstrating how to use kubernetes DNS.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides). Make sure DNS is enabled in your setup, see [DNS doc](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns).
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](http://releases.k8s.io/HEAD/examples/cluster-dns/../../docs/getting-started-guides). Make sure DNS is enabled in your setup, see [DNS doc](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns).
 
 ```shell
 $ cd kubernetes
@@ -13,7 +13,7 @@ $ hack/dev-build-and-up.sh
 
 ### Step One: Create two namespaces
 
-We'll see how cluster DNS works across multiple [namespaces](../../docs/namespaces.md), first we need to create two namespaces:
+We'll see how cluster DNS works across multiple [namespaces](http://releases.k8s.io/HEAD/examples/cluster-dns/../../docs/namespaces.md), first we need to create two namespaces:
 
 ```shell
 $ kubectl create -f examples/cluster-dns/namespace-dev.yaml
@@ -41,7 +41,7 @@ You can view your cluster name and user name in kubernetes config at ~/.kube/con
 
 ### Step Two: Create backend replication controller in each namespace
 
-Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](dns-backend-rc.yaml) to create a backend server [replication controller](../../docs/replication-controller.md) in each namespace.
+Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](http://releases.k8s.io/HEAD/examples/cluster-dns/dns-backend-rc.yaml) to create a backend server [replication controller](http://releases.k8s.io/HEAD/examples/cluster-dns/../../docs/replication-controller.md) in each namespace.
 
 ```shell
 $ kubectl config use-context dev
@@ -68,8 +68,8 @@ dns-backend   dns-backend    ddysher/dns-backend   name=dns-backend   1
 
 ### Step Three: Create backend service
 
-Use the file [`examples/cluster-dns/dns-backend-service.yaml`](dns-backend-service.yaml) to create
-a [service](../../docs/services.md) for the backend server.
+Use the file [`examples/cluster-dns/dns-backend-service.yaml`](http://releases.k8s.io/HEAD/examples/cluster-dns/dns-backend-service.yaml) to create
+a [service](http://releases.k8s.io/HEAD/examples/cluster-dns/../../docs/services.md) for the backend server.
 
 ```shell
 $ kubectl config use-context dev
@@ -96,7 +96,7 @@ dns-backend   <none>    name=dns-backend   10.0.35.246   8000/TCP
 
 ### Step Four: Create client pod in one namespace
 
-Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client [pod](../../docs/pods.md) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.cluster.local:8000`.
+Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](http://releases.k8s.io/HEAD/examples/cluster-dns/dns-frontend-pod.yaml) to create a client [pod](http://releases.k8s.io/HEAD/examples/cluster-dns/../../docs/pods.md) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.cluster.local:8000`.
 
 ```shell
 $ kubectl config use-context dev
@@ -121,7 +121,7 @@ $ kubectl logs dns-frontend
 2015-05-07T20:13:54.147738295Z Hello World!
 ```
 
-Please refer to the [source code](./images/frontend/client.py) about the log. First line prints out the ip address associated with the service in dev namespace; remaining lines print out our request and server response.
+Please refer to the [source code](http://releases.k8s.io/HEAD/examples/cluster-dns/./images/frontend/client.py) about the log. First line prints out the ip address associated with the service in dev namespace; remaining lines print out our request and server response.
 
 If we switch to prod namespace with the same pod config, we'll see the same result, i.e. dns will resolve across namespace.
 

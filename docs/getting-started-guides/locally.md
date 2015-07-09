@@ -3,26 +3,26 @@ Getting started locally
 
 **Table of Contents**
 
-- [Requirements](#requirements)
-    - [Linux](#linux)
-    - [Docker](#docker)
-    - [etcd](#etcd)
-    - [go](#go)
-- [Starting the cluster](#starting-the-cluster)
-- [Running a container](#running-a-container)
-- [Running a user defined pod](#running-a-user-defined-pod)
-- [Troubleshooting](#troubleshooting)
-    - [I cannot reach service IPs on the network.](#i-cannot-reach-service-ips-on-the-network)
-    - [I cannot create a replication controller with replica size greater than 1!  What gives?](#i-cannot-create-a-replication-controller-with-replica-size-greater-than-1--what-gives)
-    - [I changed Kubernetes code, how do I run it?](#i-changed-kubernetes-code-how-do-i-run-it)
-    - [kubectl claims to start a container but `get pods` and `docker ps` don't show it.](#kubectl-claims-to-start-a-container-but-get-pods-and-docker-ps-dont-show-it)
-    - [The pods fail to connect to the services by host names](#the-pods-fail-to-connect-to-the-services-by-host-names)
+- [Requirements](http://releases.k8s.io/HEAD/docs/getting-started-guides/#requirements)
+    - [Linux](http://releases.k8s.io/HEAD/docs/getting-started-guides/#linux)
+    - [Docker](http://releases.k8s.io/HEAD/docs/getting-started-guides/#docker)
+    - [etcd](http://releases.k8s.io/HEAD/docs/getting-started-guides/#etcd)
+    - [go](http://releases.k8s.io/HEAD/docs/getting-started-guides/#go)
+- [Starting the cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#starting-the-cluster)
+- [Running a container](http://releases.k8s.io/HEAD/docs/getting-started-guides/#running-a-container)
+- [Running a user defined pod](http://releases.k8s.io/HEAD/docs/getting-started-guides/#running-a-user-defined-pod)
+- [Troubleshooting](http://releases.k8s.io/HEAD/docs/getting-started-guides/#troubleshooting)
+    - [I cannot reach service IPs on the network.](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-cannot-reach-service-ips-on-the-network)
+    - [I cannot create a replication controller with replica size greater than 1!  What gives?](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-cannot-create-a-replication-controller-with-replica-size-greater-than-1--what-gives)
+    - [I changed Kubernetes code, how do I run it?](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-changed-kubernetes-code-how-do-i-run-it)
+    - [kubectl claims to start a container but `get pods` and `docker ps` don't show it.](http://releases.k8s.io/HEAD/docs/getting-started-guides/#kubectl-claims-to-start-a-container-but-get-pods-and-docker-ps-dont-show-it)
+    - [The pods fail to connect to the services by host names](http://releases.k8s.io/HEAD/docs/getting-started-guides/#the-pods-fail-to-connect-to-the-services-by-host-names)
 
 ### Requirements
 
 #### Linux
 
-Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](vagrant.md), or on a cloud provider like [Google Compute Engine](gce.md)
+Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](http://releases.k8s.io/HEAD/docs/getting-started-guides/vagrant.md), or on a cloud provider like [Google Compute Engine](http://releases.k8s.io/HEAD/docs/getting-started-guides/gce.md)
 
 #### Docker
 
@@ -85,8 +85,8 @@ cluster/kubectl.sh get replicationcontrollers
 
 ### Running a user defined pod
 
-Note the difference between a [container](../containers.md)
-and a [pod](../pods.md). Since you only asked for the former, kubernetes will create a wrapper pod for you.
+Note the difference between a [container](http://releases.k8s.io/HEAD/docs/getting-started-guides/../containers.md)
+and a [pod](http://releases.k8s.io/HEAD/docs/getting-started-guides/../pods.md). Since you only asked for the former, kubernetes will create a wrapper pod for you.
 However you cannot view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
