@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sustain
+  namespace: default
+  labels:
+    app: sustain
+spec:
+      containers:
+      - name: sustain
+        image: satnam6502/sustain:1.0
+        imagePullPolicy: Always
+        args: ["--requests=2000000"]
+
