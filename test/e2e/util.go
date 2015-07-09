@@ -159,6 +159,7 @@ func (s *podStore) Stop() {
 type RCConfig struct {
 	Client        *client.Client
 	Image         string
+	Command       []string
 	Name          string
 	Namespace     string
 	PollInterval  time.Duration
@@ -1020,9 +1021,10 @@ func RunRC(config RCConfig) error {
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:  config.Name,
-							Image: config.Image,
-							Ports: []api.ContainerPort{{ContainerPort: 80}},
+							Name:    config.Name,
+							Image:   config.Image,
+							Command: config.Command,
+							Ports:   []api.ContainerPort{{ContainerPort: 80}},
 						},
 					},
 				},
