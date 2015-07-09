@@ -5,12 +5,12 @@ Configuring kubernetes on Fedora via Ansible offers a simple way to quickly crea
 
 **Table of Contents**
 
-- [Prerequisites](#prerequisites)
-- [Architecture of the cluster](#architecture-of-the-cluster)
-- [Configuring ssh access to the cluster](#configuring-ssh-access-to-the-cluster)
-- [Configuring the internal kubernetes network](#configuring-the-internal-kubernetes-network)
-- [Setting up the cluster](#setting-up-the-cluster)
-- [Testing and using your new cluster](#testing-and-using-your-new-cluster)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/fedora/#prerequisites)
+- [Architecture of the cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/fedora/#architecture-of-the-cluster)
+- [Configuring ssh access to the cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/fedora/#configuring-ssh-access-to-the-cluster)
+- [Configuring the internal kubernetes network](http://releases.k8s.io/HEAD/docs/getting-started-guides/fedora/#configuring-the-internal-kubernetes-network)
+- [Setting up the cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/fedora/#setting-up-the-cluster)
+- [Testing and using your new cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/fedora/#testing-and-using-your-new-cluster)
 
 ##Prerequisites
 
@@ -77,7 +77,7 @@ ansible_ssh_user: root
 
 ## Configuring ssh access to the cluster
 
-If you already have ssh access to every machine using ssh public keys you may skip to [configuring the network](#configuring-the-network)
+If you already have ssh access to every machine using ssh public keys you may skip to [configuring the network](http://releases.k8s.io/HEAD/docs/getting-started-guides/fedora/#configuring-the-network)
 
 **Create a password file.**
 
@@ -104,7 +104,7 @@ ansible-playbook -i inventory keys.yml
 
 ## Configuring the internal kubernetes network
 
-If you already have configured your network and docker will use it correctly, skip to [setting up the cluster](#setting-up-the-cluster)
+If you already have configured your network and docker will use it correctly, skip to [setting up the cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/fedora/#setting-up-the-cluster)
 
 The ansible scripts are quite hacky configuring the network, you can see the [README](https://github.com/eparis/kubernetes-ansible) for details, or you can simply enter in variants of the 'kube_service_addresses' (in the all.yaml file) as `kube_ip_addr` entries in the minions field, as shown in the next section.
 

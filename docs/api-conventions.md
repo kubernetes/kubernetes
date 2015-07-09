@@ -7,7 +7,7 @@ Updated: 4/16/2015
 API structure, and developers wanting to extend the kubernetes API.  An introduction to
 using resources with kubectl can be found in (working_with_resources.md).*
 
-The conventions of the [Kubernetes API](api.md) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
+The conventions of the [Kubernetes API](http://releases.k8s.io/HEAD/docs/api.md) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
 
 The general style of the Kubernetes API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. Kubernetes also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields. Where relevant HTTP header fields exist, they should mirror the content of JSON fields, but the information should not be represented only in the HTTP header.
 
@@ -42,7 +42,7 @@ Kinds are grouped into three categories:
 
    Most objects defined in the system should have an endpoint that returns the full set of resources, as well as zero or more endpoints that return subsets of the full list. Some objects may be singletons (the current user, the system defaults) and may not have lists.
 
-   In addition, all lists that return objects with labels should support label filtering (see [labels.md](labels.md), and most lists should support filtering by fields.
+   In addition, all lists that return objects with labels should support label filtering (see [labels.md](http://releases.k8s.io/HEAD/docs/labels.md), and most lists should support filtering by fields.
 
    Examples: PodLists, ServiceLists, NodeLists
 
@@ -75,23 +75,23 @@ These fields are required for proper decoding of the object. They may be populat
 
 Every object kind MUST have the following metadata in a nested object field called "metadata":
 
-* namespace: a namespace is a DNS compatible subdomain that objects are subdivided into. The default namespace is 'default'.  See [namespaces.md](namespaces.md) for more.
-* name: a string that uniquely identifies this object within the current namespace (see [identifiers.md](identifiers.md)). This value is used in the path when retrieving an individual object.
-* uid: a unique in time and space value (typically an RFC 4122 generated identifier, see [identifiers.md](identifiers.md)) used to distinguish between objects with the same name that have been deleted and recreated
+* namespace: a namespace is a DNS compatible subdomain that objects are subdivided into. The default namespace is 'default'.  See [namespaces.md](http://releases.k8s.io/HEAD/docs/namespaces.md) for more.
+* name: a string that uniquely identifies this object within the current namespace (see [identifiers.md](http://releases.k8s.io/HEAD/docs/identifiers.md)). This value is used in the path when retrieving an individual object.
+* uid: a unique in time and space value (typically an RFC 4122 generated identifier, see [identifiers.md](http://releases.k8s.io/HEAD/docs/identifiers.md)) used to distinguish between objects with the same name that have been deleted and recreated
 
 Every object SHOULD have the following metadata in a nested object field called "metadata":
 
-* resourceVersion: a string that identifies the internal version of this object that can be used by clients to determine when objects have changed. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. (see [concurrency control](#concurrency-control-and-consistency), below, for more details)
+* resourceVersion: a string that identifies the internal version of this object that can be used by clients to determine when objects have changed. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. (see [concurrency control](http://releases.k8s.io/HEAD/docs/#concurrency-control-and-consistency), below, for more details)
 * creationTimestamp: a string representing an RFC 3339 date of the date and time an object was created
 * deletionTimestamp: a string representing an RFC 3339 date of the date and time after which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time.
-* labels: a map of string keys and values that can be used to organize and categorize objects (see [labels.md](labels.md))
-* annotations: a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object (see [annotations.md](annotations.md))
+* labels: a map of string keys and values that can be used to organize and categorize objects (see [labels.md](http://releases.k8s.io/HEAD/docs/labels.md))
+* annotations: a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object (see [annotations.md](http://releases.k8s.io/HEAD/docs/annotations.md))
 
 Labels are intended for organizational purposes by end users (select the pods that match this label query). Annotations enable third-party automation and tooling to decorate objects with additional metadata for their own use.
 
 #### Spec and Status
 
-By convention, the Kubernetes API makes a distinction between the specification of the desired state of an object (a nested object field called "spec") and the status of the object at the current time (a nested object field called "status"). The specification is a complete description of the desired state, including configuration settings provided by the user, [default values](#defaulting) expanded by the system, and properties initialized or otherwise changed after creation by other ecosystem components (e.g., schedulers, auto-scalers), and is persisted in stable storage with the API object. If the specification is deleted, the object will be purged from the system. The status summarizes the current state of the object in the system, and is usually persisted with the object by an automated processes but may be generated on the fly. At some cost and perhaps some temporary degradation in behavior, the status could be reconstructed by observation if it were lost.
+By convention, the Kubernetes API makes a distinction between the specification of the desired state of an object (a nested object field called "spec") and the status of the object at the current time (a nested object field called "status"). The specification is a complete description of the desired state, including configuration settings provided by the user, [default values](http://releases.k8s.io/HEAD/docs/#defaulting) expanded by the system, and properties initialized or otherwise changed after creation by other ecosystem components (e.g., schedulers, auto-scalers), and is persisted in stable storage with the API object. If the specification is deleted, the object will be purged from the system. The status summarizes the current state of the object in the system, and is usually persisted with the object by an automated processes but may be generated on the fly. At some cost and perhaps some temporary degradation in behavior, the status could be reconstructed by observation if it were lost.
 
 When a new version of an object is POSTed or PUT, the "spec" is updated and available immediately. Over time the system will work to bring the "status" into line with the "spec". The system will drive toward the most recent "spec" regardless of previous versions of that stanza. In other words, if a value is changed from 2 to 5 in one PUT and then back down to 3 in another PUT the system is not required to 'touch base' at 5 before changing the "status" to 3. In other words, the system's behavior is *level-based* rather than *edge-based*. This enables robust behavior in the presence of missed intermediate state changes.
 
@@ -99,7 +99,7 @@ The Kubernetes API also serves as the foundation for the declarative configurati
 
 The PUT and POST verbs on objects will ignore the "status" values. A `/status` subresource is provided to enable system components to update statuses of resources they manage.
 
-Otherwise, PUT expects the whole object to be specified. Therefore, if a field is omitted it is assumed that the client wants to clear that field's value. The PUT verb does not accept partial updates. Modification of just part of an object may be achieved by GETting the resource, modifying part of the spec, labels, or annotations, and then PUTting it back. See [concurrency control](#concurrency-control-and-consistency), below, regarding read-modify-write consistency when using this pattern. Some objects may expose alternative resource representations that allow mutation of the status, or performing custom actions on the object.
+Otherwise, PUT expects the whole object to be specified. Therefore, if a field is omitted it is assumed that the client wants to clear that field's value. The PUT verb does not accept partial updates. Modification of just part of an object may be achieved by GETting the resource, modifying part of the spec, labels, or annotations, and then PUTting it back. See [concurrency control](http://releases.k8s.io/HEAD/docs/#concurrency-control-and-consistency), below, regarding read-modify-write consistency when using this pattern. Some objects may expose alternative resource representations that allow mutation of the status, or performing custom actions on the object.
 
 All objects that represent a physical resource whose state may vary from the user's desired intent SHOULD have a "spec" and a "status".  Objects whose state cannot vary from the user's desired intent MAY have only "spec", and MAY rename "spec" to a more appropriate name.
 
@@ -118,11 +118,11 @@ In order to preserve extensibility, in the future, we intend to explicitly conve
 
 Note that historical information status (e.g., last transition time, failure counts) is only provided at best effort, and is not guaranteed to not be lost.
 
-Status information that may be large (especially unbounded in size, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](./design/resources.md#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
+Status information that may be large (especially unbounded in size, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](http://releases.k8s.io/HEAD/docs/./design/resources.md#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
 
 #### References to related objects
 
-References to loosely coupled sets of objects, such as [pods](pods.md) overseen by a [replication controller](replication-controller.md), are usually best referred to using a [label selector](labels.md). In order to ensure that GETs of individual objects remain bounded in time and space, these sets may be queried via separate API queries, but will not be expanded in the referring object's status.
+References to loosely coupled sets of objects, such as [pods](http://releases.k8s.io/HEAD/docs/pods.md) overseen by a [replication controller](http://releases.k8s.io/HEAD/docs/replication-controller.md), are usually best referred to using a [label selector](http://releases.k8s.io/HEAD/docs/labels.md). In order to ensure that GETs of individual objects remain bounded in time and space, these sets may be queried via separate API queries, but will not be expanded in the referring object's status.
 
 References to specific objects, especially specific resource versions and/or specific fields of those objects, are specified using the `ObjectReference` type. Unlike partial URLs, the ObjectReference type facilitates flexible defaulting of fields from the referring object or other contextual information.
 
@@ -182,7 +182,7 @@ API resources should use the traditional REST pattern:
 * GET /&lt;resourceNamePlural&gt;/&lt;name&gt; - Retrieves a single resource with the given name, e.g. GET /pods/first returns a Pod named 'first'. Should be constant time, and the resource should be bounded in size.
 * DELETE /&lt;resourceNamePlural&gt;/&lt;name&gt;  - Delete the single resource with the given name. DeleteOptions may specify gracePeriodSeconds, the optional duration in seconds before the object should be deleted. Individual kinds may declare fields which provide a default grace period, and different kinds may have differing kind-wide default grace periods. A user provided grace period overrides a default grace period, including the zero grace period ("now").
 * PUT /&lt;resourceNamePlural&gt;/&lt;name&gt; - Update or create the resource with the given name with the JSON object provided by the client.
-* PATCH /&lt;resourceNamePlural&gt;/&lt;name&gt; - Selectively modify the specified fields of the resource. See more information [below](#patch).
+* PATCH /&lt;resourceNamePlural&gt;/&lt;name&gt; - Selectively modify the specified fields of the resource. See more information [below](http://releases.k8s.io/HEAD/docs/#patch).
 
 Kubernetes by convention exposes additional verbs as new root endpoints with singular names. Examples:
 
@@ -191,7 +191,7 @@ Kubernetes by convention exposes additional verbs as new root endpoints with sin
 
 These are verbs which change the fundamental type of data returned (watch returns a stream of JSON instead of a single JSON object). Support of additional verbs is not required for all object types.
 
-Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [accessing-the-cluster.md](accessing-the-cluster.md).
+Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [accessing-the-cluster.md](http://releases.k8s.io/HEAD/docs/accessing-the-cluster.md).
 
 When resources wish to expose alternative actions that are closely coupled to a single resource, they should do so using new sub-resources. An example is allowing automated processes to update the "status" field of a Pod. The `/pods` endpoint only allows updates to "metadata" and "spec", since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted. Likewise, some actions like "stop" or "scale" are best represented as REST sub-resources that are POSTed to.  The POST action may require a simple kind to be provided if the action requires parameters, or function without a request body.
 
@@ -282,7 +282,7 @@ labels:
 Idempotency
 -----------
 
-All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [identifiers.md](identifiers.md) for details.
+All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [identifiers.md](http://releases.k8s.io/HEAD/docs/identifiers.md) for details.
 
 Names generated by the system may be requested using `metadata.generateName`. GenerateName indicates that the name should be made unique by the server prior to persisting it. A non-empty value for the field indicates the name will be made unique (and the name returned to the client will be different than the name passed). The value of this field will be combined with a unique suffix on the server if the Name field has not been provided. The provided value must be valid within the rules for Name, and may be truncated by the length of the suffix required to make the value unique on the server. If this field is specified, and Name is not present, the server will NOT return a 409 if the generated name exists - instead, it will either return 201 Created or 504 with Reason `ServerTimeout` indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).
 

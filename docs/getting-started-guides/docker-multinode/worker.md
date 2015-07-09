@@ -2,12 +2,12 @@
 
 These instructions are very similar to the master set-up above, but they are duplicated for clarity.
 You need to repeat these instructions for each node you want to join the cluster.
-We will assume that the IP address of this node is ```${NODE_IP}``` and you have the IP address of the master in ```${MASTER_IP}``` that you created in the [master instructions](master.md).
+We will assume that the IP address of this node is ```${NODE_IP}``` and you have the IP address of the master in ```${MASTER_IP}``` that you created in the [master instructions](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/master.md).
 
 For each worker node, there are three steps:
-   * [Set up ```flanneld``` on the worker node](#set-up-flanneld-on-the-worker-node)
-   * [Start kubernetes on the worker node](#start-kubernetes-on-the-worker-node)
-   * [Add the worker to the cluster](#add-the-node-to-the-cluster)
+   * [Set up ```flanneld``` on the worker node](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/#set-up-flanneld-on-the-worker-node)
+   * [Start kubernetes on the worker node](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/#start-kubernetes-on-the-worker-node)
+   * [Add the worker to the cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/#add-the-node-to-the-cluster)
 
 ### Set up Flanneld on the worker node
 As before, the Flannel daemon is going to provide network connectivity.
@@ -105,7 +105,7 @@ sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0
 
 ### Next steps
 
-Move on to [testing your cluster](testing.md) or [add another node](#adding-a-kubernetes-worker-node-via-docker)
+Move on to [testing your cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/testing.md) or [add another node](http://releases.k8s.io/HEAD/docs/getting-started-guides/docker-multinode/#adding-a-kubernetes-worker-node-via-docker)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/worker.md?pixel)]()

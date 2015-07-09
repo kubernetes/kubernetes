@@ -13,25 +13,25 @@ certainly want the docs that go with that version.</h1>
 
 ## Where to start
 
-* The [User's guide](user-guide.md) is for anyone who wants to run programs and
+* The [User's guide](http://releases.k8s.io/HEAD/docs/user-guide.md) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
 
-* The [Cluster Admin's guide](cluster-admin-guide.md) is for anyone setting up
+* The [Cluster Admin's guide](http://releases.k8s.io/HEAD/docs/cluster-admin-guide.md) is for anyone setting up
   a Kubernetes cluster or administering it.
 
-* The [Developer guide](developer-guide.md) is for anyone wanting to write
+* The [Developer guide](http://releases.k8s.io/HEAD/docs/developer-guide.md) is for anyone wanting to write
   programs that access the kubernetes API, write plugins or extensions, or
   modify the core code of kubernetes.
 
-* The [Kubectl Command Line Interface](kubectl.md) is a detailed reference on
+* The [Kubectl Command Line Interface](http://releases.k8s.io/HEAD/docs/kubectl.md) is a detailed reference on
   the `kubectl` CLI.
 
 * The [API object documentation](http://kubernetes.io/third_party/swagger-ui/)
   is a detailed description of all fields found in core API objects.
 
-* An overview of the [Design of Kubernetes](design)
+* An overview of the [Design of Kubernetes](http://releases.k8s.io/HEAD/docs/design)
 
-* There are example files and walkthroughs in the [examples](../examples)
+* There are example files and walkthroughs in the [examples](http://releases.k8s.io/HEAD/docs/../examples)
   folder.
 
 

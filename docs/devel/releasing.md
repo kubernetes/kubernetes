@@ -97,7 +97,7 @@ others around it will either have `v0.4-dev` or `v0.5-dev`.
 
 The diagram below illustrates it.
 
-![Diagram of git commits involved in the release](./releasing.png)
+![Diagram of git commits involved in the release](http://releases.k8s.io/HEAD/docs/devel/./releasing.png)
 
 After working on `v0.4-dev` and merging PR 99 we decide it is time to release
 `v0.5`. So we start a new branch, create one commit to update

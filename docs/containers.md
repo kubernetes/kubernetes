@@ -18,7 +18,7 @@ when the user does not supply values.  Docker calls the fields for commands and 
 `Entrypoint` and `Cmd` respectively.  The full details for this feature are too complicated to 
 describe here, mostly due to the fact that the docker API allows users to specify both of these
 fields as either a string array or a string and there are subtle differences in how those cases are
-handled.  We encourage the curious to check out [docker's documentation]() for this feature.
+handled.  We encourage the curious to check out [docker's documentation](http://releases.k8s.io/HEAD/docs/) for this feature.
 
 Kubernetes allows you to override both the image's default command (docker `Entrypoint`) and args
 (docker `Cmd`) with the `Command` and `Args` fields of `Container`.  The rules are:

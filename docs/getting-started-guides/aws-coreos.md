@@ -2,7 +2,7 @@
 
 The example below creates an elastic Kubernetes cluster with a custom number of worker nodes and a master.
 
-**Warning:** contrary to the [supported procedure](aws.md), the examples below provision Kubernetes with an insecure API server (plain HTTP,
+**Warning:** contrary to the [supported procedure](http://releases.k8s.io/HEAD/docs/getting-started-guides/aws.md), the examples below provision Kubernetes with an insecure API server (plain HTTP,
 no security tokens, no basic auth). For demonstration purposes only.
 
 ## Highlights
@@ -16,13 +16,13 @@ no security tokens, no basic auth). For demonstration purposes only.
 
 * [aws CLI](http://aws.amazon.com/cli)
 * [CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/)
-* [kubectl CLI](aws/kubectl.md)
+* [kubectl CLI](http://releases.k8s.io/HEAD/docs/getting-started-guides/aws/kubectl.md)
 
 ## Starting a Cluster
 
 ### CloudFormation
 
-The [cloudformation-template.json](aws/cloudformation-template.json) can be used to bootstrap a Kubernetes cluster with a single command:
+The [cloudformation-template.json](http://releases.k8s.io/HEAD/docs/getting-started-guides/aws/cloudformation-template.json) can be used to bootstrap a Kubernetes cluster with a single command:
 
 ```bash
 aws cloudformation create-stack --stack-name kubernetes --region us-west-2 \
@@ -46,7 +46,7 @@ Record the Kubernetes Master IP address:
 aws cloudformation describe-stacks --stack-name kubernetes
 ```
 
-[Skip to kubectl client configuration](#configure-the-kubectl-ssh-tunnel)
+[Skip to kubectl client configuration](http://releases.k8s.io/HEAD/docs/getting-started-guides/#configure-the-kubectl-ssh-tunnel)
 
 ### AWS CLI
 
@@ -63,8 +63,8 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --source-securi
 
 #### Save the master and node cloud-configs
 
-* [master.yaml](aws/cloud-configs/master.yaml)
-* [node.yaml](aws/cloud-configs/node.yaml)
+* [master.yaml](http://releases.k8s.io/HEAD/docs/getting-started-guides/aws/cloud-configs/master.yaml)
+* [node.yaml](http://releases.k8s.io/HEAD/docs/getting-started-guides/aws/cloud-configs/node.yaml)
 
 #### Launch the master
 

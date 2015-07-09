@@ -1,6 +1,6 @@
 ## Welcome to k8PetStore
 
-This is a follow up to the [Guestbook Example](../guestbook/README.md)'s [Go implementation](../guestbook-go/).
+This is a follow up to the [Guestbook Example](http://releases.k8s.io/HEAD/examples/k8petstore/../guestbook/README.md)'s [Go implementation](http://releases.k8s.io/HEAD/examples/k8petstore/../guestbook-go/).
 
 - It leverages the same components (redis, Go REST API) as the guestbook application
 - It comes with visualizations for graphing whats happening in Redis transactions, along with commandline printouts of transaction throughput
@@ -18,7 +18,7 @@ The guestbook tutorial will teach you a lot about the basics of Kubernetes, and 
 
 ## Architecture of this SOA
 
-A diagram of the overall architecture of this application can be seen in [k8petstore.dot](k8petstore.dot) (you can paste the contents in any graphviz viewer, including online ones such as http://sandbox.kidstrythisathome.com/erdos/.
+A diagram of the overall architecture of this application can be seen in [k8petstore.dot](http://releases.k8s.io/HEAD/examples/k8petstore/k8petstore.dot) (you can paste the contents in any graphviz viewer, including online ones such as http://sandbox.kidstrythisathome.com/erdos/.
 
 ## Docker image dependencies
 
@@ -90,7 +90,7 @@ To simplify running this application, we have a single file, k8petstore.sh, whic
 
 You might want to change it to point to your customized Go image, if you chose to modify things, like the number of data generators (more generators will create more load on the redis master).
 
-So, to run this app in Kubernetes, simply run [The all in one k8petstore.sh shell script](k8petstore.sh).
+So, to run this app in Kubernetes, simply run [The all in one k8petstore.sh shell script](http://releases.k8s.io/HEAD/examples/k8petstore/k8petstore.sh).
 
 Note that at the top of the script there are a few self explanatory parameters to set, among which the Public IPs parameter is where you can checkout the web ui (at $PUBLIC_IP:3000), which will show a plot and read outs of transaction throughput.
 

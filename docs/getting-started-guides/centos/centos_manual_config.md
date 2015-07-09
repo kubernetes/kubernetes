@@ -3,15 +3,15 @@ Getting started on [CentOS](http://centos.org)
 
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-    - [Starting a cluster](#starting-a-cluster)
+    - [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/centos/#prerequisites)
+    - [Starting a cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/centos/#starting-a-cluster)
 ## Prerequisites
 You need two machines with CentOS installed on them.
 
 ## Starting a cluster
 This is a getting started guide for CentOS.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
-This guide will only get ONE minion working.  Multiple minions requires a functional [networking configuration](../../networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
+This guide will only get ONE minion working.  Multiple minions requires a functional [networking configuration](http://releases.k8s.io/HEAD/docs/getting-started-guides/centos/../../networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
 
 The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, centos-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_.  The remaining host, centos-minion will be the minion and run kubelet, proxy, cadvisor and docker.
 
@@ -163,7 +163,7 @@ centos-minion          <none>            Ready
 
 **The cluster should be running! Launch a test pod.**
 
-You should have a functional cluster, check out [101](../../../examples/walkthrough/README.md)!
+You should have a functional cluster, check out [101](http://releases.k8s.io/HEAD/docs/getting-started-guides/centos/../../../examples/walkthrough/README.md)!
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/centos/centos_manual_config.md?pixel)]()

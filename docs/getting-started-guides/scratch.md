@@ -15,51 +15,51 @@ steps that existing cluster setup scripts are making.
 
 **Table of Contents**
 
-- [Designing and Preparing](#designing-and-preparing)
-    - [Learning](#learning)
-    - [Cloud Provider](#cloud-provider)
-    - [Nodes](#nodes)
-    - [Network](#network)
-    - [Cluster Naming](#cluster-naming)
-    - [Software Binaries](#software-binaries)
-        - [Downloading and Extracting Kubernetes Binaries](#downloading-and-extracting-kubernetes-binaries)
-        - [Selecting Images](#selecting-images)
-    - [Security Models](#security-models)
-        - [Preparing Certs](#preparing-certs)
-        - [Preparing Credentials](#preparing-credentials)
-- [Configuring and Installing Base Software on Nodes](#configuring-and-installing-base-software-on-nodes)
-    - [Docker](#docker)
-    - [rkt](#rkt)
-    - [kubelet](#kubelet)
-    - [kube-proxy](#kube-proxy)
-    - [Networking](#networking)
-    - [Other](#other)
-    - [Using Configuration Management](#using-configuration-management)
-- [Bootstrapping the Cluster](#bootstrapping-the-cluster)
-    - [etcd](#etcd)
-    - [Apiserver](#apiserver)
-        - [Apiserver pod template](#apiserver-pod-template)
-    - [Starting Apiserver](#starting-apiserver)
-    - [Scheduler](#scheduler)
-    - [Controller Manager](#controller-manager)
-    - [DNS](#dns)
-    - [Logging](#logging)
-    - [Monitoring](#monitoring)
-    - [Miscellaneous Resources](#miscelaneous-resources)
-- [Troubleshooting](#troubleshooting)
-    - [Running validate-cluster](#running-validate-cluster)
-    - [Inspect pods and services](#inspect-pods-and-services)
-    - [Try Examples](#try-examples)
-    - [Running the Conformance Test](#running-the-conformance-test)
-    - [Networking](#networking)
-    - [Getting Help](#getting-help)
+- [Designing and Preparing](http://releases.k8s.io/HEAD/docs/getting-started-guides/#designing-and-preparing)
+    - [Learning](http://releases.k8s.io/HEAD/docs/getting-started-guides/#learning)
+    - [Cloud Provider](http://releases.k8s.io/HEAD/docs/getting-started-guides/#cloud-provider)
+    - [Nodes](http://releases.k8s.io/HEAD/docs/getting-started-guides/#nodes)
+    - [Network](http://releases.k8s.io/HEAD/docs/getting-started-guides/#network)
+    - [Cluster Naming](http://releases.k8s.io/HEAD/docs/getting-started-guides/#cluster-naming)
+    - [Software Binaries](http://releases.k8s.io/HEAD/docs/getting-started-guides/#software-binaries)
+        - [Downloading and Extracting Kubernetes Binaries](http://releases.k8s.io/HEAD/docs/getting-started-guides/#downloading-and-extracting-kubernetes-binaries)
+        - [Selecting Images](http://releases.k8s.io/HEAD/docs/getting-started-guides/#selecting-images)
+    - [Security Models](http://releases.k8s.io/HEAD/docs/getting-started-guides/#security-models)
+        - [Preparing Certs](http://releases.k8s.io/HEAD/docs/getting-started-guides/#preparing-certs)
+        - [Preparing Credentials](http://releases.k8s.io/HEAD/docs/getting-started-guides/#preparing-credentials)
+- [Configuring and Installing Base Software on Nodes](http://releases.k8s.io/HEAD/docs/getting-started-guides/#configuring-and-installing-base-software-on-nodes)
+    - [Docker](http://releases.k8s.io/HEAD/docs/getting-started-guides/#docker)
+    - [rkt](http://releases.k8s.io/HEAD/docs/getting-started-guides/#rkt)
+    - [kubelet](http://releases.k8s.io/HEAD/docs/getting-started-guides/#kubelet)
+    - [kube-proxy](http://releases.k8s.io/HEAD/docs/getting-started-guides/#kube-proxy)
+    - [Networking](http://releases.k8s.io/HEAD/docs/getting-started-guides/#networking)
+    - [Other](http://releases.k8s.io/HEAD/docs/getting-started-guides/#other)
+    - [Using Configuration Management](http://releases.k8s.io/HEAD/docs/getting-started-guides/#using-configuration-management)
+- [Bootstrapping the Cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#bootstrapping-the-cluster)
+    - [etcd](http://releases.k8s.io/HEAD/docs/getting-started-guides/#etcd)
+    - [Apiserver](http://releases.k8s.io/HEAD/docs/getting-started-guides/#apiserver)
+        - [Apiserver pod template](http://releases.k8s.io/HEAD/docs/getting-started-guides/#apiserver-pod-template)
+    - [Starting Apiserver](http://releases.k8s.io/HEAD/docs/getting-started-guides/#starting-apiserver)
+    - [Scheduler](http://releases.k8s.io/HEAD/docs/getting-started-guides/#scheduler)
+    - [Controller Manager](http://releases.k8s.io/HEAD/docs/getting-started-guides/#controller-manager)
+    - [DNS](http://releases.k8s.io/HEAD/docs/getting-started-guides/#dns)
+    - [Logging](http://releases.k8s.io/HEAD/docs/getting-started-guides/#logging)
+    - [Monitoring](http://releases.k8s.io/HEAD/docs/getting-started-guides/#monitoring)
+    - [Miscellaneous Resources](http://releases.k8s.io/HEAD/docs/getting-started-guides/#miscelaneous-resources)
+- [Troubleshooting](http://releases.k8s.io/HEAD/docs/getting-started-guides/#troubleshooting)
+    - [Running validate-cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#running-validate-cluster)
+    - [Inspect pods and services](http://releases.k8s.io/HEAD/docs/getting-started-guides/#inspect-pods-and-services)
+    - [Try Examples](http://releases.k8s.io/HEAD/docs/getting-started-guides/#try-examples)
+    - [Running the Conformance Test](http://releases.k8s.io/HEAD/docs/getting-started-guides/#running-the-conformance-test)
+    - [Networking](http://releases.k8s.io/HEAD/docs/getting-started-guides/#networking)
+    - [Getting Help](http://releases.k8s.io/HEAD/docs/getting-started-guides/#getting-help)
 
 ## Designing and Preparing
 
 ### Learning 
   1. You should be familiar with using Kubernetes already.  We suggest you set
     up a temporary cluster by following one of the other Getting Started Guides.
-    This will help you become familiar with the CLI ([kubectl](../kubectl.md)) and concepts ([pods](../pods.md), [services](../services.md), etc.) first.
+    This will help you become familiar with the CLI ([kubectl](http://releases.k8s.io/HEAD/docs/getting-started-guides/../kubectl.md)) and concepts ([pods](http://releases.k8s.io/HEAD/docs/getting-started-guides/../pods.md), [services](http://releases.k8s.io/HEAD/docs/getting-started-guides/../services.md), etc.) first.
   1. You should have `kubectl` installed on your desktop.  This will happen as a side
     effect of completing one of the other Getting Started Guides.
 
@@ -85,7 +85,7 @@ on how flags are set on various components.
   have identical configurations.
 
 ### Network
-Kubernetes has a distinctive [networking model](../networking.md).
+Kubernetes has a distinctive [networking model](http://releases.k8s.io/HEAD/docs/getting-started-guides/../networking.md).
 
 Kubernetes allocates an IP address to each pod.  When creating a cluster, you
 need to allocate a block of IPs for Kubernetes to use as Pod IPs.  The simplest
@@ -95,7 +95,7 @@ another pod using the IP of the second pod.  This connectivity can be
 accomplished in two ways:
 - Configure network to route Pod IPs
   - Harder to setup from scratch.
-  - Google Compute Engine ([GCE](gce.md)) and [AWS](aws.md) guides use this approach.
+  - Google Compute Engine ([GCE](http://releases.k8s.io/HEAD/docs/getting-started-guides/gce.md)) and [AWS](http://releases.k8s.io/HEAD/docs/getting-started-guides/aws.md) guides use this approach.
   - Need to make the Pod IPs routable by programming routers, switches, etc.
   - Can be configured external to kubernetes, or can implement in the "Routes" interface of a Cloud Provider module.
   - Generally highest performance.
@@ -127,7 +127,7 @@ You need to select an address range for the Pod IPs.
     using `10.10.0.0/24` through `10.10.255.0/24`, respectively.
   - Need to make these routable or connect with overlay.
 
-Kubernetes also allocates an IP to each [service](../services.md).  However,
+Kubernetes also allocates an IP to each [service](http://releases.k8s.io/HEAD/docs/getting-started-guides/../services.md).  However,
 service IPs do not necessarily need to be routable.  The kube-proxy takes care
 of translating Service IPs to Pod IPs before traffic leaves the node.  You do
 need to Allocate a block of IPs for services.  Call this
@@ -167,7 +167,7 @@ You will need binaries for:
 #### Downloading and Extracting Kubernetes Binaries
 A Kubernetes binary release includes all the Kubernetes binaries as well as the supported release of etcd.
 You can use a Kubernetes binary release (recommended) or build your Kubernetes binaries following the instructions in the
-[Developer Documentation]( ../devel/README.md).  Only using a binary release is covered in this guide.
+[Developer Documentation](http://releases.k8s.io/HEAD/docs/getting-started-guides/ ../devel/README.md).  Only using a binary release is covered in this guide.
 
 Download the [latest binary release](
 https://github.com/GoogleCloudPlatform/kubernetes/releases/latest) and unzip it.
@@ -259,7 +259,7 @@ The format for this file is described in the [authentication documentation](
 ../authentication.md).
 
 For distributing credentials to clients, the convention in Kubernetes is to put the credentials
-into a [kubeconfig file](../kubeconfig-file.md).
+into a [kubeconfig file](http://releases.k8s.io/HEAD/docs/getting-started-guides/../kubeconfig-file.md).
 
 The kubeconfig file for the administrator can be created as follows:
  - If you have already used Kubernetes with a non-custom cluster (for example, used a Getting Started
@@ -368,7 +368,7 @@ installation, by following examples given in the Docker documentation.
 
 ### kubelet
 
-All nodes should run kubelet.  See [Selecting Binaries](#selecting-binaries).
+All nodes should run kubelet.  See [Selecting Binaries](http://releases.k8s.io/HEAD/docs/getting-started-guides/#selecting-binaries).
 
 Arguments to consider:
   - If following the HTTPS security approach:
@@ -377,12 +377,12 @@ Arguments to consider:
   - Otherwise, if taking the firewall-based security approach
     - `--api-servers=http://$MASTER_IP`
   - `--config=/etc/kubernetes/manifests` -%}
-  - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Addons](#starting-addons).)
+  - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Addons](http://releases.k8s.io/HEAD/docs/getting-started-guides/#starting-addons).)
   - `--cluster-domain=` to the dns domain prefix to use for cluster DNS addresses.
   - `--docker-root=`
   - `--root-dir=`
   - `--configure-cbr0=` (described above)
-  - `--register-node` (described in [Node](../node.md) documentation.
+  - `--register-node` (described in [Node](http://releases.k8s.io/HEAD/docs/getting-started-guides/../node.md) documentation.
 
 ### kube-proxy
 
@@ -402,7 +402,7 @@ Each node needs to be allocated its own CIDR range for pod networking.
 Call this `NODE_X_POD_CIDR`.
 
 A bridge called `cbr0` needs to be created on each node.  The bridge is explained
-further in the [networking documentation](../networking.md).  The bridge itself
+further in the [networking documentation](http://releases.k8s.io/HEAD/docs/getting-started-guides/../networking.md).  The bridge itself
 needs an address from `$NODE_X_POD_CIDR` - by convention the first IP.  Call
 this `NODE_X_BRIDGE_ADDR`.  For example, if `NODE_X_POD_CIDR` is `10.0.0.0/16`,
 then `NODE_X_BRIDGE_ADDR` is `10.0.0.1/16`.  NOTE: this retains the `/16` suffix
@@ -448,7 +448,7 @@ traffic to the internet, but have no problem with them inside your GCE Project.
 ### Using Configuration Management
 The previous steps all involved "conventional" system administration techniques for setting up
 machines.  You may want to use a Configuration Management system to automate the node configuration
-process.  There are examples of [Saltstack](../salt.md), Ansible, Juju, and CoreOS Cloud Config in the
+process.  There are examples of [Saltstack](http://releases.k8s.io/HEAD/docs/getting-started-guides/../salt.md), Ansible, Juju, and CoreOS Cloud Config in the
 various Getting Started Guides.
 
 ## Bootstrapping the Cluster
@@ -467,7 +467,7 @@ You will need to run one or more instances of etcd.
   - Alternative: run 3 or 5 etcd instances.
     - Log can be written to non-durable storage because storage is replicated. 
     - run a single apiserver which connects to one of the etc nodes.
- See [Availability](../availability.md) for more discussion on factors affecting cluster
+ See [Availability](http://releases.k8s.io/HEAD/docs/getting-started-guides/../availability.md) for more discussion on factors affecting cluster
 availability.
 
 To run an etcd instance:
@@ -493,7 +493,7 @@ Here are some apiserver flags you may need to set:
   - `--tls-cert-file=/srv/kubernetes/server.cert` -%}
   - `--tls-private-key-file=/srv/kubernetes/server.key` -%}
   - `--admission-control=$RECOMMENDED_LIST`
-    - See [admission controllers](../admission_controllers.md) for recommended arguments.
+    - See [admission controllers](http://releases.k8s.io/HEAD/docs/getting-started-guides/../admission_controllers.md) for recommended arguments.
   - `--allow-privileged=true`, only if you trust your cluster user to run pods as root.
  
 If you are following the firewall-only security approach, then use these arguments:
@@ -652,7 +652,7 @@ Flags to consider using with controller manager.
  - `--allocate-node-cidrs=`
    - *TODO*: explain when you want controller to do this and when you wanna do it another way.
  - `--cloud-provider=` and `--cloud-config` as described in apiserver section.
- - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../service_accounts.md) feature.  
+ - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](http://releases.k8s.io/HEAD/docs/getting-started-guides/../service_accounts.md) feature.  
  - `--master=127.0.0.1:8080`
 
 Template for controller manager pod:
@@ -724,16 +724,16 @@ Template for controller manager pod:
 
 ### Inspect pods and services
 
-Try to run through the "Inspect your cluster" section in one of the other Getting Started Guides, such as [GCE](gce.md#inspect-your-cluster).
+Try to run through the "Inspect your cluster" section in one of the other Getting Started Guides, such as [GCE](http://releases.k8s.io/HEAD/docs/getting-started-guides/gce.md#inspect-your-cluster).
 You should see some services.  You should also see "mirror pods" for the apiserver, scheduler and controller-manager, plus any add-ons you started.
 
 ### Try Examples
 
-At this point you should be able to run through one of the basic examples, such as the [nginx example](../../examples/simple-nginx.md).
+At this point you should be able to run through one of the basic examples, such as the [nginx example](http://releases.k8s.io/HEAD/docs/getting-started-guides/../../examples/simple-nginx.md).
 
 ### Running the Conformance Test
 
-You may want to try to run the [Conformance test](../hack/conformance.sh).  Any failures may give a hint as to areas that need more attention.
+You may want to try to run the [Conformance test](http://releases.k8s.io/HEAD/docs/getting-started-guides/../hack/conformance.sh).  Any failures may give a hint as to areas that need more attention.
 
 ### Networking
 
@@ -741,7 +741,7 @@ The nodes must be able to connect to each other using their private IP. Verify t
 pinging or SSH-ing from one node to another.
 
 ### Getting Help
-If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
+If you run into trouble, please see the section on [troubleshooting](http://releases.k8s.io/HEAD/docs/getting-started-guides/gce.md#troubleshooting), post to the
 [google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at #google-containers on freenode.
 
 

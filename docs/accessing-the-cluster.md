@@ -1,7 +1,7 @@
 # User Guide to Accessing the Cluster
- * [Accessing the cluster API](#api)
- * [Accessing services running on the cluster](#otherservices)
- * [So many proxies](#somanyproxies)
+ * [Accessing the cluster API](http://releases.k8s.io/HEAD/docs/#api)
+ * [Accessing services running on the cluster](http://releases.k8s.io/HEAD/docs/#otherservices)
+ * [So many proxies](http://releases.k8s.io/HEAD/docs/#somanyproxies)
 
 ## Accessing the cluster API<a name="api"></a>
 ### Accessing for the first time with kubectl
@@ -10,7 +10,7 @@ kubernetes CLI, `kubectl`.
 
 To access a cluster, you need to know the location of the cluster and have credentials
 to access it.  Typically, this is automatically set-up when you work through
-though a [Getting started guide](../docs/getting-started-guide/README.md),
+though a [Getting started guide](http://releases.k8s.io/HEAD/docs/../docs/getting-started-guide/README.md),
 or someone else setup the cluster and provided you with credentials and a location.
 
 Check the location and credentials that kubectl knows about with this command:
@@ -18,8 +18,8 @@ Check the location and credentials that kubectl knows about with this command:
 kubectl config view
 ```
 
-Many of the [examples](../examples/) provide an introduction to using
-kubectl and complete documentation is found in the [kubectl manual](../docs/kubectl.md).
+Many of the [examples](http://releases.k8s.io/HEAD/docs/../examples/) provide an introduction to using
+kubectl and complete documentation is found in the [kubectl manual](http://releases.k8s.io/HEAD/docs/../docs/kubectl.md).
 
 ### <a name="kubectlproxy"</a>Directly accessing the REST API
 Kubectl handles locating and authenticating to the apiserver.
@@ -44,7 +44,7 @@ Run it like this:
 ```
 kubectl proxy --port=8080 &
 ```
-See [kubectl proxy](../docs/kubectl_proxy.md) for more details.
+See [kubectl proxy](http://releases.k8s.io/HEAD/docs/../docs/kubectl_proxy.md) for more details.
 
 Then you can explore the API with curl, wget, or a browser, like so:
 ```
@@ -78,16 +78,16 @@ certificate.
 
 On some clusters, the apiserver does not require authentication; it may serve
 on localhost, or be protected by a firewall.  There is not a standard
-for this.  [Configuring Access to the API](../docs/accessing_the_api.md)
+for this.  [Configuring Access to the API](http://releases.k8s.io/HEAD/docs/../docs/accessing_the_api.md)
 describes how a cluster admin can configure this.  Such approaches may conflict
 with future high-availability support.
 
 ### Programmatic access to the API
 
-There are [client libraries](../docs/client-libraries.md) for accessing the API
+There are [client libraries](http://releases.k8s.io/HEAD/docs/../docs/client-libraries.md) for accessing the API
 from several languages.  The Kubernetes project-supported
 [Go](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/pkg/client)
-client library can use the same [kubeconfig file](../docs/kubeconfig-file.md)
+client library can use the same [kubeconfig file](http://releases.k8s.io/HEAD/docs/../docs/kubeconfig-file.md)
 as the kubectl CLI does to locate and authenticate to the apiserver.  
 
 See documentation for other libraries for how they authenticate.
@@ -102,7 +102,7 @@ the `kubernetes` DNS name, which resolves to a Service IP which in turn
 will be routed to an apiserver.
 
 The recommended way to authenticate to the apiserver is with a
-[service account](service_accounts.md) credential.  By default, a pod
+[service account](http://releases.k8s.io/HEAD/docs/service_accounts.md) credential.  By default, a pod
 is associated with a service account, and a credential (token) for that
 service account is placed into the filesystem tree of each container in that pod,
 at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
@@ -121,7 +121,7 @@ In each case, the credentials of the pod are used to communicate securely with t
 ## <a name="otherservices"></a>Accessing services running on the cluster
 The previous section was about connecting the Kubernetes API server.  This section is about
 connecting to other services running on Kubernetes cluster.  In kubernetes, the
-[nodes](../docs/node.md), [pods](../docs/pods.md) and [services](services.md) all have
+[nodes](http://releases.k8s.io/HEAD/docs/../docs/node.md), [pods](http://releases.k8s.io/HEAD/docs/../docs/pods.md) and [services](http://releases.k8s.io/HEAD/docs/services.md) all have
 their own IPs.  In many cases, the node IPs, pod IPs, and some service IPs on a cluster will not be
 routable, so they will not be reachable from a machine outside the cluster,
 such as your desktop machine.
@@ -130,8 +130,8 @@ such as your desktop machine.
 You have several options for connecting to nodes, pods and services from outside the cluster:
   - Access services through public IPs.
     - Use a service with type `NodePort` or `LoadBalancer` to make the service reachable outside
-      the cluster.  See the [services](../docs/services.md) and
-      [kubectl expose](../docs/kubectl_expose.md) documentation.
+      the cluster.  See the [services](http://releases.k8s.io/HEAD/docs/../docs/services.md) and
+      [kubectl expose](http://releases.k8s.io/HEAD/docs/../docs/kubectl_expose.md) documentation.
     - Depending on your cluster environment, this may just expose the service to your corporate network,
       or it may expose it to the internet.  Think about whether the service being exposed is secure.
       Does it do its own authentication?
@@ -145,9 +145,9 @@ You have several options for connecting to nodes, pods and services from outside
       access to ports on the node IP, or for debugging.
     - Proxies may cause problems for some web applications.
     - Only works for HTTP/HTTPS.
-    - Described [here](#apiserverproxy).
+    - Described [here](http://releases.k8s.io/HEAD/docs/#apiserverproxy).
   - Access from a node or pod in the cluster.
-    - Run a pod, and then connect to a shell in it using [kubectl exec](../docs/kubectl_exec.md).
+    - Run a pod, and then connect to a shell in it using [kubectl exec](http://releases.k8s.io/HEAD/docs/../docs/kubectl_exec.md).
       Connect to other nodes, pods, and services from that shell.
     - Some clusters may allow you to ssh to a node in the cluster.  From there you may be able to
       access cluster services.  This is a non-standard method, and will work on some clusters but
@@ -171,7 +171,7 @@ This shows the proxy-verb URL for accessing each service.
 For example, this cluster has cluster-level logging enabled (using Elasticsearch), which can be reached
 at `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/` if suitable credentials are passed, or through a kubectl proxy at, for example:
 `http://localhost:8080/api/v1/proxy/namespaces/default/services/elasticsearch-logging/`.
-(See [above](#api) for how to pass credentials or use kubectl proxy.)
+(See [above](http://releases.k8s.io/HEAD/docs/#api) for how to pass credentials or use kubectl proxy.)
 
 #### Manually constructing apiserver proxy URLs
 As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:  
@@ -209,14 +209,14 @@ The redirect capabilities have been deprecated and removed.  Please use a proxy 
 
 ##<a name="somanyproxies"></a>So Many Proxies
 There are several different proxies you may encounter when using kubernetes:
-  1. The [kubectl proxy](#kubectlproxy):
+  1. The [kubectl proxy](http://releases.k8s.io/HEAD/docs/#kubectlproxy):
     - runs on a user's desktop or in a pod
     - proxies from a localhost address to the kubernetes apiserver
     - client to proxy uses HTTP
     - proxy to apiserver uses HTTPS
     - locates apiserver
     - adds authentication headers
-  1. The [apiserver proxy](#apiserverproxy):
+  1. The [apiserver proxy](http://releases.k8s.io/HEAD/docs/#apiserverproxy):
     - is a bastion built into the apiserver
     - connects a user outside of the cluster to cluster IPs which otherwise might not be reachable
     - runs in the apiserver processes
@@ -224,7 +224,7 @@ There are several different proxies you may encounter when using kubernetes:
     - proxy to target may use HTTP or HTTPS as chosen by proxy using available information
     - can be used to reach a Node, Pod, or Service
     - does load balancing when used to reach a Service
-  1. The [kube proxy](../docs/services.md#ips-and-vips):
+  1. The [kube proxy](http://releases.k8s.io/HEAD/docs/../docs/services.md#ips-and-vips):
     - runs on each node 
     - proxies UDP and TCP
     - does not understand HTTP

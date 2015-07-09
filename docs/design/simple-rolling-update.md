@@ -1,7 +1,7 @@
 ## Simple rolling update
 This is a lightweight design document for simple rolling update in ```kubectl```
 
-Complete execution flow can be found [here](#execution-details).
+Complete execution flow can be found [here](http://releases.k8s.io/HEAD/docs/design/#execution-details).
 
 ### Lightweight rollout
 Assume that we have a current replication controller named ```foo``` and it is running image ```image:v1```
@@ -12,7 +12,7 @@ If the user doesn't specify a name for the 'next' replication controller, then t
 the name of the original replication controller.
 
 Obviously there is a race here, where if you kill the client between delete foo, and creating the new version of 'foo' you might be surprised about what is there, but I think that's ok.
-See [Recovery](#recovery) below
+See [Recovery](http://releases.k8s.io/HEAD/docs/design/#recovery) below
 
 If the user does specify a name for the 'next' replication controller, then the 'next' replication controller is retained with its existing name,
 and the old 'foo' replication controller is deleted.  For the purposes of the rollout, we add a unique-ifying label ```kubernetes.io/deployment``` to both the ```foo``` and ```foo-next``` replication controllers.

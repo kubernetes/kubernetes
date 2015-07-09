@@ -3,7 +3,7 @@
 ## Pods
 The first atom of Kubernetes is a _pod_.  A pod is a collection of containers that are symbiotically grouped.
 
-See [pods](../../docs/pods.md) for more details.
+See [pods](http://releases.k8s.io/HEAD/examples/walkthrough/../../docs/pods.md) for more details.
 
 ### Intro
 
@@ -22,7 +22,7 @@ spec:
 
 A pod definition is a declaration of a _desired state_.  Desired state is a very important concept in the Kubernetes model.  Many things present a desired state to the system, and it is Kubernetes' responsibility to make sure that the current state matches the desired state.  For example, when you create a Pod, you declare that you want the containers in it to be running.  If the containers happen to not be running (e.g. program failure, ...), Kubernetes will continue to (re-)create them for you in order to drive them to the desired state. This process continues until you delete the Pod.
 
-See the [design document](../../DESIGN.md) for more details.
+See the [design document](http://releases.k8s.io/HEAD/examples/walkthrough/../../DESIGN.md) for more details.
 
 ### Volumes
 
@@ -66,7 +66,7 @@ In Kubernetes, ```emptyDir``` Volumes live for the lifespan of the Pod, which is
 
 If you want to mount a directory that already exists in the file system (e.g. ```/var/logs```) you can use the ```hostPath``` directive.
 
-See [volumes](../../docs/volumes.md) for more details.
+See [volumes](http://releases.k8s.io/HEAD/examples/walkthrough/../../docs/volumes.md) for more details.
 
 ### Multiple Containers
 
@@ -108,8 +108,8 @@ Finally, we have also introduced an environment variable to the ```git-monitor``
 
 
 ### What's next?
-Continue on to [Kubernetes 201](../walkthrough/k8s201.md) or
-for a complete application see the [guestbook example](../guestbook/README.md)
+Continue on to [Kubernetes 201](http://releases.k8s.io/HEAD/examples/walkthrough/../walkthrough/k8s201.md) or
+for a complete application see the [guestbook example](http://releases.k8s.io/HEAD/examples/walkthrough/../guestbook/README.md)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/walkthrough/README.md?pixel)]()

@@ -4,21 +4,21 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 
 **Table of Contents**
 
-- [Prerequisites](#prerequisites)
-- [Setup](#setup)
-- [Interacting with your Kubernetes cluster with Vagrant.](#interacting-with-your-kubernetes-cluster-with-vagrant)
-- [Authenticating with your master](#authenticating-with-your-master)
-- [Running containers](#running-containers)
-- [Troubleshooting](#troubleshooting)
-    - [I keep downloading the same (large) box all the time!](#i-keep-downloading-the-same-large-box-all-the-time)
-    - [I just created the cluster, but I am getting authorization errors!](#i-just-created-the-cluster-but-i-am-getting-authorization-errors)
-    - [I just created the cluster, but I do not see my container running!](#i-just-created-the-cluster-but-i-do-not-see-my-container-running)
-    - [I want to make changes to Kubernetes code!](#i-want-to-make-changes-to-kubernetes-code)
-    - [I have brought Vagrant up but the nodes cannot validate!](#i-have-brought-vagrant-up-but-the-nodes-cannot-validate)
-    - [I want to change the number of nodes!](#i-want-to-change-the-number-of-nodes)
-    - [I want my VMs to have more memory!](#i-want-my-vms-to-have-more-memory)
-    - [I ran vagrant suspend and nothing works!](#i-ran-vagrant-suspend-and-nothing-works)
-    - [I want vagrant to sync folders via nfs!](#i-want-vagrant-to-sync-folders-via-nfs)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+- [Setup](http://releases.k8s.io/HEAD/docs/getting-started-guides/#setup)
+- [Interacting with your Kubernetes cluster with Vagrant.](http://releases.k8s.io/HEAD/docs/getting-started-guides/#interacting-with-your-kubernetes-cluster-with-vagrant)
+- [Authenticating with your master](http://releases.k8s.io/HEAD/docs/getting-started-guides/#authenticating-with-your-master)
+- [Running containers](http://releases.k8s.io/HEAD/docs/getting-started-guides/#running-containers)
+- [Troubleshooting](http://releases.k8s.io/HEAD/docs/getting-started-guides/#troubleshooting)
+    - [I keep downloading the same (large) box all the time!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-keep-downloading-the-same-large-box-all-the-time)
+    - [I just created the cluster, but I am getting authorization errors!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-just-created-the-cluster-but-i-am-getting-authorization-errors)
+    - [I just created the cluster, but I do not see my container running!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-just-created-the-cluster-but-i-do-not-see-my-container-running)
+    - [I want to make changes to Kubernetes code!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-want-to-make-changes-to-kubernetes-code)
+    - [I have brought Vagrant up but the nodes cannot validate!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-have-brought-vagrant-up-but-the-nodes-cannot-validate)
+    - [I want to change the number of nodes!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-want-to-change-the-number-of-nodes)
+    - [I want my VMs to have more memory!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-want-my-vms-to-have-more-memory)
+    - [I ran vagrant suspend and nothing works!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-ran-vagrant-suspend-and-nothing-works)
+    - [I want vagrant to sync folders via nfs!](http://releases.k8s.io/HEAD/docs/getting-started-guides/#i-want-vagrant-to-sync-folders-via-nfs)
 
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
@@ -247,7 +247,7 @@ my-nginx     my-nginx       nginx      run=my-nginx   3
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
-Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
+Check the [guestbook](http://releases.k8s.io/HEAD/docs/getting-started-guides/../../examples/guestbook/README.md) application to learn how to create a service.
 You can already play with scaling the replicas with:
 
 ```sh
@@ -297,7 +297,7 @@ If this is your first time creating the cluster, the kubelet on each minion sche
 
 #### I want to make changes to Kubernetes code!
 
-To set up a vagrant cluster for hacking, follow the [vagrant developer guide](../devel/developer-guides/vagrant.md).
+To set up a vagrant cluster for hacking, follow the [vagrant developer guide](http://releases.k8s.io/HEAD/docs/getting-started-guides/../devel/developer-guides/vagrant.md).
 
 #### I have brought Vagrant up but the nodes cannot validate!
 

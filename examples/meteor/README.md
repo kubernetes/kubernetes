@@ -11,7 +11,7 @@ Meteor uses MongoDB, and we will use the `GCEPersistentDisk` type of
 volume for persistent storage. Therefore, this example is only
 applicable to [Google Compute
 Engine](https://cloud.google.com/compute/). Take a look at the
-[volumes documentation](/docs/volumes.md) for other options.
+[volumes documentation](http://releases.k8s.io/HEAD/examples/meteor//docs/volumes.md) for other options.
 
 First, if you have not already done so:
 
@@ -99,12 +99,12 @@ Running
 -------
 
 Now that you have containerized your Meteor app it's time to set up
-your cluster. Edit [`meteor-controller.json`](meteor-controller.json)
+your cluster. Edit [`meteor-controller.json`](http://releases.k8s.io/HEAD/examples/meteor/meteor-controller.json)
 and make sure the `image:` points to the container you just pushed to
 the Docker Hub or GCR.
 
 We will need to provide MongoDB a persistent Kuberetes volume to
-store its data. See the [volumes documentation](/docs/volumes.md) for
+store its data. See the [volumes documentation](http://releases.k8s.io/HEAD/examples/meteor//docs/volumes.md) for
 options. We're going to use Google Compute Engine persistent
 disks. Create the MongoDB disk by running:
 ```
@@ -123,7 +123,7 @@ kubectl create -f meteor-controller.json
 kubectl create -f meteor-service.json
 ```
 
-Note that [`meteor-service.json`](meteor-service.json) creates a load balancer, so
+Note that [`meteor-service.json`](http://releases.k8s.io/HEAD/examples/meteor/meteor-service.json) creates a load balancer, so
 your app should be available through the IP of that load balancer once
 the Meteor pods are started. You can find the IP of your load balancer
 by running:
@@ -154,20 +154,20 @@ ENTRYPOINT MONGO_URL=mongodb://$MONGO_SERVICE_HOST:$MONGO_SERVICE_PORT /usr/loca
 Here we can see the MongoDB host and port information being passed
 into the Meteor app. The `MONGO_SERVICE...` environment variables are
 set by Kubernetes, and point to the service named `mongo` specified in
-[`mongo-service.json`](mongo-service.json). See the [environment
+[`mongo-service.json`](http://releases.k8s.io/HEAD/examples/meteor/mongo-service.json). See the [environment
 documentation](/docs/container-environment.md) for more details.
 
 As you may know, Meteor uses long lasting connections, and requires
 _sticky sessions_. With Kubernetes you can scale out your app easily
 with session affinity. The
-[`meteor-service.json`](meteor-service.json) file contains
+[`meteor-service.json`](http://releases.k8s.io/HEAD/examples/meteor/meteor-service.json) file contains
 `"sessionAffinity": "ClientIP"`, which provides this for us. See the
 [service
 documentation](/docs/services.md#virtual-ips-and-service-proxies) for
 more information.
 
 As mentioned above, the mongo container uses a volume which is mapped
-to a persistent disk by Kubernetes. In [`mongo-pod.json`](mongo-pod.json) the container
+to a persistent disk by Kubernetes. In [`mongo-pod.json`](http://releases.k8s.io/HEAD/examples/meteor/mongo-pod.json) the container
 section specifies the volume:
 ```
         "volumeMounts": [

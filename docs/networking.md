@@ -1,28 +1,28 @@
 # Networking in Kubernetes
 **Table of Contents**
 <!-- BEGIN GENERATED TOC -->
-- [Networking in Kubernetes](#networking-in-kubernetes)
-  - [Summary](#summary)
-  - [Docker model](#docker-model)
-  - [Kubernetes model](#kubernetes-model)
-  - [How to achieve this](#how-to-achieve-this)
-    - [Google Compute Engine (GCE)](#google-compute-engine-(gce))
-    - [L2 networks and linux bridging](#l2-networks-and-linux-bridging)
-    - [Flannel](#flannel)
-    - [OpenVSwitch](#openvswitch)
-    - [Weave](#weave)
-    - [Calico](#calico)
-  - [Other reading](#other-reading)
+- [Networking in Kubernetes](http://releases.k8s.io/HEAD/docs/#networking-in-kubernetes)
+  - [Summary](http://releases.k8s.io/HEAD/docs/#summary)
+  - [Docker model](http://releases.k8s.io/HEAD/docs/#docker-model)
+  - [Kubernetes model](http://releases.k8s.io/HEAD/docs/#kubernetes-model)
+  - [How to achieve this](http://releases.k8s.io/HEAD/docs/#how-to-achieve-this)
+    - [Google Compute Engine (GCE)](http://releases.k8s.io/HEAD/docs/#google-compute-engine-(gce))
+    - [L2 networks and linux bridging](http://releases.k8s.io/HEAD/docs/#l2-networks-and-linux-bridging)
+    - [Flannel](http://releases.k8s.io/HEAD/docs/#flannel)
+    - [OpenVSwitch](http://releases.k8s.io/HEAD/docs/#openvswitch)
+    - [Weave](http://releases.k8s.io/HEAD/docs/#weave)
+    - [Calico](http://releases.k8s.io/HEAD/docs/#calico)
+  - [Other reading](http://releases.k8s.io/HEAD/docs/#other-reading)
 
 <!-- END GENERATED TOC -->
 
 Kubernetes approaches networking somewhat differently than Docker does by
 default.  There are 4 distinct networking problems to solve:
 1. Highly-coupled container-to-container communications: this is solved by
-   [pods](pods.md) and `localhost` communications.
+   [pods](http://releases.k8s.io/HEAD/docs/pods.md) and `localhost` communications.
 2. Pod-to-Pod communications: this is the primary focus of this document.
-3. Pod-to-Service communications: this is covered by [services](services.md).
-4. External-to-Service communications: this is covered by [services](services.md).
+3. Pod-to-Service communications: this is covered by [services](http://releases.k8s.io/HEAD/docs/services.md).
+4. External-to-Service communications: this is covered by [services](http://releases.k8s.io/HEAD/docs/services.md).
 
 ## Summary
 
@@ -171,7 +171,7 @@ people have reported success with Flannel and Kubernetes.
 
 ### OpenVSwitch
 
-[OpenVSwitch](./ovs-networking.md) is a somewhat more mature but also
+[OpenVSwitch](http://releases.k8s.io/HEAD/docs/./ovs-networking.md) is a somewhat more mature but also
 complicated way to build an overlay network.  This is endorsed by several of the
 "Big Shops" for networking.
 

@@ -3,16 +3,16 @@ Getting started with libvirt CoreOS
 
 **Table of Contents**
 
-- [Highlights](#highlights)
-- [Prerequisites](#prerequisites)
-- [Setup](#setup)
-- [Interacting with your Kubernetes cluster with the `kube-*` scripts.](#interacting-with-your-kubernetes-cluster-with-the-kube--scripts)
-- [Troubleshooting](#troubleshooting)
-    - [!!! Cannot find kubernetes-server-linux-amd64.tar.gz](#-cannot-find-kubernetes-server-linux-amd64targz)
-    - [Can't find virsh in PATH, please fix and retry.](#cant-find-virsh-in-path-please-fix-and-retry)
-    - [error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': No such file or directory](#error-failed-to-connect-socket-to-varrunlibvirtlibvirt-sock-no-such-file-or-directory)
-    - [error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': Permission denied](#error-failed-to-connect-socket-to-varrunlibvirtlibvirt-sock-permission-denied)
-    - [error: Out of memory initializing network (virsh net-create...)](#error-out-of-memory-initializing-network-virsh-net-create)
+- [Highlights](http://releases.k8s.io/HEAD/docs/getting-started-guides/#highlights)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+- [Setup](http://releases.k8s.io/HEAD/docs/getting-started-guides/#setup)
+- [Interacting with your Kubernetes cluster with the `kube-*` scripts.](http://releases.k8s.io/HEAD/docs/getting-started-guides/#interacting-with-your-kubernetes-cluster-with-the-kube--scripts)
+- [Troubleshooting](http://releases.k8s.io/HEAD/docs/getting-started-guides/#troubleshooting)
+    - [!!! Cannot find kubernetes-server-linux-amd64.tar.gz](http://releases.k8s.io/HEAD/docs/getting-started-guides/#-cannot-find-kubernetes-server-linux-amd64targz)
+    - [Can't find virsh in PATH, please fix and retry.](http://releases.k8s.io/HEAD/docs/getting-started-guides/#cant-find-virsh-in-path-please-fix-and-retry)
+    - [error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': No such file or directory](http://releases.k8s.io/HEAD/docs/getting-started-guides/#error-failed-to-connect-socket-to-varrunlibvirtlibvirt-sock-no-such-file-or-directory)
+    - [error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': Permission denied](http://releases.k8s.io/HEAD/docs/getting-started-guides/#error-failed-to-connect-socket-to-varrunlibvirtlibvirt-sock-permission-denied)
+    - [error: Out of memory initializing network (virsh net-create...)](http://releases.k8s.io/HEAD/docs/getting-started-guides/#error-out-of-memory-initializing-network-virsh-net-create)
 
 ### Highlights
 

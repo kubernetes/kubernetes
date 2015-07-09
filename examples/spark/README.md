@@ -7,7 +7,7 @@ Spark](http://spark.apache.org/) cluster using Kubernetes and
 You will setup a Spark master service and a set of
 Spark workers using Spark's [standalone mode](http://spark.apache.org/docs/latest/spark-standalone.html).
 
-For the impatient expert, jump straight to the [tl;dr](#tldr)
+For the impatient expert, jump straight to the [tl;dr](http://releases.k8s.io/HEAD/examples/spark/#tldr)
 section.
 
 ### Sources
@@ -24,17 +24,17 @@ instructions for your platform.
 
 ## Step One: Start your Master service
 
-The Master [service](../../docs/services.md) is the master (or head) service for a Spark
+The Master [service](http://releases.k8s.io/HEAD/examples/spark/../../docs/services.md) is the master (or head) service for a Spark
 cluster.
 
-Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/pods.md) running
+Use the [`examples/spark/spark-master.json`](http://releases.k8s.io/HEAD/examples/spark/spark-master.json) file to create a [pod](http://releases.k8s.io/HEAD/examples/spark/../../docs/pods.md) running
 the Master service.
 
 ```shell
 $ kubectl create -f examples/spark/spark-master.json
 ```
 
-Then, use the [`examples/spark/spark-master-service.json`](spar-master-service.json) file to
+Then, use the [`examples/spark/spark-master-service.json`](http://releases.k8s.io/HEAD/examples/spark/spar-master-service.json) file to
 create a logical service endpoint that Spark workers can use to access
 the Master pod.
 
@@ -86,8 +86,8 @@ program.
 
 The Spark workers need the Master service to be running.
 
-Use the [`examples/spark/spark-worker-controller.json`](spark-worker-controller.json) file to create a
-[replication controller](../../docs/replication-controller.md) that manages the worker pods.
+Use the [`examples/spark/spark-worker-controller.json`](http://releases.k8s.io/HEAD/examples/spark/spark-worker-controller.json) file to create a
+[replication controller](http://releases.k8s.io/HEAD/examples/spark/../../docs/replication-controller.md) that manages the worker pods.
 
 ```shell
 $ kubectl create -f examples/spark/spark-worker-controller.json

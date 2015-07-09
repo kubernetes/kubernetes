@@ -383,7 +383,7 @@ These are often left implicit by customers, but are worth calling out explicitly
 
 TBD: All very hand-wavey still, but some initial thoughts to get the conversation going...
 
-![image](federation-high-level-arch.png)
+![image](http://releases.k8s.io/HEAD/docs/proposals/federation-high-level-arch.png)
 
 ##  Ubernetes API
 

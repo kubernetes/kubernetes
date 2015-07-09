@@ -1,6 +1,6 @@
 ## Getting started with config files.
 
-In addition to the imperative style commands described [elsewhere](simple-nginx.md), Kubernetes
+In addition to the imperative style commands described [elsewhere](http://releases.k8s.io/HEAD/examples/simple-nginx.md), Kubernetes
 supports declarative YAML or JSON configuration files.  Often times config files are preferable
 to imperative commands, since they can be checked into version control and changes to the files
 can be code reviewed, producing a more robust, reliable and archival system.
@@ -42,7 +42,7 @@ kubectl delete pods nginx
 ```
 
 ### Running a replicated set of containers from a configuration file
-To run replicated containers, you need a [Replication Controller](../docs/replication-controller.md).
+To run replicated containers, you need a [Replication Controller](http://releases.k8s.io/HEAD/examples/../docs/replication-controller.md).
 A replication controller is responsible for ensuring that a specific number of pods exist in the
 cluster.
 

@@ -1,6 +1,6 @@
 # Cluster Troubleshooting
 Most of the time, if you encounter problems, it is your application that is having problems.  For application
-problems please see the [application troubleshooting guide](application-troubleshooting.md).
+problems please see the [application troubleshooting guide](http://releases.k8s.io/HEAD/docs/application-troubleshooting.md).
 
 ## Listing your cluster
 The first thing to debug in your cluster is if your nodes are all registered correctly.

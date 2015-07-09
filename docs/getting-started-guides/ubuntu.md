@@ -1,13 +1,13 @@
 Kubernetes Deployment On Bare-metal Ubuntu Nodes
 ------------------------------------------------
 
-- [Introduction](#introduction)
-- [Prerequisites](#prerequisites)
-    - [Starting a Cluster](#starting-a-cluster)
-        - [Make *kubernetes* , *etcd* and *flanneld* binaries](#make-kubernetes--etcd-and-flanneld-binaries)
-        - [Configure and start the kubernetes cluster](#configure-and-start-the-kubernetes-cluster)
-        - [Deploy addons](#deploy-addons)
-        - [Trouble Shooting](#trouble-shooting)
+- [Introduction](http://releases.k8s.io/HEAD/docs/getting-started-guides/#introduction)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+    - [Starting a Cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#starting-a-cluster)
+        - [Make *kubernetes* , *etcd* and *flanneld* binaries](http://releases.k8s.io/HEAD/docs/getting-started-guides/#make-kubernetes--etcd-and-flanneld-binaries)
+        - [Configure and start the kubernetes cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#configure-and-start-the-kubernetes-cluster)
+        - [Deploy addons](http://releases.k8s.io/HEAD/docs/getting-started-guides/#deploy-addons)
+        - [Trouble Shooting](http://releases.k8s.io/HEAD/docs/getting-started-guides/#trouble-shooting)
 
 ## Introduction
 
@@ -120,7 +120,7 @@ NAME            LABELS                                 STATUS
 
 ```
 
-Also you can run kubernetes [guest-example](../../examples/guestbook) to build a redis backend cluster on the k8s．
+Also you can run kubernetes [guest-example](http://releases.k8s.io/HEAD/docs/getting-started-guides/../../examples/guestbook) to build a redis backend cluster on the k8s．
 
 
 #### Deploy addons

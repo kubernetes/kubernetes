@@ -15,13 +15,13 @@ wearing underwear, pants, a belt, suspenders, another pair of underwear, and ano
 of these steps in detail, but a summary is given here to help guide and orient the user.
 
 The steps involved are as follows:
-   * [Creating the reliable constituent nodes that collectively form our HA master implementation.](#reliable-nodes)
-   * [Setting up a redundant, reliable storage layer with clustered etcd.](#establishing-a-redundant-reliable-data-storage-layer)
-   * [Starting replicated, load balanced Kubernetes API servers](#replicated-api-servers)
-   * [Setting up master-elected Kubernetes scheduler and controller-manager daemons](#master-elected-components)
+   * [Creating the reliable constituent nodes that collectively form our HA master implementation.](http://releases.k8s.io/HEAD/docs/#reliable-nodes)
+   * [Setting up a redundant, reliable storage layer with clustered etcd.](http://releases.k8s.io/HEAD/docs/#establishing-a-redundant-reliable-data-storage-layer)
+   * [Starting replicated, load balanced Kubernetes API servers](http://releases.k8s.io/HEAD/docs/#replicated-api-servers)
+   * [Setting up master-elected Kubernetes scheduler and controller-manager daemons](http://releases.k8s.io/HEAD/docs/#master-elected-components)
 
 Here's what the system should look like when it's finished:
-![High availability Kubernetes diagram](high-availability/ha.png)
+![High availability Kubernetes diagram](http://releases.k8s.io/HEAD/docs/high-availability/ha.png)
 
 Ready? Let's get started.
 
@@ -46,11 +46,11 @@ choices. For example, on systemd-based systems (e.g. RHEL, CentOS), you can run 
 If you are extending from a standard Kubernetes installation, the ```kubelet``` binary should already be present on your system.  You can run
 ```which kubelet``` to determine if the binary is in fact installed.  If it is not installed,
 you should install the [kubelet binary](https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubelet), the
-[/etc/init.d/kubelet](high-availability/init-kubelet) and [/etc/default/kubelet](high-availability/default-kubelet)
+[/etc/init.d/kubelet](http://releases.k8s.io/HEAD/docs/high-availability/init-kubelet) and [/etc/default/kubelet](http://releases.k8s.io/HEAD/docs/high-availability/default-kubelet)
 scripts.
 
-If you are using monit, you should also install the monit daemon (```apt-get install monit```) and the [/etc/monit/conf.d/kubelet](high-availability/monit-kubelet) and
-[/etc/monit/conf.d/docker](high-availability/monit-docker) configs.
+If you are using monit, you should also install the monit daemon (```apt-get install monit```) and the [/etc/monit/conf.d/kubelet](http://releases.k8s.io/HEAD/docs/high-availability/monit-kubelet) and
+[/etc/monit/conf.d/docker](http://releases.k8s.io/HEAD/docs/high-availability/monit-docker) configs.
 
 On systemd systems you ```systemctl enable kubelet``` and ```systemctl enable docker```.
 
@@ -64,7 +64,7 @@ Clustered etcd already replicates your storage to all master instances in your c
 to have their physical (or virtual) disks fail at the same time.  The probability that this occurs is relatively low, so for many people
 running a replicated etcd cluster is likely reliable enough.  You can add additional reliability by increasing the
 size of the cluster from three to five nodes.  If that is still insufficient, you can add
-[even more redundancy to your storage layer](#even-more-reliable-storage).
+[even more redundancy to your storage layer](http://releases.k8s.io/HEAD/docs/#even-more-reliable-storage).
 
 ### Clustering etcd
 The full details of clustering etcd are beyond the scope of this document, lots of details are given on the
@@ -77,7 +77,7 @@ First, hit the etcd discovery service to create a new token:
 curl https://discovery.etcd.io/new?size=3
 ```
 
-On each node, copy the [etcd.manifest](high-availability/etcd.manifest) file into ```/etc/kubernetes/manifests/etcd.manifest```
+On each node, copy the [etcd.manifest](http://releases.k8s.io/HEAD/docs/high-availability/etcd.manifest) file into ```/etc/kubernetes/manifests/etcd.manifest```
 
 The kubelet on each node actively monitors the contents of that directory, and it will create an instance of the ```etcd```
 server from the definition of the pod specified in ```etcd.manifest```.
@@ -140,7 +140,7 @@ Next, you need to create a ```/srv/kubernetes/``` directory on each node.  This 
 The easiest way to create this directory, may be to copy it from the master node of a working cluster, or you can manually generate these files yourself.
 
 ### Starting the API Server
-Once these files exist, copy the [kube-apiserver.manifest](high-availability/kube-apiserver.manifest) into ```/etc/kubernetes/manifests/``` on each master node.
+Once these files exist, copy the [kube-apiserver.manifest](http://releases.k8s.io/HEAD/docs/high-availability/kube-apiserver.manifest) into ```/etc/kubernetes/manifests/``` on each master node.
 
 The kubelet monitors this directory, and will automatically create an instance of the ```kube-apiserver``` container using the pod definition specified
 in the file.
@@ -167,7 +167,7 @@ master election.  On each of the three apiserver nodes, we run a small utility a
 election protocol using etcd "compare and swap". If the apiserver node wins the election, it starts the master component it is managing (e.g. the scheduler), if it
 loses the election, it ensures that any master components running on the node (e.g. the scheduler) are stopped.
 
-In the future, we expect to more tightly integrate this lease-locking into the scheduler and controller-manager binaries directly, as described in the [high availability design proposal](proposals/high-availability.md)
+In the future, we expect to more tightly integrate this lease-locking into the scheduler and controller-manager binaries directly, as described in the [high availability design proposal](http://releases.k8s.io/HEAD/docs/proposals/high-availability.md)
 
 ### Installing configuration files
 
@@ -178,11 +178,11 @@ touch /var/log/kube-controller-manager.log
 ```
 
 Next, set up the descriptions of the scheduler and controller manager pods on each node.
-by copying [kube-scheduler.manifest](high-availability/kube-scheduler.manifest) and [kube-controller-manager.manifest](high-availability/kube-controller-manager.manifest) into the ```/srv/kubernetes/```
+by copying [kube-scheduler.manifest](http://releases.k8s.io/HEAD/docs/high-availability/kube-scheduler.manifest) and [kube-controller-manager.manifest](http://releases.k8s.io/HEAD/docs/high-availability/kube-controller-manager.manifest) into the ```/srv/kubernetes/```
  directory.
 
 ### Running the podmaster
-Now that the configuration files are in place, copy the [podmaster.manifest](high-availability/podmaster.manifest) config file into ```/etc/kubernetes/manifests/```
+Now that the configuration files are in place, copy the [podmaster.manifest](http://releases.k8s.io/HEAD/docs/high-availability/podmaster.manifest) config file into ```/etc/kubernetes/manifests/```
 
 As before, the kubelet on the node monitors this directory, and will start an instance of the podmaster using the pod specification provided in ```podmaster.manifest```.
 

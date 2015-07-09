@@ -6,11 +6,11 @@ The Salt scripts are shared across multiple hosting providers, so it's important
 
 ## Salt cluster setup
 
-The **salt-master** service runs on the kubernetes-master node [(except on the default GCE setup)](#standalone-salt-configuration-on-gce).
+The **salt-master** service runs on the kubernetes-master node [(except on the default GCE setup)](http://releases.k8s.io/HEAD/docs/#standalone-salt-configuration-on-gce).
 
 The **salt-minion** service runs on the kubernetes-master node and each kubernetes-minion node in the cluster.
 
-Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file [(except on GCE)](#standalone-salt-configuration-on-gce).
+Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file [(except on GCE)](http://releases.k8s.io/HEAD/docs/#standalone-salt-configuration-on-gce).
 
 ```
 [root@kubernetes-master] $ cat /etc/salt/minion.d/master.conf
@@ -95,7 +95,7 @@ We should define a grains.conf key that captures more specifically what network 
 
 ## Further reading
 
-The [cluster/saltbase](../cluster/saltbase) tree has more details on the current SaltStack configuration.
+The [cluster/saltbase](http://releases.k8s.io/HEAD/docs/../cluster/saltbase) tree has more details on the current SaltStack configuration.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/salt.md?pixel)]()

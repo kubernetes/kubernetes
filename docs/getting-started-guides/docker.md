@@ -3,22 +3,22 @@ Running kubernetes locally via Docker
 
 **Table of Contents**
 
-- [Overview](#setting-up-a-cluster)
-- [Prerequisites](#prerequisites)
-- [Step One: Run etcd](#step-one-run-etcd)
-- [Step Two: Run the master](#step-two-run-the-master)
-- [Step Three: Run the service proxy](#step-three-run-the-service-proxy)
-- [Test it out](#test-it-out)
-- [Run an application](#run-an-application)
-- [Expose it as a service:](#expose-it-as-a-service)
-- [A note on turning down your cluster](#a-note-on-turning-down-your-cluster)
+- [Overview](http://releases.k8s.io/HEAD/docs/getting-started-guides/#setting-up-a-cluster)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+- [Step One: Run etcd](http://releases.k8s.io/HEAD/docs/getting-started-guides/#step-one-run-etcd)
+- [Step Two: Run the master](http://releases.k8s.io/HEAD/docs/getting-started-guides/#step-two-run-the-master)
+- [Step Three: Run the service proxy](http://releases.k8s.io/HEAD/docs/getting-started-guides/#step-three-run-the-service-proxy)
+- [Test it out](http://releases.k8s.io/HEAD/docs/getting-started-guides/#test-it-out)
+- [Run an application](http://releases.k8s.io/HEAD/docs/getting-started-guides/#run-an-application)
+- [Expose it as a service:](http://releases.k8s.io/HEAD/docs/getting-started-guides/#expose-it-as-a-service)
+- [A note on turning down your cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#a-note-on-turning-down-your-cluster)
 
 ### Overview
 
 The following instructions show you how to set up a simple, single node kubernetes cluster using Docker.
 
 Here's a diagram of what the final result will look like:
-![Kubernetes Single Node on Docker](k8s-singlenode-docker.png)
+![Kubernetes Single Node on Docker](http://releases.k8s.io/HEAD/docs/getting-started-guides/k8s-singlenode-docker.png)
 
 ### Prerequisites
 1. You need to have docker installed on one machine.
@@ -33,7 +33,7 @@ docker run --net=host -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd
 docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
 ```
 
-This actually runs the kubelet, which in turn runs a [pod](../pods.md) that contains the other master components.
+This actually runs the kubelet, which in turn runs a [pod](http://releases.k8s.io/HEAD/docs/getting-started-guides/../pods.md) that contains the other master components.
 
 ### Step Three: Run the service proxy
 *Note, this could be combined with master above, but it requires --privileged for iptables manipulation*

@@ -7,9 +7,9 @@ environment information about itself, and a backend pod that it has
 accessed through the service. The goal is to illuminate the
 environment metadata available to running containers inside the
 Kubernetes cluster. The documentation for the kubernetes environment
-is [here](/docs/container-environment.md).
+is [here](http://releases.k8s.io/HEAD/examples/environment-guide//docs/container-environment.md).
 
-![Diagram](diagram.png)
+![Diagram](http://releases.k8s.io/HEAD/examples/environment-guide/diagram.png)
 
 Prerequisites
 -------------
@@ -22,7 +22,7 @@ for your platform.
 Optional: Build your own containers
 -----------------------------------
 The code for the containers is under
-[containers/](containers)
+[containers/](http://releases.k8s.io/HEAD/examples/environment-guide/containers)
 
 Get everything running
 ----------------------
@@ -67,8 +67,8 @@ Backend Namespace: default
 ```
 
 First the frontend pod's information is printed. The pod name and
-[namespace](/docs/design/namespaces.md) are retreived from the
-[Downward API](/docs/downward_api.md). Next, `USER_VAR` is the name of
+[namespace](http://releases.k8s.io/HEAD/examples/environment-guide//docs/design/namespaces.md) are retreived from the
+[Downward API](http://releases.k8s.io/HEAD/examples/environment-guide//docs/downward_api.md). Next, `USER_VAR` is the name of
 an environment variable set in the [pod
 definition](show-rc.yaml). Then, the dynamic kubernetes environment
 variables are scanned and printed. These are used to find the backend

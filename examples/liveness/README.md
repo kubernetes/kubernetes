@@ -1,7 +1,7 @@
 ## Overview
 This example shows two types of pod health checks: HTTP checks and container execution checks.
 
-The [exec-liveness.yaml](./exec-liveness.yaml) demonstrates the container execution check.
+The [exec-liveness.yaml](http://releases.k8s.io/HEAD/examples/liveness/./exec-liveness.yaml) demonstrates the container execution check.
 ```
     livenessProbe:
       exec:
@@ -20,7 +20,7 @@ echo ok > /tmp/health; sleep 10; rm -rf /tmp/health; sleep 600
 so when Kubelet executes the health check 15 seconds (defined by initialDelaySeconds) after the container started, the check would fail.
 
 
-The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
+The [http-liveness.yaml](http://releases.k8s.io/HEAD/examples/liveness/http-liveness.yaml) demonstrates the HTTP check.
 ```
     livenessProbe:
       httpGet:
@@ -31,7 +31,7 @@ The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
 ```
 The Kubelet sends a HTTP request to the specified path and port to perform the health check. If you take a look at image/server.go, you will see the server starts to respond with an error code 500 after 10 seconds, so the check fails.
 
-This [guide](../walkthrough/k8s201.md#health-checking) has more information on health checks.
+This [guide](http://releases.k8s.io/HEAD/examples/liveness/../walkthrough/k8s201.md#health-checking) has more information on health checks.
 
 ## Get your hands dirty
 To show the health check is actually working, first create the pods:

@@ -3,10 +3,10 @@ Getting started on [CloudStack](http://cloudstack.apache.org)
 
 **Table of Contents**
 
-    - [Introduction](#introduction)
-    - [Prerequisites](#prerequisites)
-    - [Clone the playbook](#clone-the-playbook)
-    - [Create a Kubernetes cluster](#create-a-kubernetes-cluster)
+    - [Introduction](http://releases.k8s.io/HEAD/docs/getting-started-guides/#introduction)
+    - [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+    - [Clone the playbook](http://releases.k8s.io/HEAD/docs/getting-started-guides/#clone-the-playbook)
+    - [Create a Kubernetes cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#create-a-kubernetes-cluster)
 
 ### Introduction
 
@@ -15,7 +15,7 @@ CloudStack is a software to build public and private clouds based on hardware vi
 [CoreOS](http://coreos.com) templates for CloudStack are built [nightly](http://stable.release.core-os.net/amd64-usr/current/). CloudStack operators need to [register](http://docs.cloudstack.apache.org/projects/cloudstack-administration/en/latest/templates.html) this template in their cloud before proceeding with these Kubernetes deployment instructions.
 
 This guide uses an [Ansible playbook](https://github.com/runseb/ansible-kubernetes).
-This is a completely automated, a single playbook deploys Kubernetes based on the coreOS [instructions](./coreos/coreos_multinode_cluster.md).
+This is a completely automated, a single playbook deploys Kubernetes based on the coreOS [instructions](http://releases.k8s.io/HEAD/docs/getting-started-guides/./coreos/coreos_multinode_cluster.md).
 
 
 This [Ansible](http://ansibleworks.com) playbook deploys Kubernetes on a CloudStack based Cloud using CoreOS images. The playbook, creates an ssh key pair, creates a security group and associated rules and finally starts coreOS instances configured via cloud-init.

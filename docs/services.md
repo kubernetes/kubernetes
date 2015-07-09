@@ -2,8 +2,8 @@
 
 ## Overview
 
-Kubernetes [`Pods`](pods.md) are mortal. They are born and they die, and they
-are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
+Kubernetes [`Pods`](http://releases.k8s.io/HEAD/docs/pods.md) are mortal. They are born and they die, and they
+are not resurrected.  [`ReplicationControllers`](http://releases.k8s.io/HEAD/docs/replication-controller.md) in
 particular create and destroy `Pods` dynamically (e.g. when scaling up or down
 or when doing rolling updates).  While each `Pod` gets its own IP address, even
 those IP addresses cannot be relied upon to be stable over time. This leads to
@@ -87,7 +87,7 @@ abstract other kinds of backends.  For example:
   * You want to have an external database cluster in production, but in test
     you use your own databases.
   * You want to point your service to a service in another
-    [`Namespace`](namespaces.md) or on another cluster.
+    [`Namespace`](http://releases.k8s.io/HEAD/docs/namespaces.md) or on another cluster.
   * You are migrating your workload to Kubernetes and some of your backends run
     outside of Kubernetes.
 
@@ -154,7 +154,7 @@ The net result is that any traffic bound for the `Service` is proxied to an
 appropriate backend without the clients knowing anything about Kubernetes or
 `Services` or `Pods`.
 
-![Services overview diagram](services_overview.png)
+![Services overview diagram](http://releases.k8s.io/HEAD/docs/services_overview.png)
 
 By default, the choice of backend is random.  Client-IP based session affinity
 can be selected by setting `service.spec.sessionAffinity` to `"ClientIP"` (the
@@ -465,7 +465,7 @@ This means that `Service` owners can choose any port they want without risk of
 collision.  Clients can simply connect to an IP and port, without being aware
 of which `Pods` they are actually accessing.
 
-![Services detailed diagram](services_detail.png)
+![Services detailed diagram](http://releases.k8s.io/HEAD/docs/services_detail.png)
 
 
 

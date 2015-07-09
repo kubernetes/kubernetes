@@ -1,16 +1,16 @@
 # Persistent Installation of MySQL and WordPress on Kubernetes
 
-This example describes how to run a persistent installation of [Wordpress](https://wordpress.org/) using the [volumes](/docs/volumes.md) feature of Kubernetes, and [Google Compute Engine](https://cloud.google.com/compute/docs/disks) [persistent disks](/docs/volumes.md#gcepersistentdisk).
+This example describes how to run a persistent installation of [Wordpress](https://wordpress.org/) using the [volumes](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd//docs/volumes.md) feature of Kubernetes, and [Google Compute Engine](https://cloud.google.com/compute/docs/disks) [persistent disks](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd//docs/volumes.md#gcepersistentdisk).
 
 We'll use the [mysql](https://registry.hub.docker.com/_/mysql/) and [wordpress](https://registry.hub.docker.com/_/wordpress/) official [Docker](https://www.docker.com/) images for this installation. (The wordpress image includes an Apache server).
 
-We'll create two Kubernetes [pods](../../docs/pods.md) to run mysql and wordpress, both with associated persistent disks, then set up a Kubernetes [service](../../docs/services.md) to front each pod.
+We'll create two Kubernetes [pods](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/../../docs/pods.md) to run mysql and wordpress, both with associated persistent disks, then set up a Kubernetes [service](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/../../docs/services.md) to front each pod.
 
 This example demonstrates several useful things, including: how to set up and use persistent disks with Kubernetes pods; how to define Kubernetes services to leverage docker-links-compatible service environment variables; and use of an external load balancer to expose the wordpress service externally and make it transparent to the user if the wordpress pod moves to a different cluster node.
 
 ## Get started on Google Compute Engine (GCE)
 
-Because we're using the `GCEPersistentDisk` type of volume for persistent storage, this example is only applicable to [Google Compute Engine](https://cloud.google.com/compute/). Take a look at the [volumes documentation](/docs/volumes.md) for other options.
+Because we're using the `GCEPersistentDisk` type of volume for persistent storage, this example is only applicable to [Google Compute Engine](https://cloud.google.com/compute/). Take a look at the [volumes documentation](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd//docs/volumes.md) for other options.
 
 First, if you have not already done so:
 
@@ -30,13 +30,13 @@ Next, start up a Kubernetes cluster:
 wget -q -O - https://get.k8s.io | bash
 ```
 
-Please see the [GCE getting started guide](../../docs/getting-started-guides/gce.md) for full details and other options for starting a cluster.
+Please see the [GCE getting started guide](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/../../docs/getting-started-guides/gce.md) for full details and other options for starting a cluster.
 
 ## Create two persistent disks
 
-For this WordPress installation, we're going to configure our Kubernetes [pods](../../docs/pods.md) to use [persistent disks](https://cloud.google.com/compute/docs/disks). This means that we can preserve installation state across pod shutdown and re-startup.
+For this WordPress installation, we're going to configure our Kubernetes [pods](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/../../docs/pods.md) to use [persistent disks](https://cloud.google.com/compute/docs/disks). This means that we can preserve installation state across pod shutdown and re-startup.
 
-You will need to create the disks in the same [GCE zone](https://cloud.google.com/compute/docs/zones) as the Kubernetes cluster. The default setup script will create the cluster in the `us-central1-b` zone, as seen in the [config-default.sh](/cluster/gce/config-default.sh) file. Replace `$ZONE` below with the appropriate zone.
+You will need to create the disks in the same [GCE zone](https://cloud.google.com/compute/docs/zones) as the Kubernetes cluster. The default setup script will create the cluster in the `us-central1-b` zone, as seen in the [config-default.sh](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd//cluster/gce/config-default.sh) file. Replace `$ZONE` below with the appropriate zone.
 
 We will create two disks: one for the mysql pod, and one for the wordpress pod. In this example, we create 20GB disks, which will be sufficient for this demo. Feel free to change the size to align with your needs, as wordpress requirements can vary. Also, keep in mind that [disk performance scales with size](https://cloud.google.com/compute/docs/disks/#comparison_of_disk_types).
 
@@ -58,7 +58,7 @@ Now that the persistent disks are defined, the Kubernetes pods can be launched. 
 
 ### Start the Mysql pod
 
-First, **edit [`mysql.yaml`](mysql.yaml)**, the mysql pod definition, to use a database password that you specify.
+First, **edit [`mysql.yaml`](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/mysql.yaml)**, the mysql pod definition, to use a database password that you specify.
 `mysql.yaml` looks like this:
 
 ```yaml
@@ -123,12 +123,12 @@ If you want to do deeper troubleshooting, e.g. if it seems a container is not st
 
 ### Start the Mysql service
 
-We'll define and start a [service](../../docs/services.md) that lets other pods access the mysql database on a known port and host.
-We will specifically name the service `mysql`.  This will let us leverage the support for [Docker-links-compatible](../../docs/services.md#how-do-they-work) service environment variables when we set up the wordpress pod. The wordpress Docker image expects to be linked to a mysql container named `mysql`, as you can see in the "How to use this image" section on the wordpress docker hub [page](https://registry.hub.docker.com/_/wordpress/).
+We'll define and start a [service](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/../../docs/services.md) that lets other pods access the mysql database on a known port and host.
+We will specifically name the service `mysql`.  This will let us leverage the support for [Docker-links-compatible](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/../../docs/services.md#how-do-they-work) service environment variables when we set up the wordpress pod. The wordpress Docker image expects to be linked to a mysql container named `mysql`, as you can see in the "How to use this image" section on the wordpress docker hub [page](https://registry.hub.docker.com/_/wordpress/).
 
 So if we label our Kubernetes mysql service `mysql`, the wordpress pod will be able to use the Docker-links-compatible environment variables, defined by Kubernetes, to connect to the database.
 
-The [`mysql-service.yaml`](mysql-service.yaml) file looks like this:
+The [`mysql-service.yaml`](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/mysql-service.yaml) file looks like this:
 
 ```yaml
 apiVersion: v1
@@ -162,7 +162,7 @@ $ kubectl get services
 ## Start the WordPress Pod and Service
 
 Once the mysql service is up, start the wordpress pod, specified in
-[`wordpress.yaml`](wordpress.yaml).  Before you start it, **edit `wordpress.yaml`** and **set the database password to be the same as you used in `mysql.yaml`**.
+[`wordpress.yaml`](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/wordpress.yaml).  Before you start it, **edit `wordpress.yaml`** and **set the database password to be the same as you used in `mysql.yaml`**.
 Note that this config file also defines a volume, this one using the `wordpress-disk` persistent disk that you created.
 
 ```yaml
@@ -211,7 +211,7 @@ $ kubectl get pods
 
 ### Start the WordPress service
 
-Once the wordpress pod is running, start its service, specified by [`wordpress-service.yaml`](wordpress-service.yaml).
+Once the wordpress pod is running, start its service, specified by [`wordpress-service.yaml`](http://releases.k8s.io/HEAD/examples/mysql-wordpress-pd/wordpress-service.yaml).
 
 The service config file looks like this:
 

@@ -29,7 +29,7 @@ The automatic creation and use of API credentials can be disabled or overridden
 if desired.  However, if all you need to do is securely access the apiserver,
 this is the recommended workflow.
 
-See the [Service Account](service_accounts.md) documentation for more
+See the [Service Account](http://releases.k8s.io/HEAD/docs/service_accounts.md) documentation for more
 information on how Service Accounts work.
 
 ### Creating a Secret Manually
@@ -47,15 +47,15 @@ data:
 ```
 
 The data field is a map.  Its keys must match
-[DNS_SUBDOMAIN](design/identifiers.md), except that leading dots are also
+[DNS_SUBDOMAIN](http://releases.k8s.io/HEAD/docs/design/identifiers.md), except that leading dots are also
 allowed.  The values are arbitrary data, encoded using base64. The values of
 username and password in the example above, before base64 encoding,
 are `value-1` and `value-2`, respectively, with carriage return and newline characters at the end.
 
-Create the secret using [`kubectl create`](kubectl-create.md).
+Create the secret using [`kubectl create`](http://releases.k8s.io/HEAD/docs/kubectl-create.md).
 
 Once the secret is created, you can:
-  - create pods that automatically use it via a [Service Account](service_accounts.md).
+  - create pods that automatically use it via a [Service Account](http://releases.k8s.io/HEAD/docs/service_accounts.md).
   - modify your pod specification to use the secret
 
 ### Manually specifying a Secret to be Mounted on a Pod
@@ -172,9 +172,9 @@ change, even if the secret resource is modified.  To change the secret used,
 the original pod must be deleted, and a new pod (perhaps with an identical
 `PodSpec`) must be created.  Therefore, updating a secret follows the same
 workflow as deploying a new container image.  The `kubectl rolling-update`
-command can be used ([man page](kubectl_rolling-update.md)).
+command can be used ([man page](http://releases.k8s.io/HEAD/docs/kubectl_rolling-update.md)).
 
-The [`resourceVersion`](api-conventions.md#concurrency-control-and-consistency)
+The [`resourceVersion`](http://releases.k8s.io/HEAD/docs/api-conventions.md#concurrency-control-and-consistency)
 of the secret is not specified when it is referenced.
 Therefore, if a secret is updated at about the same time as pods are starting,
 then it is not defined which version of the secret will be used for the pod. It

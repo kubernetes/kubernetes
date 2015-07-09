@@ -4,7 +4,7 @@
 
 A _replication controller_ ensures that a specified number of pod "replicas" are running at any one time.  If there are too many, it will kill some.  If there are too few, it will start more. Unlike in the case where a user directly created pods, a replication controller replaces pods that are deleted or terminated for any reason, such as in the case of node failure or disruptive node maintenance, such as a kernel upgrade. For this reason, we recommend that you use a replication controller even if your application requires only a single pod. Think of it similarly to a process supervisor, only it supervises multiple pods across multiple nodes instead of individual processes on a single node.  A replication controller delegates local container restarts to some agent on the node (e.g., Kubelet or Docker).
 
-As discussed in [life of a pod](pod-states.md), `ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`. (Note: If `RestartPolicy` is not set, the default value is `Always`.)  `ReplicationController` should refuse to instantiate any pod that has a different restart policy. As discussed in [issue #503](https://github.com/GoogleCloudPlatform/kubernetes/issues/503#issuecomment-50169443), we expect other types of controllers to be added to Kubernetes to handle other types of workloads, such as build/test and batch workloads, in the future.
+As discussed in [life of a pod](http://releases.k8s.io/HEAD/docs/pod-states.md), `ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`. (Note: If `RestartPolicy` is not set, the default value is `Always`.)  `ReplicationController` should refuse to instantiate any pod that has a different restart policy. As discussed in [issue #503](https://github.com/GoogleCloudPlatform/kubernetes/issues/503#issuecomment-50169443), we expect other types of controllers to be added to Kubernetes to handle other types of workloads, such as build/test and batch workloads, in the future.
 
 A replication controller will never terminate on its own, but it isn't expected to be as long-lived as services. Services may be composed of pods controlled by multiple replication controllers, and it is expected that many replication controllers may be created and destroyed over the lifetime of a service (for instance, to perform an update of pods that run the service). Both services themselves and their clients should remain oblivious to the replication controllers that maintain the pods of the services.
 
@@ -20,7 +20,7 @@ Pods created by a replication controller are intended to be fungible and semanti
 
 ### Labels
 
-The population of pods that a replication controller is monitoring is defined with a [label selector](labels.md#label-selectors), which creates a loosely coupled relationship between the controller and the pods controlled, in contrast to pods, which are more tightly coupled to their definition. We deliberately chose not to represent the set of pods controlled using a fixed-length array of pod specifications, because our experience is that that approach increases complexity of management operations, for both clients and the system.
+The population of pods that a replication controller is monitoring is defined with a [label selector](http://releases.k8s.io/HEAD/docs/labels.md#label-selectors), which creates a loosely coupled relationship between the controller and the pods controlled, in contrast to pods, which are more tightly coupled to their definition. We deliberately chose not to represent the set of pods controlled using a fixed-length array of pod specifications, because our experience is that that approach increases complexity of management operations, for both clients and the system.
 
 The replication controller should verify that the pods created from the specified template have labels that match its label selector. Though it isn't verified yet, you should also ensure that only one replication controller controls any given pod, by ensuring that the label selectors of replication controllers do not target overlapping sets.
 
@@ -28,7 +28,7 @@ Note that replication controllers may themselves have labels and would generally
 
 Pods may be removed from a replication controller's target set by changing their labels. This technique may be used to remove pods from service for debugging, data recovery, etc. Pods that are removed in this way will be replaced automatically (assuming that the number of replicas is not also changed).
 
-Similarly, deleting a replication controller does not affect the pods it created. Its `replicas` field must first be set to 0 in order to delete the pods controlled. (Note that the client tool, kubectl, provides a single operation, [stop](kubectl_stop.md) to delete both the replication controller and the pods it controlls. However, there is no such operation in the API at the moment)
+Similarly, deleting a replication controller does not affect the pods it created. Its `replicas` field must first be set to 0 in order to delete the pods controlled. (Note that the client tool, kubectl, provides a single operation, [stop](http://releases.k8s.io/HEAD/docs/kubectl_stop.md) to delete both the replication controller and the pods it controlls. However, there is no such operation in the API at the moment)
 
 ## Responsibilities of the replication controller
 
@@ -59,7 +59,7 @@ Ideally, the rolling update controller would take application readiness into acc
 The two replication controllers would need to create pods with at least one differentiating label, such as the image tag of the primary container of the pod, since it is typically image updates that motivate rolling updates.
 
 Rolling update is implemented in the client tool
-[kubectl](kubectl_rolling-update.md)
+[kubectl](http://releases.k8s.io/HEAD/docs/kubectl_rolling-update.md)
 
 ### Multiple release tracks
 

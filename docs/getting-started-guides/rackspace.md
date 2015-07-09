@@ -3,13 +3,13 @@ Getting started on Rackspace
 
 **Table of Contents**
 
-- [Introduction](#introduction)
-- [Prerequisites](#prerequisites)
-- [Provider: Rackspace](#provider-rackspace)
-- [Build](#build)
-- [Cluster](#cluster)
-- [Some notes:](#some-notes)
-- [Network Design](#network-design)
+- [Introduction](http://releases.k8s.io/HEAD/docs/getting-started-guides/#introduction)
+- [Prerequisites](http://releases.k8s.io/HEAD/docs/getting-started-guides/#prerequisites)
+- [Provider: Rackspace](http://releases.k8s.io/HEAD/docs/getting-started-guides/#provider-rackspace)
+- [Build](http://releases.k8s.io/HEAD/docs/getting-started-guides/#build)
+- [Cluster](http://releases.k8s.io/HEAD/docs/getting-started-guides/#cluster)
+- [Some notes:](http://releases.k8s.io/HEAD/docs/getting-started-guides/#some-notes)
+- [Network Design](http://releases.k8s.io/HEAD/docs/getting-started-guides/#network-design)
 
 ## Introduction
 
