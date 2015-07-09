@@ -41,7 +41,7 @@ func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunApiVersions(f *cmdutil.Factory, out io.Writer) error {
-	if os.Args[1] == "apiversions" {
+	if len(os.Args) > 1 && os.Args[1] == "apiversions" {
 		printDeprecationWarning("api-versions", "apiversions")
 	}
 
