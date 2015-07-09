@@ -907,6 +907,53 @@ func (dm *DockerManager) runInContainerUsingNsinit(containerID string, cmd []str
 	return c.CombinedOutput()
 }
 
+func (dm *DockerManager) createExec(containerID string, cmd []string) (*docker.Exec, error) {
+	createOpts := docker.CreateExecOptions{
+		Container:    containerID,
+		Cmd:          cmd,
+		AttachStdin:  false,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          false,
+	}
+	execObj, err := dm.client.CreateExec(createOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run in container - Exec setup failed - %v", err)
+	}
+	return execObj, err
+}
+
+func commandEqual(cmd1, cmd2 []string) bool {
+	if len(cmd1) != len(cmd2) {
+		return false
+	}
+	for i, arg := range cmd2 {
+		if cmd1[i] != arg {
+			return false
+		}
+	}
+	return true
+}
+
+func (dm *DockerManager) findExec(containerID string, cmd []string) (*docker.Exec, error) {
+	ins, err := dm.client.InspectContainer(containerID)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range ins.ExecIDs {
+		ins, err := dm.client.InspectExec(id)
+		if err != nil {
+			glog.Infof("Failed to inspect exec %v", id)
+			continue
+		}
+		if commandEqual(cmd, append([]string{ins.ProcessConfig.EntryPoint}, ins.ProcessConfig.Arguments...)) {
+			glog.Infof("Found existing exec id %v", id)
+			return &docker.Exec{id}, nil
+		}
+	}
+	return nil, fmt.Errorf("Didn't find exec command for container %v, cmd %v", containerID, cmd)
+}
+
 // RunInContainer uses nsinit to run the command inside the container identified by containerID
 // TODO(yifan): Use strong type for containerID.
 func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byte, error) {
@@ -920,19 +967,16 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 		return dm.runInContainerUsingNsinit(containerID, cmd)
 	}
 	glog.V(2).Infof("Using docker native exec to run cmd %+v inside container %s", cmd, containerID)
-	createOpts := docker.CreateExecOptions{
-		Container:    containerID,
-		Cmd:          cmd,
-		AttachStdin:  false,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          false,
-	}
-	execObj, err := dm.client.CreateExec(createOpts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to run in container - Exec setup failed - %v", err)
-	}
 	var buf bytes.Buffer
+	var execObj *docker.Exec
+	execObj, err = dm.findExec(containerID, cmd)
+	if err != nil {
+		glog.Infof("Couldn't locate existing exec for command %v, creating a new one: %v", cmd, err)
+		execObj, err = dm.createExec(containerID, cmd)
+		if err != nil {
+			return nil, err
+		}
+	}
 	startOpts := docker.StartExecOptions{
 		Detach:       false,
 		Tty:          false,
