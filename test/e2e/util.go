@@ -1432,8 +1432,9 @@ func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 func isNodeReadySetAsExpected(node *api.Node, wantReady bool) bool {
 	// Check the node readiness condition (logging all).
 	for i, cond := range node.Status.Conditions {
-		Logf("Node %s condition %d/%d: type: %v, status: %v",
-			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status)
+		Logf("Node %s condition %d/%d: type: %v, status: %v, reason: %q, message: %q, last transistion time: %v",
+			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status,
+			cond.Reason, cond.Message, cond.LastTransitionTime)
 		// Ensure that the condition type is readiness and the status
 		// matches as desired.
 		if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
@@ -1466,15 +1467,28 @@ func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time
 }
 
 // checks whether all registered nodes are ready
-func allNodesReady(c *client.Client) error {
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
-	Expect(err).NotTo(HaveOccurred())
+func allNodesReady(c *client.Client, timeout time.Duration) error {
+	Logf("Waiting up to %v for all nodes to be ready", timeout)
+
 	var notReady []api.Node
-	for _, node := range nodes.Items {
-		if isNodeReadySetAsExpected(&node, false) {
-			notReady = append(notReady, node)
+	err := wait.Poll(poll, timeout, func() (bool, error) {
+		notReady = nil
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		if err != nil {
+			return false, err
 		}
+		for _, node := range nodes.Items {
+			if !isNodeReadySetAsExpected(&node, true) {
+				notReady = append(notReady, node)
+			}
+		}
+		return len(notReady) == 0, nil
+	})
+
+	if err != nil && err != wait.ErrWaitTimeout {
+		return err
 	}
+
 	if len(notReady) > 0 {
 		return fmt.Errorf("Not ready nodes: %v", notReady)
 	}
