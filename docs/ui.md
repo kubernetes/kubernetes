@@ -1,14 +1,15 @@
 # Kubernetes User Interface
-Kubernetes has a web-based user interface that displays the current cluster state graphically. It is accessible via `https://<kubernetes-master>/ui`, which redirects to `https://<kubernetes-master>/api/v1/proxy/namespaces/kube-system/services/kube-ui/#/dashboard/`.
+Kubernetes has a web-based user interface that displays the current cluster state graphically. 
 
 ## Accessing the UI
-By default, the Kubernetes UI is deployed remotely as a cluster addon. To access it, visit `https://<kubernetes-master>/ui`, which redirects to `https://<kubernetes-master>/api/v1/proxy/namespaces/kube-system/services/kube-ui/#/dashboard/`.
+By default, the Kubernetes UI is deployed as a cluster addon. To access it, visit `https://<kubernetes-master>/ui`, which redirects to `https://<kubernetes-master>/api/v1/proxy/namespaces/kube-system/services/kube-ui/#/dashboard/`.
 
-If the [`kube-addons.sh`](../cluster/saltbase/salt/kube-addons/kube-addons.sh) script is not running, the kube-ui service will not be started. In this case, it can be started manually with:
+If you find that you're not able to access the UI, it may be because the kube-ui service has not been started on your cluster. In that case, you can start it manually with:
 ```sh
 kubectl create -f cluster/addons/kube-ui/kube-ui-rc.yaml
 kubectl create -f cluster/addons/kube-ui/kube-ui-svc.yaml
 ```
+Normally, this should be taken care of automatically by the [`kube-addons.sh`](../cluster/saltbase/salt/kube-addons/kube-addons.sh) script that runs on the master.
 
 ## Using the UI
 The Kubernetes UI can be used to introspect your current cluster, such as checking how resources are used, or looking at error messages. You cannot, however, use the UI to modify your cluster. 
