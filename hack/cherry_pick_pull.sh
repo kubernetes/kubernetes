@@ -29,7 +29,11 @@ declare -r STARTINGBRANCH=$(git symbolic-ref --short HEAD)
 declare -r REBASEMAGIC="${KUBE_ROOT}/.git/rebase-apply"
 
 if [[ "$#" -ne 2 ]]; then
-  echo "${0} <pr-number> <branch>: cherry pick <pr> onto <branch> and leave instructions for proposing pull request"
+  echo "${0} <pr-number> <remote branch>: cherry pick <pr> onto <remote branch> and leave instructions for proposing pull request"
+  echo ""
+  echo "  Checks out <remote branch> and handles the cherry-pick of <pr> for you."
+  echo "  Example:"
+  echo "    $0 12345 upstream/release-3.14"
   exit 2
 fi
 
@@ -48,6 +52,12 @@ declare -r BRANCH="${2}"
 echo "+++ Updating remotes..."
 git remote update
 
+if ! git log -n1 --format=%H "${BRANCH}" >/dev/null 2>&1; then
+  echo "!!! '${BRANCH}' not found. The second argument should be something like upstream/release-0.21."
+  echo "    (In particular, it needs to be a valid, existing remote branch that I can 'git checkout'.)"
+  exit 1
+fi
+
 echo "+++ Downloading patch to /tmp/${PULL}.patch (in case you need to do this again)"
 
 curl -o "/tmp/${PULL}.patch" -sSL "https://github.com/GoogleCloudPlatform/kubernetes/pull/${PULL}.patch"
@@ -62,11 +72,11 @@ function return_to_kansas {
   echo ""
   echo "+++ Returning you to the ${STARTINGBRANCH} branch and cleaning up."
   if [[ "${gitamcleanup}" == "true" ]]; then
-    git am --abort >/dev/null
+    git am --abort >/dev/null 2>&1 || true
   fi
-  git checkout -f "${STARTINGBRANCH}" >/dev/null
+  git checkout -f "${STARTINGBRANCH}" >/dev/null 2>&1 || true
   if [[ -n "${cleanbranch}" ]]; then
-    git branch -D "${cleanbranch}" >/dev/null
+    git branch -D "${cleanbranch}" >/dev/null 2>&1 || true
   fi
 }
 trap return_to_kansas EXIT
