@@ -33,7 +33,7 @@ if [[ "$#" -ne 2 ]]; then
   exit 2
 fi
 
-if git_status=$(git status --porcelain 2>/dev/null) && [[ -n ${git_status} ]]; then
+if git_status=$(git status --porcelain --untracked=no 2>/dev/null) && [[ -n "${git_status}" ]]; then
   echo "!!! Dirty tree. Clean up and try again."
   exit 1
 fi
