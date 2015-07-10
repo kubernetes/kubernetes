@@ -96,7 +96,7 @@ DOCS_TO_EDIT=(docs/README.md examples/README.md)
 for DOC in "${DOCS_TO_EDIT[@]}"; do
   $SED -ri \
       -e '/<!-- BEGIN STRIP_FOR_RELEASE -->/,/<!-- END STRIP_FOR_RELEASE -->/d' \
-      -e "s/HEAD/${NEW_VERSION}/" \
+      -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" \
       "${DOC}"
 done
 
