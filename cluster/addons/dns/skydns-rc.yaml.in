@@ -1,22 +1,22 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v7
+  name: kube-dns-v8
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v7
+    version: v8
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: {{ pillar['dns_replicas'] }}
   selector:
     k8s-app: kube-dns
-    version: v7
+    version: v8
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v7
+        version: v8
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
@@ -28,12 +28,17 @@ spec:
             memory: 50Mi
         command:
         - /usr/local/bin/etcd
+        - -data-dir
+        - /var/etcd/data
         - -listen-client-urls
         - http://127.0.0.1:2379,http://127.0.0.1:4001
         - -advertise-client-urls
         - http://127.0.0.1:2379,http://127.0.0.1:4001
         - -initial-cluster-token
         - skydns-etcd
+        volumeMounts:
+        - name: etcd-storage
+          mountPath: /var/etcd/data
       - name: kube2sky
         image: gcr.io/google_containers/kube2sky:1.11
         resources:
@@ -80,4 +85,7 @@ spec:
         ports:
         - containerPort: 8080
           protocol: TCP
+      volumes:
+      - name: etcd-storage
+        emptyDir: {}
       dnsPolicy: Default  # Don't use cluster DNS.
