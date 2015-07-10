@@ -1,4 +1,4 @@
-# Kubernetes Examples: HEAD
+# Kubernetes Examples: releases.k8s.io/HEAD
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 

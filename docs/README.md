@@ -1,4 +1,4 @@
-# Kubernetes Documentation: HEAD
+# Kubernetes Documentation: releases.k8s.io/HEAD
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
