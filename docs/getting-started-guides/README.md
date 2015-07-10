@@ -158,6 +158,7 @@ Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.md)    
 AWS                  | Saltstack    | Ubuntu | OVS         | [docs](aws.md)                                    |          | Community (@justinsb)
 Vmware               | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community (@kelseyhightower)
 Azure                | Saltstack    | Ubuntu | OpenVPN     | [docs](azure.md)                                  |          | Community
+Bare-metal           | custom       | Ubuntu | calico      | [docs](ubuntu-calico.md)                          |          | Community (@djosborne)
 Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.md)                                 |          | Community (@resouer @WIZARD-CXY)
 Local                |              |        | _none_      | [docs](locally.md)                                |          | Community (@preillyme)
 libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.md)                         |          | Community (@lhuard1A)
