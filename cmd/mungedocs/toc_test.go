@@ -22,45 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_updateMacroBlock(t *testing.T) {
-	var cases = []struct {
-		in  string
-		out string
-	}{
-		{"", ""},
-		{"Lorem ipsum\ndolor sit amet\n",
-			"Lorem ipsum\ndolor sit amet\n"},
-		{"Lorem ipsum \n BEGIN\ndolor\nEND\nsit amet\n",
-			"Lorem ipsum \n BEGIN\nfoo\n\nEND\nsit amet\n"},
-	}
-	for _, c := range cases {
-		actual, err := updateMacroBlock([]byte(c.in), "BEGIN", "END", "foo\n")
-		assert.NoError(t, err)
-		if c.out != string(actual) {
-			t.Errorf("Expected '%v' but got '%v'", c.out, string(actual))
-		}
-	}
-}
-
-func Test_updateMacroBlock_errors(t *testing.T) {
-	var cases = []struct {
-		in string
-	}{
-		{"BEGIN\n"},
-		{"blah\nBEGIN\nblah"},
-		{"END\n"},
-		{"blah\nEND\nblah\n"},
-		{"END\nBEGIN"},
-		{"BEGIN\nEND\nEND"},
-		{"BEGIN\nBEGIN\nEND"},
-		{"BEGIN\nBEGIN\nEND\nEND"},
-	}
-	for _, c := range cases {
-		_, err := updateMacroBlock([]byte(c.in), "BEGIN", "END", "foo")
-		assert.Error(t, err)
-	}
-}
-
 func Test_buildTOC(t *testing.T) {
 	var cases = []struct {
 		in  string
