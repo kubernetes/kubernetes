@@ -22,17 +22,23 @@ import (
 	"strings"
 )
 
-// Replaces the text between matching "beginMark" and "endMark" within "document" with "insertThis".
-//
-// Delimiters should occupy own line.
-// Returns copy of document with modifications.
-func updateMacroBlock(document []byte, beginMark, endMark, insertThis string) ([]byte, error) {
-	var buffer bytes.Buffer
+// Splits a document up into a slice of lines.
+func splitLines(document []byte) []string {
 	lines := strings.Split(string(document), "\n")
 	// Skip trailing empty string from Split-ing
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
+	return lines
+}
+
+// Replaces the text between matching "beginMark" and "endMark" within the
+// document represented by "lines" with "insertThis".
+//
+// Delimiters should occupy own line.
+// Returns copy of document with modifications.
+func updateMacroBlock(lines []string, beginMark, endMark, insertThis string) ([]byte, error) {
+	var buffer bytes.Buffer
 	betweenBeginAndEnd := false
 	for _, line := range lines {
 		trimmedLine := strings.Trim(line, " \n")

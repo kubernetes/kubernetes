@@ -35,7 +35,8 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	updatedMarkdown, err := updateMacroBlock(markdown, "<!-- BEGIN GENERATED TOC -->", "<!-- END GENERATED TOC -->", string(toc))
+	lines := splitLines(markdown)
+	updatedMarkdown, err := updateMacroBlock(lines, "<!-- BEGIN GENERATED TOC -->", "<!-- END GENERATED TOC -->", string(toc))
 	if err != nil {
 		return nil, err
 	}

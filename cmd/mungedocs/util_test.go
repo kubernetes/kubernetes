@@ -34,7 +34,7 @@ func Test_updateMacroBlock(t *testing.T) {
 			"Lorem ipsum \n BEGIN\nfoo\n\nEND\nsit amet\n"},
 	}
 	for _, c := range cases {
-		actual, err := updateMacroBlock([]byte(c.in), "BEGIN", "END", "foo\n")
+		actual, err := updateMacroBlock(splitLines([]byte(c.in)), "BEGIN", "END", "foo\n")
 		assert.NoError(t, err)
 		if c.out != string(actual) {
 			t.Errorf("Expected '%v' but got '%v'", c.out, string(actual))
@@ -56,7 +56,7 @@ func Test_updateMacroBlock_errors(t *testing.T) {
 		{"BEGIN\nBEGIN\nEND\nEND"},
 	}
 	for _, c := range cases {
-		_, err := updateMacroBlock([]byte(c.in), "BEGIN", "END", "foo")
+		_, err := updateMacroBlock(splitLines([]byte(c.in)), "BEGIN", "END", "foo")
 		assert.Error(t, err)
 	}
 }
