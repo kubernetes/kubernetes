@@ -42,12 +42,12 @@ import (
 
 const (
 	// version applies to upgrades; kube-push always pushes local binaries.
-	version       = "latest_ci"
 	versionURLFmt = "https://storage.googleapis.com/kubernetes-release/%s/%s.txt"
 )
 
-// realVersion turns a version constant--one accepted by cluster/gce/upgrade.sh--
-// into a deployable version string.
+// realVersion turns a version constant s--one accepted by cluster/gce/upgrade.sh--
+// into a deployable version string. If the s is not known to be a version
+// constant, it will assume it is already a valid version, and return s directly.
 //
 // NOTE: KEEP THIS LIST UP-TO-DATE WITH THE CODE BELOW.
 // The version strings supported are:
@@ -65,7 +65,10 @@ func realVersion(s string) (string, error) {
 	case "latest_ci":
 		bucket, file = "ci", "latest"
 	default:
-		return "", fmt.Errorf("version %s is not supported", s)
+		// If we don't match one of the above, we assume that the passed version
+		// is already valid (such as "0.19.1" or "0.19.1-669-gabac8c8").
+		Logf("Assuming %q is already a valid version.", s)
+		return s, nil
 	}
 
 	url := fmt.Sprintf(versionURLFmt, bucket, file)
@@ -200,11 +203,11 @@ var _ = Describe("Skipped", func() {
 			// The version is determined once at the beginning of the test so that
 			// the master and nodes won't be skewed if the value changes during the
 			// test.
-			By(fmt.Sprintf("Getting real version for %q", version))
+			By(fmt.Sprintf("Getting real version for %q", testContext.UpgradeTarget))
 			var err error
-			v, err = realVersion(version)
+			v, err = realVersion(testContext.UpgradeTarget)
 			expectNoError(err)
-			Logf("Version for %q is %s", version, v)
+			Logf("Version for %q is %s", testContext.UpgradeTarget, v)
 
 			By("Setting up the service, RC, and pods")
 			f.beforeEach()

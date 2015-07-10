@@ -113,6 +113,7 @@ type TestContextType struct {
 	OutputDir      string
 	prefix         string
 	MinStartupPods int
+	UpgradeTarget  string
 }
 
 var testContext TestContextType

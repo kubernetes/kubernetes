@@ -79,7 +79,7 @@ func init() {
 
 	flag.StringVar(&cloudConfig.ClusterTag, "cluster-tag", "", "Tag used to identify resources.  Only required if provider is aws.")
 	flag.IntVar(&testContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used.")
-
+	flag.StringVar(&testContext.UpgradeTarget, "upgrade-target", "latest_ci", "Version to upgrade to (e.g. 'latest_stable', 'latest_release', 'latest_ci', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
 }
 
 func TestE2E(t *testing.T) {
