@@ -1,4 +1,4 @@
-{% if grains['os_family'] != 'RedHat' %}
+{% if not pillar.get('is_systemd') %}
 
 monit:
   pkg:

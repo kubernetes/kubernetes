@@ -81,6 +81,27 @@ contexts:
 current-context: service-account-context
 EOF
 
+mkdir -p /srv/salt-overlay/salt/kubelet
+kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+cat > "${kubelet_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    token: ${kubelet_token}
+clusters:
+- name: local
+  cluster:
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+
 # Generate tokens for other "service accounts".  Append to known_tokens.
 #
 # NB: If this list ever changes, this script actually has to

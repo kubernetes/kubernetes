@@ -87,3 +87,9 @@ RUNTIME_CONFIG="api/v1"
 
 # Specify the inter-node network fabric. Valid values: openvswitch, calico
 NETWORK_MODE=${NETWORK_MODE-"openvswitch"}
+
+# Determine extra certificate names for master
+octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
+((octets[3]+=1))
+service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
+MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"

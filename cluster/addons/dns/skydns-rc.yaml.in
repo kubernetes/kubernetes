@@ -1,22 +1,22 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v5
+  name: kube-dns-v6
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v5
+    version: v6
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: {{ pillar['dns_replicas'] }}
   selector:
     k8s-app: kube-dns
-    version: v5
+    version: v6
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v5
+        version: v6
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
@@ -61,12 +61,4 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
-        livenessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - nslookup kubernetes.default.svc.{{ pillar['dns_domain'] }} localhost >/dev/null
-          initialDelaySeconds: 30
-          timeoutSeconds: 5
       dnsPolicy: Default  # Don't use cluster DNS.
