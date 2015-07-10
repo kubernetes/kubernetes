@@ -81,7 +81,7 @@ You should now be able to curl the nginx Service on `10.0.208.159:80` from any n
 
 ## Accessing the Service from other pods in the cluster
 
-Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](../../cluster/addon/dns/README.md).
+Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](../../cluster/addons/dns/README.md).
 
 ### Environment Variables:
 When a Pod is run on a Node, the kubelet adds a set of environment variables for each active Service. This introduces an ordering problem. To see why, inspect the environment of your running nginx pods:
@@ -200,3 +200,6 @@ $ kubectl get service nginxsvc -o json | grep \"ip\"
 ```
 Now you have a load balancer that automatically does what you would’ve in the previous step. Note that you cannot directly curl your nodes on port 80, you need to go to the ip of the load balancer.
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-applications.md?pixel)]()
