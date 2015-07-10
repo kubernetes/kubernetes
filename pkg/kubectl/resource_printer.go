@@ -1024,8 +1024,7 @@ func printAutoScalerStatus(item *api.AutoScaler, w io.Writer, withNamespace bool
 	return err
 }
 
-func printAutoScalerStatusList(list *api.AutoScalerList, w io.Writer,
-withNamespace bool, wide bool, columnLabels []string) error {
+func printAutoScalerStatusList(list *api.AutoScalerList, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
 	for _, item := range list.Items {
 		if err := printAutoScalerStatus(&item, w, withNamespace, wide, columnLabels); err != nil {
 			return err
