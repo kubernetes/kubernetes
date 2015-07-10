@@ -149,7 +149,7 @@ kube::util::gen-doc() {
       local link path
       path="${relative_doc_dest}/${file}"
       link=$(kube::util::analytics-link "${path}")
-      echo -e "\n${link}" >> "${tmpdir}/${file}"
+      echo -e "\n\n${link}" >> "${tmpdir}/${file}"
     fi
     # Remove all old generated files from the destination
     if [[ -e "${tmpdir}/${file}" ]]; then
