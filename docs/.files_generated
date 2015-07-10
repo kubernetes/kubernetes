@@ -1,3 +1,7 @@
+kube-apiserver.md
+kube-controller-manager.md
+kube-proxy.md
+kube-scheduler.md
 kubectl.md
 kubectl_api-versions.md
 kubectl_cluster-info.md
@@ -27,3 +31,4 @@ kubectl_run.md
 kubectl_scale.md
 kubectl_stop.md
 kubectl_version.md
+kubelet.md
