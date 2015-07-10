@@ -614,6 +614,9 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		return resp.Body, nil
 
 	default:
+		// ensure we close the body before returning the error
+		defer resp.Body.Close()
+
 		// we have a decent shot at taking the object returned, parsing it as a status object and returning a more normal error
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
