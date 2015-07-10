@@ -2,7 +2,6 @@
 
 There are multiple guides on running Kubernetes with [CoreOS](http://coreos.com):
 
-* [Single Node Cluster](coreos/coreos_single_node_cluster.md)
 * [Multi-node Cluster](coreos/coreos_multinode_cluster.md)
 * [Setup Multi-node Cluster on Google Compute Engine in an easy way](https://github.com/rimusz/coreos-multi-node-k8s-gce/blob/master/README.md)
 * [Multi-node cluster using cloud-config and Weave on Vagrant](https://github.com/errordeveloper/weave-demos/blob/master/poseidon/README.md)

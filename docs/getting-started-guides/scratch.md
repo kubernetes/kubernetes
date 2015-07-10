@@ -758,7 +758,7 @@ At this point you should be able to run through one of the basic examples, such 
 
 ### Running the Conformance Test
 
-You may want to try to run the [Conformance test](../hack/conformance.sh).  Any failures may give a hint as to areas that need more attention.
+You may want to try to run the [Conformance test](../../hack/conformance-test.sh).  Any failures may give a hint as to areas that need more attention.
 
 ### Networking
 

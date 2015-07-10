@@ -10,7 +10,7 @@ kubernetes CLI, `kubectl`.
 
 To access a cluster, you need to know the location of the cluster and have credentials
 to access it.  Typically, this is automatically set-up when you work through
-though a [Getting started guide](../docs/getting-started-guide/README.md),
+though a [Getting started guide](../docs/getting-started-guides/README.md),
 or someone else setup the cluster and provided you with credentials and a location.
 
 Check the location and credentials that kubectl knows about with this command:

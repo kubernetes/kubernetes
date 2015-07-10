@@ -110,7 +110,7 @@ However, it will not be killed for excessive CPU usage.
 
 The resource usage of a pod is reported as part of the Pod status.
 
-If [optional monitoring](../cluster/addons/monitoring/README.md) is configured for your cluster,
+If [optional monitoring](../cluster/addons/cluster-monitoring/README.md) is configured for your cluster,
 then pod resource usage can be retrieved from the monitoring system.
 
 ## Troubleshooting
