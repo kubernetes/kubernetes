@@ -42,8 +42,10 @@ cp flannel-${FLANNEL_VERSION}/flanneld binaries/minion
 
 # ectd
 echo "Download etcd release ..."
-ETCD_VERSION=${ETCD_VERSION:-"2.0.9"}
+
+ETCD_VERSION=${ETCD_VERSION:-"2.0.12"}
 ETCD="etcd-v${ETCD_VERSION}-linux-amd64"
+
 if [ ! -f etcd.tar.gz ] ; then
   curl -L https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${ETCD}.tar.gz -o etcd.tar.gz
   tar xzf etcd.tar.gz
@@ -53,7 +55,8 @@ cp $ETCD/etcd $ETCD/etcdctl binaries/minion
 
 # k8s
 echo "Download kubernetes release ..."
-K8S_VERSION=${K8S_VERSION:-"0.18.0"}
+K8S_VERSION=${K8S_VERSION:-"0.19.3"}
+
 if [ ! -f kubernetes.tar.gz ] ; then
   curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${K8S_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
   tar xzf kubernetes.tar.gz
@@ -71,4 +74,5 @@ cp kubernetes/server/kubernetes/server/bin/kubelet \
 cp kubernetes/server/kubernetes/server/bin/kubectl binaries/
 
 rm -rf flannel* kubernetes* etcd*
+
 echo "Done! All your commands locate in ./binaries dir"

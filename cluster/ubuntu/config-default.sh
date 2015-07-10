@@ -37,7 +37,7 @@ echo $FLANNEL_NET
 export FLANNEL_OPTS=${FLANNEL_OPTS:-"Network": 172.16.0.0/16}
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ServiceAccount,ResourceQuota}
+export ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ServiceAccount,ResourceQuota
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false

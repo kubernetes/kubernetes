@@ -33,7 +33,7 @@ Joyent               | Juju         | Ubuntu | flannel     | [docs](../../docs/g
 AWS                  | Saltstack    | Ubuntu | OVS         | [docs](../../docs/getting-started-guides/aws.md)                               |             | Community (@justinsb)        | Uses K8s version 0.5.0
 Vmware               | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)                            |             | Community (@kelseyhightower) | Uses K8s version 0.15.0
 Azure                | Saltstack    | Ubuntu | OpenVPN     | [docs](../../docs/getting-started-guides/azure.md)                             |             | Community                    |
-Bare-metal           | custom       | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/ubuntu.md)                            |             | Community (@resouer @WIZARD-CXY)       | use k8s version 0.18.0
+Bare-metal           | custom       | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/ubuntu.md)                            |             | Community (@resouer @WIZARD-CXY)       | use k8s version 0.19.3
 Local                |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)                           |             | Community (@preillyme)      |
 libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](../../docs/getting-started-guides/libvirt-coreos.md)                    |             | Community (@lhuard1A)       |
 oVirt                |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)                             |             | Community (@simon3z)        |
