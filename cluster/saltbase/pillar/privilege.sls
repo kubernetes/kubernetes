@@ -1,2 +1,2 @@
 # If true, allow privileged containers to be created by API
-allow_privileged: false
+allow_privileged: true

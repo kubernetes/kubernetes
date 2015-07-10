@@ -64,7 +64,7 @@ func Get() Capabilities {
 	// This check prevents clobbering of capabilities that might've been set via SetForTests
 	if capabilities == nil {
 		Initialize(Capabilities{
-			AllowPrivileged:    false,
+			AllowPrivileged:    true,
 			HostNetworkSources: []string{},
 		})
 	}
