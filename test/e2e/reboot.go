@@ -51,11 +51,11 @@ var _ = Describe("Reboot", func() {
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
 
-		// These tests requires SSH, so the provider check should be identical to there
+		// These tests requires SSH to nodes, so the provider check should be identical to there
 		// (the limiting factor is the implementation of util.go's getSigner(...)).
 
 		// Cluster must support node reboot
-		SkipUnlessProviderIs("gce", "aws")
+		SkipUnlessProviderIs("gce", "gke", "aws")
 	})
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
