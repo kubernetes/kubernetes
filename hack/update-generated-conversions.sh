@@ -49,6 +49,8 @@ EOF
 }
 
 VERSIONS="v1beta3 v1"
-for ver in $VERSIONS; do 
-	generate_version "${ver}"
+for ver in $VERSIONS; do
+  # Ensure that the version being processed is registered by setting
+  # KUBE_API_VERSIONS.
+  KUBE_API_VERSIONS="${ver}" generate_version "${ver}"
 done
