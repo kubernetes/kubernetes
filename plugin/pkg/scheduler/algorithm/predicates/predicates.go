@@ -82,7 +82,7 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // NoDiskConflict evaluates if a pod can fit due to the volumes it requests, and those that
 // are already mounted. Some times of volumes are mounted onto node machines.  For now, these mounts
 // are exclusive so if there is already a volume mounted on that node, another pod can't schedule
-// there. This is GCE specific for now.
+// there. This is GCE and Amazon EBS specific for now.
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	manifest := &(pod.Spec)
