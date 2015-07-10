@@ -102,6 +102,10 @@ for doc in "${mdfiles[@]}"; do
       -e '/<!-- BEGIN STRIP_FOR_RELEASE -->/,/<!-- END STRIP_FOR_RELEASE -->/d' \
       -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" \
       "${doc}"
+  is_versioned_tag='<!-- TAG IS_VERSIONED -->'
+  if ! grep -q "${is_versioned_tag}" "${doc}"; then
+    echo "${is_versioned_tag}" >> "${doc}"
+  fi
 done
 
 # Update API descriptions to match this version.
