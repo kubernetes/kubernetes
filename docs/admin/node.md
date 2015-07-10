@@ -36,9 +36,9 @@ certainly want the docs that go with that version.</h1>
 
 `Node` is a worker machine in Kubernetes, previously known as `Minion`. Node
 may be a VM or physical machine, depending on the cluster. Each node has
-the services necessary to run [Pods](pods.md) and be managed from the master
+the services necessary to run [Pods](../pods.md) and be managed from the master
 systems. The services include docker, kubelet and network proxy. See
-[The Kubernetes Node](design/architecture.md#the-kubernetes-node) section in design
+[The Kubernetes Node](../design/architecture.md#the-kubernetes-node) section in design
 doc for more details.
 
 ## Node Status
@@ -101,7 +101,7 @@ The information is gathered by Kubernetes from the node.
 
 ## Node Management
 
-Unlike [Pods](pods.md) and [Services](services.md), a Node is not inherently
+Unlike [Pods](../pods.md) and [Services](../services.md), a Node is not inherently
 created by Kubernetes: it is either created from cloud providers like Google Compute Engine,
 or from your physical or virtual machines. What this means is that when
 Kubernetes creates a node, it only creates a representation for the node.
@@ -216,5 +216,5 @@ on each kubelet where you want to reserve resources.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/node.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/node.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

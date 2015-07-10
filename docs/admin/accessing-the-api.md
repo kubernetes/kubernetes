@@ -20,7 +20,7 @@ cluster administrators who want to customize their cluster
 or understand the details.
 
 Most questions about accessing the cluster are covered
-in [Accessing the cluster](accessing-the-cluster.md).
+in [Accessing the cluster](../accessing-the-cluster.md).
 
 
 ## Ports and IPs Served On
@@ -90,5 +90,5 @@ variety of uses cases:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/accessing_the_api.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/accessing-the-api.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

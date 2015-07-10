@@ -66,7 +66,7 @@ The automatic creation and use of API credentials can be disabled or overridden
 if desired.  However, if all you need to do is securely access the apiserver,
 this is the recommended workflow.
 
-See the [Service Account](service_accounts.md) documentation for more
+See the [Service Account](service-accounts.md) documentation for more
 information on how Service Accounts work.
 
 ### Creating a Secret Manually
@@ -92,7 +92,7 @@ are `value-1` and `value-2`, respectively, with carriage return and newline char
 Create the secret using [`kubectl create`](user-guide/kubectl/kubectl_create.md).
 
 Once the secret is created, you can:
-  - create pods that automatically use it via a [Service Account](service_accounts.md).
+  - create pods that automatically use it via a [Service Account](service-accounts.md).
   - modify your pod specification to use the secret
 
 ### Manually specifying a Secret to be Mounted on a Pod
@@ -141,7 +141,7 @@ Use of imagePullSecrets is desribed in the [images documentation](images.md#spec
 *This feature is planned but not implemented.  See [issue
 9902](https://github.com/GoogleCloudPlatform/kubernetes/issues/9902).*
 
-You can reference manually created secrets from a [service account](service_accounts.md).
+You can reference manually created secrets from a [service account](service-accounts.md).
 Then, pods which use that service account will have
 `volumeMounts` and/or `imagePullSecrets` added to them.
 The secrets will be mounted at **TBD**.

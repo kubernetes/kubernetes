@@ -82,7 +82,7 @@ Backend Namespace: default
 
 First the frontend pod's information is printed. The pod name and
 [namespace](../../docs/design/namespaces.md) are retreived from the
-[Downward API](../../docs/downward_api.md). Next, `USER_VAR` is the name of
+[Downward API](../../docs/downward-api.md). Next, `USER_VAR` is the name of
 an environment variable set in the [pod
 definition](show-rc.yaml). Then, the dynamic kubernetes environment
 variables are scanned and printed. These are used to find the backend

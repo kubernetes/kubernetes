@@ -58,7 +58,7 @@ Changes to services are the most significant difference between v1beta3 and v1.
 
 Some other difference between v1beta3 and v1:
 
-* The `pod.spec.containers[*].privileged` and `pod.spec.containers[*].capabilities` properties are now nested under the `pod.spec.containers[*].securityContext` property. See [Security Contexts](security_context.md).
+* The `pod.spec.containers[*].privileged` and `pod.spec.containers[*].capabilities` properties are now nested under the `pod.spec.containers[*].securityContext` property. See [Security Contexts](security-context.md).
 * The `pod.spec.host` property is renamed to `pod.spec.nodeName`.
 * The `endpoints.subsets[*].addresses.IP` property is renamed to `endpoints.subsets[*].addresses.ip`.
 * The `pod.status.containerStatuses[*].state.termination` and `pod.status.containerStatuses[*].lastState.termination` properties are renamed to `pod.status.containerStatuses[*].state.terminated` and `pod.status.containerStatuses[*].lastState.terminated` respectively.
@@ -79,7 +79,7 @@ Some important differences between v1beta1/2 and v1beta3:
 * The `labels` query parameter has been renamed to `labelSelector`.
 * The `fields` query parameter has been renamed to `fieldSelector`.
 * The container `entrypoint` has been renamed to `command`, and `command` has been renamed to `args`.
-* Container, volume, and node resources are expressed as nested maps (e.g., `resources{cpu:1}`) rather than as individual fields, and resource values support [scaling suffixes](compute_resources.md#specifying-resource-quantities) rather than fixed scales (e.g., milli-cores).
+* Container, volume, and node resources are expressed as nested maps (e.g., `resources{cpu:1}`) rather than as individual fields, and resource values support [scaling suffixes](compute-resources.md#specifying-resource-quantities) rather than fixed scales (e.g., milli-cores).
 * Restart policy is represented simply as a string (e.g., `"Always"`) rather than as a nested map (`always{}`).
 * Pull policies changed from `PullAlways`, `PullNever`, and `PullIfNotPresent` to `Always`, `Never`, and `IfNotPresent`.
 * The volume `source` is inlined into `volume` rather than nested.

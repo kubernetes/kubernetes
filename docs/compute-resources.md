@@ -34,7 +34,7 @@ in units of cores.  Memory is specified in units of bytes.
 
 CPU and RAM are collectively referred to as *compute resources*, or just *resources*.  Compute
 resources are measureable quantities which can be requested, allocated, and consumed.  They are
-distinct from [API resources](working_with_resources.md).  API resources, such as pods and
+distinct from [API resources](working-with-resources.md).  API resources, such as pods and
 [services](services.md) are objects that can be written to and retrieved from the Kubernetes API
 server.
 
@@ -223,5 +223,5 @@ across providers and platforms.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/compute_resources.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/compute-resources.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

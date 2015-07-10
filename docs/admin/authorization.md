@@ -94,7 +94,7 @@ To permit an action Policy with an unset namespace applies regardless of namespa
  3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`
  4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "ns": "projectCaribou"}`
 
-[Complete file example](../pkg/auth/authorizer/abac/example_policy_file.jsonl)
+[Complete file example](../../pkg/auth/authorizer/abac/example_policy_file.jsonl)
 
 ## Plugin Development
 
@@ -118,5 +118,5 @@ caching and revocation of permissions.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/authorization.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/authorization.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
