@@ -70,8 +70,8 @@ spec:
 ```
 
 Some more thorough examples:
-   * [environment variables](../examples/environment-guide)
-   * [downward API](../examples/downward-api)
+   * [environment variables](../examples/environment-guide/)
+   * [downward API](../examples/downward-api/)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/downward_api.md?pixel)]()

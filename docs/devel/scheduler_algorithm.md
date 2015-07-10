@@ -30,7 +30,7 @@ Currently, Kubernetes scheduler provides some practical priority functions, incl
 - `CalculateSpreadPriority`: Spread Pods by minimizing the number of Pods belonging to the same service on the same node.
 - `CalculateAntiAffinityPriority`: Spread Pods by minimizing the number of Pods belonging to the same service on nodes with the same value for a particular label.
 
-The details of the above priority functions can be found in [plugin/pkg/scheduler/algorithm/priorities](../../plugin/pkg/scheduler/algorithm/priorities). Kubernetes uses some, but not all, of these priority functions by default. You can see which ones are used by default in [/plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](../../plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go). Similar as predicates, you can combine the above priority functions and assign weight factors (positive number) to them as you want (check [docs/devel/scheduler.md](../../docs/devel/scheduler.md) for how to customize).
+The details of the above priority functions can be found in [plugin/pkg/scheduler/algorithm/priorities](../../plugin/pkg/scheduler/algorithm/priorities/). Kubernetes uses some, but not all, of these priority functions by default. You can see which ones are used by default in [plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](../../plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go). Similar as predicates, you can combine the above priority functions and assign weight factors (positive number) to them as you want (check [docs/devel/scheduler.md](../../docs/devel/scheduler.md) for how to customize).
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/scheduler_algorithm.md?pixel)]()
