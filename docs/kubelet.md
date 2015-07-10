@@ -59,7 +59,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
       --low-diskspace-threshold-mb=0: The absolute free disk space, in MB, to maintain. When disk space falls below this threshold, new pods would be rejected. Default: 256
       --manifest-url="": URL for accessing the container manifest
       --master-service-namespace="": The namespace from which the kubernetes master services should be injected into pods
-      --max-pods=100: Number of Pods that can run on this Kubelet.
+      --max-pods=40: Number of Pods that can run on this Kubelet.
       --maximum-dead-containers=0: Maximum number of old instances of a containers to retain globally.  Each container takes up some disk space.  Default: 100.
       --maximum-dead-containers-per-container=0: Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 2.
       --minimum-container-ttl-duration=0: Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'
