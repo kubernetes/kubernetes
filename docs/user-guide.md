@@ -38,7 +38,7 @@ kubernetes API, or to contribute directly to the kubernetes project.
   (e.g. ssh keys, passwords) separately from the Pods that use them, protecting
   the sensitive data from proliferation by tools that process pods.
 
-* **Accessing the API and other cluster services via a Proxy** [accessing-the-cluster.md](../docs/accessing-the-cluster.md)
+* **Accessing the API and other cluster services via a Proxy** [docs/accessing-the-cluster.md](../docs/accessing-the-cluster.md)
 
 * **API Overview** ([api.md](api.md)): Pointers to API documentation on various topics
   and explanation of Kubernetes's approaches to API changes and API versioning.

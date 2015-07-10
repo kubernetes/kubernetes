@@ -29,9 +29,9 @@ certainly want the docs that go with that version.</h1>
 * The [API object documentation](http://kubernetes.io/third_party/swagger-ui/)
   is a detailed description of all fields found in core API objects.
 
-* An overview of the [Design of Kubernetes](design)
+* An overview of the [Design of Kubernetes](design/)
 
-* There are example files and walkthroughs in the [examples](../examples)
+* There are example files and walkthroughs in the [examples](../examples/)
   folder.
 
 

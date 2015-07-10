@@ -213,7 +213,7 @@ Now for the good stuff!
 ## Cloud Configs
 The following config files are tailored for the OFFLINE version of a Kubernetes deployment.
 
-These are based on the work found here: [master.yml](./cloud-configs/master.yaml), [node.yml](./cloud-configs/node.yaml)
+These are based on the work found here: [master.yml](cloud-configs/master.yaml), [node.yml](cloud-configs/node.yaml)
 
 To make the setup work, you need to replace a few placeholders:
 
@@ -622,7 +622,7 @@ Now that the CoreOS with Kubernetes installed is up and running lets spin up som
 
 See [a simple nginx example](../../../examples/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../../examples).
+For more complete applications, please look in the [examples directory](../../../examples/).
 
 ## Helping commands for debugging
 

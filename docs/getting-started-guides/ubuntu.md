@@ -120,7 +120,7 @@ NAME            LABELS                                 STATUS
 
 ```
 
-Also you can run kubernetes [guest-example](../../examples/guestbook) to build a redis backend cluster on the k8s．
+Also you can run kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
 
 
 #### Deploy addons

@@ -167,7 +167,7 @@ You will need binaries for:
 #### Downloading and Extracting Kubernetes Binaries
 A Kubernetes binary release includes all the Kubernetes binaries as well as the supported release of etcd.
 You can use a Kubernetes binary release (recommended) or build your Kubernetes binaries following the instructions in the
-[Developer Documentation]( ../devel/README.md).  Only using a binary release is covered in this guide.
+[Developer Documentation](../devel/README.md).  Only using a binary release is covered in this guide.
 
 Download the [latest binary release](
 https://github.com/GoogleCloudPlatform/kubernetes/releases/latest) and unzip it.
@@ -255,8 +255,7 @@ The admin user (and any users) need:
 
 Your tokens and passwords need to be stored in a file for the apiserver
 to read.  This guide uses `/var/lib/kube-apiserver/known_tokens.csv`.
-The format for this file is described in the [authentication documentation](
-../authentication.md).
+The format for this file is described in the [authentication documentation](../authentication.md).
 
 For distributing credentials to clients, the convention in Kubernetes is to put the credentials
 into a [kubeconfig file](../kubeconfig-file.md).

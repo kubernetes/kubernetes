@@ -98,15 +98,13 @@ You can package many files into one secret, or use many secrets,
 whichever is convenient.
 
 ### Manually specifying an imagePullSecret
-Use of imagePullSecrets is desribed in the [images documentation](
-images.md#specifying-imagepullsecrets-on-a-pod)
+Use of imagePullSecrets is desribed in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)
 ### Automatic use of Manually Created Secrets
 
 *This feature is planned but not implemented.  See [issue
 9902](https://github.com/GoogleCloudPlatform/kubernetes/issues/9902).*
 
-You can reference manually created secrets from a [service account](
-service_accounts.md).
+You can reference manually created secrets from a [service account](service_accounts.md).
 Then, pods which use that service account will have
 `volumeMounts` and/or `imagePullSecrets` added to them.
 The secrets will be mounted at **TBD**.
