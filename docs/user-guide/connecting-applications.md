@@ -72,7 +72,7 @@ $ kubectl get pods -l app=nginx -o json | grep podIP
 ```
 You should be able to ssh into any node in your cluster and curl both ips. Note that the containers are *not* using port 80 on the node, nor are there any special NAT rules to route traffic to the pod. This means you can run multiple nginx pods on the same node all using the same containerPort and access them from any other pod or node in your cluster using ip. Like Docker, ports can still be published to the host node's interface(s), but the need for this is radically diminished because of the networking model.
 
-You can read more about [how we achieve this](../networking.md#how-to-achieve-this) if you’re curious.
+You can read more about [how we achieve this](../admin/networking.md#how-to-achieve-this) if you’re curious.
 
 ## Creating a Service for the pods
 

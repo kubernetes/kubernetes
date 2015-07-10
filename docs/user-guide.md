@@ -81,13 +81,13 @@ for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv 
 * **Annotations** ([annotations.md](annotations.md)): Attaching
   arbitrary non-identifying metadata.
 
-* **Downward API** ([downward_api.md](downward_api.md)): Accessing system
+* **Downward API** ([downward-api.md](downward-api.md)): Accessing system
   configuration from a pod without accessing Kubernetes API (see also
   [container-environment.md](container-environment.md)).
 
 * **Kubernetes Container Environment** ([container-environment.md](container-environment.md)):
   Describes the environment for Kubelet managed containers on a Kubernetes
-  node (see also [downward_api.md](downward_api.md)).
+  node (see also [downward-api.md](downward-api.md)).
 
 * **DNS Integration with SkyDNS** ([admin/dns.md](admin/dns.md)):
   Resolving a DNS name directly to a Kubernetes service.
@@ -108,7 +108,7 @@ for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv 
 * **Services and firewalls** ([services-firewalls.md](services-firewalls.md)): How
   to use firewalls.
 
-* **Compute Resources** ([compute_resources.md](compute_resources.md)):
+* **Compute Resources** ([compute-resources.md](compute-resources.md)):
   Provides resource information such as size, type, and quantity to assist in
   assigning Kubernetes resources appropriately.
 

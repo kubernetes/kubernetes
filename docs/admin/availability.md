@@ -134,7 +134,7 @@ you need `R + U` clusters.  If it is not (e.g you want to ensure low latency for
 cluster failure), then you need to have `R * U` clusters (`U` in each of `R` regions).  In any case, try to put each cluster in a different zone.
 
 Finally, if any of your clusters would need more than the maximum recommended number of nodes for a Kubernetes cluster, then
-you may need even more clusters.  Our [roadmap](roadmap.md)
+you may need even more clusters.  Our [roadmap](../roadmap.md)
 calls for maximum 100 node clusters at v1.0 and maximum 1000 node clusters in the middle of 2015.
 
 ## Working with multiple clusters
@@ -145,5 +145,5 @@ failures of a single cluster are not visible to end users.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/availability.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/availability.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
