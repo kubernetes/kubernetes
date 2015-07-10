@@ -92,12 +92,16 @@ fi
 echo "+++ Versioning documentation and examples"
 
 # Update the docs to match this version.
-DOCS_TO_EDIT=(docs/README.md examples/README.md)
-for DOC in "${DOCS_TO_EDIT[@]}"; do
+md_dirs=(docs examples)
+md_files=()
+for dir in "${md_dirs[@]}"; do
+  mdfiles+=($( find "${dir}" -name "*.md" -type f ))
+done
+for doc in "${mdfiles[@]}"; do
   $SED -ri \
       -e '/<!-- BEGIN STRIP_FOR_RELEASE -->/,/<!-- END STRIP_FOR_RELEASE -->/d' \
       -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" \
-      "${DOC}"
+      "${doc}"
 done
 
 # Update API descriptions to match this version.
