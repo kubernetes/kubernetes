@@ -61,7 +61,7 @@ var _ = Describe("Restart", func() {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
 		skipped = true
-		SkipUnlessProviderIs("gce")
+		SkipUnlessProviderIs("gce", "gke")
 		skipped = false
 
 		ps = newPodStore(c, api.NamespaceDefault, labels.Everything(), fields.Everything())
@@ -214,7 +214,7 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 // allowing up to nt per node.
 func restartNodes(provider string, nt time.Duration) error {
 	switch provider {
-	case "gce":
+	case "gce", "gke":
 		return migRollingUpdateSelf(nt)
 	default:
 		return fmt.Errorf("restartNodes(...) not implemented for %s", provider)
