@@ -78,8 +78,8 @@ kubectl get pods
 You'll see a single phabricator pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
 
 ```
-POD                           IP           CONTAINER(S)  IMAGE(S)                  HOST                                                      LABELS                                   STATUS
-phabricator-controller-02qp4  10.244.1.34  phabricator   fgrzadkowski/phabricator  kubernetes-minion-2.c.myproject.internal/130.211.141.151  name=phabricator
+NAME                           READY     STATUS    RESTARTS   AGE
+phabricator-controller-9vy68   1/1       Running   0          1m
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
@@ -203,7 +203,7 @@ phabricator
 To play with the service itself, find the external IP of the load balancer:
 
 ```shell
-$ kubectl get services guestbook -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}'
+$ kubectl get services phabricator -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}{{"\n"}}'
 ```
 
 and then visit port 80 of that IP address.

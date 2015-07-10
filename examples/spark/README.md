@@ -46,7 +46,7 @@ $ kubectl create -f examples/spark/spark-master-service.json
 
 ```shell
 $ kubectl get pods
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                           READY     STATUS    RESTARTS   AGE
 [...]
 spark-master                                   1/1       Running   0          25s
 
@@ -97,7 +97,7 @@ $ kubectl create -f examples/spark/spark-worker-controller.json
 
 ```shell
 $ kubectl get pods
-NAME                                           READY     REASON    RESTARTS   AGE
+NAME                                            READY     STATUS    RESTARTS   AGE
 [...]
 spark-master                                    1/1       Running   0          14m
 spark-worker-controller-hifwi                   1/1       Running   0          33s
