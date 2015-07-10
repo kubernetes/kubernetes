@@ -60,3 +60,51 @@ func Test_updateMacroBlock_errors(t *testing.T) {
 		assert.Error(t, err)
 	}
 }
+
+func TestHasLine(t *testing.T) {
+	cases := []struct {
+		lines    []string
+		needle   string
+		expected bool
+	}{
+		{[]string{"abc", "def", "ghi"}, "abc", true},
+		{[]string{"  abc", "def", "ghi"}, "abc", true},
+		{[]string{"abc  ", "def", "ghi"}, "abc", true},
+		{[]string{"\n abc", "def", "ghi"}, "abc", true},
+		{[]string{"abc \n", "def", "ghi"}, "abc", true},
+		{[]string{"abc", "def", "ghi"}, "def", true},
+		{[]string{"abc", "def", "ghi"}, "ghi", true},
+		{[]string{"abc", "def", "ghi"}, "xyz", false},
+	}
+
+	for i, c := range cases {
+		if hasLine(c.lines, c.needle) != c.expected {
+			t.Errorf("case[%d]: %q, expected %t, got %t", i, c.needle, c.expected, !c.expected)
+		}
+	}
+}
+
+func TestHasMacroBlock(t *testing.T) {
+	cases := []struct {
+		lines    []string
+		begin    string
+		end      string
+		expected bool
+	}{
+		{[]string{"<<<", ">>>"}, "<<<", ">>>", true},
+		{[]string{"<<<", "abc", ">>>"}, "<<<", ">>>", true},
+		{[]string{"<<<", "<<<", "abc", ">>>"}, "<<<", ">>>", true},
+		{[]string{"<<<", "abc", ">>>", ">>>"}, "<<<", ">>>", true},
+		{[]string{"<<<", ">>>", "<<<", ">>>"}, "<<<", ">>>", true},
+		{[]string{"<<<"}, "<<<", ">>>", false},
+		{[]string{">>>"}, "<<<", ">>>", false},
+		{[]string{"<<<", "abc"}, "<<<", ">>>", false},
+		{[]string{"abc", ">>>"}, "<<<", ">>>", false},
+	}
+
+	for i, c := range cases {
+		if hasMacroBlock(c.lines, c.begin, c.end) != c.expected {
+			t.Errorf("case[%d]: %q,%q, expected %t, got %t", i, c.begin, c.end, c.expected, !c.expected)
+		}
+	}
+}

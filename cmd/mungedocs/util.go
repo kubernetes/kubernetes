@@ -71,3 +71,30 @@ func updateMacroBlock(lines []string, beginMark, endMark, insertThis string) ([]
 	}
 	return buffer.Bytes(), nil
 }
+
+// Tests that a document, represented as a slice of lines, has a line.  Ignores
+// leading and trailing space.
+func hasLine(lines []string, needle string) bool {
+	for _, line := range lines {
+		trimmedLine := strings.Trim(line, " \n")
+		if trimmedLine == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// Tests that a document, represented as a slice of lines, has a macro block.
+func hasMacroBlock(lines []string, begin string, end string) bool {
+	foundBegin := false
+	for _, line := range lines {
+		trimmedLine := strings.Trim(line, " \n")
+		switch {
+		case !foundBegin && trimmedLine == begin:
+			foundBegin = true
+		case foundBegin && trimmedLine == end:
+			return true
+		}
+	}
+	return false
+}
