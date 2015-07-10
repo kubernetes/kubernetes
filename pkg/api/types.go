@@ -1708,6 +1708,12 @@ const (
 	//   "causes" - The original error
 	// Status code 500
 	StatusReasonInternalError = "InternalError"
+
+	// StatusReasonServiceUnavailable means that the request itself was valid,
+	// but the requested service is unavailable at this time.
+	// Retrying the request after some time might succeed.
+	// Status code 503
+	StatusReasonServiceUnavailable StatusReason = "ServiceUnavailable"
 )
 
 // StatusCause provides more information about an api.Status failure, including

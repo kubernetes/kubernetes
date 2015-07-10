@@ -199,6 +199,16 @@ var aBinding string = `
 }
 `
 
+var emptyEndpoints string = `
+{
+  "kind": "Endpoints",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "a"%s
+  }
+}
+`
+
 var aEndpoints string = `
 {
   "kind": "Endpoints",
@@ -243,6 +253,7 @@ var code405 = map[int]bool{405: true}
 var code409 = map[int]bool{409: true}
 var code422 = map[int]bool{422: true}
 var code500 = map[int]bool{500: true}
+var code503 = map[int]bool{503: true}
 
 // To ensure that a POST completes before a dependent GET, set a timeout.
 func addTimeoutFlag(URLString string) string {
@@ -299,8 +310,14 @@ func getTestRequests() []struct {
 		{"GET", path("services", "", ""), "", code200},
 		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
 		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
+		// Create an endpoint for the service (this is done automatically by endpoint controller
+		// whenever a service is created, but this test does not run that controller)
+		{"POST", timeoutPath("endpoints", api.NamespaceDefault, ""), emptyEndpoints, code201},
+		// Should return service unavailable when endpoint.subset is empty.
+		{"GET", pathWithPrefix("proxy", "services", api.NamespaceDefault, "a") + "/", "", code503},
 		{"PUT", timeoutPath("services", api.NamespaceDefault, "a"), aService, code200},
 		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
+		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
 		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
 
 		// Normal methods on replicationControllers

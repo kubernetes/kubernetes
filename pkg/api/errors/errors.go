@@ -193,6 +193,16 @@ func NewBadRequest(reason string) error {
 	}}
 }
 
+// NewServiceUnavailable creates an error that indicates that the requested service is unavailable.
+func NewServiceUnavailable(reason string) error {
+	return &StatusError{api.Status{
+		Status:  api.StatusFailure,
+		Code:    http.StatusServiceUnavailable,
+		Reason:  api.StatusReasonServiceUnavailable,
+		Message: reason,
+	}}
+}
+
 // NewMethodNotSupported returns an error indicating the requested action is not supported on this kind.
 func NewMethodNotSupported(kind, action string) error {
 	return &StatusError{api.Status{
