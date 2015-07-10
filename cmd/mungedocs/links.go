@@ -58,7 +58,7 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 		if err != nil {
 			errors = append(
 				errors,
-				fmt.Sprintf("%v, link %q is unparsable: %v", filePath, linkText, err),
+				fmt.Sprintf("link %q is unparsable: %v", linkText, err),
 			)
 			return in
 		}
@@ -74,7 +74,7 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 			if !targetExists {
 				errors = append(
 					errors,
-					fmt.Sprintf("%v, %q: target not found\n", filePath, linkText),
+					fmt.Sprintf("%q: target not found", linkText),
 				)
 			}
 			u.Path = newPath
