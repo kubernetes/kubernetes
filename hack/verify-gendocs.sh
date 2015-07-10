@@ -46,7 +46,9 @@ _tmp="${KUBE_ROOT}/_tmp"
 mkdir -p "${_tmp}"
 cp -a "${DOCROOT}" "${TMP_DOCROOT}"
 
-"${mungedocs}" "--verify=true" "--root-dir=${TMP_DOCROOT}"
+# mungedocs --verify can (and should) be run on the real docs, otherwise their
+# links will be distorted. --verify means that it will not make changes.
+"${mungedocs}" "--verify=true" "--root-dir=${DOCROOT}"
 ret=$?
 if [[ $ret -eq 1 ]]; then
   echo "${DOCROOT} is out of date. Please run hack/run-gendocs.sh"

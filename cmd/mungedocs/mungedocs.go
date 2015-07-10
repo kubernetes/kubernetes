@@ -33,52 +33,62 @@ var (
 	rootDir = flag.String("root-dir", "", "Root directory containing documents to be processed.")
 
 	ErrChangesNeeded = errors.New("mungedocs: changes required")
+
+	// TODO: allow selection from command line. (e.g., just check links in the examples directory.)
+	mungesToMake = munges{
+		munger(updateTOC),
+		munger(checkLinks),
+	}
 )
 
-func visitAndVerify(path string, i os.FileInfo, e error) error {
-	return visitAndChangeOrVerify(path, i, e, false)
-}
+// Munger processes a document, returning an updated document xor an error.
+// Munger is NOT allowed to mutate 'before', if changes are needed it must copy
+// data into a new byte array.
+type munger func(filePath string, before []byte) (after []byte, err error)
 
-func visitAndChange(path string, i os.FileInfo, e error) error {
-	return visitAndChangeOrVerify(path, i, e, true)
+type munges []munger
+
+type fileProcessor struct {
+	// Which munge functions should we call?
+	munges munges
+
+	// Are we allowed to make changes?
+	verifyOnly bool
 }
 
 // Either change a file or verify that it needs no changes (according to modify argument)
-func visitAndChangeOrVerify(path string, i os.FileInfo, e error, modify bool) error {
+func (f fileProcessor) visit(path string, i os.FileInfo, e error) error {
 	if !strings.HasSuffix(path, ".md") {
 		return nil
 	}
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
 
-	before, err := ioutil.ReadAll(file)
+	fileBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	after, err := updateTOC(before)
-	if err != nil {
-		return err
-	}
-	if modify {
-		// Write out new file with any changes.
-		if !bytes.Equal(after, before) {
-			file.Close()
-			ioutil.WriteFile(path, after, 0644)
+	modificationsMade := false
+	for _, munge := range f.munges {
+		after, err := munge(path, fileBytes)
+		if err != nil {
+			return err
 		}
-	} else {
-		// Just verify that there are no changes.
-		if !bytes.Equal(after, before) {
-			return ErrChangesNeeded
+		if !modificationsMade {
+			if !bytes.Equal(after, fileBytes) {
+				modificationsMade = true
+				if f.verifyOnly {
+					// We're not allowed to make changes.
+					return ErrChangesNeeded
+				}
+			}
 		}
+		fileBytes = after
 	}
 
-	// TODO(erictune): more types of passes, such as:
-	// Linkify terms
-	// Verify links point to files.
+	// Write out new file with any changes.
+	if modificationsMade {
+		ioutil.WriteFile(path, fileBytes, 0644)
+	}
 
 	return nil
 }
@@ -91,6 +101,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	fp := fileProcessor{
+		munges:     mungesToMake,
+		verifyOnly: *verify,
+	}
+
 	// For each markdown file under source docs root, process the doc.
 	// If any error occurs, will exit with failure.
 	// If verify is true, then status is 0 for no changes needed, 1 for changes needed
@@ -98,12 +113,7 @@ func main() {
 	// If verify is false, then status is 0 if changes successfully made or no changes needed,
 	// 1 if changes were needed but require human intervention, and >1 for an unexpected
 	// error during processing.
-	var err error
-	if *verify {
-		err = filepath.Walk(*rootDir, visitAndVerify)
-	} else {
-		err = filepath.Walk(*rootDir, visitAndChange)
-	}
+	err := filepath.Walk(*rootDir, fp.visit)
 	if err != nil {
 		if err == ErrChangesNeeded {
 			if *verify {

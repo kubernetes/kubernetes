@@ -37,7 +37,7 @@ can be overridden by passing the command-line flag `--policy-config-file` to the
 file specifying which scheduling policies to use. See
 [examples/scheduler-policy-config.json](../../examples/scheduler-policy-config.json) for an example
 config file. (Note that the config file format is versioned; the API is defined in
-[plugin/pkg/scheduler/api/](../../plugin/pkg/scheduler/api/)).
+[plugin/pkg/scheduler/api](../../plugin/pkg/scheduler/api/)).
 Thus to add a new scheduling policy, you should modify predicates.go or priorities.go,
 and either register the policy in `defaultPredicates()` or `defaultPriorities()`, or use a policy config file.
 

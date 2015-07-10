@@ -150,7 +150,7 @@ Some of the pods may take a few seconds to start up (during this time they'll sh
 
 Then, see [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../examples).  The [guestbook example](../../examples/guestbook) is a good "getting started" walkthrough.
+For more complete applications, please look in the [examples directory](../../examples/).  The [guestbook example](../../examples/guestbook/) is a good "getting started" walkthrough.
 
 ### Tearing down the cluster
 To remove/delete/teardown the cluster, use the `kube-down.sh` script.

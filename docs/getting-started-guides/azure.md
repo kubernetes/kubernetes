@@ -51,7 +51,7 @@ can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 ## Getting started with your cluster
 See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../examples).
+For more complete applications, please look in the [examples directory](../../examples/).
 
 ## Tearing down the cluster
 ```

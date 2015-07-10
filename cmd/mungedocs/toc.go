@@ -30,7 +30,7 @@ import (
 // the ToC, thereby updating any previously inserted ToC.
 //
 // TODO(erictune): put this in own package with tests
-func updateTOC(markdown []byte) ([]byte, error) {
+func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 	toc, err := buildTOC(markdown)
 	if err != nil {
 		return nil, err

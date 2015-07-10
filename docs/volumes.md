@@ -7,7 +7,7 @@ container starts with a clean slate.  second, when running containers together
 in a `Pod` it is often necessary to share files between those containers.  The
 Kubernetes `Volume` abstraction solves both of these problems.
 
-Familiarity with [pods](./pods.md) is suggested.
+Familiarity with [pods](pods.md) is suggested.
 
 ## Background
 
@@ -332,7 +332,7 @@ medium of the filesystem holding the kubelet root dir (typically
 pods.
 
 In the future, we expect that `emptyDir` and `hostPath` volumes will be able to
-request a certain amount of space using a [resource](./compute_resources.md)
+request a certain amount of space using a [resource](compute_resources.md)
 specification, and to select the type of media to use, for clusters that have
 several media types.
 

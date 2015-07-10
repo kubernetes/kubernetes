@@ -79,9 +79,9 @@ For more information, please read [kubeconfig files](https://github.com/GoogleCl
 ### Examples
 See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
-The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook)
+The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/)
 
-For more complete applications, please look in the [examples directory](../../examples)
+For more complete applications, please look in the [examples directory](../../examples/)
 
 ## Tearing down the cluster
 Make sure the environment variables you used to provision your cluster are still exported, then call the following script inside the
