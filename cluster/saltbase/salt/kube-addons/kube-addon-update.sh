@@ -162,7 +162,11 @@ function wait-for-jobs() {
     local rv=0
     local pid
     for pid in $(jobs -p); do
-        wait ${pid} || (rv=1; log ERR "error in pid ${pid}")
+        wait ${pid}
+        if [[ $? -ne 0 ]]; then
+            rv=1;
+            log ERR "error in pid ${pid}"
+        fi
         log DB2 "pid ${pid} completed, current error code: ${rv}"
     done
     return ${rv}
