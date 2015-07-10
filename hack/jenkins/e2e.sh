@@ -85,6 +85,7 @@ ${GCE_DEFAULT_SKIP_TEST_REGEX}\
 |Nodes\sNetwork\
 |Nodes\sResize\
 |MaxPods\
+|Shell.*services\
 "
 # Tests which are known to be flaky when run in parallel.
 # TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
