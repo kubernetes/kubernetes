@@ -37,7 +37,7 @@ Next, specify an existing virtual network and subnet in `cluster/azure/config-de
 
 You can create a virtual network:
 
-    azure network vnet create <vnet name> --subnet=<subnet name> --location "West US" -v
+    azure network vnet create <vnet name> --subnet-name=<subnet name> --location "West US" -v
 
 Now you're ready.
 
