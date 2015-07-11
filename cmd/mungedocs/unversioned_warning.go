@@ -16,9 +16,12 @@ limitations under the License.
 
 package main
 
-var beginUnversionedWarning = "<!-- BEGIN UNVERSIONED_WARNING -->"
-var endUnversionedWarning = "<!-- END UNVERSIONED_WARNING -->"
-var unversionedWarning = `
+const unversionedWarningTag = "UNVERSIONED_WARNING"
+
+var beginUnversionedWarning = beginMungeTag(unversionedWarningTag)
+var endUnversionedWarning = endMungeTag(unversionedWarningTag)
+
+const unversionedWarning = `
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <h1>*** PLEASE NOTE: This document applies to the HEAD of the source

@@ -1,6 +1,6 @@
 # Networking in Kubernetes
 **Table of Contents**
-<!-- BEGIN GENERATED TOC -->
+<!-- BEGIN MUNGE: GENERATED_TOC -->
 - [Networking in Kubernetes](#networking-in-kubernetes)
   - [Summary](#summary)
   - [Docker model](#docker-model)
@@ -14,7 +14,7 @@
     - [Calico](#calico)
   - [Other reading](#other-reading)
 
-<!-- END GENERATED TOC -->
+<!-- END MUNGE: GENERATED_TOC -->
 
 Kubernetes approaches networking somewhat differently than Docker does by
 default.  There are 4 distinct networking problems to solve:
