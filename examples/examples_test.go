@@ -252,7 +252,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 		},
 		"../examples/limitrange": {
 			"invalid-pod": &api.Pod{},
-			"limit-range": &api.LimitRange{},
+			"limits":      &api.LimitRange{},
+			"namespace":   &api.Namespace{},
 			"valid-pod":   &api.Pod{},
 		},
 		"../examples/logging-demo": {
