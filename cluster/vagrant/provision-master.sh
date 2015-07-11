@@ -32,7 +32,7 @@ systemctl restart network
 
 function release_not_found() {
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
-  echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
+  echo "are running from a clone of the git repo, please run 'KUBE_RELEASE_RUN_TESTS=n ./build/release.sh.'" >&2
   echo "Note that this requires having Docker installed.  If you are running " >&2
   echo "from a release tarball, something is wrong.  Look at " >&2
   echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
