@@ -6,3 +6,4 @@
     enablerepo=virt7-docker-common-candidate
   notify:
     - restart daemons
+  when: not is_atomic

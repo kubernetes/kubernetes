@@ -1,0 +1,29 @@
+---
+- name: Copy master binaries
+  copy:
+    src: ../../_output/local/go/bin/{{ item }}
+    dest: /usr/bin/
+    mode: 755
+  with_items:
+    - kube-apiserver
+    - kube-scheduler
+    - kube-controller-manager
+    - kubectl
+
+- name: Copy master service files
+  copy:
+    src: ../init/systemd/{{ item }}
+    dest: /etc/systemd/system/
+    mode: 644
+  with_items:
+    - kube-apiserver.service
+    - kube-scheduler.service
+    - kube-controller-manager.service
+  notify: reload systemd
+
+- name: Copy systemd tmpfile for apiserver
+  copy:
+    src: ../init/systemd/tmpfiles.d/
+    dest: /etc/tmpfiles.d/
+    mode: 644
+  notify: reload systemd

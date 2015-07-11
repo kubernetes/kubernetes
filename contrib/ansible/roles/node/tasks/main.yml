@@ -8,11 +8,11 @@
   selinux: state=permissive policy=targeted
   when: "'Enforcing' in selinux.stdout"
 
-- include: generic-install.yml
-  when: not is_atomic and not ansible_distribution == "CentOS"
+- include: packageManagerInstall.yml
+  when: source_type == "packageManager"
 
-- include: centos.yml
-  when: not is_atomic and ansible_distribution == "CentOS"
+- include: localBuildInstall.yml
+  when: source_type == "localBuild"
 
 - name: Make sure manifest directory exists
   file: path={{ kube_manifest_dir }} state=directory

@@ -1,9 +1,9 @@
 ---
-- include: generic-install.yml
-  when: not is_atomic and not ansible_distribution == "CentOS"
+- include: packageManagerInstall.yml
+  when: source_type == "packageManager"
 
-- include: centos.yml
-  when: not is_atomic and ansible_distribution == "CentOS"
+- include: localBuildInstall.yml
+  when: source_type == "localBuild"
 
 - name: write the config file for the api server
   template: src=apiserver.j2 dest={{ kube_config_dir }}/apiserver

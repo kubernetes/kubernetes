@@ -1,0 +1,25 @@
+---
+- name: Copy node binaries
+  copy:
+    src: ../../_output/local/go/bin/{{ item }}
+    dest: /usr/bin/
+    mode: 755
+  with_items:
+    - kubelet
+    - kube-proxy
+    - kubectl
+
+- name: Copy node service files
+  copy:
+    src: ../init/systemd/{{ item }}
+    dest: /etc/systemd/system/
+    mode: 644
+  with_items:
+    - kube-proxy.service
+    - kubelet.service
+  notify: reload systemd
+
+- name: Create the /var/lib/kubelet working directory
+  file:
+    path: /var/lib/kubelet
+    state: directory
