@@ -77,12 +77,12 @@ First, hit the etcd discovery service to create a new token:
 curl https://discovery.etcd.io/new?size=3
 ```
 
-On each node, copy the [etcd.manifest](high-availability/etcd.manifest) file into ```/etc/kubernetes/manifests/etcd.manifest```
+On each node, copy the [etcd.yaml](high-availability/etcd.yaml) file into ```/etc/kubernetes/manifests/etcd.yaml```
 
 The kubelet on each node actively monitors the contents of that directory, and it will create an instance of the ```etcd```
-server from the definition of the pod specified in ```etcd.manifest```.
+server from the definition of the pod specified in ```etcd.yaml```.
 
-Note that in ```etcd.manifest``` you should substitute the token URL you got above for ```${DISCOVERY_TOKEN}``` on all three machines,
+Note that in ```etcd.yaml``` you should substitute the token URL you got above for ```${DISCOVERY_TOKEN}``` on all three machines,
 and you should substitute a different name (e.g. ```node-1```) for ${NODE_NAME} and the correct IP address
 for ```${NODE_IP}``` on each machine.
 
@@ -140,7 +140,7 @@ Next, you need to create a ```/srv/kubernetes/``` directory on each node.  This 
 The easiest way to create this directory, may be to copy it from the master node of a working cluster, or you can manually generate these files yourself.
 
 ### Starting the API Server
-Once these files exist, copy the [kube-apiserver.manifest](high-availability/kube-apiserver.manifest) into ```/etc/kubernetes/manifests/``` on each master node.
+Once these files exist, copy the [kube-apiserver.yaml](high-availability/kube-apiserver.yaml) into ```/etc/kubernetes/manifests/``` on each master node.
 
 The kubelet monitors this directory, and will automatically create an instance of the ```kube-apiserver``` container using the pod definition specified
 in the file.
@@ -178,13 +178,13 @@ touch /var/log/kube-controller-manager.log
 ```
 
 Next, set up the descriptions of the scheduler and controller manager pods on each node.
-by copying [kube-scheduler.manifest](high-availability/kube-scheduler.manifest) and [kube-controller-manager.manifest](high-availability/kube-controller-manager.manifest) into the ```/srv/kubernetes/```
+by copying [kube-scheduler.yaml](high-availability/kube-scheduler.yaml) and [kube-controller-manager.yaml](high-availability/kube-controller-manager.yaml) into the ```/srv/kubernetes/```
  directory.
 
 ### Running the podmaster
-Now that the configuration files are in place, copy the [podmaster.manifest](high-availability/podmaster.manifest) config file into ```/etc/kubernetes/manifests/```
+Now that the configuration files are in place, copy the [podmaster.yaml](high-availability/podmaster.yaml) config file into ```/etc/kubernetes/manifests/```
 
-As before, the kubelet on the node monitors this directory, and will start an instance of the podmaster using the pod specification provided in ```podmaster.manifest```.
+As before, the kubelet on the node monitors this directory, and will start an instance of the podmaster using the pod specification provided in ```podmaster.yaml```.
 
 Now you will have one instance of the scheduler process running on a single master node, and likewise one
 controller-manager process running on a single (possibly different) master node.  If either of these processes fail,
