@@ -440,6 +440,8 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	}
 	mockDriver.On("LaunchTasks", mAny("[]*mesosproto.OfferID"), mAny("[]*mesosproto.TaskInfo"), mAny("*mesosproto.Filters")).
 		Return(mesos.Status_DRIVER_RUNNING, nil).Run(launchTasksCalledFunc)
+	mockDriver.On("DeclineOffer", mAny("*mesosproto.OfferID"), mAny("*mesosproto.Filters")).
+		Return(mesos.Status_DRIVER_RUNNING, nil)
 
 	// elect master with mock driver
 	driverFactory := ha.DriverFactory(func() (bindings.SchedulerDriver, error) {
