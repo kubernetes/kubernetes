@@ -45,5 +45,12 @@ $ kubectl exec storage ls /data
 redis
 ```
 
+## Using kubectl exec to open a bash terminal in a pod
+After all, open a terminal in a pod is the most direct way to introspect the pod. Assuming the pod/storage is still running, run
+```
+$ kubectl exec -ti storage -- bash
+root@storage:/data#
+```
+This gets you a terminal.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/getting-into-containers.md?pixel)]()

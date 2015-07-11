@@ -17,7 +17,10 @@ The above proxy URL is an access to the kube-ui service provided by the apiserve
 $ kubectl proxy --port=8001
 Starting to serve on localhost:8001
 ```
-Now you can access the kube-ui service on your local workstation at http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kube-ui
+Now you can access the kube-ui service on your local workstation at [http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kube-ui](http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kube-ui)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-to-applications-1.md?pixel)]()
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-to-applications-proxy.md?pixel)]()

@@ -39,3 +39,6 @@ Now one can debug the database from the local workstation.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-to-applications-2.md?pixel)]()
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-to-applications-port-forward.md?pixel)]()
