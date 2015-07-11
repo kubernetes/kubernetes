@@ -200,4 +200,10 @@ restarting the kubelets on each node.
 If you are turning up a fresh cluster, you will need to install the kubelet and kube-proxy on each worker node, and
 set the ```--apiserver``` flag to your replicated endpoint.
 
+##Vagrant up!
+
+We indeed have an initial proof of concept tester for this, which is available [here](../examples/high-availability/).
+
+It implements the major concepts (with a few minor reductions for simplicity), of the podmaster HA implementation alongside a quick smoke test using k8petstore.
+
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/high-availability.md?pixel)]()
