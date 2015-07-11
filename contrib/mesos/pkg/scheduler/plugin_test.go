@@ -499,14 +499,22 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	}
 
 	// start another pod
-	podNum := 1
-	startPod := func(offers []*mesos.Offer) (*api.Pod, *mesos.TaskInfo) {
+	podNum := 2
+	startPod := func() (*api.Pod, *mesos.TaskInfo) {
 		podNum = podNum + 1
 
-		// create pod and matching offer
+		// create pod
 		pod := NewTestPod(podNum)
 		podListWatch.Add(pod, true) // notify watchers
+
+		// wait for failedScheduling event because there is no offer
+		assert.EventWithReason(eventObserver, "failedScheduling", "failedScheduling event not received")
+
+		// supply a matching offer
+		offers := []*mesos.Offer{NewTestOffer(podNum)}
 		testScheduler.ResourceOffers(mockDriver, offers)
+
+		// and wait to get scheduled
 		assert.EventWithReason(eventObserver, "scheduled")
 
 		// wait for driver.launchTasks call
@@ -522,7 +530,7 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		}
 	}
 
-	pod, launchedTask := startPod(offers1)
+	pod, launchedTask := startPod()
 
 	// mock drvier.KillTask, should be invoked when a pod is deleted
 	mockDriver.On("KillTask", mAny("*mesosproto.TaskID")).Return(mesos.Status_DRIVER_RUNNING, nil).Run(func(args mock.Arguments) {
@@ -563,22 +571,22 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	}
 
 	// 1. with pod deleted from the apiserver
-	pod, launchedTask = startPod(offers1)
+	pod, launchedTask = startPod()
 	podListWatch.Delete(pod, false) // not notifying the watchers
 	failPodFromExecutor(launchedTask)
 
 	// 2. with pod still on the apiserver, not bound
-	pod, launchedTask = startPod(offers1)
+	pod, launchedTask = startPod()
 	failPodFromExecutor(launchedTask)
 
 	// 3. with pod still on the apiserver, bound i.e. host!=""
-	pod, launchedTask = startPod(offers1)
+	pod, launchedTask = startPod()
 	pod.Spec.NodeName = *offers1[0].Hostname
 	podListWatch.Modify(pod, false) // not notifying the watchers
 	failPodFromExecutor(launchedTask)
 
 	// 4. with pod still on the apiserver, bound i.e. host!="", notified via ListWatch
-	pod, launchedTask = startPod(offers1)
+	pod, launchedTask = startPod()
 	pod.Spec.NodeName = *offers1[0].Hostname
 	podListWatch.Modify(pod, true) // notifying the watchers
 	time.Sleep(time.Second / 2)
