@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -127,6 +128,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Split the root dir of "foo/docs" into "foo" and "docs". We
+	// chdir into "foo" and walk "docs" so the walk is always at a
+	// relative path.
+	stem, leaf := path.Split(strings.TrimRight(*rootDir, "/"))
+	if err := os.Chdir(stem); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+		os.Exit(2)
+	}
+
 	fp := fileProcessor{
 		munges:     allMunges,
 		verifyOnly: *verify,
@@ -140,7 +150,7 @@ func main() {
 	//   changes needed.
 	var changesNeeded bool
 
-	err := filepath.Walk(*rootDir, newWalkFunc(&fp, &changesNeeded))
+	err := filepath.Walk(leaf, newWalkFunc(&fp, &changesNeeded))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(2)
