@@ -500,7 +500,7 @@ func TestPlugin_LifeCycle(t *testing.T) {
 
 	// start another pod
 	podNum := 2
-	startPod := func() (*api.Pod, *mesos.TaskInfo) {
+	startPod := func() (*api.Pod, *mesos.TaskInfo, *mesos.Offer) {
 		podNum = podNum + 1
 
 		// create pod
@@ -522,15 +522,15 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		case launchedTask := <-launchedTasks:
 			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_STAGING))
 			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_RUNNING))
-			return pod, launchedTask
+			return pod, launchedTask, offers[0]
 
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for launchTasks")
-			return nil, nil
+			return nil, nil, nil
 		}
 	}
 
-	pod, launchedTask := startPod()
+	pod, launchedTask, _ := startPod()
 
 	// mock drvier.KillTask, should be invoked when a pod is deleted
 	mockDriver.On("KillTask", mAny("*mesosproto.TaskID")).Return(mesos.Status_DRIVER_RUNNING, nil).Run(func(args mock.Arguments) {
@@ -571,23 +571,23 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	}
 
 	// 1. with pod deleted from the apiserver
-	pod, launchedTask = startPod()
+	pod, launchedTask, _ = startPod()
 	podListWatch.Delete(pod, false) // not notifying the watchers
 	failPodFromExecutor(launchedTask)
 
 	// 2. with pod still on the apiserver, not bound
-	pod, launchedTask = startPod()
+	pod, launchedTask, _ = startPod()
 	failPodFromExecutor(launchedTask)
 
 	// 3. with pod still on the apiserver, bound i.e. host!=""
-	pod, launchedTask = startPod()
-	pod.Spec.NodeName = *offers1[0].Hostname
+	pod, launchedTask, usedOffer := startPod()
+	pod.Spec.NodeName = *usedOffer.Hostname
 	podListWatch.Modify(pod, false) // not notifying the watchers
 	failPodFromExecutor(launchedTask)
 
 	// 4. with pod still on the apiserver, bound i.e. host!="", notified via ListWatch
-	pod, launchedTask = startPod()
-	pod.Spec.NodeName = *offers1[0].Hostname
+	pod, launchedTask, usedOffer = startPod()
+	pod.Spec.NodeName = *usedOffer.Hostname
 	podListWatch.Modify(pod, true) // notifying the watchers
 	time.Sleep(time.Second / 2)
 	failPodFromExecutor(launchedTask)
