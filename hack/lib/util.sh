@@ -143,11 +143,19 @@ kube::util::gen-doc() {
       link=$(kube::util::analytics-link "${path}")
       echo -e "\n${link}" >> "${tmpdir}/${file}"
     fi
-    # remove all old generated files from the destination
-    if [[ -e "${tmpdir}/${file}" && -n "${skipprefix}" ]]; then
+    # Remove all old generated files from the destination
+    if [[ -e "${tmpdir}/${file}" ]]; then
       local original generated
-      original=$(grep -v "^${skipprefix}" "${dest}/${file}") || :
-      generated=$(grep -v "^${skipprefix}" "${tmpdir}/${file}") || :
+      # Filter all munges from original content.
+      original=$(cat "${dest}/${file}" | sed '/^<!-- BEGIN MUNGE:.*/,/^<!-- END MUNGE:.*/d')
+      generated=$(cat "${tmpdir}/${file}")
+      # If this function was asked to filter lines with a prefix, do so.
+      if [[ -n "${skipprefix}" ]]; then
+        original=$(echo "${original}" | grep -v "^${skipprefix}" || :)
+        generated=$(echo "${generated}" | grep -v "^${skipprefix}" || :)
+      fi
+      # By now, the contents should be normalized and stripped of any
+      # auto-managed content.
       if [[ "${original}" == "${generated}" ]]; then
         # actual contents same, overwrite generated with original.
         mv "${dest}/${file}" "${tmpdir}/${file}"
