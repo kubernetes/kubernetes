@@ -100,10 +100,13 @@ manage cherry picks prior to cutting the release.
 
 #### Tagging and Merging
 
-Do the following (you still have `${VER}` set and you're still working on the
-`release-${VER}` branch, right?):
-
+1. `export VER=x.y` (e.g. `0.20` for v0.20)
 1. `export PATCH=Z` where `Z` is the patch level of `vX.Y.Z`
+1. cd to the base of the repo
+1. `git fetch upstream && git checkout -b upstream/release-${VER}`
+1. Make sure you don't have any files you care about littering your repo (they
+   better be checked in or outside the repo, or the next step will delete them).
+1. `make clean && git reset --hard HEAD && git clean -xdf`
 1. `make` (TBD: you really shouldn't have to do this, but the swagger output step requires it right now)
 1. `./build/mark-new-version.sh v${VER}.${PATCH}` to mark the new release and get further
    instructions. This creates a series of commits on the branch you're working
