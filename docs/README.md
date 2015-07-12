@@ -1,8 +1,8 @@
-# Kubernetes Documentation: releases.k8s.io/HEAD
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<h1>*** PLEASE NOTE: This documentation applies to the HEAD of the source
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
 tree only. If you are using a released version of Kubernetes, you almost
 certainly want the docs that go with that version.</h1>
 
@@ -11,7 +11,8 @@ certainly want the docs that go with that version.</h1>
 
 <!-- END STRIP_FOR_RELEASE -->
 
-## Where to start
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+# Kubernetes Documentation: releases.k8s.io/HEAD
 
 * The [User's guide](user-guide.md) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
