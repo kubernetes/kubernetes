@@ -551,12 +551,6 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 	})
 }
 
-// waitForPodSuccess returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-// The default namespace is used to identify pods.
-func waitForPodSuccess(c *client.Client, podName string, contName string) error {
-	return waitForPodSuccessInNamespace(c, podName, contName, api.NamespaceDefault)
-}
-
 // waitForRCPodOnNode returns the pod from the given replication controller (decribed by rcName) which is scheduled on the given node.
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, error) {
@@ -1224,7 +1218,7 @@ func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 // restart and node unhealthy events. Note that listing events like this will mess
 // with latency metrics, beware of calling it during a test.
 func getNodeEvents(c *client.Client, nodeName string) []api.Event {
-	events, err := c.Events(api.NamespaceDefault).List(
+	events, err := c.Events(api.NamespaceSystem).List(
 		labels.Everything(),
 		fields.Set{
 			"involvedObject.kind":      "Node",

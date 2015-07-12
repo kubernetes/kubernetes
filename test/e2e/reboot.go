@@ -156,7 +156,7 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 // failed step, it will return false through result and not run the rest.
 func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan bool) {
 	// Setup
-	ns := api.NamespaceDefault
+	ns := api.NamespaceSystem
 	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
 	defer ps.Stop()
 
