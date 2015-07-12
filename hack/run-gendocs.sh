@@ -45,14 +45,17 @@ kube::util::gen-doc "${genman}" "${KUBE_ROOT}/docs/man/man1"
 kube::util::gen-doc "${genbashcomp}" "${KUBE_ROOT}/contrib/completions/bash/"
 kube::util::gen-analytics "${KUBE_ROOT}"
 
-"${mungedocs}" "--root-dir=${KUBE_ROOT}/docs/" 
-ret=$?
-if [[ $ret -eq 1 ]]; then
-  echo "${KUBE_ROOT}/docs/ requires manual changes.  See proceeding errors."
-  exit 1
-elif [[ $ret -eq 2 ]]; then
-  echo "Error running mungedocs."
-  exit 1
-fi
+docs_dirs=(docs examples)
+for dir in "${docs_dirs[@]}"; do
+  "${mungedocs}" "--root-dir=${KUBE_ROOT}/${dir}/"
+  ret=$?
+  if [[ $ret -eq 1 ]]; then
+    echo "${KUBE_ROOT}/${dir}/ requires manual changes.  See preceeding errors."
+    exit 1
+  elif [[ $ret -eq 2 ]]; then
+    echo "Error running mungedocs."
+    exit 1
+  fi
+done
 
 # ex: ts=2 sw=2 et filetype=sh
