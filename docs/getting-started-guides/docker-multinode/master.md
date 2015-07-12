@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Installing a Kubernetes Master Node via Docker
 We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine is ```${MASTER_IP}```
 

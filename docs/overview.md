@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 # Kubernetes User Documentation
 
 Kubernetes is an open-source system for managing containerized applications across multiple hosts in a cluster. It provides mechanisms for application deployment, scheduling, updating, maintenance, and scaling. A key feature of Kubernetes is that it actively manages the containers to ensure that the state of the cluster continually matches the user's intentions.
