@@ -1,6 +1,7 @@
 # Networking
 
 There are 4 distinct networking problems to solve:
+
 1. Highly-coupled container-to-container communications
 2. Pod-to-Pod communications
 3. Pod-to-Service communications
