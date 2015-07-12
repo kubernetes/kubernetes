@@ -8,7 +8,7 @@ Kubernetes projects.
 Any contributor can propose a cherry pick of any pull request, like so:
 
 ```
-hack/cherry_pick_pull.sh 98765 upstream/release-3.14
+hack/cherry_pick_pull.sh upstream/release-3.14 98765
 ```
 
 This will walk you through the steps to propose an automated cherry pick of pull
