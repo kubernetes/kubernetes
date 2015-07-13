@@ -206,7 +206,7 @@ aws ec2 create-volume --availability-zone eu-west-1a --size 10 --volume-type gp2
 Make sure the zone matches the zone you brought up your cluster in.  (And also check that the size and EBS volume
 type are suitable for your use!)
 
-#### AWS EBS Example configuration:
+#### AWS EBS Example configuration
 
 ```yaml
 apiVersion: v1

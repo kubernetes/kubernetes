@@ -90,7 +90,7 @@ $ kubectl create -f secret.json
 $ kubectl describe secret mysecretname
 ```
 
-#### To delete/invalidate a service account token:
+#### To delete/invalidate a service account token
 ```
 kubectl delete secret mysecretname
 ```

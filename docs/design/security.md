@@ -32,7 +32,7 @@ While Kubernetes today is not primarily a multi-tenant system, the long term evo
 
 ## Use cases
 
-### Roles:
+### Roles
 
 We define "user" as a unique identity accessing the Kubernetes API server, which may be a human or an automated process.  Human users fall into the following categories:
 
@@ -46,7 +46,7 @@ Automated process users fall into the following categories:
 2. k8s infrastructure user - the user that kubernetes infrastructure components use to perform cluster functions with clearly defined roles
 
 
-### Description of roles:
+### Description of roles
 
 * Developers:
   * write pod specs.

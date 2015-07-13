@@ -56,7 +56,7 @@ There is a short window after a new master acquires the lease, during which data
 
 5. When the API server makes the corresponding write to etcd, it includes it in a transaction that does a compare-and-swap on the "current master" entry (old value == new value == host:port and sequence number from the replica that sent the mutating operation). This basically guarantees that if we elect the new master, all transactions coming from the old master will fail. You can think of this as the master attaching a "precondition" of its belief about who is the latest master.
 
-## Open Questions:
+## Open Questions
 * Is there a desire to keep track of all nodes for a specific component type?
 
 
