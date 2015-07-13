@@ -13,7 +13,7 @@ certainly want the docs that go with that version.</h1>
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 ﻿#Connecting to applications: kubectl port-forward
-kubectl port-forward forwards connections to a local port to a port on a pod. Its man page is available [here](../../docs/kubectl_port-forward.md). Compared to [kubectl proxy](../../docs/accessing-the-cluster.md#using-kubectl-proxy), `kubectl port-forward` is more generic as it can forward TCP traffic while `kubectl proxy` can only forward HTTP traffic. This guide demonstrates how to use `kubectl port-forward` to connect to a Redis database, which may be useful for database debugging.
+kubectl port-forward forwards connections to a local port to a port on a pod. Its man page is available [here](../../docs/user-guide/kubectl/kubectl_port-forward.md). Compared to [kubectl proxy](../../docs/accessing-the-cluster.md#using-kubectl-proxy), `kubectl port-forward` is more generic as it can forward TCP traffic while `kubectl proxy` can only forward HTTP traffic. This guide demonstrates how to use `kubectl port-forward` to connect to a Redis database, which may be useful for database debugging.
 
 
 ## Creating a Redis master
@@ -50,9 +50,5 @@ $ redis-cli
 PONG
 ```
 Now one can debug the database from the local workstation.
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-to-applications-2.md?pixel)]()
-
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-to-applications-port-forward.md?pixel)]()

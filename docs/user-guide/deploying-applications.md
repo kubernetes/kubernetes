@@ -97,7 +97,7 @@ CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS   APP
 my-nginx     nginx          nginx      app=nginx   2          nginx
 ```
 
-More importantly, the pod template’s labels are used to create a [`selector`](../../docs/labels.md#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](../../docs/kubectl_get.md):
+More importantly, the pod template’s labels are used to create a [`selector`](../../docs/labels.md#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](../../docs/user-guide/kubectl/kubectl_get.md):
 ```bash
 $ kubectl get rc my-nginx -o template --template="{{.spec.selector}}"
 map[app:nginx]

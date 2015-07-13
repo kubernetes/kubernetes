@@ -95,7 +95,7 @@ The next few steps will show you:
 The cluster startup script will leave you with a running cluster and a ```kubernetes``` directory on your workstation.
 The next step is to make sure the `kubectl` tool is in your path.
 
-The [kubectl](../kubectl.md) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
+The [kubectl](../user-guide/kubectl/kubectl.md) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
 You will use it to look at your new cluster and bring up example apps.
 
 Add the appropriate binary folder to your ```PATH``` to access kubectl:
