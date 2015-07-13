@@ -40,6 +40,7 @@ if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" || ! -x "$mungedo
 fi
 
 DOCROOT="${KUBE_ROOT}/docs/"
+EXAMPLEROOT="${KUBE_ROOT}/examples/"
 TMP_DOCROOT="${KUBE_ROOT}/_tmp/docs/"
 _tmp="${KUBE_ROOT}/_tmp"
 
@@ -52,6 +53,17 @@ cp -a "${DOCROOT}" "${TMP_DOCROOT}"
 ret=$?
 if [[ $ret -eq 1 ]]; then
   echo "${DOCROOT} is out of date. Please run hack/run-gendocs.sh"
+  exit 1
+fi
+if [[ $ret -eq 2 ]]; then
+  echo "Error running mungedocs"
+  exit 1
+fi
+
+"${mungedocs}" "--verify=true" "--root-dir=${EXAMPLEROOT}"
+ret=$?
+if [[ $ret -eq 1 ]]; then
+  echo "${EXAMPLEROOT} is out of date. Please run hack/run-gendocs.sh"
   exit 1
 fi
 if [[ $ret -eq 2 ]]; then
