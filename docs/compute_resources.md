@@ -21,6 +21,7 @@ certainly want the docs that go with that version.</h1>
   - [How Pods with Resource Limits are Run](#how-pods-with-resource-limits-are-run)
   - [Monitoring Compute Resource Usage](#monitoring-compute-resource-usage)
   - [Troubleshooting](#troubleshooting)
+    - [Detecting Resource Starved Containers](#detecting-resource-starved-containers)
   - [Planned Improvements](#planned-improvements)
 
 When specifying a [pod](pods.md), you can optionally specify how much CPU and memory (RAM) each
@@ -108,17 +109,13 @@ When using Docker:
 **TODO: document behavior for rkt**
 
 If a container exceeds its memory limit, it may be terminated.  If it is restartable, it will be
-restarted by kubelet, as will any other type of runtime failure.  If it is killed for exceeding its
-memory limit, you will see the reason `OOM Killed`, as in this example:
-```
-$ kubectl get pods/memhog
-NAME      READY     REASON       RESTARTS   AGE
-memhog    0/1       OOM Killed   0          1h
-```
-*OOM* stands for Out Of Memory.
+restarted by kubelet, as will any other type of runtime failure.  
 
 A container may or may not be allowed to exceed its CPU limit for extended periods of time.
 However, it will not be killed for excessive CPU usage.
+
+To determine if a container cannot be scheduled or is being killed due to resource limits, see the
+"Troubleshooting" section below.
 
 ## Monitoring Compute Resource Usage
 
@@ -153,6 +150,56 @@ Here are some example command lines that extract just the necessary information:
 The [resource quota](resource_quota_admin.md) feature can be configured
 to limit the total amount of resources that can be consumed.  If used in conjunction
 with namespaces, it can prevent one team from hogging all the resources.
+
+### Detecting Resource Starved Containers
+To check if a container is being killed because it is hitting a resource limit, call `kubectl describe pod`
+on the pod you are interested in:
+
+```
+[12:54:41] $ ./cluster/kubectl.sh describe pod simmemleak-hra99
+Name:               simmemleak-hra99
+Namespace:          default
+Image(s):           saadali/simmemleak
+Node:               kubernetes-minion-tf0f/10.240.216.66
+Labels:             name=simmemleak
+Status:             Running
+Reason:             
+Message:            
+IP:             10.244.2.75
+Replication Controllers:    simmemleak (1/1 replicas created)
+Containers:
+  simmemleak:
+    Image:  saadali/simmemleak
+    Limits:
+      cpu:      100m
+      memory:       50Mi
+    State:      Running
+      Started:      Tue, 07 Jul 2015 12:54:41 -0700
+    Ready:      False
+    Restart Count:  5
+Conditions:
+  Type      Status
+  Ready     False 
+Events:
+  FirstSeen                         LastSeen                         Count  From                              SubobjectPath                       Reason      Message
+  Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {scheduler }                                                          scheduled   Successfully assigned simmemleak-hra99 to kubernetes-minion-tf0f
+  Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  implicitly required container POD   pulled      Pod container image "gcr.io/google_containers/pause:0.8.0" already present on machine
+  Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  implicitly required container POD   created     Created with docker id 6a41280f516d
+  Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  implicitly required container POD   started     Started with docker id 6a41280f516d
+  Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  spec.containers{simmemleak}         created     Created with docker id 87348f12526a
+```
+
+The `Restart Count:  5` indicates that the `simmemleak` container in this pod was terminated and restarted 5 times.
+
+Once [#10861](https://github.com/GoogleCloudPlatform/kubernetes/issues/10861) is resolved the reason for the termination of the last container will also be printed in this output.
+
+Until then you can call `get pod` with the `-o template -t ...` option to fetch the status of previously terminated containers:
+```
+[13:59:01] $ ./cluster/kubectl.sh  get pod -o template -t '{{range.status.containerStatuses}}{{"Container Name: "}}{{.name}}{{"\r\nLastState: "}}{{.lastState}}{{end}}'  simmemleak-60xbc
+Container Name: simmemleak
+LastState: map[terminated:map[exitCode:137 reason:OOM Killed startedAt:2015-07-07T20:58:43Z finishedAt:2015-07-07T20:58:43Z containerID:docker://0e4095bba1feccdfe7ef9fb6ebffe972b4b14285d5acdec6f0d3ae8a22fad8b2]][13:59:03] clusterScaleDoc ~/go/src/github.com/GoogleCloudPlatform/kubernetes $ 
+```
+We can see that this container was terminated because `reason:OOM Killed`, where *OOM* stands for Out Of Memory.
 
 ## Planned Improvements
 
