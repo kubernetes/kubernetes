@@ -33,7 +33,7 @@ kubectl config view
 ```
 
 Many of the [examples](../examples/) provide an introduction to using
-kubectl and complete documentation is found in the [kubectl manual](../docs/kubectl.md).
+kubectl and complete documentation is found in the [kubectl manual](../docs/user-guide/kubectl/kubectl.md).
 
 ### <a name="kubectlproxy"</a>Directly accessing the REST API
 Kubectl handles locating and authenticating to the apiserver.
@@ -58,7 +58,7 @@ Run it like this:
 ```
 kubectl proxy --port=8080 &
 ```
-See [kubectl proxy](../docs/kubectl_proxy.md) for more details.
+See [kubectl proxy](../docs/user-guide/kubectl/kubectl_proxy.md) for more details.
 
 Then you can explore the API with curl, wget, or a browser, like so:
 ```
@@ -145,7 +145,7 @@ You have several options for connecting to nodes, pods and services from outside
   - Access services through public IPs.
     - Use a service with type `NodePort` or `LoadBalancer` to make the service reachable outside
       the cluster.  See the [services](../docs/services.md) and
-      [kubectl expose](../docs/kubectl_expose.md) documentation.
+      [kubectl expose](../docs/user-guide/kubectl/kubectl_expose.md) documentation.
     - Depending on your cluster environment, this may just expose the service to your corporate network,
       or it may expose it to the internet.  Think about whether the service being exposed is secure.
       Does it do its own authentication?
@@ -161,7 +161,7 @@ You have several options for connecting to nodes, pods and services from outside
     - Only works for HTTP/HTTPS.
     - Described [here](#apiserverproxy).
   - Access from a node or pod in the cluster.
-    - Run a pod, and then connect to a shell in it using [kubectl exec](../docs/kubectl_exec.md).
+    - Run a pod, and then connect to a shell in it using [kubectl exec](../docs/user-guide/kubectl/kubectl_exec.md).
       Connect to other nodes, pods, and services from that shell.
     - Some clusters may allow you to ssh to a node in the cluster.  From there you may be able to
       access cluster services.  This is a non-standard method, and will work on some clusters but

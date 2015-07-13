@@ -22,7 +22,7 @@ Complete API details are documented via [Swagger](http://swagger.io/). The Kuber
 
 Remote access to the API is discussed in the [access doc](accessing_the_api.md).
 
-The Kubernetes API also serves as the foundation for the declarative configuration schema for the system. The [Kubectl](kubectl.md) command-line tool can be used to create, update, delete, and get API objects.
+The Kubernetes API also serves as the foundation for the declarative configuration schema for the system. The [Kubectl](user-guide/kubectl/kubectl.md) command-line tool can be used to create, update, delete, and get API objects.
 
 Kubernetes also stores its serialized state (currently in [etcd](https://coreos.com/docs/distributed-configuration/getting-started-with-etcd/)) in terms of the API resources.
 

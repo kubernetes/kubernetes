@@ -34,7 +34,7 @@ Other details:
 
 * [API](api.md)
 * [Client libraries](client-libraries.md)
-* [Command-line interface](kubectl.md)
+* [Command-line interface](user-guide/kubectl/kubectl.md)
 * [UI](ui.md)
 * [Images and registries](images.md)
 * [Container environment](container-environment.md)

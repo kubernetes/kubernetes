@@ -12,57 +12,52 @@ certainly want the docs that go with that version.</h1>
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-## kubectl expose
+## kubectl run
 
-Take a replicated application and expose it as Kubernetes Service
+Run a particular image on the cluster.
 
 ### Synopsis
 
 
-Take a replicated application and expose it as Kubernetes Service.
-
-Looks up a replication controller or service by name and uses the selector for that resource as the
-selector for a new Service on the specified port. If no labels are specified, the new service will
-re-use the labels from the resource it exposes.
+Create and run a particular image, possibly replicated.
+Creates a replication controller to manage the created container(s).
 
 ```
-kubectl expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--type=type]
+kubectl run NAME --image=image [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json]
 ```
 
 ### Examples
 
 ```
-// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
-$ kubectl expose rc nginx --port=80 --target-port=8000
+// Starts a single instance of nginx.
+$ kubectl run nginx --image=nginx
 
-// Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
-$ kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
+// Starts a replicated instance of nginx.
+$ kubectl run nginx --image=nginx --replicas=5
 
-// Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-$ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
+// Dry run. Print the corresponding API objects without creating them.
+$ kubectl run nginx --image=nginx --dry-run
+
+// Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
+$ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 ```
 
 ### Options
 
 ```
-      --container-port="": Synonym for --target-port
-      --create-external-load-balancer=false: If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.
-      --dry-run=false: If true, only print the object that would be sent, without creating it.
-      --generator="service/v1": The name of the API generator to use.  Default is 'service/v1'.
-  -h, --help=false: help for expose
-  -l, --labels="": Labels to apply to the service created by this call.
-      --name="": The name for the newly created object.
+      --dry-run=false: If true, only print the object that would be sent, without sending it.
+      --generator="run/v1": The name of the API generator to use.  Default is 'run-controller/v1'.
+  -h, --help=false: help for run
+      --hostport=-1: The host port mapping for the container port. To demonstrate a single-machine container.
+      --image="": The image for the container to run.
+  -l, --labels="": Labels to apply to the pod(s).
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile|wide.
       --output-version="": Output the formatted object with the given version (default api-version).
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
-      --port=-1: The port that the service should serve on. Required.
-      --protocol="TCP": The network protocol for the service to be created. Default is 'tcp'.
-      --public-ip="": Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
-      --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
-      --target-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
+      --port=-1: The port that this container exposes.
+  -r, --replicas=1: Number of replicas to create for this container. Default is 1.
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
-      --type="": Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP' unless --create-external-load-balancer is specified.
 ```
 
 ### Options inherited from parent commands
@@ -97,6 +92,6 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 ### SEE ALSO
 * [kubectl](kubectl.md)	 - kubectl controls the Kubernetes cluster manager
 
-###### Auto generated by spf13/cobra at 2015-06-30 16:51:25.609406207 +0000 UTC
+###### Auto generated by spf13/cobra at 2015-07-13 17:48:54.037967503 +0000 UTC
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl_expose.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_run.md?pixel)]()

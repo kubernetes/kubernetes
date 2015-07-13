@@ -12,55 +12,57 @@ certainly want the docs that go with that version.</h1>
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-## kubectl label
+## kubectl expose
 
-Update the labels on a resource
+Take a replicated application and expose it as Kubernetes Service
 
 ### Synopsis
 
 
-Update the labels on a resource.
+Take a replicated application and expose it as Kubernetes Service.
 
-A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to 63 characters.
-If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
-If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
+Looks up a replication controller or service by name and uses the selector for that resource as the
+selector for a new Service on the specified port. If no labels are specified, the new service will
+re-use the labels from the resource it exposes.
 
 ```
-kubectl label [--overwrite] RESOURCE NAME KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]
+kubectl expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--type=type]
 ```
 
 ### Examples
 
 ```
-// Update pod 'foo' with the label 'unhealthy' and the value 'true'.
-$ kubectl label pods foo unhealthy=true
+// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+$ kubectl expose rc nginx --port=80 --target-port=8000
 
-// Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
-$ kubectl label --overwrite pods foo status=unhealthy
+// Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
+$ kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
 
-// Update all pods in the namespace
-$ kubectl label pods --all status=unhealthy
-
-// Update pod 'foo' only if the resource is unchanged from version 1.
-$ kubectl label pods foo status=unhealthy --resource-version=1
-
-// Update pod 'foo' by removing a label named 'bar' if it exists.
-// Does not require the --overwrite flag.
-$ kubectl label pods foo bar-
+// Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
+$ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 ```
 
 ### Options
 
 ```
-      --all=false: select all resources in the namespace of the specified resource types
-  -h, --help=false: help for label
+      --container-port="": Synonym for --target-port
+      --create-external-load-balancer=false: If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.
+      --dry-run=false: If true, only print the object that would be sent, without creating it.
+      --generator="service/v1": The name of the API generator to use.  Default is 'service/v1'.
+  -h, --help=false: help for expose
+  -l, --labels="": Labels to apply to the service created by this call.
+      --name="": The name for the newly created object.
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile|wide.
       --output-version="": Output the formatted object with the given version (default api-version).
-      --overwrite=false: If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.
-      --resource-version="": If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.
-  -l, --selector="": Selector (label query) to filter on
+      --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
+      --port=-1: The port that the service should serve on. Required.
+      --protocol="TCP": The network protocol for the service to be created. Default is 'tcp'.
+      --public-ip="": Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
+      --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
+      --target-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
+      --type="": Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP' unless --create-external-load-balancer is specified.
 ```
 
 ### Options inherited from parent commands
@@ -95,6 +97,6 @@ $ kubectl label pods foo bar-
 ### SEE ALSO
 * [kubectl](kubectl.md)	 - kubectl controls the Kubernetes cluster manager
 
-###### Auto generated by spf13/cobra at 2015-06-30 16:51:25.609525621 +0000 UTC
+###### Auto generated by spf13/cobra at 2015-07-13 17:48:54.038219725 +0000 UTC
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl_label.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_expose.md?pixel)]()
