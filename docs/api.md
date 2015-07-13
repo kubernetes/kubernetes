@@ -40,7 +40,7 @@ Fine-grain resource evolution alone makes it difficult to eliminate fields or re
 
 Distinct API versions present more clear, consistent views of system resources and behavior than intermingled, independently evolved resources. They also provide a more straightforward mechanism for controlling access to end-of-lifed and/or experimental APIs.
 
-The [API and release versioning proposal](versioning.md) describes the current thinking on the API version evolution process.
+The [API and release versioning proposal](design/versioning.md) describes the current thinking on the API version evolution process.
 
 ## v1beta1, v1beta2, and v1beta3 are deprecated; please move to v1 ASAP
 
