@@ -40,6 +40,7 @@ var (
 	allMunges = []munge{
 		{"table-of-contents", updateTOC},
 		{"check-links", checkLinks},
+		{"unversioned-warning", updateUnversionedWarning},
 	}
 )
 

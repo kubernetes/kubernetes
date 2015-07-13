@@ -98,3 +98,15 @@ func hasMacroBlock(lines []string, begin string, end string) bool {
 	}
 	return false
 }
+
+// Returns the canonical begin-tag for a given description.  This does not
+// include the trailing newline.
+func beginMungeTag(desc string) string {
+	return fmt.Sprintf("<!-- BEGIN MUNGE: %s -->", desc)
+}
+
+// Returns the canonical end-tag for a given description.  This does not
+// include the trailing newline.
+func endMungeTag(desc string) string {
+	return fmt.Sprintf("<!-- END MUNGE: %s -->", desc)
+}
