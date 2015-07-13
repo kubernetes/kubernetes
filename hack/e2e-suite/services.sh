@@ -79,6 +79,22 @@ function make_namespace() {
 __EOF__
 }
 
+wait_for_apiserver() {
+  echo "Waiting for apiserver to be up"
+
+  local i
+  for i in $(seq 1 12); do
+    results=($(ssh-to-node "${master}" "
+      wget -q -T 1 -O - http://localhost:8080/healthz || true
+    "))
+    if [[ "${results}" == "ok" ]]; then
+      return
+    fi
+    sleep 5  # wait for apiserver to restart
+  done
+  error "restarting apiserver timed out"
+}
+
 # Args:
 #   $1: service name
 #   $2: service port
@@ -420,7 +436,7 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 echo "Test 6: Restart the master, make sure VIPs come back."
 echo "Restarting the master"
 restart-apiserver "${master}"
-sleep 5
+wait_for_apiserver
 echo "Verifying the VIPs from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
@@ -456,7 +472,5 @@ wait_for_service_up "${svc4_name}" "${svc4_ip}" "${svc4_port}" \
 echo "Verifying the VIPs from a container"
 verify_from_container "${svc4_name}" "${svc4_ip}" "${svc4_port}" \
     "${svc4_count}" "${svc4_pods}"
-
-# TODO: test createExternalLoadBalancer
 
 exit 0
