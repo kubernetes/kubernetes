@@ -14,7 +14,7 @@ the Pod's name, for example, and inject it into this well-known variable.
 
 ## Capabilities
 
-The following information is available to a `Pod` through the the downward API:
+The following information is available to a `Pod` through the downward API:
 
 *   The pod's name
 *   The pod's namespace

@@ -17,7 +17,7 @@ consistent manner.
 *CPU* and *memory* are each a *resource type*.  A resource type has a base unit.  CPU is specified
 in units of cores.  Memory is specified in units of bytes.
 
-CPU and RAM are collectively refered to as *compute resources*, or just *resources*.  Compute
+CPU and RAM are collectively referred to as *compute resources*, or just *resources*.  Compute
 resources are measureable quantities which can be requested, allocated, and consumed.  They are
 distinct from [API resources](working_with_resources.md).  API resources, such as pods and
 [services](services.md) are objects that can be written to and retrieved from the Kubernetes API

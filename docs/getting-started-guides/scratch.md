@@ -361,7 +361,7 @@ installation, by following examples given in the Docker documentation.
 
 ### rkt
 
-[rkt](https://github.com/coreos/rkt) is an alterative to Docker.  You only need to install one of Docker or rkt.
+[rkt](https://github.com/coreos/rkt) is an alternative to Docker.  You only need to install one of Docker or rkt.
 
 *TODO*: how to install and configure rkt.
 

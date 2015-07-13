@@ -208,7 +208,7 @@ be specified as "when requests per second fall below 25 for 30 seconds scale the
 This section has intentionally been left empty.  I will defer to folks who have more experience gathering and analyzing
 time series statistics.  
 
-Data aggregation is opaque to the the auto-scaler resource.  The auto-scaler is configured to use `AutoScaleThresholds`
+Data aggregation is opaque to the auto-scaler resource.  The auto-scaler is configured to use `AutoScaleThresholds`
 that know how to work with the underlying data in order to know if an application must be scaled up or down.   Data aggregation
 must feed a common data structure to ease the development of `AutoScaleThreshold`s but it does not matter to the
 auto-scaler whether this occurs in a push or pull implementation, whether or not the data is stored at a granular level,

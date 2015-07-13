@@ -37,7 +37,7 @@ sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/googl
 
 
 ### Set up Flannel on the master node
-Flannel is a network abstraction layer build by CoreOS, we will use it to provide simplfied networking between our Pods of containers.
+Flannel is a network abstraction layer build by CoreOS, we will use it to provide simplified networking between our Pods of containers.
 
 Flannel re-configures the bridge that Docker uses for networking.  As a result we need to stop Docker, reconfigure its networking, and then restart Docker.
 
