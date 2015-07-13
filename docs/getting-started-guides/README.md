@@ -20,9 +20,9 @@ For the easiest "kick the tires" experience, please try the [local docker](docke
 If you are considering contributing a new guide, please read the
 [guidelines](../../docs/devel/writing-a-getting-started-guide.md).
 
-IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                                                           | Conformance | Support Level                | Notes
+IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                                                           | Conforms    | Support Level                | Notes
 -------------------- | ------------ | ------ | ----------  | ------------------------------------------------------------------------------ | ----------- | ---------------------------- | -----
-GKE                  |              |        | GCE         | [docs](https://cloud.google.com/container-engine)                              |             | Commercial                   | Uses K8s version 0.15.0
+GKE                  |              |        | GCE         | [docs](https://cloud.google.com/container-engine)                              | [✓](1)      | Commercial                   | Uses K8s version 0.15.0
 Vagrant              | Saltstack    | Fedora | OVS         | [docs](../../docs/getting-started-guides/vagrant.md)                           |             | Project                      | Uses latest via https://get.k8s.io/
 GCE                  | Saltstack    | Debian | GCE         | [docs](../../docs/getting-started-guides/gce.md)                               |             | Project                      | Tested with 0.15.0 by @robertbailey
 Azure                | CoreOS       | CoreOS | Weave       | [docs](../../docs/getting-started-guides/coreos/azure/README.md)               |             | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin)) | Uses K8s version 0.17.0
@@ -64,8 +64,13 @@ Definition of columns:
     nodes.
   - **Networking** is what implements the [networking model](../../docs/networking.md).  Those with networking type
     _none_ may not support more than one node, or may support multiple VM nodes only in the same physical node.
+<<<<<<< Updated upstream
   - **Conformance** indicates whether a cluster created with this configuration has passed the project's conformance
     tests. 
+=======
+  - **Conforms** indicates whether a cluster created with this configuration has passed the project's conformance
+    tests for supporting the API and base features of Kubernetes v1.0.0. 
+>>>>>>> Stashed changes
   - Support Levels
     - **Project**:  Kubernetes Committers regularly use this configuration, so it usually works with the latest release
       of Kubernetes.
@@ -74,5 +79,7 @@ Definition of columns:
     - **Inactive**: No active maintainer.  Not recommended for first-time K8s users, and may be deleted soon.
   - **Notes** is relevant information such as version k8s used.
 
+References:
+- [1] [GCE conformance test result](https://gist.github.com/erictune/4cabc010906afbcc5061)
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/README.md?pixel)]()
