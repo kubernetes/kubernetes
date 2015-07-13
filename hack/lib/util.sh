@@ -18,6 +18,12 @@ kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
 
+# this mimics the behavior of linux realpath which is not shipped by default with
+# mac OS X 
+kube::util::realpath() {
+  [[ $1 = /* ]] && echo "$1" | sed 's/\/$//' || echo "$PWD/${1#./}"  | sed 's/\/$//'
+}
+
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
@@ -123,9 +129,9 @@ kube::util::wait-for-jobs() {
 # that match $3, copy is skipped.
 kube::util::gen-doc() {
   local cmd="$1"
-  local base_dest="$(realpath $2)/"
-  local relative_doc_dest="$3"
-  local dest="${base_dest}${relative_doc_dest}"
+  local base_dest="$(kube::util::realpath $2)"
+  local relative_doc_dest="$(echo $3 | sed 's/\/$//')"
+  local dest="${base_dest}/${relative_doc_dest}"
   local skipprefix="${4:-}"
 
   # We do this in a tmpdir in case the dest has other non-autogenned files
@@ -141,7 +147,7 @@ kube::util::gen-doc() {
     # Add analytics link to generated .md files
     if [[ "${file}" == *.md ]]; then
       local link path
-      path="$relative_doc_dest$file"
+      path="${relative_doc_dest}/${file}"
       link=$(kube::util::analytics-link "${path}")
       echo -e "\n${link}" >> "${tmpdir}/${file}"
     fi
