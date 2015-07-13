@@ -144,13 +144,9 @@ kube::util::gen-doc() {
   ls "${tmpdir}" | LC_ALL=C sort > "${tmpdir}/.files_generated"
 
   while read file; do
-    # Add analytics link to generated .md files
-    if [[ "${file}" == *.md ]]; then
-      local link path
-      path="${relative_doc_dest}/${file}"
-      link=$(kube::util::analytics-link "${path}")
-      echo -e "\n\n${link}" >> "${tmpdir}/${file}"
-    fi
+    # Don't add analytics link to generated .md files -- that is done (and
+    # checked) by mungedocs.
+
     # Remove all old generated files from the destination
     if [[ -e "${tmpdir}/${file}" ]]; then
       local original generated
