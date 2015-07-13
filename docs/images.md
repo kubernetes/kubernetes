@@ -78,7 +78,7 @@ example, run these on your desktop/laptop:
    1. get a list of your nodes 
       - for example: `nodes=$(kubectl get nodes -o template --template='{{range.items}}{{.metadata.name}} {{end}}')`
    1. copy your local `.dockercfg` to the home directory of roon on each node.
-      - for example: `for n in $nodes; do scp ~/.dockercfg root@$n:/root/.dockercfg`
+      - for example: `for n in $nodes; do scp ~/.dockercfg root@$n:/root/.dockercfg; done`
 
 Verify by creating a pod that uses a private image, e.g.:
 ```
