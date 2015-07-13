@@ -20,7 +20,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ma
 
 *2 All machines can communicate with each other, no need to connect Internet (should use private docker registry in this case)*
 
-*3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it should also work on most Ubuntu versions*
+*3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with Ubuntu 15 which use systemd instead of upstart and we are fixing this*
 
 *4 Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-0.19.3, but it may work with higher versions*
 
@@ -156,6 +156,13 @@ $ KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh
 
 After some time, you can use `$ kubectl get pods` to see the dns pod is running in the cluster. Done!
 
+#### On going
+
+We are working on these features which we'd like to let everybody know:
+
+1. Run Kubernetes binaries in Docker using [kube-in-docker](https://github.com/ZJU-SEL/kube-in-docker/tree/baremetal-kube), to eliminate OS-distro differences.
+
+2. Tearing Down scripts: clear and re-create the whole stack by one click.
 
 #### Trouble Shooting
 
