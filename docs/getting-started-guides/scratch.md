@@ -73,7 +73,7 @@ steps that existing cluster setup scripts are making.
 ### Learning 
   1. You should be familiar with using Kubernetes already.  We suggest you set
     up a temporary cluster by following one of the other Getting Started Guides.
-    This will help you become familiar with the CLI ([kubectl](../kubectl.md)) and concepts ([pods](../pods.md), [services](../services.md), etc.) first.
+    This will help you become familiar with the CLI ([kubectl](../user-guide/kubectl/kubectl.md)) and concepts ([pods](../pods.md), [services](../services.md), etc.) first.
   1. You should have `kubectl` installed on your desktop.  This will happen as a side
     effect of completing one of the other Getting Started Guides.
 

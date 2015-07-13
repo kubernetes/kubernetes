@@ -60,7 +60,7 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Kubernetes Web Interface** ([ui.md](ui.md)): Accessing the Kubernetes
   web user interface.
 
-* **Kubectl Command Line Interface** ([kubectl.md](kubectl.md)):
+* **Kubectl Command Line Interface** ([user-guide/kubectl/kubectl.md](user-guide/kubectl/kubectl.md)):
   The `kubectl` command line reference.
 
 * **Sharing Cluster Access** ([sharing-clusters.md](sharing-clusters.md)):

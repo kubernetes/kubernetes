@@ -24,7 +24,7 @@ certainly want the docs that go with that version.</h1>
   programs that access the kubernetes API, write plugins or extensions, or
   modify the core code of kubernetes.
 
-* The [Kubectl Command Line Interface](kubectl.md) is a detailed reference on
+* The [Kubectl Command Line Interface](user-guide/kubectl/kubectl.md) is a detailed reference on
   the `kubectl` CLI.
 
 * The [API object documentation](http://kubernetes.io/third_party/swagger-ui/)
