@@ -22,6 +22,19 @@ Many applications require multiple resources to be created, such as a Replicatio
 
 ```yaml
 apiVersion: v1
+kind: Service
+metadata:
+  name: my-nginx-svc
+  labels:
+    app: nginx
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: nginx
+---
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: my-nginx
@@ -37,31 +50,20 @@ spec:
         image: nginx
         ports:
         - containerPort: 80
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-nginx-svc
-  labels:
-    app: nginx
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 80
-  selector:
-    app: nginx
 ```
 
 Multiple resources can be created the same way as a single resource:
 ```bash
 $ kubectl create -f nginx-app.yaml
-replicationcontrollers/my-nginx
 services/my-nginx-svc
+replicationcontrollers/my-nginx
 ```
+
+The resources will be created in the order they appear in the file. Therefore, it's best to specify the service first, since that will ensure the scheduler can spread the pods associated with the service as they are created by the replication controller(s).
 
 `kubectl create` also accepts multiple `-f` arguments:
 ```bash
-$ kubectl create -f nginx-rc.yaml -f nginx-svc.yaml
+$ kubectl create -f nginx-svc.yaml -f nginx-rc.yaml
 ```
 
 And a directory can be specified rather than or in addition to individual files:
