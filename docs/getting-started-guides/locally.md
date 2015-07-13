@@ -63,7 +63,7 @@ hack/local-up-cluster.sh
 ```
 
 This will build and start a lightweight local cluster, consisting of a master
-and a single minion. Type Control-C to shut it down.
+and a single node. Type Control-C to shut it down.
 
 You can use the cluster/kubectl.sh script to interact with the local cluster. hack/local-up-cluster.sh will
 print the commands to run to point kubectl at the local cluster.
@@ -127,7 +127,7 @@ change the service-cluster-ip-range flag to something else.
 
 #### I cannot create a replication controller with replica size greater than 1!  What gives?
 
-You are running a single minion setup.  This has the limitation of only supporting a single replica of a given pod.  If you are interested in running with larger replica sizes, we encourage you to try the local vagrant setup or one of the cloud providers.
+You are running a single node setup.  This has the limitation of only supporting a single replica of a given pod.  If you are interested in running with larger replica sizes, we encourage you to try the local vagrant setup or one of the cloud providers.
 
 #### I changed Kubernetes code, how do I run it?
 

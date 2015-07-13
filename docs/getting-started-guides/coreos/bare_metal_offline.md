@@ -648,14 +648,14 @@ List fleet machines
 
     fleetctl list-machines
 
-Check system status of services on master node:
+Check system status of services on master:
 
     systemctl status kube-apiserver
     systemctl status kube-controller-manager
     systemctl status kube-scheduler
     systemctl status kube-register
 
-Check system status of services on a minion node:
+Check system status of services on a node:
 
     systemctl status kube-kubelet
     systemctl status docker.service

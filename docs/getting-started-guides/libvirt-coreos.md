@@ -109,7 +109,7 @@ setfacl -m g:kvm:--x ~
 
 ### Setup
 
-By default, the libvirt-coreos setup will create a single kubernetes master and 3 kubernetes minions. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
+By default, the libvirt-coreos setup will create a single kubernetes master and 3 kubernetes nodes. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
 
 To start your local cluster, open a shell and run:
 
@@ -122,7 +122,7 @@ cluster/kube-up.sh
 
 The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
-The `NUM_MINIONS` environment variable may be set to specify the number of minions to start. If it is not set, the number of minions defaults to 3.
+The `NUM_MINIONS` environment variable may be set to specify the number of nodes to start. If it is not set, the number of nodes defaults to 3.
 
 The `KUBE_PUSH` environment variable may be set to specify which kubernetes binaries must be deployed on the cluster. Its possible values are:
 
@@ -155,7 +155,7 @@ The VMs are running [CoreOS](https://coreos.com/).
 Your ssh keys have already been pushed to the VM. (It looks for ~/.ssh/id_*.pub)
 The user to use to connect to the VM is `core`.
 The IP to connect to the master is 192.168.10.1.
-The IPs to connect to the minions are 192.168.10.2 and onwards.
+The IPs to connect to the nodes are 192.168.10.2 and onwards.
 
 Connect to `kubernetes_master`:
 ```
@@ -175,7 +175,7 @@ All of the following commands assume you have set `KUBERNETES_PROVIDER` appropri
 export KUBERNETES_PROVIDER=libvirt-coreos
 ```
 
-Bring up a libvirt-CoreOS cluster of 5 minions
+Bring up a libvirt-CoreOS cluster of 5 nodes
 
 ```
 NUM_MINIONS=5 cluster/kube-up.sh
