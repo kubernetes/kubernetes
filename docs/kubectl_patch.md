@@ -25,7 +25,7 @@ kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 
 ```
   -h, --help=false: help for patch
-  -p, --patch="": The patch to be appied to the resource JSON file.
+  -p, --patch="": The patch to be applied to the resource JSON file.
 ```
 
 ### Options inherited from parent commands

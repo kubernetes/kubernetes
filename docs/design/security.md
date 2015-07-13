@@ -78,7 +78,7 @@ A pod runs in a *security context* under a *service account* that is defined by 
    5.  Developers should be able to run their own images or images from the community and expect those images to run correctly
    6.  Developers may need to ensure their images work within higher security requirements specified by administrators
    7.  When available, Linux kernel user namespaces can be used to ensure 5.2 and 5.4 are met.
-   8.  When application developers want to share filesytem data via distributed filesystems, the Unix user ids on those filesystems must be consistent across different container processes
+   8.  When application developers want to share filesystem data via distributed filesystems, the Unix user ids on those filesystems must be consistent across different container processes
 6. Developers should be able to define [secrets](secrets.md) that are automatically added to the containers when pods are run
    1.  Secrets are files injected into the container whose values should not be displayed within a pod. Examples:
        1. An SSH private key for git cloning remote data
