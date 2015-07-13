@@ -44,7 +44,7 @@ docker run --net=host -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd
 
 ### Step Two: Run the master
 ```sh
-docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
+docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
 ```
 
 This actually runs the kubelet, which in turn runs a [pod](../pods.md) that contains the other master components.
@@ -52,7 +52,7 @@ This actually runs the kubelet, which in turn runs a [pod](../pods.md) that cont
 ### Step Three: Run the service proxy
 *Note, this could be combined with master above, but it requires --privileged for iptables manipulation*
 ```sh
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
