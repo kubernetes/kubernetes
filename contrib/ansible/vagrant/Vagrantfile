@@ -58,6 +58,18 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     os.server_name = n.vm.hostname
   end
 
+  def set_vbox(vb, config)
+    config.vm.box = "chef/centos-7.0"
+    config.vm.network "private_network", type: "dhcp"
+    vb.gui = false
+    vb.memory = 2048
+    vb.cpus = 2
+
+    # Use faster paravirtualized networking
+    vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
+    vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
+  end
+
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   nodes = Array.new()
@@ -69,6 +81,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       n.vm.hostname = name
       n.vm.provider :openstack do |os, override|
         set_openstack(os, override, n)
+      end
+      n.vm.provider :virtualbox do |vb, override|
+        set_vbox(vb, override)
       end
     end
   end
@@ -88,6 +103,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     n.vm.hostname = name
     n.vm.provider :openstack do |os, override|
       set_openstack(os, override, n)
+    end
+    n.vm.provider :virtualbox do |vb, override|
+      set_vbox(vb, override)
     end
 
     # This set up the vagrant hosts before we run the main playbook
