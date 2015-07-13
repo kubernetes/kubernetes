@@ -35,7 +35,9 @@ import (
 const (
 	replace_long = `Replace a resource by filename or stdin.
 
-JSON and YAML formats are accepted.`
+JSON and YAML formats are accepted.
+
+Please refer to the models in https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html to find if a field is mutable.`
 	replace_example = `// Replace a pod using the data in pod.json.
 $ kubectl replace -f ./pod.json
 
