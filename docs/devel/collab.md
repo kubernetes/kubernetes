@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 # On Collaborative Development
 
 Kubernetes is open source, but many of the people working on it do so as their day job.  In order to avoid forcing people to be "at work" effectively 24/7, we want to establish some semi-formal protocols around development.  Hopefully these rules make things go more smoothly.  If you find that this is not the case, please complain loudly.

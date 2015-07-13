@@ -29,8 +29,10 @@ func Test_buildTOC(t *testing.T) {
 	}{
 		{"", ""},
 		{"Lorem ipsum\ndolor sit amet\n", ""},
-		{"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n",
-			"- [Title](#title)\n  - [Section Heading](#section-heading)\n"},
+		{
+			"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n",
+			"- [Title](#title)\n  - [Section Heading](#section-heading)\n",
+		},
 	}
 	for _, c := range cases {
 		actual, err := buildTOC([]byte(c.in))
@@ -47,10 +49,14 @@ func Test_updateTOC(t *testing.T) {
 		out string
 	}{
 		{"", ""},
-		{"Lorem ipsum\ndolor sit amet\n",
-			"Lorem ipsum\ndolor sit amet\n"},
-		{"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN GENERATED TOC -->\nold cruft\n<!-- END GENERATED TOC -->\n## Section Heading\ndolor sit amet\n",
-			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN GENERATED TOC -->\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n<!-- END GENERATED TOC -->\n## Section Heading\ndolor sit amet\n"},
+		{
+			"Lorem ipsum\ndolor sit amet\n",
+			"Lorem ipsum\ndolor sit amet\n",
+		},
+		{
+			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN MUNGE: GENERATED_TOC -->\nold cruft\n<!-- END MUNGE: GENERATED_TOC -->\n## Section Heading\ndolor sit amet\n",
+			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN MUNGE: GENERATED_TOC -->\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n<!-- END MUNGE: GENERATED_TOC -->\n## Section Heading\ndolor sit amet\n",
+		},
 	}
 	for _, c := range cases {
 		actual, err := updateTOC("filename.md", []byte(c.in))

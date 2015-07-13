@@ -23,10 +23,12 @@ import (
 	"strings"
 )
 
+const tocMungeTag = "GENERATED_TOC"
+
 // inserts/updates a table of contents in markdown file.
 //
 // First, builds a ToC.
-// Then, finds <!-- BEGIN GENERATED TOC --> and <!-- END GENERATED TOC -->, and replaces anything between those with
+// Then, finds the magic macro block tags and replaces anything between those with
 // the ToC, thereby updating any previously inserted ToC.
 //
 // TODO(erictune): put this in own package with tests
@@ -36,7 +38,7 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 		return nil, err
 	}
 	lines := splitLines(markdown)
-	updatedMarkdown, err := updateMacroBlock(lines, "<!-- BEGIN GENERATED TOC -->", "<!-- END GENERATED TOC -->", string(toc))
+	updatedMarkdown, err := updateMacroBlock(lines, beginMungeTag(tocMungeTag), endMungeTag(tocMungeTag), string(toc))
 	if err != nil {
 		return nil, err
 	}

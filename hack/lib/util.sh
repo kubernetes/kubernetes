@@ -144,10 +144,14 @@ kube::util::gen-doc() {
       echo -e "\n${link}" >> "${tmpdir}/${file}"
     fi
     # remove all old generated files from the destination
-    if [[ -e "${tmpdir}/${file}" && -n "${skipprefix}" ]]; then
+    if [[ -e "${tmpdir}/${file}" ]]; then
       local original generated
-      original=$(grep -v "^${skipprefix}" "${dest}/${file}") || :
-      generated=$(grep -v "^${skipprefix}" "${tmpdir}/${file}") || :
+      original=$(cat "${dest}/${file}" | sed '/^<!-- BEGIN MUNGE:.*/,/^<!-- END MUNGE:.*/d')
+      generated=$(cat "${tmpdir}/${file}")
+      if [[ -n "${skipprefix}" ]]; then
+        original=$(echo "${original}" | grep -v "^${skipprefix}" || :)
+        generated=$(echo "${generated}" | grep -v "^${skipprefix}" || :)
+      fi
       if [[ "${original}" == "${generated}" ]]; then
         # actual contents same, overwrite generated with original.
         mv "${dest}/${file}" "${tmpdir}/${file}"
