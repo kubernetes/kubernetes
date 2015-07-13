@@ -34,8 +34,9 @@ import (
 const (
 	// Interval to poll /runningpods on a node
 	pollInterval = 1 * time.Second
-	// Interval used compute cpu usage of a container
-	cpuIntervalInSeconds = 60
+	// Interval to poll /stats/container on a node
+	containerStatsPollingInterval = 5 * time.Second
+	resourceCollectionTime        = 1 * time.Minute
 )
 
 // getPodMatches returns a set of pod names on the given node that matches the
@@ -87,10 +88,11 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames util.StringSet, pod
 	})
 }
 
-var _ = Describe("Clean up pods on node", func() {
+var _ = Describe("kubelet", func() {
 	var numNodes int
 	var nodeNames util.StringSet
-	framework := NewFramework("kubelet-delete")
+	framework := NewFramework("kubelet")
+	var resourceMonitor *resourceMonitor
 
 	BeforeEach(func() {
 		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything())
@@ -100,56 +102,73 @@ var _ = Describe("Clean up pods on node", func() {
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
-		logOneTimeResourceUsageSummary(framework.Client, nodeNames.List(), cpuIntervalInSeconds)
+		resourceMonitor = newResourceMonitor(framework.Client, targetContainers, containerStatsPollingInterval)
+		resourceMonitor.Start()
 	})
 
-	type DeleteTest struct {
-		podsPerNode int
-		timeout     time.Duration
-	}
+	AfterEach(func() {
+		resourceMonitor.Stop()
+	})
 
-	deleteTests := []DeleteTest{
-		{podsPerNode: 10, timeout: 1 * time.Minute},
-	}
+	Describe("Clean up pods on node", func() {
+		type DeleteTest struct {
+			podsPerNode int
+			timeout     time.Duration
+		}
+		deleteTests := []DeleteTest{
+			{podsPerNode: 10, timeout: 1 * time.Minute},
+		}
+		for _, itArg := range deleteTests {
+			name := fmt.Sprintf(
+				"kubelet should be able to delete %d pods per node in %v.", itArg.podsPerNode, itArg.timeout)
+			It(name, func() {
+				totalPods := itArg.podsPerNode * numNodes
+				By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
+				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(util.NewUUID()))
 
-	for _, itArg := range deleteTests {
-		name := fmt.Sprintf(
-			"kubelet should be able to delete %d pods per node in %v.", itArg.podsPerNode, itArg.timeout)
-		It(name, func() {
-			totalPods := itArg.podsPerNode * numNodes
+				Expect(RunRC(RCConfig{
+					Client:    framework.Client,
+					Name:      rcName,
+					Namespace: framework.Namespace.Name,
+					Image:     "gcr.io/google_containers/pause:go",
+					Replicas:  totalPods,
+				})).NotTo(HaveOccurred())
+				// Perform a sanity check so that we know all desired pods are
+				// running on the nodes according to kubelet. The timeout is set to
+				// only 30 seconds here because RunRC already waited for all pods to
+				// transition to the running status.
+				Expect(waitTillNPodsRunningOnNodes(framework.Client, nodeNames, rcName, framework.Namespace.Name, totalPods,
+					time.Second*30)).NotTo(HaveOccurred())
+				resourceMonitor.LogLatest()
 
-			By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
-			rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(util.NewUUID()))
+				By("Deleting the RC")
+				DeleteRC(framework.Client, framework.Namespace.Name, rcName)
+				// Check that the pods really are gone by querying /runningpods on the
+				// node. The /runningpods handler checks the container runtime (or its
+				// cache) and  returns a list of running pods. Some possible causes of
+				// failures are:
+				//   - kubelet deadlock
+				//   - a bug in graceful termination (if it is enabled)
+				//   - docker slow to delete pods (or resource problems causing slowness)
+				start := time.Now()
+				Expect(waitTillNPodsRunningOnNodes(framework.Client, nodeNames, rcName, framework.Namespace.Name, 0,
+					itArg.timeout)).NotTo(HaveOccurred())
+				Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
+					time.Since(start))
+				resourceMonitor.LogCPUSummary()
+			})
+		}
+	})
 
-			Expect(RunRC(RCConfig{
-				Client:    framework.Client,
-				Name:      rcName,
-				Namespace: framework.Namespace.Name,
-				Image:     "gcr.io/google_containers/pause:go",
-				Replicas:  totalPods,
-			})).NotTo(HaveOccurred())
-			// Perform a sanity check so that we know all desired pods are
-			// running on the nodes according to kubelet. The timeout is set to
-			// only 30 seconds here because RunRC already waited for all pods to
-			// transition to the running status.
-			Expect(waitTillNPodsRunningOnNodes(framework.Client, nodeNames, rcName, framework.Namespace.Name, totalPods,
-				time.Second*30)).NotTo(HaveOccurred())
-			logOneTimeResourceUsageSummary(framework.Client, nodeNames.List(), cpuIntervalInSeconds)
-
-			By("Deleting the RC")
-			DeleteRC(framework.Client, framework.Namespace.Name, rcName)
-			// Check that the pods really are gone by querying /runningpods on the
-			// node. The /runningpods handler checks the container runtime (or its
-			// cache) and  returns a list of running pods. Some possible causes of
-			// failures are:
-			//   - kubelet deadlock
-			//   - a bug in graceful termination (if it is enabled)
-			//   - docker slow to delete pods (or resource problems causing slowness)
-			start := time.Now()
-			Expect(waitTillNPodsRunningOnNodes(framework.Client, nodeNames, rcName, framework.Namespace.Name, 0,
-				itArg.timeout)).NotTo(HaveOccurred())
-			Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
-				time.Since(start))
+	Describe("Monitor resource usage on node", func() {
+		It("Ask kubelet to report container resource usage", func() {
+			// TODO: After gathering some numbers, we should set a resource
+			// limit for each container and fail the test if the usage exceeds
+			// the preset limit.
+			By(fmt.Sprintf("Waiting %v to collect resource usage on node", resourceCollectionTime))
+			time.Sleep(resourceCollectionTime)
+			resourceMonitor.LogLatest()
+			resourceMonitor.LogCPUSummary()
 		})
-	}
+	})
 })
