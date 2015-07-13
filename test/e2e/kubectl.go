@@ -169,7 +169,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 		It("should support port-forward", func() {
 			By("forwarding the container port to a local port")
-			cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), "-p", simplePodName, fmt.Sprintf(":%d", simplePodPort))
+			cmd := kubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), simplePodName, fmt.Sprintf(":%d", simplePodPort))
 			defer tryKill(cmd)
 			// This is somewhat ugly but is the only way to retrieve the port that was picked
 			// by the port-forward command. We don't want to hard code the port as we have no
