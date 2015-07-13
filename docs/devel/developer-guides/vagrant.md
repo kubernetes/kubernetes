@@ -27,7 +27,7 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 
 ### Setup
 
-By default, the Vagrant setup will create a single kubernetes-master and 1 kubernetes-minion. Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
+By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-minion-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
 
 ```sh
 cd kubernetes
@@ -77,7 +77,7 @@ vagrant ssh master
 [vagrant@kubernetes-master ~] $ sudo systemctl status nginx
 ```
 
-To view the services on any of the kubernetes-minion(s):
+To view the services on any of the nodes:
 ```sh
 vagrant ssh minion-1
 [vagrant@kubernetes-minion-1] $ sudo systemctl status docker
@@ -312,20 +312,20 @@ cat ~/.kubernetes_vagrant_auth
 
 #### I just created the cluster, but I do not see my container running!
 
-If this is your first time creating the cluster, the kubelet on each minion schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
+If this is your first time creating the cluster, the kubelet on each node schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
 
 #### I changed Kubernetes code, but it's not running!
 
 Are you sure there was no build error?  After running `$ vagrant provision`, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.
 It's very likely you see a build error due to an error in your source files!
 
-#### I have brought Vagrant up but the minions won't validate!
+#### I have brought Vagrant up but the nodes won't validate!
 
-Are you sure you built a release first? Did you install `net-tools`? For more clues, login to one of the minions (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
+Are you sure you built a release first? Did you install `net-tools`? For more clues, login to one of the nodes (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
 
-#### I want to change the number of minions!
+#### I want to change the number of nodes!
 
-You can control the number of minions that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
+You can control the number of nodes that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single node. You do this, by setting `NUM_MINIONS` to 1 like so:
 
 ```sh
 export NUM_MINIONS=1
@@ -340,7 +340,7 @@ Just set it to the number of megabytes you would like the machines to have. For 
 export KUBERNETES_MEMORY=2048
 ```
 
-If you need more granular control, you can set the amount of memory for the master and minions independently. For example:
+If you need more granular control, you can set the amount of memory for the master and nodes independently. For example:
 
 ```sh
 export KUBERNETES_MASTER_MEMORY=1536

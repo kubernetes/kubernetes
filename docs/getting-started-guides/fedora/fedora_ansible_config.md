@@ -120,7 +120,7 @@ ansible-playbook -i inventory keys.yml
 
 If you already have configured your network and docker will use it correctly, skip to [setting up the cluster](#setting-up-the-cluster)
 
-The ansible scripts are quite hacky configuring the network, you can see the [README](https://github.com/eparis/kubernetes-ansible) for details, or you can simply enter in variants of the 'kube_service_addresses' (in the all.yaml file) as `kube_ip_addr` entries in the minions field, as shown in the next section.
+The ansible scripts are quite hacky configuring the network, you can see the [README](https://github.com/eparis/kubernetes-ansible) for details, or you can simply enter in variants of the 'kube_service_addresses' (in the all.yaml file) as `kube_ip_addr` entries in the nodes field, as shown in the next section.
 
 **Configure the ip addresses which should be used to run pods on each machine**
 
