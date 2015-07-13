@@ -85,20 +85,6 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		loc.Path += "/"
 	}
 
-	// From pkg/apiserver/proxy.go#ServeHTTP:
-	// Redirect requests with an empty path to a location that ends with a '/'
-	// This is essentially a hack for https://github.com/GoogleCloudPlatform/kubernetes/issues/4958.
-	// Note: Keep this code after tryUpgrade to not break that flow.
-	if len(loc.Path) == 0 {
-		var queryPart string
-		if len(req.URL.RawQuery) > 0 {
-			queryPart = "?" + req.URL.RawQuery
-		}
-		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
-		w.WriteHeader(http.StatusMovedPermanently)
-		return
-	}
-
 	if h.Transport == nil {
 		h.Transport = h.defaultProxyTransport(req.URL)
 	}
