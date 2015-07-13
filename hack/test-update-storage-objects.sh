@@ -32,7 +32,6 @@ KUBE_NEW_API_VERSION=${KUBE_NEW_API_VERSION:-"v1"}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8080}
-API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 KUBE_API_VERSIONS=""
 RUNTIME_CONFIG=""
@@ -40,40 +39,8 @@ RUNTIME_CONFIG=""
 KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 UPDATE_ETCD_OBJECTS_SCRIPT="${KUBE_ROOT}/cluster/update-storage-objects.sh"
 
-function startApiServer() {
-  kube::log::status "Starting kube-apiserver with KUBE_API_VERSIONS: ${KUBE_API_VERSIONS} and runtime_config: ${RUNTIME_CONFIG}"
-
-  KUBE_API_VERSIONS="${KUBE_API_VERSIONS}" \
-    "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-    --address="127.0.0.1" \
-    --public_address_override="127.0.0.1" \
-    --port="${API_PORT}" \
-    --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-    --public_address_override="127.0.0.1" \
-    --kubelet_port=${KUBELET_PORT} \
-    --runtime_config="${RUNTIME_CONFIG}" \
-    --cert_dir="${TMPDIR:-/tmp/}" \
+trap kube::apiserver::cleanup EXIT SIGINT
     --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
-  APISERVER_PID=$!
-
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
-}
-
-function killApiServer() {
-  kube::log::status "Killing api server"
-  [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
-  unset APISERVER_PID
-}
-
-function cleanup() {
-  killApiServer
-
-  kube::etcd::cleanup
-
-  kube::log::status "Clean up complete"
-}
-
-trap cleanup EXIT SIGINT
 
 kube::etcd::start
 
@@ -89,13 +56,13 @@ kube::log::status "Running test for update etcd object scenario"
 
 KUBE_API_VERSIONS="${KUBE_OLD_API_VERSION},${KUBE_NEW_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/${KUBE_OLD_API_VERSION}=true,api/${KUBE_NEW_API_VERSION}=true"
-startApiServer
+kube::apiserver::start
 
 # Create a pod
 kube::log::status "Creating a pod"
 ${KUBECTL} create -f examples/pod.yaml
 
-killApiServer
+kube::apiserver::kill
 
 
 #######################################################
@@ -105,12 +72,12 @@ killApiServer
 
 KUBE_API_VERSIONS="${KUBE_NEW_API_VERSION},${KUBE_OLD_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/${KUBE_OLD_API_VERSION}=true,api/${KUBE_NEW_API_VERSION}=true"
-startApiServer
+kube::apiserver::start
 
 # Update etcd objects, so that will now be stored in the new api version.
 ${UPDATE_ETCD_OBJECTS_SCRIPT}
 
-killApiServer
+kube::apiserver::kill
 
 
 #######################################################
@@ -119,7 +86,7 @@ killApiServer
 
 KUBE_API_VERSIONS="${KUBE_NEW_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/${KUBE_NEW_API_VERSION}=true"
-startApiServer
+kube::apiserver::start
 
 # Verify that the server is able to read the object.
 # This will fail if the object is in a version that is not understood by the
