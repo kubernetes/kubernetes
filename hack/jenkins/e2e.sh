@@ -51,7 +51,7 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   : ${E2E_ZONE:="us-central1-f"}
   : ${MASTER_SIZE:="n1-standard-2"}
   : ${MINION_SIZE:="n1-standard-2"}
-  : ${NUM_MINIONS:="2"}
+  : ${NUM_MINIONS:="3"}
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
