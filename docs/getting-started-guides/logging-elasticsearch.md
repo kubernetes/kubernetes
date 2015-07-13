@@ -152,7 +152,7 @@ users:
     token: JsUe2Z3cXqa17UQqQ8qWGGf4nOSLwSnp
 ```
 
-Now you can can issue requests to Elasticsearch:
+Now you can issue requests to Elasticsearch:
 ```
 $ curl --header "Authorization: Bearer JsUe2Z3cXqa17UQqQ8qWGGf4nOSLwSnp" --insecure https://146.148.94.154/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging/
 {

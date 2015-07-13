@@ -130,7 +130,7 @@ $ kubectl get --all-namespaces pods
 ```
 command.
 
-You'll see see a list of pods that looks something like this (the name specifics will be different):
+You'll see a list of pods that looks something like this (the name specifics will be different):
 
 ```shell
 NAMESPACE     NAME                                           READY     STATUS    RESTARTS   AGE
