@@ -69,14 +69,16 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
 	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
 	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
+	cmd.Flags().String("ip", "127.0.0.1", "The IP on which to run the proxy.")
 	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks.  Use with caution.")
 	return cmd
 }
 
 func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+	ip := cmdutil.GetFlagString(cmd, "ip")
 	port := cmdutil.GetFlagInt(cmd, "port")
-	fmt.Fprintf(out, "Starting to serve on localhost:%d", port)
+	fmt.Fprintf(out, "Starting to serve on %s:%d", ip, port)
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
@@ -107,6 +109,6 @@ func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
-	glog.Fatal(server.Serve(port))
+	glog.Fatal(server.Serve(ip, port))
 	return nil
 }

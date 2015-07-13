@@ -157,9 +157,9 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 }
 
 // Serve starts the server (http.DefaultServeMux) on given port, loops forever.
-func (s *ProxyServer) Serve(port int) error {
+func (s *ProxyServer) Serve(ip string, port int) error {
 	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    fmt.Sprintf("%s:%d", ip, port),
 		Handler: s.handler,
 	}
 	return server.ListenAndServe()
