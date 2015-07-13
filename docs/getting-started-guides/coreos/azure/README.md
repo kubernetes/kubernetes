@@ -56,7 +56,7 @@ Now, all you need to do is:
 ./create-kubernetes-cluster.js
 ```
 
-This script will provision a cluster suitable for production use, where there is a ring of 3 dedicated etcd nodes, 1 kubernetes master and 2 kubernetes nodes. The `kube-00` VM will be the master, your work loads are only to be deployed on the nodes, `kube-01` and `kube-02`. Initially, all VMs are single-core, to ensure a user of the free tier can reproduce it without paying extra. I will show how to add more bigger VMs later.
+This script will provision a cluster suitable for production use, where there is a ring of 3 dedicated etcd nodes: 1 kubernetes master and 2 kubernetes nodes. The `kube-00` VM will be the master, your work loads are only to be deployed on the nodes, `kube-01` and `kube-02`. Initially, all VMs are single-core, to ensure a user of the free tier can reproduce it without paying extra. I will show how to add more bigger VMs later.
 
 ![VMs in Azure](initial_cluster.png)
 

@@ -25,7 +25,7 @@ You need two machines with CentOS installed on them.
 ## Starting a cluster
 This is a getting started guide for CentOS.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
-This guide will only get ONE minion working.  Multiple minions requires a functional [networking configuration](../../networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
+This guide will only get ONE node working.  Multiple nodes requires a functional [networking configuration](../../networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
 
 The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, centos-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_.  The remaining host, centos-minion will be the node and run kubelet, proxy, cadvisor and docker.
 
@@ -71,7 +71,7 @@ yum install http://cbs.centos.org/kojifiles/packages/etcd/0.4.6/7.el7.centos/x86
 yum -y install --enablerepo=virt7-testing kubernetes
 ```
 
-* Add master and minion to /etc/hosts on all machines (not needed if hostnames already in DNS)
+* Add master and node to /etc/hosts on all machines (not needed if hostnames already in DNS)
 
 ```
 echo "192.168.121.9	centos-master
@@ -94,7 +94,7 @@ KUBE_LOG_LEVEL="--v=0"
 KUBE_ALLOW_PRIV="--allow_privileged=false"
 ```
 
-* Disable the firewall on both the master and minion, as docker does not play well with other firewall rule managers
+* Disable the firewall on both the master and node, as docker does not play well with other firewall rule managers
 
 ```
 systemctl disable iptables-services firewalld
@@ -115,7 +115,7 @@ KUBE_API_PORT="--port=8080"
 # How the replication controller and scheduler find the kube-apiserver
 KUBE_MASTER="--master=http://centos-master:8080"
 
-# Port nodes listen on
+# Port kubelets listen on
 KUBELET_PORT="--kubelet_port=10250"
 
 # Address range to use for services

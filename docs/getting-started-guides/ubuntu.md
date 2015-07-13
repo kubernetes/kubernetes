@@ -84,7 +84,7 @@ The first variable `nodes` defines all your cluster nodes, MASTER node comes fir
 
 Then the `roles ` variable defines the role of above machine in the same order, "ai" stands for machine acts as both master and node, "a" stands for master, "i" stands for node. So they are just defined the k8s cluster as the table above described.
 
-The `NUM_MINIONS` variable defines the total number of minions.
+The `NUM_MINIONS` variable defines the total number of nodes.
 
 The `SERVICE_CLUSTER_IP_RANGE` variable defines the kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range according to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
 
