@@ -14,6 +14,22 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Replication Controller
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Replication Controller](#replication-controller)
+  - [What is a _replication controller_?](#what-is-a-_replication-controller_?)
+  - [How does a replication controller work?](#how-does-a-replication-controller-work?)
+    - [Pod template](#pod-template)
+    - [Labels](#labels)
+  - [Responsibilities of the replication controller](#responsibilities-of-the-replication-controller)
+  - [Common usage patterns](#common-usage-patterns)
+    - [Rescheduling](#rescheduling)
+    - [Scaling](#scaling)
+    - [Rolling updates](#rolling-updates)
+    - [Multiple release tracks](#multiple-release-tracks)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## What is a _replication controller_?
 
 A _replication controller_ ensures that a specified number of pod "replicas" are running at any one time.  If there are too many, it will kill some.  If there are too few, it will start more. Unlike in the case where a user directly created pods, a replication controller replaces pods that are deleted or terminated for any reason, such as in the case of node failure or disruptive node maintenance, such as a kernel upgrade. For this reason, we recommend that you use a replication controller even if your application requires only a single pod. Think of it similarly to a process supervisor, only it supervises multiple pods across multiple nodes instead of individual processes on a single node.  A replication controller delegates local container restarts to some agent on the node (e.g., Kubelet or Docker).

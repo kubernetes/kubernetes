@@ -13,11 +13,25 @@ certainly want the docs that go with that version.</h1>
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Images
+
 Each container in a pod has its own image.  Currently, the only type of image supported is a [Docker Image](https://docs.docker.com/userguide/dockerimages/).
 
 You create your Docker image and push it to a registry before referring to it in a kubernetes pod.
 
 The `image` property of a container supports the same syntax as the `docker` command does, including private registries and tags.
+
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Images](#images)
+  - [Updating Images](#updating-images)
+  - [Using a Private Registry](#using-a-private-registry)
+    - [Using Google Container Registry](#using-google-container-registry)
+    - [Configuring Nodes to Authenticate to a Private Repository](#configuring-nodes-to-authenticate-to-a-private-repository)
+    - [Pre-pulling Images](#pre-pulling-images)
+    - [Specifying ImagePullSecrets on a Pod](#specifying-imagepullsecrets-on-a-pod)
+    - [Use Cases](#use-cases)
+
+<!-- END MUNGE: GENERATED_TOC -->
 
 ## Updating Images
 

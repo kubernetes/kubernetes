@@ -14,6 +14,19 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Kubernetes User Guide: Managing Applications: Configuring and launching containers
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes User Guide: Managing Applications: Configuring and launching containers](#kubernetes-user-guide:-managing-applications:-configuring-and-launching-containers)
+  - [Configuration in Kubernetes](#configuration-in-kubernetes)
+  - [Launching a container using a configuration file](#launching-a-container-using-a-configuration-file)
+  - [Validating configuration](#validating-configuration)
+  - [Environment variables and variable expansion](#environment-variables-and-variable-expansion)
+  - [Viewing pod status](#viewing-pod-status)
+  - [Viewing pod output](#viewing-pod-output)
+  - [Deleting pods](#deleting-pods)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Configuration in Kubernetes
 
 In addition to the imperative-style commands, such as `kubectl run` and `kubectl expose`, described [elsewhere](quick-start.md), Kubernetes supports declarative configuration. Often times, configuration files are preferable to imperative commands, since they can be checked into version control and changes to the files can be code reviewed, which is especially important for more complex configurations, producing a more robust, reliable and archival system.

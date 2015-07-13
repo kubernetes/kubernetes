@@ -16,6 +16,21 @@ certainly want the docs that go with that version.</h1>
 
 You’ve deployed your application and exposed it via a service. Now what? Kubernetes provides a number of tools to help you manage your application deployment, including scaling and updating. Among the features we’ll discuss in more depth are [configuration files](configuring-containers.md#configuration-in-kubernetes) and [labels](deploying-applications.md#labels).
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes User Guide: Managing Applications: Managing deployments](#kubernetes-user-guide:-managing-applications:-managing-deployments)
+  - [Organizing resource configurations](#organizing-resource-configurations)
+  - [Bulk operations in kubectl](#bulk-operations-in-kubectl)
+  - [Using labels effectively](#using-labels-effectively)
+  - [Canary deployments](#canary-deployments)
+  - [Updating labels](#updating-labels)
+  - [Scaling your application](#scaling-your-application)
+  - [Updating your application without a service outage](#updating-your-application-without-a-service-outage)
+  - [In-place updates of resources](#in-place-updates-of-resources)
+  - [Disruptive updates](#disruptive-updates)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Organizing resource configurations
 
 Many applications require multiple resources to be created, such as a Replication Controller and a Service. Management of multiple resources can be simplified by grouping them together in the same file (separated by `---` in YAML). For example:
