@@ -123,8 +123,10 @@ kube::util::wait-for-jobs() {
 # that match $3, copy is skipped.
 kube::util::gen-doc() {
   local cmd="$1"
-  local dest="$2"
-  local skipprefix="${3:-}"
+  local base_dest="$(realpath $2)/"
+  local relative_doc_dest="$3"
+  local dest="${base_dest}${relative_doc_dest}"
+  local skipprefix="${4:-}"
 
   # We do this in a tmpdir in case the dest has other non-autogenned files
   # We don't want to include them in the list of gen'd files
@@ -139,7 +141,7 @@ kube::util::gen-doc() {
     # Add analytics link to generated .md files
     if [[ "${file}" == *.md ]]; then
       local link path
-      path=$(basename "$dest")/${file}
+      path="$relative_doc_dest$file"
       link=$(kube::util::analytics-link "${path}")
       echo -e "\n${link}" >> "${tmpdir}/${file}"
     fi
@@ -192,7 +194,7 @@ kube::util::gen-analytics() {
               -not -path "${path}/Godeps/*" \
               -not -path "${path}/third_party/*" \
               -not -path "${path}/_output/*" \
-              -not -path "${path}/docs/kubectl*" ))
+              -not -path "${path}/docs/user-guide/kubectl/kubectl*" ))
   for f in "${mdfiles[@]}"; do
     link=$(kube::util::analytics-link "${f#${path}/}")
     if grep -q -F -x "${link}" "${f}"; then
