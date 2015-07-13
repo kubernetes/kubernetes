@@ -420,7 +420,7 @@ The following HTTP status codes may be returned by the API.
   * Suggested client recovery behavior
     * Do not retry. Fix the request.
 * `405 StatusMethodNotAllowed`
-  * Indicates that that the action the client attempted to perform on the resource was not supported by the code.
+  * Indicates that the action the client attempted to perform on the resource was not supported by the code.
   * Suggested client recovery behavior
     * Do not retry. Fix the request.
 * `409 StatusConflict`
@@ -570,7 +570,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * The server should set the `Retry-After` HTTP header and return `retryAfterSeconds` in the details field of the object. A value of `0` is the default.
   * Http status code: `504 StatusServerTimeout`
 * `MethodNotAllowed`
-  * Indicates that that the action the client attempted to perform on the resource was not supported by the code.
+  * Indicates that the action the client attempted to perform on the resource was not supported by the code.
   * For instance, attempting to delete a resource that can only be created.
   * API calls that return MethodNotAllowed can never succeed.
   * Http status code: `405 StatusMethodNotAllowed`

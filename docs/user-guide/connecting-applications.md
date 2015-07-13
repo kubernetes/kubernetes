@@ -113,7 +113,7 @@ NAME       LABELS       SELECTOR             IP(S)       PORT(S)
 kube-dns   <none>       k8s-app=kube-dns     10.0.0.10   53/UDP
                                                          53/TCP
 ```
-If it isn’t running, you can [enable it](../../cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived ip (nginxsvc), and a dns server that has assigned a name to that ip (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
+If it isn’t running, you can [enable it](../../cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived ip (nginxsvc), and a dns server that has assigned a name to that ip (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
 
 ```yaml
 apiVersion: v1

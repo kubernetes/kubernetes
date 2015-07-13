@@ -2,8 +2,8 @@
 
 On-disk files in a container are ephemeral, which presents some problems for
 non-trivial applications when running in containers.  First, when a container
-crashes kubelet will restart it, but the files will be lost lost - the
-container starts with a clean slate.  second, when running containers together
+crashes kubelet will restart it, but the files will be lost - the
+container starts with a clean slate.  Second, when running containers together
 in a `Pod` it is often necessary to share files between those containers.  The
 Kubernetes `Volume` abstraction solves both of these problems.
 
@@ -130,7 +130,7 @@ and then serve it in parallel from as many pods as you need.  Unfortunately,
 PDs can only be mounted by a single consumer in read-write mode - no
 simultaneous readers allowed.
 
-Using a PD on a pod controlled by a ReplicationController will will fail unless
+Using a PD on a pod controlled by a ReplicationController will fail unless
 the PD is read-only or the replica count is 0 or 1.
 
 #### Creating a PD
