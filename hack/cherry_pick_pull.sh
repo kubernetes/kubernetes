@@ -123,18 +123,31 @@ for pull in "${PULLS[@]}"; do
 done
 gitamcleanup=false
 
+function make-a-pr() {
+  echo "+++ Now you must propose ${NEWBRANCH} as a pull against ${BRANCH} (<--- NOT MASTER)."
+  echo "    You are constructing a pull against the upstream release branch! To do"
+  echo "    this in the GitHub UI, when you get to the 'Comparing Changes' screen, keep the"
+  echo "    'base fork' as GoogleCloudPlatform/kubernetes, but change the 'base' to e.g. 'release-1.0',"
+  echo "    presumably ${BRANCH}. (This selection is near the top left.)"
+  echo
+  echo "    Use this subject: 'Automated cherry pick of ${PULLSUBJ}' and include a justification."
+  echo
+  echo "    Note: the tools actually scrape the branch name you just pushed, so don't worry about"
+  echo "    the subject too much, but DO keep at least ${NEWBRANCHREQ} in the remote branch name."
+  echo
+}
+
 if git remote -v | grep ^origin | grep GoogleCloudPlatform/kubernetes.git; then
   echo "!!! You have 'origin' configured as your GoogleCloudPlatform/kubernetes.git"
   echo "This isn't normal. Leaving you with push instructions:"
   echo
+  echo "+++ First manually push the branch this script created:"
+  echo
   echo "  git push REMOTE ${NEWBRANCHUNIQ}:${NEWBRANCH}"
   echo
   echo "where REMOTE is your personal fork (maybe 'upstream'? Consider swapping those.)."
-  echo "Then propose ${NEWBRANCH} as a pull against ${BRANCH} (NOT MASTER)."
-  echo "Use this subject: 'Automated cherry pick of ${PULLSUBJ}' and include a justification."
-  echo ""
-  echo "Note: the tools actually scrape the branch name you just pushed, so don't worry about"
-  echo "the subject too much, but DO keep at least ${NEWBRANCHREQ} in the remote branch name."
+  echo
+  make-a-pr
   cleanbranch=""
   exit 0
 fi
@@ -151,11 +164,4 @@ if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
 fi
 
 git push origin -f "${NEWBRANCHUNIQ}:${NEWBRANCH}"
-
-echo
-echo "+++ Now you must propose ${NEWBRANCH} as a pull against ${BRANCH} (NOT MASTER)."
-echo "    Use this subject: 'Automated cherry pick of ${PULLSUBJ}' and include a justification."
-echo ""
-echo "    Note: the tools actually scrape the branch name you just pushed, so don't worry about"
-echo "    the subject too much, but DO keep at least ${NEWBRANCHREQ} in the remote branch name."
-echo
+make-a-pr
