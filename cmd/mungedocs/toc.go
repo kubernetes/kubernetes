@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -54,8 +55,20 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 func buildTOC(markdown []byte) ([]byte, error) {
 	var buffer bytes.Buffer
 	scanner := bufio.NewScanner(bytes.NewReader(markdown))
+	inBlockQuotes := false
 	for scanner.Scan() {
 		line := scanner.Text()
+		match, err := regexp.Match("^```", []byte(line))
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			inBlockQuotes = !inBlockQuotes
+			continue
+		}
+		if inBlockQuotes {
+			continue
+		}
 		noSharps := strings.TrimLeft(line, "#")
 		numSharps := len(line) - len(noSharps)
 		heading := strings.Trim(noSharps, " \n")
@@ -65,6 +78,7 @@ func buildTOC(markdown []byte) ([]byte, error) {
 			tocLine := fmt.Sprintf("%s- [%s](#%s)\n", indent, heading, bookmark)
 			buffer.WriteString(tocLine)
 		}
+
 	}
 	if err := scanner.Err(); err != nil {
 		return []byte{}, err
