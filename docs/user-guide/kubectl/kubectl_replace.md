@@ -12,56 +12,43 @@ certainly want the docs that go with that version.</h1>
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-## kubectl config set-credentials
+## kubectl replace
 
-Sets a user entry in kubeconfig
+Replace a resource by filename or stdin.
 
 ### Synopsis
 
 
-Sets a user entry in kubeconfig
-Specifying a name that already exists will merge new fields on top of existing values.
+Replace a resource by filename or stdin.
 
-  Client-certificate flags:
-    --client-certificate=certfile --client-key=keyfile
-
-  Bearer token flags:
-    --token=bearer_token
-
-  Basic auth flags:
-    --username=basic_user --password=basic_password
-
-  Bearer token and basic auth are mutually exclusive.
-
+JSON and YAML formats are accepted.
 
 ```
-kubectl config set-credentials NAME [--client-certificate=path/to/certfile] [--client-key=path/to/keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password]
+kubectl replace -f FILENAME
 ```
 
 ### Examples
 
 ```
-// Set only the "client-key" field on the "cluster-admin"
-// entry, without touching other values:
-$ kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
+// Replace a pod using the data in pod.json.
+$ kubectl replace -f pod.json
 
-// Set basic auth for the "cluster-admin" entry
-$ kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
+// Replace a pod based on the JSON passed into stdin.
+$ cat pod.json | kubectl replace -f -
 
-// Embed client certificate data in the "cluster-admin" entry
-$ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true
+// Force replace, delete and then re-create the resource
+kubectl replace --force -f pod.json
 ```
 
 ### Options
 
 ```
-      --client-certificate=: path to client-certificate for the user entry in kubeconfig
-      --client-key=: path to client-key for the user entry in kubeconfig
-      --embed-certs=false: embed client cert/key for the user entry in kubeconfig
-  -h, --help=false: help for set-credentials
-      --password=: password for the user entry in kubeconfig
-      --token=: token for the user entry in kubeconfig
-      --username=: username for the user entry in kubeconfig
+      --cascade=false: Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.
+  -f, --filename=[]: Filename, directory, or URL to file to use to replace the resource.
+      --force=false: Delete and re-create the specified resource
+      --grace-period=-1: Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
+  -h, --help=false: help for replace
+      --timeout=0: Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object
 ```
 
 ### Options inherited from parent commands
@@ -70,27 +57,32 @@ $ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admi
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
+      --client-certificate="": Path to a client key file for TLS.
+      --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
-      --kubeconfig="": use a particular kubeconfig file
+      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log-backtrace-at=:0: when logging hits line file:N, emit a stack trace
       --log-dir=: If non-empty, write log files in this directory
       --log-flush-frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
+      --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
 ```
 
 ### SEE ALSO
-* [kubectl config](kubectl_config.md)	 - config modifies kubeconfig files
+* [kubectl](kubectl.md)	 - kubectl controls the Kubernetes cluster manager
 
-###### Auto generated by spf13/cobra at 2015-06-22 20:33:35.307768646 +0000 UTC
+###### Auto generated by spf13/cobra at 2015-07-13 17:48:54.036845595 +0000 UTC
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl_config_set-credentials.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_replace.md?pixel)]()
