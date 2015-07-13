@@ -18,7 +18,10 @@ package meta
 
 // kubernetes api object annotations
 const (
-	BindingHostKey           = "k8s.mesosphere.io/bindingHost"
+	// the BindingHostKey pod annotation marks a pod as being assigned to a Mesos
+	// slave. It is already or will be launched on the slave as a task.
+	BindingHostKey = "k8s.mesosphere.io/bindingHost"
+
 	TaskIdKey                = "k8s.mesosphere.io/taskId"
 	SlaveIdKey               = "k8s.mesosphere.io/slaveId"
 	OfferIdKey               = "k8s.mesosphere.io/offerId"

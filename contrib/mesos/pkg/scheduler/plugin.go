@@ -151,6 +151,11 @@ func (b *binder) rollback(task *podtask.T, err error) error {
 }
 
 // assumes that: caller has acquired scheduler lock and that the task is still pending
+//
+// bind does not actually do the binding itself, but launches the pod as a Mesos task. The
+// kubernetes executor on the slave will finally do the binding. This is different from the
+// upstream scheduler in the sense that the upstream scheduler does the binding and the
+// kubelet will notice that and launches the pod.
 func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (err error) {
 	// sanity check: ensure that the task hasAcceptedOffer(), it's possible that between
 	// Schedule() and now that the offer for this task was rescinded or invalidated.
@@ -193,16 +198,7 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 	oemCt := pod.Spec.Containers
 	pod.Spec.Containers = append([]api.Container{}, oemCt...) // (shallow) clone before mod
 
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	} else {
-		oemAnn := pod.Annotations
-		pod.Annotations = make(map[string]string)
-		for k, v := range oemAnn {
-			pod.Annotations[k] = v
-		}
-	}
-	pod.Annotations[annotation.BindingHostKey] = machine
+	annotateForExecutorOnSlave(&pod, machine)
 	task.SaveRecoveryInfo(pod.Annotations)
 
 	for _, entry := range task.Spec.PortMap {
@@ -235,6 +231,31 @@ type kubeScheduler struct {
 	podUpdates               queue.FIFO
 	defaultContainerCPULimit mresource.CPUShares
 	defaultContainerMemLimit mresource.MegaBytes
+}
+
+// annotatedForExecutor checks whether a pod is assigned to a Mesos slave, and
+// possibly already launched. It can, but doesn't have to be scheduled already
+// in the sense of kubernetes, i.e. the NodeName field might still be empty.
+func annotatedForExecutor(pod *api.Pod) bool {
+	_, ok := pod.ObjectMeta.Annotations[annotation.BindingHostKey]
+	return ok
+}
+
+// annotateForExecutorOnSlave sets the BindingHostKey annotation which
+// marks the pod to be processed by the scheduler and launched as a Mesos
+// task. The executor on the slave will to the final binding to finish the
+// scheduling in the kubernetes sense.
+func annotateForExecutorOnSlave(pod *api.Pod, slave string) {
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	} else {
+		oemAnn := pod.Annotations
+		pod.Annotations = make(map[string]string)
+		for k, v := range oemAnn {
+			pod.Annotations[k] = v
+		}
+	}
+	pod.Annotations[annotation.BindingHostKey] = slave
 }
 
 // Schedule implements the Scheduler interface of Kubernetes.
@@ -441,7 +462,7 @@ func (q *queuer) Run(done <-chan struct{}) {
 			}
 
 			pod := p.(*Pod)
-			if pod.Spec.NodeName != "" {
+			if annotatedForExecutor(pod.Pod) {
 				log.V(3).Infof("dequeuing pod for scheduling: %v", pod.Pod.Name)
 				q.dequeue(pod.GetUID())
 			} else {
@@ -490,7 +511,7 @@ func (q *queuer) yield() *api.Pod {
 			log.Warningf("yield unable to understand pod object %+v, will skip: %v", pod, err)
 		} else if !q.podUpdates.Poll(podName, queue.POP_EVENT) {
 			log.V(1).Infof("yield popped a transitioning pod, skipping: %+v", pod)
-		} else if pod.Spec.NodeName != "" {
+		} else if annotatedForExecutor(pod) {
 			// should never happen if enqueuePods is filtering properly
 			log.Warningf("yield popped an already-scheduled pod, skipping: %+v", pod)
 		} else {
@@ -798,7 +819,7 @@ func (s *schedulingPlugin) reconcilePod(oldPod api.Pod) {
 		return
 	}
 	if oldPod.Spec.NodeName != pod.Spec.NodeName {
-		if pod.Spec.NodeName == "" {
+		if annotatedForExecutor(pod) {
 			// pod is unscheduled.
 			// it's possible that we dropped the pod in the scheduler error handler
 			// because of task misalignment with the pod (task.Has(podtask.Launched) == true)

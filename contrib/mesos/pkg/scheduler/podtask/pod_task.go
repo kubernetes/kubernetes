@@ -213,6 +213,11 @@ func (t *T) AcceptOffer(offer *mesos.Offer) bool {
 		return false
 	}
 
+	// if the user has specified a target host, make sure this offer is for that host
+	if t.Pod.Spec.NodeName != "" && offer.GetHostname() != t.Pod.Spec.NodeName {
+		return false
+	}
+
 	// check ports
 	if _, err := t.mapper.Generate(t, offer); err != nil {
 		log.V(3).Info(err)

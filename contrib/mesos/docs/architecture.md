@@ -18,6 +18,25 @@ The executor launches the pod/task, which registers the bound pod with the kubel
 
 ![Architecture Diagram](architecture.png)
 
+## Scheduling
+
+The scheduling of a pod on Kubernetes on Mesos is essentially a two-phase process:
+
+1. A new pod is noticed by the k8sm-scheduler and possibly matched with a
+   Mesos offer. Then:
+
+   - The offer is *accepted*,
+   - the pod is *annotated* with a number of annotation, especially `k8s.mesosphere.io/bindingHost`
+   - the pod is *launched* on a Mesos slave.
+
+   The existence of the `bindingHost` annotation tells the k8sm-scheduler that this pod has been launched. If it is not set, the pod is considered *new*.
+
+2. The Mesos slave receives the task launch event and starts (if not running yet) the k8sm-executor (possibly via the km hyperkube binary). Then:
+
+    - The k8sm-executor *binds* the tasks to the node via the apiserver, which means that the `NodeName` field is set by the apiserver.
+    - The k8sm-executor sends the pod to the kubelet which is part of the k8sm-executor process.
+    - The kubelet launches the containers using Docker.
+
 ## Networking
 
 Kubernetes-Mesos uses "normal" Docker IPv4, host-private networking, rather than Kubernetes' SDN-based networking that assigns an IP per pod. This is mostly transparent to the user, especially when using the service abstraction to access pods. For details on some issues it creates, see [issues][3].
