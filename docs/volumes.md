@@ -35,7 +35,7 @@ Familiarity with [pods](pods.md) is suggested.
       - [Example pod](#example-pod)
     - [awsElasticBlockStore](#awselasticblockstore)
       - [Creating an EBS volume](#creating-an-ebs-volume)
-      - [AWS EBS Example configuration:](#aws-ebs-example-configuration:)
+      - [AWS EBS Example configuration](#aws-ebs-example-configuration)
     - [nfs](#nfs)
     - [iscsi](#iscsi)
     - [glusterfs](#glusterfs)
