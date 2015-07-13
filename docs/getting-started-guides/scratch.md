@@ -338,17 +338,15 @@ brctl delbr docker0
 ```
 
 The way you configure docker will depend in whether you have chosen the routable-vip or overlay-network approaches for your network.
-Some docker options will want to think about:
-  - create your own bridge for the per-node CIDR ranges, and set `--bridge=cbr0` and `--bip=false`.  Or let docker do it with `--bip=true`.
-  - `--iptables=false` so docker will not manipulate iptables for host-ports (too coarse on older docker versions, may be fixed in newer versions)
+Some suggested docker options:
+  - create your own bridge for the per-node CIDR ranges, call it cbr0, and set `--bridge=cbr0` option on docker.
+  - set `--iptables=false` so docker will not manipulate iptables for host-ports (too coarse on older docker versions, may be fixed in newer versions)
 so that kube-proxy can manage iptables instead of docker.
   - `--ip-masq=false`
     - if you have setup PodIPs to be routable, then you want this false, otherwise, docker will
       rewrite the PodIP source-address to a NodeIP.
     - some environments (e.g. GCE) still need you to masquerade out-bound traffic when it leaves the cloud environment. This is very environment specific.
     - if you are using an overlay network, consult those instructions.  
-  - `--bip=`
-    - should be the CIDR range for pods for that specific node.
   - `--mtu=`
     - may be required when using Flannel, because of the extra packet size due to udp encapsulation
   - `--insecure-registry $CLUSTER_SUBNET` 
@@ -411,7 +409,7 @@ Arguments to consider:
 
 ### Networking
 Each node needs to be allocated its own CIDR range for pod networking.
-Call this `NODE_X_POD_CIDR`.
+Call this `NODE_X_POD_CIDR`. 
 
 A bridge called `cbr0` needs to be created on each node.  The bridge is explained
 further in the [networking documentation](../admin/networking.md).  The bridge itself
