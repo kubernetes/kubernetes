@@ -14,17 +14,20 @@ matrix:
           KUBE_TEST_ETCD_PREFIXES="kubernetes.io/registry"
 
 install:
-  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+  - go get golang.org/x/tools/cmd/cover
   - go get github.com/mattn/goveralls
+  - go get github.com/tools/godep
   - ./hack/travis/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
   - ./hack/verify-description.sh
   - ./hack/travis/install-std-race.sh
   - ./hack/build-go.sh
-  - GOPATH=$PWD/Godeps/_workspace:$GOPATH go install ./...
-  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
-  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-swagger-spec.sh
+  - PATH=$GOPATH/bin:$PATH godep go install ./...
+  - PATH=$GOPATH/bin:$PATH ./hack/verify-generated-conversions.sh
+  - PATH=$GOPATH/bin:$PATH ./hack/verify-generated-deep-copies.sh
+  - PATH=$GOPATH/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
+  - PATH=$GOPATH/bin:./third_party/etcd:$PATH ./hack/verify-swagger-spec.sh
 
 before_script:
   - npm install karma karma-junit-reporter karma-phantomjs-launcher karma-jasmine
