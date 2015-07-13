@@ -16,6 +16,31 @@ certainly want the docs that go with that version.</h1>
 
 This document describes the current state of `PersistentVolumes` in Kubernetes.  Familiarity with [volumes](volumes.md) is suggested.
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Persistent Volumes and Claims](#persistent-volumes-and-claims)
+  - [Introduction](#introduction)
+  - [Lifecycle of a volume and claim](#lifecycle-of-a-volume-and-claim)
+    - [Provisioning](#provisioning)
+    - [Binding](#binding)
+    - [Using](#using)
+    - [Releasing](#releasing)
+    - [Reclaiming](#reclaiming)
+  - [Types of Persistent Volumes](#types-of-persistent-volumes)
+  - [Persistent Volumes](#persistent-volumes)
+    - [Capacity](#capacity)
+    - [Access Modes](#access-modes)
+    - [Recycling Policy](#recycling-policy)
+    - [Phase](#phase)
+  - [PersistentVolumeClaims](#persistentvolumeclaims)
+    - [Access Modes](#access-modes)
+    - [Resources](#resources)
+  - [<a name="claims-as-volumes"></a> Claims As Volumes](#<a-name="claims-as-volumes"></a>-claims-as-volumes)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+## Introduction
+
 Managing storage is a distinct problem from managing compute. The `PersistentVolume` subsystem provides an API for users and administrators that abstracts details of how storage is provided from how it is consumed.  To do this we introduce two new API resources:  `PersistentVolume` and `PersistentVolumeClaim`.
 
 A `PersistentVolume` (PV) is a piece of networked storage in the cluster that has been provisioned by an administrator.  It is a resource in the cluster just like a node is a cluster resource.   PVs are volume plugins like Volumes, but have a lifecycle independent of any individual pod that uses the PV.  This API object captures the details of the implementation of the storage, be that NFS, iSCSI, or a cloud-provider-specific storage system.

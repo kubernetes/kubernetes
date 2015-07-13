@@ -14,6 +14,27 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Admission Controllers
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Admission Controllers](#admission-controllers)
+  - [What are they?](#what-are-they?)
+  - [Why do I need them?](#why-do-i-need-them?)
+  - [How do I turn on an admission control plug-in?](#how-do-i-turn-on-an-admission-control-plug-in?)
+  - [What does each plug-in do?](#what-does-each-plug-in-do?)
+    - [AlwaysAdmit](#alwaysadmit)
+    - [AlwaysDeny](#alwaysdeny)
+    - [DenyExecOnPrivileged](#denyexeconprivileged)
+    - [ServiceAccount](#serviceaccount)
+    - [SecurityContextDeny](#securitycontextdeny)
+    - [ResourceQuota](#resourcequota)
+    - [LimitRanger](#limitranger)
+    - [NamespaceExists](#namespaceexists)
+    - [NamespaceAutoProvision (deprecated)](#namespaceautoprovision-(deprecated))
+    - [NamespaceLifecycle](#namespacelifecycle)
+  - [Is there a recommended set of plug-ins to use?](#is-there-a-recommended-set-of-plug-ins-to-use?)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## What are they?
 
 An admission control plug-in is a piece of code that intercepts requests to the Kubernetes

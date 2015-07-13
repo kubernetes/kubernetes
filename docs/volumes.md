@@ -23,6 +23,30 @@ Kubernetes `Volume` abstraction solves both of these problems.
 
 Familiarity with [pods](pods.md) is suggested.
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Volumes](#volumes)
+  - [Background](#background)
+  - [Types of Volumes](#types-of-volumes)
+    - [emptyDir](#emptydir)
+    - [hostPath](#hostpath)
+    - [gcePersistentDisk](#gcepersistentdisk)
+      - [Creating a PD](#creating-a-pd)
+      - [Example pod](#example-pod)
+    - [awsElasticBlockStore](#awselasticblockstore)
+      - [Creating an EBS volume](#creating-an-ebs-volume)
+      - [AWS EBS Example configuration:](#aws-ebs-example-configuration:)
+    - [nfs](#nfs)
+    - [iscsi](#iscsi)
+    - [glusterfs](#glusterfs)
+    - [rbd](#rbd)
+    - [gitRepo](#gitrepo)
+    - [Secrets](#secrets)
+    - [persistentVolumeClaim](#persistentvolumeclaim)
+  - [Resources](#resources)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Background
 
 Docker also has a concept of

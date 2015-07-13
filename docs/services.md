@@ -14,6 +14,31 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Services in Kubernetes
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Services in Kubernetes](#services-in-kubernetes)
+  - [Overview](#overview)
+  - [Defining a service](#defining-a-service)
+    - [Services without selectors](#services-without-selectors)
+  - [Virtual IPs and service proxies](#virtual-ips-and-service-proxies)
+  - [Multi-Port Services](#multi-port-services)
+  - [Choosing your own IP address](#choosing-your-own-ip-address)
+    - [Why not use round-robin DNS?](#why-not-use-round-robin-dns?)
+  - [Discovering services](#discovering-services)
+    - [Environment variables](#environment-variables)
+    - [DNS](#dns)
+  - [Headless services](#headless-services)
+  - [<a name="external"></a>External services](#<a-name="external"></a>external-services)
+    - [Type = NodePort](#type-=-nodeport)
+    - [Type = LoadBalancer](#type-=-loadbalancer)
+  - [Shortcomings](#shortcomings)
+  - [Future work](#future-work)
+  - [The gory details of virtual IPs](#the-gory-details-of-virtual-ips)
+    - [Avoiding collisions](#avoiding-collisions)
+    - [IPs and VIPs](#ips-and-vips)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Overview
 
 Kubernetes [`Pods`](pods.md) are mortal. They are born and they die, and they

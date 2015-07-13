@@ -18,6 +18,15 @@ This guide is to help users debug applications that are deployed into Kubernetes
 This is *not* a guide for people who want to debug their cluster.  For that you should check out
 [this guide](cluster-troubleshooting.md)
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Application Troubleshooting.](#application-troubleshooting.)
+  - [FAQ](#faq)
+  - [Diagnosing the problem](#diagnosing-the-problem)
+    - [Debugging Pods](#debugging-pods)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## FAQ
 Users are highly encouraged to check out our [FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
 

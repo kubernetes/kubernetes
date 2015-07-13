@@ -18,6 +18,15 @@ Once your application is running, you’ll inevitably need to debug problems wit
 Earlier we described how you can use ```kubectl get pods``` to retrieve simple status information about
 your pods. But there are a number of ways to get even more information about your application.
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes User Guide: Managing Applications: Application Introspection and Debugging](#kubernetes-user-guide:-managing-applications:-application-introspection-and-debugging)
+  - [Using ```kubectl describe pod``` to fetch details about pods](#using-```kubectl-describe-pod```-to-fetch-details-about-pods)
+  - [Example: debugging Pending Pods](#example:-debugging-pending-pods)
+  - [Example: debugging a down/unreachable node](#example:-debugging-a-down/unreachable-node)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Using ```kubectl describe pod``` to fetch details about pods
 
 For this example we’ll use a ReplicationController to create two pods, similar to the earlier example.
