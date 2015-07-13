@@ -19,7 +19,7 @@ supports forward lookups (A records) and service lookups (SRV records).
 
 ## How it Works
 
-The DNS pod that runs holds 3 containers - skydns, etcd (which skydns uses),
+The running DNS pod holds 3 containers - skydns, etcd (which skydns uses),
 and a kubernetes-to-skydns bridge called kube2sky.  The kube2sky process
 watches the kubernetes master for changes in Services, and then writes the
 information to etcd, which skydns reads.  This etcd instance is not linked to
