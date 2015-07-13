@@ -22,7 +22,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ku
 
 *3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it should also work on most Ubuntu versions*
 
-*4 Dependences of this guide: etcd-2.0.12, flannel-0.4.0, k8s-0.19.3, but it may work with higher versions*
+*4 Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-0.19.3, but it may work with higher versions*
 
 *5 All the remote servers can be ssh logged in without a password by using key authentication* 
 

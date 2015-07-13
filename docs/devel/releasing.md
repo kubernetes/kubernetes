@@ -21,7 +21,7 @@ You should progress in this strict order.
 #### Selecting Release Components
 
 When cutting a major/minor release, your first job is to find the branch
-point. We cut `vX.Y.0` releases directly from `master`, which is also the the
+point. We cut `vX.Y.0` releases directly from `master`, which is also the
 branch that we have most continuous validation on. Go first to [the main GCE
 Jenkins end-to-end job](http://go/k8s-test/job/kubernetes-e2e-gce) and next to [the
 Critical Builds page](http://go/k8s-test/view/Critical%20Builds) and hopefully find a
@@ -42,7 +42,7 @@ Because Jenkins builds frequently, if you're looking between jobs
 `kubernetes-e2e-gce` build (but please check that it corresponds to a temporally
 similar build that's green on `kubernetes-e2e-gke-ci`). Lastly, if you're having
 trouble understanding why the GKE continuous integration clusters are failing
-and you're trying to cut a release, don't hesistate to contact the GKE
+and you're trying to cut a release, don't hesitate to contact the GKE
 oncall.
 
 Before proceeding to the next step:

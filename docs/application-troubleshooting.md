@@ -42,7 +42,7 @@ You don't have enough resources.  You may have exhausted the supply of CPU or Me
 you need to delete Pods, adjust resource requests, or add new nodes to your cluster.
 
 You are using ```hostPort```.  When you bind a Pod to a ```hostPort``` there are a limited number of places that pod can be
-scheduled.  In most cases, ```hostPort``` is unnecesary, try using a Service object to expose your Pod.  If you do require
+scheduled.  In most cases, ```hostPort``` is unnecessary, try using a Service object to expose your Pod.  If you do require
 ```hostPort``` then you can only schedule as many Pods as there are nodes in your Kubernetes cluster.
 
 

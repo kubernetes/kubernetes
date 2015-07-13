@@ -183,7 +183,7 @@ The [k8petstore example](../../examples/k8petstore/) is available as a
 
     juju action do kubernetes-master/0
 
-Note: this example includes curl statements to exercise the app, which automatically generates "petstore" transactions written to redis, and allows you to visualize the throughput in your browswer.
+Note: this example includes curl statements to exercise the app, which automatically generates "petstore" transactions written to redis, and allows you to visualize the throughput in your browser.
 
 ## Tear down cluster
 
@@ -199,7 +199,7 @@ Kubernetes Bundle on Github
 
  - [Bundle Repository](https://github.com/whitmo/bundle-kubernetes)
    * [Kubernetes master charm](https://github.com/whitmo/charm-kubernetes-master)
-   * [Kubernetes mininion charm](https://github.com/whitmo/charm-kubernetes)
+   * [Kubernetes minion charm](https://github.com/whitmo/charm-kubernetes)
  - [Bundle Documentation](http://whitmo.github.io/bundle-kubernetes)
  - [More about Juju](https://juju.ubuntu.com)
 

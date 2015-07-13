@@ -40,7 +40,7 @@ gpgcheck=0
 yum -y install --enablerepo=virt7-testing kubernetes
 ```
 
-* Note * Using etcd-0.4.6-7 (This is temperory update in documentation)
+* Note * Using etcd-0.4.6-7 (This is temporary update in documentation)
 
 If you do not get etcd-0.4.6-7 installed with virt7-testing repo,
 
@@ -80,7 +80,7 @@ KUBE_LOG_LEVEL="--v=0"
 KUBE_ALLOW_PRIV="--allow_privileged=false"
 ```
 
-* Disable the firewall on both the master and minon, as docker does not play well with other firewall rule managers
+* Disable the firewall on both the master and minion, as docker does not play well with other firewall rule managers
 
 ```
 systemctl disable iptables-services firewalld

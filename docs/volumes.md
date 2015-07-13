@@ -223,7 +223,7 @@ mounted into your pod. Unlike `emptyDir`, which is erased when a Pod is
 removed, the contents of an `nfs` volume are preserved and the volume is merely
 unmounted.  This means that an NFS volume can be pre-populated with data, and
 that data can be "handed off" between pods.  NFS can be mounted by multiple
-writers simultaneuosly.
+writers simultaneously.
 
 __Important: You must have your own NFS server running with the share exported
 before you can use it__
@@ -266,7 +266,7 @@ source networked filesystem) volume to be mounted into your pod.  Unlike
 `glusterfs` volume are preserved and the volume is merely unmounted.  This
 means that a glusterfs volume can be pre-populated with data, and that data can
 be "handed off" between pods.  GlusterFS can be mounted by multiple writers
-simultaneuosly.
+simultaneously.
 
 __Important: You must have your own GlusterFS installation running before you
 can use it__
