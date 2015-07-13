@@ -4,7 +4,7 @@ This deployer sets up a vagrant cluster and installs kubernetes with flannel on 
 
 ## Before you start !
 
-You will need a functioning vagrant provider. Currently supported are openstack and virtualbox.
+You will need a functioning vagrant provider. Currently supported are openstack, libvirt, and virtualbox.
 
 ## USAGE
 
@@ -43,6 +43,15 @@ To use the vagrant openstack provider you will need
 - Edit `openstack_config.yml` to include your relevant details.
 
 For vagrant (1.7.2) does not seem to ever want to pick openstack as the provider. So you will need to tell it to use openstack explicitly.
+
+###### Libvirt
+
+The libvirt vagrant provider is non-deterministic when launching VMs. This is a problem as we need ansible to only run after all of the VMs are running. To solve this when using libvirt one must
+do the following
+```
+vagrant up --no-provision
+vagrant provision
+```
 
 ### VirtualBox
 Nothing special with VirtualBox. Hopefully `vagrant up` just works.

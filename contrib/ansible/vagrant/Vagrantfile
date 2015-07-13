@@ -70,6 +70,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
   end
 
+  def set_libvirt(lv, config)
+    config.vm.box = "kube-centos-7"
+    config.vm.box_url = "http://cloud.centos.org/centos/7/vagrant/x86_64/images/CentOS-7.LibVirt.box"
+    lv.memory = 2048
+    lv.cpus = 2
+    lv.nested = true
+    lv.volume_cache = 'none'
+  end
+
   def set_provider(n)
     n.vm.provider :openstack do |os, override|
       set_openstack(os, override, n)
@@ -77,6 +86,10 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     n.vm.provider :virtualbox do |vb, override|
       set_vbox(vb, override)
     end
+    n.vm.provider :libvirt do |lv, override|
+      set_libvirt(lv, override)
+    end
+  end
 
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
