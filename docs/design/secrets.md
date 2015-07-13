@@ -261,7 +261,7 @@ Kubelet volume plugin API will be changed so that a volume plugin receives the s
 a volume along with the volume spec.  This will allow volume plugins to implement setting the
 security context of volumes they manage.
 
-## Community work:
+## Community work
 
 Several proposals / upstream patches are notable as background for this proposal:
 

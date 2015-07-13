@@ -88,7 +88,7 @@ kubectl -s http://localhost:8080 run-container nginx --image=nginx --port=80
 
 now run ```docker ps``` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
 
-### Expose it as a service:
+### Expose it as a service
 ```sh
 kubectl expose rc nginx --port=80
 ```

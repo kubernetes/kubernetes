@@ -26,7 +26,7 @@ For each worker node, there are three steps:
 ### Set up Flanneld on the worker node
 As before, the Flannel daemon is going to provide network connectivity.
 
-#### Set up a bootstrap docker:
+#### Set up a bootstrap docker
 As previously, we need a second instance of the Docker daemon running to bootstrap the flannel networking.
 
 Run:

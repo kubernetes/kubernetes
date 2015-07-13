@@ -64,7 +64,7 @@ There is a specific `cluster/rackspace` directory with the scripts for the follo
 3. The master server and additional nodes will be created via the `nova` CLI. A `cloud-config.yaml` is generated and provided as user-data with the entire configuration for the systems.
 4. We then boot as many nodes as defined via `$NUM_MINIONS`.
 
-## Some notes:
+## Some notes
 - The scripts expect `eth2` to be the cloud network that the containers will communicate across.
 - A number of the items in `config-default.sh` are overridable via environment variables.
 - For older versions please either:
