@@ -16,7 +16,7 @@ The details of the above predicates can be found in [plugin/pkg/scheduler/algori
 
 ## Ranking the nodes
 
-The filtered nodes are considered suitable to host the Pod, and it is often that there are more than one nodes remaining. Kubernetes prioritizes the remaining nodes to to find the "best" one for the Pod. The prioritization is performed by a set of priority functions. For each remaining node, a priority function gives a score which scales from 0-10 with 10 representing for "most preferred" and 0 for "least preferred". Each priority function is weighted by a positive number and the final score of each node is calculated by adding up all the weighted scores. For example, suppose there are two priority functions, `priorityFunc1` and `priorityFunc2` with weighting factors `weight1` and `weight2` respectively, the final score of some NodeA is:
+The filtered nodes are considered suitable to host the Pod, and it is often that there are more than one nodes remaining. Kubernetes prioritizes the remaining nodes to find the "best" one for the Pod. The prioritization is performed by a set of priority functions. For each remaining node, a priority function gives a score which scales from 0-10 with 10 representing for "most preferred" and 0 for "least preferred". Each priority function is weighted by a positive number and the final score of each node is calculated by adding up all the weighted scores. For example, suppose there are two priority functions, `priorityFunc1` and `priorityFunc2` with weighting factors `weight1` and `weight2` respectively, the final score of some NodeA is:
 
     finalScoreNodeA = (weight1 * priorityFunc1) + (weight2 * priorityFunc2)
     

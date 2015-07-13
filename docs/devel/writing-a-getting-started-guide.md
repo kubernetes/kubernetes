@@ -62,7 +62,7 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
       refactoring and feature additions that affect code for their IaaS.
 
 ## Rationale 
- - We want want people to create Kubernetes clusters with whatever IaaS, Node OS,
+ - We want people to create Kubernetes clusters with whatever IaaS, Node OS,
    configuration management tools, and so on, which they are familiar with.  The
    guidelines for **versioned distros** are designed for flexibility.
  - We want developers to be able to work without understanding all the permutations of
@@ -81,7 +81,7 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
    gate commits on passing CI for all distros, and since end-to-end tests are typically somewhat
    flaky, it would be highly likely for there to be false positives and CI backlogs with many CI pipelines.
  - We do not require versioned distros to do **CI** for several reasons.  It is a steep
-   learning curve to understand our our automated testing scripts.  And it is considerable effort
+   learning curve to understand our automated testing scripts.  And it is considerable effort
    to fully automate setup and teardown of a cluster, which is needed for CI.  And, not everyone
    has the time and money to run CI.  We do not want to
    discourage people from writing and sharing guides because of this.  

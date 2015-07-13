@@ -90,7 +90,7 @@ The distinction is useful for a number of reasons:
 Pod Object.
 
 The `secrets` field is a list of references to /secret objects that an process started as that service account should
-have access to to be able to assert that role.
+have access to be able to assert that role.
 
 The secrets are not inline with the serviceAccount object.  This way, most or all users can have permission to `GET /serviceAccounts` so they can remind themselves
 what serviceAccounts are available for use.
@@ -150,7 +150,7 @@ then it copies in the referenced securityContext and secrets references for the 
 
 Second, if ServiceAccount definitions change, it may take some actions.
 **TODO**: decide what actions it takes when a serviceAccount definition changes.  Does it stop pods, or just
-allow someone to list ones that out out of spec?  In general, people may want to customize this?
+allow someone to list ones that are out of spec?  In general, people may want to customize this?
 
 Third, if a new namespace is created, it may create a new serviceAccount for that namespace.  This may include
 a new username (e.g. `NAMESPACE-default-service-account@serviceaccounts.$CLUSTERID.kubernetes.io`), a new

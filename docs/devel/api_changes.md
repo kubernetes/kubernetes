@@ -177,7 +177,7 @@ need to add cases to `pkg/api/<version>/defaults.go`.  Of course, since you
 have added code, you have to add a test: `pkg/api/<version>/defaults_test.go`.
 
 Do use pointers to scalars when you need to distinguish between an unset value
-and an an automatic zero value.  For example,
+and an automatic zero value.  For example,
 `PodSpec.TerminationGracePeriodSeconds` is defined as `*int64` the go type
 definition.  A zero value means 0 seconds, and a nil value asks the system to
 pick a default.

@@ -29,7 +29,7 @@ Claims will remain unbound indefinitely if a matching volume does not exist.  Cl
 
 Pods use claims as volumes. The cluster inspects the claim to find the bound volume and mounts that volume for a pod.  For those volumes that support multiple access modes, the user specifies which mode desired when using their claim as a volume in a pod.
 
-Once a user has a claim and that claim is bound, the bound PV belongs to the user for as long as she needs it. Users schedule Pods and access their their claimed PVs by including a persistentVolumeClaim in their Pod's volumes block. [See below for syntax details](#claims-as-volumes).
+Once a user has a claim and that claim is bound, the bound PV belongs to the user for as long as she needs it. Users schedule Pods and access their claimed PVs by including a persistentVolumeClaim in their Pod's volumes block. [See below for syntax details](#claims-as-volumes).
 
 ### Releasing
 
@@ -113,7 +113,7 @@ Currently, NFS and HostPath support recycling.
 
 A volume will be in one of the following phases:
 
-* Available -- a free resource resource that is not yet bound to a claim
+* Available -- a free resource that is not yet bound to a claim
 * Bound -- the volume is bound to a claim
 * Released -- the claim has been deleted, but the resource is not yet reclaimed by the cluster
 * Failed -- the volume has failed its automatic reclamation
