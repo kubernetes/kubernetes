@@ -193,8 +193,8 @@ If the Kubernetes startup script hangs waiting for the API to be reachable, you 
 If you're having trouble SSHing into your instances, ensure the GCE firewall
 isn't blocking port 22 to your VMs.  By default, this should work but if you
 have edited firewall rules or created a new non-default network, you'll need to
-expose it: `gcloud compute firewall-rules create --network=<network-name>
---description "SSH allowed from anywhere" --allow tcp:22 default-ssh`
+expose it: `gcloud compute firewall-rules create default-ssh --network=<network-name>
+--description "SSH allowed from anywhere" --allow tcp:22`
 
 Additionally, your GCE SSH key must either have no passcode or you need to be
 using `ssh-agent`.
