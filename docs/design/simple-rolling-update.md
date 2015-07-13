@@ -6,7 +6,7 @@ Complete execution flow can be found [here](#execution-details).
 ### Lightweight rollout
 Assume that we have a current replication controller named ```foo``` and it is running image ```image:v1```
 
-```kubectl rolling-update rc foo [foo-v2] --image=myimage:v2```
+```kubectl rolling-update foo [foo-v2] --image=myimage:v2```
 
 If the user doesn't specify a name for the 'next' replication controller, then the 'next' replication controller is renamed to
 the name of the original replication controller.
@@ -27,7 +27,7 @@ To facilitate recovery in the case of a crash of the updating process itself, we
 Recovery is achieved by issuing the same command again:
 
 ```
-kubectl rolling-update rc foo [foo-v2] --image=myimage:v2
+kubectl rolling-update foo [foo-v2] --image=myimage:v2
 ```
 
 Whenever the rolling update command executes, the kubectl client looks for replication controllers called ```foo``` and ```foo-next```, if they exist, an attempt is
@@ -38,11 +38,11 @@ it is assumed that the rollout is nearly completed, and ```foo-next``` is rename
 ### Aborting a rollout
 Abort is assumed to want to reverse a rollout in progress.
 
-```kubectl rolling-update rc foo [foo-v2] --rollback```
+```kubectl rolling-update foo [foo-v2] --rollback```
 
 This is really just semantic sugar for:
 
-```kubectl rolling-update rc foo-v2 foo```
+```kubectl rolling-update foo-v2 foo```
 
 With the added detail that it moves the ```desired-replicas``` annotation from ```foo-v2``` to ```foo```
 
