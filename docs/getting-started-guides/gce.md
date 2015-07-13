@@ -198,7 +198,7 @@ Also ensure that-- as listed in the [Prerequsites section](#prerequisites)-- you
 
 #### Cluster initialization hang
 
-If the Kubernetes startup script hangs waiting for the API to be reachable, you can troubleshoot by SSHing into the master and minion VMs and looking at logs such as `/var/log/startupscript.log`.
+If the Kubernetes startup script hangs waiting for the API to be reachable, you can troubleshoot by SSHing into the master and node VMs and looking at logs such as `/var/log/startupscript.log`.
 
 **Once you fix the issue, you should run `kube-down.sh` to cleanup** after the partial cluster creation, before running `kube-up.sh` to try again.
 

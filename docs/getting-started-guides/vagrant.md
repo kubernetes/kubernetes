@@ -54,7 +54,7 @@ curl -sS https://get.k8s.io | bash
 
 The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
-By default, the Vagrant setup will create a single kubernetes-master and 1 kubernetes-minion. Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
+By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-minion-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
 
 ```sh
 cd kubernetes
@@ -75,14 +75,14 @@ export KUBERNETES_PROVIDER=vagrant
 
 By default, each VM in the cluster is running Fedora.
 
-To access the master or any minion:
+To access the master or any node:
 
 ```sh
 vagrant ssh master
 vagrant ssh minion-1
 ```
 
-If you are running more than one minion, you can access the others by:
+If you are running more than one node, you can access the others by:
 
 ```sh
 vagrant ssh minion-2
@@ -110,7 +110,7 @@ vagrant ssh master
 [root@kubernetes-master ~] $ tail -f /var/log/kube-scheduler.log
 ```
 
-To view the services on any of the kubernetes-minion(s):
+To view the services on any of the nodes:
 ```sh
 vagrant ssh minion-1
 [vagrant@kubernetes-master ~] $ sudo su
@@ -307,7 +307,7 @@ cat ~/.kubernetes_vagrant_auth
 
 #### I just created the cluster, but I do not see my container running!
 
-If this is your first time creating the cluster, the kubelet on each minion schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
+If this is your first time creating the cluster, the kubelet on each node schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
 
 #### I want to make changes to Kubernetes code!
 
@@ -319,7 +319,7 @@ Log on to one of the nodes (`vagrant ssh minion-1`) and inspect the salt minion 
 
 #### I want to change the number of nodes!
 
-You can control the number of nodes that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
+You can control the number of nodes that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single node. You do this, by setting `NUM_MINIONS` to 1 like so:
 
 ```sh
 export NUM_MINIONS=1

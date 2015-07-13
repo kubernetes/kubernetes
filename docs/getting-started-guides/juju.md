@@ -213,7 +213,7 @@ Kubernetes Bundle on Github
 
  - [Bundle Repository](https://github.com/whitmo/bundle-kubernetes)
    * [Kubernetes master charm](https://github.com/whitmo/charm-kubernetes-master)
-   * [Kubernetes minion charm](https://github.com/whitmo/charm-kubernetes)
+   * [Kubernetes node charm](https://github.com/whitmo/charm-kubernetes)
  - [Bundle Documentation](http://whitmo.github.io/bundle-kubernetes)
  - [More about Juju](https://juju.ubuntu.com)
 

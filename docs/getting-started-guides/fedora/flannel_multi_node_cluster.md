@@ -25,7 +25,7 @@ Kubernetes multiple nodes cluster with flannel on Fedora
 
 ## Introduction
 
-This document describes how to deploy kubernetes on multiple hosts to set up a multi-node cluster and networking with flannel. Follow fedora [getting started guide](fedora_manual_config.md) to setup 1 master (fed-master) and 2 or more nodes (minions). Make sure that all nodes (minions) have different names (fed-node1, fed-node2 and so on) and labels (fed-node1-label, fed-node2-label, and so on) to avoid any conflict. Also make sure that the kubernetes master host is running etcd, kube-controller-manager, kube-scheduler, and kube-apiserver services, and the nodes (minions) are running docker, kube-proxy and kubelet services. Now install flannel on kubernetes nodes (minions). flannel on each node configures an overlay network that docker uses. flannel runs on each node to setup a unique class-C container network.
+This document describes how to deploy kubernetes on multiple hosts to set up a multi-node cluster and networking with flannel. Follow fedora [getting started guide](fedora_manual_config.md) to setup 1 master (fed-master) and 2 or more nodes. Make sure that all nodes have different names (fed-node1, fed-node2 and so on) and labels (fed-node1-label, fed-node2-label, and so on) to avoid any conflict. Also make sure that the kubernetes master host is running etcd, kube-controller-manager, kube-scheduler, and kube-apiserver services, and the nodes are running docker, kube-proxy and kubelet services. Now install flannel on kubernetes nodes. flannel on each node configures an overlay network that docker uses. flannel runs on each node to setup a unique class-C container network.
 
 ## Prerequisites
 1. You need 2 or more machines with Fedora installed.
