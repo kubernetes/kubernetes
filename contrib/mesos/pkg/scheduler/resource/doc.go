@@ -14,17 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
-
-import (
-	"time"
-)
-
-// default values to use when constructing mesos ExecutorInfo messages
-const (
-	DefaultInfoID         = "k8sm-executor"
-	DefaultInfoSource     = "kubernetes"
-	DefaultInfoName       = "Kubelet-Executor"
-	DefaultSuicideTimeout = 20 * time.Minute
-	DefaultCgroupPrefix   = "mesos"
-)
+// Package resource contains the Mesos scheduler specific resource functions
+package resource

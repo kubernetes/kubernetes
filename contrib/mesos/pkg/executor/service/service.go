@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -70,6 +71,26 @@ type KubeletExecutorServer struct {
 	SuicideTimeout time.Duration
 	ShutdownFD     int
 	ShutdownFIFO   string
+	cgroupRoot     string
+	cgroupPrefix   string
+}
+
+func findMesosCgroup(prefix string) string {
+	// derive our cgroup from MESOS_DIRECTORY environment
+	mesosDir := os.Getenv("MESOS_DIRECTORY")
+	if mesosDir == "" {
+		log.V(2).Infof("cannot derive executor's cgroup because MESOS_DIRECTORY is empty")
+		return ""
+	}
+
+	containerId := path.Base(mesosDir)
+	if containerId == "" {
+		log.V(2).Infof("cannot derive executor's cgroup from MESOS_DIRECTORY=%q", mesosDir)
+		return ""
+	}
+	trimmedPrefix := strings.Trim(prefix, "/")
+	cgroupRoot := fmt.Sprintf("/%s/%v", trimmedPrefix, containerId)
+	return cgroupRoot
 }
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
@@ -79,6 +100,7 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 		ProxyExec:      "./kube-proxy",
 		ProxyLogfile:   "./proxy-log",
 		SuicideTimeout: config.DefaultSuicideTimeout,
+		cgroupPrefix:   config.DefaultCgroupPrefix,
 	}
 	if pwd, err := os.Getwd(); err != nil {
 		log.Warningf("failed to determine current directory: %v", err)
@@ -87,6 +109,7 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 	}
 	k.Address = util.IP(net.ParseIP(defaultBindingAddress()))
 	k.ShutdownFD = -1 // indicates unspecified FD
+
 	return k
 }
 
@@ -112,6 +135,7 @@ func (s *KubeletExecutorServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.SuicideTimeout, "suicide-timeout", s.SuicideTimeout, "Self-terminate after this period of inactivity. Zero disables suicide watch.")
 	fs.IntVar(&s.ShutdownFD, "shutdown-fd", s.ShutdownFD, "File descriptor used to signal shutdown to external watchers, requires shutdown-fifo flag")
 	fs.StringVar(&s.ShutdownFIFO, "shutdown-fifo", s.ShutdownFIFO, "FIFO used to signal shutdown to external watchers, requires shutdown-fd flag")
+	fs.StringVar(&s.cgroupPrefix, "cgroup-prefix", s.cgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
 }
 
 func (s *KubeletExecutorServer) AddStandaloneFlags(fs *pflag.FlagSet) {
@@ -143,6 +167,14 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		log.Info(err)
 	}
 
+	// derive the executor cgroup and use it as docker cgroup root
+	mesosCgroup := findMesosCgroup(s.cgroupPrefix)
+	s.cgroupRoot = mesosCgroup
+	s.SystemContainer = mesosCgroup
+	s.ResourceContainer = mesosCgroup
+	log.V(2).Infof("passing cgroup %q to the kubelet as cgroup root", s.CgroupRoot)
+
+	// create apiserver client
 	var apiclient *client.Client
 	clientConfig, err := s.CreateAPIServerClientConfig()
 	if err == nil {
@@ -249,7 +281,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		Cloud:                          nil, // TODO(jdef) Cloud, specifying null here because we don't want all kubelets polling mesos-master; need to account for this in the cloudprovider impl
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
 		ResourceContainer:         s.ResourceContainer,
-		CgroupRoot:                s.CgroupRoot,
+		CgroupRoot:                s.cgroupRoot,
 		ContainerRuntime:          s.ContainerRuntime,
 		Mounter:                   mounter,
 		DockerDaemonContainer:     s.DockerDaemonContainer,

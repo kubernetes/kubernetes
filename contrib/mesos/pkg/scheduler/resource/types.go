@@ -14,17 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package resource
 
 import (
-	"time"
+	"fmt"
+	"strconv"
 )
 
-// default values to use when constructing mesos ExecutorInfo messages
-const (
-	DefaultInfoID         = "k8sm-executor"
-	DefaultInfoSource     = "kubernetes"
-	DefaultInfoName       = "Kubelet-Executor"
-	DefaultSuicideTimeout = 20 * time.Minute
-	DefaultCgroupPrefix   = "mesos"
-)
+type MegaBytes float64
+type CPUShares float64
+
+func (f *CPUShares) Set(s string) error {
+	v, err := strconv.ParseFloat(s, 64)
+	*f = CPUShares(v)
+	return err
+}
+
+func (f *CPUShares) Type() string {
+	return "float64"
+}
+
+func (f *CPUShares) String() string { return fmt.Sprintf("%v", *f) }
+
+func (f *MegaBytes) Set(s string) error {
+	v, err := strconv.ParseFloat(s, 64)
+	*f = MegaBytes(v)
+	return err
+}
+
+func (f *MegaBytes) Type() string {
+	return "float64"
+}
+
+func (f *MegaBytes) String() string { return fmt.Sprintf("%v", *f) }
