@@ -37,7 +37,7 @@ import (
 )
 
 // This should match whatever the default/configured range is
-var ServiceNodePortRange = util.PortRange{Base: 30000, Size: 2767}
+var ServiceNodePortRange = util.PortRange{Base: 30000, Size: 2768}
 
 var _ = Describe("Services", func() {
 	var c *client.Client
