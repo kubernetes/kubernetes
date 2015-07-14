@@ -93,5 +93,5 @@ Server-side support:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cli-roadmap.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/cli-roadmap.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
