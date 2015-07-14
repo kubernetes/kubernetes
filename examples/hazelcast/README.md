@@ -31,7 +31,7 @@ This is a somewhat long tutorial.  If you want to jump straight to the "do it no
 Source is freely available at:
 * Hazelcast Discovery - https://github.com/pires/hazelcast-kubernetes-bootstrapper
 * Dockerfile - https://github.com/pires/hazelcast-kubernetes
-* Docker Trusted Build - https://registry.hub.docker.com/u/pires/hazelcast-k8s
+* Docker Trusted Build - https://quay.io/repository/pires/hazelcast-kubernetes
 
 ### Simple Single Pod Hazelcast Node
 In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes. 
@@ -53,7 +53,6 @@ metadata:
 spec: 
   ports:
     - port: 5701
-      targetPort: 5701
   selector: 
     name: hazelcast
 ```
@@ -91,8 +90,8 @@ spec:
       containers: 
         - resources:
             limits:
-              cpu: 0.5
-          image: quay.io/pires/hazelcast-kubernetes:0.3.1
+              cpu: 1
+          image: quay.io/pires/hazelcast-kubernetes:0.5
           name: hazelcast
           env:
           - name: "DNS_DOMAIN"
@@ -102,7 +101,7 @@ spec:
               name: hazelcast
 ```
 
-There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.3.1`.  This is a `busybox` installation with JRE 8.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingle.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
+There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.5`.  This is a `busybox` installation with JRE 8 Update 45.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingle.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
 
 You may also note that we tell Kubernetes that the container exposes the `hazelcast` port.  Finally, we tell the cluster manager that we need 1 cpu core.
 
@@ -118,30 +117,44 @@ $ kubectl create -f hazelcast-controller.yaml
 
 After the controller provisions successfully the pod, you can query the service endpoints:
 ```sh
-$ kubectl get endpoints hazelcast -o yaml
-apiVersion: v1
-kind: Endpoints
-metadata:
-  creationTimestamp: 2015-05-04T17:43:40Z
-  labels:
-    name: hazelcast
-  name: hazelcast
-  namespace: default
-  resourceVersion: "120480"
-  selfLink: /api/v1/namespaces/default/endpoints/hazelcast
-  uid: 19a22aa9-f285-11e4-b38f-42010af0bbf9
-subsets:
-- addresses:
-  - IP: 10.245.2.68
-    targetRef:
-      kind: Pod
-      name: hazelcast
-      namespace: default
-      resourceVersion: "120479"
-      uid: d7238173-f283-11e4-b38f-42010af0bbf9
-  ports:
-  - port: 5701
-    protocol: TCP
+$ kubectl get endpoints hazelcast -o json
+{
+    "kind": "Endpoints",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "hazelcast",
+        "namespace": "default",
+        "selfLink": "/api/v1/namespaces/default/endpoints/hazelcast",
+        "uid": "094e507a-2700-11e5-abbc-080027eae546",
+        "resourceVersion": "4094",
+        "creationTimestamp": "2015-07-10T12:34:41Z",
+        "labels": {
+            "name": "hazelcast"
+        }
+    },
+    "subsets": [
+        {
+            "addresses": [
+                {
+                    "ip": "10.244.37.3",
+                    "targetRef": {
+                        "kind": "Pod",
+                        "namespace": "default",
+                        "name": "hazelcast-nsyzn",
+                        "uid": "f57eb6b0-2706-11e5-abbc-080027eae546",
+                        "resourceVersion": "4093"
+                    }
+                }
+            ],
+            "ports": [
+                {
+                    "port": 5701,
+                    "protocol": "TCP"
+                }
+            ]
+        }
+    ]
+}
 ```
 
 You can see that the _Service_ has found the pod created by the replication controller.
@@ -158,46 +171,47 @@ Now if you list the pods in your cluster, you should see two hazelcast pods:
 ```sh
 $ kubectl get pods
 NAME              READY     STATUS    RESTARTS   AGE
-hazelcast-1vmnv   1/1       Running   0          34s
-hazelcast-ezs01   1/1       Running   0          43s
+hazelcast-nanfb   1/1       Running   0          40s
+hazelcast-nsyzn   1/1       Running   0          2m
+kube-dns-xudrp    3/3       Running   0          1h
 ```
 
 To prove that this all works, you can use the `log` command to examine the logs of one pod, for example:
 
 ```sh
-$ kubectl logs hazelcast-ulkws hazelcast
-2015-05-09 22:06:20.016  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Starting Application v0.2-SNAPSHOT on hazelcast-enyli with PID 5 (/bootstrapper.jar started by root in /)
-2015-05-09 22:06:20.071  INFO 5 --- [           main] s.c.a.AnnotationConfigApplicationContext : Refreshing org.springframework.context.annotation.AnnotationConfigApplicationContext@5424f110: startup date [Sat May 09 22:06:20 GMT 2015]; root of context hierarchy
-2015-05-09 22:06:21.511  INFO 5 --- [           main] o.s.j.e.a.AnnotationMBeanExporter        : Registering beans for JMX exposure on startup
-2015-05-09 22:06:21.549  INFO 5 --- [           main] c.g.p.h.HazelcastDiscoveryController     : Asking k8s registry at https://kubernetes.default.cluster.local..
-2015-05-09 22:06:22.031  INFO 5 --- [           main] c.g.p.h.HazelcastDiscoveryController     : Found 2 pods running Hazelcast.
-2015-05-09 22:06:22.176  INFO 5 --- [           main] c.h.instance.DefaultAddressPicker        : [LOCAL] [someGroup] [3.4.2] Interfaces is disabled, trying to pick one address from TCP-IP config addresses: [10.244.90.3, 10.244.66.2]
-2015-05-09 22:06:22.177  INFO 5 --- [           main] c.h.instance.DefaultAddressPicker        : [LOCAL] [someGroup] [3.4.2] Prefer IPv4 stack is true.
-2015-05-09 22:06:22.189  INFO 5 --- [           main] c.h.instance.DefaultAddressPicker        : [LOCAL] [someGroup] [3.4.2] Picked Address[10.244.66.2]:5701, using socket ServerSocket[addr=/0:0:0:0:0:0:0:0,localport=5701], bind any local is true
-2015-05-09 22:06:22.642  INFO 5 --- [           main] com.hazelcast.spi.OperationService       : [10.244.66.2]:5701 [someGroup] [3.4.2] Backpressure is disabled
-2015-05-09 22:06:22.647  INFO 5 --- [           main] c.h.spi.impl.BasicOperationScheduler     : [10.244.66.2]:5701 [someGroup] [3.4.2] Starting with 2 generic operation threads and 2 partition operation threads.
-2015-05-09 22:06:22.796  INFO 5 --- [           main] com.hazelcast.system                     : [10.244.66.2]:5701 [someGroup] [3.4.2] Hazelcast 3.4.2 (20150326 - f6349a4) starting at Address[10.244.66.2]:5701
-2015-05-09 22:06:22.798  INFO 5 --- [           main] com.hazelcast.system                     : [10.244.66.2]:5701 [someGroup] [3.4.2] Copyright (C) 2008-2014 Hazelcast.com
-2015-05-09 22:06:22.800  INFO 5 --- [           main] com.hazelcast.instance.Node              : [10.244.66.2]:5701 [someGroup] [3.4.2] Creating TcpIpJoiner
-2015-05-09 22:06:22.801  INFO 5 --- [           main] com.hazelcast.core.LifecycleService      : [10.244.66.2]:5701 [someGroup] [3.4.2] Address[10.244.66.2]:5701 is STARTING
-2015-05-09 22:06:23.108  INFO 5 --- [cached.thread-2] com.hazelcast.nio.tcp.SocketConnector    : [10.244.66.2]:5701 [someGroup] [3.4.2] Connecting to /10.244.90.3:5701, timeout: 0, bind-any: true
-2015-05-09 22:06:23.182  INFO 5 --- [cached.thread-2] c.h.nio.tcp.TcpIpConnectionManager       : [10.244.66.2]:5701 [someGroup] [3.4.2] Established socket connection between /10.244.66.2:48051 and 10.244.90.3/10.244.90.3:5701
-2015-05-09 22:06:29.158  INFO 5 --- [ration.thread-1] com.hazelcast.cluster.ClusterService     : [10.244.66.2]:5701 [someGroup] [3.4.2]
+$ kubectl log hazelcast-nanfb hazelcast
+2015-07-10 13:26:34.443  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Starting Application on hazelcast-nanfb with PID 5 (/bootstrapper.jar started by root in /)
+2015-07-10 13:26:34.535  INFO 5 --- [           main] s.c.a.AnnotationConfigApplicationContext : Refreshing org.springframework.context.annotation.AnnotationConfigApplicationContext@42cfcf1: startup date [Fri Jul 10 13:26:34 GMT 2015]; root of context hierarchy
+2015-07-10 13:26:35.888  INFO 5 --- [           main] o.s.j.e.a.AnnotationMBeanExporter        : Registering beans for JMX exposure on startup
+2015-07-10 13:26:35.924  INFO 5 --- [           main] c.g.p.h.HazelcastDiscoveryController     : Asking k8s registry at https://kubernetes.default.svc.cluster.local..
+2015-07-10 13:26:37.259  INFO 5 --- [           main] c.g.p.h.HazelcastDiscoveryController     : Found 2 pods running Hazelcast.
+2015-07-10 13:26:37.404  INFO 5 --- [           main] c.h.instance.DefaultAddressPicker        : [LOCAL] [someGroup] [3.5] Interfaces is disabled, trying to pick one address from TCP-IP config addresses: [10.244.77.3, 10.244.37.3]
+2015-07-10 13:26:37.405  INFO 5 --- [           main] c.h.instance.DefaultAddressPicker        : [LOCAL] [someGroup] [3.5] Prefer IPv4 stack is true.
+2015-07-10 13:26:37.415  INFO 5 --- [           main] c.h.instance.DefaultAddressPicker        : [LOCAL] [someGroup] [3.5] Picked Address[10.244.77.3]:5701, using socket ServerSocket[addr=/0:0:0:0:0:0:0:0,localport=5701], bind any local is true
+2015-07-10 13:26:37.852  INFO 5 --- [           main] com.hazelcast.spi.OperationService       : [10.244.77.3]:5701 [someGroup] [3.5] Backpressure is disabled
+2015-07-10 13:26:37.879  INFO 5 --- [           main] c.h.s.i.o.c.ClassicOperationExecutor     : [10.244.77.3]:5701 [someGroup] [3.5] Starting with 2 generic operation threads and 2 partition operation threads.
+2015-07-10 13:26:38.531  INFO 5 --- [           main] com.hazelcast.system                     : [10.244.77.3]:5701 [someGroup] [3.5] Hazelcast 3.5 (20150617 - 4270dc6) starting at Address[10.244.77.3]:5701
+2015-07-10 13:26:38.532  INFO 5 --- [           main] com.hazelcast.system                     : [10.244.77.3]:5701 [someGroup] [3.5] Copyright (c) 2008-2015, Hazelcast, Inc. All Rights Reserved.
+2015-07-10 13:26:38.533  INFO 5 --- [           main] com.hazelcast.instance.Node              : [10.244.77.3]:5701 [someGroup] [3.5] Creating TcpIpJoiner
+2015-07-10 13:26:38.534  INFO 5 --- [           main] com.hazelcast.core.LifecycleService      : [10.244.77.3]:5701 [someGroup] [3.5] Address[10.244.77.3]:5701 is STARTING
+2015-07-10 13:26:38.672  INFO 5 --- [        cached1] com.hazelcast.nio.tcp.SocketConnector    : [10.244.77.3]:5701 [someGroup] [3.5] Connecting to /10.244.37.3:5701, timeout: 0, bind-any: true
+2015-07-10 13:26:38.683  INFO 5 --- [        cached1] c.h.nio.tcp.TcpIpConnectionManager       : [10.244.77.3]:5701 [someGroup] [3.5] Established socket connection between /10.244.77.3:59951
+2015-07-10 13:26:45.699  INFO 5 --- [ration.thread-1] com.hazelcast.cluster.ClusterService     : [10.244.77.3]:5701 [someGroup] [3.5]
 
 Members [2] {
-  Member [10.244.90.3]:5701
-  Member [10.244.66.2]:5701 this
+        Member [10.244.37.3]:5701
+        Member [10.244.77.3]:5701 this
 }
 
-2015-05-09 22:06:31.177  INFO 5 --- [           main] com.hazelcast.core.LifecycleService      : [10.244.66.2]:5701 [someGroup] [3.4.2] Address[10.244.66.2]:5701 is STARTED
-```
+2015-07-10 13:26:47.722  INFO 5 --- [           main] com.hazelcast.core.LifecycleService      : [10.244.77.3]:5701 [someGroup] [3.5] Address[10.244.77.3]:5701 is STARTED
+2015-07-10 13:26:47.723  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Started Application in 13.792 seconds (JVM running for 14.542)```
 
 Now let's scale our cluster to 4 nodes:
 ```sh
 $ kubectl scale rc hazelcast --replicas=4
 ```
 
-Examine the status again by checking a node’s log and you should see the 4 members connected.
+Examine the status again by checking the logs and you should see the 4 members connected.
 
 ### tl; dr;
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
