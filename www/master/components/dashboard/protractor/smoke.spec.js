@@ -1,6 +1,6 @@
 describe('Kubernetes UI Dashboard', function() {
   it('should have all the expected components loaded', function() {
-    browser.get('http://localhost:8000');
+    browser.get(browser.baseUrl + '/');
     expect(browser.getTitle()).toEqual('Kubernetes UI');
 
     // Navigate to the graph page.
@@ -15,7 +15,7 @@ describe('Kubernetes UI Dashboard', function() {
   });
 
   it('should have the subnav view', function() {
-    browser.get('http://localhost:8000/');
+    browser.get(browser.baseUrl + '/');
 
     // Make sure the subnav and subpage selection is correctly loaded.
     expect(by.css('.dashboard-subnav')).toBeDefined();
@@ -40,7 +40,7 @@ describe('Kubernetes UI Dashboard', function() {
   });
 
   it('should have the cAdvisor view by default', function() {
-    browser.get('http://localhost:8000/');
+    browser.get(browser.baseUrl + '/');
     expect(browser.getTitle()).toEqual('Kubernetes UI');
 
     expect(element.all(by.css('.dashboard')).count()).toBeGreaterThan(0);
@@ -55,7 +55,7 @@ describe('Kubernetes UI Dashboard', function() {
   });
 
   it('should have the correct subviews', function() {
-    browser.get('http://localhost:8000/');
+    browser.get(browser.baseUrl + '/');
 
     var subviews = ['podsView', 'minionsView', 'rcView', 'servicesView', 'eventsView'];
 
@@ -85,7 +85,7 @@ describe('Kubernetes UI Dashboard', function() {
   });
 
   it('should have the correct groups view', function() {
-    browser.get('http://localhost:8000/');
+    browser.get(browser.baseUrl + '/');
 
     // Navigate to the group view.
     var select = element(by.model('page'));

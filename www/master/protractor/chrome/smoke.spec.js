@@ -1,6 +1,6 @@
 describe('Kubernetes UI Chome', function() {
   it('should have all the expected tabs loaded', function() {
-    browser.get('http://localhost:8000');
+    browser.get(browser.baseUrl + '/');
     expect(browser.getTitle()).toEqual('Kubernetes UI');
 
     // Navigate to the graph page.
