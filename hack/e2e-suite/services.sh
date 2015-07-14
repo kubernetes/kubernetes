@@ -84,9 +84,9 @@ wait_for_apiserver() {
 
   local i
   for i in $(seq 1 12); do
-    results=($(ssh-to-node "${master}" "
+    results=$(ssh-to-node "${master}" "
       wget -q -T 1 -O - http://localhost:8080/healthz || true
-    "))
+    ")
     if [[ "${results}" == "ok" ]]; then
       return
     fi
