@@ -12,7 +12,7 @@
       "type": "v1beta3.Binding",
       "method": "POST",
       "summary": "create a Binding",
-      "nickname": "createBinding",
+      "nickname": "createNamespacedBinding",
       "parameters": [
        {
         "type": "string",
@@ -106,7 +106,7 @@
       "type": "v1beta3.ComponentStatusList",
       "method": "GET",
       "summary": "list objects of kind ComponentStatus",
-      "nickname": "listComponentStatus",
+      "nickname": "listNamespacedComponentStatus",
       "parameters": [
        {
         "type": "string",
@@ -181,7 +181,7 @@
       "type": "v1beta3.ComponentStatus",
       "method": "GET",
       "summary": "read the specified ComponentStatus",
-      "nickname": "readComponentStatus",
+      "nickname": "readNamespacedComponentStatus",
       "parameters": [
        {
         "type": "string",
@@ -299,7 +299,7 @@
       "type": "v1beta3.EndpointsList",
       "method": "GET",
       "summary": "list or watch objects of kind Endpoints",
-      "nickname": "listEndpoints",
+      "nickname": "listNamespacedEndpoints",
       "parameters": [
        {
         "type": "string",
@@ -368,7 +368,7 @@
       "type": "v1beta3.Endpoints",
       "method": "POST",
       "summary": "create a Endpoints",
-      "nickname": "createEndpoints",
+      "nickname": "createNamespacedEndpoints",
       "parameters": [
        {
         "type": "string",
@@ -419,7 +419,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
-      "nickname": "watchEndpointsList",
+      "nickname": "watchNamespacedEndpointsList",
       "parameters": [
        {
         "type": "string",
@@ -494,7 +494,7 @@
       "type": "v1beta3.Endpoints",
       "method": "GET",
       "summary": "read the specified Endpoints",
-      "nickname": "readEndpoints",
+      "nickname": "readNamespacedEndpoints",
       "parameters": [
        {
         "type": "string",
@@ -539,7 +539,7 @@
       "type": "v1beta3.Endpoints",
       "method": "PUT",
       "summary": "replace the specified Endpoints",
-      "nickname": "replaceEndpoints",
+      "nickname": "replaceNamespacedEndpoints",
       "parameters": [
        {
         "type": "string",
@@ -592,7 +592,7 @@
       "type": "v1beta3.Endpoints",
       "method": "PATCH",
       "summary": "partially update the specified Endpoints",
-      "nickname": "patchEndpoints",
+      "nickname": "patchNamespacedEndpoints",
       "parameters": [
        {
         "type": "string",
@@ -647,7 +647,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a Endpoints",
-      "nickname": "deleteEndpoints",
+      "nickname": "deleteNamespacedEndpoints",
       "parameters": [
        {
         "type": "string",
@@ -706,7 +706,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Endpoints",
-      "nickname": "watchEndpoints",
+      "nickname": "watchNamespacedEndpoints",
       "parameters": [
        {
         "type": "string",
@@ -960,7 +960,7 @@
       "type": "v1beta3.EventList",
       "method": "GET",
       "summary": "list or watch objects of kind Event",
-      "nickname": "listEvent",
+      "nickname": "listNamespacedEvent",
       "parameters": [
        {
         "type": "string",
@@ -1029,7 +1029,7 @@
       "type": "v1beta3.Event",
       "method": "POST",
       "summary": "create a Event",
-      "nickname": "createEvent",
+      "nickname": "createNamespacedEvent",
       "parameters": [
        {
         "type": "string",
@@ -1080,7 +1080,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
-      "nickname": "watchEventList",
+      "nickname": "watchNamespacedEventList",
       "parameters": [
        {
         "type": "string",
@@ -1155,7 +1155,7 @@
       "type": "v1beta3.Event",
       "method": "GET",
       "summary": "read the specified Event",
-      "nickname": "readEvent",
+      "nickname": "readNamespacedEvent",
       "parameters": [
        {
         "type": "string",
@@ -1200,7 +1200,7 @@
       "type": "v1beta3.Event",
       "method": "PUT",
       "summary": "replace the specified Event",
-      "nickname": "replaceEvent",
+      "nickname": "replaceNamespacedEvent",
       "parameters": [
        {
         "type": "string",
@@ -1253,7 +1253,7 @@
       "type": "v1beta3.Event",
       "method": "PATCH",
       "summary": "partially update the specified Event",
-      "nickname": "patchEvent",
+      "nickname": "patchNamespacedEvent",
       "parameters": [
        {
         "type": "string",
@@ -1308,7 +1308,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a Event",
-      "nickname": "deleteEvent",
+      "nickname": "deleteNamespacedEvent",
       "parameters": [
        {
         "type": "string",
@@ -1359,7 +1359,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Event",
-      "nickname": "watchEvent",
+      "nickname": "watchNamespacedEvent",
       "parameters": [
        {
         "type": "string",
@@ -1613,7 +1613,7 @@
       "type": "v1beta3.LimitRangeList",
       "method": "GET",
       "summary": "list or watch objects of kind LimitRange",
-      "nickname": "listLimitRange",
+      "nickname": "listNamespacedLimitRange",
       "parameters": [
        {
         "type": "string",
@@ -1682,7 +1682,7 @@
       "type": "v1beta3.LimitRange",
       "method": "POST",
       "summary": "create a LimitRange",
-      "nickname": "createLimitRange",
+      "nickname": "createNamespacedLimitRange",
       "parameters": [
        {
         "type": "string",
@@ -1733,7 +1733,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
-      "nickname": "watchLimitRangeList",
+      "nickname": "watchNamespacedLimitRangeList",
       "parameters": [
        {
         "type": "string",
@@ -1808,7 +1808,7 @@
       "type": "v1beta3.LimitRange",
       "method": "GET",
       "summary": "read the specified LimitRange",
-      "nickname": "readLimitRange",
+      "nickname": "readNamespacedLimitRange",
       "parameters": [
        {
         "type": "string",
@@ -1853,7 +1853,7 @@
       "type": "v1beta3.LimitRange",
       "method": "PUT",
       "summary": "replace the specified LimitRange",
-      "nickname": "replaceLimitRange",
+      "nickname": "replaceNamespacedLimitRange",
       "parameters": [
        {
         "type": "string",
@@ -1906,7 +1906,7 @@
       "type": "v1beta3.LimitRange",
       "method": "PATCH",
       "summary": "partially update the specified LimitRange",
-      "nickname": "patchLimitRange",
+      "nickname": "patchNamespacedLimitRange",
       "parameters": [
        {
         "type": "string",
@@ -1961,7 +1961,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a LimitRange",
-      "nickname": "deleteLimitRange",
+      "nickname": "deleteNamespacedLimitRange",
       "parameters": [
        {
         "type": "string",
@@ -2012,7 +2012,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind LimitRange",
-      "nickname": "watchLimitRange",
+      "nickname": "watchNamespacedLimitRange",
       "parameters": [
        {
         "type": "string",
@@ -2266,7 +2266,7 @@
       "type": "v1beta3.NamespaceList",
       "method": "GET",
       "summary": "list or watch objects of kind Namespace",
-      "nickname": "listNamespace",
+      "nickname": "listNamespacedNamespace",
       "parameters": [
        {
         "type": "string",
@@ -2327,7 +2327,7 @@
       "type": "v1beta3.Namespace",
       "method": "POST",
       "summary": "create a Namespace",
-      "nickname": "createNamespace",
+      "nickname": "createNamespacedNamespace",
       "parameters": [
        {
         "type": "string",
@@ -2370,7 +2370,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Namespace",
-      "nickname": "watchNamespaceList",
+      "nickname": "watchNamespacedNamespaceList",
       "parameters": [
        {
         "type": "string",
@@ -2437,7 +2437,7 @@
       "type": "v1beta3.Namespace",
       "method": "GET",
       "summary": "read the specified Namespace",
-      "nickname": "readNamespace",
+      "nickname": "readNamespacedNamespace",
       "parameters": [
        {
         "type": "string",
@@ -2474,7 +2474,7 @@
       "type": "v1beta3.Namespace",
       "method": "PUT",
       "summary": "replace the specified Namespace",
-      "nickname": "replaceNamespace",
+      "nickname": "replaceNamespacedNamespace",
       "parameters": [
        {
         "type": "string",
@@ -2519,7 +2519,7 @@
       "type": "v1beta3.Namespace",
       "method": "PATCH",
       "summary": "partially update the specified Namespace",
-      "nickname": "patchNamespace",
+      "nickname": "patchNamespacedNamespace",
       "parameters": [
        {
         "type": "string",
@@ -2566,7 +2566,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a Namespace",
-      "nickname": "deleteNamespace",
+      "nickname": "deleteNamespacedNamespace",
       "parameters": [
        {
         "type": "string",
@@ -2617,7 +2617,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Namespace",
-      "nickname": "watchNamespace",
+      "nickname": "watchNamespacedNamespace",
       "parameters": [
        {
         "type": "string",
@@ -2692,7 +2692,7 @@
       "type": "v1beta3.Namespace",
       "method": "PUT",
       "summary": "replace finalize of the specified Namespace",
-      "nickname": "replaceNamespaceFinalize",
+      "nickname": "replaceNamespacedNamespaceFinalize",
       "parameters": [
        {
         "type": "string",
@@ -2743,7 +2743,7 @@
       "type": "v1beta3.Namespace",
       "method": "PUT",
       "summary": "replace status of the specified Namespace",
-      "nickname": "replaceNamespaceStatus",
+      "nickname": "replaceNamespacedNamespaceStatus",
       "parameters": [
        {
         "type": "string",
@@ -2794,7 +2794,7 @@
       "type": "v1beta3.NodeList",
       "method": "GET",
       "summary": "list or watch objects of kind Node",
-      "nickname": "listNode",
+      "nickname": "listNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -2855,7 +2855,7 @@
       "type": "v1beta3.Node",
       "method": "POST",
       "summary": "create a Node",
-      "nickname": "createNode",
+      "nickname": "createNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -2898,7 +2898,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Node",
-      "nickname": "watchNodeList",
+      "nickname": "watchNamespacedNodeList",
       "parameters": [
        {
         "type": "string",
@@ -2965,7 +2965,7 @@
       "type": "v1beta3.Node",
       "method": "GET",
       "summary": "read the specified Node",
-      "nickname": "readNode",
+      "nickname": "readNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3002,7 +3002,7 @@
       "type": "v1beta3.Node",
       "method": "PUT",
       "summary": "replace the specified Node",
-      "nickname": "replaceNode",
+      "nickname": "replaceNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3047,7 +3047,7 @@
       "type": "v1beta3.Node",
       "method": "PATCH",
       "summary": "partially update the specified Node",
-      "nickname": "patchNode",
+      "nickname": "patchNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3094,7 +3094,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a Node",
-      "nickname": "deleteNode",
+      "nickname": "deleteNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3145,7 +3145,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Node",
-      "nickname": "watchNode",
+      "nickname": "watchNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3220,7 +3220,7 @@
       "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
-      "nickname": "proxyGETNode",
+      "nickname": "proxyGETNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3250,7 +3250,7 @@
       "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
-      "nickname": "proxyPUTNode",
+      "nickname": "proxyPUTNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3280,7 +3280,7 @@
       "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
-      "nickname": "proxyPOSTNode",
+      "nickname": "proxyPOSTNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3310,7 +3310,7 @@
       "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
-      "nickname": "proxyDELETENode",
+      "nickname": "proxyDELETENamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3340,7 +3340,7 @@
       "type": "string",
       "method": "HEAD",
       "summary": "proxy HEAD requests to Node",
-      "nickname": "proxyHEADNode",
+      "nickname": "proxyHEADNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3370,7 +3370,7 @@
       "type": "string",
       "method": "OPTIONS",
       "summary": "proxy OPTIONS requests to Node",
-      "nickname": "proxyOPTIONSNode",
+      "nickname": "proxyOPTIONSNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3406,7 +3406,7 @@
       "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
-      "nickname": "proxyGETNode",
+      "nickname": "proxyGETNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3428,7 +3428,7 @@
       "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
-      "nickname": "proxyPUTNode",
+      "nickname": "proxyPUTNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3450,7 +3450,7 @@
       "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
-      "nickname": "proxyPOSTNode",
+      "nickname": "proxyPOSTNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3472,7 +3472,7 @@
       "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
-      "nickname": "proxyDELETENode",
+      "nickname": "proxyDELETENamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3494,7 +3494,7 @@
       "type": "string",
       "method": "HEAD",
       "summary": "proxy HEAD requests to Node",
-      "nickname": "proxyHEADNode",
+      "nickname": "proxyHEADNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3516,7 +3516,7 @@
       "type": "string",
       "method": "OPTIONS",
       "summary": "proxy OPTIONS requests to Node",
-      "nickname": "proxyOPTIONSNode",
+      "nickname": "proxyOPTIONSNamespacedNode",
       "parameters": [
        {
         "type": "string",
@@ -3544,7 +3544,7 @@
       "type": "v1beta3.Node",
       "method": "PUT",
       "summary": "replace status of the specified Node",
-      "nickname": "replaceNodeStatus",
+      "nickname": "replaceNamespacedNodeStatus",
       "parameters": [
        {
         "type": "string",
@@ -3595,7 +3595,7 @@
       "type": "v1beta3.PersistentVolumeClaimList",
       "method": "GET",
       "summary": "list or watch objects of kind PersistentVolumeClaim",
-      "nickname": "listPersistentVolumeClaim",
+      "nickname": "listNamespacedPersistentVolumeClaim",
       "parameters": [
        {
         "type": "string",
@@ -3664,7 +3664,7 @@
       "type": "v1beta3.PersistentVolumeClaim",
       "method": "POST",
       "summary": "create a PersistentVolumeClaim",
-      "nickname": "createPersistentVolumeClaim",
+      "nickname": "createNamespacedPersistentVolumeClaim",
       "parameters": [
        {
         "type": "string",
@@ -3715,7 +3715,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
-      "nickname": "watchPersistentVolumeClaimList",
+      "nickname": "watchNamespacedPersistentVolumeClaimList",
       "parameters": [
        {
         "type": "string",
@@ -3790,7 +3790,7 @@
       "type": "v1beta3.PersistentVolumeClaim",
       "method": "GET",
       "summary": "read the specified PersistentVolumeClaim",
-      "nickname": "readPersistentVolumeClaim",
+      "nickname": "readNamespacedPersistentVolumeClaim",
       "parameters": [
        {
         "type": "string",
@@ -3835,7 +3835,7 @@
       "type": "v1beta3.PersistentVolumeClaim",
       "method": "PUT",
       "summary": "replace the specified PersistentVolumeClaim",
-      "nickname": "replacePersistentVolumeClaim",
+      "nickname": "replaceNamespacedPersistentVolumeClaim",
       "parameters": [
        {
         "type": "string",
@@ -3888,7 +3888,7 @@
       "type": "v1beta3.PersistentVolumeClaim",
       "method": "PATCH",
       "summary": "partially update the specified PersistentVolumeClaim",
-      "nickname": "patchPersistentVolumeClaim",
+      "nickname": "patchNamespacedPersistentVolumeClaim",
       "parameters": [
        {
         "type": "string",
@@ -3943,7 +3943,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a PersistentVolumeClaim",
-      "nickname": "deletePersistentVolumeClaim",
+      "nickname": "deleteNamespacedPersistentVolumeClaim",
       "parameters": [
        {
         "type": "string",
@@ -4002,7 +4002,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolumeClaim",
-      "nickname": "watchPersistentVolumeClaim",
+      "nickname": "watchNamespacedPersistentVolumeClaim",
       "parameters": [
        {
         "type": "string",
@@ -4256,7 +4256,7 @@
       "type": "v1beta3.PersistentVolumeClaim",
       "method": "PUT",
       "summary": "replace status of the specified PersistentVolumeClaim",
-      "nickname": "replacePersistentVolumeClaimStatus",
+      "nickname": "replaceNamespacedPersistentVolumeClaimStatus",
       "parameters": [
        {
         "type": "string",
@@ -4315,7 +4315,7 @@
       "type": "v1beta3.PersistentVolumeList",
       "method": "GET",
       "summary": "list or watch objects of kind PersistentVolume",
-      "nickname": "listPersistentVolume",
+      "nickname": "listNamespacedPersistentVolume",
       "parameters": [
        {
         "type": "string",
@@ -4376,7 +4376,7 @@
       "type": "v1beta3.PersistentVolume",
       "method": "POST",
       "summary": "create a PersistentVolume",
-      "nickname": "createPersistentVolume",
+      "nickname": "createNamespacedPersistentVolume",
       "parameters": [
        {
         "type": "string",
@@ -4419,7 +4419,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolume",
-      "nickname": "watchPersistentVolumeList",
+      "nickname": "watchNamespacedPersistentVolumeList",
       "parameters": [
        {
         "type": "string",
@@ -4486,7 +4486,7 @@
       "type": "v1beta3.PersistentVolume",
       "method": "GET",
       "summary": "read the specified PersistentVolume",
-      "nickname": "readPersistentVolume",
+      "nickname": "readNamespacedPersistentVolume",
       "parameters": [
        {
         "type": "string",
@@ -4523,7 +4523,7 @@
       "type": "v1beta3.PersistentVolume",
       "method": "PUT",
       "summary": "replace the specified PersistentVolume",
-      "nickname": "replacePersistentVolume",
+      "nickname": "replaceNamespacedPersistentVolume",
       "parameters": [
        {
         "type": "string",
@@ -4568,7 +4568,7 @@
       "type": "v1beta3.PersistentVolume",
       "method": "PATCH",
       "summary": "partially update the specified PersistentVolume",
-      "nickname": "patchPersistentVolume",
+      "nickname": "patchNamespacedPersistentVolume",
       "parameters": [
        {
         "type": "string",
@@ -4615,7 +4615,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a PersistentVolume",
-      "nickname": "deletePersistentVolume",
+      "nickname": "deleteNamespacedPersistentVolume",
       "parameters": [
        {
         "type": "string",
@@ -4666,7 +4666,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolume",
-      "nickname": "watchPersistentVolume",
+      "nickname": "watchNamespacedPersistentVolume",
       "parameters": [
        {
         "type": "string",
@@ -4741,7 +4741,7 @@
       "type": "v1beta3.PersistentVolume",
       "method": "PUT",
       "summary": "replace status of the specified PersistentVolume",
-      "nickname": "replacePersistentVolumeStatus",
+      "nickname": "replaceNamespacedPersistentVolumeStatus",
       "parameters": [
        {
         "type": "string",
@@ -4792,7 +4792,7 @@
       "type": "v1beta3.PodList",
       "method": "GET",
       "summary": "list or watch objects of kind Pod",
-      "nickname": "listPod",
+      "nickname": "listNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -4861,7 +4861,7 @@
       "type": "v1beta3.Pod",
       "method": "POST",
       "summary": "create a Pod",
-      "nickname": "createPod",
+      "nickname": "createNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -4912,7 +4912,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
-      "nickname": "watchPodList",
+      "nickname": "watchNamespacedPodList",
       "parameters": [
        {
         "type": "string",
@@ -4987,7 +4987,7 @@
       "type": "v1beta3.Pod",
       "method": "GET",
       "summary": "read the specified Pod",
-      "nickname": "readPod",
+      "nickname": "readNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5032,7 +5032,7 @@
       "type": "v1beta3.Pod",
       "method": "PUT",
       "summary": "replace the specified Pod",
-      "nickname": "replacePod",
+      "nickname": "replaceNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5085,7 +5085,7 @@
       "type": "v1beta3.Pod",
       "method": "PATCH",
       "summary": "partially update the specified Pod",
-      "nickname": "patchPod",
+      "nickname": "patchNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5140,7 +5140,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a Pod",
-      "nickname": "deletePod",
+      "nickname": "deleteNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5199,7 +5199,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Pod",
-      "nickname": "watchPod",
+      "nickname": "watchNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5282,7 +5282,7 @@
       "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Pod",
-      "nickname": "proxyGETPod",
+      "nickname": "proxyGETNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5320,7 +5320,7 @@
       "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Pod",
-      "nickname": "proxyPUTPod",
+      "nickname": "proxyPUTNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5358,7 +5358,7 @@
       "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Pod",
-      "nickname": "proxyPOSTPod",
+      "nickname": "proxyPOSTNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5396,7 +5396,7 @@
       "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
-      "nickname": "proxyDELETEPod",
+      "nickname": "proxyDELETENamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5434,7 +5434,7 @@
       "type": "string",
       "method": "HEAD",
       "summary": "proxy HEAD requests to Pod",
-      "nickname": "proxyHEADPod",
+      "nickname": "proxyHEADNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5472,7 +5472,7 @@
       "type": "string",
       "method": "OPTIONS",
       "summary": "proxy OPTIONS requests to Pod",
-      "nickname": "proxyOPTIONSPod",
+      "nickname": "proxyOPTIONSNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5516,7 +5516,7 @@
       "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Pod",
-      "nickname": "proxyGETPod",
+      "nickname": "proxyGETNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5546,7 +5546,7 @@
       "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Pod",
-      "nickname": "proxyPUTPod",
+      "nickname": "proxyPUTNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5576,7 +5576,7 @@
       "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Pod",
-      "nickname": "proxyPOSTPod",
+      "nickname": "proxyPOSTNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5606,7 +5606,7 @@
       "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
-      "nickname": "proxyDELETEPod",
+      "nickname": "proxyDELETENamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5636,7 +5636,7 @@
       "type": "string",
       "method": "HEAD",
       "summary": "proxy HEAD requests to Pod",
-      "nickname": "proxyHEADPod",
+      "nickname": "proxyHEADNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5666,7 +5666,7 @@
       "type": "string",
       "method": "OPTIONS",
       "summary": "proxy OPTIONS requests to Pod",
-      "nickname": "proxyOPTIONSPod",
+      "nickname": "proxyOPTIONSNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -5873,7 +5873,7 @@
       "type": "v1beta3.Binding",
       "method": "POST",
       "summary": "create binding of a Binding",
-      "nickname": "createBindingBinding",
+      "nickname": "createNamespacedBindingBinding",
       "parameters": [
        {
         "type": "string",
@@ -5932,7 +5932,7 @@
       "type": "string",
       "method": "GET",
       "summary": "connect GET requests to exec of Pod",
-      "nickname": "connectGetPodExec",
+      "nickname": "connectGetNamespacedPodExec",
       "parameters": [
        {
         "type": "string",
@@ -5962,7 +5962,7 @@
       "type": "string",
       "method": "POST",
       "summary": "connect POST requests to exec of Pod",
-      "nickname": "connectPostPodExec",
+      "nickname": "connectPostNamespacedPodExec",
       "parameters": [
        {
         "type": "string",
@@ -5998,7 +5998,7 @@
       "type": "v1beta3.Pod",
       "method": "GET",
       "summary": "read log of the specified Pod",
-      "nickname": "readPodLog",
+      "nickname": "readNamespacedPodLog",
       "parameters": [
        {
         "type": "string",
@@ -6049,7 +6049,7 @@
       "type": "string",
       "method": "GET",
       "summary": "connect GET requests to portforward of Pod",
-      "nickname": "connectGetPodPortforward",
+      "nickname": "connectGetNamespacedPodPortforward",
       "parameters": [
        {
         "type": "string",
@@ -6079,7 +6079,7 @@
       "type": "string",
       "method": "POST",
       "summary": "connect POST requests to portforward of Pod",
-      "nickname": "connectPostPodPortforward",
+      "nickname": "connectPostNamespacedPodPortforward",
       "parameters": [
        {
         "type": "string",
@@ -6115,7 +6115,7 @@
       "type": "string",
       "method": "GET",
       "summary": "connect GET requests to proxy of Pod",
-      "nickname": "connectGetPodProxy",
+      "nickname": "connectGetNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6145,7 +6145,7 @@
       "type": "string",
       "method": "POST",
       "summary": "connect POST requests to proxy of Pod",
-      "nickname": "connectPostPodProxy",
+      "nickname": "connectPostNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6175,7 +6175,7 @@
       "type": "string",
       "method": "PUT",
       "summary": "connect PUT requests to proxy of Pod",
-      "nickname": "connectPutPodProxy",
+      "nickname": "connectPutNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6205,7 +6205,7 @@
       "type": "string",
       "method": "DELETE",
       "summary": "connect DELETE requests to proxy of Pod",
-      "nickname": "connectDeletePodProxy",
+      "nickname": "connectDeleteNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6235,7 +6235,7 @@
       "type": "string",
       "method": "HEAD",
       "summary": "connect HEAD requests to proxy of Pod",
-      "nickname": "connectHeadPodProxy",
+      "nickname": "connectHeadNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6265,7 +6265,7 @@
       "type": "string",
       "method": "OPTIONS",
       "summary": "connect OPTIONS requests to proxy of Pod",
-      "nickname": "connectOptionsPodProxy",
+      "nickname": "connectOptionsNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6301,7 +6301,7 @@
       "type": "string",
       "method": "GET",
       "summary": "connect GET requests to proxy of Pod",
-      "nickname": "connectGetPodProxy",
+      "nickname": "connectGetNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6339,7 +6339,7 @@
       "type": "string",
       "method": "POST",
       "summary": "connect POST requests to proxy of Pod",
-      "nickname": "connectPostPodProxy",
+      "nickname": "connectPostNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6377,7 +6377,7 @@
       "type": "string",
       "method": "PUT",
       "summary": "connect PUT requests to proxy of Pod",
-      "nickname": "connectPutPodProxy",
+      "nickname": "connectPutNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6415,7 +6415,7 @@
       "type": "string",
       "method": "DELETE",
       "summary": "connect DELETE requests to proxy of Pod",
-      "nickname": "connectDeletePodProxy",
+      "nickname": "connectDeleteNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6453,7 +6453,7 @@
       "type": "string",
       "method": "HEAD",
       "summary": "connect HEAD requests to proxy of Pod",
-      "nickname": "connectHeadPodProxy",
+      "nickname": "connectHeadNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6491,7 +6491,7 @@
       "type": "string",
       "method": "OPTIONS",
       "summary": "connect OPTIONS requests to proxy of Pod",
-      "nickname": "connectOptionsPodProxy",
+      "nickname": "connectOptionsNamespacedPodProxy",
       "parameters": [
        {
         "type": "string",
@@ -6535,7 +6535,7 @@
       "type": "v1beta3.Pod",
       "method": "PUT",
       "summary": "replace status of the specified Pod",
-      "nickname": "replacePodStatus",
+      "nickname": "replaceNamespacedPodStatus",
       "parameters": [
        {
         "type": "string",
@@ -6594,7 +6594,7 @@
       "type": "v1beta3.PodTemplateList",
       "method": "GET",
       "summary": "list or watch objects of kind PodTemplate",
-      "nickname": "listPodTemplate",
+      "nickname": "listNamespacedPodTemplate",
       "parameters": [
        {
         "type": "string",
@@ -6663,7 +6663,7 @@
       "type": "v1beta3.PodTemplate",
       "method": "POST",
       "summary": "create a PodTemplate",
-      "nickname": "createPodTemplate",
+      "nickname": "createNamespacedPodTemplate",
       "parameters": [
        {
         "type": "string",
@@ -6714,7 +6714,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
-      "nickname": "watchPodTemplateList",
+      "nickname": "watchNamespacedPodTemplateList",
       "parameters": [
        {
         "type": "string",
@@ -6789,7 +6789,7 @@
       "type": "v1beta3.PodTemplate",
       "method": "GET",
       "summary": "read the specified PodTemplate",
-      "nickname": "readPodTemplate",
+      "nickname": "readNamespacedPodTemplate",
       "parameters": [
        {
         "type": "string",
@@ -6834,7 +6834,7 @@
       "type": "v1beta3.PodTemplate",
       "method": "PUT",
       "summary": "replace the specified PodTemplate",
-      "nickname": "replacePodTemplate",
+      "nickname": "replaceNamespacedPodTemplate",
       "parameters": [
        {
         "type": "string",
@@ -6887,7 +6887,7 @@
       "type": "v1beta3.PodTemplate",
       "method": "PATCH",
       "summary": "partially update the specified PodTemplate",
-      "nickname": "patchPodTemplate",
+      "nickname": "patchNamespacedPodTemplate",
       "parameters": [
        {
         "type": "string",
@@ -6942,7 +6942,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a PodTemplate",
-      "nickname": "deletePodTemplate",
+      "nickname": "deleteNamespacedPodTemplate",
       "parameters": [
        {
         "type": "string",
@@ -7001,7 +7001,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind PodTemplate",
-      "nickname": "watchPodTemplate",
+      "nickname": "watchNamespacedPodTemplate",
       "parameters": [
        {
         "type": "string",
@@ -7255,7 +7255,7 @@
       "type": "v1beta3.ReplicationControllerList",
       "method": "GET",
       "summary": "list or watch objects of kind ReplicationController",
-      "nickname": "listReplicationController",
+      "nickname": "listNamespacedReplicationController",
       "parameters": [
        {
         "type": "string",
@@ -7324,7 +7324,7 @@
       "type": "v1beta3.ReplicationController",
       "method": "POST",
       "summary": "create a ReplicationController",
-      "nickname": "createReplicationController",
+      "nickname": "createNamespacedReplicationController",
       "parameters": [
        {
         "type": "string",
@@ -7375,7 +7375,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
-      "nickname": "watchReplicationControllerList",
+      "nickname": "watchNamespacedReplicationControllerList",
       "parameters": [
        {
         "type": "string",
@@ -7450,7 +7450,7 @@
       "type": "v1beta3.ReplicationController",
       "method": "GET",
       "summary": "read the specified ReplicationController",
-      "nickname": "readReplicationController",
+      "nickname": "readNamespacedReplicationController",
       "parameters": [
        {
         "type": "string",
@@ -7495,7 +7495,7 @@
       "type": "v1beta3.ReplicationController",
       "method": "PUT",
       "summary": "replace the specified ReplicationController",
-      "nickname": "replaceReplicationController",
+      "nickname": "replaceNamespacedReplicationController",
       "parameters": [
        {
         "type": "string",
@@ -7548,7 +7548,7 @@
       "type": "v1beta3.ReplicationController",
       "method": "PATCH",
       "summary": "partially update the specified ReplicationController",
-      "nickname": "patchReplicationController",
+      "nickname": "patchNamespacedReplicationController",
       "parameters": [
        {
         "type": "string",
@@ -7603,7 +7603,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a ReplicationController",
-      "nickname": "deleteReplicationController",
+      "nickname": "deleteNamespacedReplicationController",
       "parameters": [
        {
         "type": "string",
@@ -7662,7 +7662,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ReplicationController",
-      "nickname": "watchReplicationController",
+      "nickname": "watchNamespacedReplicationController",
       "parameters": [
        {
         "type": "string",
@@ -7916,7 +7916,7 @@
       "type": "v1beta3.ResourceQuotaList",
       "method": "GET",
       "summary": "list or watch objects of kind ResourceQuota",
-      "nickname": "listResourceQuota",
+      "nickname": "listNamespacedResourceQuota",
       "parameters": [
        {
         "type": "string",
@@ -7985,7 +7985,7 @@
       "type": "v1beta3.ResourceQuota",
       "method": "POST",
       "summary": "create a ResourceQuota",
-      "nickname": "createResourceQuota",
+      "nickname": "createNamespacedResourceQuota",
       "parameters": [
        {
         "type": "string",
@@ -8036,7 +8036,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
-      "nickname": "watchResourceQuotaList",
+      "nickname": "watchNamespacedResourceQuotaList",
       "parameters": [
        {
         "type": "string",
@@ -8111,7 +8111,7 @@
       "type": "v1beta3.ResourceQuota",
       "method": "GET",
       "summary": "read the specified ResourceQuota",
-      "nickname": "readResourceQuota",
+      "nickname": "readNamespacedResourceQuota",
       "parameters": [
        {
         "type": "string",
@@ -8156,7 +8156,7 @@
       "type": "v1beta3.ResourceQuota",
       "method": "PUT",
       "summary": "replace the specified ResourceQuota",
-      "nickname": "replaceResourceQuota",
+      "nickname": "replaceNamespacedResourceQuota",
       "parameters": [
        {
         "type": "string",
@@ -8209,7 +8209,7 @@
       "type": "v1beta3.ResourceQuota",
       "method": "PATCH",
       "summary": "partially update the specified ResourceQuota",
-      "nickname": "patchResourceQuota",
+      "nickname": "patchNamespacedResourceQuota",
       "parameters": [
        {
         "type": "string",
@@ -8264,7 +8264,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a ResourceQuota",
-      "nickname": "deleteResourceQuota",
+      "nickname": "deleteNamespacedResourceQuota",
       "parameters": [
        {
         "type": "string",
@@ -8323,7 +8323,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ResourceQuota",
-      "nickname": "watchResourceQuota",
+      "nickname": "watchNamespacedResourceQuota",
       "parameters": [
        {
         "type": "string",
@@ -8577,7 +8577,7 @@
       "type": "v1beta3.ResourceQuota",
       "method": "PUT",
       "summary": "replace status of the specified ResourceQuota",
-      "nickname": "replaceResourceQuotaStatus",
+      "nickname": "replaceNamespacedResourceQuotaStatus",
       "parameters": [
        {
         "type": "string",
@@ -8636,7 +8636,7 @@
       "type": "v1beta3.SecretList",
       "method": "GET",
       "summary": "list or watch objects of kind Secret",
-      "nickname": "listSecret",
+      "nickname": "listNamespacedSecret",
       "parameters": [
        {
         "type": "string",
@@ -8705,7 +8705,7 @@
       "type": "v1beta3.Secret",
       "method": "POST",
       "summary": "create a Secret",
-      "nickname": "createSecret",
+      "nickname": "createNamespacedSecret",
       "parameters": [
        {
         "type": "string",
@@ -8756,7 +8756,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
-      "nickname": "watchSecretList",
+      "nickname": "watchNamespacedSecretList",
       "parameters": [
        {
         "type": "string",
@@ -8831,7 +8831,7 @@
       "type": "v1beta3.Secret",
       "method": "GET",
       "summary": "read the specified Secret",
-      "nickname": "readSecret",
+      "nickname": "readNamespacedSecret",
       "parameters": [
        {
         "type": "string",
@@ -8876,7 +8876,7 @@
       "type": "v1beta3.Secret",
       "method": "PUT",
       "summary": "replace the specified Secret",
-      "nickname": "replaceSecret",
+      "nickname": "replaceNamespacedSecret",
       "parameters": [
        {
         "type": "string",
@@ -8929,7 +8929,7 @@
       "type": "v1beta3.Secret",
       "method": "PATCH",
       "summary": "partially update the specified Secret",
-      "nickname": "patchSecret",
+      "nickname": "patchNamespacedSecret",
       "parameters": [
        {
         "type": "string",
@@ -8984,7 +8984,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a Secret",
-      "nickname": "deleteSecret",
+      "nickname": "deleteNamespacedSecret",
       "parameters": [
        {
         "type": "string",
@@ -9043,7 +9043,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Secret",
-      "nickname": "watchSecret",
+      "nickname": "watchNamespacedSecret",
       "parameters": [
        {
         "type": "string",
@@ -9297,7 +9297,7 @@
       "type": "v1beta3.ServiceAccountList",
       "method": "GET",
       "summary": "list or watch objects of kind ServiceAccount",
-      "nickname": "listServiceAccount",
+      "nickname": "listNamespacedServiceAccount",
       "parameters": [
        {
         "type": "string",
@@ -9366,7 +9366,7 @@
       "type": "v1beta3.ServiceAccount",
       "method": "POST",
       "summary": "create a ServiceAccount",
-      "nickname": "createServiceAccount",
+      "nickname": "createNamespacedServiceAccount",
       "parameters": [
        {
         "type": "string",
@@ -9417,7 +9417,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
-      "nickname": "watchServiceAccountList",
+      "nickname": "watchNamespacedServiceAccountList",
       "parameters": [
        {
         "type": "string",
@@ -9492,7 +9492,7 @@
       "type": "v1beta3.ServiceAccount",
       "method": "GET",
       "summary": "read the specified ServiceAccount",
-      "nickname": "readServiceAccount",
+      "nickname": "readNamespacedServiceAccount",
       "parameters": [
        {
         "type": "string",
@@ -9537,7 +9537,7 @@
       "type": "v1beta3.ServiceAccount",
       "method": "PUT",
       "summary": "replace the specified ServiceAccount",
-      "nickname": "replaceServiceAccount",
+      "nickname": "replaceNamespacedServiceAccount",
       "parameters": [
        {
         "type": "string",
@@ -9590,7 +9590,7 @@
       "type": "v1beta3.ServiceAccount",
       "method": "PATCH",
       "summary": "partially update the specified ServiceAccount",
-      "nickname": "patchServiceAccount",
+      "nickname": "patchNamespacedServiceAccount",
       "parameters": [
        {
         "type": "string",
@@ -9645,7 +9645,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a ServiceAccount",
-      "nickname": "deleteServiceAccount",
+      "nickname": "deleteNamespacedServiceAccount",
       "parameters": [
        {
         "type": "string",
@@ -9704,7 +9704,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ServiceAccount",
-      "nickname": "watchServiceAccount",
+      "nickname": "watchNamespacedServiceAccount",
       "parameters": [
        {
         "type": "string",
@@ -9958,7 +9958,7 @@
       "type": "v1beta3.ServiceList",
       "method": "GET",
       "summary": "list or watch objects of kind Service",
-      "nickname": "listService",
+      "nickname": "listNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10027,7 +10027,7 @@
       "type": "v1beta3.Service",
       "method": "POST",
       "summary": "create a Service",
-      "nickname": "createService",
+      "nickname": "createNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10078,7 +10078,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
-      "nickname": "watchServiceList",
+      "nickname": "watchNamespacedServiceList",
       "parameters": [
        {
         "type": "string",
@@ -10153,7 +10153,7 @@
       "type": "v1beta3.Service",
       "method": "GET",
       "summary": "read the specified Service",
-      "nickname": "readService",
+      "nickname": "readNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10198,7 +10198,7 @@
       "type": "v1beta3.Service",
       "method": "PUT",
       "summary": "replace the specified Service",
-      "nickname": "replaceService",
+      "nickname": "replaceNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10251,7 +10251,7 @@
       "type": "v1beta3.Service",
       "method": "PATCH",
       "summary": "partially update the specified Service",
-      "nickname": "patchService",
+      "nickname": "patchNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10306,7 +10306,7 @@
       "type": "v1beta3.Status",
       "method": "DELETE",
       "summary": "delete a Service",
-      "nickname": "deleteService",
+      "nickname": "deleteNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10357,7 +10357,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Service",
-      "nickname": "watchService",
+      "nickname": "watchNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10440,7 +10440,7 @@
       "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Service",
-      "nickname": "proxyGETService",
+      "nickname": "proxyGETNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10478,7 +10478,7 @@
       "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Service",
-      "nickname": "proxyPUTService",
+      "nickname": "proxyPUTNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10516,7 +10516,7 @@
       "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Service",
-      "nickname": "proxyPOSTService",
+      "nickname": "proxyPOSTNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10554,7 +10554,7 @@
       "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
-      "nickname": "proxyDELETEService",
+      "nickname": "proxyDELETENamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10592,7 +10592,7 @@
       "type": "string",
       "method": "HEAD",
       "summary": "proxy HEAD requests to Service",
-      "nickname": "proxyHEADService",
+      "nickname": "proxyHEADNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10630,7 +10630,7 @@
       "type": "string",
       "method": "OPTIONS",
       "summary": "proxy OPTIONS requests to Service",
-      "nickname": "proxyOPTIONSService",
+      "nickname": "proxyOPTIONSNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10674,7 +10674,7 @@
       "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Service",
-      "nickname": "proxyGETService",
+      "nickname": "proxyGETNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10704,7 +10704,7 @@
       "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Service",
-      "nickname": "proxyPUTService",
+      "nickname": "proxyPUTNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10734,7 +10734,7 @@
       "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Service",
-      "nickname": "proxyPOSTService",
+      "nickname": "proxyPOSTNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10764,7 +10764,7 @@
       "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
-      "nickname": "proxyDELETEService",
+      "nickname": "proxyDELETENamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10794,7 +10794,7 @@
       "type": "string",
       "method": "HEAD",
       "summary": "proxy HEAD requests to Service",
-      "nickname": "proxyHEADService",
+      "nickname": "proxyHEADNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -10824,7 +10824,7 @@
       "type": "string",
       "method": "OPTIONS",
       "summary": "proxy OPTIONS requests to Service",
-      "nickname": "proxyOPTIONSService",
+      "nickname": "proxyOPTIONSNamespacedService",
       "parameters": [
        {
         "type": "string",
