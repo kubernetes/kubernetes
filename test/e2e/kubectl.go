@@ -238,6 +238,51 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
+	Describe("Kubectl logs", func() {
+		It("should find a string in pod logs", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			controllerJson := mkpath("redis-master-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			By("creating Redis RC")
+			runKubectl("create", "-f", controllerJson, nsFlag)
+			By("checking logs")
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				_, err := lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("Kubectl patch", func() {
+		It("should add annotations for pods in rc", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			controllerJson := mkpath("redis-master-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			By("creating Redis RC")
+			runKubectl("create", "-f", controllerJson, nsFlag)
+			By("patching all pods")
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				runKubectl("patch", "pod", pod.Name, nsFlag, "-p", "{\"metadata\":{\"annotations\":{\"x\":\"y\"}}}")
+			})
+
+			By("checking annotations")
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				found := false
+				for key, val := range pod.Annotations {
+					if key == "x" && val == "y" {
+						found = true
+					}
+				}
+				if !found {
+					Failf("Added annation not found")
+				}
+			})
+		})
+	})
 })
 
 func curl(addr string) (string, error) {
