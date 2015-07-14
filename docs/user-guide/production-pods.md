@@ -160,6 +160,174 @@ spec:
     - name: myregistrykey
 ```
 
+## Helper containers
+
+[Pods](../../docs/pods.md) support running multiple containers co-located together. They can be used to host vertically integrated application stacks, but their primary motivation is to support auxiliary helper programs that assist the primary application. Typical examples are data pullers, data pushers, and proxies.
+
+Such containers typically need to communicate with one another, often through the file system. This can be achieved by mounting the same volume into both containers. An example of this pattern would be a web server with a [program that polls a git repository](../../contrib/git-sync/) for new updates:
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: my-nginx
+spec:
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      volumes:
+      - name: www-data
+        emptyDir: {}
+      containers:
+      - name: nginx
+        image: nginx
+        # This container reads from the www-data volume
+        volumeMounts:
+        - mountPath: /srv/www
+          name: www-data
+          readOnly: true
+      - name: git-monitor
+        image: myrepo/git-monitor
+        env:
+        - name: GIT_REPO
+          value: http://github.com/some/repo.git
+        # This container writes to the www-data volume
+        volumeMounts:
+        - mountPath: /data
+          name: www-data
+```
+
+More examples can be found in our [blog article](http://blog.kubernetes.io/2015/06/the-distributed-system-toolkit-patterns.html) and [presentation slides](http://www.slideshare.net/Docker/slideshare-burns).
+
+## Resource management
+
+Kubernetes’s scheduler will place applications only where they have adequate CPU and memory, but it can only do so if it knows how much [resources they require](../../docs/compute-resources.md). The consequence of specifying too little CPU is that the containers could be starved of CPU if too many other containers were scheduled onto the same node. Similarly, containers could die unpredictably due to running out of memory if no memory were requested, which can be especially likely for large-memory applications. 
+
+If no resource requirements are specified, a nominal amount of resources is assumed. (This default is applied via a [LimitRange](../../examples/limitrange/) for the default [Namespace](../../docs/namespaces.md). It can be viewed with `kubectl describe limitrange limits`.) You may explicitly specify the amount of resources required as follows:
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: my-nginx
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            # cpu units are cores
+            cpu: 500m
+            # memory units are bytes
+            memory: 64Mi
+```
+The container will die due to OOM (out of memory) if it exceeds its specified limit, so specifying a value a little higher than expected generally improves reliability.
+
+If you’re not sure how much resources to request, you can first launch the application without specifying resources, and use [resource usage monitoring](../../docs/monitoring.md) to determine appropriate values.
+
+## Liveness and readiness probes (aka health checks)
+
+Many applications running for long periods of time eventually transition to broken states, and cannot recover except by restarting them. Kubernetes provides [*liveness probes*](../../docs/pod-states.md#container-probes) to detect and remedy such situations.
+
+A common way to probe an application is using HTTP, which can be specified as follows:
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: my-nginx
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        livenessProbe:
+          httpGet:
+            # Path to probe; should be cheap, but representative of typical behavior
+            path: /index.html
+            port: 80
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
+```
+
+Other times, applications are only temporarily unable to serve, and will recover on their own. Typically in such cases you’d prefer not to kill the application, but don’t want to send it requests, either, since the application won’t respond correctly or at all. A common such scenario is loading large data or configuration files during application startup. Kubernetes provides *readiness probes* to detect and mitigate such situations. Readiness probes are configured similarly to liveness probes, just using the `readinessProbe` field. A pod with containers reporting that they are not ready will not receive traffic through Kubernetes [services](connecting-applications.md).
+
+For more details (e.g., how to specify command-based probes), see the [example in the walkthrough](../../examples/walkthrough/k8s201.md#health-checking), the [standalone example](../../examples/liveness/), and the [documentation](../../docs/pod-states.md#container-probes).
+
+## Lifecycle hooks and termination notice
+
+Of course, nodes and applications may fail at any time, but many applications benefit from clean shutdown, such as to complete in-flight requests, when the termination of the application is deliberate. To support such cases, Kubernetes supports two kinds of notifications:
+Kubernetes will send SIGTERM to applications, which can be handled in order to effect graceful termination. SIGKILL is sent 10 seconds later if the application does not terminate sooner.
+Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*](../../docs/container-environment.md#container-hooks), which will execute prior to sending SIGTERM. 
+
+The specification of a pre-stop hook is similar to that of probes, but without the timing-related parameters. For example:
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: my-nginx
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        lifecycle:
+          preStop:
+            exec:
+              # SIGTERM triggers a quick exit; gracefully terminate instead
+              command: ["/usr/sbin/nginx","-s","quit"]
+```
+
+## Termination message
+
+In order to achieve a reasonably high level of availability, especially for actively developed applications, it’s important to debug failures quickly. Kubernetes can speed debugging by surfacing causes of fatal errors in a way that can be display using [`kubectl`](kubectl/kubectl.md) or the [UI](../../docs/ui.md), in addition to general [log collection](../../docs/logging.md). It is possible to specify a `terminationMessagePath` where a container will write its “death rattle”, such as assertion failure messages, stack traces, exceptions, and so on. The default path is `/dev/termination-log`.
+
+Here is a toy example:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-w-message
+spec:
+  containers:
+  - name: messager
+    image: "ubuntu:14.04"
+    command: ["/bin/sh","-c"]
+    args: ["sleep 60 && /bin/echo Sleep expired > /dev/termination-log"]
+```
+
+The message is recorded along with the other state of the last (i.e., most recent) termination:
+```bash
+$ kubectl create -f pod.yaml
+pods/pod-w-message
+$ sleep 70
+$ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}"
+Sleep expired
+$ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatuses}}{{.lastState.terminated.exitCode}}{{end}}"
+0
+```
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/production-pods.md?pixel)]()
