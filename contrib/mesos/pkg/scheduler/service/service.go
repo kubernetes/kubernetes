@@ -350,30 +350,36 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 
 	log.V(1).Infof("prepared executor command %q with args '%+v'", ci.GetValue(), ci.Arguments)
 
-	// Create mesos scheduler driver.
-	info := &mesos.ExecutorInfo{
-		Command: ci,
-		Name:    proto.String(execcfg.DefaultInfoName),
-		Source:  proto.String(execcfg.DefaultInfoSource),
-	}
-
 	// Check for staticPods
+	mem := 32.0
+	cpus := 0.0
+	data := []byte{}
 	if s.StaticPodsConfigPath != "" {
 		bs, numberStaticPods, err := archive.ZipDir(s.StaticPodsConfigPath)
 		if err != nil {
 			return nil, nil, err
 		}
-		info.Data = bs
+		data = bs
 
 		// Adjust the resource accounting for the executor.
 		// Currently each podTask accounts the default amount of resources.
 		// TODO(joerg84) adapt to actual resources specified by pods.
 		log.Infof("Detected %d staticPods in Configuration.", numberStaticPods)
 
-		info.Resources = []*mesos.Resource{
-			mutil.NewScalarResource("cpus", float64(numberStaticPods)*podtask.DefaultContainerCpus),
-			mutil.NewScalarResource("mem", float64(numberStaticPods)*podtask.DefaultContainerMem),
-		}
+		cpus += float64(numberStaticPods) * podtask.DefaultContainerCpus
+		mem += float64(numberStaticPods) * podtask.DefaultContainerMem
+	}
+
+	// Create mesos scheduler driver.
+	info := &mesos.ExecutorInfo{
+		Command: ci,
+		Name:    proto.String(execcfg.DefaultInfoName),
+		Source:  proto.String(execcfg.DefaultInfoSource),
+		Resources: []*mesos.Resource{
+			mutil.NewScalarResource("cpus", cpus),
+			mutil.NewScalarResource("mem", mem),
+		},
+		Data: data,
 	}
 
 	// calculate ExecutorInfo hash to be used for validating compatibility
