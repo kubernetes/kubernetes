@@ -222,5 +222,6 @@ cores.  We plan to revise the definition of the cpu resource to allow for more c
 across providers and platforms.
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/compute_resources.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

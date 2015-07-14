@@ -214,4 +214,7 @@ Set the `cpu` and `memory` values to the amount of resources you want to reserve
 Place the file in the manifest directory (`--config=DIR` flag of kubelet).  Do this
 on each kubelet where you want to reserve resources.
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/node.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

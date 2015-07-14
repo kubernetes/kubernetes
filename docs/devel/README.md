@@ -47,4 +47,7 @@ Docs in this directory relate to developing Kubernetes.
 
 * **Getting Recent Builds** ([getting-builds.md](getting-builds.md)): How to get recent builds including the latest builds to pass CI.
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

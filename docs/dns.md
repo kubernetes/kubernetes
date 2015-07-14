@@ -52,4 +52,6 @@ time.
 See [the docs for the DNS cluster addon](../cluster/addons/dns/README.md).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/dns.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

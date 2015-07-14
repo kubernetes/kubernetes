@@ -43,7 +43,7 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
    search for uses of flags by guides.
  - We may ask that you host binary assets or large amounts of code in our `contrib` directory or on your
    own repo.
- - Setup a cluster and run the [conformance test](../../docs/devel/development.md#conformance-testing) against it, and report the
+ - Setup a cluster and run the [conformance test](development.md#conformance-testing) against it, and report the
    results in your PR.
  - Add or update a row in [The Matrix](../../docs/getting-started-guides/README.md).
  - State the binary version of kubernetes that you tested clearly in your Guide doc and in The Matrix.
@@ -113,4 +113,6 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
       
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/writing-a-getting-started-guide.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

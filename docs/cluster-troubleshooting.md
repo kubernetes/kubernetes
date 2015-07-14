@@ -40,5 +40,6 @@ of the relevant log files.  (note that on systemd based systems, you may need to
    * /var/log/kube-proxy.log - Kube Proxy, responsible for service load balancing
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cluster-troubleshooting.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

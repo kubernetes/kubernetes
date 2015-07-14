@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 # Kubernetes 101 - Walkthrough
 
 ## Pods
@@ -108,8 +122,10 @@ Finally, we have also introduced an environment variable to the ```git-monitor``
 
 
 ### What's next?
-Continue on to [Kubernetes 201](../walkthrough/k8s201.md) or
+Continue on to [Kubernetes 201](k8s201.md) or
 for a complete application see the [guestbook example](../guestbook/README.md)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/walkthrough/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

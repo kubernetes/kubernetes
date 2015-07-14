@@ -71,4 +71,6 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](compute_resources.md#troubleshooting).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cluster-large.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

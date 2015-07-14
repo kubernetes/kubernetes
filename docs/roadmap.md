@@ -105,4 +105,6 @@ In terms of performance, the objectives include:
 - startup time at the 99%tile ([#3552](https://github.com/GoogleCloudPlatform/kubernetes/issues/3952))
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/roadmap.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

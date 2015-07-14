@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Resource Quota
 ========================================
 This example demonstrates how resource quota and limits can be applied to a Kubernetes namespace.
@@ -151,4 +165,7 @@ by the namespace quota.
 Any action that consumes those resources can be tweaked, or can pick up namespace level defaults to
 meet your end goal.
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/resourcequota/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

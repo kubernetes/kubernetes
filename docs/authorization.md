@@ -117,4 +117,6 @@ same or similar arguments.  Developers should then consider the interaction betw
 caching and revocation of permissions.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/authorization.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

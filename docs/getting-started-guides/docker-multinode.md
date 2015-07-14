@@ -66,4 +66,6 @@ Once your cluster has been created you can [test it out](docker-multinode/testin
 For more complete applications, please look in the [examples directory](../../examples/)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

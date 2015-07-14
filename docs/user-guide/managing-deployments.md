@@ -232,7 +232,7 @@ my-nginx-o0ef1   1/1       Running   0          1h
 
 At some point, you’ll eventually need to update your deployed application, typically by specifying a new image or image tag, as in the canary deployment scenario above. `kubectl` supports several update operations, each of which is applicable to different scenarios.
 
-To update a service without an outage, `kubectl` supports what is called [“rolling update”](../../docs/user-guide/kubectl/kubectl_rolling-update.md), which updates one pod at a time, rather than taking down the entire service at the same time.
+To update a service without an outage, `kubectl` supports what is called [“rolling update”](kubectl/kubectl_rolling-update.md), which updates one pod at a time, rather than taking down the entire service at the same time.
 
 Let’s say you were running version 1.7.9 of nginx:
 ```yaml
@@ -389,4 +389,6 @@ replicationcontrollers/my-nginx-v4
 ```
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/managing-deployments.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -19,7 +19,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
+)
+
+var (
+	// Finds all preformatted block start/stops.
+	preformatRE = regexp.MustCompile("^```.*")
 )
 
 // Splits a document up into a slice of lines.
@@ -109,4 +115,45 @@ func beginMungeTag(desc string) string {
 // include the trailing newline.
 func endMungeTag(desc string) string {
 	return fmt.Sprintf("<!-- END MUNGE: %s -->", desc)
+}
+
+// Calls 'replace' for all sections of the document not in ``` / ``` blocks. So
+// that you don't have false positives inside those blocks.
+func replaceNonPreformatted(input []byte, replace func([]byte) []byte) []byte {
+	output := []byte(nil)
+	cur := []byte(nil)
+	keepBlock := true
+	// SplitAfter keeps the newline, so you don't have to worry about
+	// omitting it on the last line or anything. Also, the documentation
+	// claims it's unicode safe.
+	for _, line := range bytes.SplitAfter(input, []byte("\n")) {
+		if keepBlock {
+			if preformatRE.Match(line) {
+				cur = replace(cur)
+				output = append(output, cur...)
+				cur = []byte{}
+				keepBlock = false
+			}
+			cur = append(cur, line...)
+		} else {
+			cur = append(cur, line...)
+			if preformatRE.Match(line) {
+				output = append(output, cur...)
+				cur = []byte{}
+				keepBlock = true
+			}
+		}
+	}
+	if keepBlock {
+		cur = replace(cur)
+	}
+	output = append(output, cur...)
+	return output
+}
+
+// As above, but further uses exp to parse the non-preformatted sections.
+func replaceNonPreformattedRegexp(input []byte, exp *regexp.Regexp, replace func([]byte) []byte) []byte {
+	return replaceNonPreformatted(input, func(in []byte) []byte {
+		return exp.ReplaceAllFunc(in, replace)
+	})
 }

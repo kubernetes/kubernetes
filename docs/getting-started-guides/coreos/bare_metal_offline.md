@@ -671,4 +671,6 @@ Kill all pods:
     for i in `kubectl get pods | awk '{print $1}'`; do kubectl stop pod $i; done
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/bare_metal_offline.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

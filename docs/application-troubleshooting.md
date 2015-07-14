@@ -166,4 +166,6 @@ check:
    * Is your application serving on the port that you configured?  Kubernetes doesn't do port remapping, so if your application serves on 8080, the ```containerPort``` field needs to be 8080.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/application-troubleshooting.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

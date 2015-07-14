@@ -1,10 +1,24 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Kubernetes DNS example
 
 This is a toy example demonstrating how to use kubernetes DNS.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides). Make sure DNS is enabled in your setup, see [DNS doc](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns).
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns).
 
 ```shell
 $ cd kubernetes
@@ -121,7 +135,7 @@ $ kubectl logs dns-frontend
 2015-05-07T20:13:54.147738295Z Hello World!
 ```
 
-Please refer to the [source code](./images/frontend/client.py) about the log. First line prints out the ip address associated with the service in dev namespace; remaining lines print out our request and server response.
+Please refer to the [source code](images/frontend/client.py) about the log. First line prints out the ip address associated with the service in dev namespace; remaining lines print out our request and server response.
 
 If we switch to prod namespace with the same pod config, we'll see the same result, i.e. dns will resolve across namespace.
 
@@ -176,4 +190,6 @@ kubectl logs dns-frontend
 ```
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cluster-dns/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -88,4 +88,6 @@ Some more thorough examples:
    * [downward API](../examples/downward-api/)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/downward_api.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

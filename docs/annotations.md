@@ -39,4 +39,6 @@ Possible information that could be recorded in annotations:
 Yes, this information could be stored in an external database or directory, but that would make it much harder to produce shared client libraries and tools for deployment, management, introspection, etc.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/annotations.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

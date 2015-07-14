@@ -177,5 +177,6 @@ Finally, it may provide an interface to automate creation of new serviceAccounts
 to GET serviceAccounts to see what has been created.
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/service_accounts.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

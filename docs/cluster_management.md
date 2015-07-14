@@ -73,4 +73,6 @@ If you want more control over the upgrading process, you may use the following w
     node discovery; currently this is only Google Compute Engine, not including CoreOS on Google Compute Engine using kube-register). See [Node](node.md).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cluster_management.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

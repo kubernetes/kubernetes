@@ -281,8 +281,8 @@ go run hack/e2e.go -v -ctl='delete pod foobar'
 
 ## Conformance testing
 End-to-end testing, as described above, is for [development
-distributions](../../docs/devel/writing-a-getting-started-guide.md).  A conformance test is used on
-a [versioned distro](../../docs/devel/writing-a-getting-started-guide.md).
+distributions](writing-a-getting-started-guide.md).  A conformance test is used on
+a [versioned distro](writing-a-getting-started-guide.md).
 
 The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not
 require support for up/push/down and other operations.  To run a conformance test, you need to know the
@@ -300,4 +300,6 @@ hack/run-gendocs.sh
 ```
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/development.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

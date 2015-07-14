@@ -36,4 +36,6 @@ certainly want the docs that go with that version.</h1>
   folder.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

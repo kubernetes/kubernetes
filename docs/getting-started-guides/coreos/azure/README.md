@@ -217,4 +217,6 @@ If you don't wish care about the Azure bill, you can tear down the cluster. It's
 By the way, with the scripts shown, you can deploy multiple clusters, if you like :)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/azure/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -163,7 +163,7 @@ where node creation is automated.
 Kubernetes supports specifying registry keys on a pod.
 
 First, create a `.dockercfg`, such as running `docker login <registry.domain>`.
-Then put the resulting `.dockercfg` file into a [secret resource](../docs/secrets.md).  For example:
+Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
 ```
 $ docker login
 Username: janedoe
@@ -215,7 +215,7 @@ spec:
 ```
 This needs to be done for each pod that is using a private registry.
 However, setting of this field can be automated by setting the imagePullSecrets
-in a [serviceAccount](../docs/service_accounts.md) resource.
+in a [serviceAccount](service_accounts.md) resource.
 
 Currently, all pods will potentially have read access to any images which were
 pulled using imagePullSecrets.  That is, imagePullSecrets does *NOT* protect your
@@ -250,4 +250,6 @@ common use cases and suggested solutions.
      - NOT supported yet.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/images.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

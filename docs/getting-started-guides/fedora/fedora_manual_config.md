@@ -207,4 +207,6 @@ $ kubectl delete -f node.json
 You should have a functional cluster, check out [101](../../../examples/walkthrough/README.md)!
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/fedora/fedora_manual_config.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

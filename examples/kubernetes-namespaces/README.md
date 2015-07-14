@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Kubernetes Namespaces
 
 Kubernetes _[namespaces](../../docs/namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
@@ -15,7 +29,7 @@ This example demonstrates how to use Kubernetes namespaces to subdivide your clu
 
 This example assumes the following:
 
-1. You have an [existing Kubernetes cluster](../../docs/getting-started-guides).
+1. You have an [existing Kubernetes cluster](../../docs/getting-started-guides/).
 2. You have a basic understanding of Kubernetes _[pods](../../docs/pods.md)_, _[services](../../docs/services.md)_, and _[replication controllers](../../docs/replication-controller.md)_.
 
 ### Step One: Understand the default namespace
@@ -242,4 +256,6 @@ As the policy support in Kubernetes evolves, we will extend this scenario to sho
 authorization rules for each namespace.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/kubernetes-namespaces/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -375,4 +375,6 @@ specification, and to select the type of media to use, for clusters that have
 several media types.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/volumes.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

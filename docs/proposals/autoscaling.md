@@ -267,5 +267,6 @@ temporarily disable negative decrement thresholds until the deployment process i
 an auto-scaler to be able to grow capacity during a deployment than to shrink the number of instances precisely.
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/autoscaling.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

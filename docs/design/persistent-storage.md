@@ -228,4 +228,6 @@ The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim 
 Admins can script the recycling of released volumes.  Future dynamic provisioners will understand how a volume should be recycled.  
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/persistent-storage.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

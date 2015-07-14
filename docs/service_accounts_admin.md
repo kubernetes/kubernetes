@@ -95,4 +95,7 @@ $ kubectl describe secret mysecretname
 kubectl delete secret mysecretname
 ```
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/service_accounts_admin.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

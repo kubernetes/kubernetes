@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Environment Guide Example
 =========================
 This example demonstrates running pods, replication controllers, and
@@ -7,7 +21,7 @@ environment information about itself, and a backend pod that it has
 accessed through the service. The goal is to illuminate the
 environment metadata available to running containers inside the
 Kubernetes cluster. The documentation for the kubernetes environment
-is [here](/docs/container-environment.md).
+is [here](../../docs/container-environment.md).
 
 ![Diagram](diagram.png)
 
@@ -16,13 +30,13 @@ Prerequisites
 This example assumes that you have a Kubernetes cluster installed and
 running, and that you have installed the `kubectl` command line tool
 somewhere in your path.  Please see the [getting
-started](/docs/getting-started-guides) for installation instructions
+started](../../docs/getting-started-guides/) for installation instructions
 for your platform.
 
 Optional: Build your own containers
 -----------------------------------
 The code for the containers is under
-[containers/](containers)
+[containers/](containers/)
 
 Get everything running
 ----------------------
@@ -67,8 +81,8 @@ Backend Namespace: default
 ```
 
 First the frontend pod's information is printed. The pod name and
-[namespace](/docs/design/namespaces.md) are retreived from the
-[Downward API](/docs/downward_api.md). Next, `USER_VAR` is the name of
+[namespace](../../docs/design/namespaces.md) are retreived from the
+[Downward API](../../docs/downward_api.md). Next, `USER_VAR` is the name of
 an environment variable set in the [pod
 definition](show-rc.yaml). Then, the dynamic kubernetes environment
 variables are scanned and printed. These are used to find the backend
@@ -89,4 +103,6 @@ Cleanup
     kubectl delete rc,service -l type=backend-type
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/environment-guide/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

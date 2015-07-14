@@ -38,7 +38,7 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 	dir := path.Dir(filePath)
 	errors := []string{}
 
-	output := linkRE.ReplaceAllFunc(fileBytes, func(in []byte) (out []byte) {
+	output := replaceNonPreformattedRegexp(fileBytes, linkRE, func(in []byte) (out []byte) {
 		match := linkRE.FindSubmatch(in)
 		// match[0] is the entire expression; [1] is the visible text and [2] is the link text.
 		visibleText := string(match[1])
@@ -108,13 +108,23 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 	return output, err
 }
 
-func makeRepoRelative(path string) string {
-	parts := strings.Split(path, "github.com/GoogleCloudPlatform/kubernetes/")
-	if len(parts) > 1 {
-		// Take out anything that is specific to the local filesystem.
-		return parts[1]
+func makeRepoRelative(filePath string) string {
+	realRoot := path.Join(*rootDir, *repoRoot) + "/"
+	return strings.TrimPrefix(filePath, realRoot)
+}
+
+// We have to append together before path.Clean will be able to tell that stuff
+// like ../docs isn't needed.
+func cleanPath(dirPath, linkPath string) string {
+	clean := path.Clean(path.Join(dirPath, linkPath))
+	if strings.HasPrefix(clean, dirPath+"/") {
+		out := strings.TrimPrefix(clean, dirPath+"/")
+		if out != linkPath {
+			fmt.Printf("%s -> %s\n", linkPath, out)
+		}
+		return out
 	}
-	return path
+	return linkPath
 }
 
 func checkPath(filePath, linkPath string) (newPath string, ok bool) {
@@ -126,18 +136,49 @@ func checkPath(filePath, linkPath string) (newPath string, ok bool) {
 			linkPath = linkPath[1:]
 		}
 	}
+	linkPath = cleanPath(dir, linkPath)
 
-	newPath = linkPath
-	for i := 0; i < 5; i++ {
-		// The file must exist.
-		target := path.Join(dir, newPath)
-		if info, err := os.Stat(target); err == nil {
-			if info.IsDir() {
-				return newPath + "/", true
-			}
-			return newPath, true
+	// Fast exit if the link is already correct.
+	if info, err := os.Stat(path.Join(dir, linkPath)); err == nil {
+		if info.IsDir() {
+			return linkPath + "/", true
 		}
-		newPath = path.Join("..", newPath)
+		return linkPath, true
+	}
+
+	for strings.HasPrefix(linkPath, "../") {
+		linkPath = strings.TrimPrefix(linkPath, "../")
+	}
+
+	// Fix - vs _ automatically
+	nameMungers := []func(string) string{
+		func(s string) string { return s },
+		func(s string) string { return strings.Replace(s, "-", "_", -1) },
+		func(s string) string { return strings.Replace(s, "_", "-", -1) },
+	}
+	// Fix being moved into/out of admin (replace "admin" with directory
+	// you're doing mass movements to/from).
+	pathMungers := []func(string) string{
+		func(s string) string { return s },
+		func(s string) string { return path.Join("admin", s) },
+		func(s string) string { return strings.TrimPrefix(s, "admin/") },
+	}
+
+	for _, namer := range nameMungers {
+		for _, pather := range pathMungers {
+			newPath = pather(namer(linkPath))
+			for i := 0; i < 7; i++ {
+				// The file must exist.
+				target := path.Join(dir, newPath)
+				if info, err := os.Stat(target); err == nil {
+					if info.IsDir() {
+						return newPath + "/", true
+					}
+					return newPath, true
+				}
+				newPath = path.Join("..", newPath)
+			}
+		}
 	}
 	return linkPath, false
 }

@@ -97,7 +97,7 @@ CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS   APP
 my-nginx     nginx          nginx      app=nginx   2          nginx
 ```
 
-More importantly, the pod template’s labels are used to create a [`selector`](../../docs/labels.md#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](../../docs/user-guide/kubectl/kubectl_get.md):
+More importantly, the pod template’s labels are used to create a [`selector`](../../docs/labels.md#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](kubectl/kubectl_get.md):
 ```bash
 $ kubectl get rc my-nginx -o template --template="{{.spec.selector}}"
 map[app:nginx]
@@ -106,4 +106,6 @@ map[app:nginx]
 You could also specify the `selector` explicitly, such as if you wanted to specify labels in the pod template that you didn’t want to select on, but you should ensure that the selector will match the labels of the pods created from the pod template, and that it won’t match pods created by other replication controllers. The most straightforward way to ensure the latter is to create a unique label value for the replication controller, and to specify it in both the pod template’s labels and in the selector.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/deploying-applications.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

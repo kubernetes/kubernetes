@@ -31,4 +31,6 @@ Finally, Kubernetes aspires to be an extensible, pluggable, building-block OSS p
 For more about the Kubernetes architecture, see [architecture](architecture.md).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
