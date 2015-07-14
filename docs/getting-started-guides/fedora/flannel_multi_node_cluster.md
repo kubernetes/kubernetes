@@ -191,4 +191,6 @@ PING 18.16.90.4 (18.16.90.4) 56(84) bytes of data.
 * Now kubernetes multi-node cluster is set up with overlay networking set up by flannel.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/fedora/flannel_multi_node_cluster.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

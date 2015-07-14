@@ -150,4 +150,6 @@ hdiutil makehybrid -iso -joliet -joliet-volume-name "config-2" -joliet -o node.i
 Boot one or more the [vmware image](https://coreos.com/docs/running-coreos/platforms/vmware) using `node.iso` as a config drive.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/coreos_multinode_cluster.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

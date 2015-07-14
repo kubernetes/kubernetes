@@ -120,4 +120,6 @@ Pods (and other objects) may belong to multiple sets simultaneously, which enabl
 Concerning API: we may extend such filtering to DELETE operations in the future.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/labels.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

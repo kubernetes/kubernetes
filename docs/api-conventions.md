@@ -624,6 +624,6 @@ Possible values for the ```reason``` and ```details``` fields:
 TODO: Document events (refer to another doc for details)
 
 
-
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/api-conventions.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

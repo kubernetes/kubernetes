@@ -103,4 +103,6 @@ See [a simple nginx example](../../../examples/simple-nginx.md) to try out your 
 For more complete applications, please look in the [examples directory](../../../examples/).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rkt/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 <!--
 Copyright 2014 Google Inc. All rights reserved.
 
@@ -19,7 +33,7 @@ This example demonstrates the usage of Kubernetes to perform a live update on a 
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides):
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/):
 
 ```bash
 $ cd kubernetes
@@ -118,4 +132,6 @@ Note that the images included here are public domain.
 * [nautilus](http://commons.wikimedia.org/wiki/File:Nautilus_pompilius.jpg)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/update-demo/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -21,4 +21,6 @@ Use of multiple namespaces is optional.  For small teams, they may not be needed
 Namespaces are still under development.  For now, the best documentation is the [Namespaces Design Document](design/namespaces.md).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/namespaces.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

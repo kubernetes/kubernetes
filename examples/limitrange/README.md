@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Limit Range
 ========================================
 By default, pods run with unbounded CPU and memory limits.  This means that any pod in the
@@ -29,7 +43,7 @@ For a detailed description of the Kubernetes resource model, see [Resources](htt
 
 Step 0: Prerequisites
 -----------------------------------------
-This example requires a running Kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started.
+This example requires a running Kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides/) for how to get started.
 
 Change to the `<kubernetes>/examples/limitrange` directory if you're not already there.
 
@@ -163,4 +177,6 @@ the Kubernetes system is able to apply default resource limits if desired in ord
 amount of resource a pod consumes on a node.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/limitrange/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

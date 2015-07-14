@@ -76,4 +76,6 @@ If you do a final check for flakes with ```docker ps -a```, ignore tasks that ex
 Happy flake hunting!
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/flaky-tests.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

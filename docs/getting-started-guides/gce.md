@@ -226,4 +226,6 @@ field values:
 * Allowed Protocols and Port: `tcp:1-65535;udp:1-65535;icmp`
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/gce.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

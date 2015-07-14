@@ -115,4 +115,6 @@ writing a 'controller' which watches the quota usage and adjusts the quota
 hard limits of each namespace.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/resource_quota_admin.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

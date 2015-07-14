@@ -33,4 +33,6 @@ Definitions
 * untriaged - anything without a priority/X label will be considered untriaged
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/issues.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

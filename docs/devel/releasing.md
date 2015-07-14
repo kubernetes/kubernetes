@@ -314,4 +314,6 @@ by plain mortals (in a perfect world PR/issue's title would be enough but often
 it is just too cryptic/geeky/domain-specific that it isn't).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/releasing.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

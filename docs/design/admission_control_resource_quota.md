@@ -167,4 +167,6 @@ services                3       5
 ```
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

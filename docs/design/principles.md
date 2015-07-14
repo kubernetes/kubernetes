@@ -69,4 +69,6 @@ TODO
 * [Eric Raymond's 17 UNIX rules](https://en.wikipedia.org/wiki/Unix_philosophy#Eric_Raymond.E2.80.99s_17_Unix_Rules)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/principles.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

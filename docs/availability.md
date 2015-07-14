@@ -144,4 +144,6 @@ service instances behind a load balancer (AWS Elastic Load Balancer, GCE Forward
 failures of a single cluster are not visible to end users.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/availability.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

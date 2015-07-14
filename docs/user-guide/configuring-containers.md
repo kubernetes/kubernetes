@@ -159,4 +159,6 @@ Terminated pods aren’t currently automatically deleted, so that you can observ
 On the other hand, containers and their logs are eventually deleted automatically in order to free up disk space on the nodes.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/configuring-containers.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

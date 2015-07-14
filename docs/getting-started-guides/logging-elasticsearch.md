@@ -243,4 +243,6 @@ Starting to serve on localhost:8001
 Now you can visit the URL [http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging](http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging) to contact Elasticsearch and [http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kibana-logging](http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kibana-logging) to access the Kibana viewer.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/logging-elasticsearch.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

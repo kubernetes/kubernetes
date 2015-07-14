@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Meteor on Kuberenetes
 =====================
 
@@ -11,7 +25,7 @@ Meteor uses MongoDB, and we will use the `GCEPersistentDisk` type of
 volume for persistent storage. Therefore, this example is only
 applicable to [Google Compute
 Engine](https://cloud.google.com/compute/). Take a look at the
-[volumes documentation](/docs/volumes.md) for other options.
+[volumes documentation](../../docs/volumes.md) for other options.
 
 First, if you have not already done so:
 
@@ -104,7 +118,7 @@ and make sure the `image:` points to the container you just pushed to
 the Docker Hub or GCR.
 
 We will need to provide MongoDB a persistent Kuberetes volume to
-store its data. See the [volumes documentation](/docs/volumes.md) for
+store its data. See the [volumes documentation](../../docs/volumes.md) for
 options. We're going to use Google Compute Engine persistent
 disks. Create the MongoDB disk by running:
 ```
@@ -155,7 +169,7 @@ Here we can see the MongoDB host and port information being passed
 into the Meteor app. The `MONGO_SERVICE...` environment variables are
 set by Kubernetes, and point to the service named `mongo` specified in
 [`mongo-service.json`](mongo-service.json). See the [environment
-documentation](/docs/container-environment.md) for more details.
+documentation](../../docs/container-environment.md) for more details.
 
 As you may know, Meteor uses long lasting connections, and requires
 _sticky sessions_. With Kubernetes you can scale out your app easily
@@ -163,7 +177,7 @@ with session affinity. The
 [`meteor-service.json`](meteor-service.json) file contains
 `"sessionAffinity": "ClientIP"`, which provides this for us. See the
 [service
-documentation](/docs/services.md#virtual-ips-and-service-proxies) for
+documentation](../../docs/services.md#virtual-ips-and-service-proxies) for
 more information.
 
 As mentioned above, the mongo container uses a volume which is mapped
@@ -192,4 +206,6 @@ container section:
 ```
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/meteor/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
