@@ -22,6 +22,21 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Kubernetes User Guide: Managing Applications: Working with pods and containers in production
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes User Guide: Managing Applications: Working with pods and containers in production](#kubernetes-user-guide:-managing-applications:-working-with-pods-and-containers-in-production)
+  - [Persistent storage](#persistent-storage)
+  - [Distributing credentials](#distributing-credentials)
+  - [Authenticating with a private image registry](#authenticating-with-a-private-image-registry)
+  - [Helper containers](#helper-containers)
+  - [Resource management](#resource-management)
+  - [Liveness and readiness probes (aka health checks)](#liveness-and-readiness-probes-(aka-health-checks))
+  - [Lifecycle hooks and termination notice](#lifecycle-hooks-and-termination-notice)
+  - [Termination message](#termination-message)
+  - [What's next?](#what's-next?)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 You’ve seen [how to configure and deploy pods and containers](configuring-containers.md), using some of the most common configuration parameters. This section dives into additional features that are especially useful for running applications in production.
 
 ## Persistent storage
@@ -335,6 +350,10 @@ Sleep expired
 $ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatuses}}{{.lastState.terminated.exitCode}}{{end}}"
 0
 ```
+
+## What's next?
+
+[Learn more about managing deployments.](managing-deployments.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

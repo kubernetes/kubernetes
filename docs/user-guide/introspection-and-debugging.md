@@ -32,6 +32,7 @@ your pods. But there are a number of ways to get even more information about you
   - [Using ```kubectl describe pod``` to fetch details about pods](#using-```kubectl-describe-pod```-to-fetch-details-about-pods)
   - [Example: debugging Pending Pods](#example:-debugging-pending-pods)
   - [Example: debugging a down/unreachable node](#example:-debugging-a-down/unreachable-node)
+  - [What's next?](#what's-next?)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -316,6 +317,15 @@ status:
     osImage: Debian GNU/Linux 7 (wheezy)
     systemUUID: ABE5F6B4-D44B-108B-C46A-24CCE16C8B6E
 ```
+
+## What's next?
+
+Learn about additional debugging tools, including:
+* [Logging](logging.md)
+* [Monitoring](monitoring.md)
+* [Getting into containers via `exec`](getting-into-containers.md)
+* [Connecting to containers via proxies](connecting-to-applications-proxy.md)
+* [Connecting to containers via port forwarding](connecting-to-applications-port-forward.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

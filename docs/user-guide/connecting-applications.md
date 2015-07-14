@@ -32,6 +32,7 @@ certainly want the docs that go with that version.</h1>
     - [Environment Variables](#environment-variables)
     - [DNS](#dns)
   - [Exposing the Service to the internet](#exposing-the-service-to-the-internet)
+  - [What's next?](#what's-next?)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -235,6 +236,10 @@ $ kubectl get service nginxsvc -o json | grep \"ip\"
 "ip": "104.197.37.222"
 ```
 Now you have a load balancer that automatically does what you would’ve in the previous step. Note that you cannot directly curl your nodes on port 80, you need to go to the ip of the load balancer.
+
+## What's next?
+
+[Learn about more Kubernetes features that will help you run containers reliably in production.](production-pods.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
