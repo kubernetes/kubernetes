@@ -110,4 +110,6 @@ Please see the [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernet
 and using a Kubernetes cluster.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

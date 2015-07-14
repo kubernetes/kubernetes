@@ -318,4 +318,7 @@ Future work will add instructions to this guide to enable support for Kubernetes
 [11]: ../../cluster/addons/dns/skydns-rc.yaml.in
 [12]: ../../cluster/addons/dns/skydns-svc.yaml.in
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/mesos.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

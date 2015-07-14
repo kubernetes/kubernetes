@@ -42,5 +42,6 @@ Other details:
 * Monitoring using [CAdvisor](https://github.com/google/cadvisor) and [Heapster](https://github.com/GoogleCloudPlatform/heapster)
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/overview.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

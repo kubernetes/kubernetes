@@ -1,7 +1,21 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Overview
 This example shows two types of pod health checks: HTTP checks and container execution checks.
 
-The [exec-liveness.yaml](./exec-liveness.yaml) demonstrates the container execution check.
+The [exec-liveness.yaml](exec-liveness.yaml) demonstrates the container execution check.
 ```
     livenessProbe:
       exec:
@@ -67,4 +81,8 @@ Sat, 27 Jun 2015 13:44:44 +0200    Sat, 27 Jun 2015 13:44:44 +0200    1    {kube
 Sat, 27 Jun 2015 13:44:44 +0200    Sat, 27 Jun 2015 13:44:44 +0200    1    {kubelet kubernetes-minion-6fbi}    spec.containers{liveness}    created    Created with docker id ed6bb004ee10
 Sat, 27 Jun 2015 13:44:44 +0200    Sat, 27 Jun 2015 13:44:44 +0200    1    {kubelet kubernetes-minion-6fbi}    spec.containers{liveness}    started    Started with docker id ed6bb004ee10
 ```
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/liveness/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

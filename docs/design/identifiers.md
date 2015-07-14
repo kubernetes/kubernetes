@@ -106,4 +106,6 @@ objectives.
       1. This may correspond to Docker's container ID.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/identifiers.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

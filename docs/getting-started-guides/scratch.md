@@ -767,5 +767,6 @@ If you run into trouble, please see the section on [troubleshooting](gce.md#trou
 [google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at #google-containers on freenode.
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/scratch.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

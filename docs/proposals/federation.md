@@ -445,4 +445,6 @@ their primary zookeeper replica? And now how do I do a shared, highly
 available redis database?
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/federation.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

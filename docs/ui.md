@@ -52,4 +52,7 @@ Other views (Pods, Nodes, Replication Controllers, Services, and Events) simply 
 ## More Information 
 For more information, see the [Kubernetes UI development document](../www/README.md) in the www directory.
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/ui.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

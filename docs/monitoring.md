@@ -70,4 +70,7 @@ Now that you’ve learned a bit about Heapster, feel free to try it out on your 
 *Authors: Vishnu Kannan and Victor Marmol, Google Software Engineers.* 
 *This article was originally posted in [Kubernetes blog](http://blog.kubernetes.io/2015/05/resource-usage-monitoring-kubernetes.html).*
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/monitoring.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

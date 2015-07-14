@@ -58,4 +58,6 @@ All other cluster-level functions are currently performed by the Controller Mana
 The [`replicationcontroller`](../replication-controller.md) is a mechanism that is layered on top of the simple [`pod`](../pods.md) API. We eventually plan to port it to a generic plug-in mechanism, once one is implemented.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/architecture.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

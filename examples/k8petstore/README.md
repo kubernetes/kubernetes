@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Welcome to k8PetStore
 
 This is a follow up to the [Guestbook Example](../guestbook/README.md)'s [Go implementation](../guestbook-go/).
@@ -109,4 +123,6 @@ For questions on running this app, you can ask on the google containers group (f
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -163,4 +163,6 @@ $kubectl config use-context federal-context
 ```
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubeconfig-file.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -42,4 +42,7 @@ Once those requirements are met, they will be labeled [ok-to-merge](https://gith
 
 These restrictions will be relaxed after v1.0 is released.
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/pull-requests.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

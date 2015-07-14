@@ -87,5 +87,6 @@ project.](salt.md).
 * **Admission Controllers** [admission_controllers](admission_controllers.md)
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cluster-admin-guide.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -22,7 +22,7 @@ to Kubernetes and running your first containers on the cluster.
 
 From this point onwards, it is assumed that `kubectl` is on your path from one of the getting started guides.
 
-The [`kubectl run`](../../docs/user-guide/kubectl/kubectl_run.md) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](../docs/pods.md) listening on port 80. It will also create a [replication controller](../docs/replication-controller.md) named `my-nginx` to ensure that there are always two pods running.
+The [`kubectl run`](../docs/user-guide/kubectl/kubectl_run.md) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](../docs/pods.md) listening on port 80. It will also create a [replication controller](../docs/replication-controller.md) named `my-nginx` to ensure that there are always two pods running.
 
 ```bash
 kubectl run my-nginx --image=nginx --replicas=2 --port=80

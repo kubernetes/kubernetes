@@ -86,4 +86,6 @@ Some important differences between v1beta1/2 and v1beta3:
 * Host volumes have been changed from `hostDir` to `hostPath` to better reflect that they can be files or directories.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/api.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

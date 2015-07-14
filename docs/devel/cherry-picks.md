@@ -46,4 +46,6 @@ against a release is a GitHub query: For example,
 [this query is all of the v0.21.x cherry-picks](https://github.com/GoogleCloudPlatform/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Apr+%22automated+cherry+pick%22+base%3Arelease-0.21)
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/cherry-picks.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

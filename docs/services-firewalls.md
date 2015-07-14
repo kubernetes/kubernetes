@@ -61,4 +61,7 @@ This will be fixed in an upcoming release of Kubernetes.
 ### Other cloud providers
 Coming soon.
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/services-firewalls.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

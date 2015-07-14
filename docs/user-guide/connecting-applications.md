@@ -229,5 +229,6 @@ $ kubectl get service nginxsvc -o json | grep \"ip\"
 Now you have a load balancer that automatically does what you would’ve in the previous step. Note that you cannot directly curl your nodes on port 80, you need to go to the ip of the load balancer.
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-applications.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
