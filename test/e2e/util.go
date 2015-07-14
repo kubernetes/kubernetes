@@ -784,6 +784,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+waitLoop:
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1", "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
@@ -796,20 +797,20 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
 				Logf("%s is created but not running", podID)
-				continue
+				continue waitLoop
 			}
 
 			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
-				continue
+				continue waitLoop
 			}
 
 			// Call the generic validator function here.
 			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
 			if err := validator(c, podID); err != nil {
 				Logf("%s is running right image but validator function failed: %v", podID, err)
-				continue
+				continue waitLoop
 			}
 
 			Logf("%s is verified up and running", podID)
@@ -1252,11 +1253,12 @@ func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
 	podStore := newPodStore(c, ns, label, fields.Everything())
 	defer podStore.Stop()
+waitLoop:
 	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
 		pods := podStore.List()
 		for _, p := range pods {
 			if p.Status.Phase != api.PodRunning {
-				continue
+				continue waitLoop
 			}
 		}
 		running = true
