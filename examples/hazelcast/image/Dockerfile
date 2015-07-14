@@ -5,7 +5,7 @@ MAINTAINER Paulo Pires <pjpires@gmail.com>
 EXPOSE 5701
 
 RUN \
-  curl -Lskj https://github.com/pires/hazelcast-kubernetes-bootstrapper/releases/download/0.3.1/hazelcast-kubernetes-bootstrapper-0.3.1.jar \
+  curl -Lskj https://github.com/pires/hazelcast-kubernetes-bootstrapper/releases/download/0.5/hazelcast-kubernetes-bootstrapper-0.5.jar \
   -o /bootstrapper.jar
 
 CMD java -jar /bootstrapper.jar
