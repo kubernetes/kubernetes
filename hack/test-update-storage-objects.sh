@@ -93,7 +93,7 @@ startApiServer
 
 # Create a pod
 kube::log::status "Creating a pod"
-${KUBECTL} create -f examples/pod.yaml
+${KUBECTL} create -f docs/user-guide/pod.yaml
 
 killApiServer
 
