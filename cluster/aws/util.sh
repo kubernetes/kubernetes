@@ -117,6 +117,13 @@ function get_instance_public_ip {
     --query Reservations[].Instances[].NetworkInterfaces[0].Association.PublicIp
 }
 
+function get_instance_private_ip {
+  local instance_id=$1
+  $AWS_CMD --output text describe-instances \
+    --instance-ids ${instance_id} \
+    --query Reservations[].Instances[].NetworkInterfaces[0].PrivateIpAddress
+}
+
 # Gets a security group id, by name ($1)
 function get_security_group_id {
   local name=$1
