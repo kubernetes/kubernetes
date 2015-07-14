@@ -22,9 +22,10 @@ certainly want the docs that go with that version.</h1>
 
    * [Java (OSGI)](https://bitbucket.org/amdatulabs/amdatu-kubernetes)
    * [Java (Fabric8)](https://github.com/fabric8io/fabric8/tree/master/components/kubernetes-api)
-   * [Ruby1](https://github.com/Ch00k/kuber)
-   * [Ruby2](https://github.com/abonas/kubeclient)
+   * [Ruby](https://github.com/Ch00k/kuber)
+   * [Ruby](https://github.com/abonas/kubeclient)
    * [PHP](https://github.com/devstub/kubernetes-api-php-client)
+   * [PHP](https://github.com/maclof/kubernetes-client)
    * [Node.js](https://github.com/tenxcloud/node-kubernetes-client)
    * [Perl](https://metacpan.org/pod/Net::Kubernetes)
 
