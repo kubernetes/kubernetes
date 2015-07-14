@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Running your first containers in Kubernetes
 
 Ok, you've run one of the [getting started guides](../docs/getting-started-guides/) and you have
@@ -8,7 +22,7 @@ to Kubernetes and running your first containers on the cluster.
 
 From this point onwards, it is assumed that `kubectl` is on your path from one of the getting started guides.
 
-The [`kubectl run`](/docs/kubectl_run.md) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](/docs/pods.md) listening on port 80. It will also create a [replication controller](/docs/replication-controller.md) named `my-nginx` to ensure that there are always two pods running.
+The [`kubectl run`](../../docs/user-guide/kubectl/kubectl_run.md) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](../docs/pods.md) listening on port 80. It will also create a [replication controller](../docs/replication-controller.md) named `my-nginx` to ensure that there are always two pods running.
 
 ```bash
 kubectl run my-nginx --image=nginx --replicas=2 --port=80
@@ -30,7 +44,7 @@ kubectl stop rc my-nginx
 ```
 
 ### Exposing your pods to the internet.
-On some platforms (for example Google Compute Engine) the kubectl command can integrate with your cloud provider to add a [public IP address](/docs/services.md#external-services) for the pods,
+On some platforms (for example Google Compute Engine) the kubectl command can integrate with your cloud provider to add a [public IP address](../docs/services.md#external-services) for the pods,
 to do this run:
 
 ```bash
@@ -50,4 +64,6 @@ Most people will eventually want to use declarative configuration files for crea
 is given in a different document.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/simple-nginx.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

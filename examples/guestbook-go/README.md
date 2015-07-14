@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Guestbook Example
 
 This example shows how to build a simple multi-tier web application using Kubernetes and Docker. The application consists of a web front-end, Redis master for storage, and replicated set of Redis slaves, all for which we will create Kubernetes replication controllers, pods, and services.
@@ -5,27 +19,27 @@ This example shows how to build a simple multi-tier web application using Kubern
 If you are running a cluster in Google Container Engine (GKE), instead see the [Guestbook Example for Google Container Engine](https://cloud.google.com/container-engine/docs/tutorials/guestbook).
 
 ##### Table of Contents  
- * [Step Zero: Prerequisites](<#step-zero) 
- * [Step One: Create the Redis master pod](<#step-one) 
- * [Step Two: Create the Redis master service](<#step-two) 
- * [Step Three: Create the Redis slave pods](<#step-three) 
- * [Step Four: Create the Redis slave service](<#step-four) 
- * [Step Five: Create the guestbook pods](<#step-five) 
- * [Step Six: Create the guestbook service](<#step-six) 
- * [Step Seven: View the guestbook](<#step-seven) 
+ * [Step Zero: Prerequisites](#step-zero) 
+ * [Step One: Create the Redis master pod](#step-one) 
+ * [Step Two: Create the Redis master service](#step-two) 
+ * [Step Three: Create the Redis slave pods](#step-three) 
+ * [Step Four: Create the Redis slave service](#step-four) 
+ * [Step Five: Create the guestbook pods](#step-five) 
+ * [Step Six: Create the guestbook service](#step-six) 
+ * [Step Seven: View the guestbook](#step-seven) 
  * [Step Eight: Cleanup](#step-eight)
 
 ### Step Zero: Prerequisites <a id="step-zero"></a>
 
-This example assumes that you have a working cluster. See the [Getting Started Guides](../../docs/getting-started-guides) for details about creating a cluster.
+This example assumes that you have a working cluster. See the [Getting Started Guides](../../docs/getting-started-guides/) for details about creating a cluster.
 
-**Tip:** View all the `kubectl` commands, including their options and descriptions in the [kudectl CLI reference](../../docs/kubectl.md).
+**Tip:** View all the `kubectl` commands, including their options and descriptions in the [kudectl CLI reference](../../docs/user-guide/kubectl/kubectl.md).
 
 ### Step One: Create the Redis master pod<a id="step-one"></a>
 
 Use the `examples/guestbook-go/redis-master-controller.json` file to create a [replication controller](../../docs/replication-controller.md) and Redis master [pod](../../docs/pods.md). The pod runs a Redis key-value server in a container. Using a replication controller is the preferred way to launch long-running pods, even for 1 replica, so that the pod benefits from the self-healing mechanism in Kubernetes (keeps the pods alive).
 
-1. Use the [examples/guestbook-go/redis-master-controller.json](redis-master-controller.json) file to create the Redis master replication controller in your Kubernetes cluster by running the `kubectl create -f` *`filename`* command:
+1. Use the [redis-master-controller.json](redis-master-controller.json) file to create the Redis master replication controller in your Kubernetes cluster by running the `kubectl create -f` *`filename`* command:
     ```shell
     $ kubectl create -f examples/guestbook-go/redis-master-controller.json
     replicationcontrollers/redis-master
@@ -64,7 +78,7 @@ A Kubernetes '[service](../../docs/services.md)' is a named load balancer that p
 
 Services find the containers to load balance based on pod labels. The pod that you created in Step One has the label `app=redis` and `role=master`. The selector field of the service determines which pods will receive the traffic sent to the service.
 
-1. Use the [examples/guestbook-go/redis-master-service.json](redis-master-service.json) file to create the service in your Kubernetes cluster by running the `kubectl create -f` *`filename`* command:
+1. Use the [redis-master-service.json](redis-master-service.json) file to create the service in your Kubernetes cluster by running the `kubectl create -f` *`filename`* command:
     ```shell
     $ kubectl create -f examples/guestbook-go/redis-master-service.json
     services/redis-master
@@ -83,7 +97,7 @@ Services find the containers to load balance based on pod labels. The pod that y
 ### Step Three: Create the Redis slave pods <a id="step-three"></a>
 The Redis master we created earlier is a single pod (REPLICAS = 1), while the Redis read slaves we are creating here are 'replicated' pods. In Kubernetes, a replication controller is responsible for managing the multiple instances of a replicated pod.
 
-1. Use the file [examples/guestbook-go/redis-slave-controller.json](redis-slave-controller.json) to create the replication controller by running the `kubectl create -f` *`filename`* command:
+1. Use the file [redis-slave-controller.json](redis-slave-controller.json) to create the replication controller by running the `kubectl create -f` *`filename`* command:
     ```shell
     $ kubectl create -f examples/guestbook-go/redis-slave-controller.json
     replicationcontrollers/redis-slave
@@ -120,7 +134,7 @@ The Redis master we created earlier is a single pod (REPLICAS = 1), while the Re
 
 Just like the master, we want to have a service to proxy connections to the read slaves. In this case, in addition to discovery, the Redis slave service provides transparent load balancing to clients.
 
-1. Use the [examples/guestbook-go/redis-slave-service.json](redis-slave-service.json) file to create the Redis slave service by running the `kubectl create -f` *`filename`* command:
+1. Use the [redis-slave-service.json](redis-slave-service.json) file to create the Redis slave service by running the `kubectl create -f` *`filename`* command:
     ```shell
     $ kubectl create -f examples/guestbook-go/redis-slave-service.json
     services/redis-slave
@@ -142,7 +156,7 @@ Tip: It is helpful to set labels on your services themselves--as we've done here
 
 This is a simple Go `net/http` ([negroni](https://github.com/codegangsta/negroni) based) server that is configured to talk to either the slave or master services depending on whether the request is a read or a write. The pods we are creating expose a simple JSON interface and serves a jQuery-Ajax based UI. Like the Redis read slaves, these pods are also managed by a replication controller.
 
-1. Use the [examples/guestbook-go/guestbook-controller.json](guestbook-controller.json) file to create the guestbook replication controller by running the `kubectl create -f` *`filename`* command:
+1. Use the [guestbook-controller.json](guestbook-controller.json) file to create the guestbook replication controller by running the `kubectl create -f` *`filename`* command:
     ```shell
     $ kubectl create -f examples/guestbook-go/guestbook-controller.json
     replicationcontrollers/guestbook
@@ -176,7 +190,7 @@ This is a simple Go `net/http` ([negroni](https://github.com/codegangsta/negroni
 
 Just like the others, we create a service to group the guestbook pods but this time, to make the guestbook front-end externally visible, we specify `"type": "LoadBalancer"`.
 
-1. Use the [examples/guestbook-go/guestbook-service.json](guestbook-service.json) file to create the guestbook service by running the `kubectl create -f` *`filename`* command:
+1. Use the [guestbook-service.json](guestbook-service.json) file to create the guestbook service by running the `kubectl create -f` *`filename`* command:
     ```shell
     $ kubectl create -f examples/guestbook-go/guestbook-service.json
 		  An external load-balanced service was created.  On many platforms (e.g. Google Compute Engine),
@@ -243,7 +257,9 @@ redis-slave
 ```
 
 Tip: To turn down your Kubernetes cluster, follow the corresponding instructions in the version of the
-[Getting Started Guides](../../docs/getting-started-guides) that you previously used to create your cluster.
+[Getting Started Guides](../../docs/getting-started-guides/) that you previously used to create your cluster.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook-go/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
