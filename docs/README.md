@@ -20,7 +20,7 @@ certainly want the docs that go with that version.</h1>
 * The [Cluster Admin's guide](admin/README.md) is for anyone setting up
   a Kubernetes cluster or administering it.
 
-* The [Developer guide](developer-guide.md) is for anyone wanting to write
+* The [Developer guide](devel/developer-guide.md) is for anyone wanting to write
   programs that access the kubernetes API, write plugins or extensions, or
   modify the core code of kubernetes.
 

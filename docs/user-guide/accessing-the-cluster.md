@@ -116,7 +116,7 @@ with future high-availability support.
 
 ### Programmatic access to the API
 
-There are [client libraries](../client-libraries.md) for accessing the API
+There are [client libraries](../devel/client-libraries.md) for accessing the API
 from several languages.  The Kubernetes project-supported
 [Go](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/pkg/client)
 client library can use the same [kubeconfig file](kubeconfig-file.md)
@@ -134,7 +134,7 @@ the `kubernetes` DNS name, which resolves to a Service IP which in turn
 will be routed to an apiserver.
 
 The recommended way to authenticate to the apiserver is with a
-[service account](../service-accounts.md) credential.  By default, a pod
+[service account](service-accounts.md) credential.  By default, a pod
 is associated with a service account, and a credential (token) for that
 service account is placed into the filesystem tree of each container in that pod,
 at `/var/run/secrets/kubernetes.io/serviceaccount/token`.

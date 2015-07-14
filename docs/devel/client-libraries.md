@@ -31,5 +31,5 @@ certainly want the docs that go with that version.</h1>
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/client-libraries.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/client-libraries.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
