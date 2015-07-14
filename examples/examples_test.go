@@ -161,8 +161,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-slave-service":     &api.Service{},
 		},
 		"../docs/user-guide/walkthrough": {
-			"pod1": &api.Pod{},
-			"pod2": &api.Pod{},
+			"pod-nginx":                 &api.Pod{},
+			"pod-nginx-with-label":      &api.Pod{},
+			"pod-redis":                 &api.Pod{},
 			"pod-with-http-healthcheck": &api.Pod{},
 			"service":                   &api.Service{},
 			"replication-controller":    &api.ReplicationController{},
@@ -205,7 +206,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"replication": &api.ReplicationController{},
 		},
 		"../examples": {
-			"pod": &api.Pod{},
 			"scheduler-policy-config": &schedulerapi.Policy{},
 		},
 		"../examples/rbd/secret": {
