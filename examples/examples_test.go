@@ -160,7 +160,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-master-service":    &api.Service{},
 			"redis-slave-service":     &api.Service{},
 		},
-		"../examples/walkthrough": {
+		"../docs/user-guide/walkthrough": {
 			"pod1": &api.Pod{},
 			"pod2": &api.Pod{},
 			"pod-with-http-healthcheck": &api.Pod{},
@@ -168,22 +168,22 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"replication-controller":    &api.ReplicationController{},
 			"podtemplate":               &api.PodTemplate{},
 		},
-		"../examples/update-demo": {
+		"../docs/user-guide/update-demo": {
 			"kitten-rc":   &api.ReplicationController{},
 			"nautilus-rc": &api.ReplicationController{},
 		},
-		"../examples/persistent-volumes/volumes": {
+		"../docs/user-guide/persistent-volumes/volumes": {
 			"local-01": &api.PersistentVolume{},
 			"local-02": &api.PersistentVolume{},
 			"gce":      &api.PersistentVolume{},
 			"nfs":      &api.PersistentVolume{},
 		},
-		"../examples/persistent-volumes/claims": {
+		"../docs/user-guide/persistent-volumes/claims": {
 			"claim-01": &api.PersistentVolumeClaim{},
 			"claim-02": &api.PersistentVolumeClaim{},
 			"claim-03": &api.PersistentVolumeClaim{},
 		},
-		"../examples/persistent-volumes/simpletest": {
+		"../docs/user-guide/persistent-volumes/simpletest": {
 			"namespace": &api.Namespace{},
 			"pod":       &api.Pod{},
 			"service":   &api.Service{},
@@ -195,14 +195,16 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"glusterfs-pod":       &api.Pod{},
 			"glusterfs-endpoints": &api.Endpoints{},
 		},
-		"../examples/liveness": {
+		"../docs/user-guide/liveness": {
 			"exec-liveness": &api.Pod{},
 			"http-liveness": &api.Pod{},
 		},
+		"../docs/user-guide": {
+			"multi-pod":   nil,
+			"pod":         &api.Pod{},
+			"replication": &api.ReplicationController{},
+		},
 		"../examples": {
-			"multi-pod":               nil,
-			"pod":                     &api.Pod{},
-			"replication":             &api.ReplicationController{},
 			"scheduler-policy-config": &schedulerapi.Policy{},
 		},
 		"../examples/rbd/secret": {
@@ -231,7 +233,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"namespace-dev":       &api.Namespace{},
 			"namespace-prod":      &api.Namespace{},
 		},
-		"../examples/downward-api": {
+		"../docs/user-guide/downward-api": {
 			"dapi-pod": &api.Pod{},
 		},
 		"../examples/elasticsearch": {
@@ -250,13 +252,13 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"namespace-dev":  &api.Namespace{},
 			"namespace-prod": &api.Namespace{},
 		},
-		"../examples/limitrange": {
+		"../docs/user-guide/limitrange": {
 			"invalid-pod": &api.Pod{},
 			"limits":      &api.LimitRange{},
 			"namespace":   &api.Namespace{},
 			"valid-pod":   &api.Pod{},
 		},
-		"../examples/logging-demo": {
+		"../docs/user-guide/logging-demo": {
 			"synthetic_0_25lps": &api.Pod{},
 			"synthetic_10lps":   &api.Pod{},
 		},
@@ -277,7 +279,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"nfs-server-service": &api.Service{},
 			"nfs-web-pod":        &api.Pod{},
 		},
-		"../examples/node-selection": {
+		"../docs/user-guide/node-selection": {
 			"pod": &api.Pod{},
 		},
 		"../examples/openshift-origin": {
@@ -296,7 +298,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-sentinel-controller": &api.ReplicationController{},
 			"redis-sentinel-service":    &api.Service{},
 		},
-		"../examples/resourcequota": {
+		"../docs/user-guide/resourcequota": {
 			"namespace": &api.Namespace{},
 			"limits":    &api.LimitRange{},
 			"quota":     &api.ResourceQuota{},
@@ -307,7 +309,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"driver-service": &api.Service{},
 			"rc":             &api.ReplicationController{},
 		},
-		"../examples/secrets": {
+		"../docs/user-guide/secrets": {
 			"secret-pod": &api.Pod{},
 			"secret":     &api.Secret{},
 		},
@@ -362,6 +364,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			t.Errorf("Expected no error, Got %v", err)
 		}
 		if tested != len(expected) {
+			t.Logf("failing path: %q", path)
 			t.Errorf("Expected %d examples, Got %d", len(expected), tested)
 		}
 	}
@@ -392,9 +395,9 @@ func TestReadme(t *testing.T) {
 		expectedType []runtime.Object
 	}{
 		{"../README.md", []runtime.Object{&api.Pod{}}},
-		{"../examples/walkthrough/README.md", []runtime.Object{&api.Pod{}}},
+		{"../docs/user-guide/walkthrough/README.md", []runtime.Object{&api.Pod{}}},
 		{"../examples/iscsi/README.md", []runtime.Object{&api.Pod{}}},
-		{"../examples/simple-yaml.md", []runtime.Object{&api.Pod{}, &api.ReplicationController{}}},
+		{"../docs/user-guide/simple-yaml.md", []runtime.Object{&api.Pod{}, &api.ReplicationController{}}},
 	}
 
 	for _, path := range paths {
