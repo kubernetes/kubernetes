@@ -29,44 +29,27 @@ steps that existing cluster setup scripts are making.
 
 **Table of Contents**
 
-- [Designing and Preparing](#designing-and-preparing)
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [Designing and Preparing](#designing-and-preparing)
     - [Learning](#learning)
     - [Cloud Provider](#cloud-provider)
     - [Nodes](#nodes)
     - [Network](#network)
     - [Cluster Naming](#cluster-naming)
     - [Software Binaries](#software-binaries)
-        - [Downloading and Extracting Kubernetes Binaries](#downloading-and-extracting-kubernetes-binaries)
-        - [Selecting Images](#selecting-images)
+      - [Downloading and Extracting Kubernetes Binaries](#downloading-and-extracting-kubernetes-binaries)
+      - [Selecting Images](#selecting-images)
     - [Security Models](#security-models)
-        - [Preparing Certs](#preparing-certs)
-        - [Preparing Credentials](#preparing-credentials)
-- [Configuring and Installing Base Software on Nodes](#configuring-and-installing-base-software-on-nodes)
+      - [Preparing Certs](#preparing-certs)
+      - [Preparing Credentials](#preparing-credentials)
+  - [Configuring and Installing Base Software on Nodes](#configuring-and-installing-base-software-on-nodes)
     - [Docker](#docker)
     - [rkt](#rkt)
     - [kubelet](#kubelet)
     - [kube-proxy](#kube-proxy)
     - [Networking](#networking)
-    - [Other](#other)
-    - [Using Configuration Management](#using-configuration-management)
-- [Bootstrapping the Cluster](#bootstrapping-the-cluster)
-    - [etcd](#etcd)
-    - [Apiserver](#apiserver)
-        - [Apiserver pod template](#apiserver-pod-template)
-    - [Starting Apiserver](#starting-apiserver)
-    - [Scheduler](#scheduler)
-    - [Controller Manager](#controller-manager)
-    - [DNS](#dns)
-    - [Logging](#logging)
-    - [Monitoring](#monitoring)
-    - [Miscellaneous Resources](#miscelaneous-resources)
-- [Troubleshooting](#troubleshooting)
-    - [Running validate-cluster](#running-validate-cluster)
-    - [Inspect pods and services](#inspect-pods-and-services)
-    - [Try Examples](#try-examples)
-    - [Running the Conformance Test](#running-the-conformance-test)
-    - [Networking](#networking)
-    - [Getting Help](#getting-help)
+
+<!-- END MUNGE: GENERATED_TOC -->
 
 ## Designing and Preparing
 

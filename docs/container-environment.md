@@ -15,6 +15,22 @@ certainly want the docs that go with that version.</h1>
 
 # Kubernetes Container Environment
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes Container Environment](#kubernetes-container-environment)
+  - [Overview](#overview)
+  - [Cluster Information](#cluster-information)
+    - [Container Information](#container-information)
+    - [Cluster Information](#cluster-information)
+  - [Container Hooks](#container-hooks)
+    - [Hook Details](#hook-details)
+    - [Hook Handler Execution](#hook-handler-execution)
+    - [Hook delivery guarantees](#hook-delivery-guarantees)
+    - [Hook Handler Implementations](#hook-handler-implementations)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+
 ## Overview
 This document describes the environment for Kubelet managed containers on a Kubernetes node (kNode).  In contrast to the Kubernetes cluster API, which provides an API for creating and managing containers, the Kubernetes container environment provides the container access to information about what else is going on in the cluster. 
 

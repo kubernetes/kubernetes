@@ -14,6 +14,21 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Kubernetes User Guide: Managing Applications: Connecting applications
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes User Guide: Managing Applications: Connecting applications](#kubernetes-user-guide:-managing-applications:-connecting-applications)
+- [The Kubernetes model for connecting Containers](#the-kubernetes-model-for-connecting-containers)
+  - [Exposing nginx pods to the cluster](#exposing-nginx-pods-to-the-cluster)
+  - [Creating a Service for the pods](#creating-a-service-for-the-pods)
+  - [Accessing the Service from other pods in the cluster](#accessing-the-service-from-other-pods-in-the-cluster)
+    - [Environment Variables](#environment-variables)
+    - [DNS](#dns)
+  - [Exposing the Service to the internet](#exposing-the-service-to-the-internet)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+# The Kubernetes model for connecting Containers
+
 Now that you have a continuously running, replicated application you can expose it on a network. Before discussing the Kubernetes approach to networking, it is worthwhile to contrast it with the "normal" way networking works with Docker.
 
 By default, Docker uses host-private networking, so containers can talk to other containers only if they are on the same machine. In order for Docker containers to communicate across nodes, they must be allocated ports on the machine's own IP address, which are then forwarded or proxied to the containers. This obviously means that containers must either coordinate which ports they use very carefully or else be allocated ports dynamically.

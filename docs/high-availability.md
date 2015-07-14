@@ -14,6 +14,16 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # High Availability Kubernetes Clusters
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [High Availability Kubernetes Clusters](#high-availability-kubernetes-clusters)
+  - [Introduction](#introduction)
+  - [Overview](#overview)
+  - [Initial set-up](#initial-set-up)
+  - [Reliable nodes](#reliable-nodes)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## Introduction
 This document describes how to build a high-availability (HA) Kubernetes cluster.  This is a fairly advanced topic.
 Users who merely want to experiment with Kubernetes are encouraged to use configurations that are simpler to set up such as
