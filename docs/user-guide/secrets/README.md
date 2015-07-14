@@ -21,7 +21,7 @@ You can learn more about secrets [Here](https://github.com/GoogleCloudPlatform/k
 
 This example assumes you have a Kubernetes cluster installed and running, and that you have
 installed the ```kubectl``` command line tool somewhere in your path. Please see the [getting
-started](../../docs/getting-started-guides/) for installation instructions for your platform.
+started](../../../docs/getting-started-guides/) for installation instructions for your platform.
 
 ## Step One: Create the secret
 
@@ -74,5 +74,5 @@ $ kubectl logs secret-test-pod
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/secrets/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/secrets/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

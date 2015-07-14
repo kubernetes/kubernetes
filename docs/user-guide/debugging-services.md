@@ -504,5 +504,5 @@ Contact us on
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/debugging-services.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/debugging-services.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

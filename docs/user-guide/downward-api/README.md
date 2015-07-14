@@ -21,7 +21,7 @@ namespace using the [downward API](https://github.com/GoogleCloudPlatform/kubern
 
 This example assumes you have a Kubernetes cluster installed and running, and that you have
 installed the ```kubectl``` command line tool somewhere in your path. Please see the [getting
-started](../../docs/getting-started-guides/) for installation instructions for your platform.
+started](../../../docs/getting-started-guides/) for installation instructions for your platform.
 
 ## Step One: Create the pod
 
@@ -48,5 +48,5 @@ $ kubectl logs dapi-test-pod | grep POD_
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/downward-api/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/downward-api/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

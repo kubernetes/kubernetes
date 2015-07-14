@@ -120,5 +120,5 @@ Detailed examples and explanation of `kubeconfig` loading/merging rules can be f
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/sharing-clusters.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/sharing-clusters.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

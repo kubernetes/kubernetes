@@ -16,8 +16,8 @@ certainly want the docs that go with that version.</h1>
 
 The user guide is intended for anyone who wants to run programs and services
 on an existing Kubernetes cluster.  Setup and administration of a
-Kubernetes cluster is described in the [Cluster Admin Guide](admin/README.md).
-The [Developer Guide](developer-guide.md) is for anyone wanting to either write code which directly accesses the
+Kubernetes cluster is described in the [Cluster Admin Guide](../admin/README.md).
+The [Developer Guide](../developer-guide.md) is for anyone wanting to either write code which directly accesses the
 kubernetes API, or to contribute directly to the kubernetes project.
 
 ## Primary concepts
@@ -25,7 +25,7 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Overview** ([overview.md](overview.md)): A brief overview
   of Kubernetes concepts. 
 
-* **Nodes** ([admin/node.md](admin/node.md)): A node is a worker machine in Kubernetes.
+* **Nodes** ([docs/admin/node.md](../admin/node.md)): A node is a worker machine in Kubernetes.
 
 * **Pods** ([pods.md](pods.md)): A pod is a tightly-coupled group of containers
   with shared volumes.
@@ -54,22 +54,22 @@ kubernetes API, or to contribute directly to the kubernetes project.
 
 * **Accessing the API and other cluster services via a Proxy** [accessing-the-cluster.md](accessing-the-cluster.md)
 
-* **API Overview** ([api.md](api.md)): Pointers to API documentation on various topics
+* **API Overview** ([docs/api.md](../api.md)): Pointers to API documentation on various topics
   and explanation of Kubernetes's approaches to API changes and API versioning.
 
 * **Kubernetes Web Interface** ([ui.md](ui.md)): Accessing the Kubernetes
   web user interface.
 
-* **Kubectl Command Line Interface** ([user-guide/kubectl/kubectl.md](user-guide/kubectl/kubectl.md)):
+* **Kubectl Command Line Interface** ([kubectl/kubectl.md](kubectl/kubectl.md)):
   The `kubectl` command line reference.
 
 * **Sharing Cluster Access** ([sharing-clusters.md](sharing-clusters.md)):
   How to share client credentials for a kubernetes cluster.
 
-* **Roadmap** ([roadmap.md](roadmap.md)): The set of supported use cases, features,
+* **Roadmap** ([docs/roadmap.md](../roadmap.md)): The set of supported use cases, features,
   docs, and patterns that are required before Kubernetes 1.0.
 
-* **Glossary** ([glossary.md](glossary.md)): Terms and concepts.
+* **Glossary** ([docs/glossary.md](../glossary.md)): Terms and concepts.
 
 ## Further reading
 <!--- make sure all documents from the docs directory are linked somewhere.
@@ -89,7 +89,7 @@ for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv 
   Describes the environment for Kubelet managed containers on a Kubernetes
   node (see also [downward-api.md](downward-api.md)).
 
-* **DNS Integration with SkyDNS** ([admin/dns.md](admin/dns.md)):
+* **DNS Integration with SkyDNS** ([docs/admin/dns.md](../admin/dns.md)):
   Resolving a DNS name directly to a Kubernetes service.
 
 * **Identifiers** ([identifiers.md](identifiers.md)): Names and UIDs
@@ -103,9 +103,9 @@ for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv 
 * **Namespaces** ([namespaces.md](namespaces.md)): Namespaces help different
   projects, teams, or customers to share a kubernetes cluster.
 
-* **Networking** ([admin/networking.md](admin/networking.md)): Pod networking overview.
+* **Networking** ([docs/admin/networking.md](../admin/networking.md)): Pod networking overview.
 
-* **Services and firewalls** ([services-firewalls.md](services-firewalls.md)): How
+* **Services and firewalls** ([docs/services-firewalls.md](../services-firewalls.md)): How
   to use firewalls.
 
 * **Compute Resources** ([compute-resources.md](compute-resources.md)):
@@ -118,5 +118,5 @@ for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/user-guide.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

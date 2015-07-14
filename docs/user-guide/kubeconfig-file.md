@@ -97,7 +97,7 @@ The rules for loading and merging the kubeconfig files are straightforward, but 
 
 ## Manipulation of kubeconfig via `kubectl config <subcommand>`
 In order to more easily manipulate kubeconfig files, there are a series of subcommands to `kubectl config` to help.
-See [user-guide/kubectl/kubectl_config.md](user-guide/kubectl/kubectl_config.md) for help.
+See [kubectl/kubectl_config.md](kubectl/kubectl_config.md) for help.
 
 ### Example
 ```
@@ -164,5 +164,5 @@ $kubectl config use-context federal-context
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubeconfig-file.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubeconfig-file.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

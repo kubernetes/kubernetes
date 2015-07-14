@@ -23,7 +23,7 @@ If you find that you're not able to access the UI, it may be because the kube-ui
 kubectl create -f cluster/addons/kube-ui/kube-ui-rc.yaml --namespace=kube-system
 kubectl create -f cluster/addons/kube-ui/kube-ui-svc.yaml --namespace=kube-system
 ```
-Normally, this should be taken care of automatically by the [`kube-addons.sh`](../cluster/saltbase/salt/kube-addons/kube-addons.sh) script that runs on the master.
+Normally, this should be taken care of automatically by the [`kube-addons.sh`](../../cluster/saltbase/salt/kube-addons/kube-addons.sh) script that runs on the master.
 
 ## Using the UI
 The Kubernetes UI can be used to introspect your current cluster, such as checking how resources are used, or looking at error messages. You cannot, however, use the UI to modify your cluster. 
@@ -50,9 +50,9 @@ Other views (Pods, Nodes, Replication Controllers, Services, and Events) simply 
 ![kubernetes UI - Nodes](k8s-ui-nodes.png)
 
 ## More Information 
-For more information, see the [Kubernetes UI development document](../www/README.md) in the www directory.
+For more information, see the [Kubernetes UI development document](../../www/README.md) in the www directory.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/ui.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/ui.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

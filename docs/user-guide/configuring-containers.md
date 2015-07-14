@@ -35,7 +35,7 @@ In the declarative style, all configuration is stored in YAML or JSON configurat
 
 ## Launching a container using a configuration file
 
-Kubernetes executes containers in [*Pods*](../../docs/pods.md). A pod containing a simple Hello World container can be specified in YAML as follows:
+Kubernetes executes containers in [*Pods*](pods.md). A pod containing a simple Hello World container can be specified in YAML as follows:
 
 ```yaml
 apiVersion: v1
@@ -53,7 +53,7 @@ The value of `metadata.name`, `hello-world`, will be the name of the pod resourc
 
 `restartPolicy: Never` indicates that we just want to run the container once and then terminate the pod. 
 
-The [`command`](../../docs/containers.md#containers-and-commands) overrides the Docker container’s `Entrypoint`. Command arguments (corresponding to Docker’s `Cmd`) may be specified using `args`, as follows:
+The [`command`](containers.md#containers-and-commands) overrides the Docker container’s `Entrypoint`. Command arguments (corresponding to Docker’s `Cmd`) may be specified using `args`, as follows:
 
 ```yaml
     command: ["/bin/echo"]

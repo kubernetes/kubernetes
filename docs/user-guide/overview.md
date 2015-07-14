@@ -24,17 +24,17 @@ Users can create and manage pods themselves, but Kubernetes drastically simplifi
 
 Frequently it is useful to refer to a set of pods, for example to limit the set of pods on which a mutating operation should be performed, or that should be queried for status. As a general mechanism, users can attach to most Kubernetes API objects arbitrary key-value pairs called [labels](labels.md), and then use a set of label selectors (key-value queries over labels) to constrain the target of API operations. Each resource also has a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object, called [annotations](annotations.md). 
 
-Kubernetes supports a unique [networking model](admin/networking.md). Kubernetes encourages a flat address space and does not dynamically allocate ports, instead allowing users to select whichever ports are convenient for them. To achieve this, it allocates an IP address for each pod.
+Kubernetes supports a unique [networking model](../admin/networking.md). Kubernetes encourages a flat address space and does not dynamically allocate ports, instead allowing users to select whichever ports are convenient for them. To achieve this, it allocates an IP address for each pod.
 
-Modern Internet applications are commonly built by layering micro-services, for example a set of web front-ends talking to a distributed in-memory key-value store talking to a replicated storage service. To facilitate this architecture, Kubernetes offers the [service](services.md) abstraction, which provides a stable IP address and [DNS name](admin/dns.md) that corresponds to a dynamic set of pods such as the set of pods constituting a micro-service. The set is defined using a label selector and thus can refer to any set of pods. When a container running in a Kubernetes pod connects to this address, the connection is forwarded by a local agent (called the kube proxy) running on the source machine, to one of the corresponding back-end containers. The exact back-end is chosen using a round-robin policy to balance load. The kube proxy takes care of tracking the dynamic set of back-ends as pods are replaced by new pods on new hosts, so that the service IP address (and DNS name) never changes.
+Modern Internet applications are commonly built by layering micro-services, for example a set of web front-ends talking to a distributed in-memory key-value store talking to a replicated storage service. To facilitate this architecture, Kubernetes offers the [service](services.md) abstraction, which provides a stable IP address and [DNS name](../admin/dns.md) that corresponds to a dynamic set of pods such as the set of pods constituting a micro-service. The set is defined using a label selector and thus can refer to any set of pods. When a container running in a Kubernetes pod connects to this address, the connection is forwarded by a local agent (called the kube proxy) running on the source machine, to one of the corresponding back-end containers. The exact back-end is chosen using a round-robin policy to balance load. The kube proxy takes care of tracking the dynamic set of back-ends as pods are replaced by new pods on new hosts, so that the service IP address (and DNS name) never changes.
 
 Every resource in Kubernetes, such as a pod, is identified by a URI and has a UID. Important components of the URI are the kind of object (e.g. pod), the object’s name, and the object’s [namespace](namespaces.md). For a certain object kind, every name is unique within its namespace. In contexts where an object name is provided without a namespace, it is assumed to be in the default namespace. UID is unique across time and space.
 
 Other details:
 
-* [API](api.md)
-* [Client libraries](client-libraries.md)
-* [Command-line interface](user-guide/kubectl/kubectl.md)
+* [API](../api.md)
+* [Client libraries](../client-libraries.md)
+* [Command-line interface](kubectl/kubectl.md)
 * [UI](ui.md)
 * [Images and registries](images.md)
 * [Container environment](container-environment.md)
@@ -43,5 +43,5 @@ Other details:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/overview.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/overview.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -140,7 +140,7 @@ to serve the purpose outside of GCE.
 
 ## Pod to service
 
-The [service](../services.md) abstraction provides a way to group pods under a
+The [service](../user-guide/services.md) abstraction provides a way to group pods under a
 common access policy (e.g. load-balanced).  The implementation of this creates a
 virtual IP which clients can access and which is transparently proxied to the
 pods in a Service.  Each node runs a kube-proxy process which programs

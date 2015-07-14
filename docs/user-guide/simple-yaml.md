@@ -56,7 +56,7 @@ kubectl delete pods nginx
 ```
 
 ### Running a replicated set of containers from a configuration file
-To run replicated containers, you need a [Replication Controller](../docs/replication-controller.md).
+To run replicated containers, you need a [Replication Controller](replication-controller.md).
 A replication controller is responsible for ensuring that a specific number of pods exist in the
 cluster.
 
@@ -96,5 +96,5 @@ kubectl delete rc nginx
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/simple-yaml.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/simple-yaml.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

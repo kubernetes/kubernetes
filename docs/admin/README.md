@@ -15,7 +15,7 @@ certainly want the docs that go with that version.</h1>
 # Kubernetes Cluster Admin Guide
 
 The cluster admin guide is for anyone creating or administering a Kubernetes cluster.
-It assumes some familiarity with concepts in the [User Guide](../user-guide.md).
+It assumes some familiarity with concepts in the [User Guide](../user-guide/user-guide.md).
 
 ## Planning a cluster
 
@@ -63,7 +63,7 @@ project.](salt.md).
 * **DNS Integration with SkyDNS** ([dns.md](dns.md)):
   Resolving a DNS name directly to a Kubernetes service.
 
-* **Logging** with [Kibana](../logging.md)
+* **Logging** with [Kibana](../user-guide/logging.md)
 
 ## Multi-tenant support
 
@@ -74,7 +74,7 @@ project.](salt.md).
 
 ## Security
 
-* **Kubernetes Container Environment** ([docs/container-environment.md](../container-environment.md)):
+* **Kubernetes Container Environment** ([docs/user-guide/container-environment.md](../user-guide/container-environment.md)):
   Describes the environment for Kubelet managed containers on a Kubernetes
   node.
 

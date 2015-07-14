@@ -121,7 +121,7 @@ To determine if a container cannot be scheduled or is being killed due to resour
 
 The resource usage of a pod is reported as part of the Pod status.
 
-If [optional monitoring](../cluster/addons/cluster-monitoring/README.md) is configured for your cluster,
+If [optional monitoring](../../cluster/addons/cluster-monitoring/README.md) is configured for your cluster,
 then pod resource usage can be retrieved from the monitoring system.
 
 ## Troubleshooting
@@ -147,7 +147,7 @@ Here are some example command lines that extract just the necessary information:
 - `kubectl get nodes -o yaml | grep '\sname\|cpu\|memory'`
 - `kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, cap: .status.capacity}'`
 
-The [resource quota](admin/resource-quota.md) feature can be configured
+The [resource quota](../admin/resource-quota.md) feature can be configured
 to limit the total amount of resources that can be consumed.  If used in conjunction
 with namespaces, it can prevent one team from hogging all the resources.
 
@@ -209,7 +209,7 @@ such as [EmptyDir volumes](volumes.md#emptydir).
 
 The current system only supports container limits for CPU and Memory.
 It is planned to add new resource types, including a node disk space
-resource, and a framework for adding custom [resource types](design/resources.md#resource-types).
+resource, and a framework for adding custom [resource types](../design/resources.md#resource-types).
 
 The current system does not facilitate overcommitment of resources because resources reserved
 with container limits are assured.  It is planned to support multiple levels of [Quality of
@@ -223,5 +223,5 @@ across providers and platforms.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/compute-resources.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/compute-resources.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

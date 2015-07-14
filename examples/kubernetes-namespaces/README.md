@@ -14,11 +14,11 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Kubernetes Namespaces
 
-Kubernetes _[namespaces](../../docs/namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
+Kubernetes _[namespaces](../../docs/user-guide/namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
 
 It does this by providing the following:
 
-1. A scope for [Names](../../docs/identifiers.md).
+1. A scope for [Names](../../docs/user-guide/identifiers.md).
 2. A mechanism to attach authorization and policy to a subsection of the cluster.
 
 Use of multiple namespaces is optional.
@@ -30,7 +30,7 @@ This example demonstrates how to use Kubernetes namespaces to subdivide your clu
 This example assumes the following:
 
 1. You have an [existing Kubernetes cluster](../../docs/getting-started-guides/).
-2. You have a basic understanding of Kubernetes _[pods](../../docs/pods.md)_, _[services](../../docs/services.md)_, and _[replication controllers](../../docs/replication-controller.md)_.
+2. You have a basic understanding of Kubernetes _[pods](../../docs/user-guide/pods.md)_, _[services](../../docs/user-guide/services.md)_, and _[replication controllers](../../docs/user-guide/replication-controller.md)_.
 
 ### Step One: Understand the default namespace
 

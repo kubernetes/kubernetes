@@ -34,10 +34,10 @@ certainly want the docs that go with that version.</h1>
 Kubernetes approaches networking somewhat differently than Docker does by
 default.  There are 4 distinct networking problems to solve:
 1. Highly-coupled container-to-container communications: this is solved by
-   [pods](../pods.md) and `localhost` communications.
+   [pods](../user-guide/pods.md) and `localhost` communications.
 2. Pod-to-Pod communications: this is the primary focus of this document.
-3. Pod-to-Service communications: this is covered by [services](../services.md).
-4. External-to-Service communications: this is covered by [services](../services.md).
+3. Pod-to-Service communications: this is covered by [services](../user-guide/services.md).
+4. External-to-Service communications: this is covered by [services](../user-guide/services.md).
 
 ## Summary
 

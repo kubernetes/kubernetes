@@ -114,5 +114,5 @@ Enjoy!
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/persistent-volumes/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/persistent-volumes/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

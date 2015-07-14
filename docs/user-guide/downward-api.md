@@ -84,10 +84,10 @@ spec:
 ```
 
 Some more thorough examples:
-   * [environment variables](../examples/environment-guide/)
-   * [downward API](../examples/downward-api/)
+   * [environment variables](environment-guide/)
+   * [downward API](downward-api/)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/downward-api.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/downward-api.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

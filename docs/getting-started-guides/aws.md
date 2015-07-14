@@ -91,7 +91,7 @@ By default, `kubectl` will use the `kubeconfig` file generated during the cluste
 For more information, please read [kubeconfig files](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubeconfig-file.md)
 
 ### Examples
-See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
 
 The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/)
 
