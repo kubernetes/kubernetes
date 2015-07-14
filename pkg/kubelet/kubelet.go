@@ -78,6 +78,14 @@ const (
 
 	// Location of container logs.
 	containerLogsDir = "/var/log/containers"
+
+	// Limits for resolv.conf, per man(5) resolv.conf.
+	// max number of "nameserver" IPs.
+	glibcMaxResolvConfSearchEntries = 3
+	// max number of "search" strings.
+	glibcMaxResolvConfNameserverEntries = 6
+	// max length overall of "search" strings, excluding the word "search" and newline.
+	glibcMaxResolvConfSearchChars = 256
 )
 
 var (
@@ -918,6 +926,19 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		if err != nil {
 			return nil, err
 		}
+	}
+	// TODO(erictune): move into each container runtime, so we don't
+	// do this check on operating systems that don't use glibc (BSD, Windows).
+	// Also, this might be different with ipv6?
+	// TODO(erictune): get docker and rkt to warn about exceeding this limit?
+	if len(opts.DNSSearch) > glibcMaxResolvConfSearchEntries {
+		return nil, fmt.Errorf("Cluster DNS configuration error: more than %d search entries required", glibcMaxResolvConfSearchEntries)
+	}
+	if len(opts.DNS) > glibcMaxResolvConfNameserverEntries {
+		return nil, fmt.Errorf("Cluster DNS configuration error: more than %d nameserver entries required", glibcMaxResolvConfNameserverEntries)
+	}
+	if len(strings.Join(opts.DNSSearch, " ")) > glibcMaxResolvConfSearchChars {
+		return nil, fmt.Errorf("Cluster DNS configuration error: search string would exceed %d chars", glibcMaxResolvConfSearchChars)
 	}
 	return opts, nil
 }
