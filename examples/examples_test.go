@@ -234,6 +234,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"namespace-dev":       &api.Namespace{},
 			"namespace-prod":      &api.Namespace{},
 		},
+		"../examples/cmd-exec": {
+			"sleep-pod": &api.Pod{},
+		},
 		"../docs/user-guide/downward-api": {
 			"dapi-pod": &api.Pod{},
 		},
