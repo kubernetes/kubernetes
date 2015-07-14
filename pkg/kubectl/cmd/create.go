@@ -121,23 +121,15 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 	switch obj := obj.(type) {
 	case *api.Service:
-		if obj.Spec.Type == api.ServiceTypeLoadBalancer {
-			msg := fmt.Sprintf(`
-			An external load-balanced service was created.  On many platforms (e.g. Google Compute Engine),
-			you will also need to explicitly open a Firewall rule for the service port(s) (%s) to serve traffic.
-
-			See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewalls.md for more details.
-			`, makePortsString(obj.Spec.Ports, false))
-			out.Write([]byte(msg))
-		}
 		if obj.Spec.Type == api.ServiceTypeNodePort {
-			msg := fmt.Sprintf(`
-				You have exposed your service on an external port on all nodes in your cluster.
-				If you want to expose this service to the external internet, you may need to set up
-				firewall rules for the service port(s) (%s) to serve traffic.
-				
-				See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewalls.md for more details.
-				`, makePortsString(obj.Spec.Ports, true))
+			msg := fmt.Sprintf(
+				`You have exposed your service on an external port on all nodes in your
+cluster.  If you want to expose this service to the external internet, you may
+need to set up firewall rules for the service port(s) (%s) to serve traffic.
+
+See http://releases.k8s.io/HEAD/docs/services-firewalls.md for more details.
+`,
+				makePortsString(obj.Spec.Ports, true))
 			out.Write([]byte(msg))
 		}
 	}

@@ -188,12 +188,11 @@ spec:
   selector:
     app: nginx
 ```
-You should see a similar message informing you about firewall rules on port 80:
+
 ```shell
 $ kubectl delete svc nginxsvc
 $ kubectl create -f nginxsvc.yaml
-An external load-balanced service was created.  On many platforms (e.g. Google Compute Engine),
-you will also need to explicitly open a Firewall rule for the service port(s) (tcp:80) to serve traffic.
+services/nginxsvc
 
 $ kubectl get service nginxsvc -o json | grep \"ip\"
 "ip": "104.197.37.222"
