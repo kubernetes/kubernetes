@@ -238,6 +238,71 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
+	Describe("Kubectl expose", func() {
+		It("should create services for rc", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			controllerJson := mkpath("redis-master-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			redisPort := 6379
+			serviceTimeout := 30 * time.Second
+
+			By("creating Redis RC")
+			runKubectl("create", "-f", controllerJson, nsFlag)
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
+			})
+			validateService := func(name string, servicePort int, timeout time.Duration) {
+				endpointFound := false
+				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
+					endpoints, err := c.Endpoints(ns).Get(name)
+					Expect(err).NotTo(HaveOccurred())
+
+					ipToPort := getPortsByIp(endpoints.Subsets)
+					if len(ipToPort) != 1 {
+						Logf("No IP found, retrying")
+						continue
+					}
+					for _, port := range ipToPort {
+						if port[0] != redisPort {
+							Failf("Wrong endpoint port: %d", port[0])
+						}
+					}
+					endpointFound = true
+					break
+				}
+				if !endpointFound {
+					Failf("1 endpoint is expected")
+				}
+				service, err := c.Services(ns).Get(name)
+				Expect(err).NotTo(HaveOccurred())
+
+				if len(service.Spec.Ports) != 1 {
+					Failf("1 port is expected")
+				}
+				port := service.Spec.Ports[0]
+				if port.Port != servicePort {
+					Failf("Wrong service port: %d", port.Port)
+				}
+				if port.TargetPort.IntVal != redisPort {
+					Failf("Wrong target port: %d")
+				}
+			}
+
+			By("exposing RC")
+			runKubectl("expose", "rc", "redis-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			waitForService(c, ns, "rm2", true, poll, serviceTimeout)
+			validateService("rm2", 1234, serviceTimeout)
+
+			By("exposing service")
+			runKubectl("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			waitForService(c, ns, "rm3", true, poll, serviceTimeout)
+			validateService("rm3", 2345, serviceTimeout)
+		})
+	})
+
 	Describe("Kubectl logs", func() {
 		It("should find a string in pod logs", func() {
 			mkpath := func(file string) string {
