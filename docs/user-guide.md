@@ -16,7 +16,7 @@ certainly want the docs that go with that version.</h1>
 
 The user guide is intended for anyone who wants to run programs and services
 on an existing Kubernetes cluster.  Setup and administration of a
-Kubernetes cluster is described in the [Cluster Admin Guide](cluster-admin-guide.md).
+Kubernetes cluster is described in the [Cluster Admin Guide](admin/README.md).
 The [Developer Guide](developer-guide.md) is for anyone wanting to either write code which directly accesses the
 kubernetes API, or to contribute directly to the kubernetes project.
 
@@ -25,7 +25,7 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Overview** ([overview.md](overview.md)): A brief overview
   of Kubernetes concepts. 
 
-* **Nodes** ([node.md](node.md)): A node is a worker machine in Kubernetes.
+* **Nodes** ([admin/node.md](admin/node.md)): A node is a worker machine in Kubernetes.
 
 * **Pods** ([pods.md](pods.md)): A pod is a tightly-coupled group of containers
   with shared volumes.
@@ -81,15 +81,15 @@ for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv 
 * **Annotations** ([annotations.md](annotations.md)): Attaching
   arbitrary non-identifying metadata.
 
-* **Downward API** ([downward_api.md](downward_api.md)): Accessing system
+* **Downward API** ([downward-api.md](downward-api.md)): Accessing system
   configuration from a pod without accessing Kubernetes API (see also
   [container-environment.md](container-environment.md)).
 
 * **Kubernetes Container Environment** ([container-environment.md](container-environment.md)):
   Describes the environment for Kubelet managed containers on a Kubernetes
-  node (see also [downward_api.md](downward_api.md)).
+  node (see also [downward-api.md](downward-api.md)).
 
-* **DNS Integration with SkyDNS** ([dns.md](dns.md)):
+* **DNS Integration with SkyDNS** ([admin/dns.md](admin/dns.md)):
   Resolving a DNS name directly to a Kubernetes service.
 
 * **Identifiers** ([identifiers.md](identifiers.md)): Names and UIDs
@@ -103,12 +103,12 @@ for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv 
 * **Namespaces** ([namespaces.md](namespaces.md)): Namespaces help different
   projects, teams, or customers to share a kubernetes cluster.
 
-* **Networking** ([networking.md](networking.md)): Pod networking overview.
+* **Networking** ([admin/networking.md](admin/networking.md)): Pod networking overview.
 
 * **Services and firewalls** ([services-firewalls.md](services-firewalls.md)): How
   to use firewalls.
 
-* **Compute Resources** ([compute_resources.md](compute_resources.md)):
+* **Compute Resources** ([compute-resources.md](compute-resources.md)):
   Provides resource information such as size, type, and quantity to assist in
   assigning Kubernetes resources appropriately.
 

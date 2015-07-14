@@ -20,7 +20,7 @@ Overall API conventions are described in the [API conventions doc](api-conventio
 
 Complete API details are documented via [Swagger](http://swagger.io/). The Kubernetes apiserver (aka "master") exports an API that can be used to retrieve the [Swagger spec](https://github.com/swagger-api/swagger-spec/tree/master/schemas/v1.2) for the Kubernetes API, by default at `/swaggerapi`, and a UI you can use to browse the API documentation at `/swagger-ui`. We also periodically update a [statically generated UI](http://kubernetes.io/third_party/swagger-ui/).
 
-Remote access to the API is discussed in the [access doc](accessing_the_api.md).
+Remote access to the API is discussed in the [access doc](admin/accessing-the-api.md).
 
 The Kubernetes API also serves as the foundation for the declarative configuration schema for the system. The [Kubectl](user-guide/kubectl/kubectl.md) command-line tool can be used to create, update, delete, and get API objects.
 
@@ -48,7 +48,7 @@ As of June 4, 2015, the Kubernetes v1 API has been enabled by default. The v1bet
 
 ### v1 conversion tips (from v1beta3)
 
-We're working to convert all documentation and examples to v1. A simple [API conversion tool](cluster_management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
+We're working to convert all documentation and examples to v1. A simple [API conversion tool](admin/cluster-management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
 
 Changes to services are the most significant difference between v1beta3 and v1.
 
@@ -58,7 +58,7 @@ Changes to services are the most significant difference between v1beta3 and v1.
 
 Some other difference between v1beta3 and v1:
 
-* The `pod.spec.containers[*].privileged` and `pod.spec.containers[*].capabilities` properties are now nested under the `pod.spec.containers[*].securityContext` property. See [Security Contexts](security_context.md).
+* The `pod.spec.containers[*].privileged` and `pod.spec.containers[*].capabilities` properties are now nested under the `pod.spec.containers[*].securityContext` property. See [Security Contexts](security-context.md).
 * The `pod.spec.host` property is renamed to `pod.spec.nodeName`.
 * The `endpoints.subsets[*].addresses.IP` property is renamed to `endpoints.subsets[*].addresses.ip`.
 * The `pod.status.containerStatuses[*].state.termination` and `pod.status.containerStatuses[*].lastState.termination` properties are renamed to `pod.status.containerStatuses[*].state.terminated` and `pod.status.containerStatuses[*].lastState.terminated` respectively.
@@ -79,7 +79,7 @@ Some important differences between v1beta1/2 and v1beta3:
 * The `labels` query parameter has been renamed to `labelSelector`.
 * The `fields` query parameter has been renamed to `fieldSelector`.
 * The container `entrypoint` has been renamed to `command`, and `command` has been renamed to `args`.
-* Container, volume, and node resources are expressed as nested maps (e.g., `resources{cpu:1}`) rather than as individual fields, and resource values support [scaling suffixes](compute_resources.md#specifying-resource-quantities) rather than fixed scales (e.g., milli-cores).
+* Container, volume, and node resources are expressed as nested maps (e.g., `resources{cpu:1}`) rather than as individual fields, and resource values support [scaling suffixes](compute-resources.md#specifying-resource-quantities) rather than fixed scales (e.g., milli-cores).
 * Restart policy is represented simply as a string (e.g., `"Always"`) rather than as a nested map (`always{}`).
 * Pull policies changed from `PullAlways`, `PullNever`, and `PullIfNotPresent` to `Always`, `Never`, and `IfNotPresent`.
 * The volume `source` is inlined into `volume` rather than nested.

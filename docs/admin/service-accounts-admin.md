@@ -15,7 +15,7 @@ certainly want the docs that go with that version.</h1>
 # Cluster Admin Guide to Service Accounts
 
 *This is a Cluster Administrator guide to service accounts.  It assumes knowledge of
-the [User Guide to Service Accounts](service_accounts.md).*
+the [User Guide to Service Accounts](../service-accounts.md).*
 
 *Support for authorization and user accounts is planned but incomplete.  Sometimes
 incomplete features are referred to in order to better describe service accounts.*
@@ -49,7 +49,7 @@ Three separate components cooperate to implement the automation around service a
 ### Service Account Admission Controller
 
 The modification of pods is implemented via a plugin
-called an [Admission Controller](admission_controllers.md). It is part of the apiserver.
+called an [Admission Controller](admission-controllers.md). It is part of the apiserver.
 It acts synchronously to modify pods as they are created or updated. When this plugin is active
 (and it is by default on most distributions), then it does the following when a pod is created or modified:
   1. If the pod does not have a `ServiceAccount` set, it sets the `ServiceAccount` to `default`.
@@ -97,5 +97,5 @@ kubectl delete secret mysecretname
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/service_accounts_admin.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/service-accounts-admin.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -82,7 +82,7 @@ on how flags are set on various components.
   have identical configurations.
 
 ### Network
-Kubernetes has a distinctive [networking model](../networking.md).
+Kubernetes has a distinctive [networking model](../admin/networking.md).
 
 Kubernetes allocates an IP address to each pod.  When creating a cluster, you
 need to allocate a block of IPs for Kubernetes to use as Pod IPs.  The simplest
@@ -252,7 +252,7 @@ The admin user (and any users) need:
 
 Your tokens and passwords need to be stored in a file for the apiserver
 to read.  This guide uses `/var/lib/kube-apiserver/known_tokens.csv`.
-The format for this file is described in the [authentication documentation](../authentication.md).
+The format for this file is described in the [authentication documentation](../admin/authentication.md).
 
 For distributing credentials to clients, the convention in Kubernetes is to put the credentials
 into a [kubeconfig file](../kubeconfig-file.md).
@@ -378,7 +378,7 @@ Arguments to consider:
   - `--docker-root=`
   - `--root-dir=`
   - `--configure-cbr0=` (described above)
-  - `--register-node` (described in [Node](../node.md) documentation.
+  - `--register-node` (described in [Node](../admin/node.md) documentation.
 
 ### kube-proxy
 
@@ -398,7 +398,7 @@ Each node needs to be allocated its own CIDR range for pod networking.
 Call this `NODE_X_POD_CIDR`.
 
 A bridge called `cbr0` needs to be created on each node.  The bridge is explained
-further in the [networking documentation](../networking.md).  The bridge itself
+further in the [networking documentation](../admin/networking.md).  The bridge itself
 needs an address from `$NODE_X_POD_CIDR` - by convention the first IP.  Call
 this `NODE_X_BRIDGE_ADDR`.  For example, if `NODE_X_POD_CIDR` is `10.0.0.0/16`,
 then `NODE_X_BRIDGE_ADDR` is `10.0.0.1/16`.  NOTE: this retains the `/16` suffix
@@ -444,7 +444,7 @@ traffic to the internet, but have no problem with them inside your GCE Project.
 ### Using Configuration Management
 The previous steps all involved "conventional" system administration techniques for setting up
 machines.  You may want to use a Configuration Management system to automate the node configuration
-process.  There are examples of [Saltstack](../salt.md), Ansible, Juju, and CoreOS Cloud Config in the
+process.  There are examples of [Saltstack](../admin/salt.md), Ansible, Juju, and CoreOS Cloud Config in the
 various Getting Started Guides.
 
 ## Bootstrapping the Cluster
@@ -463,7 +463,7 @@ You will need to run one or more instances of etcd.
   - Alternative: run 3 or 5 etcd instances.
     - Log can be written to non-durable storage because storage is replicated. 
     - run a single apiserver which connects to one of the etc nodes.
- See [Availability](../availability.md) for more discussion on factors affecting cluster
+ See [Availability](../admin/availability.md) for more discussion on factors affecting cluster
 availability.
 
 To run an etcd instance:
@@ -489,7 +489,7 @@ Here are some apiserver flags you may need to set:
   - `--tls-cert-file=/srv/kubernetes/server.cert` -%}
   - `--tls-private-key-file=/srv/kubernetes/server.key` -%}
   - `--admission-control=$RECOMMENDED_LIST`
-    - See [admission controllers](../admission_controllers.md) for recommended arguments.
+    - See [admission controllers](../admin/admission-controllers.md) for recommended arguments.
   - `--allow-privileged=true`, only if you trust your cluster user to run pods as root.
  
 If you are following the firewall-only security approach, then use these arguments:
@@ -663,7 +663,7 @@ Flags to consider using with controller manager.
  - `--allocate-node-cidrs=`
    - *TODO*: explain when you want controller to do this and when you wanna do it another way.
  - `--cloud-provider=` and `--cloud-config` as described in apiserver section.
- - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../service_accounts.md) feature.  
+ - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../service-accounts.md) feature.  
  - `--master=127.0.0.1:8080`
 
 Template for controller manager pod:

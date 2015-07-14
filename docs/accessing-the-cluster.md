@@ -110,7 +110,7 @@ certificate.
 
 On some clusters, the apiserver does not require authentication; it may serve
 on localhost, or be protected by a firewall.  There is not a standard
-for this.  [Configuring Access to the API](accessing_the_api.md)
+for this.  [Configuring Access to the API](admin/accessing-the-api.md)
 describes how a cluster admin can configure this.  Such approaches may conflict
 with future high-availability support.
 
@@ -134,7 +134,7 @@ the `kubernetes` DNS name, which resolves to a Service IP which in turn
 will be routed to an apiserver.
 
 The recommended way to authenticate to the apiserver is with a
-[service account](service_accounts.md) credential.  By default, a pod
+[service account](service-accounts.md) credential.  By default, a pod
 is associated with a service account, and a credential (token) for that
 service account is placed into the filesystem tree of each container in that pod,
 at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
@@ -153,7 +153,7 @@ In each case, the credentials of the pod are used to communicate securely with t
 ## Accessing services running on the cluster
 The previous section was about connecting the Kubernetes API server.  This section is about
 connecting to other services running on Kubernetes cluster.  In kubernetes, the
-[nodes](node.md), [pods](pods.md) and [services](services.md) all have
+[nodes](admin/node.md), [pods](pods.md) and [services](services.md) all have
 their own IPs.  In many cases, the node IPs, pod IPs, and some service IPs on a cluster will not be
 routable, so they will not be reachable from a machine outside the cluster,
 such as your desktop machine.

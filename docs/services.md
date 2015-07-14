@@ -193,7 +193,7 @@ The net result is that any traffic bound for the `Service` is proxied to an
 appropriate backend without the clients knowing anything about Kubernetes or
 `Services` or `Pods`.
 
-![Services overview diagram](services_overview.png)
+![Services overview diagram](services-overview.png)
 
 By default, the choice of backend is random.  Client-IP based session affinity
 can be selected by setting `service.spec.sessionAffinity` to `"ClientIP"` (the
@@ -504,7 +504,7 @@ This means that `Service` owners can choose any port they want without risk of
 collision.  Clients can simply connect to an IP and port, without being aware
 of which `Pods` they are actually accessing.
 
-![Services detailed diagram](services_detail.png)
+![Services detailed diagram](services-detail.png)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
