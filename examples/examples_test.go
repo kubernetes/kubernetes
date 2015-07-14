@@ -205,6 +205,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"replication": &api.ReplicationController{},
 		},
 		"../examples": {
+			"pod": &api.Pod{},
 			"scheduler-policy-config": &schedulerapi.Policy{},
 		},
 		"../examples/rbd/secret": {
