@@ -56,7 +56,7 @@ func addPods(store cache.Store, namespace string, nPods int, nPorts int) {
 		}
 		for j := 0; j < nPorts; j++ {
 			p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports,
-				api.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: 8080 + j})
+				api.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: 8080 + j, Protocol: "TCP"})
 		}
 		store.Add(p)
 	}
@@ -74,7 +74,7 @@ func TestFindPort(t *testing.T) {
 		containers: []api.Container{{}},
 		port:       util.NewIntOrStringFromInt(93),
 		expected:   93,
-		pass:       true,
+		pass:       false,
 	}, {
 		name: "valid int, with ports",
 		containers: []api.Container{{Ports: []api.ContainerPort{{
@@ -88,7 +88,7 @@ func TestFindPort(t *testing.T) {
 		}}}},
 		port:     util.NewIntOrStringFromInt(93),
 		expected: 93,
-		pass:     true,
+		pass:     false,
 	}, {
 		name:       "valid str, no ports",
 		containers: []api.Container{{}},
@@ -142,7 +142,7 @@ func TestFindPort(t *testing.T) {
 		if err == nil && !tc.pass {
 			t.Errorf("unexpected non-error for %s: %d", tc.name, port)
 		}
-		if port != tc.expected {
+		if err == nil && port != tc.expected {
 			t.Errorf("wrong result for %s: expected %d, got %d", tc.name, tc.expected, port)
 		}
 	}
@@ -405,7 +405,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 			Selector: map[string]string{"foo": "bar"},
 			Ports: []api.ServicePort{
 				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
-				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8081)},
 			},
 		},
 	})
@@ -418,7 +418,44 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 		Ports: []api.EndpointPort{
 			{Name: "port0", Port: 8080, Protocol: "TCP"},
-			{Name: "port1", Port: 8088, Protocol: "TCP"},
+			{Name: "port1", Port: 8081, Protocol: "TCP"},
+		},
+	}}
+	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			ResourceVersion: "",
+		},
+		Subsets: endptspkg.SortSubsets(expectedSubsets),
+	})
+	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
+	endpointsHandler.ValidateRequestCount(t, 2)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
+}
+
+func TestSyncDeprecatedUndeclaredEndpointsItems(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns,
+		serverResponse{http.StatusOK, &api.Endpoints{}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	addPods(endpoints.podStore.Store, ns, 1, 0)
+	endpoints.serviceStore.Store.Add(&api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports: []api.ServicePort{
+				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+			},
+		},
+	})
+	endpoints.syncService("other/foo")
+	expectedSubsets := []api.EndpointSubset{{
+		Addresses: []api.EndpointAddress{
+			{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+		},
+		Ports: []api.EndpointPort{
+			{Name: "port0", Port: 8088, Protocol: "TCP"},
 		},
 	}}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
@@ -451,7 +488,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 			Selector: map[string]string{"foo": "bar"},
 			Ports: []api.ServicePort{
 				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
-				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8081)},
 			},
 		},
 	})
@@ -464,7 +501,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 		},
 		Ports: []api.EndpointPort{
 			{Name: "port0", Port: 8080, Protocol: "TCP"},
-			{Name: "port1", Port: 8088, Protocol: "TCP"},
+			{Name: "port1", Port: 8081, Protocol: "TCP"},
 		},
 	}}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{

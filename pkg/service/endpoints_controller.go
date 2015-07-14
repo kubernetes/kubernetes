@@ -296,6 +296,7 @@ func (e *EndpointController) syncService(key string) {
 	}
 
 	subsets := []api.EndpointSubset{}
+	podsByUndeclaredNumericPorts := make(map[int][]*api.Pod)
 	for i := range pods.Items {
 		pod := &pods.Items[i]
 
@@ -304,7 +305,20 @@ func (e *EndpointController) syncService(key string) {
 
 			portName := servicePort.Name
 			portProto := servicePort.Protocol
+
 			portNum, err := findPort(pod, servicePort)
+
+			// handle DEPRECATED undeclared numeric ports gracefully for now.
+			// Only print out a warning below, but accept the targetPort of the
+			// service without verification.
+			if err != nil && servicePort.TargetPort.Kind == util.IntstrInt {
+				portNum, err = servicePort.TargetPort.IntVal, nil
+				pods, ok := podsByUndeclaredNumericPorts[portNum]
+				if !ok {
+					pods = []*api.Pod{}
+				}
+				podsByUndeclaredNumericPorts[portNum] = append(pods, pod)
+			}
 			if err != nil {
 				glog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
@@ -352,6 +366,15 @@ func (e *EndpointController) syncService(key string) {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return
 	}
+
+	// print DEPRECATION warning if an undeclared numeric port was found in any
+	// of the selected pods of the service
+	if len(podsByUndeclaredNumericPorts) > 0 {
+		for port := range podsByUndeclaredNumericPorts {
+			glog.Warningf("DEPRECATION NOTICE: the service %s/%s points to pods which do not explicitly declare the numeric port %v", service.Namespace, service.Name, port)
+		}
+	}
+
 	newEndpoints := currentEndpoints
 	newEndpoints.Subsets = subsets
 	newEndpoints.Labels = service.Labels
@@ -409,7 +432,14 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 			}
 		}
 	case util.IntstrInt:
-		return portName.IntVal, nil
+		p := portName.IntVal
+		for _, container := range pod.Spec.Containers {
+			for _, port := range container.Ports {
+				if port.ContainerPort == p && port.Protocol == svcPort.Protocol {
+					return portName.IntVal, nil
+				}
+			}
+		}
 	}
 
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)

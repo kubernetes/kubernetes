@@ -55,6 +55,7 @@ Changes to services are the most significant difference between v1beta3 and v1.
 * The `service.spec.portalIP` property is renamed to `service.spec.clusterIP`.
 * The `service.spec.createExternalLoadBalancer` property is removed. Specify `service.spec.type: "LoadBalancer"` to create an external load balancer instead.
 * The `service.spec.publicIPs` property is deprecated and now called `service.spec.deprecatedPublicIPs`. This property will be removed entirely when v1beta3 is removed. The vast majority of users of this field were using it to expose services on ports on the node. Those users should specify `service.spec.type: "NodePort"` instead. Read [External Services](services.md#external-services) for more info. If this is not sufficient for your use case, please file an issue or contact @thockin.
+* Endpoints for pods which do not explicitly expose numeric ports are deprecated. In a future version the endpoint controller will not create endpoints for those pods anymore, in analogy to the case of named ports which are not defined for a pod, but referenced from a service.
 
 Some other difference between v1beta3 and v1:
 

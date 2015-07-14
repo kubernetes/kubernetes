@@ -115,6 +115,8 @@ deploying and evolving your `Services`.  For example, you can change the port
 number that pods expose in the next version of your backend software, without
 breaking clients.
 
+Also note that endpoints for pods without explicitly exposed numeric ports are deprecated. Hence, in order to address pods via a service the container ports – even the numeric ones – must be explicitly declared in the specification of the pod. Future versions of Kubernetes will not create endpoints otherwise and the pods will not be made available through services.
+
 Kubernetes `Services` support `TCP` and `UDP` for protocols.  The default
 is `TCP`.
 
