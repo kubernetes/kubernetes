@@ -16,7 +16,7 @@ certainly want the docs that go with that version.</h1>
 
 The developer guide is for anyone wanting to either write code which directly accesses the
 kubernetes API, or to contribute directly to the kubernetes project.
-It assumes some familiarity with concepts in the [User Guide](user-guide.md) and the [Cluster Admin
+It assumes some familiarity with concepts in the [User Guide](user-guide/user-guide.md) and the [Cluster Admin
 Guide](admin/README.md).
 
 
@@ -24,7 +24,7 @@ Guide](admin/README.md).
 
 * API objects are explained at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
 
-* **Annotations** ([annotations.md](annotations.md)): are for attaching arbitrary non-identifying metadata to objects.
+* **Annotations** ([user-guide/annotations.md](user-guide/annotations.md)): are for attaching arbitrary non-identifying metadata to objects.
   Programs that automate Kubernetes objects may use annotations to store small amounts of their state.
 
 * **API Conventions** ([api-conventions.md](api-conventions.md)):

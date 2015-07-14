@@ -56,7 +56,7 @@ steps that existing cluster setup scripts are making.
 ### Learning 
   1. You should be familiar with using Kubernetes already.  We suggest you set
     up a temporary cluster by following one of the other Getting Started Guides.
-    This will help you become familiar with the CLI ([kubectl](../user-guide/kubectl/kubectl.md)) and concepts ([pods](../pods.md), [services](../services.md), etc.) first.
+    This will help you become familiar with the CLI ([kubectl](../user-guide/kubectl/kubectl.md)) and concepts ([pods](../user-guide/pods.md), [services](../user-guide/services.md), etc.) first.
   1. You should have `kubectl` installed on your desktop.  This will happen as a side
     effect of completing one of the other Getting Started Guides.
 
@@ -124,7 +124,7 @@ You need to select an address range for the Pod IPs.
     using `10.10.0.0/24` through `10.10.255.0/24`, respectively.
   - Need to make these routable or connect with overlay.
 
-Kubernetes also allocates an IP to each [service](../services.md).  However,
+Kubernetes also allocates an IP to each [service](../user-guide/services.md).  However,
 service IPs do not necessarily need to be routable.  The kube-proxy takes care
 of translating Service IPs to Pod IPs before traffic leaves the node.  You do
 need to Allocate a block of IPs for services.  Call this
@@ -255,7 +255,7 @@ to read.  This guide uses `/var/lib/kube-apiserver/known_tokens.csv`.
 The format for this file is described in the [authentication documentation](../admin/authentication.md).
 
 For distributing credentials to clients, the convention in Kubernetes is to put the credentials
-into a [kubeconfig file](../kubeconfig-file.md).
+into a [kubeconfig file](../user-guide/kubeconfig-file.md).
 
 The kubeconfig file for the administrator can be created as follows:
  - If you have already used Kubernetes with a non-custom cluster (for example, used a Getting Started

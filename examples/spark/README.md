@@ -38,10 +38,10 @@ instructions for your platform.
 
 ## Step One: Start your Master service
 
-The Master [service](../../docs/services.md) is the master (or head) service for a Spark
+The Master [service](../../docs/user-guide/services.md) is the master (or head) service for a Spark
 cluster.
 
-Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/pods.md) running
+Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/user-guide/pods.md) running
 the Master service.
 
 ```shell
@@ -101,7 +101,7 @@ program.
 The Spark workers need the Master service to be running.
 
 Use the [`examples/spark/spark-worker-controller.json`](spark-worker-controller.json) file to create a
-[replication controller](../../docs/replication-controller.md) that manages the worker pods.
+[replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
 
 ```shell
 $ kubectl create -f examples/spark/spark-worker-controller.json

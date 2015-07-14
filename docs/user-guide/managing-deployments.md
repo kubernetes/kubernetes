@@ -351,11 +351,11 @@ Update succeeded. Deleting my-nginx
 my-nginx-v4
 ```
 
-You can also run the [update demo](../../examples/update-demo/) to see a visual representation of the rolling update process.
+You can also run the [update demo](update-demo/) to see a visual representation of the rolling update process.
 
 ## In-place updates of resources
 
-Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](../../docs/annotations.md) with a description of your object. That’s easiest to do with `kubectl patch`:
+Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](annotations.md) with a description of your object. That’s easiest to do with `kubectl patch`:
 ```bash
 $ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
 my-nginx-v4

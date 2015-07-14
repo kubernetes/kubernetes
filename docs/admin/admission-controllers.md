@@ -86,7 +86,7 @@ We strongly recommend using this plug-in if you intend to make use of Kubernetes
 
 ### SecurityContextDeny
 
-This plug-in will deny any pod with a [SecurityContext](../security-context.md) that defines options that were not available on the ```Container```.
+This plug-in will deny any pod with a [SecurityContext](../user-guide/security-context.md) that defines options that were not available on the ```Container```.
 
 ### ResourceQuota
 

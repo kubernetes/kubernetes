@@ -14,7 +14,7 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # The Kubernetes API
 
-Primary system and API concepts are documented in the [User guide](user-guide.md).
+Primary system and API concepts are documented in the [User guide](user-guide/user-guide.md).
 
 Overall API conventions are described in the [API conventions doc](api-conventions.md).
 
@@ -54,11 +54,11 @@ Changes to services are the most significant difference between v1beta3 and v1.
 
 * The `service.spec.portalIP` property is renamed to `service.spec.clusterIP`.
 * The `service.spec.createExternalLoadBalancer` property is removed. Specify `service.spec.type: "LoadBalancer"` to create an external load balancer instead.
-* The `service.spec.publicIPs` property is deprecated and now called `service.spec.deprecatedPublicIPs`. This property will be removed entirely when v1beta3 is removed. The vast majority of users of this field were using it to expose services on ports on the node. Those users should specify `service.spec.type: "NodePort"` instead. Read [External Services](services.md#external-services) for more info. If this is not sufficient for your use case, please file an issue or contact @thockin.
+* The `service.spec.publicIPs` property is deprecated and now called `service.spec.deprecatedPublicIPs`. This property will be removed entirely when v1beta3 is removed. The vast majority of users of this field were using it to expose services on ports on the node. Those users should specify `service.spec.type: "NodePort"` instead. Read [External Services](user-guide/services.md#external-services) for more info. If this is not sufficient for your use case, please file an issue or contact @thockin.
 
 Some other difference between v1beta3 and v1:
 
-* The `pod.spec.containers[*].privileged` and `pod.spec.containers[*].capabilities` properties are now nested under the `pod.spec.containers[*].securityContext` property. See [Security Contexts](security-context.md).
+* The `pod.spec.containers[*].privileged` and `pod.spec.containers[*].capabilities` properties are now nested under the `pod.spec.containers[*].securityContext` property. See [Security Contexts](user-guide/security-context.md).
 * The `pod.spec.host` property is renamed to `pod.spec.nodeName`.
 * The `endpoints.subsets[*].addresses.IP` property is renamed to `endpoints.subsets[*].addresses.ip`.
 * The `pod.status.containerStatuses[*].state.termination` and `pod.status.containerStatuses[*].lastState.termination` properties are renamed to `pod.status.containerStatuses[*].state.terminated` and `pod.status.containerStatuses[*].lastState.terminated` respectively.
@@ -79,7 +79,7 @@ Some important differences between v1beta1/2 and v1beta3:
 * The `labels` query parameter has been renamed to `labelSelector`.
 * The `fields` query parameter has been renamed to `fieldSelector`.
 * The container `entrypoint` has been renamed to `command`, and `command` has been renamed to `args`.
-* Container, volume, and node resources are expressed as nested maps (e.g., `resources{cpu:1}`) rather than as individual fields, and resource values support [scaling suffixes](compute-resources.md#specifying-resource-quantities) rather than fixed scales (e.g., milli-cores).
+* Container, volume, and node resources are expressed as nested maps (e.g., `resources{cpu:1}`) rather than as individual fields, and resource values support [scaling suffixes](user-guide/compute-resources.md#specifying-resource-quantities) rather than fixed scales (e.g., milli-cores).
 * Restart policy is represented simply as a string (e.g., `"Always"`) rather than as a nested map (`always{}`).
 * Pull policies changed from `PullAlways`, `PullNever`, and `PullIfNotPresent` to `Always`, `Never`, and `IfNotPresent`.
 * The volume `source` is inlined into `volume` rather than nested.

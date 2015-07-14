@@ -142,7 +142,7 @@ var _ = Describe("Kubectl client", func() {
 		var podPath string
 
 		BeforeEach(func() {
-			podPath = filepath.Join(testContext.RepoRoot, "examples/pod.yaml")
+			podPath = filepath.Join(testContext.RepoRoot, "docs/user-guide/pod.yaml")
 			By("creating the pod")
 			runKubectl("create", "-f", podPath, fmt.Sprintf("--namespace=%v", ns))
 			checkPodsRunningReady(c, ns, []string{simplePodName}, podStartTimeout)
@@ -206,7 +206,7 @@ var _ = Describe("Kubectl client", func() {
 		var podPath string
 		var nsFlag string
 		BeforeEach(func() {
-			podPath = filepath.Join(testContext.RepoRoot, "examples/pod.yaml")
+			podPath = filepath.Join(testContext.RepoRoot, "docs/user-guide/pod.yaml")
 			By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			runKubectl("create", "-f", podPath, nsFlag)

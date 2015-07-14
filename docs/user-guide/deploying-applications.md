@@ -18,7 +18,7 @@ You previously read about how to quickly deploy a simple replicated application 
 
 ## Launching a set of replicas using a configuration file
 
-Kubernetes creates and manages sets of replicated containers (actually, replicated [Pods](../../docs/pods.md)) using [*Replication Controllers*](../../docs/replication-controller.md). 
+Kubernetes creates and manages sets of replicated containers (actually, replicated [Pods](pods.md)) using [*Replication Controllers*](replication-controller.md). 
 
 A replication controller simply ensures that a specified number of pod "replicas" are running at any one time. If there are too many, it will kill some. If there are too few, it will start more. It’s analogous to Google Compute Engine’s [Instance Group Manager](https://cloud.google.com/compute/docs/instance-groups/manager/) or AWS’s [Auto-scaling Group](http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroup.html) (with no scaling policies).
 
@@ -82,7 +82,7 @@ If you try to delete the pods before deleting the replication controller, it wil
 
 ## Labels
 
-Kubernetes uses user-defined key-value attributes called [*labels*](../../docs/labels.md) to categorize and identify sets of resources, such as pods and replication controllers. The example above specified a single label in the pod template, with key `app` and value `nginx`. All pods created carry that label, which can be viewed using `-L`:
+Kubernetes uses user-defined key-value attributes called [*labels*](labels.md) to categorize and identify sets of resources, such as pods and replication controllers. The example above specified a single label in the pod template, with key `app` and value `nginx`. All pods created carry that label, which can be viewed using `-L`:
 ```bash
 $ kubectl get pods -L app
 NAME             READY     STATUS    RESTARTS   AGE       APP
@@ -97,7 +97,7 @@ CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS   APP
 my-nginx     nginx          nginx      app=nginx   2          nginx
 ```
 
-More importantly, the pod template’s labels are used to create a [`selector`](../../docs/labels.md#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](kubectl/kubectl_get.md):
+More importantly, the pod template’s labels are used to create a [`selector`](labels.md#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](kubectl/kubectl_get.md):
 ```bash
 $ kubectl get rc my-nginx -o template --template="{{.spec.selector}}"
 map[app:nginx]
