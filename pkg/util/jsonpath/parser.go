@@ -58,7 +58,7 @@ func NewParser(name string) *Parser {
 
 // parseAction parsed the expression inside delimiter
 func parseAction(name, text string) (*Parser, error) {
-	p, err := Parse(name, fmt.Sprintf("{%s}", text))
+	p, err := Parse(name, fmt.Sprintf("%s%s%s", leftDelim, text, rightDelim))
 	p.Root = p.Root.Nodes[0].(*ListNode)
 	return p, err
 }
@@ -70,6 +70,7 @@ func (p *Parser) Parse(text string) error {
 	return p.parseText(p.Root)
 }
 
+// consumeText return the parsed text since last cosumeText
 func (p *Parser) consumeText() string {
 	value := p.input[p.start:p.pos]
 	p.start = p.pos
@@ -276,7 +277,7 @@ Loop:
 	reg = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
 	value = reg.FindStringSubmatch(text)
 	if value == nil {
-		return fmt.Errorf("incorrect array index %s", text)
+		return fmt.Errorf("invalid array index %s", text)
 	}
 	value = value[1:]
 	params := [3]ParamsEntry{}
@@ -288,8 +289,12 @@ Loop:
 			if i > 0 && value[i] == "" {
 				params[i].Known = false
 			} else {
+				var err error
 				params[i].Known = true
-				params[i].Value, _ = strconv.Atoi(value[i])
+				params[i].Value, err = strconv.Atoi(value[i])
+				if err != nil {
+					return fmt.Errorf("array index %s is not a number", params[i].Value)
+				}
 			}
 		} else {
 			if i == 1 {
@@ -326,17 +331,17 @@ Loop:
 	text = string(text[:len(text)-2])
 	value := reg.FindStringSubmatch(text)
 	if value == nil {
-		parser, err := Parse("text", fmt.Sprintf("{%s}", text))
+		parser, err := parseAction("text", text)
 		if err != nil {
 			return err
 		}
 		cur.append(newFilter(parser.Root, newList(), "exists"))
 	} else {
-		leftParser, err := Parse("left", fmt.Sprintf("{%s}", value[1]))
+		leftParser, err := parseAction("left", value[1])
 		if err != nil {
 			return err
 		}
-		rightParser, err := Parse("right", fmt.Sprintf("{%s}", value[3]))
+		rightParser, err := parseAction("right", value[3])
 		if err != nil {
 			return err
 		}

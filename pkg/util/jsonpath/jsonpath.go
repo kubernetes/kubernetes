@@ -66,7 +66,7 @@ func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 			return err
 		}
 
-		//encounter a end node, one loop ended
+		//encounter an end node, break the current block
 		if j.endRange > 0 && j.endRange <= j.inRange {
 			j.endRange -= 1
 			break
@@ -314,7 +314,10 @@ func (j *JSONPath) evalRecursive(input []reflect.Value, node *RecursiveNode) ([]
 		}
 		if len(results) != 0 {
 			result = append(result, value)
-			output, _ := j.evalRecursive(results, node)
+			output, err := j.evalRecursive(results, node)
+			if err != nil {
+				return result, err
+			}
 			result = append(result, output...)
 		}
 	}

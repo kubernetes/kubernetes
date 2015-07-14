@@ -67,6 +67,7 @@ func testJSONPath(tests []jsonpathTest, t *testing.T) {
 	}
 }
 
+// TestStoreData tests cases from original jsonpath webpage
 func TestStoreData(t *testing.T) {
 	storeData := store{
 		Name: "jsonpath",
@@ -120,8 +121,8 @@ func TestPoints(t *testing.T) {
 		t.Error(err)
 	}
 	pointsTests := []jsonpathTest{
-		{"existsfilter", "{[?(@.z)].id}", pointsData, "i2 i5"},
-		{"arrayfield", "{[0]['id']}", pointsData, "i1"},
+		{"exsits filter", "{[?(@.z)].id}", pointsData, "i2 i5"},
+		{"bracket key", "{[0]['id']}", pointsData, "i1"},
 	}
 	testJSONPath(pointsTests, t)
 }
