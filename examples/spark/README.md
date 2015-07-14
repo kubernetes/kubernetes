@@ -1,3 +1,17 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
+tree only. If you are using a released version of Kubernetes, you almost
+certainly want the docs that go with that version.</h1>
+
+<strong>Documentation for specific releases can be found at
+[releases.k8s.io](http://releases.k8s.io).</strong>
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 # Spark example
 
 Following this example, you will create a functional [Apache
@@ -19,7 +33,7 @@ The Docker images are heavily based on https://github.com/mattf/docker-spark
 This example assumes you have a Kubernetes cluster installed and
 running, and that you have installed the ```kubectl``` command line
 tool somewhere in your path. Please see the [getting
-started](../../docs/getting-started-guides) for installation
+started](../../docs/getting-started-guides/) for installation
 instructions for your platform.
 
 ## Step One: Start your Master service
@@ -34,7 +48,7 @@ the Master service.
 $ kubectl create -f examples/spark/spark-master.json
 ```
 
-Then, use the [`examples/spark/spark-master-service.json`](spar-master-service.json) file to
+Then, use the [`examples/spark/spark-master-service.json`](spark-master-service.json) file to
 create a logical service endpoint that Spark workers can use to access
 the Master pod.
 
@@ -181,4 +195,7 @@ Make sure the Master Pod is running (use: ```kubectl get pods```).
 
 ```kubectl create -f spark-worker-controller.json```
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
