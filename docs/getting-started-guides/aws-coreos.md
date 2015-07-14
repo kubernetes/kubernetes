@@ -38,7 +38,7 @@ no security tokens, no basic auth). For demonstration purposes only.
 
 * [aws CLI](http://aws.amazon.com/cli)
 * [CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/)
-* [kubectl CLI](aws/kubectl.md)
+* [kubectl CLI](aws/kubectl.md) ([installation](aws.md#command-line-administration-tool-kubectl))
 
 ## Starting a Cluster
 
