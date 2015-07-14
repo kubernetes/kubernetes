@@ -74,9 +74,7 @@ Example\
 "
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TEST_REGEX="\
-MaxPods.*\
-"
+GCE_FLAKY_TEST_REGEX=""
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TEST_REGEX="\
 ${GCE_DEFAULT_SKIP_TEST_REGEX}\
@@ -91,8 +89,6 @@ ${GCE_DEFAULT_SKIP_TEST_REGEX}\
 # TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
 GCE_PARALLEL_FLAKY_TEST_REGEX="\
 Elasticsearch\
-|Hostdir.*MOD\
-|Networking.*intra\
 |PD\
 |ServiceAccounts\
 |Service\sendpoints\slatency\
@@ -100,7 +96,6 @@ Elasticsearch\
 |Services.*functioning\sexternal\sload\sbalancer\
 |Services.*identically\snamed\
 |Services.*release.*load\sbalancer\
-|multiport\sendpoints\
 "
 
 # Define environment variables based on the Jenkins project name.
