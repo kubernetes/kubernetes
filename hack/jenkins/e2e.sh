@@ -297,22 +297,22 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
 
     if [[ ! "${CIRCLECI:-}" == "true" ]]; then
         # Copy GCE keys so we don't keep cycling them.
-        # To set this up, you must know the <project>, <zone>, and <instance> that
+        # To set this up, you must know the <project>, <zone>, and <instance>
         # on which your jenkins jobs are running. Then do:
         #
-        # # Get into the instance.
+        # # SSH from your computer into the instance.
         # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
         #
-        # # Generate a key by ssh'ing into itself, then exit.
+        # # Generate a key by ssh'ing from the instance into itself, then exit.
         # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
         # $ ^D
         #
-        # # Copy the keys to the desired location, e.g. /var/lib/jenkins/gce_keys/
+        # # Copy the keys to the desired location (e.g. /var/lib/jenkins/gce_keys/).
         # $ sudo mkdir -p /var/lib/jenkins/gce_keys/
         # $ sudo cp ~/.ssh/google_compute_engine /var/lib/jenkins/gce_keys/
         # $ sudo cp ~/.ssh/google_compute_engine.pub /var/lib/jenkins/gce_keys/
         #
-        # Move the permissions to jenkins.
+        # # Move the permissions for the keys to Jenkins.
         # $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
         # $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
         if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
