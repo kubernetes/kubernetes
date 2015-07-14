@@ -22,7 +22,7 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # The Kubernetes API
 
-Primary system and API concepts are documented in the [User guide](user-guide/user-guide.md).
+Primary system and API concepts are documented in the [User guide](user-guide/README.md).
 
 Overall API conventions are described in the [API conventions doc](api-conventions.md).
 

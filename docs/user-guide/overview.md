@@ -20,11 +20,13 @@ certainly want the docs that go with that version.</h1>
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-# Kubernetes User Documentation
+# Kubernetes Overview
 
 Kubernetes is an open-source system for managing containerized applications across multiple hosts in a cluster. It provides mechanisms for application deployment, scheduling, updating, maintenance, and scaling. A key feature of Kubernetes is that it actively manages the containers to ensure that the state of the cluster continually matches the user's intentions.
 
-Today, Kubernetes supports just [Docker](http://www.docker.io) containers, but other container image formats and container runtimes will be supported in the future (e.g., [Rocket](https://coreos.com/blog/rocket/) support is in progress). Similarly, while Kubernetes currently focuses on continuously-running stateless (e.g. web server or in-memory object cache) and "cloud native" stateful applications (e.g. NoSQL datastores), in the near future it will support all the other workload types commonly found in production cluster environments, such as batch, stream processing, and traditional databases. 
+Kubernetes supports [Docker](http://www.docker.io) and [Rocket](https://coreos.com/blog/rocket/) containers, and other container image formats and container runtimes will be supported in the future.
+
+While Kubernetes currently focuses on continuously-running stateless (e.g. web server or in-memory object cache) and "cloud native" stateful applications (e.g. NoSQL datastores), in the near future it will support all the other workload types commonly found in production cluster environments, such as batch, stream processing, and traditional databases.
 
 In Kubernetes, all containers run inside [pods](pods.md). A pod can host a single container, or multiple cooperating containers; in the latter case, the containers in the pod are guaranteed to be co-located on the same machine and can share resources. A pod can also contain zero or more [volumes](volumes.md), which are directories that are private to a container or shared across containers in a pod. For each pod the user creates, the system finds a machine that is healthy and that has sufficient available capacity, and starts up the corresponding container(s) there. If a container fails it can be automatically restarted by Kubernetes' node agent, called the Kubelet. But if the pod or its machine fails, it is not automatically moved or restarted unless the user also defines a [replication controller](replication-controller.md), which we discuss next.
 
@@ -37,17 +39,6 @@ Kubernetes supports a unique [networking model](../admin/networking.md). Kuberne
 Modern Internet applications are commonly built by layering micro-services, for example a set of web front-ends talking to a distributed in-memory key-value store talking to a replicated storage service. To facilitate this architecture, Kubernetes offers the [service](services.md) abstraction, which provides a stable IP address and [DNS name](../admin/dns.md) that corresponds to a dynamic set of pods such as the set of pods constituting a micro-service. The set is defined using a label selector and thus can refer to any set of pods. When a container running in a Kubernetes pod connects to this address, the connection is forwarded by a local agent (called the kube proxy) running on the source machine, to one of the corresponding back-end containers. The exact back-end is chosen using a round-robin policy to balance load. The kube proxy takes care of tracking the dynamic set of back-ends as pods are replaced by new pods on new hosts, so that the service IP address (and DNS name) never changes.
 
 Every resource in Kubernetes, such as a pod, is identified by a URI and has a UID. Important components of the URI are the kind of object (e.g. pod), the object’s name, and the object’s [namespace](namespaces.md). For a certain object kind, every name is unique within its namespace. In contexts where an object name is provided without a namespace, it is assumed to be in the default namespace. UID is unique across time and space.
-
-Other details:
-
-* [API](../api.md)
-* [Client libraries](../client-libraries.md)
-* [Command-line interface](kubectl/kubectl.md)
-* [UI](ui.md)
-* [Images and registries](images.md)
-* [Container environment](container-environment.md)
-* [Logging](logging.md)
-* Monitoring using [CAdvisor](https://github.com/google/cadvisor) and [Heapster](https://github.com/GoogleCloudPlatform/heapster)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

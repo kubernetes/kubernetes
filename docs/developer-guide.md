@@ -24,7 +24,7 @@ certainly want the docs that go with that version.</h1>
 
 The developer guide is for anyone wanting to either write code which directly accesses the
 kubernetes API, or to contribute directly to the kubernetes project.
-It assumes some familiarity with concepts in the [User Guide](user-guide/user-guide.md) and the [Cluster Admin
+It assumes some familiarity with concepts in the [User Guide](user-guide/README.md) and the [Cluster Admin
 Guide](admin/README.md).
 
 
