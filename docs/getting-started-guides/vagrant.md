@@ -37,7 +37,7 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install one of:
-   1. The latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
+   1. Version 4.3.28 of Virtual Box from https://www.virtualbox.org/wiki/Download_Old_Builds_4_3
    2. [VMWare Fusion](https://www.vmware.com/products/fusion/) version 5 or greater as well as the appropriate [Vagrant VMWare Fusion provider](https://www.vagrantup.com/vmware)
    3. [VMWare Workstation](https://www.vmware.com/products/workstation/) version 9 or greater as well as the [Vagrant VMWare Workstation provider](https://www.vagrantup.com/vmware)
    4. [Parallels Desktop](https://www.parallels.com/products/desktop/) version 9 or greater as well as the [Vagrant Parallels provider](https://parallels.github.io/vagrant-parallels/)
