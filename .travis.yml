@@ -9,7 +9,7 @@ matrix:
 install:
   - go get github.com/tools/godep
   - ./hack/travis/install-etcd.sh
-  - ./hack/build-go.sh
+  - ./hack/build-go.sh cmd/gendocs cmd/genman cmd/mungedocs cmd/genbashcomp cmd/genconversion cmd/gendeepcopy cmd/kube-apiserver
 
 script:
   - ./hack/verify-gofmt.sh
