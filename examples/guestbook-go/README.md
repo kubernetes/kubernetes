@@ -201,9 +201,6 @@ Just like the others, we create a service to group the guestbook pods but this t
 1. Use the [guestbook-service.json](guestbook-service.json) file to create the guestbook service by running the `kubectl create -f` *`filename`* command:
     ```shell
     $ kubectl create -f examples/guestbook-go/guestbook-service.json
-		  An external load-balanced service was created.  On many platforms (e.g. Google Compute Engine),
-          you will also need to explicitly open a Firewall rule for the service port(s) (tcp:3000) to serve traffic.
-          See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewall.md for more details.
     ```
 
 
@@ -230,14 +227,6 @@ You can now play with the guestbook that you just created by opening it in a bro
     1. To view the guestbook on a remote host, locate the external IP of the load balancer in the **IP** column of the `kubectl get services` output. In our example, the internal IP address is `10.0.217.218` and the external IP address is `146.148.81.8` (*Note: you might need to scroll to see the IP column*). 
 
     2. Append port `3000` to the IP address (for example `http://146.148.81.8:3000`), and then navigate to that address in your browser.
-
-    **Remember:** You might need to open the firewall for port `3000`. 
-    If you're using Google Compute Engine, you can use the [Developers Console][cloud-console] or the `gcloud` CLI to open port `3000`. 
-
-    To use the `gcloud` CLI, you can run the following command to allow traffic from any source to instances tagged `kubernetes-minion`:
-    ```shell
-    $ gcloud compute firewall-rules create --allow=tcp:3000 --target-tags=kubernetes-minion kubernetes-minion-3000
-    ```
 
     Result: The guestbook displays in your browser:
 
