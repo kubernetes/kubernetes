@@ -30,9 +30,9 @@ If you are considering contributing a new guide, please read the
 
 IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                              | Conforms                       | Support Level                | Notes
 -------------------- | ------------ | ------ | ----------  | ---------------------------------------------     | ------------------------------ | ---------------------------- | -----
-GKE                  |              |        | GCE         | [docs](https://cloud.google.com/container-engine) | [✓][<sup>1</sup>](#references) | Commercial                   | Uses latest via https://get.k8s.io
+GKE                  |              |        | GCE         | [docs](https://cloud.google.com/container-engine) |                                | Commercial                   | Uses latest via https://get.k8s.io
 Vagrant              | Saltstack    | Fedora | OVS         | [docs](vagrant.md)                                |                                | Project                      | Uses latest via https://get.k8s.io/
-GCE                  | Saltstack    | Debian | GCE         | [docs](gce.md)                                    |                                | Project                      | Uses latest via https://get.k8s.io
+GCE                  | Saltstack    | Debian | GCE         | [docs](gce.md)                                    | [✓][<sup>1</sup>](#references) | Project                      | Uses latest via https://get.k8s.io
 Azure                | CoreOS       | CoreOS | Weave       | [docs](coreos/azure/README.md)                    |                                | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin)) | Uses K8s version 0.17.0
 Docker Single Node   | custom       | N/A    | local       | [docs](docker.md)                                 |                                | Project (@brendandburns)     | Tested @ 0.14.1 |
 Docker Multi Node    | Flannel      | N/A    | local       | [docs](docker-multinode.md)                       |                                | Project (@brendandburns)     | Tested @ 0.14.1 |
