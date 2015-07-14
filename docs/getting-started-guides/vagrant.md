@@ -52,9 +52,7 @@ export KUBERNETES_PROVIDER=vagrant
 curl -sS https://get.k8s.io | bash
 ```
 
-The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
-
-By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-minion-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
+Alternatively, you can download [Kubernetes release](https://github.com/GoogleCloudPlatform/kubernetes/releases) and extract the archive. To start your local cluster, open a shell and run:
 
 ```sh
 cd kubernetes
@@ -62,6 +60,10 @@ cd kubernetes
 export KUBERNETES_PROVIDER=vagrant
 ./cluster/kube-up.sh
 ```
+
+The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
+
+By default, the Vagrant setup will create a single master VM (called kubernetes-master) and one node (called kubernetes-minion-1). Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space).
 
 Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
 
