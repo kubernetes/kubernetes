@@ -32,7 +32,8 @@ certainly want the docs that go with that version.</h1>
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-This guide will help you get oriented to Kubernetes and running your first containers on the cluster.
+This guide will help you get oriented to Kubernetes and running your first containers on the cluster. If you are already familiar with the docker-cli, you can also checkout the docker-cli to kubectl migration guide [here](docker-cli-to-kubectl.md).
+
 
 ## Launching a simple application
 
