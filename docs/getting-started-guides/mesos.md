@@ -217,7 +217,7 @@ started the Kubernetes pod.
 
 ## Launching kube-dns
 
-Kube-dns is an addon for Kubernetes which adds service discovery to the cluster. For a detailed explanation see [DNS in Kubernetes][4].
+Kube-dns is an addon for Kubernetes which adds DNS-based service discovery to the cluster. For a detailed explanation see [DNS in Kubernetes][4].
 
 The kube-dns addon runs as a pod inside the cluster. The pod consists of three co-located containers:
 - a local etcd instance
@@ -289,7 +289,7 @@ Then start the pod:
 kubectl create -f busybox.yaml
 ```
 
-When the pod is up and running, start a lookup:
+When the pod is up and running, start a lookup for the Kubernetes master service, made available on 10.10.10.1 by default:
 
 ```bash
 kubectl  exec busybox -- nslookup kubernetes
