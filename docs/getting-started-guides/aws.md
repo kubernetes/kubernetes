@@ -42,7 +42,6 @@ Getting started on AWS EC2
 3. You need an AWS [instance profile and role](http://docs.aws.amazon.com/IAM/latest/UserGuide/instance-profiles.html) with EC2 full access.
 
 ## Cluster turnup
-### Supported procedure: `get-kube`
 ```bash
 #Using wget
 export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
@@ -83,14 +82,17 @@ AWS CloudFormation or EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
 ### Command line administration tool: `kubectl`
-Copy the appropriate `kubectl` binary to any location defined in your `PATH` environment variable, for example:
+The cluster startup script will leave you with a ```kubernetes``` directory on your workstation.
+Alternately, you can download the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
+
+Next, add the appropriate binary folder to your ```PATH``` to access kubectl:
 
 ```bash
 # OS X
-sudo cp kubernetes/platforms/darwin/amd64/kubectl /usr/local/bin/kubectl
+export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 
 # Linux
-sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
+export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
 ```
 
 An up-to-date documentation page for this tool is available here: [kubectl manual](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
