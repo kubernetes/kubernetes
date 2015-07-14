@@ -19,6 +19,10 @@ _Note_:
 These instructions are somewhat significantly more advanced than the [single node](docker.md) instructions.  If you are
 interested in just starting to explore Kubernetes, we recommend that you start there.
 
+_Note_:
+There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
+Please install Docker 1.6.2 or wait for Docker 1.7.1.
+
 **Table of Contents**
 
 - [Prerequisites](#prerequisites)

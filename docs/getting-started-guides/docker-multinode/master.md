@@ -22,6 +22,10 @@ There are two main phases to installing the master:
 
 ## Setting up flanneld and etcd
 
+_Note_:
+There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
+Please install Docker 1.6.2 or wait for Docker 1.7.1.
+
 ### Setup Docker-Bootstrap
 We're going to use ```flannel``` to set up networking between Docker daemons.  Flannel itself (and etcd on which it relies) will run inside of
 Docker containers themselves.  To achieve this, we need a separate "bootstrap" instance of the Docker daemon.  This daemon will be started with
@@ -40,13 +44,13 @@ across reboots and failures.
 ### Startup etcd for flannel and the API server to use
 Run:
 ```
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
 ```
 
 Next, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.9 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
 ```
 
 
@@ -76,7 +80,7 @@ or it may be something else.
 
 Now run flanneld itself:
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.3.0
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0
 ```
 
 The previous command should have printed a really long hash, copy this hash.
@@ -122,20 +126,20 @@ systemctl start docker
 Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case, we will use the "main" instance of the Docker daemon for the Kubernetes components.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
+sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
 ```
 
 ### Also run the service proxy
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
 Download the kubectl binary
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/linux/amd64/kubectl))
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.21.2/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v0.21.2/bin/linux/amd64/kubectl))
 
 List the nodes
 
