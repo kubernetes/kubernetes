@@ -70,6 +70,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
   end
 
+  def set_provider(n)
+    n.vm.provider :openstack do |os, override|
+      set_openstack(os, override, n)
+    end
+    n.vm.provider :virtualbox do |vb, override|
+      set_vbox(vb, override)
+    end
+
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   nodes = Array.new()
@@ -79,12 +87,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     nodes.push(name)
     config.vm.define "#{name}" do |n|
       n.vm.hostname = name
-      n.vm.provider :openstack do |os, override|
-        set_openstack(os, override, n)
-      end
-      n.vm.provider :virtualbox do |vb, override|
-        set_vbox(vb, override)
-      end
+      set_provider(n)
     end
   end
 
@@ -101,12 +104,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.define "kube-master" do |n|
     name = "kube-master"
     n.vm.hostname = name
-    n.vm.provider :openstack do |os, override|
-      set_openstack(os, override, n)
-    end
-    n.vm.provider :virtualbox do |vb, override|
-      set_vbox(vb, override)
-    end
+    set_provider(n)
 
     # This set up the vagrant hosts before we run the main playbook
     # Today this just creates /etc/hosts so machines can talk via their
