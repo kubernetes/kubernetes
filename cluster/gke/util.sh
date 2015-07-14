@@ -51,14 +51,13 @@ function detect-project() {
   echo "... in detect-project()" >&2
   if [[ -z "${PROJECT:-}" ]]; then
     export PROJECT=$("${GCLOUD}" config list project | tail -n 1 | cut -f 3 -d ' ')
+    echo "... Using project: ${PROJECT}" >&2
   fi
-
   if [[ -z "${PROJECT:-}" ]]; then
     echo "Could not detect Google Cloud Platform project. Set the default project using " >&2
     echo "'gcloud config set project <PROJECT>'" >&2
     exit 1
   fi
-  echo "Project: ${PROJECT}" >&2
 }
 
 # Execute prior to running tests to build a release if required for env.
@@ -121,7 +120,7 @@ function kube-up() {
     echo "Creating new network: ${NETWORK}" >&2
     "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
   else
-    echo "Using network: ${NETWORK}" >&2
+    echo "... Using network: ${NETWORK}" >&2
   fi
 
   # Allow SSH on all nodes in the network. This doesn't actually check whether
@@ -134,7 +133,7 @@ function kube-up() {
       --project="${PROJECT}" \
       --source-ranges="0.0.0.0/0"
   else
-    echo "Using firewall-rule: ${FIREWALL_SSH}" >&2
+    echo "... Using firewall-rule: ${FIREWALL_SSH}" >&2
   fi
 
   local create_args=(
