@@ -28,38 +28,38 @@ For the easiest "kick the tires" experience, please try the [local docker](docke
 If you are considering contributing a new guide, please read the
 [guidelines](../../docs/devel/writing-a-getting-started-guide.md).
 
-IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                              | Conforms                       | Support Level
--------------------- | ------------ | ------ | ----------  | ---------------------------------------------     | ------------------------------ | ----------------------------
-GKE                  |              |        | GCE         | [docs](https://cloud.google.com/container-engine) |                                | Commercial
-Vagrant              | Saltstack    | Fedora | OVS         | [docs](vagrant.md)                                |                                | Project
-GCE                  | Saltstack    | Debian | GCE         | [docs](gce.md)                                    | [✓][<sup>1</sup>](#references) | Project
-Azure                | CoreOS       | CoreOS | Weave       | [docs](coreos/azure/README.md)                    |                                | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin))
-Docker Single Node   | custom       | N/A    | local       | [docs](docker.md)                                 |                                | Project (@brendandburns)
-Docker Multi Node    | Flannel      | N/A    | local       | [docs](docker-multinode.md)                       |                                | Project (@brendandburns)
-Bare-metal           | Ansible      | Fedora | flannel     | [docs](fedora/fedora_ansible_config.md)           |                                | Project
-Bare-metal           | custom       | Fedora | _none_      | [docs](fedora/fedora_manual_config.md)            |                                | Project
-Bare-metal           | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |                                | Community ([@aveshagarwal](https://github.com/aveshagarwal))
-libvirt              | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |                                | Community ([@aveshagarwal](https://github.com/aveshagarwal))
-KVM                  | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |                                | Community ([@aveshagarwal](https://github.com/aveshagarwal))
-Mesos/GCE            |              |        |             | [docs](mesos.md)                                  |                                | [Community](https://github.com/mesosphere/kubernetes-mesos) ([@jdef](https://github.com/jdef))
-AWS                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |                                | Community
-GCE                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |                                | Community [@pires](https://github.com/pires)
-Vagrant              | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |                                | Community ( [@pires](https://github.com/pires), [@AntonioMeireles](https://github.com/AntonioMeireles) )
-Bare-metal (Offline) | CoreOS       | CoreOS | flannel     | [docs](coreos/bare_metal_offline.md)              |                                | Community([@jeffbean](https://github.com/jeffbean))
-CloudStack           | Ansible      | CoreOS | flannel     | [docs](cloudstack.md)                             |                                | Community (@runseb)
-Vmware               |              | Debian | OVS         | [docs](vsphere.md)                                |                                | Community (@pietern)
-Bare-metal           | custom       | CentOS | _none_      | [docs](centos/centos_manual_config.md)            |                                | Community(@coolsvap)
-AWS                  | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |                                | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
-OpenStack/HPCloud    | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |                                | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
-Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |                                | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
-AWS                  | Saltstack    | Ubuntu | OVS         | [docs](aws.md)                                    |                                | Community (@justinsb)
-Vmware               | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |                                | Community (@kelseyhightower)
-Azure                | Saltstack    | Ubuntu | OpenVPN     | [docs](azure.md)                                  |                                | Community
-Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.md)                                 |                                | Community (@resouer @WIZARD-CXY)
-Local                |              |        | _none_      | [docs](locally.md)                                |                                | Community (@preillyme)
-libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.md)                         |                                | Community (@lhuard1A)
-oVirt                |              |        |             | [docs](ovirt.md)                                  |                                | Community (@simon3z)
-Rackspace            | CoreOS       | CoreOS | flannel     | [docs](rackspace.md)                              |                                | Community (@doublerr)
+IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                              | Conforms | Support Level
+-------------------- | ------------ | ------ | ----------  | ---------------------------------------------     | ---------| ----------------------------
+GKE                  |              |        | GCE         | [docs](https://cloud.google.com/container-engine) |          | Commercial
+Vagrant              | Saltstack    | Fedora | OVS         | [docs](vagrant.md)                                |          | Project
+GCE                  | Saltstack    | Debian | GCE         | [docs](gce.md)                                    | [✓][1]   | Project
+Azure                | CoreOS       | CoreOS | Weave       | [docs](coreos/azure/README.md)                    |          | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin))
+Docker Single Node   | custom       | N/A    | local       | [docs](docker.md)                                 |          | Project (@brendandburns)
+Docker Multi Node    | Flannel      | N/A    | local       | [docs](docker-multinode.md)                       |          | Project (@brendandburns)
+Bare-metal           | Ansible      | Fedora | flannel     | [docs](fedora/fedora_ansible_config.md)           |          | Project
+Bare-metal           | custom       | Fedora | _none_      | [docs](fedora/fedora_manual_config.md)            |          | Project
+Bare-metal           | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
+libvirt              | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
+KVM                  | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
+Mesos/GCE            |              |        |             | [docs](mesos.md)                                  |          | [Community](https://github.com/mesosphere/kubernetes-mesos) ([@jdef](https://github.com/jdef))
+AWS                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community
+GCE                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community [@pires](https://github.com/pires)
+Vagrant              | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ( [@pires](https://github.com/pires), [@AntonioMeireles](https://github.com/AntonioMeireles) )
+Bare-metal (Offline) | CoreOS       | CoreOS | flannel     | [docs](coreos/bare_metal_offline.md)              |          | Community([@jeffbean](https://github.com/jeffbean))
+CloudStack           | Ansible      | CoreOS | flannel     | [docs](cloudstack.md)                             |          | Community (@runseb)
+Vmware               |              | Debian | OVS         | [docs](vsphere.md)                                |          | Community (@pietern)
+Bare-metal           | custom       | CentOS | _none_      | [docs](centos/centos_manual_config.md)            |          | Community(@coolsvap)
+AWS                  | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
+OpenStack/HPCloud    | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
+Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
+AWS                  | Saltstack    | Ubuntu | OVS         | [docs](aws.md)                                    |          | Community (@justinsb)
+Vmware               | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community (@kelseyhightower)
+Azure                | Saltstack    | Ubuntu | OpenVPN     | [docs](azure.md)                                  |          | Community
+Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.md)                                 |          | Community (@resouer @WIZARD-CXY)
+Local                |              |        | _none_      | [docs](locally.md)                                |          | Community (@preillyme)
+libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.md)                         |          | Community (@lhuard1A)
+oVirt                |              |        |             | [docs](ovirt.md)                                  |          | Community (@simon3z)
+Rackspace            | CoreOS       | CoreOS | flannel     | [docs](rackspace.md)                              |          | Community (@doublerr)
 
 Don't see anything above that meets your needs?  See our [Getting Started from Scratch](scratch.md) guide.
 
@@ -82,8 +82,9 @@ Definition of columns:
     - **Inactive**: No active maintainer.  Not recommended for first-time K8s users, and may be deleted soon.
   - **Notes** is relevant information such as version k8s used.
 
-#### References:
-- [1] [GCE conformance test result](https://gist.github.com/erictune/4cabc010906afbcc5061)
+<!-- reference style links below here -->
+<!-- GCE conformance test result -->
+[1]: https://gist.github.com/erictune/4cabc010906afbcc5061
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
