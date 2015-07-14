@@ -14,6 +14,8 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Adding a Kubernetes worker node via Docker.
 
+
+
 These instructions are very similar to the master set-up above, but they are duplicated for clarity.
 You need to repeat these instructions for each node you want to join the cluster.
 We will assume that the IP address of this node is ```${NODE_IP}``` and you have the IP address of the master in ```${MASTER_IP}``` that you created in the [master instructions](master.md).
@@ -25,6 +27,11 @@ For each worker node, there are three steps:
 
 ### Set up Flanneld on the worker node
 As before, the Flannel daemon is going to provide network connectivity.
+
+_Note_:
+There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
+Please install Docker 1.6.2 or wait for Docker 1.7.1.
+
 
 #### Set up a bootstrap docker
 As previously, we need a second instance of the Docker daemon running to bootstrap the flannel networking.
@@ -59,7 +66,7 @@ or it may be something else.
 
 Now run flanneld itself, this call is slightly different from the above, since we point it at the etcd instance on the master.
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.3.0 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001
 ```
 
 The previous command should have printed a really long hash, copy this hash.
@@ -107,14 +114,14 @@ systemctl start docker
 Again this is similar to the above, but the ```--api_servers``` now points to the master we set up in the beginning.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube kubelet --api_servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=$(hostname -i)
+sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=$(hostname -i)
 ```
 
 #### Run the service proxy
 The service proxy provides load-balancing between groups of containers defined by Kubernetes ```Services```
 
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
+sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
 ```
 
 ### Next steps
