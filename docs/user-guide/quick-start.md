@@ -22,6 +22,16 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Kubernetes User Guide: Managing Applications: Quick start
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes User Guide: Managing Applications: Quick start](#kubernetes-user-guide:-managing-applications:-quick-start)
+  - [Launching a simple application](#launching-a-simple-application)
+  - [Exposing your application to the Internet](#exposing-your-application-to-the-internet)
+  - [Killing the application](#killing-the-application)
+  - [What's next?](#what's-next?)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 This guide will help you get oriented to Kubernetes and running your first containers on the cluster.
 
 ## Launching a simple application
@@ -73,6 +83,10 @@ replicationcontrollers/my-nginx
 $ kubectl delete svc my-nginx
 services/my-nginx
 ```
+
+## What's next?
+
+[Learn about how to configure common container parameters, such as commands and environment variables.](configuring-containers.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -32,6 +32,7 @@ certainly want the docs that go with that version.</h1>
   - [Viewing pod status](#viewing-pod-status)
   - [Viewing pod output](#viewing-pod-output)
   - [Deleting pods](#deleting-pods)
+  - [What's next?](#what's-next?)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -165,6 +166,10 @@ pods/hello-world
 Terminated pods aren’t currently automatically deleted, so that you can observe their final status, so be sure to clean up your dead pods. 
 
 On the other hand, containers and their logs are eventually deleted automatically in order to free up disk space on the nodes.
+
+## What's next?
+
+[Learn about deploying continuously running applications.](deploying-applications.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
