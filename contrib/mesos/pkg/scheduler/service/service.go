@@ -208,7 +208,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.KubeletRootDirectory, "kubelet-root-dir", s.KubeletRootDirectory, "Directory path for managing kubelet files (volume mounts,etc). Defaults to executor sandbox.")
 	fs.StringVar(&s.KubeletDockerEndpoint, "kubelet-docker-endpoint", s.KubeletDockerEndpoint, "If non-empty, kubelet will use this for the docker endpoint to communicate with.")
 	fs.StringVar(&s.KubeletPodInfraContainerImage, "kubelet-pod-infra-container-image", s.KubeletPodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
-	fs.UintVar(&s.KubeletCadvisorPort, "kubelet-cadvisor-port", s.KubeletCadvisorPort, "The port of the kubelet's local cAdvisor endpoint")
+	fs.UintVar(&s.KubeletCadvisorPort, "kubelet-cadvisor-port", s.KubeletCadvisorPort, "The port of the kubelet's local cAdvisor endpoint. Will be allocated from the Mesos slave resources.")
 	fs.StringVar(&s.KubeletHostNetworkSources, "kubelet-host-network-sources", s.KubeletHostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
 	fs.DurationVar(&s.KubeletSyncFrequency, "kubelet-sync-frequency", s.KubeletSyncFrequency, "Max period between synchronizing running containers and config")
 	fs.StringVar(&s.KubeletNetworkPluginName, "kubelet-network-plugin", s.KubeletNetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
@@ -376,6 +376,12 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		Name:    proto.String(execcfg.DefaultInfoName),
 		Source:  proto.String(execcfg.DefaultInfoSource),
 		Resources: []*mesos.Resource{
+			mutil.NewRangesResource("ports", []*mesos.Value_Range{
+				mutil.NewValueRange(uint64(s.KubeletCadvisorPort), uint64(s.KubeletCadvisorPort)),
+				mutil.NewValueRange(ports.KubeletPort, ports.KubeletPort),
+				mutil.NewValueRange(ports.KubeletReadOnlyPort, ports.KubeletReadOnlyPort),
+				mutil.NewValueRange(ports.KubeletStatusPort, ports.KubeletStatusPort),
+			}),
 			mutil.NewScalarResource("cpus", cpus),
 			mutil.NewScalarResource("mem", mem),
 		},
