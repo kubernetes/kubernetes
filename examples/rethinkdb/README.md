@@ -134,7 +134,7 @@ since the ui is not stateless when playing with Web Admin UI will cause `Connect
 **BTW**
 
   * `gen_pod.sh` is using to generate pod templates for my local cluster,
-the generated pods which is using `nodeSelector` to force k8s to schedule containers to my designate nodes, for I need to access persistent data on my host dirs. Note that one needs to label the node before 'nodeSelector' can work, see this [tutorial](../node-selection/)
+the generated pods which is using `nodeSelector` to force k8s to schedule containers to my designate nodes, for I need to access persistent data on my host dirs. Note that one needs to label the node before 'nodeSelector' can work, see this [tutorial](../../docs/user-guide/node-selection/)
 
   * see [antmanler/rethinkdb-k8s](https://github.com/antmanler/rethinkdb-k8s) for detail
 

@@ -20,7 +20,7 @@ This document covers the lifecycle of a pod.  It is not an exhaustive document, 
 
 ## Pod Phase
 
-As consistent with the overall [API convention](api-conventions.md#typical-status-properties), phase is a simple, high-level summary of the phase of the lifecycle of a pod. It is not intended to be a comprehensive rollup of observations of container-level or even pod-level conditions or other state, nor is it intended to be a comprehensive state machine.
+As consistent with the overall [API convention](../api-conventions.md#typical-status-properties), phase is a simple, high-level summary of the phase of the lifecycle of a pod. It is not intended to be a comprehensive rollup of observations of container-level or even pod-level conditions or other state, nor is it intended to be a comprehensive state machine.
 
 The number and meanings of `PodPhase` values are tightly guarded.  Other than what is documented here, nothing should be assumed about pods with a given `PodPhase`.
 
@@ -120,5 +120,5 @@ If a node dies or is disconnected from the rest of the cluster, some entity with
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/pod-states.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/pod-states.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

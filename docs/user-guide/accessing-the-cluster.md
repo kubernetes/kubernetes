@@ -42,7 +42,7 @@ kubernetes CLI, `kubectl`.
 
 To access a cluster, you need to know the location of the cluster and have credentials
 to access it.  Typically, this is automatically set-up when you work through
-though a [Getting started guide](getting-started-guides/README.md),
+though a [Getting started guide](../getting-started-guides/README.md),
 or someone else setup the cluster and provided you with credentials and a location.
 
 Check the location and credentials that kubectl knows about with this command:
@@ -50,8 +50,8 @@ Check the location and credentials that kubectl knows about with this command:
 kubectl config view
 ```
 
-Many of the [examples](../examples/) provide an introduction to using
-kubectl and complete documentation is found in the [kubectl manual](user-guide/kubectl/kubectl.md).
+Many of the [examples](../../examples/) provide an introduction to using
+kubectl and complete documentation is found in the [kubectl manual](kubectl/kubectl.md).
 
 ### Directly accessing the REST API
 Kubectl handles locating and authenticating to the apiserver.
@@ -76,7 +76,7 @@ Run it like this:
 ```
 kubectl proxy --port=8080 &
 ```
-See [kubectl proxy](user-guide/kubectl/kubectl_proxy.md) for more details.
+See [kubectl proxy](kubectl/kubectl_proxy.md) for more details.
 
 Then you can explore the API with curl, wget, or a browser, like so:
 ```
@@ -110,13 +110,13 @@ certificate.
 
 On some clusters, the apiserver does not require authentication; it may serve
 on localhost, or be protected by a firewall.  There is not a standard
-for this.  [Configuring Access to the API](admin/accessing-the-api.md)
+for this.  [Configuring Access to the API](../admin/accessing-the-api.md)
 describes how a cluster admin can configure this.  Such approaches may conflict
 with future high-availability support.
 
 ### Programmatic access to the API
 
-There are [client libraries](client-libraries.md) for accessing the API
+There are [client libraries](../client-libraries.md) for accessing the API
 from several languages.  The Kubernetes project-supported
 [Go](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/pkg/client)
 client library can use the same [kubeconfig file](kubeconfig-file.md)
@@ -134,7 +134,7 @@ the `kubernetes` DNS name, which resolves to a Service IP which in turn
 will be routed to an apiserver.
 
 The recommended way to authenticate to the apiserver is with a
-[service account](service-accounts.md) credential.  By default, a pod
+[service account](../service-accounts.md) credential.  By default, a pod
 is associated with a service account, and a credential (token) for that
 service account is placed into the filesystem tree of each container in that pod,
 at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
@@ -144,7 +144,7 @@ From within a pod the recommended ways to connect to API are:
     process within a container.  This proxies the
     kubernetes API to the localhost interface of the pod, so that other processes
     in any container of the pod can access it.  See this [example of using kubectl proxy
-    in a pod](../examples/kubectl-container/).
+    in a pod](../../examples/kubectl-container/).
   - use the Go client library, and create a client using the `client.NewInCluster()` factory.
     This handles locating and authenticating to the apiserver.
 In each case, the credentials of the pod are used to communicate securely with the apiserver.
@@ -153,7 +153,7 @@ In each case, the credentials of the pod are used to communicate securely with t
 ## Accessing services running on the cluster
 The previous section was about connecting the Kubernetes API server.  This section is about
 connecting to other services running on Kubernetes cluster.  In kubernetes, the
-[nodes](admin/node.md), [pods](pods.md) and [services](services.md) all have
+[nodes](../admin/node.md), [pods](pods.md) and [services](services.md) all have
 their own IPs.  In many cases, the node IPs, pod IPs, and some service IPs on a cluster will not be
 routable, so they will not be reachable from a machine outside the cluster,
 such as your desktop machine.
@@ -163,7 +163,7 @@ You have several options for connecting to nodes, pods and services from outside
   - Access services through public IPs.
     - Use a service with type `NodePort` or `LoadBalancer` to make the service reachable outside
       the cluster.  See the [services](services.md) and
-      [kubectl expose](user-guide/kubectl/kubectl_expose.md) documentation.
+      [kubectl expose](kubectl/kubectl_expose.md) documentation.
     - Depending on your cluster environment, this may just expose the service to your corporate network,
       or it may expose it to the internet.  Think about whether the service being exposed is secure.
       Does it do its own authentication?
@@ -179,7 +179,7 @@ You have several options for connecting to nodes, pods and services from outside
     - Only works for HTTP/HTTPS.
     - Described [here](#discovering-builtin-services).
   - Access from a node or pod in the cluster.
-    - Run a pod, and then connect to a shell in it using [kubectl exec](user-guide/kubectl/kubectl_exec.md).
+    - Run a pod, and then connect to a shell in it using [kubectl exec](kubectl/kubectl_exec.md).
       Connect to other nodes, pods, and services from that shell.
     - Some clusters may allow you to ssh to a node in the cluster.  From there you may be able to
       access cluster services.  This is a non-standard method, and will work on some clusters but
@@ -279,5 +279,5 @@ will typically ensure that the latter types are setup correctly.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/accessing-the-cluster.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/accessing-the-cluster.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

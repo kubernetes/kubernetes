@@ -634,7 +634,7 @@ Reboot these servers to get the images PXEd and ready for running containers!
 ## Creating test pod
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-See [a simple nginx example](../../../examples/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../../../docs/user-guide/simple-nginx.md) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../../examples/).
 

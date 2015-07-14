@@ -21,7 +21,7 @@ environment information about itself, and a backend pod that it has
 accessed through the service. The goal is to illuminate the
 environment metadata available to running containers inside the
 Kubernetes cluster. The documentation for the kubernetes environment
-is [here](../../docs/container-environment.md).
+is [here](../../../docs/user-guide/container-environment.md).
 
 ![Diagram](diagram.png)
 
@@ -30,7 +30,7 @@ Prerequisites
 This example assumes that you have a Kubernetes cluster installed and
 running, and that you have installed the `kubectl` command line tool
 somewhere in your path.  Please see the [getting
-started](../../docs/getting-started-guides/) for installation instructions
+started](../../../docs/getting-started-guides/) for installation instructions
 for your platform.
 
 Optional: Build your own containers
@@ -81,8 +81,8 @@ Backend Namespace: default
 ```
 
 First the frontend pod's information is printed. The pod name and
-[namespace](../../docs/design/namespaces.md) are retreived from the
-[Downward API](../../docs/downward-api.md). Next, `USER_VAR` is the name of
+[namespace](../../../docs/design/namespaces.md) are retreived from the
+[Downward API](../../../docs/user-guide/downward-api.md). Next, `USER_VAR` is the name of
 an environment variable set in the [pod
 definition](show-rc.yaml). Then, the dynamic kubernetes environment
 variables are scanned and printed. These are used to find the backend
@@ -104,5 +104,5 @@ Cleanup
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/environment-guide/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/environment-guide/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -204,7 +204,7 @@ $ kubectl delete -f node.json
 
 **The cluster should be running! Launch a test pod.**
 
-You should have a functional cluster, check out [101](../../../examples/walkthrough/README.md)!
+You should have a functional cluster, check out [101](../../../docs/user-guide/walkthrough/README.md)!
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

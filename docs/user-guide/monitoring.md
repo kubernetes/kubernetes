@@ -18,7 +18,7 @@ Understanding how an application behaves when deployed is crucial to scaling the
 
 ### Overview
 
-Heapster is a cluster-wide aggregator of monitoring and event data. It currently supports Kubernetes natively and works on all Kubernetes setups. Heapster runs as a pod in the cluster, similar to how any Kubernetes application would run. The Heapster pod discovers all nodes in the cluster and queries usage information from the nodes’ [Kubelet](../DESIGN.md#kubelet)s, the on-machine Kubernetes agent. The Kubelet itself fetches the data from [cAdvisor](https://github.com/google/cadvisor). Heapster groups the information by pod along with the relevant labels. This data is then pushed to a configurable backend for storage and visualization. Currently supported backends include [InfluxDB](http://influxdb.com/) (with [Grafana](http://grafana.org/) for visualization) and [Google Cloud Monitoring](https://cloud.google.com/monitoring/). The overall architecture of the service can be seen below:
+Heapster is a cluster-wide aggregator of monitoring and event data. It currently supports Kubernetes natively and works on all Kubernetes setups. Heapster runs as a pod in the cluster, similar to how any Kubernetes application would run. The Heapster pod discovers all nodes in the cluster and queries usage information from the nodes’ [Kubelet](../../DESIGN.md#kubelet)s, the on-machine Kubernetes agent. The Kubelet itself fetches the data from [cAdvisor](https://github.com/google/cadvisor). Heapster groups the information by pod along with the relevant labels. This data is then pushed to a configurable backend for storage and visualization. Currently supported backends include [InfluxDB](http://influxdb.com/) (with [Grafana](http://grafana.org/) for visualization) and [Google Cloud Monitoring](https://cloud.google.com/monitoring/). The overall architecture of the service can be seen below:
 
 ![overall monitoring architecture](monitoring-architecture.png)
 
@@ -30,7 +30,7 @@ cAdvisor is an open source container resource usage and performance analysis age
 
 On most Kubernetes clusters, cAdvisor exposes a simple UI for on-machine containers on port 4194. Here is a snapshot of part of cAdvisor’s UI that shows the overall machine usage:
 
-![cAdvisor](cadvisor.png)
+![cAdvisor](../cadvisor.png)
 
 ### Kubelet
 
@@ -61,7 +61,7 @@ Here is a video showing how to setup and run a Google Cloud Monitoring backed He
 
 Here is a snapshot of the a Google Cloud Monitoring dashboard showing cluster-wide resource usage.
 
-![Google Cloud Monitoring dashboard](gcm.png)
+![Google Cloud Monitoring dashboard](../gcm.png)
 
 ## Try it out!
 Now that you’ve learned a bit about Heapster, feel free to try it out on your own clusters! The [Heapster repository](https://github.com/GoogleCloudPlatform/heapster) is available on GitHub. It contains detailed instructions to setup Heapster and its storage backends. Heapster runs by default on most Kubernetes clusters, so you may already have it! Feedback is always welcome. Please let us know if you run into any issues. Heapster and Kubernetes developers hang out in the [#google-containers](http://webchat.freenode.net/?channels=google-containers) IRC channel on freenode.net. You can also reach us on the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers).
@@ -72,5 +72,5 @@ Now that you’ve learned a bit about Heapster, feel free to try it out on your 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/monitoring.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/monitoring.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -53,9 +53,9 @@ This example requires a running Kubernetes cluster.  See the [Getting Started gu
 
 **Note**: The redis master in this example is *not* highly available.  Making it highly available would be an interesting, but intricate exercise— redis doesn't actually support multi-master deployments at this point in time, so high availability would be a somewhat tricky thing to implement, and might involve periodic serialization to disk, and so on.
 
-To start the redis master, use the file `examples/guestbook/redis-master-controller.yaml`, which describes a single [pod](../../docs/pods.md) running a redis key-value server in a container.
+To start the redis master, use the file `examples/guestbook/redis-master-controller.yaml`, which describes a single [pod](../../docs/user-guide/pods.md) running a redis key-value server in a container.
 
-Although we have a single instance of our redis master, we are using a [replication controller](../../docs/replication-controller.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the replication controller will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
+Although we have a single instance of our redis master, we are using a [replication controller](../../docs/user-guide/replication-controller.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the replication controller will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
 
 Here is `redis-master-controller.yaml`:
 
@@ -173,7 +173,7 @@ $ docker logs <container_id>
 
 ### Step Two: Fire up the redis master service
 
-A Kubernetes [service](../../docs/services.md) is a named load balancer that proxies traffic to one or more containers. This is done using the [labels](../../docs/labels.md) metadata that we defined in the `redis-master` pod above.  As mentioned, we have only one redis master, but we nevertheless want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
+A Kubernetes [service](../../docs/user-guide/services.md) is a named load balancer that proxies traffic to one or more containers. This is done using the [labels](../../docs/user-guide/labels.md) metadata that we defined in the `redis-master` pod above.  As mentioned, we have only one redis master, but we nevertheless want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
 
 Services find the pods to load balance based on the pods' labels.
 The pod that you created in [Step One](#step-one-start-up-the-redis-master) has the label `name=redis-master`.

@@ -63,7 +63,7 @@ The script above will start (by default) a single master VM along with 4 worker 
 can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 
 ## Getting started with your cluster
-See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../user-guide/simple-nginx.md) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../examples/).
 

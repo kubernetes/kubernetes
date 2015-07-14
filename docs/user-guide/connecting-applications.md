@@ -78,7 +78,7 @@ You can read more about [how we achieve this](../admin/networking.md#how-to-achi
 
 So we have pods running nginx in a flat, cluster wide, address space. In theory, you could talk to these pods directly, but what happens when a node dies? The pods die with it, and the replication controller will create new ones, with different ips. This is the problem a Service solves.
 
-A Kubernetes Service is an abstraction which defines a logical set of Pods running somewhere in your cluster, that all provide the same functionality. When created, each Service is assigned a unique IP address (also called clusterIP). This address is tied to the lifespan of the Service, and will not change while the Service is alive. Pods can be configured to talk to the Service, and know that communication to the Service will be automatically load-balanced out to some pod that is a member of the Service ([why not use round robin dns?](../services.md#why-not-use-round-robin-dns)).
+A Kubernetes Service is an abstraction which defines a logical set of Pods running somewhere in your cluster, that all provide the same functionality. When created, each Service is assigned a unique IP address (also called clusterIP). This address is tied to the lifespan of the Service, and will not change while the Service is alive. Pods can be configured to talk to the Service, and know that communication to the Service will be automatically load-balanced out to some pod that is a member of the Service ([why not use round robin dns?](services.md#why-not-use-round-robin-dns)).
 
 You can create a Service for your 2 nginx replicas with the following yaml:
 ```yaml
@@ -106,7 +106,7 @@ $ kubectl get ep
 NAME         ENDPOINTS
 nginxsvc     10.245.0.14:80,10.245.0.15:80
 ```
-You should now be able to curl the nginx Service on `10.0.208.159:80` from any node in your cluster. Note that the Service ip is completely virtual, it never hits the wire, if you’re curious about how this works you can read more about the [service proxy](../services.md#virtual-ips-and-service-proxies).
+You should now be able to curl the nginx Service on `10.0.208.159:80` from any node in your cluster. Note that the Service ip is completely virtual, it never hits the wire, if you’re curious about how this works you can read more about the [service proxy](services.md#virtual-ips-and-service-proxies).
 
 ## Accessing the Service from other pods in the cluster
 

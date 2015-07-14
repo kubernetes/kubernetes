@@ -20,7 +20,7 @@ cluster administrators who want to customize their cluster
 or understand the details.
 
 Most questions about accessing the cluster are covered
-in [Accessing the cluster](../accessing-the-cluster.md).
+in [Accessing the cluster](../user-guide/accessing-the-cluster.md).
 
 
 ## Ports and IPs Served On

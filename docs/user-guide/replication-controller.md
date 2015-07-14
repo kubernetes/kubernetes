@@ -58,7 +58,7 @@ Note that replication controllers may themselves have labels and would generally
 
 Pods may be removed from a replication controller's target set by changing their labels. This technique may be used to remove pods from service for debugging, data recovery, etc. Pods that are removed in this way will be replaced automatically (assuming that the number of replicas is not also changed).
 
-Similarly, deleting a replication controller does not affect the pods it created. Its `replicas` field must first be set to 0 in order to delete the pods controlled. (Note that the client tool, kubectl, provides a single operation, [stop](user-guide/kubectl/kubectl_stop.md) to delete both the replication controller and the pods it controls. However, there is no such operation in the API at the moment)
+Similarly, deleting a replication controller does not affect the pods it created. Its `replicas` field must first be set to 0 in order to delete the pods controlled. (Note that the client tool, kubectl, provides a single operation, [stop](kubectl/kubectl_stop.md) to delete both the replication controller and the pods it controls. However, there is no such operation in the API at the moment)
 
 ## Responsibilities of the replication controller
 
@@ -89,7 +89,7 @@ Ideally, the rolling update controller would take application readiness into acc
 The two replication controllers would need to create pods with at least one differentiating label, such as the image tag of the primary container of the pod, since it is typically image updates that motivate rolling updates.
 
 Rolling update is implemented in the client tool
-[kubectl](user-guide/kubectl/kubectl_rolling-update.md)
+[kubectl](kubectl/kubectl_rolling-update.md)
 
 ### Multiple release tracks
 
@@ -99,5 +99,5 @@ For instance, a service might target all pods with `tier in (frontend), environm
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/replication-controller.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/replication-controller.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

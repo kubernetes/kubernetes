@@ -266,9 +266,9 @@ writers simultaneously.
 __Important: You must have your own NFS server running with the share exported
 before you can use it__
 
-See the [NFS example](../examples/nfs/) for more details.
+See the [NFS example](../../examples/nfs/) for more details.
 
-For example, [this file](../examples/nfs/nfs-web-pod.yaml) demonstrates how to
+For example, [this file](../../examples/nfs/nfs-web-pod.yaml) demonstrates how to
 specify the usage of an NFS volume within a pod.
 
 In this example one can see that a `volumeMount` called "nfs" is being mounted
@@ -294,7 +294,7 @@ and then serve it in parallel from as many pods as you need.  Unfortunately,
 iSCSI volumes can only be mounted by a single consumer in read-write mode - no
 simultaneous readers allowed.
 
-See the [iSCSI example](../examples/iscsi/) for more details.
+See the [iSCSI example](../../examples/iscsi/) for more details.
 
 ### glusterfs
 
@@ -309,7 +309,7 @@ simultaneously.
 __Important: You must have your own GlusterFS installation running before you
 can use it__
 
-See the [GlusterFS example](../examples/glusterfs/) for more details.
+See the [GlusterFS example](../../examples/glusterfs/) for more details.
 
 ### rbd
 
@@ -329,7 +329,7 @@ and then serve it in parallel from as many pods as you need.  Unfortunately,
 RBD volumes can only be mounted by a single consumer in read-write mode - no
 simultaneous readers allowed.
 
-See the [RBD example](../examples/rbd/) for more details.
+See the [RBD example](../../examples/rbd/) for more details.
 
 ### gitRepo
 
@@ -358,7 +358,7 @@ A `persistentVolumeClaim` volume is used to mount a
 way for users to "claim" durable storage (such as a GCE PersistentDisk or an
 iSCSI volume) without knowing the details of the particular cloud environment.
 
-See the [PersistentVolumes example](../examples/persistent-volumes/) for more
+See the [PersistentVolumes example](persistent-volumes/) for more
 details.
 
 ## Resources
@@ -376,5 +376,5 @@ several media types.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/volumes.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/volumes.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

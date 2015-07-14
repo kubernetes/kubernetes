@@ -68,7 +68,7 @@ wget -q -O - https://get.k8s.io | bash
 
 Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster.
 
-By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](../logging.md), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.md) services.
+By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.md), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.md) services.
 
 The script run by the commands above creates a cluster with the name/prefix "kubernetes". It defines one specific cluster config, so you can't run it more than once.
 
@@ -123,7 +123,7 @@ Once `kubectl` is in your path, you can use it to look at your cluster. E.g., ru
 $ kubectl get --all-namespaces services
 ```
 
-should show a set of [services](../services.md) that look something like this:
+should show a set of [services](../user-guide/services.md) that look something like this:
 
 ```shell
 NAMESPACE     NAME                  LABELS                                                                           SELECTOR                IP(S)       PORT(S)
@@ -136,7 +136,7 @@ kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernete
 kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
                                                                                                                                                             8086/TCP
 ```
-Similarly, you can take a look at the set of [pods](../pods.md) that were created during cluster startup.
+Similarly, you can take a look at the set of [pods](../user-guide/pods.md) that were created during cluster startup.
 You can do this via the
 
 ```shell
@@ -162,7 +162,7 @@ Some of the pods may take a few seconds to start up (during this time they'll sh
 
 #### Run some examples
 
-Then, see [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
+Then, see [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../examples/).  The [guestbook example](../../examples/guestbook/) is a good "getting started" walkthrough.
 

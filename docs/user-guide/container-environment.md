@@ -119,5 +119,5 @@ Hook handlers are the way that hooks are surfaced to containers.  Containers ca
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/container-environment.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/container-environment.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
