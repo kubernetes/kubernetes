@@ -43,6 +43,8 @@ certainly want the docs that go with that version.</h1>
 * There are example files and walkthroughs in the [examples](../examples/)
   folder.
 
+* If something went wrong, see the [troubleshooting](troubleshooting.md) document for how to debug.
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/README.md?pixel)]()
