@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -296,5 +297,27 @@ func TestCheckInvalidErr(t *testing.T) {
 		if errReturned != test.expected {
 			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
 		}
+	}
+}
+
+func TestDumpReaderToFile(t *testing.T) {
+	testString := "TEST STRING"
+	tempFile, err := ioutil.TempFile("", "hlpers_test_dump_")
+	if err != nil {
+		t.Errorf("unexpected error setting up a temporary file %v", err)
+	}
+	defer syscall.Unlink(tempFile.Name())
+	defer tempFile.Close()
+	err = DumpReaderToFile(strings.NewReader(testString), tempFile.Name())
+	if err != nil {
+		t.Errorf("error in DumpReaderToFile: %v", err)
+	}
+	data, err := ioutil.ReadFile(tempFile.Name())
+	if err != nil {
+		t.Errorf("error when reading %s: %v", tempFile, err)
+	}
+	stringData := string(data)
+	if stringData != testString {
+		t.Fatalf("Wrong file content %s != %s", testString, stringData)
 	}
 }

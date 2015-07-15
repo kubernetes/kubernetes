@@ -19,7 +19,9 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -129,6 +131,22 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+
+	for i, filename := range filenames {
+		if filename == "-" {
+			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(tempDir)
+			tempFilename := filepath.Join(tempDir, "resource.stdin")
+			err = cmdutil.DumpReaderToFile(os.Stdin, tempFilename)
+			if err != nil {
+				return err
+			}
+			filenames[i] = tempFilename
+		}
 	}
 
 	mapper, typer := f.Object()
