@@ -24,7 +24,7 @@ certainly want the docs that go with that version.</h1>
 
 A running Kubernetes cluster contains node agents (kubelet) and master components (APIs, scheduler, etc), on top of a distributed storage solution. This diagram shows our desired eventual state, though we're still working on a few things, like making kubelet itself (all our components, really) run within containers, and making the scheduler 100% pluggable.
 
-![Architecture Diagram](../architecture.png?raw=true "Architecture overview")
+![Architecture Diagram](architecture.png?raw=true "Architecture overview")
 
 ## The Kubernetes Node
 
