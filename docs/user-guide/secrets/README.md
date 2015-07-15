@@ -38,7 +38,7 @@ A secret contains a set of named byte arrays.
 Use the [`examples/secrets/secret.yaml`](secret.yaml) file to create a secret:
 
 ```shell
-$ kubectl create -f examples/secrets/secret.yaml
+$ kubectl create -f docs/user-guide/secrets/secret.yaml
 ```
 
 You can use `kubectl` to see information about the secret:
@@ -69,7 +69,7 @@ consumes it.
 Use the [`examples/secrets/secret-pod.yaml`](secret-pod.yaml) file to create a Pod that consumes the secret.
 
 ```shell
-$ kubectl create -f examples/secrets/secret-pod.yaml
+$ kubectl create -f docs/user-guide/secrets/secret-pod.yaml
 ```
 
 This pod runs a binary that displays the content of one of the pieces of secret data in the secret
