@@ -32,7 +32,7 @@ type Fake struct {
 // NewFake makes a new fake MasterElector.
 func NewFake() *Fake {
 	// 0 means block for clients.
-	return &Fake{mux: watch.NewBroadcaster(0, watch.WaitIfChannelFull)}
+	return &Fake{mux: watch.NewBroadcaster(0, 0, watch.WaitIfChannelFull)}
 }
 
 func (f *Fake) ChangeMaster(newMaster Master) {

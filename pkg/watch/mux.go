@@ -34,7 +34,7 @@ const (
 // Buffer the incoming queue a little bit even though it should rarely ever accumulate
 // anything, just in case a few events are received in such a short window that
 // Broadcaster can't move them onto the watchers' queues fast enough.
-const incomingQueueLength = 25
+const DefaultIncomingQueueLength = 25
 
 // Broadcaster distributes event notifications among any number of watchers. Every event
 // is delivered to every watcher.
@@ -57,14 +57,15 @@ type Broadcaster struct {
 	fullChannelBehavior FullChannelBehavior
 }
 
-// NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue per watcher.
+// NewBroadcaster creates a new Broadcaster.
+// watchQueueLength is the maximum number of events to queue per watcher.
 // It is guaranteed that events will be distibuted in the order in which they ocur,
 // but the order in which a single event is distributed among all of the watchers is unspecified.
-func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
+func NewBroadcaster(watchQueueLength, incomingQueueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
 	m := &Broadcaster{
 		watchers:            map[int64]*broadcasterWatcher{},
 		incoming:            make(chan Event, incomingQueueLength),
-		watchQueueLength:    queueLength,
+		watchQueueLength:    watchQueueLength,
 		fullChannelBehavior: fullChannelBehavior,
 	}
 	go m.loop()

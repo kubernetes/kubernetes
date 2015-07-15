@@ -31,7 +31,7 @@ import (
 func NewFakeControllerSource() *FakeControllerSource {
 	return &FakeControllerSource{
 		items:       map[nnu]runtime.Object{},
-		broadcaster: watch.NewBroadcaster(100, watch.WaitIfChannelFull),
+		broadcaster: watch.NewBroadcaster(100, watch.DefaultIncomingQueueLength, watch.WaitIfChannelFull),
 	}
 }
 
