@@ -24,7 +24,7 @@ certainly want the docs that go with that version.</h1>
 
 This guide is to help users debug applications that are deployed into Kubernetes and not behaving correctly.
 This is *not* a guide for people who want to debug their cluster.  For that you should check out
-[this guide](../cluster-troubleshooting.md)
+[this guide](../admin/cluster-troubleshooting.md)
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
