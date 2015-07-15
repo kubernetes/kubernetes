@@ -157,7 +157,7 @@ ENABLE_CLUSTER_DNS=true
 
 DNS_SERVER_IP="192.168.3.10"
 
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 
 DNS_REPLICAS=1
 
