@@ -36,7 +36,7 @@ You’ve deployed your application and exposed it via a service. Now what? Kuber
   - [Updating your application without a service outage](#updating-your-application-without-a-service-outage)
   - [In-place updates of resources](#in-place-updates-of-resources)
   - [Disruptive updates](#disruptive-updates)
-  - [What's next?](#what's-next?)
+  - [What's next?](#whats-next)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
