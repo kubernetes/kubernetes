@@ -158,7 +158,7 @@ For example,
 
 ```
 $ kubectl namespace myspace
-$ kubectl create -f examples/resourcequota/resource-quota.json
+$ kubectl create -f docs/user-guide/resourcequota/quota.yaml
 $ kubectl get quota
 NAME
 quota
