@@ -91,9 +91,11 @@ $ kubectl rolling-update update-demo-nautilus --update-period=10s -f examples/up
 The rolling-update command in kubectl will do 2 things:
 
 1. Create a new [replication controller](../../../docs/user-guide/replication-controller.md) with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
-2. Scale the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.
+2. Scale the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinning up new ones to replace them.
 
 Watch the [demo website](http://localhost:8001/static/index.html), it will update one pod every 10 seconds until all of the pods have the new image.
+Note that the new replication controller definition does not include the replica count, so the current replica count of the old replication controller is preserved.
+But if the replica count had been specified, the final replica count of the new replication controller will be equal this number.
 
 ### Step Five: Bring down the pods
 
