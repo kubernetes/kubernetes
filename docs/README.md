@@ -22,7 +22,7 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Kubernetes Documentation: releases.k8s.io/HEAD
 
-* The [User's guide](user-guide/user-guide.md) is for anyone who wants to run programs and
+* The [User's guide](user-guide/README.md) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
 
 * The [Cluster Admin's guide](admin/README.md) is for anyone setting up
