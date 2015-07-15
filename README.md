@@ -35,15 +35,15 @@ Kubernetes works with the following concepts:
 
 **Clusters** are the compute resources on top of which your containers are built. Kubernetes can run anywhere! See the [Getting Started Guides](docs/getting-started-guides) for instructions for a variety of services.
 
-**Pods** are a colocated group of Docker containers with shared volumes. They're the smallest deployable units that can be created, scheduled, and managed with Kubernetes. Pods can be created individually, but it's recommended that you use a replication controller even if creating a single pod. [More about pods](docs/pods.md).
+**Pods** are a colocated group of Docker containers with shared volumes. They're the smallest deployable units that can be created, scheduled, and managed with Kubernetes. Pods can be created individually, but it's recommended that you use a replication controller even if creating a single pod. [More about pods](docs/user-guide/pods.md).
 
 **Replication controllers** manage the lifecycle of pods. They ensure that a specified number of pods are running
-at any given time, by creating or killing pods as required. [More about replication controllers](docs/replication-controller.md).
+at any given time, by creating or killing pods as required. [More about replication controllers](docs/user-guide/replication-controller.md).
 
 **Services** provide a single, stable name and address for a set of pods.
-They act as basic load balancers. [More about services](docs/services.md).
+They act as basic load balancers. [More about services](docs/user-guide/services.md).
 
-**Labels** are used to organize and select groups of objects based on key:value pairs. [More about labels](docs/labels.md).
+**Labels** are used to organize and select groups of objects based on key:value pairs. [More about labels](docs/user-guide/labels.md).
 
 ## Documentation
 
