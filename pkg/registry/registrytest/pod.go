@@ -37,7 +37,7 @@ type PodRegistry struct {
 func NewPodRegistry(pods *api.PodList) *PodRegistry {
 	return &PodRegistry{
 		Pods:        pods,
-		broadcaster: watch.NewBroadcaster(0, watch.WaitIfChannelFull),
+		broadcaster: watch.NewBroadcaster(0, watch.DefaultIncomingQueueLength, watch.WaitIfChannelFull),
 	}
 }
 

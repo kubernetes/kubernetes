@@ -64,12 +64,31 @@ func (s *slowService) Stop() {
 	s.changes <- false
 }
 
-func Test(t *testing.T) {
+func TestNotify(t *testing.T) {
 	m := NewFake()
 	changes := make(chan bool, 1500)
 	done := make(chan struct{})
 	s := &slowService{t: t, changes: changes, done: done}
+
+	// change master to "notme" such that the initial m.Elect call inside Notify
+	// will trigger an obversable event. We will wait for it to make sure the
+	// Notify loop will see those master changes triggered by the go routine below.
+	m.ChangeMaster(Master("me"))
+	temporaryWatch := m.mux.Watch()
+	ch := temporaryWatch.ResultChan()
+
 	notifyDone := runtime.After(func() { Notify(m, "", "me", s, done) })
+
+	// wait for the event triggered by the initial m.Elect of Notify. Then drain
+	// the channel to not block anything.
+	<-ch
+	temporaryWatch.Stop()
+	for {
+		_, ok := <-ch
+		if !ok {
+			break
+		}
+	}
 
 	go func() {
 		defer close(done)
@@ -83,16 +102,8 @@ func Test(t *testing.T) {
 	<-notifyDone
 	close(changes)
 
-	changeList := []bool{}
-	for {
-		change, ok := <-changes
-		if !ok {
-			break
-		}
-		changeList = append(changeList, change)
-	}
-
-	if len(changeList) > 1000 {
-		t.Errorf("unexpected number of changes: %v", len(changeList))
+	// elections that don't include "me" don't trigger change events
+	if got, want := len(changes), 1000; got != want {
+		t.Errorf("unexpected number of changes: got, want: %v, %v", got, want)
 	}
 }

@@ -88,7 +88,11 @@ type EventBroadcaster interface {
 
 // Creates a new event broadcaster.
 func NewBroadcaster() EventBroadcaster {
-	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull)}
+	return &eventBroadcasterImpl{watch.NewBroadcaster(
+		maxQueuedEvents,
+		watch.DefaultIncomingQueueLength,
+		watch.DropIfChannelFull,
+	)}
 }
 
 type eventBroadcasterImpl struct {
