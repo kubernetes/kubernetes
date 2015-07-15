@@ -32,7 +32,7 @@ certainly want the docs that go with that version.</h1>
   - [Viewing pod status](#viewing-pod-status)
   - [Viewing pod output](#viewing-pod-output)
   - [Deleting pods](#deleting-pods)
-  - [What's next?](#what's-next?)
+  - [What's next?](#whats-next)
 
 <!-- END MUNGE: GENERATED_TOC -->
 

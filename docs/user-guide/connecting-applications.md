@@ -32,7 +32,7 @@ certainly want the docs that go with that version.</h1>
     - [Environment Variables](#environment-variables)
     - [DNS](#dns)
   - [Exposing the Service to the internet](#exposing-the-service-to-the-internet)
-  - [What's next?](#what's-next?)
+  - [What's next?](#whats-next)
 
 <!-- END MUNGE: GENERATED_TOC -->
 

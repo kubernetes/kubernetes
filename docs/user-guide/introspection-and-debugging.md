@@ -32,7 +32,7 @@ your pods. But there are a number of ways to get even more information about you
   - [Using ```kubectl describe pod``` to fetch details about pods](#using-```kubectl-describe-pod```-to-fetch-details-about-pods)
   - [Example: debugging Pending Pods](#example:-debugging-pending-pods)
   - [Example: debugging a down/unreachable node](#example:-debugging-a-down/unreachable-node)
-  - [What's next?](#what's-next?)
+  - [What's next?](#whats-next)
 
 <!-- END MUNGE: GENERATED_TOC -->
 

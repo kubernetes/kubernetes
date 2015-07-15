@@ -25,7 +25,7 @@ certainly want the docs that go with that version.</h1>
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 - [Node](#node)
-  - [What is a node?](#what-is-a-node?)
+  - [What is a node?](#what-is-a-node)
   - [Node Status](#node-status)
     - [Node Addresses](#node-addresses)
     - [Node Phase](#node-phase)
