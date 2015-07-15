@@ -17,7 +17,7 @@ limitations under the License.
 package client
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,12 +30,12 @@ type ResourceQuotasNamespacer interface {
 
 // ResourceQuotaInterface has methods to work with ResourceQuota resources.
 type ResourceQuotaInterface interface {
-	List(selector labels.Selector) (*api.ResourceQuotaList, error)
-	Get(name string) (*api.ResourceQuota, error)
+	List(selector labels.Selector) (*v1api.ResourceQuotaList, error)
+	Get(name string) (*v1api.ResourceQuota, error)
 	Delete(name string) error
-	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
-	Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
-	UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
+	Create(resourceQuota *v1api.ResourceQuota) (*v1api.ResourceQuota, error)
+	Update(resourceQuota *v1api.ResourceQuota) (*v1api.ResourceQuota, error)
+	UpdateStatus(resourceQuota *v1api.ResourceQuota) (*v1api.ResourceQuota, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -54,15 +54,15 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 }
 
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
-func (c *resourceQuotas) List(selector labels.Selector) (result *api.ResourceQuotaList, err error) {
-	result = &api.ResourceQuotaList{}
+func (c *resourceQuotas) List(selector labels.Selector) (result *v1api.ResourceQuotaList, err error) {
+	result = &v1api.ResourceQuotaList{}
 	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
 // Get takes the name of the resourceQuota, and returns the corresponding ResourceQuota object, and an error if it occurs
-func (c *resourceQuotas) Get(name string) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Get(name string) (result *v1api.ResourceQuota, err error) {
+	result = &v1api.ResourceQuota{}
 	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").Name(name).Do().Into(result)
 	return
 }
@@ -73,22 +73,22 @@ func (c *resourceQuotas) Delete(name string) error {
 }
 
 // Create takes the representation of a resourceQuota.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
-func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Create(resourceQuota *v1api.ResourceQuota) (result *v1api.ResourceQuota, err error) {
+	result = &v1api.ResourceQuota{}
 	err = c.r.Post().Namespace(c.ns).Resource("resourceQuotas").Body(resourceQuota).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a resourceQuota to update spec.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
-func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Update(resourceQuota *v1api.ResourceQuota) (result *v1api.ResourceQuota, err error) {
+	result = &v1api.ResourceQuota{}
 	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).Body(resourceQuota).Do().Into(result)
 	return
 }
 
 // Status takes the representation of a resourceQuota to update status.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
-func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) UpdateStatus(resourceQuota *v1api.ResourceQuota) (result *v1api.ResourceQuota, err error) {
+	result = &v1api.ResourceQuota{}
 	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).SubResource("status").Body(resourceQuota).Do().Into(result)
 	return
 }

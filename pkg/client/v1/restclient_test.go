@@ -22,9 +22,9 @@ import (
 	"reflect"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -108,7 +108,7 @@ func TestValidatesHostParameter(t *testing.T) {
 }
 
 func TestDoRequestBearer(t *testing.T) {
-	status := &api.Status{Status: api.StatusFailure}
+	status := &v1api.Status{Status: v1api.StatusFailure}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   400,
@@ -137,7 +137,7 @@ func TestDoRequestBearer(t *testing.T) {
 }
 
 func TestDoRequestWithoutPassword(t *testing.T) {
-	status := &api.Status{Status: api.StatusFailure}
+	status := &v1api.Status{Status: v1api.StatusFailure}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   400,
@@ -176,7 +176,7 @@ func TestDoRequestWithoutPassword(t *testing.T) {
 }
 
 func TestDoRequestSuccess(t *testing.T) {
-	status := &api.Status{Status: api.StatusSuccess}
+	status := &v1api.Status{Status: v1api.StatusSuccess}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -213,12 +213,12 @@ func TestDoRequestSuccess(t *testing.T) {
 }
 
 func TestDoRequestFailed(t *testing.T) {
-	status := &api.Status{
+	status := &v1api.Status{
 		Code:    http.StatusNotFound,
-		Status:  api.StatusFailure,
-		Reason:  api.StatusReasonNotFound,
+		Status:  v1api.StatusFailure,
+		Reason:  v1api.StatusReasonNotFound,
 		Message: " \"\" not found",
-		Details: &api.StatusDetails{},
+		Details: &v1api.StatusDetails{},
 	}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
@@ -251,7 +251,7 @@ func TestDoRequestFailed(t *testing.T) {
 }
 
 func TestDoRequestCreated(t *testing.T) {
-	status := &api.Status{Status: api.StatusSuccess}
+	status := &v1api.Status{Status: v1api.StatusSuccess}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   201,

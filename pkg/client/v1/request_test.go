@@ -32,10 +32,11 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -201,7 +202,7 @@ func TestRequestBody(t *testing.T) {
 
 func TestResultIntoWithErrReturnsErr(t *testing.T) {
 	res := Result{err: errors.New("test")}
-	if err := res.Into(&api.Pod{}); err != res.err {
+	if err := res.Into(&v1api.Pod{}); err != res.err {
 		t.Errorf("should have returned exact error from result")
 	}
 }
@@ -437,9 +438,9 @@ func TestRequestWatch(t *testing.T) {
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), &api.Status{
-							Status: api.StatusFailure,
-							Reason: api.StatusReasonUnauthorized,
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), &v1api.Status{
+							Status: v1api.StatusFailure,
+							Reason: v1api.StatusReasonUnauthorized,
 						})))),
 					}, nil
 				}),
@@ -537,9 +538,9 @@ func TestRequestStream(t *testing.T) {
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), &api.Status{
-							Status: api.StatusFailure,
-							Reason: api.StatusReasonUnauthorized,
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), &v1api.Status{
+							Status: v1api.StatusFailure,
+							Reason: v1api.StatusReasonUnauthorized,
 						})))),
 					}, nil
 				}),
@@ -714,7 +715,7 @@ func TestRequestDo(t *testing.T) {
 
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1api.Service{Spec: v1api.ServiceSpec{Ports: []v1api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -810,9 +811,9 @@ func BenchmarkCheckRetryClosesBody(t *testing.B) {
 	}
 }
 func TestDoRequestNewWayReader(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &v1api.Pod{ObjectMeta: v1api.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := testapi.Codec().Encode(reqObj)
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1api.Service{Spec: v1api.ServiceSpec{Ports: []v1api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -852,9 +853,9 @@ func TestDoRequestNewWayReader(t *testing.T) {
 }
 
 func TestDoRequestNewWayObj(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &v1api.Pod{ObjectMeta: v1api.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := testapi.Codec().Encode(reqObj)
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1api.Service{Spec: v1api.ServiceSpec{Ports: []v1api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -894,7 +895,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 }
 
 func TestDoRequestNewWayFile(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &v1api.Pod{ObjectMeta: v1api.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, err := testapi.Codec().Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -910,7 +911,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1api.Service{Spec: v1api.ServiceSpec{Ports: []v1api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -951,13 +952,13 @@ func TestDoRequestNewWayFile(t *testing.T) {
 }
 
 func TestWasCreated(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &v1api.Pod{ObjectMeta: v1api.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, err := testapi.Codec().Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1api.Service{Spec: v1api.ServiceSpec{Ports: []v1api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
@@ -1175,9 +1176,9 @@ func TestWatch(t *testing.T) {
 		t   watch.EventType
 		obj runtime.Object
 	}{
-		{watch.Added, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "first"}}},
-		{watch.Modified, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "second"}}},
-		{watch.Deleted, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "last"}}},
+		{watch.Added, &v1api.Pod{ObjectMeta: v1api.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &v1api.Pod{ObjectMeta: v1api.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &v1api.Pod{ObjectMeta: v1api.ObjectMeta{Name: "last"}}},
 	}
 
 	auth := &Config{Username: "user", Password: "pass"}

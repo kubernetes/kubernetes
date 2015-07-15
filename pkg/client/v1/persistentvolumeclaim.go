@@ -19,7 +19,7 @@ package client
 import (
 	"fmt"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -32,11 +32,11 @@ type PersistentVolumeClaimsNamespacer interface {
 
 // PersistentVolumeClaimInterface has methods to work with PersistentVolumeClaim resources.
 type PersistentVolumeClaimInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeClaimList, error)
-	Get(name string) (*api.PersistentVolumeClaim, error)
-	Create(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
-	Update(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
-	UpdateStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
+	List(label labels.Selector, field fields.Selector) (*v1api.PersistentVolumeClaimList, error)
+	Get(name string) (*v1api.PersistentVolumeClaim, error)
+	Create(claim *v1api.PersistentVolumeClaim) (*v1api.PersistentVolumeClaim, error)
+	Update(claim *v1api.PersistentVolumeClaim) (*v1api.PersistentVolumeClaim, error)
+	UpdateStatus(claim *v1api.PersistentVolumeClaim) (*v1api.PersistentVolumeClaim, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -52,8 +52,8 @@ func newPersistentVolumeClaims(c *Client, namespace string) *persistentVolumeCla
 	return &persistentVolumeClaims{c, namespace}
 }
 
-func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Selector) (result *api.PersistentVolumeClaimList, err error) {
-	result = &api.PersistentVolumeClaimList{}
+func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Selector) (result *v1api.PersistentVolumeClaimList, err error) {
+	result = &v1api.PersistentVolumeClaimList{}
 
 	err = c.client.Get().
 		Namespace(c.namespace).
@@ -66,20 +66,20 @@ func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Select
 	return result, err
 }
 
-func (c *persistentVolumeClaims) Get(name string) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Get(name string) (result *v1api.PersistentVolumeClaim, err error) {
+	result = &v1api.PersistentVolumeClaim{}
 	err = c.client.Get().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(name).Do().Into(result)
 	return
 }
 
-func (c *persistentVolumeClaims) Create(claim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Create(claim *v1api.PersistentVolumeClaim) (result *v1api.PersistentVolumeClaim, err error) {
+	result = &v1api.PersistentVolumeClaim{}
 	err = c.client.Post().Namespace(c.namespace).Resource("persistentVolumeClaims").Body(claim).Do().Into(result)
 	return
 }
 
-func (c *persistentVolumeClaims) Update(claim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Update(claim *v1api.PersistentVolumeClaim) (result *v1api.PersistentVolumeClaim, err error) {
+	result = &v1api.PersistentVolumeClaim{}
 	if len(claim.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", claim)
 		return
@@ -88,8 +88,8 @@ func (c *persistentVolumeClaims) Update(claim *api.PersistentVolumeClaim) (resul
 	return
 }
 
-func (c *persistentVolumeClaims) UpdateStatus(claim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) UpdateStatus(claim *v1api.PersistentVolumeClaim) (result *v1api.PersistentVolumeClaim, err error) {
+	result = &v1api.PersistentVolumeClaim{}
 	err = c.client.Put().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(claim.Name).SubResource("status").Body(claim).Do().Into(result)
 	return
 }

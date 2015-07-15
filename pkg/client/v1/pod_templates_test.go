@@ -20,8 +20,8 @@ import (
 	"net/url"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -31,13 +31,13 @@ func getPodTemplatesResoureName() string {
 }
 
 func TestPodTemplateCreate(t *testing.T) {
-	ns := api.NamespaceDefault
-	podTemplate := api.PodTemplate{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	podTemplate := v1api.PodTemplate{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
 		},
-		Template: api.PodTemplateSpec{},
+		Template: v1api.PodTemplateSpec{},
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -54,13 +54,13 @@ func TestPodTemplateCreate(t *testing.T) {
 }
 
 func TestPodTemplateGet(t *testing.T) {
-	ns := api.NamespaceDefault
-	podTemplate := &api.PodTemplate{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	podTemplate := &v1api.PodTemplate{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:      "abc",
 			Namespace: ns,
 		},
-		Template: api.PodTemplateSpec{},
+		Template: v1api.PodTemplateSpec{},
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -77,11 +77,11 @@ func TestPodTemplateGet(t *testing.T) {
 }
 
 func TestPodTemplateList(t *testing.T) {
-	ns := api.NamespaceDefault
-	podTemplateList := &api.PodTemplateList{
-		Items: []api.PodTemplate{
+	ns := v1api.NamespaceDefault
+	podTemplateList := &v1api.PodTemplateList{
+		Items: []v1api.PodTemplate{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: ns,
 				},
@@ -102,14 +102,14 @@ func TestPodTemplateList(t *testing.T) {
 }
 
 func TestPodTemplateUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	podTemplate := &api.PodTemplate{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	podTemplate := &v1api.PodTemplate{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:            "abc",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
-		Template: api.PodTemplateSpec{},
+		Template: v1api.PodTemplateSpec{},
 	}
 	c := &testClient{
 		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getPodTemplatesResoureName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
@@ -120,7 +120,7 @@ func TestPodTemplateUpdate(t *testing.T) {
 }
 
 func TestPodTemplateDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPodTemplatesResoureName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
@@ -137,6 +137,6 @@ func TestPodTemplateWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().PodTemplates(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup().PodTemplates(v1api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

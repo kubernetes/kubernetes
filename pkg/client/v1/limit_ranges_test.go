@@ -20,9 +20,9 @@ import (
 	"net/url"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -32,22 +32,22 @@ func getLimitRangesResourceName() string {
 }
 
 func TestLimitRangeCreate(t *testing.T) {
-	ns := api.NamespaceDefault
-	limitRange := &api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	limitRange := &v1api.LimitRange{
+		ObjectMeta: v1api.ObjectMeta{
 			Name: "abc",
 		},
-		Spec: api.LimitRangeSpec{
-			Limits: []api.LimitRangeItem{
+		Spec: v1api.LimitRangeSpec{
+			Limits: []v1api.LimitRangeItem{
 				{
-					Type: api.LimitTypePod,
-					Max: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100"),
-						api.ResourceMemory: resource.MustParse("10000"),
+					Type: v1api.LimitTypePod,
+					Max: v1api.ResourceList{
+						v1api.ResourceCPU:    resource.MustParse("100"),
+						v1api.ResourceMemory: resource.MustParse("10000"),
 					},
-					Min: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("0"),
-						api.ResourceMemory: resource.MustParse("100"),
+					Min: v1api.ResourceList{
+						v1api.ResourceCPU:    resource.MustParse("0"),
+						v1api.ResourceMemory: resource.MustParse("100"),
 					},
 				},
 			},
@@ -68,22 +68,22 @@ func TestLimitRangeCreate(t *testing.T) {
 }
 
 func TestLimitRangeGet(t *testing.T) {
-	ns := api.NamespaceDefault
-	limitRange := &api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	limitRange := &v1api.LimitRange{
+		ObjectMeta: v1api.ObjectMeta{
 			Name: "abc",
 		},
-		Spec: api.LimitRangeSpec{
-			Limits: []api.LimitRangeItem{
+		Spec: v1api.LimitRangeSpec{
+			Limits: []v1api.LimitRangeItem{
 				{
-					Type: api.LimitTypePod,
-					Max: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100"),
-						api.ResourceMemory: resource.MustParse("10000"),
+					Type: v1api.LimitTypePod,
+					Max: v1api.ResourceList{
+						v1api.ResourceCPU:    resource.MustParse("100"),
+						v1api.ResourceMemory: resource.MustParse("10000"),
 					},
-					Min: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("0"),
-						api.ResourceMemory: resource.MustParse("100"),
+					Min: v1api.ResourceList{
+						v1api.ResourceCPU:    resource.MustParse("0"),
+						v1api.ResourceMemory: resource.MustParse("100"),
 					},
 				},
 			},
@@ -104,12 +104,12 @@ func TestLimitRangeGet(t *testing.T) {
 }
 
 func TestLimitRangeList(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 
-	limitRangeList := &api.LimitRangeList{
-		Items: []api.LimitRange{
+	limitRangeList := &v1api.LimitRangeList{
+		Items: []v1api.LimitRange{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: v1api.ObjectMeta{Name: "foo"},
 			},
 		},
 	}
@@ -127,23 +127,23 @@ func TestLimitRangeList(t *testing.T) {
 }
 
 func TestLimitRangeUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	limitRange := &api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	limitRange := &v1api.LimitRange{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:            "abc",
 			ResourceVersion: "1",
 		},
-		Spec: api.LimitRangeSpec{
-			Limits: []api.LimitRangeItem{
+		Spec: v1api.LimitRangeSpec{
+			Limits: []v1api.LimitRangeItem{
 				{
-					Type: api.LimitTypePod,
-					Max: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100"),
-						api.ResourceMemory: resource.MustParse("10000"),
+					Type: v1api.LimitTypePod,
+					Max: v1api.ResourceList{
+						v1api.ResourceCPU:    resource.MustParse("100"),
+						v1api.ResourceMemory: resource.MustParse("10000"),
 					},
-					Min: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("0"),
-						api.ResourceMemory: resource.MustParse("100"),
+					Min: v1api.ResourceList{
+						v1api.ResourceCPU:    resource.MustParse("0"),
+						v1api.ResourceMemory: resource.MustParse("100"),
 					},
 				},
 			},
@@ -158,22 +158,22 @@ func TestLimitRangeUpdate(t *testing.T) {
 }
 
 func TestInvalidLimitRangeUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	limitRange := &api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	limitRange := &v1api.LimitRange{
+		ObjectMeta: v1api.ObjectMeta{
 			Name: "abc",
 		},
-		Spec: api.LimitRangeSpec{
-			Limits: []api.LimitRangeItem{
+		Spec: v1api.LimitRangeSpec{
+			Limits: []v1api.LimitRangeItem{
 				{
-					Type: api.LimitTypePod,
-					Max: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100"),
-						api.ResourceMemory: resource.MustParse("10000"),
+					Type: v1api.LimitTypePod,
+					Max: v1api.ResourceList{
+						v1api.ResourceCPU:    resource.MustParse("100"),
+						v1api.ResourceMemory: resource.MustParse("10000"),
 					},
-					Min: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("0"),
-						api.ResourceMemory: resource.MustParse("100"),
+					Min: v1api.ResourceList{
+						v1api.ResourceCPU:    resource.MustParse("0"),
+						v1api.ResourceMemory: resource.MustParse("100"),
 					},
 				},
 			},
@@ -190,7 +190,7 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 }
 
 func TestLimitRangeDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
@@ -207,6 +207,6 @@ func TestLimitRangeWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup().LimitRanges(v1api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -396,7 +396,7 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 		r.err = err
 		return r
 	}
-	return r.setParam(api.FieldSelectorQueryParam(r.apiVersion), s2.String())
+	return r.setParam("fieldSelector", s2.String())
 }
 
 // LabelsSelectorParam adds the given selector as a query parameter
@@ -410,7 +410,7 @@ func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(api.LabelSelectorQueryParam(r.apiVersion), s.String())
+	return r.setParam("labelSelector", s.String())
 }
 
 // UintParam creates a query parameter with the given value.
@@ -780,7 +780,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 
 	// Did the server give us a status response?
 	isStatusResponse := false
-	var status api.Status
+	var status v1api.Status
 	if err := r.codec.DecodeInto(body, &status); err == nil && status.Status != "" {
 		isStatusResponse = true
 	}
@@ -797,7 +797,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 
 	// If the server gave us a status back, look at what it was.
 	success := resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent
-	if isStatusResponse && (status.Status != api.StatusSuccess && !success) {
+	if isStatusResponse && (status.Status != v1api.StatusSuccess && !success) {
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
 		return Result{err: errors.FromObject(&status)}
 	}

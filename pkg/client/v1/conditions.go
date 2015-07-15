@@ -17,13 +17,13 @@ limitations under the License.
 package client
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 )
 
 // ControllerHasDesiredReplicas returns a condition that will be true iff the desired replica count
 // for a controller's ReplicaSelector equals the Replicas count.
-func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationController) wait.ConditionFunc {
+func ControllerHasDesiredReplicas(c Interface, controller *v1api.ReplicationController) wait.ConditionFunc {
 
 	// If we're given a controller where the status lags the spec, it either means that the controller is stale,
 	// or that the rc manager hasn't noticed the update yet. Polling status.Replicas is not safe in the latter case.
@@ -38,6 +38,10 @@ func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationContro
 		// or, after this check has passed, a modification causes the rc manager to create more pods.
 		// This will not be an issue once we've implemented graceful delete for rcs, but till then
 		// concurrent stop operations on the same rc might have unintended side effects.
-		return ctrl.Status.ObservedGeneration >= desiredGeneration && ctrl.Status.Replicas == ctrl.Spec.Replicas, nil
+		wanted := 1
+		if ctrl.Spec.Replicas != nil {
+			wanted = *ctrl.Spec.Replicas
+		}
+		return ctrl.Status.ObservedGeneration >= desiredGeneration && ctrl.Status.Replicas == wanted, nil
 	}
 }

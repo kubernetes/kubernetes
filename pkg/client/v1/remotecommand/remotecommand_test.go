@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 )
@@ -63,16 +63,16 @@ func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.St
 	defer c.lock.Unlock()
 
 	stream := &fakeUpgradeStream{}
-	switch headers.Get(api.StreamType) {
-	case api.StreamTypeStdin:
+	switch headers.Get(v1api.StreamType) {
+	case v1api.StreamTypeStdin:
 		c.stdin = stream
-	case api.StreamTypeStdout:
+	case v1api.StreamTypeStdout:
 		c.stdout = stream
 		stream.data = c.stdoutData
-	case api.StreamTypeStderr:
+	case v1api.StreamTypeStderr:
 		c.stderr = stream
 		stream.data = c.stderrData
-	case api.StreamTypeError:
+	case v1api.StreamTypeError:
 		c.errorStream = stream
 		stream.data = c.errorData
 	default:

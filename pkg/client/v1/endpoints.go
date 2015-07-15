@@ -19,7 +19,7 @@ package client
 import (
 	"fmt"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -32,11 +32,11 @@ type EndpointsNamespacer interface {
 
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
-	Create(endpoints *api.Endpoints) (*api.Endpoints, error)
-	List(selector labels.Selector) (*api.EndpointsList, error)
-	Get(name string) (*api.Endpoints, error)
+	Create(endpoints *v1api.Endpoints) (*v1api.Endpoints, error)
+	List(selector labels.Selector) (*v1api.EndpointsList, error)
+	Get(name string) (*v1api.Endpoints, error)
 	Delete(name string) error
-	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
+	Update(endpoints *v1api.Endpoints) (*v1api.Endpoints, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -52,15 +52,15 @@ func newEndpoints(c *Client, namespace string) *endpoints {
 }
 
 // Create creates a new endpoint.
-func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	result := &api.Endpoints{}
+func (c *endpoints) Create(endpoints *v1api.Endpoints) (*v1api.Endpoints, error) {
+	result := &v1api.Endpoints{}
 	err := c.r.Post().Namespace(c.ns).Resource("endpoints").Body(endpoints).Do().Into(result)
 	return result, err
 }
 
 // List takes a selector, and returns the list of endpoints that match that selector
-func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, err error) {
-	result = &api.EndpointsList{}
+func (c *endpoints) List(selector labels.Selector) (result *v1api.EndpointsList, err error) {
+	result = &v1api.EndpointsList{}
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -71,8 +71,8 @@ func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, e
 }
 
 // Get returns information about the endpoints for a particular service.
-func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
-	result = &api.Endpoints{}
+func (c *endpoints) Get(name string) (result *v1api.Endpoints, err error) {
+	result = &v1api.Endpoints{}
 	err = c.r.Get().Namespace(c.ns).Resource("endpoints").Name(name).Do().Into(result)
 	return
 }
@@ -94,8 +94,8 @@ func (c *endpoints) Watch(label labels.Selector, field fields.Selector, resource
 		Watch()
 }
 
-func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	result := &api.Endpoints{}
+func (c *endpoints) Update(endpoints *v1api.Endpoints) (*v1api.Endpoints, error) {
+	result := &v1api.Endpoints{}
 	if len(endpoints.ResourceVersion) == 0 {
 		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
 	}

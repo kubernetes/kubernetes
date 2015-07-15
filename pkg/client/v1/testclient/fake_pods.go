@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,29 +30,29 @@ type FakePods struct {
 	Namespace string
 }
 
-func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-pods"}, &api.PodList{})
-	return obj.(*api.PodList), err
+func (c *FakePods) List(label labels.Selector, field fields.Selector) (*v1api.PodList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-pods"}, &v1api.PodList{})
+	return obj.(*v1api.PodList), err
 }
 
-func (c *FakePods) Get(name string) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-pod", Value: name}, &api.Pod{})
-	return obj.(*api.Pod), err
+func (c *FakePods) Get(name string) (*v1api.Pod, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-pod", Value: name}, &v1api.Pod{})
+	return obj.(*v1api.Pod), err
 }
 
-func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-pod", Value: name}, &api.Pod{})
+func (c *FakePods) Delete(name string, options *v1api.DeleteOptions) error {
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-pod", Value: name}, &v1api.Pod{})
 	return err
 }
 
-func (c *FakePods) Create(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-pod"}, &api.Pod{})
-	return obj.(*api.Pod), err
+func (c *FakePods) Create(pod *v1api.Pod) (*v1api.Pod, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-pod"}, &v1api.Pod{})
+	return obj.(*v1api.Pod), err
 }
 
-func (c *FakePods) Update(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-pod", Value: pod.Name}, &api.Pod{})
-	return obj.(*api.Pod), err
+func (c *FakePods) Update(pod *v1api.Pod) (*v1api.Pod, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-pod", Value: pod.Name}, &v1api.Pod{})
+	return obj.(*v1api.Pod), err
 }
 
 func (c *FakePods) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
@@ -60,12 +60,12 @@ func (c *FakePods) Watch(label labels.Selector, field fields.Selector, resourceV
 	return c.Fake.Watch, c.Fake.Err
 }
 
-func (c *FakePods) Bind(bind *api.Binding) error {
+func (c *FakePods) Bind(bind *v1api.Binding) error {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "bind-pod", Value: bind.Name})
 	return nil
 }
 
-func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-pod", Value: pod.Name}, &api.Pod{})
-	return obj.(*api.Pod), err
+func (c *FakePods) UpdateStatus(pod *v1api.Pod) (*v1api.Pod, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-pod", Value: pod.Name}, &v1api.Pod{})
+	return obj.(*v1api.Pod), err
 }

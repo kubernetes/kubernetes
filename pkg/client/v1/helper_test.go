@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 )

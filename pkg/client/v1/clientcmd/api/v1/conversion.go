@@ -25,47 +25,47 @@ import (
 )
 
 func init() {
-	err := api.Scheme.AddConversionFuncs(
-		func(in *Cluster, out *api.Cluster, s conversion.Scope) error {
+	err := v1api.Scheme.AddConversionFuncs(
+		func(in *Cluster, out *v1api.Cluster, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *api.Cluster, out *Cluster, s conversion.Scope) error {
+		func(in *v1api.Cluster, out *Cluster, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *Preferences, out *api.Preferences, s conversion.Scope) error {
+		func(in *Preferences, out *v1api.Preferences, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *api.Preferences, out *Preferences, s conversion.Scope) error {
+		func(in *v1api.Preferences, out *Preferences, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *AuthInfo, out *api.AuthInfo, s conversion.Scope) error {
+		func(in *AuthInfo, out *v1api.AuthInfo, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *api.AuthInfo, out *AuthInfo, s conversion.Scope) error {
+		func(in *v1api.AuthInfo, out *AuthInfo, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *Context, out *api.Context, s conversion.Scope) error {
+		func(in *Context, out *v1api.Context, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *api.Context, out *Context, s conversion.Scope) error {
+		func(in *v1api.Context, out *Context, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
 
-		func(in *Config, out *api.Config, s conversion.Scope) error {
+		func(in *Config, out *v1api.Config, s conversion.Scope) error {
 			out.CurrentContext = in.CurrentContext
 			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {
 				return err
 			}
 
-			out.Clusters = make(map[string]api.Cluster)
+			out.Clusters = make(map[string]v1api.Cluster)
 			if err := s.Convert(&in.Clusters, &out.Clusters, 0); err != nil {
 				return err
 			}
-			out.AuthInfos = make(map[string]api.AuthInfo)
+			out.AuthInfos = make(map[string]v1api.AuthInfo)
 			if err := s.Convert(&in.AuthInfos, &out.AuthInfos, 0); err != nil {
 				return err
 			}
-			out.Contexts = make(map[string]api.Context)
+			out.Contexts = make(map[string]v1api.Context)
 			if err := s.Convert(&in.Contexts, &out.Contexts, 0); err != nil {
 				return err
 			}
@@ -75,7 +75,7 @@ func init() {
 			}
 			return nil
 		},
-		func(in *api.Config, out *Config, s conversion.Scope) error {
+		func(in *v1api.Config, out *Config, s conversion.Scope) error {
 			out.CurrentContext = in.CurrentContext
 			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {
 				return err
@@ -99,9 +99,9 @@ func init() {
 			}
 			return nil
 		},
-		func(in *[]NamedCluster, out *map[string]api.Cluster, s conversion.Scope) error {
+		func(in *[]NamedCluster, out *map[string]v1api.Cluster, s conversion.Scope) error {
 			for _, curr := range *in {
-				newCluster := api.NewCluster()
+				newCluster := v1api.NewCluster()
 				if err := s.Convert(&curr.Cluster, newCluster, 0); err != nil {
 					return err
 				}
@@ -110,7 +110,7 @@ func init() {
 
 			return nil
 		},
-		func(in *map[string]api.Cluster, out *[]NamedCluster, s conversion.Scope) error {
+		func(in *map[string]v1api.Cluster, out *[]NamedCluster, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)
@@ -130,9 +130,9 @@ func init() {
 
 			return nil
 		},
-		func(in *[]NamedAuthInfo, out *map[string]api.AuthInfo, s conversion.Scope) error {
+		func(in *[]NamedAuthInfo, out *map[string]v1api.AuthInfo, s conversion.Scope) error {
 			for _, curr := range *in {
-				newAuthInfo := api.NewAuthInfo()
+				newAuthInfo := v1api.NewAuthInfo()
 				if err := s.Convert(&curr.AuthInfo, newAuthInfo, 0); err != nil {
 					return err
 				}
@@ -141,7 +141,7 @@ func init() {
 
 			return nil
 		},
-		func(in *map[string]api.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
+		func(in *map[string]v1api.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)
@@ -161,9 +161,9 @@ func init() {
 
 			return nil
 		},
-		func(in *[]NamedContext, out *map[string]api.Context, s conversion.Scope) error {
+		func(in *[]NamedContext, out *map[string]v1api.Context, s conversion.Scope) error {
 			for _, curr := range *in {
-				newContext := api.NewContext()
+				newContext := v1api.NewContext()
 				if err := s.Convert(&curr.Context, newContext, 0); err != nil {
 					return err
 				}
@@ -172,7 +172,7 @@ func init() {
 
 			return nil
 		},
-		func(in *map[string]api.Context, out *[]NamedContext, s conversion.Scope) error {
+		func(in *map[string]v1api.Context, out *[]NamedContext, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)

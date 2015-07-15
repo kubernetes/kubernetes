@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -31,27 +31,27 @@ type FakeEvents struct {
 }
 
 // Create makes a new event. Returns the copy of the event the server returns, or an error.
-func (c *FakeEvents) Create(event *api.Event) (*api.Event, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-event", Value: event.Name}, &api.Event{})
-	return obj.(*api.Event), err
+func (c *FakeEvents) Create(event *v1api.Event) (*v1api.Event, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-event", Value: event.Name}, &v1api.Event{})
+	return obj.(*v1api.Event), err
 }
 
 // Update replaces an existing event. Returns the copy of the event the server returns, or an error.
-func (c *FakeEvents) Update(event *api.Event) (*api.Event, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-event", Value: event.Name}, &api.Event{})
-	return obj.(*api.Event), err
+func (c *FakeEvents) Update(event *v1api.Event) (*v1api.Event, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-event", Value: event.Name}, &v1api.Event{})
+	return obj.(*v1api.Event), err
 }
 
 // List returns a list of events matching the selectors.
-func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-events"}, &api.EventList{})
-	return obj.(*api.EventList), err
+func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*v1api.EventList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-events"}, &v1api.EventList{})
+	return obj.(*v1api.EventList), err
 }
 
 // Get returns the given event, or an error.
-func (c *FakeEvents) Get(id string) (*api.Event, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-endpoints", Value: id}, &api.Event{})
-	return obj.(*api.Event), err
+func (c *FakeEvents) Get(id string) (*v1api.Event, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-endpoints", Value: id}, &v1api.Event{})
+	return obj.(*v1api.Event), err
 }
 
 // Watch starts watching for events matching the given selectors.
@@ -61,13 +61,13 @@ func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, resourc
 }
 
 // Search returns a list of events matching the specified object.
-func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "search-events"}, &api.EventList{})
-	return obj.(*api.EventList), err
+func (c *FakeEvents) Search(objOrRef runtime.Object) (*v1api.EventList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "search-events"}, &v1api.EventList{})
+	return obj.(*v1api.EventList), err
 }
 
 func (c *FakeEvents) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-event", Value: name}, &api.Event{})
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-event", Value: name}, &v1api.Event{})
 	return err
 }
 

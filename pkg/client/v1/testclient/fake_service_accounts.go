@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,28 +30,28 @@ type FakeServiceAccounts struct {
 	Namespace string
 }
 
-func (c *FakeServiceAccounts) List(labels labels.Selector, field fields.Selector) (*api.ServiceAccountList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-serviceaccounts"}, &api.ServiceAccountList{})
-	return obj.(*api.ServiceAccountList), err
+func (c *FakeServiceAccounts) List(labels labels.Selector, field fields.Selector) (*v1api.ServiceAccountList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-serviceaccounts"}, &v1api.ServiceAccountList{})
+	return obj.(*v1api.ServiceAccountList), err
 }
 
-func (c *FakeServiceAccounts) Get(name string) (*api.ServiceAccount, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-serviceaccount", Value: name}, &api.ServiceAccount{})
-	return obj.(*api.ServiceAccount), err
+func (c *FakeServiceAccounts) Get(name string) (*v1api.ServiceAccount, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-serviceaccount", Value: name}, &v1api.ServiceAccount{})
+	return obj.(*v1api.ServiceAccount), err
 }
 
-func (c *FakeServiceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-serviceaccount", Value: serviceAccount}, &api.ServiceAccount{})
-	return obj.(*api.ServiceAccount), err
+func (c *FakeServiceAccounts) Create(serviceAccount *v1api.ServiceAccount) (*v1api.ServiceAccount, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-serviceaccount", Value: serviceAccount}, &v1api.ServiceAccount{})
+	return obj.(*v1api.ServiceAccount), err
 }
 
-func (c *FakeServiceAccounts) Update(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-serviceaccount", Value: serviceAccount}, &api.ServiceAccount{})
-	return obj.(*api.ServiceAccount), err
+func (c *FakeServiceAccounts) Update(serviceAccount *v1api.ServiceAccount) (*v1api.ServiceAccount, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-serviceaccount", Value: serviceAccount}, &v1api.ServiceAccount{})
+	return obj.(*v1api.ServiceAccount), err
 }
 
 func (c *FakeServiceAccounts) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-serviceaccount", Value: name}, &api.ServiceAccount{})
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-serviceaccount", Value: name}, &v1api.ServiceAccount{})
 	return err
 }
 

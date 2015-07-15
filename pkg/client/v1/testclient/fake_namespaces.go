@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -29,29 +29,29 @@ type FakeNamespaces struct {
 	Fake *Fake
 }
 
-func (c *FakeNamespaces) List(labels labels.Selector, field fields.Selector) (*api.NamespaceList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-namespaces"}, &api.NamespaceList{})
-	return obj.(*api.NamespaceList), err
+func (c *FakeNamespaces) List(labels labels.Selector, field fields.Selector) (*v1api.NamespaceList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-namespaces"}, &v1api.NamespaceList{})
+	return obj.(*v1api.NamespaceList), err
 }
 
-func (c *FakeNamespaces) Get(name string) (*api.Namespace, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-namespace", Value: name}, &api.Namespace{})
-	return obj.(*api.Namespace), err
+func (c *FakeNamespaces) Get(name string) (*v1api.Namespace, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-namespace", Value: name}, &v1api.Namespace{})
+	return obj.(*v1api.Namespace), err
 }
 
 func (c *FakeNamespaces) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-namespace", Value: name}, &api.Namespace{})
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-namespace", Value: name}, &v1api.Namespace{})
 	return err
 }
 
-func (c *FakeNamespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
+func (c *FakeNamespaces) Create(namespace *v1api.Namespace) (*v1api.Namespace, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-namespace"})
-	return &api.Namespace{}, c.Fake.Err
+	return &v1api.Namespace{}, c.Fake.Err
 }
 
-func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-namespace", Value: namespace}, &api.Namespace{})
-	return obj.(*api.Namespace), err
+func (c *FakeNamespaces) Update(namespace *v1api.Namespace) (*v1api.Namespace, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-namespace", Value: namespace}, &v1api.Namespace{})
+	return obj.(*v1api.Namespace), err
 }
 
 func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
@@ -59,12 +59,12 @@ func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, res
 	return c.Fake.Watch, nil
 }
 
-func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "finalize-namespace", Value: namespace}, &api.Namespace{})
-	return obj.(*api.Namespace), err
+func (c *FakeNamespaces) Finalize(namespace *v1api.Namespace) (*v1api.Namespace, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "finalize-namespace", Value: namespace}, &v1api.Namespace{})
+	return obj.(*v1api.Namespace), err
 }
 
-func (c *FakeNamespaces) Status(namespace *api.Namespace) (*api.Namespace, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "status-namespace", Value: namespace}, &api.Namespace{})
-	return obj.(*api.Namespace), err
+func (c *FakeNamespaces) Status(namespace *v1api.Namespace) (*v1api.Namespace, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "status-namespace", Value: namespace}, &v1api.Namespace{})
+	return obj.(*v1api.Namespace), err
 }

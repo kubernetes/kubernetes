@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,29 +30,29 @@ type FakePodTemplates struct {
 	Namespace string
 }
 
-func (c *FakePodTemplates) List(label labels.Selector, field fields.Selector) (*api.PodTemplateList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-podTemplates"}, &api.PodTemplateList{})
-	return obj.(*api.PodTemplateList), err
+func (c *FakePodTemplates) List(label labels.Selector, field fields.Selector) (*v1api.PodTemplateList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-podTemplates"}, &v1api.PodTemplateList{})
+	return obj.(*v1api.PodTemplateList), err
 }
 
-func (c *FakePodTemplates) Get(name string) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-podTemplate", Value: name}, &api.PodTemplate{})
-	return obj.(*api.PodTemplate), err
+func (c *FakePodTemplates) Get(name string) (*v1api.PodTemplate, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-podTemplate", Value: name}, &v1api.PodTemplate{})
+	return obj.(*v1api.PodTemplate), err
 }
 
-func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-podTemplate", Value: name}, &api.PodTemplate{})
+func (c *FakePodTemplates) Delete(name string, options *v1api.DeleteOptions) error {
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-podTemplate", Value: name}, &v1api.PodTemplate{})
 	return err
 }
 
-func (c *FakePodTemplates) Create(pod *api.PodTemplate) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-podTemplate"}, &api.PodTemplate{})
-	return obj.(*api.PodTemplate), err
+func (c *FakePodTemplates) Create(pod *v1api.PodTemplate) (*v1api.PodTemplate, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-podTemplate"}, &v1api.PodTemplate{})
+	return obj.(*v1api.PodTemplate), err
 }
 
-func (c *FakePodTemplates) Update(pod *api.PodTemplate) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-podTemplate", Value: pod.Name}, &api.PodTemplate{})
-	return obj.(*api.PodTemplate), err
+func (c *FakePodTemplates) Update(pod *v1api.PodTemplate) (*v1api.PodTemplate, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-podTemplate", Value: pod.Name}, &v1api.PodTemplate{})
+	return obj.(*v1api.PodTemplate), err
 }
 
 func (c *FakePodTemplates) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {

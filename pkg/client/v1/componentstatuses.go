@@ -17,7 +17,7 @@ limitations under the License.
 package client
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -28,8 +28,8 @@ type ComponentStatusesInterface interface {
 
 // ComponentStatusInterface contains methods to retrieve ComponentStatus
 type ComponentStatusInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.ComponentStatusList, error)
-	Get(name string) (*api.ComponentStatus, error)
+	List(label labels.Selector, field fields.Selector) (*v1api.ComponentStatusList, error)
+	Get(name string) (*v1api.ComponentStatus, error)
 
 	// TODO: It'd be nice to have watch support at some point
 	//Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -44,8 +44,8 @@ func newComponentStatuses(c *Client) *componentStatuses {
 	return &componentStatuses{c}
 }
 
-func (c *componentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
-	result = &api.ComponentStatusList{}
+func (c *componentStatuses) List(label labels.Selector, field fields.Selector) (result *v1api.ComponentStatusList, err error) {
+	result = &v1api.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentStatuses").
 		LabelsSelectorParam(label).
@@ -56,8 +56,8 @@ func (c *componentStatuses) List(label labels.Selector, field fields.Selector) (
 	return result, err
 }
 
-func (c *componentStatuses) Get(name string) (result *api.ComponentStatus, err error) {
-	result = &api.ComponentStatus{}
+func (c *componentStatuses) Get(name string) (result *v1api.ComponentStatus, err error) {
+	result = &v1api.ComponentStatus{}
 	err = c.client.Get().Resource("componentStatuses").Name(name).Do().Into(result)
 	return
 }

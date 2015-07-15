@@ -19,7 +19,7 @@ package record
 import (
 	"sync"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/groupcache/lru"
 )
@@ -51,7 +51,7 @@ var previousEvents = historyCache{cache: lru.New(maxLruCacheEntries)}
 
 // addOrUpdateEvent creates a new entry for the given event in the previous events hash table if the event
 // doesn't already exist, otherwise it updates the existing entry.
-func addOrUpdateEvent(newEvent *api.Event) history {
+func addOrUpdateEvent(newEvent *v1api.Event) history {
 	key := getEventKey(newEvent)
 	previousEvents.Lock()
 	defer previousEvents.Unlock()
@@ -68,7 +68,7 @@ func addOrUpdateEvent(newEvent *api.Event) history {
 
 // getEvent returns the entry corresponding to the given event, if one exists, otherwise a history object
 // with a count of 0 is returned.
-func getEvent(event *api.Event) history {
+func getEvent(event *v1api.Event) history {
 	key := getEventKey(event)
 	previousEvents.RLock()
 	defer previousEvents.RUnlock()
@@ -86,7 +86,7 @@ func getEventFromCache(key string) history {
 	return history{}
 }
 
-func getEventKey(event *api.Event) string {
+func getEventKey(event *v1api.Event) string {
 	return event.Source.Component +
 		event.Source.Host +
 		event.InvolvedObject.Kind +

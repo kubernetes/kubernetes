@@ -17,7 +17,7 @@ limitations under the License.
 package client
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,11 +30,11 @@ type PodTemplatesNamespacer interface {
 
 // PodTemplateInterface has methods to work with PodTemplate resources.
 type PodTemplateInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.PodTemplateList, error)
-	Get(name string) (*api.PodTemplate, error)
-	Delete(name string, options *api.DeleteOptions) error
-	Create(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
-	Update(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
+	List(label labels.Selector, field fields.Selector) (*v1api.PodTemplateList, error)
+	Get(name string) (*v1api.PodTemplate, error)
+	Delete(name string, options *v1api.DeleteOptions) error
+	Create(podTemplate *v1api.PodTemplate) (*v1api.PodTemplate, error)
+	Update(podTemplate *v1api.PodTemplate) (*v1api.PodTemplate, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -53,26 +53,26 @@ func newPodTemplates(c *Client, namespace string) *podTemplates {
 }
 
 // List takes label and field selectors, and returns the list of podTemplates that match those selectors.
-func (c *podTemplates) List(label labels.Selector, field fields.Selector) (result *api.PodTemplateList, err error) {
-	result = &api.PodTemplateList{}
+func (c *podTemplates) List(label labels.Selector, field fields.Selector) (result *v1api.PodTemplateList, err error) {
+	result = &v1api.PodTemplateList{}
 	err = c.r.Get().Namespace(c.ns).Resource("podTemplates").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes the name of the podTemplate, and returns the corresponding PodTemplate object, and an error if it occurs
-func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
-	result = &api.PodTemplate{}
+func (c *podTemplates) Get(name string) (result *v1api.PodTemplate, err error) {
+	result = &v1api.PodTemplate{}
 	err = c.r.Get().Namespace(c.ns).Resource("podTemplates").Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes the name of the podTemplate, and returns an error if one occurs
-func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
+func (c *podTemplates) Delete(name string, options *v1api.DeleteOptions) error {
 	// TODO: to make this reusable in other client libraries
 	if options == nil {
 		return c.r.Delete().Namespace(c.ns).Resource("podTemplates").Name(name).Do().Error()
 	}
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
+	body, err := v1api.Codec.Encode(options)
 	if err != nil {
 		return err
 	}
@@ -80,15 +80,15 @@ func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // Create takes the representation of a podTemplate.  Returns the server's representation of the podTemplate, and an error, if it occurs.
-func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
-	result = &api.PodTemplate{}
+func (c *podTemplates) Create(podTemplate *v1api.PodTemplate) (result *v1api.PodTemplate, err error) {
+	result = &v1api.PodTemplate{}
 	err = c.r.Post().Namespace(c.ns).Resource("podTemplates").Body(podTemplate).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a podTemplate to update.  Returns the server's representation of the podTemplate, and an error, if it occurs.
-func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
-	result = &api.PodTemplate{}
+func (c *podTemplates) Update(podTemplate *v1api.PodTemplate) (result *v1api.PodTemplate, err error) {
+	result = &v1api.PodTemplate{}
 	err = c.r.Put().Namespace(c.ns).Resource("podTemplates").Name(podTemplate.Name).Body(podTemplate).Do().Into(result)
 	return
 }

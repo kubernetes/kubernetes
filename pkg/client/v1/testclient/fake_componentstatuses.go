@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -27,13 +27,13 @@ type FakeComponentStatuses struct {
 	Fake *Fake
 }
 
-func (c *FakeComponentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-componentstatuses"}, &api.ComponentStatusList{})
-	return obj.(*api.ComponentStatusList), err
+func (c *FakeComponentStatuses) List(label labels.Selector, field fields.Selector) (result *v1api.ComponentStatusList, err error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-componentstatuses"}, &v1api.ComponentStatusList{})
+	return obj.(*v1api.ComponentStatusList), err
 }
 
-func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-componentstatus", Value: name}, &api.ComponentStatus{})
+func (c *FakeComponentStatuses) Get(name string) (*v1api.ComponentStatus, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-componentstatus", Value: name}, &v1api.ComponentStatus{})
 	//   c.Actions = append(c.Actions, FakeAction{Action: "get-componentstatuses", Value: nil})
 	// testStatus := &api.ComponentStatus{
 	//   Name:       "test",
@@ -43,5 +43,5 @@ func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
 	//   Error:      "",
 	// }
 	// return &api.ComponentStatusList{Items: []api.ComponentStatus{*testStatus}}, nil
-	return obj.(*api.ComponentStatus), err
+	return obj.(*v1api.ComponentStatus), err
 }

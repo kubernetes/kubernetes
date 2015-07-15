@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -28,34 +28,34 @@ type FakePersistentVolumes struct {
 	Namespace string
 }
 
-func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-persistentVolumes"}, &api.PersistentVolumeList{})
-	return obj.(*api.PersistentVolumeList), err
+func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector) (*v1api.PersistentVolumeList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-persistentVolumes"}, &v1api.PersistentVolumeList{})
+	return obj.(*v1api.PersistentVolumeList), err
 }
 
-func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-persistentVolumes", Value: name}, &api.PersistentVolume{})
-	return obj.(*api.PersistentVolume), err
+func (c *FakePersistentVolumes) Get(name string) (*v1api.PersistentVolume, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-persistentVolumes", Value: name}, &v1api.PersistentVolume{})
+	return obj.(*v1api.PersistentVolume), err
 }
 
 func (c *FakePersistentVolumes) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-persistentVolumes", Value: name}, &api.PersistentVolume{})
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-persistentVolumes", Value: name}, &v1api.PersistentVolume{})
 	return err
 }
 
-func (c *FakePersistentVolumes) Create(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-persistentVolumes"}, &api.PersistentVolume{})
-	return obj.(*api.PersistentVolume), err
+func (c *FakePersistentVolumes) Create(pv *v1api.PersistentVolume) (*v1api.PersistentVolume, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-persistentVolumes"}, &v1api.PersistentVolume{})
+	return obj.(*v1api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) Update(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-persistentVolumes", Value: pv.Name}, &api.PersistentVolume{})
-	return obj.(*api.PersistentVolume), err
+func (c *FakePersistentVolumes) Update(pv *v1api.PersistentVolume) (*v1api.PersistentVolume, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-persistentVolumes", Value: pv.Name}, &v1api.PersistentVolume{})
+	return obj.(*v1api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-persistentVolumes", Value: pv}, &api.PersistentVolume{})
-	return obj.(*api.PersistentVolume), err
+func (c *FakePersistentVolumes) UpdateStatus(pv *v1api.PersistentVolume) (*v1api.PersistentVolume, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-persistentVolumes", Value: pv}, &v1api.PersistentVolume{})
+	return obj.(*v1api.PersistentVolume), err
 }
 
 func (c *FakePersistentVolumes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {

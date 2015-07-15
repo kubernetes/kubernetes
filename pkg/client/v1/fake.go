@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"net/url"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )

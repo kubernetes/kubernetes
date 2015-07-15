@@ -22,8 +22,8 @@ import (
 
 	"github.com/golang/glog"
 
-	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 )
 
 // DeferredLoadingClientConfig is a ClientConfig interface that is backed by a set of loading rules

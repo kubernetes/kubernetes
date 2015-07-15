@@ -22,9 +22,9 @@ import (
 	"reflect"
 	"strings"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 )
@@ -168,11 +168,11 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 	}
 	o.last[kind] = index + 1
 
-	if status, ok := out.(*api.Status); ok {
+	if status, ok := out.(*v1api.Status); ok {
 		if status.Details != nil {
 			status.Details.Kind = kind
 		}
-		if status.Status != api.StatusSuccess {
+		if status.Status != v1api.StatusSuccess {
 			return nilValue, &errors.StatusError{*status}
 		}
 	}
@@ -205,7 +205,7 @@ func (o objects) Add(obj runtime.Object) error {
 			}
 		}
 	default:
-		if status, ok := obj.(*api.Status); ok && status.Details != nil {
+		if status, ok := obj.(*v1api.Status); ok && status.Details != nil {
 			kind = status.Details.Kind
 		}
 		o.types[kind] = append(o.types[kind], obj)

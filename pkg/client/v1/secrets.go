@@ -17,7 +17,7 @@ limitations under the License.
 package client
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -28,11 +28,11 @@ type SecretsNamespacer interface {
 }
 
 type SecretsInterface interface {
-	Create(secret *api.Secret) (*api.Secret, error)
-	Update(secret *api.Secret) (*api.Secret, error)
+	Create(secret *v1api.Secret) (*v1api.Secret, error)
+	Update(secret *v1api.Secret) (*v1api.Secret, error)
 	Delete(name string) error
-	List(label labels.Selector, field fields.Selector) (*api.SecretList, error)
-	Get(name string) (*api.Secret, error)
+	List(label labels.Selector, field fields.Selector) (*v1api.SecretList, error)
+	Get(name string) (*v1api.Secret, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -50,8 +50,8 @@ func newSecrets(c *Client, ns string) *secrets {
 	}
 }
 
-func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
-	result := &api.Secret{}
+func (s *secrets) Create(secret *v1api.Secret) (*v1api.Secret, error) {
+	result := &v1api.Secret{}
 	err := s.client.Post().
 		Namespace(s.namespace).
 		Resource("secrets").
@@ -63,8 +63,8 @@ func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
 }
 
 // List returns a list of secrets matching the selectors.
-func (s *secrets) List(label labels.Selector, field fields.Selector) (*api.SecretList, error) {
-	result := &api.SecretList{}
+func (s *secrets) List(label labels.Selector, field fields.Selector) (*v1api.SecretList, error) {
+	result := &v1api.SecretList{}
 
 	err := s.client.Get().
 		Namespace(s.namespace).
@@ -78,8 +78,8 @@ func (s *secrets) List(label labels.Selector, field fields.Selector) (*api.Secre
 }
 
 // Get returns the given secret, or an error.
-func (s *secrets) Get(name string) (*api.Secret, error) {
-	result := &api.Secret{}
+func (s *secrets) Get(name string) (*v1api.Secret, error) {
+	result := &v1api.Secret{}
 	err := s.client.Get().
 		Namespace(s.namespace).
 		Resource("secrets").
@@ -111,8 +111,8 @@ func (s *secrets) Delete(name string) error {
 		Error()
 }
 
-func (s *secrets) Update(secret *api.Secret) (result *api.Secret, err error) {
-	result = &api.Secret{}
+func (s *secrets) Update(secret *v1api.Secret) (result *v1api.Secret, err error) {
+	result = &v1api.Secret{}
 	err = s.client.Put().
 		Namespace(s.namespace).
 		Resource("secrets").

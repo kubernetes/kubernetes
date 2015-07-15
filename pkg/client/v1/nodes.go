@@ -19,7 +19,7 @@ package client
 import (
 	"fmt"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,12 +30,12 @@ type NodesInterface interface {
 }
 
 type NodeInterface interface {
-	Get(name string) (result *api.Node, err error)
-	Create(node *api.Node) (*api.Node, error)
-	List(label labels.Selector, field fields.Selector) (*api.NodeList, error)
+	Get(name string) (result *v1api.Node, err error)
+	Create(node *v1api.Node) (*v1api.Node, error)
+	List(label labels.Selector, field fields.Selector) (*v1api.NodeList, error)
 	Delete(name string) error
-	Update(*api.Node) (*api.Node, error)
-	UpdateStatus(*api.Node) (*api.Node, error)
+	Update(*v1api.Node) (*v1api.Node, error)
+	UpdateStatus(*v1api.Node) (*v1api.Node, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -52,29 +52,26 @@ func newNodes(c *Client) *nodes {
 // resourceName returns node's URL resource name based on resource version.
 // Uses "minions" as the URL resource name for v1beta1 and v1beta2.
 func (c *nodes) resourceName() string {
-	if api.PreV1Beta3(c.r.APIVersion()) {
-		return "minions"
-	}
 	return "nodes"
 }
 
 // Create creates a new node.
-func (c *nodes) Create(node *api.Node) (*api.Node, error) {
-	result := &api.Node{}
+func (c *nodes) Create(node *v1api.Node) (*v1api.Node, error) {
+	result := &v1api.Node{}
 	err := c.r.Post().Resource(c.resourceName()).Body(node).Do().Into(result)
 	return result, err
 }
 
 // List takes a selector, and returns the list of nodes that match that selector in the cluster.
-func (c *nodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
-	result := &api.NodeList{}
+func (c *nodes) List(label labels.Selector, field fields.Selector) (*v1api.NodeList, error) {
+	result := &v1api.NodeList{}
 	err := c.r.Get().Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return result, err
 }
 
 // Get gets an existing node.
-func (c *nodes) Get(name string) (*api.Node, error) {
-	result := &api.Node{}
+func (c *nodes) Get(name string) (*v1api.Node, error) {
+	result := &v1api.Node{}
 	err := c.r.Get().Resource(c.resourceName()).Name(name).Do().Into(result)
 	return result, err
 }
@@ -85,8 +82,8 @@ func (c *nodes) Delete(name string) error {
 }
 
 // Update updates an existing node.
-func (c *nodes) Update(node *api.Node) (*api.Node, error) {
-	result := &api.Node{}
+func (c *nodes) Update(node *v1api.Node) (*v1api.Node, error) {
+	result := &v1api.Node{}
 	if len(node.ResourceVersion) == 0 {
 		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
@@ -95,8 +92,8 @@ func (c *nodes) Update(node *api.Node) (*api.Node, error) {
 	return result, err
 }
 
-func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
-	result := &api.Node{}
+func (c *nodes) UpdateStatus(node *v1api.Node) (*v1api.Node, error) {
+	result := &v1api.Node{}
 	if len(node.ResourceVersion) == 0 {
 		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
@@ -109,7 +106,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 func (c *nodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
-		Namespace(api.NamespaceAll).
+		Namespace(v1api.NamespaceAll).
 		Resource(c.resourceName()).
 		Param("resourceVersion", resourceVersion).
 		LabelsSelectorParam(label).

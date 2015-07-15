@@ -17,7 +17,7 @@ limitations under the License.
 package client
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,14 +30,14 @@ type PodsNamespacer interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.PodList, error)
-	Get(name string) (*api.Pod, error)
-	Delete(name string, options *api.DeleteOptions) error
-	Create(pod *api.Pod) (*api.Pod, error)
-	Update(pod *api.Pod) (*api.Pod, error)
+	List(label labels.Selector, field fields.Selector) (*v1api.PodList, error)
+	Get(name string) (*v1api.Pod, error)
+	Delete(name string, options *v1api.DeleteOptions) error
+	Create(pod *v1api.Pod) (*v1api.Pod, error)
+	Update(pod *v1api.Pod) (*v1api.Pod, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
-	Bind(binding *api.Binding) error
-	UpdateStatus(pod *api.Pod) (*api.Pod, error)
+	Bind(binding *v1api.Binding) error
+	UpdateStatus(pod *v1api.Pod) (*v1api.Pod, error)
 }
 
 // pods implements PodsNamespacer interface
@@ -55,26 +55,26 @@ func newPods(c *Client, namespace string) *pods {
 }
 
 // List takes label and field selectors, and returns the list of pods that match those selectors.
-func (c *pods) List(label labels.Selector, field fields.Selector) (result *api.PodList, err error) {
-	result = &api.PodList{}
+func (c *pods) List(label labels.Selector, field fields.Selector) (result *v1api.PodList, err error) {
+	result = &v1api.PodList{}
 	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
 // Get takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
-func (c *pods) Get(name string) (result *api.Pod, err error) {
-	result = &api.Pod{}
+func (c *pods) Get(name string) (result *v1api.Pod, err error) {
+	result = &v1api.Pod{}
 	err = c.r.Get().Namespace(c.ns).Resource("pods").Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes the name of the pod, and returns an error if one occurs
-func (c *pods) Delete(name string, options *api.DeleteOptions) error {
+func (c *pods) Delete(name string, options *v1api.DeleteOptions) error {
 	// TODO: to make this reusable in other client libraries
 	if options == nil {
 		return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
 	}
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
+	body, err := v1api.Codec.Encode(options)
 	if err != nil {
 		return err
 	}
@@ -82,15 +82,15 @@ func (c *pods) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
-	result = &api.Pod{}
+func (c *pods) Create(pod *v1api.Pod) (result *v1api.Pod, err error) {
+	result = &v1api.Pod{}
 	err = c.r.Post().Namespace(c.ns).Resource("pods").Body(pod).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
-	result = &api.Pod{}
+func (c *pods) Update(pod *v1api.Pod) (result *v1api.Pod, err error) {
+	result = &v1api.Pod{}
 	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).Body(pod).Do().Into(result)
 	return
 }
@@ -108,13 +108,13 @@ func (c *pods) Watch(label labels.Selector, field fields.Selector, resourceVersi
 }
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
-func (c *pods) Bind(binding *api.Binding) error {
+func (c *pods) Bind(binding *v1api.Binding) error {
 	return c.r.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
 }
 
 // UpdateStatus takes the name of the pod and the new status.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
-	result = &api.Pod{}
+func (c *pods) UpdateStatus(pod *v1api.Pod) (result *v1api.Pod, err error) {
+	result = &v1api.Pod{}
 	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).SubResource("status").Body(pod).Do().Into(result)
 	return
 }

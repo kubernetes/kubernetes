@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,28 +30,28 @@ type FakeSecrets struct {
 	Namespace string
 }
 
-func (c *FakeSecrets) List(labels labels.Selector, field fields.Selector) (*api.SecretList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-secrets"}, &api.SecretList{})
-	return obj.(*api.SecretList), err
+func (c *FakeSecrets) List(labels labels.Selector, field fields.Selector) (*v1api.SecretList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-secrets"}, &v1api.SecretList{})
+	return obj.(*v1api.SecretList), err
 }
 
-func (c *FakeSecrets) Get(name string) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-secret", Value: name}, &api.Secret{})
-	return obj.(*api.Secret), err
+func (c *FakeSecrets) Get(name string) (*v1api.Secret, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-secret", Value: name}, &v1api.Secret{})
+	return obj.(*v1api.Secret), err
 }
 
-func (c *FakeSecrets) Create(secret *api.Secret) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-secret", Value: secret}, &api.Secret{})
-	return obj.(*api.Secret), err
+func (c *FakeSecrets) Create(secret *v1api.Secret) (*v1api.Secret, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-secret", Value: secret}, &v1api.Secret{})
+	return obj.(*v1api.Secret), err
 }
 
-func (c *FakeSecrets) Update(secret *api.Secret) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-secret", Value: secret}, &api.Secret{})
-	return obj.(*api.Secret), err
+func (c *FakeSecrets) Update(secret *v1api.Secret) (*v1api.Secret, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-secret", Value: secret}, &v1api.Secret{})
+	return obj.(*v1api.Secret), err
 }
 
 func (c *FakeSecrets) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-secret", Value: name}, &api.Secret{})
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-secret", Value: name}, &v1api.Secret{})
 	return err
 }
 

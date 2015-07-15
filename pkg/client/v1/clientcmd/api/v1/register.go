@@ -22,10 +22,10 @@ import (
 )
 
 // Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, "v1")
+var Codec = runtime.CodecFor(v1api.Scheme, "v1")
 
 func init() {
-	api.Scheme.AddKnownTypes("v1",
+	v1api.Scheme.AddKnownTypes("v1",
 		&Config{},
 	)
 }

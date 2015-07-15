@@ -29,8 +29,8 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -241,12 +241,12 @@ func NewOrDie(c *Config) *Client {
 // running inside a pod running on kuberenetes. It will return an error if
 // called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountTokenKey)
+	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + v1api.ServiceAccountTokenKey)
 	if err != nil {
 		return nil, err
 	}
 	tlsClientConfig := TLSClientConfig{}
-	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
+	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + v1api.ServiceAccountRootCAKey
 	if _, err := util.CertPoolFromFile(rootCAFile); err != nil {
 		glog.Errorf("expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {

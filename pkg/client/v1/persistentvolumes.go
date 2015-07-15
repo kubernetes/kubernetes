@@ -19,7 +19,7 @@ package client
 import (
 	"fmt"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -31,11 +31,11 @@ type PersistentVolumesInterface interface {
 
 // PersistentVolumeInterface has methods to work with PersistentVolume resources.
 type PersistentVolumeInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error)
-	Get(name string) (*api.PersistentVolume, error)
-	Create(volume *api.PersistentVolume) (*api.PersistentVolume, error)
-	Update(volume *api.PersistentVolume) (*api.PersistentVolume, error)
-	UpdateStatus(persistentVolume *api.PersistentVolume) (*api.PersistentVolume, error)
+	List(label labels.Selector, field fields.Selector) (*v1api.PersistentVolumeList, error)
+	Get(name string) (*v1api.PersistentVolume, error)
+	Create(volume *v1api.PersistentVolume) (*v1api.PersistentVolume, error)
+	Update(volume *v1api.PersistentVolume) (*v1api.PersistentVolume, error)
+	UpdateStatus(persistentVolume *v1api.PersistentVolume) (*v1api.PersistentVolume, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -49,8 +49,8 @@ func newPersistentVolumes(c *Client) *persistentVolumes {
 	return &persistentVolumes{c}
 }
 
-func (c *persistentVolumes) List(label labels.Selector, field fields.Selector) (result *api.PersistentVolumeList, err error) {
-	result = &api.PersistentVolumeList{}
+func (c *persistentVolumes) List(label labels.Selector, field fields.Selector) (result *v1api.PersistentVolumeList, err error) {
+	result = &v1api.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentVolumes").
 		LabelsSelectorParam(label).
@@ -61,20 +61,20 @@ func (c *persistentVolumes) List(label labels.Selector, field fields.Selector) (
 	return result, err
 }
 
-func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err error) {
-	result = &api.PersistentVolume{}
+func (c *persistentVolumes) Get(name string) (result *v1api.PersistentVolume, err error) {
+	result = &v1api.PersistentVolume{}
 	err = c.client.Get().Resource("persistentVolumes").Name(name).Do().Into(result)
 	return
 }
 
-func (c *persistentVolumes) Create(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
-	result = &api.PersistentVolume{}
+func (c *persistentVolumes) Create(volume *v1api.PersistentVolume) (result *v1api.PersistentVolume, err error) {
+	result = &v1api.PersistentVolume{}
 	err = c.client.Post().Resource("persistentVolumes").Body(volume).Do().Into(result)
 	return
 }
 
-func (c *persistentVolumes) Update(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
-	result = &api.PersistentVolume{}
+func (c *persistentVolumes) Update(volume *v1api.PersistentVolume) (result *v1api.PersistentVolume, err error) {
+	result = &v1api.PersistentVolume{}
 	if len(volume.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", volume)
 		return
@@ -83,8 +83,8 @@ func (c *persistentVolumes) Update(volume *api.PersistentVolume) (result *api.Pe
 	return
 }
 
-func (c *persistentVolumes) UpdateStatus(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
-	result = &api.PersistentVolume{}
+func (c *persistentVolumes) UpdateStatus(volume *v1api.PersistentVolume) (result *v1api.PersistentVolume, err error) {
+	result = &v1api.PersistentVolume{}
 	err = c.client.Put().Resource("persistentVolumes").Name(volume.Name).SubResource("status").Body(volume).Do().Into(result)
 	return
 }

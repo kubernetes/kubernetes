@@ -17,8 +17,8 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -27,7 +27,7 @@ import (
 
 // NewSimpleFake returns a client that will respond with the provided objects
 func NewSimpleFake(objects ...runtime.Object) *Fake {
-	o := NewObjects(api.Scheme, api.Scheme)
+	o := NewObjects(v1api.Scheme, v1api.Scheme)
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -129,9 +129,9 @@ func (c *Fake) ServerVersion() (*version.Info, error) {
 	return &versionInfo, nil
 }
 
-func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
+func (c *Fake) ServerAPIVersions() (*v1api.APIVersions, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-apiversions", Value: nil})
-	return &api.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
+	return &v1api.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
 }
 
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {

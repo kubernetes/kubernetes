@@ -19,24 +19,24 @@ package record
 import (
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestAddOrUpdateEventNoExisting(t *testing.T) {
 	// Arrange
 	eventTime := util.Now()
-	event := api.Event{
+	event := v1api.Event{
 		Reason:  "my reasons are many",
 		Message: "my message is love",
-		InvolvedObject: api.ObjectReference{
+		InvolvedObject: v1api.ObjectReference{
 			Kind:       "Pod",
 			Name:       "awesome.name",
 			Namespace:  "betterNamespace",
 			UID:        "C934D34AFB20242",
 			APIVersion: "version",
 		},
-		Source: api.EventSource{
+		Source: v1api.EventSource{
 			Component: "kubelet",
 			Host:      "kublet.node1",
 		},
@@ -56,20 +56,20 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 	// Arrange
 	event1Time := util.Unix(2324, 2342)
 	event2Time := util.Now()
-	event1 := api.Event{
+	event1 := v1api.Event{
 		Reason:  "something happened",
 		Message: "can you believe it?",
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1api.ObjectMeta{
 			ResourceVersion: "rs1",
 		},
-		InvolvedObject: api.ObjectReference{
+		InvolvedObject: v1api.ObjectReference{
 			Kind:       "Scheduler",
 			Name:       "anOkName",
 			Namespace:  "someNamespace",
 			UID:        "C934D3234CD0242",
 			APIVersion: "version",
 		},
-		Source: api.EventSource{
+		Source: v1api.EventSource{
 			Component: "kubelet",
 			Host:      "kublet.node2",
 		},
@@ -77,20 +77,20 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 		FirstTimestamp: event1Time,
 		LastTimestamp:  event1Time,
 	}
-	event2 := api.Event{
+	event2 := v1api.Event{
 		Reason:  "something happened",
 		Message: "can you believe it?",
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1api.ObjectMeta{
 			ResourceVersion: "rs2",
 		},
-		InvolvedObject: api.ObjectReference{
+		InvolvedObject: v1api.ObjectReference{
 			Kind:       "Scheduler",
 			Name:       "anOkName",
 			Namespace:  "someNamespace",
 			UID:        "C934D3234CD0242",
 			APIVersion: "version",
 		},
-		Source: api.EventSource{
+		Source: v1api.EventSource{
 			Component: "kubelet",
 			Host:      "kublet.node2",
 		},
@@ -111,17 +111,17 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 
 func TestGetEventNoExisting(t *testing.T) {
 	// Arrange
-	event := api.Event{
+	event := v1api.Event{
 		Reason:  "to be or not to be",
 		Message: "do I exist",
-		InvolvedObject: api.ObjectReference{
+		InvolvedObject: v1api.ObjectReference{
 			Kind:       "Controller",
 			Name:       "iAmAController",
 			Namespace:  "IHaveANamespace",
 			UID:        "9039D34AFBCDA42",
 			APIVersion: "version",
 		},
-		Source: api.EventSource{
+		Source: v1api.EventSource{
 			Component: "kubelet",
 			Host:      "kublet.node3",
 		},
@@ -140,17 +140,17 @@ func TestGetEventNoExisting(t *testing.T) {
 func TestGetEventExisting(t *testing.T) {
 	// Arrange
 	eventTime := util.Now()
-	event := api.Event{
+	event := v1api.Event{
 		Reason:  "do I exist",
 		Message: "I do, oh my",
-		InvolvedObject: api.ObjectReference{
+		InvolvedObject: v1api.ObjectReference{
 			Kind:       "Pod",
 			Name:       "clever.name.here",
 			Namespace:  "spaceOfName",
 			UID:        "D933D32AFB2A238",
 			APIVersion: "version",
 		},
-		Source: api.EventSource{
+		Source: v1api.EventSource{
 			Component: "kubelet",
 			Host:      "kublet.node4",
 		},
@@ -167,7 +167,7 @@ func TestGetEventExisting(t *testing.T) {
 	compareEventWithHistoryEntry(&event, &existingEvent, t)
 }
 
-func compareEventWithHistoryEntry(expected *api.Event, actual *history, t *testing.T) {
+func compareEventWithHistoryEntry(expected *v1api.Event, actual *history, t *testing.T) {
 
 	if actual.Count != expected.Count {
 		t.Fatalf("There should be one existing instance of this event in the hash table.")

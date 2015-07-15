@@ -23,8 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -36,12 +36,12 @@ func init() {
 }
 
 type testEventSink struct {
-	OnCreate func(e *api.Event) (*api.Event, error)
-	OnUpdate func(e *api.Event) (*api.Event, error)
+	OnCreate func(e *v1api.Event) (*v1api.Event, error)
+	OnUpdate func(e *v1api.Event) (*v1api.Event, error)
 }
 
 // CreateEvent records the event for testing.
-func (t *testEventSink) Create(e *api.Event) (*api.Event, error) {
+func (t *testEventSink) Create(e *v1api.Event) (*v1api.Event, error) {
 	if t.OnCreate != nil {
 		return t.OnCreate(e)
 	}
@@ -49,7 +49,7 @@ func (t *testEventSink) Create(e *api.Event) (*api.Event, error) {
 }
 
 // UpdateEvent records the event for testing.
-func (t *testEventSink) Update(e *api.Event) (*api.Event, error) {
+func (t *testEventSink) Update(e *v1api.Event) (*v1api.Event, error) {
 	if t.OnUpdate != nil {
 		return t.OnUpdate(e)
 	}
@@ -57,24 +57,24 @@ func (t *testEventSink) Update(e *api.Event) (*api.Event, error) {
 }
 
 func TestEventf(t *testing.T) {
-	testPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	testPod := &v1api.Pod{
+		ObjectMeta: v1api.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",
 		},
 	}
-	testPod2 := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	testPod2 := &v1api.Pod{
+		ObjectMeta: v1api.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "differentUid",
 		},
 	}
-	testRef, err := api.GetPartialReference(testPod, "spec.containers[2]")
-	testRef2, err := api.GetPartialReference(testPod2, "spec.containers[3]")
+	testRef, err := v1api.GetPartialReference(testPod, "spec.containers[2]")
+	testRef2, err := v1api.GetPartialReference(testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestEventf(t *testing.T) {
 		reason       string
 		messageFmt   string
 		elements     []interface{}
-		expect       *api.Event
+		expect       *v1api.Event
 		expectLog    string
 		expectUpdate bool
 	}{
@@ -92,12 +92,12 @@ func TestEventf(t *testing.T) {
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
-			expect: &api.Event{
-				ObjectMeta: api.ObjectMeta{
+			expect: &v1api.Event{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: v1api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
 					Namespace:  "baz",
@@ -107,7 +107,7 @@ func TestEventf(t *testing.T) {
 				},
 				Reason:  "Started",
 				Message: "some verbose message: 1",
-				Source:  api.EventSource{Component: "eventTest"},
+				Source:  v1api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
 			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[2]"}): reason: 'Started' some verbose message: 1`,
@@ -118,12 +118,12 @@ func TestEventf(t *testing.T) {
 			reason:     "Killed",
 			messageFmt: "some other verbose message: %v",
 			elements:   []interface{}{1},
-			expect: &api.Event{
-				ObjectMeta: api.ObjectMeta{
+			expect: &v1api.Event{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: v1api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
 					Namespace:  "baz",
@@ -132,7 +132,7 @@ func TestEventf(t *testing.T) {
 				},
 				Reason:  "Killed",
 				Message: "some other verbose message: 1",
-				Source:  api.EventSource{Component: "eventTest"},
+				Source:  v1api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
 			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:""}): reason: 'Killed' some other verbose message: 1`,
@@ -143,12 +143,12 @@ func TestEventf(t *testing.T) {
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
-			expect: &api.Event{
-				ObjectMeta: api.ObjectMeta{
+			expect: &v1api.Event{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: v1api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
 					Namespace:  "baz",
@@ -158,7 +158,7 @@ func TestEventf(t *testing.T) {
 				},
 				Reason:  "Started",
 				Message: "some verbose message: 1",
-				Source:  api.EventSource{Component: "eventTest"},
+				Source:  v1api.EventSource{Component: "eventTest"},
 				Count:   2,
 			},
 			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[2]"}): reason: 'Started' some verbose message: 1`,
@@ -169,12 +169,12 @@ func TestEventf(t *testing.T) {
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
-			expect: &api.Event{
-				ObjectMeta: api.ObjectMeta{
+			expect: &v1api.Event{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: v1api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
 					Namespace:  "baz",
@@ -184,7 +184,7 @@ func TestEventf(t *testing.T) {
 				},
 				Reason:  "Started",
 				Message: "some verbose message: 1",
-				Source:  api.EventSource{Component: "eventTest"},
+				Source:  v1api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
 			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[3]"}): reason: 'Started' some verbose message: 1`,
@@ -195,12 +195,12 @@ func TestEventf(t *testing.T) {
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
-			expect: &api.Event{
-				ObjectMeta: api.ObjectMeta{
+			expect: &v1api.Event{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: v1api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
 					Namespace:  "baz",
@@ -210,7 +210,7 @@ func TestEventf(t *testing.T) {
 				},
 				Reason:  "Started",
 				Message: "some verbose message: 1",
-				Source:  api.EventSource{Component: "eventTest"},
+				Source:  v1api.EventSource{Component: "eventTest"},
 				Count:   3,
 			},
 			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[2]"}): reason: 'Started' some verbose message: 1`,
@@ -221,12 +221,12 @@ func TestEventf(t *testing.T) {
 			reason:     "Stopped",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
-			expect: &api.Event{
-				ObjectMeta: api.ObjectMeta{
+			expect: &v1api.Event{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: v1api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
 					Namespace:  "baz",
@@ -236,7 +236,7 @@ func TestEventf(t *testing.T) {
 				},
 				Reason:  "Stopped",
 				Message: "some verbose message: 1",
-				Source:  api.EventSource{Component: "eventTest"},
+				Source:  v1api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
 			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[3]"}): reason: 'Stopped' some verbose message: 1`,
@@ -247,12 +247,12 @@ func TestEventf(t *testing.T) {
 			reason:     "Stopped",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
-			expect: &api.Event{
-				ObjectMeta: api.ObjectMeta{
+			expect: &v1api.Event{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: v1api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
 					Namespace:  "baz",
@@ -262,7 +262,7 @@ func TestEventf(t *testing.T) {
 				},
 				Reason:  "Stopped",
 				Message: "some verbose message: 1",
-				Source:  api.EventSource{Component: "eventTest"},
+				Source:  v1api.EventSource{Component: "eventTest"},
 				Count:   2,
 			},
 			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[3]"}): reason: 'Stopped' some verbose message: 1`,
@@ -273,7 +273,7 @@ func TestEventf(t *testing.T) {
 	for _, item := range table {
 		called := make(chan struct{})
 		testEvents := testEventSink{
-			OnCreate: func(event *api.Event) (*api.Event, error) {
+			OnCreate: func(event *v1api.Event) (*v1api.Event, error) {
 				returnEvent, _ := validateEvent(event, item.expect, t)
 				if item.expectUpdate {
 					t.Errorf("Expected event update(), got event create()")
@@ -281,7 +281,7 @@ func TestEventf(t *testing.T) {
 				called <- struct{}{}
 				return returnEvent, nil
 			},
-			OnUpdate: func(event *api.Event) (*api.Event, error) {
+			OnUpdate: func(event *v1api.Event) (*v1api.Event, error) {
 				returnEvent, _ := validateEvent(event, item.expect, t)
 				if !item.expectUpdate {
 					t.Errorf("Expected event create(), got event update()")
@@ -299,7 +299,7 @@ func TestEventf(t *testing.T) {
 			}
 			called <- struct{}{}
 		})
-		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+		recorder := eventBroadcaster.NewRecorder(v1api.EventSource{Component: "eventTest"})
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
 		<-called
@@ -310,7 +310,7 @@ func TestEventf(t *testing.T) {
 	}
 }
 
-func validateEvent(actualEvent *api.Event, expectedEvent *api.Event, t *testing.T) (*api.Event, error) {
+func validateEvent(actualEvent *v1api.Event, expectedEvent *v1api.Event, t *testing.T) (*v1api.Event, error) {
 	expectCompression := expectedEvent.Count > 1
 	// Just check that the timestamp was set.
 	if actualEvent.FirstTimestamp.IsZero() || actualEvent.LastTimestamp.IsZero() {
@@ -344,7 +344,7 @@ func validateEvent(actualEvent *api.Event, expectedEvent *api.Event, t *testing.
 }
 
 func TestWriteEventError(t *testing.T) {
-	ref := &api.ObjectReference{
+	ref := &v1api.ObjectReference{
 		Kind:       "Pod",
 		Name:       "foo",
 		Namespace:  "baz",
@@ -389,7 +389,7 @@ func TestWriteEventError(t *testing.T) {
 	eventBroadcaster := NewBroadcaster()
 	defer eventBroadcaster.StartRecordingToSink(
 		&testEventSink{
-			OnCreate: func(event *api.Event) (*api.Event, error) {
+			OnCreate: func(event *v1api.Event) (*v1api.Event, error) {
 				if event.Message == "finished" {
 					close(done)
 					return event, nil
@@ -407,7 +407,7 @@ func TestWriteEventError(t *testing.T) {
 			},
 		},
 	).Stop()
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+	recorder := eventBroadcaster.NewRecorder(v1api.EventSource{Component: "eventTest"})
 	for caseName := range table {
 		recorder.Event(ref, "Reason", caseName)
 	}
@@ -428,7 +428,7 @@ func TestLotsOfEvents(t *testing.T) {
 	// Fail each event a few times to ensure there's some load on the tested code.
 	var counts [1000]int
 	testEvents := testEventSink{
-		OnCreate: func(event *api.Event) (*api.Event, error) {
+		OnCreate: func(event *v1api.Event) (*v1api.Event, error) {
 			num, err := strconv.Atoi(event.Message)
 			if err != nil {
 				t.Error(err)
@@ -448,8 +448,8 @@ func TestLotsOfEvents(t *testing.T) {
 	logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 		loggerCalled <- struct{}{}
 	})
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
-	ref := &api.ObjectReference{
+	recorder := eventBroadcaster.NewRecorder(v1api.EventSource{Component: "eventTest"})
+	ref := &v1api.ObjectReference{
 		Kind:       "Pod",
 		Name:       "foo",
 		Namespace:  "baz",
@@ -475,14 +475,14 @@ func TestLotsOfEvents(t *testing.T) {
 }
 
 func TestEventfNoNamespace(t *testing.T) {
-	testPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	testPod := &v1api.Pod{
+		ObjectMeta: v1api.ObjectMeta{
 			SelfLink: "/api/version/pods/foo",
 			Name:     "foo",
 			UID:      "bar",
 		},
 	}
-	testRef, err := api.GetPartialReference(testPod, "spec.containers[2]")
+	testRef, err := v1api.GetPartialReference(testPod, "spec.containers[2]")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -491,7 +491,7 @@ func TestEventfNoNamespace(t *testing.T) {
 		reason       string
 		messageFmt   string
 		elements     []interface{}
-		expect       *api.Event
+		expect       *v1api.Event
 		expectLog    string
 		expectUpdate bool
 	}{
@@ -500,12 +500,12 @@ func TestEventfNoNamespace(t *testing.T) {
 			reason:     "Started",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
-			expect: &api.Event{
-				ObjectMeta: api.ObjectMeta{
+			expect: &v1api.Event{
+				ObjectMeta: v1api.ObjectMeta{
 					Name:      "foo",
 					Namespace: "default",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: v1api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
 					Namespace:  "",
@@ -515,7 +515,7 @@ func TestEventfNoNamespace(t *testing.T) {
 				},
 				Reason:  "Started",
 				Message: "some verbose message: 1",
-				Source:  api.EventSource{Component: "eventTest"},
+				Source:  v1api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
 			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"spec.containers[2]"}): reason: 'Started' some verbose message: 1`,
@@ -526,7 +526,7 @@ func TestEventfNoNamespace(t *testing.T) {
 	for _, item := range table {
 		called := make(chan struct{})
 		testEvents := testEventSink{
-			OnCreate: func(event *api.Event) (*api.Event, error) {
+			OnCreate: func(event *v1api.Event) (*v1api.Event, error) {
 				returnEvent, _ := validateEvent(event, item.expect, t)
 				if item.expectUpdate {
 					t.Errorf("Expected event update(), got event create()")
@@ -534,7 +534,7 @@ func TestEventfNoNamespace(t *testing.T) {
 				called <- struct{}{}
 				return returnEvent, nil
 			},
-			OnUpdate: func(event *api.Event) (*api.Event, error) {
+			OnUpdate: func(event *v1api.Event) (*v1api.Event, error) {
 				returnEvent, _ := validateEvent(event, item.expect, t)
 				if !item.expectUpdate {
 					t.Errorf("Expected event create(), got event update()")
@@ -552,7 +552,7 @@ func TestEventfNoNamespace(t *testing.T) {
 			}
 			called <- struct{}{}
 		})
-		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+		recorder := eventBroadcaster.NewRecorder(v1api.EventSource{Component: "eventTest"})
 		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
 		<-called

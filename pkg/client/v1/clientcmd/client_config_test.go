@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 )
 
 func createValidTestConfig() *clientcmdapi.Config {

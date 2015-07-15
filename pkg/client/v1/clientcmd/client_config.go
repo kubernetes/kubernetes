@@ -24,9 +24,9 @@ import (
 
 	"github.com/imdario/mergo"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 )
 
@@ -217,7 +217,7 @@ func (config DirectClientConfig) Namespace() (string, bool, error) {
 	configContext := config.getContext()
 
 	if len(configContext.Namespace) == 0 {
-		return api.NamespaceDefault, false, nil
+		return v1api.NamespaceDefault, false, nil
 	}
 
 	overridden := false

@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -34,19 +34,19 @@ func TestEventSearch(t *testing.T) {
 			Method: "GET",
 			Path:   testapi.ResourcePath("events", "baz", ""),
 			Query: url.Values{
-				api.FieldSelectorQueryParam(testapi.Version()): []string{
+				"fieldSelector": []string{
 					getInvolvedObjectNameFieldLabel(testapi.Version()) + "=foo,",
 					"involvedObject.namespace=baz,",
 					"involvedObject.kind=Pod",
 				},
-				api.LabelSelectorQueryParam(testapi.Version()): []string{},
+				"labelSelector": []string{},
 			},
 		},
-		Response: Response{StatusCode: 200, Body: &api.EventList{}},
+		Response: Response{StatusCode: 200, Body: &v1api.EventList{}},
 	}
 	eventList, err := c.Setup().Events("baz").Search(
-		&api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		&v1api.Pod{
+			ObjectMeta: v1api.ObjectMeta{
 				Name:      "foo",
 				Namespace: "baz",
 				SelfLink:  testapi.SelfLink("pods", ""),
@@ -57,7 +57,7 @@ func TestEventSearch(t *testing.T) {
 }
 
 func TestEventCreate(t *testing.T) {
-	objReference := &api.ObjectReference{
+	objReference := &v1api.ObjectReference{
 		Kind:            "foo",
 		Namespace:       "nm",
 		Name:            "objref1",
@@ -66,9 +66,9 @@ func TestEventCreate(t *testing.T) {
 		ResourceVersion: "1",
 	}
 	timeStamp := util.Now()
-	event := &api.Event{
-		ObjectMeta: api.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+	event := &v1api.Event{
+		ObjectMeta: v1api.ObjectMeta{
+			Namespace: v1api.NamespaceDefault,
 		},
 		InvolvedObject: *objReference,
 		FirstTimestamp: timeStamp,
@@ -78,13 +78,13 @@ func TestEventCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.ResourcePath("events", api.NamespaceDefault, ""),
+			Path:   testapi.ResourcePath("events", v1api.NamespaceDefault, ""),
 			Body:   event,
 		},
 		Response: Response{StatusCode: 200, Body: event},
 	}
 
-	response, err := c.Setup().Events(api.NamespaceDefault).Create(event)
+	response, err := c.Setup().Events(v1api.NamespaceDefault).Create(event)
 
 	if err != nil {
 		t.Fatalf("%v should be nil.", err)
@@ -96,7 +96,7 @@ func TestEventCreate(t *testing.T) {
 }
 
 func TestEventGet(t *testing.T) {
-	objReference := &api.ObjectReference{
+	objReference := &v1api.ObjectReference{
 		Kind:            "foo",
 		Namespace:       "nm",
 		Name:            "objref1",
@@ -105,8 +105,8 @@ func TestEventGet(t *testing.T) {
 		ResourceVersion: "1",
 	}
 	timeStamp := util.Now()
-	event := &api.Event{
-		ObjectMeta: api.ObjectMeta{
+	event := &v1api.Event{
+		ObjectMeta: v1api.ObjectMeta{
 			Namespace: "other",
 		},
 		InvolvedObject: *objReference,
@@ -135,8 +135,8 @@ func TestEventGet(t *testing.T) {
 }
 
 func TestEventList(t *testing.T) {
-	ns := api.NamespaceDefault
-	objReference := &api.ObjectReference{
+	ns := v1api.NamespaceDefault
+	objReference := &v1api.ObjectReference{
 		Kind:            "foo",
 		Namespace:       ns,
 		Name:            "objref1",
@@ -145,8 +145,8 @@ func TestEventList(t *testing.T) {
 		ResourceVersion: "1",
 	}
 	timeStamp := util.Now()
-	eventList := &api.EventList{
-		Items: []api.Event{
+	eventList := &v1api.EventList{
+		Items: []v1api.Event{
 			{
 				InvolvedObject: *objReference,
 				FirstTimestamp: timeStamp,
@@ -182,7 +182,7 @@ func TestEventList(t *testing.T) {
 }
 
 func TestEventDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{
 			Method: "DELETE",

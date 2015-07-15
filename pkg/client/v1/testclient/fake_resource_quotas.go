@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,34 +30,34 @@ type FakeResourceQuotas struct {
 	Namespace string
 }
 
-func (c *FakeResourceQuotas) List(selector labels.Selector) (*api.ResourceQuotaList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-resourceQuotas"}, &api.ResourceQuotaList{})
-	return obj.(*api.ResourceQuotaList), err
+func (c *FakeResourceQuotas) List(selector labels.Selector) (*v1api.ResourceQuotaList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-resourceQuotas"}, &v1api.ResourceQuotaList{})
+	return obj.(*v1api.ResourceQuotaList), err
 }
 
-func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-resourceQuota", Value: name}, &api.ResourceQuota{})
-	return obj.(*api.ResourceQuota), err
+func (c *FakeResourceQuotas) Get(name string) (*v1api.ResourceQuota, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-resourceQuota", Value: name}, &v1api.ResourceQuota{})
+	return obj.(*v1api.ResourceQuota), err
 }
 
 func (c *FakeResourceQuotas) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-resourceQuota", Value: name}, &api.ResourceQuota{})
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-resourceQuota", Value: name}, &v1api.ResourceQuota{})
 	return err
 }
 
-func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
-	return obj.(*api.ResourceQuota), err
+func (c *FakeResourceQuotas) Create(resourceQuota *v1api.ResourceQuota) (*v1api.ResourceQuota, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-resourceQuota", Value: resourceQuota}, &v1api.ResourceQuota{})
+	return obj.(*v1api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
-	return obj.(*api.ResourceQuota), err
+func (c *FakeResourceQuotas) Update(resourceQuota *v1api.ResourceQuota) (*v1api.ResourceQuota, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-resourceQuota", Value: resourceQuota}, &v1api.ResourceQuota{})
+	return obj.(*v1api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
-	return obj.(*api.ResourceQuota), err
+func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *v1api.ResourceQuota) (*v1api.ResourceQuota, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-resourceQuota", Value: resourceQuota}, &v1api.ResourceQuota{})
+	return obj.(*v1api.ResourceQuota), err
 }
 
 func (c *FakeResourceQuotas) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {

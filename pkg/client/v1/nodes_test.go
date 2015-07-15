@@ -20,9 +20,9 @@ import (
 	"net/url"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -37,15 +37,15 @@ func TestListMinions(t *testing.T) {
 			Method: "GET",
 			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
 		},
-		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
+		Response: Response{StatusCode: 200, Body: &v1api.NodeList{ListMeta: v1api.ListMeta{ResourceVersion: "1"}}},
 	}
 	response, err := c.Setup().Nodes().List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
 }
 
 func TestListMinionsLabels(t *testing.T) {
-	ns := api.NamespaceNone
-	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Version())
+	ns := "" // Value of api.NamespaceNone at the time v1 was made
+	labelSelectorQueryParamName := "labelSelector"
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
@@ -53,10 +53,10 @@ func TestListMinionsLabels(t *testing.T) {
 			Query:  buildQueryValues(ns, url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: Response{
 			StatusCode: 200,
-			Body: &api.NodeList{
-				Items: []api.Node{
+			Body: &v1api.NodeList{
+				Items: []v1api.Node{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1api.ObjectMeta{
 							Labels: map[string]string{
 								"foo":  "bar",
 								"name": "baz",
@@ -80,7 +80,7 @@ func TestGetMinion(t *testing.T) {
 			Method: "GET",
 			Path:   testapi.ResourcePath(getNodesResourceName(), "", "1"),
 		},
-		Response: Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "minion-1"}}},
+		Response: Response{StatusCode: 200, Body: &v1api.Node{ObjectMeta: v1api.ObjectMeta{Name: "minion-1"}}},
 	}
 	response, err := c.Setup().Nodes().Get("1")
 	c.Validate(t, response, err)
@@ -97,17 +97,17 @@ func TestGetMinionWithNoName(t *testing.T) {
 }
 
 func TestCreateMinion(t *testing.T) {
-	requestMinion := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+	requestMinion := &v1api.Node{
+		ObjectMeta: v1api.ObjectMeta{
 			Name: "minion-1",
 		},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1000m"),
-				api.ResourceMemory: resource.MustParse("1Mi"),
+		Status: v1api.NodeStatus{
+			Capacity: v1api.ResourceList{
+				v1api.ResourceCPU:    resource.MustParse("1000m"),
+				v1api.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		},
-		Spec: api.NodeSpec{
+		Spec: v1api.NodeSpec{
 			Unschedulable: false,
 		},
 	}
@@ -138,18 +138,18 @@ func TestDeleteMinion(t *testing.T) {
 }
 
 func TestUpdateMinion(t *testing.T) {
-	requestMinion := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+	requestMinion := &v1api.Node{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1000m"),
-				api.ResourceMemory: resource.MustParse("1Mi"),
+		Status: v1api.NodeStatus{
+			Capacity: v1api.ResourceList{
+				v1api.ResourceCPU:    resource.MustParse("1000m"),
+				v1api.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		},
-		Spec: api.NodeSpec{
+		Spec: v1api.NodeSpec{
 			Unschedulable: true,
 		},
 	}

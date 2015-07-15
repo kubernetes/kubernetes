@@ -19,23 +19,23 @@ package client
 import (
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 func TestListEndpoints(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, ""), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200,
-			Body: &api.EndpointsList{
-				Items: []api.Endpoints{
+			Body: &v1api.EndpointsList{
+				Items: []v1api.Endpoints{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "endpoint-1"},
-						Subsets: []api.EndpointSubset{{
-							Addresses: []api.EndpointAddress{{IP: "10.245.1.2"}, {IP: "10.245.1.3"}},
-							Ports:     []api.EndpointPort{{Port: 8080}},
+						ObjectMeta: v1api.ObjectMeta{Name: "endpoint-1"},
+						Subsets: []v1api.EndpointSubset{{
+							Addresses: []v1api.EndpointAddress{{IP: "10.245.1.2"}, {IP: "10.245.1.3"}},
+							Ports:     []v1api.EndpointPort{{Port: 8080}},
 						}},
 					},
 				},
@@ -47,17 +47,17 @@ func TestListEndpoints(t *testing.T) {
 }
 
 func TestGetEndpoints(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, "endpoint-1"), Query: buildQueryValues(ns, nil)},
-		Response: Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
+		Response: Response{StatusCode: 200, Body: &v1api.Endpoints{ObjectMeta: v1api.ObjectMeta{Name: "endpoint-1"}}},
 	}
 	response, err := c.Setup().Endpoints(ns).Get("endpoint-1")
 	c.Validate(t, response, err)
 }
 
 func TestGetEndpointWithNoName(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{Error: true}
 	receivedPod, err := c.Setup().Endpoints(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {

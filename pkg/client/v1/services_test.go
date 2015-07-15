@@ -20,30 +20,30 @@ import (
 	"net/url"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 func TestListServices(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath("services", ns, ""),
 			Query:  buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200,
-			Body: &api.ServiceList{
-				Items: []api.Service{
+			Body: &v1api.ServiceList{
+				Items: []v1api.Service{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1api.ObjectMeta{
 							Name: "name",
 							Labels: map[string]string{
 								"foo":  "bar",
 								"name": "baz",
 							},
 						},
-						Spec: api.ServiceSpec{
+						Spec: v1api.ServiceSpec{
 							Selector: map[string]string{
 								"one": "two",
 							},
@@ -59,25 +59,25 @@ func TestListServices(t *testing.T) {
 }
 
 func TestListServicesLabels(t *testing.T) {
-	ns := api.NamespaceDefault
-	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Version())
+	ns := v1api.NamespaceDefault
+	labelSelectorQueryParamName := "labelSelector"
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath("services", ns, ""),
 			Query:  buildQueryValues(ns, url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: Response{StatusCode: 200,
-			Body: &api.ServiceList{
-				Items: []api.Service{
+			Body: &v1api.ServiceList{
+				Items: []v1api.Service{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: v1api.ObjectMeta{
 							Name: "name",
 							Labels: map[string]string{
 								"foo":  "bar",
 								"name": "baz",
 							},
 						},
-						Spec: api.ServiceSpec{
+						Spec: v1api.ServiceSpec{
 							Selector: map[string]string{
 								"one": "two",
 							},
@@ -95,20 +95,20 @@ func TestListServicesLabels(t *testing.T) {
 }
 
 func TestGetService(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath("services", ns, "1"),
 			Query:  buildQueryValues(ns, nil)},
-		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
+		Response: Response{StatusCode: 200, Body: &v1api.Service{ObjectMeta: v1api.ObjectMeta{Name: "service-1"}}},
 	}
 	response, err := c.Setup().Services(ns).Get("1")
 	c.Validate(t, response, err)
 }
 
 func TestGetServiceWithNoName(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{Error: true}
 	receivedPod, err := c.Setup().Services(ns).Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
@@ -119,22 +119,22 @@ func TestGetServiceWithNoName(t *testing.T) {
 }
 
 func TestCreateService(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
 			Path:   testapi.ResourcePath("services", ns, ""),
-			Body:   &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}},
+			Body:   &v1api.Service{ObjectMeta: v1api.ObjectMeta{Name: "service-1"}},
 			Query:  buildQueryValues(ns, nil)},
-		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
+		Response: Response{StatusCode: 200, Body: &v1api.Service{ObjectMeta: v1api.ObjectMeta{Name: "service-1"}}},
 	}
-	response, err := c.Setup().Services(ns).Create(&api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}})
+	response, err := c.Setup().Services(ns).Create(&v1api.Service{ObjectMeta: v1api.ObjectMeta{Name: "service-1"}})
 	c.Validate(t, response, err)
 }
 
 func TestUpdateService(t *testing.T) {
-	ns := api.NamespaceDefault
-	svc := &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1", ResourceVersion: "1"}}
+	ns := v1api.NamespaceDefault
+	svc := &v1api.Service{ObjectMeta: v1api.ObjectMeta{Name: "service-1", ResourceVersion: "1"}}
 	c := &testClient{
 		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath("services", ns, "service-1"), Body: svc, Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: svc},
@@ -144,7 +144,7 @@ func TestUpdateService(t *testing.T) {
 }
 
 func TestDeleteService(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("services", ns, "1"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},

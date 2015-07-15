@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )

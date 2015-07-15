@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,29 +30,29 @@ type FakeLimitRanges struct {
 	Namespace string
 }
 
-func (c *FakeLimitRanges) List(selector labels.Selector) (*api.LimitRangeList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-limitRanges"}, &api.LimitRangeList{})
-	return obj.(*api.LimitRangeList), err
+func (c *FakeLimitRanges) List(selector labels.Selector) (*v1api.LimitRangeList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-limitRanges"}, &v1api.LimitRangeList{})
+	return obj.(*v1api.LimitRangeList), err
 }
 
-func (c *FakeLimitRanges) Get(name string) (*api.LimitRange, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-limitRange", Value: name}, &api.LimitRange{})
-	return obj.(*api.LimitRange), err
+func (c *FakeLimitRanges) Get(name string) (*v1api.LimitRange, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-limitRange", Value: name}, &v1api.LimitRange{})
+	return obj.(*v1api.LimitRange), err
 }
 
 func (c *FakeLimitRanges) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-limitRange", Value: name}, &api.LimitRange{})
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-limitRange", Value: name}, &v1api.LimitRange{})
 	return err
 }
 
-func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (*api.LimitRange, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-limitRange"}, &api.LimitRange{})
-	return obj.(*api.LimitRange), err
+func (c *FakeLimitRanges) Create(limitRange *v1api.LimitRange) (*v1api.LimitRange, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-limitRange"}, &v1api.LimitRange{})
+	return obj.(*v1api.LimitRange), err
 }
 
-func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (*api.LimitRange, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-limitRange", Value: limitRange.Name}, &api.LimitRange{})
-	return obj.(*api.LimitRange), err
+func (c *FakeLimitRanges) Update(limitRange *v1api.LimitRange) (*v1api.LimitRange, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-limitRange", Value: limitRange.Name}, &v1api.LimitRange{})
+	return obj.(*v1api.LimitRange), err
 }
 
 func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {

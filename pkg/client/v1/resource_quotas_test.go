@@ -20,9 +20,9 @@ import (
 	"net/url"
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -32,20 +32,20 @@ func getResourceQuotasResoureName() string {
 }
 
 func TestResourceQuotaCreate(t *testing.T) {
-	ns := api.NamespaceDefault
-	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	resourceQuota := &v1api.ResourceQuota{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:      "abc",
 			Namespace: "foo",
 		},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourceCPU:                    resource.MustParse("100"),
-				api.ResourceMemory:                 resource.MustParse("10000"),
-				api.ResourcePods:                   resource.MustParse("10"),
-				api.ResourceServices:               resource.MustParse("10"),
-				api.ResourceReplicationControllers: resource.MustParse("10"),
-				api.ResourceQuotas:                 resource.MustParse("10"),
+		Spec: v1api.ResourceQuotaSpec{
+			Hard: v1api.ResourceList{
+				v1api.ResourceCPU:                    resource.MustParse("100"),
+				v1api.ResourceMemory:                 resource.MustParse("10000"),
+				v1api.ResourcePods:                   resource.MustParse("10"),
+				v1api.ResourceServices:               resource.MustParse("10"),
+				v1api.ResourceReplicationControllers: resource.MustParse("10"),
+				v1api.ResourceQuotas:                 resource.MustParse("10"),
 			},
 		},
 	}
@@ -64,20 +64,20 @@ func TestResourceQuotaCreate(t *testing.T) {
 }
 
 func TestResourceQuotaGet(t *testing.T) {
-	ns := api.NamespaceDefault
-	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	resourceQuota := &v1api.ResourceQuota{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:      "abc",
 			Namespace: "foo",
 		},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourceCPU:                    resource.MustParse("100"),
-				api.ResourceMemory:                 resource.MustParse("10000"),
-				api.ResourcePods:                   resource.MustParse("10"),
-				api.ResourceServices:               resource.MustParse("10"),
-				api.ResourceReplicationControllers: resource.MustParse("10"),
-				api.ResourceQuotas:                 resource.MustParse("10"),
+		Spec: v1api.ResourceQuotaSpec{
+			Hard: v1api.ResourceList{
+				v1api.ResourceCPU:                    resource.MustParse("100"),
+				v1api.ResourceMemory:                 resource.MustParse("10000"),
+				v1api.ResourcePods:                   resource.MustParse("10"),
+				v1api.ResourceServices:               resource.MustParse("10"),
+				v1api.ResourceReplicationControllers: resource.MustParse("10"),
+				v1api.ResourceQuotas:                 resource.MustParse("10"),
 			},
 		},
 	}
@@ -96,12 +96,12 @@ func TestResourceQuotaGet(t *testing.T) {
 }
 
 func TestResourceQuotaList(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 
-	resourceQuotaList := &api.ResourceQuotaList{
-		Items: []api.ResourceQuota{
+	resourceQuotaList := &v1api.ResourceQuotaList{
+		Items: []v1api.ResourceQuota{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: v1api.ObjectMeta{Name: "foo"},
 			},
 		},
 	}
@@ -119,21 +119,21 @@ func TestResourceQuotaList(t *testing.T) {
 }
 
 func TestResourceQuotaUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	resourceQuota := &v1api.ResourceQuota{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:            "abc",
 			Namespace:       "foo",
 			ResourceVersion: "1",
 		},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourceCPU:                    resource.MustParse("100"),
-				api.ResourceMemory:                 resource.MustParse("10000"),
-				api.ResourcePods:                   resource.MustParse("10"),
-				api.ResourceServices:               resource.MustParse("10"),
-				api.ResourceReplicationControllers: resource.MustParse("10"),
-				api.ResourceQuotas:                 resource.MustParse("10"),
+		Spec: v1api.ResourceQuotaSpec{
+			Hard: v1api.ResourceList{
+				v1api.ResourceCPU:                    resource.MustParse("100"),
+				v1api.ResourceMemory:                 resource.MustParse("10000"),
+				v1api.ResourcePods:                   resource.MustParse("10"),
+				v1api.ResourceServices:               resource.MustParse("10"),
+				v1api.ResourceReplicationControllers: resource.MustParse("10"),
+				v1api.ResourceQuotas:                 resource.MustParse("10"),
 			},
 		},
 	}
@@ -146,21 +146,21 @@ func TestResourceQuotaUpdate(t *testing.T) {
 }
 
 func TestResourceQuotaStatusUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+	ns := v1api.NamespaceDefault
+	resourceQuota := &v1api.ResourceQuota{
+		ObjectMeta: v1api.ObjectMeta{
 			Name:            "abc",
 			Namespace:       "foo",
 			ResourceVersion: "1",
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:                    resource.MustParse("100"),
-				api.ResourceMemory:                 resource.MustParse("10000"),
-				api.ResourcePods:                   resource.MustParse("10"),
-				api.ResourceServices:               resource.MustParse("10"),
-				api.ResourceReplicationControllers: resource.MustParse("10"),
-				api.ResourceQuotas:                 resource.MustParse("10"),
+		Status: v1api.ResourceQuotaStatus{
+			Hard: v1api.ResourceList{
+				v1api.ResourceCPU:                    resource.MustParse("100"),
+				v1api.ResourceMemory:                 resource.MustParse("10000"),
+				v1api.ResourcePods:                   resource.MustParse("10"),
+				v1api.ResourceServices:               resource.MustParse("10"),
+				v1api.ResourceReplicationControllers: resource.MustParse("10"),
+				v1api.ResourceQuotas:                 resource.MustParse("10"),
 			},
 		},
 	}
@@ -176,7 +176,7 @@ func TestResourceQuotaStatusUpdate(t *testing.T) {
 }
 
 func TestResourceQuotaDelete(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := v1api.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getResourceQuotasResoureName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
@@ -193,6 +193,6 @@ func TestResourceQuotaWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup().ResourceQuotas(v1api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

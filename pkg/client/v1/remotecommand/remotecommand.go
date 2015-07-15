@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	client "github.com/GoogleCloudPlatform/kubernetes/pkg/client/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion/queryparams"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
@@ -70,7 +70,7 @@ func New(req *client.Request, config *client.Config, command []string, stdin io.
 // connection and creating streams to represent stdin/stdout/stderr. Data is
 // copied between these streams and the supplied stdin/stdout/stderr parameters.
 func (e *Executor) Execute() error {
-	opts := api.PodExecOptions{
+	opts := v1api.PodExecOptions{
 		Stdin:   (e.stdin != nil),
 		Stdout:  (e.stdout != nil),
 		Stderr:  (!e.tty && e.stderr != nil),
@@ -78,7 +78,7 @@ func (e *Executor) Execute() error {
 		Command: e.command,
 	}
 
-	versioned, err := api.Scheme.ConvertToVersion(&opts, e.config.Version)
+	versioned, err := v1api.Scheme.ConvertToVersion(&opts, e.config.Version)
 	if err != nil {
 		return err
 	}
@@ -110,13 +110,13 @@ func (e *Executor) Execute() error {
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
 			glog.Errorf("Error copying %s: %v", s, err)
 		}
-		if s == api.StreamTypeStdout || s == api.StreamTypeStderr {
+		if s == v1api.StreamTypeStdout || s == v1api.StreamTypeStderr {
 			doneChan <- struct{}{}
 		}
 	}
 
 	headers := http.Header{}
-	headers.Set(api.StreamType, api.StreamTypeError)
+	headers.Set(v1api.StreamType, v1api.StreamTypeError)
 	errorStream, err := conn.CreateStream(headers)
 	if err != nil {
 		return err
@@ -135,7 +135,7 @@ func (e *Executor) Execute() error {
 	defer errorStream.Reset()
 
 	if opts.Stdin {
-		headers.Set(api.StreamType, api.StreamTypeStdin)
+		headers.Set(v1api.StreamType, v1api.StreamTypeStdin)
 		remoteStdin, err := conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -145,7 +145,7 @@ func (e *Executor) Execute() error {
 		// because stdin is not closed until the process exits. If we try to call
 		// stdin.Close(), it returns no error but doesn't unblock the copy. It will
 		// exit when the process exits, instead.
-		go cp(api.StreamTypeStdin, remoteStdin, e.stdin)
+		go cp(v1api.StreamTypeStdin, remoteStdin, e.stdin)
 	}
 
 	waitCount := 0
@@ -153,24 +153,24 @@ func (e *Executor) Execute() error {
 
 	if opts.Stdout {
 		waitCount++
-		headers.Set(api.StreamType, api.StreamTypeStdout)
+		headers.Set(v1api.StreamType, v1api.StreamTypeStdout)
 		remoteStdout, err := conn.CreateStream(headers)
 		if err != nil {
 			return err
 		}
 		defer remoteStdout.Reset()
-		go cp(api.StreamTypeStdout, e.stdout, remoteStdout)
+		go cp(v1api.StreamTypeStdout, e.stdout, remoteStdout)
 	}
 
 	if opts.Stderr && !e.tty {
 		waitCount++
-		headers.Set(api.StreamType, api.StreamTypeStderr)
+		headers.Set(v1api.StreamType, v1api.StreamTypeStderr)
 		remoteStderr, err := conn.CreateStream(headers)
 		if err != nil {
 			return err
 		}
 		defer remoteStderr.Reset()
-		go cp(api.StreamTypeStderr, e.stderr, remoteStderr)
+		go cp(v1api.StreamTypeStderr, e.stderr, remoteStderr)
 	}
 
 Loop:

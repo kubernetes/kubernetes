@@ -23,7 +23,8 @@ import (
 	"net/url"
 	"strings"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
@@ -116,7 +117,7 @@ type VersionInterface interface {
 // APIStatus is exposed by errors that can be converted to an api.Status object
 // for finer grained details.
 type APIStatus interface {
-	Status() api.Status
+	Status() v1api.Status
 }
 
 // Client is the implementation of a Kubernetes client.
@@ -139,6 +140,8 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 }
 
 // ServerAPIVersions retrieves and parses the list of API versions the server supports.
+// Note that it is safe to get APIVersions from pkg/api and not pkg/api/v1.
+// TODO: move apai.APIVersions so the above disclaimer is obvious.
 func (c *Client) ServerAPIVersions() (*api.APIVersions, error) {
 	body, err := c.Get().UnversionedPath("").Do().Raw()
 	if err != nil {
@@ -153,22 +156,22 @@ func (c *Client) ServerAPIVersions() (*api.APIVersions, error) {
 }
 
 type ComponentValidatorInterface interface {
-	ValidateComponents() (*api.ComponentStatusList, error)
+	ValidateComponents() (*v1api.ComponentStatusList, error)
 }
 
 // ValidateComponents retrieves and parses the master's self-monitored cluster state.
 // TODO: This should hit the versioned endpoint when that is implemented.
-func (c *Client) ValidateComponents() (*api.ComponentStatusList, error) {
+func (c *Client) ValidateComponents() (*v1api.ComponentStatusList, error) {
 	body, err := c.Get().AbsPath("/validate").DoRaw()
 	if err != nil {
 		return nil, err
 	}
 
-	statuses := []api.ComponentStatus{}
+	statuses := []v1api.ComponentStatus{}
 	if err := json.Unmarshal(body, &statuses); err != nil {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
-	return &api.ComponentStatusList{Items: statuses}, nil
+	return &v1api.ComponentStatusList{Items: statuses}, nil
 }
 
 // IsTimeout tests if this is a timeout error in the underlying transport.

@@ -19,16 +19,16 @@ package testclient
 import (
 	"testing"
 
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	v1api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestNewClient(t *testing.T) {
-	o := NewObjects(api.Scheme, api.Scheme)
-	if err := AddObjectsFromPath("../../../../examples/guestbook/frontend-service.yaml", o, api.Scheme); err != nil {
+	o := NewObjects(v1api.Scheme, v1api.Scheme)
+	if err := AddObjectsFromPath("../../../../examples/guestbook/frontend-service.yaml", o, v1api.Scheme); err != nil {
 		t.Fatal(err)
 	}
 	client := &Fake{ReactFn: ObjectReaction(o, latest.RESTMapper)}
@@ -52,8 +52,8 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
-	o := NewObjects(api.Scheme, api.Scheme)
-	o.Add(&api.List{
+	o := NewObjects(v1api.Scheme, v1api.Scheme)
+	o.Add(&v1api.List{
 		Items: []runtime.Object{
 			// This first call to List will return this error
 			&(errors.NewNotFound("ServiceList", "").(*errors.StatusError).ErrStatus),
