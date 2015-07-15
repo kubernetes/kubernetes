@@ -419,7 +419,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/multi-pod.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/multi-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod and redis-proxy PODs are running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:redis-proxy:'
 
@@ -427,7 +427,7 @@ runTests() {
   # Pre-condition: redis-master and redis-proxy PODs are running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:redis-proxy:'
   # Command
-  kubectl delete -f examples/multi-pod.yaml "${kube_flags[@]}"
+  kubectl delete -f docs/user-guide/multi-pod.yaml "${kube_flags[@]}"
   # Post-condition: no PODs are running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -462,7 +462,7 @@ runTests() {
   # Pre-condition: no PODTEMPLATE
   kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" ''
   # Command
-  kubectl create -f examples/walkthrough/podtemplate.json "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/walkthrough/podtemplate.json "${kube_flags[@]}"
   # Post-condition: nginx PODTEMPLATE is available
   kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" 'nginx:'
 
@@ -682,13 +682,13 @@ __EOF__
   # Pre-condition: no persistent volumes currently exist
   kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/persistent-volumes/volumes/local-01.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/persistent-volumes/volumes/local-01.yaml "${kube_flags[@]}"
   kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" 'pv0001:'
   kubectl delete pv pv0001 "${kube_flags[@]}"
-  kubectl create -f examples/persistent-volumes/volumes/local-02.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/persistent-volumes/volumes/local-02.yaml "${kube_flags[@]}"
   kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" 'pv0002:'
   kubectl delete pv pv0002 "${kube_flags[@]}"
-  kubectl create -f examples/persistent-volumes/volumes/gce.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/persistent-volumes/volumes/gce.yaml "${kube_flags[@]}"
   kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" 'pv0003:'
   kubectl delete pv pv0003 "${kube_flags[@]}"
   # Post-condition: no PVs
@@ -702,15 +702,15 @@ __EOF__
   # Pre-condition: no persistent volume claims currently exist
   kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/persistent-volumes/claims/claim-01.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/persistent-volumes/claims/claim-01.yaml "${kube_flags[@]}"
   kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" 'myclaim-1:'
   kubectl delete pvc myclaim-1 "${kube_flags[@]}"
 
-  kubectl create -f examples/persistent-volumes/claims/claim-02.yaml "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/persistent-volumes/claims/claim-02.yaml "${kube_flags[@]}"
   kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" 'myclaim-2:'
   kubectl delete pvc myclaim-2 "${kube_flags[@]}"
 
-  kubectl create -f examples/persistent-volumes/claims/claim-03.json "${kube_flags[@]}"
+  kubectl create -f docs/user-guide/persistent-volumes/claims/claim-03.json "${kube_flags[@]}"
   kube::test::get_object_assert pvc "{{range.items}}{{.$id_field}}:{{end}}" 'myclaim-3:'
   kubectl delete pvc myclaim-3 "${kube_flags[@]}"
   # Post-condition: no PVCs
