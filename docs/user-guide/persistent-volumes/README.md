@@ -50,7 +50,7 @@ $ echo 'I love Kubernetes storage!' > /tmp/data01/index.html
 PVs are created by posting them to the API server.
 
 ```
-$ kubectl create -f examples/persistent-volumes/volumes/local-01.yaml
+$ kubectl create -f docs/user-guide/persistent-volumes/volumes/local-01.yaml
 NAME      LABELS       CAPACITY      ACCESSMODES   STATUS      CLAIM     REASON
 pv0001    type=local   10737418240   RWO           Available 
 ```
@@ -64,7 +64,7 @@ Claims must be created in the same namespace as the pods that use them.
 
 ```
 
-$ kubectl create -f examples/persistent-volumes/claims/claim-01.yaml
+$ kubectl create -f docs/user-guide/persistent-volumes/claims/claim-01.yaml
 
 $ kubectl get pvc
 NAME                LABELS              STATUS              VOLUME
@@ -88,19 +88,17 @@ pv0001    type=local   10737418240   RWO           Bound     default/myclaim-1
 Claims are used as volumes in pods.  Kubernetes uses the claim to look up its bound PV.  The PV is then exposed to the pod.
 
 ```
-$ kubectl create -f examples/persistent-volumes/simpletest/pod.yaml
+$ kubectl create -f docs/user-guide/persistent-volumes/simpletest/pod.yaml
 
 $ kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
 mypod     1/1       Running   0          1h
 
-$ kubectl create -f examples/persistent-volumes/simpletest/service.json
+$ kubectl create -f docs/user-guide/persistent-volumes/simpletest/service.json
 $ kubectl get services
 NAME              LABELS                                    SELECTOR            IP(S)        PORT(S)
 frontendservice   <none>                                    name=frontendhttp   10.0.0.241   3000/TCP
 kubernetes        component=apiserver,provider=kubernetes   <none>              10.0.0.2     443/TCP
-
-
 ```
 
 ## Next steps

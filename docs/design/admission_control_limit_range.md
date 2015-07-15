@@ -131,7 +131,7 @@ For example,
 
 ```shell
 $ kubectl namespace myspace
-$ kubectl create -f examples/limitrange/limit-range.json
+$ kubectl create -f docs/user-guide/limitrange/limits.yaml
 $ kubectl get limits
 NAME
 limits

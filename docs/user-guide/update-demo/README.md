@@ -67,7 +67,7 @@ Now visit the the [demo website](http://localhost:8001/static).  You won't see a
 Now we will turn up two replicas of an image.  They all serve on internal port 80.
 
 ```bash
-$ kubectl create -f examples/update-demo/nautilus-rc.yaml
+$ kubectl create -f docs/user-guide/update-demo/nautilus-rc.yaml
 ```
 
 After pulling the image from the Docker Hub to your worker nodes (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
@@ -86,7 +86,7 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```bash
-$ kubectl rolling-update update-demo-nautilus --update-period=10s -f examples/update-demo/kitten-rc.yaml
+$ kubectl rolling-update update-demo-nautilus --update-period=10s -f docs/user-guide/update-demo/kitten-rc.yaml
 ```
 The rolling-update command in kubectl will do 2 things:
 
