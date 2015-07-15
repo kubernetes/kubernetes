@@ -20,10 +20,11 @@ certainly want the docs that go with that version.</h1>
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Writing a Getting Started Guide
 This page gives some advice for anyone planning to write or update a Getting Started Guide for Kubernetes.
 It also gives some guidelines which reviewers should follow when reviewing a pull request for a
-guide. 
+guide.
 
 A Getting Started Guide is instructions on how to create a Kubernetes cluster on top of a particular
 type(s) of infrastructure.  Infrastructure includes: the IaaS provider for VMs;
@@ -36,11 +37,12 @@ the combination of all these things needed to run on a particular type of infras
 which is similar to the one you have planned, consider improving that one.
 
 
-Distros fall into two categories:  
+Distros fall into two categories:
   - **versioned distros** are tested to work with a particular binary release of Kubernetes.  These
     come in a wide variety, reflecting a wide range of ideas and preferences in how to run a cluster.
   - **development distros** are tested work with the latest Kubernetes source code.  But, there are
-    relatively few of these and the bar is much higher for creating one.
+    relatively few of these and the bar is much higher for creating one.  They must support
+    fully automated cluster creation, deletion, and upgrade.
 
 There are different guidelines for each.
 
@@ -51,17 +53,14 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
    search for uses of flags by guides.
  - We may ask that you host binary assets or large amounts of code in our `contrib` directory or on your
    own repo.
+ - Add or update a row in [The Matrix](../../docs/getting-started-guides/README.md).
+ - State the binary version of kubernetes that you tested clearly in your Guide doc.
  - Setup a cluster and run the [conformance test](development.md#conformance-testing) against it, and report the
    results in your PR.
- - Add or update a row in [The Matrix](../../docs/getting-started-guides/README.md).
- - State the binary version of kubernetes that you tested clearly in your Guide doc and in The Matrix.
- - Even if you are just updating the binary version used, please still do a conformance test.
-     - If it worked before and now fails, you can ask on IRC, 
-       check the release notes since your last tested version, or look at git -logs for files in other distros
-       that are updated to the new version.
  - Versioned distros should typically not modify or add code in `cluster/`.  That is just scripts for developer
    distros.  
- - If a versioned distro has not been updated for many binary releases, it may be dropped from the Matrix.
+ - When a new major or minor release of Kubernetes comes out, we may also release a new
+   conformance test, and require a new conformance test run to earn a conformance checkmark.
 
 If you have a cluster partially working, but doing all the above steps seems like too much work,
 we still want to hear from you.  We suggest you write a blog post or a Gist, and we will link to it on our wiki page.
@@ -93,11 +92,6 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
  - We want users to have a uniform experience with Kubernetes whenever they follow instructions anywhere
    in our Github repository.  So, we ask that versioned distros pass a **conformance test** to make sure
    really work.
- - We ask versioned distros to **clearly state a version**.  People pulling from Github may 
-   expect any instructions there to work at Head, so stuff that has not been tested at Head needs
-   to be called out.  We are still changing things really fast, and, while the REST API is versioned,
-   it is not practical at this point to version or limit changes that affect distros.  We still change
-   flags at the Kubernetes/Infrastructure interface.
  - We want to **limit the number of development distros** for several reasons.  Developers should
    only have to change a limited number of places to add a new feature.  Also, since we will
    gate commits on passing CI for all distros, and since end-to-end tests are typically somewhat
