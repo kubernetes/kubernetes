@@ -137,7 +137,9 @@ manage cherry picks prior to cutting the release.
    version commit.
 1. Follow the instructions given to you by that script. They are canon for the
    remainder of the Git process. If you don't understand something in that
-   process, please ask!
+   process, please ask! When proposing PRs, you can pre-fill the body with
+   `hack/cherry_pick_list.sh upstream/release-${VER}` to inform people of what
+   is already on the branch.
 
 **TODO**: how to fix tags, etc., if the release is changed.
 
@@ -154,10 +156,10 @@ In your git repo (you still have `${VER}` and `${PATCH}` set from above right?):
 
 #### Writing Release Notes
 
-Release notes for a patch release are relatives fast: `git log release-${VER}`
-(If you followed the procedure in the first section, all the cherry-picks will
-have the pull request number in the commit log). Unless there's some reason not
-to, just include all the PRs back to the last release.
+Run `hack/cherry_pick_list.sh ${VER}.${PATCH}~1` to get the release notes for
+the patch release you just created. Feel free to prune anything internal, like
+you would for a major release, but typically for patch releases we tend to
+include everything in the release notes.
 
 ## Origin of the Sources
 
