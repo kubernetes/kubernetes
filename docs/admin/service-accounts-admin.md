@@ -23,7 +23,7 @@ certainly want the docs that go with that version.</h1>
 # Cluster Admin Guide to Service Accounts
 
 *This is a Cluster Administrator guide to service accounts.  It assumes knowledge of
-the [User Guide to Service Accounts](../service-accounts.md).*
+the [User Guide to Service Accounts](../user-guide/service-accounts.md).*
 
 *Support for authorization and user accounts is planned but incomplete.  Sometimes
 incomplete features are referred to in order to better describe service accounts.*

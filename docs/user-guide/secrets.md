@@ -74,7 +74,7 @@ The automatic creation and use of API credentials can be disabled or overridden
 if desired.  However, if all you need to do is securely access the apiserver,
 this is the recommended workflow.
 
-See the [Service Account](../service-accounts.md) documentation for more
+See the [Service Account](service-accounts.md) documentation for more
 information on how Service Accounts work.
 
 ### Creating a Secret Manually
@@ -100,7 +100,7 @@ are `value-1` and `value-2`, respectively, with carriage return and newline char
 Create the secret using [`kubectl create`](kubectl/kubectl_create.md).
 
 Once the secret is created, you can:
-  - create pods that automatically use it via a [Service Account](../service-accounts.md).
+  - create pods that automatically use it via a [Service Account](service-accounts.md).
   - modify your pod specification to use the secret
 
 ### Manually specifying a Secret to be Mounted on a Pod
@@ -149,7 +149,7 @@ Use of imagePullSecrets is desribed in the [images documentation](images.md#spec
 *This feature is planned but not implemented.  See [issue
 9902](https://github.com/GoogleCloudPlatform/kubernetes/issues/9902).*
 
-You can reference manually created secrets from a [service account](../service-accounts.md).
+You can reference manually created secrets from a [service account](service-accounts.md).
 Then, pods which use that service account will have
 `volumeMounts` and/or `imagePullSecrets` added to them.
 The secrets will be mounted at **TBD**.
@@ -217,7 +217,7 @@ the original pod must be deleted, and a new pod (perhaps with an identical
 workflow as deploying a new container image.  The `kubectl rolling-update`
 command can be used ([man page](kubectl/kubectl_rolling-update.md)).
 
-The [`resourceVersion`](../api-conventions.md#concurrency-control-and-consistency)
+The [`resourceVersion`](../devel/api-conventions.md#concurrency-control-and-consistency)
 of the secret is not specified when it is referenced.
 Therefore, if a secret is updated at about the same time as pods are starting,
 then it is not defined which version of the secret will be used for the pod. It
