@@ -74,7 +74,11 @@ Example\
 "
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TEST_REGEX=""
+# NOTE: if you want the flaky test suite to be empty, you CANNOT leave the
+# regexp empty - this will cause running all tests in flaky suite and no tests
+# in regular "gce" suite.
+GCE_FLAKY_TEST_REGEX="DO\sNOT\sRUN\sANYTHING"
+
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TEST_REGEX="\
 ${GCE_DEFAULT_SKIP_TEST_REGEX}\
@@ -86,7 +90,6 @@ ${GCE_DEFAULT_SKIP_TEST_REGEX}\
 |Shell.*services\
 "
 # Tests which are known to be flaky when run in parallel.
-# TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
 GCE_PARALLEL_FLAKY_TEST_REGEX="\
 Elasticsearch\
 |PD\
