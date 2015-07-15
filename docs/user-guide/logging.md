@@ -90,6 +90,10 @@ describes how to ingest cluster level logs into Elasticsearch and view them usin
 Cluster level logging only collects the standard output and standard error output of the applications
 running in containers. The guide [Collecting log files within containers with Fluentd](../../contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
 
+## Known issues
+
+Kubernetes does log rotation for kubernetes components and docker containers. The command `kubectl logs` currently only read the latest logs, not all historical ones.
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/logging.md?pixel)]()
