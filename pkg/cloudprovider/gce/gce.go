@@ -219,10 +219,23 @@ func (gce *GCECloud) Routes() (cloudprovider.Routes, bool) {
 	return gce, true
 }
 
-func makeHostLink(projectID, zone, host string) string {
+func makeHostURL(projectID, zone, host string) string {
 	host = canonicalizeInstanceName(host)
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/instances/%s",
 		projectID, zone, host)
+}
+
+func makeComparableHostPath(zone, host string) string {
+	host = canonicalizeInstanceName(host)
+	return fmt.Sprintf("/zones/%s/instances/%s", zone, host)
+}
+
+func hostURLToComparablePath(hostURL string) string {
+	idx := strings.Index(hostURL, "/zones/")
+	if idx < 0 {
+		return ""
+	}
+	return hostURL[idx:]
 }
 
 // Session Affinity Type string
@@ -240,7 +253,7 @@ const (
 func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinityType GCEAffinityType) error {
 	var instances []string
 	for _, host := range hosts {
-		instances = append(instances, makeHostLink(gce.projectID, gce.zone, host))
+		instances = append(instances, makeHostURL(gce.projectID, gce.zone, host))
 	}
 	pool := &compute.TargetPool{
 		Name:            name,
@@ -390,12 +403,15 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 	if err != nil {
 		return err
 	}
-	existing := util.NewStringSet(pool.Instances...)
+	existing := util.NewStringSet()
+	for _, instance := range pool.Instances {
+		existing.Insert(hostURLToComparablePath(instance))
+	}
 
 	var toAdd []*compute.InstanceReference
 	var toRemove []*compute.InstanceReference
 	for _, host := range hosts {
-		link := makeHostLink(gce.projectID, gce.zone, host)
+		link := makeComparableHostPath(gce.zone, host)
 		if !existing.Has(link) {
 			toAdd = append(toAdd, &compute.InstanceReference{link})
 		}
