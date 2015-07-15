@@ -22,6 +22,17 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Kubernetes User Guide: Managing Applications: Deploying continuously running applications
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes User Guide: Managing Applications: Deploying continuously running applications](#kubernetes-user-guide:-managing-applications:-deploying-continuously-running-applications)
+  - [Launching a set of replicas using a configuration file](#launching-a-set-of-replicas-using-a-configuration-file)
+  - [Viewing replication controller status](#viewing-replication-controller-status)
+  - [Deleting replication controllers](#deleting-replication-controllers)
+  - [Labels](#labels)
+  - [What's next?](#what's-next?)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 You previously read about how to quickly deploy a simple replicated application using [`kubectl run`](quick-start.md) and how to configure and launch single-run containers using pods (configuring-containers.md). Here, you’ll use the configuration-based approach to deploy a continuously running, replicated application.
 
 ## Launching a set of replicas using a configuration file
@@ -112,6 +123,10 @@ map[app:nginx]
 ```
 
 You could also specify the `selector` explicitly, such as if you wanted to specify labels in the pod template that you didn’t want to select on, but you should ensure that the selector will match the labels of the pods created from the pod template, and that it won’t match pods created by other replication controllers. The most straightforward way to ensure the latter is to create a unique label value for the replication controller, and to specify it in both the pod template’s labels and in the selector.
+
+## What's next?
+
+[Learn about exposing applications to users and clients, and connecting tiers of your application together.](connecting-applications.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
