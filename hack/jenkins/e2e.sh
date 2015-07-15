@@ -28,6 +28,13 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+# Join all args with |
+#   Example: join_regex a b "c d" e  =>  a|b|c d|e
+function join_regex() {
+    local IFS="|"
+    echo "$*"
+}
+
 echo "--------------------------------------------------------------------------------"
 echo "Initial Environment:"
 printenv | sort
@@ -66,40 +73,39 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
 fi
 
 # Specialized tests which should be skipped by default for projects.
-GCE_DEFAULT_SKIP_TEST_REGEX="\
-Skipped|\
-Reboot|\
-Restart|\
-Example\
-"
+GCE_DEFAULT_SKIP_TESTS=(
+    "Skipped"
+    "Reboot"
+    "Restart"
+    "Example"
+    )
+
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-# NOTE: if you want the flaky test suite to be empty, you CANNOT leave the
-# regexp empty - this will cause running all tests in flaky suite and no tests
-# in regular "gce" suite.
-GCE_FLAKY_TEST_REGEX="DO\sNOT\sRUN\sANYTHING"
+GCE_FLAKY_TESTS=()
 
 # Tests which are not able to be run in parallel.
-GCE_PARALLEL_SKIP_TEST_REGEX="\
-${GCE_DEFAULT_SKIP_TEST_REGEX}\
-|Etcd\
-|NetworkingNew\
-|Nodes\sNetwork\
-|Nodes\sResize\
-|MaxPods\
-|Shell.*services\
-"
+GCE_PARALLEL_SKIP_TESTS=(
+    ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}}
+    "Etcd"
+    "NetworkingNew"
+    "Nodes\sNetwork"
+    "Nodes\sResize"
+    "MaxPods"
+    "Shell.*services"
+    )
+
 # Tests which are known to be flaky when run in parallel.
-GCE_PARALLEL_FLAKY_TEST_REGEX="\
-Elasticsearch\
-|PD\
-|ServiceAccounts\
-|Service\sendpoints\slatency\
-|Services.*change\sthe\stype\
-|Services.*functioning\sexternal\sload\sbalancer\
-|Services.*identically\snamed\
-|Services.*release.*load\sbalancer\
-"
+GCE_PARALLEL_FLAKY_TESTS=(
+    "Elasticsearch"
+    "PD"
+    "ServiceAccounts"
+    "Service\sendpoints\slatency"
+    "Services.*change\sthe\stype"
+    "Services.*functioning\sexternal\sload\sbalancer"
+    "Services.*identically\snamed"
+    "Services.*release.*load\sbalancer"
+    )
 
 # Define environment variables based on the Jenkins project name.
 case ${JOB_NAME} in
@@ -108,7 +114,10 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-gce"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
     ;;
@@ -118,7 +127,11 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-flaky"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX} --ginkgo.focus=${GCE_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ) --ginkgo.focus=$(join_regex \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
     ;;
@@ -128,7 +141,11 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-parallel"}
     : ${E2E_NETWORK:="e2e-parallel"}
     : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
@@ -140,7 +157,12 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="parallel-flaky"}
     : ${E2E_NETWORK:="e2e-parallel-flaky"}
     : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX} --ginkgo.focus=${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ) --ginkgo.focus=$(join_regex \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
     # Override GCE defaults.
@@ -178,7 +200,11 @@ case ${JOB_NAME} in
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce-parallel. It
     # currently also excludes a slow namespace test.
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
@@ -196,7 +222,10 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-gce-release"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
