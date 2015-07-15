@@ -106,16 +106,16 @@ func expandResourceShortcut(resource string) string {
 		"cs":     "componentstatuses",
 		"ev":     "events",
 		"ep":     "endpoints",
-		"limits": "limitRanges",
+		"limits": "limitranges",
 		"no":     "nodes",
+		"ns":     "namespaces",
 		"po":     "pods",
-		"pv":     "persistentVolumes",
-		"pvc":    "persistentVolumeClaims",
-		"quota":  "resourceQuotas",
+		"pv":     "persistentvolumes",
+		"pvc":    "persistentvolumeclaims",
+		"quota":  "resourcequotas",
 		"rc":     "replicationcontrollers",
-		// DEPRECATED: will be removed before 1.0
-		"se":  "services",
-		"svc": "services",
+		"se":     "services", // DEPRECATED: will be removed before 1.0
+		"svc":    "services",
 	}
 	if expanded, ok := shortForms[resource]; ok {
 		return expanded
