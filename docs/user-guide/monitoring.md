@@ -38,7 +38,7 @@ cAdvisor is an open source container resource usage and performance analysis age
 
 On most Kubernetes clusters, cAdvisor exposes a simple UI for on-machine containers on port 4194. Here is a snapshot of part of cAdvisor’s UI that shows the overall machine usage:
 
-![cAdvisor](../cadvisor.png)
+![cAdvisor](cadvisor.png)
 
 ### Kubelet
 
@@ -69,7 +69,7 @@ Here is a video showing how to setup and run a Google Cloud Monitoring backed He
 
 Here is a snapshot of the a Google Cloud Monitoring dashboard showing cluster-wide resource usage.
 
-![Google Cloud Monitoring dashboard](../gcm.png)
+![Google Cloud Monitoring dashboard](gcm.png)
 
 ## Try it out!
 Now that you’ve learned a bit about Heapster, feel free to try it out on your own clusters! The [Heapster repository](https://github.com/GoogleCloudPlatform/heapster) is available on GitHub. It contains detailed instructions to setup Heapster and its storage backends. Heapster runs by default on most Kubernetes clusters, so you may already have it! Feedback is always welcome. Please let us know if you run into any issues. Heapster and Kubernetes developers hang out in the [#google-containers](http://webchat.freenode.net/?channels=google-containers) IRC channel on freenode.net. You can also reach us on the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers).
