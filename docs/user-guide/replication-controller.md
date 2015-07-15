@@ -25,8 +25,8 @@ certainly want the docs that go with that version.</h1>
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 - [Replication Controller](#replication-controller)
-  - [What is a _replication controller_?](#what-is-a-_replication-controller_?)
-  - [How does a replication controller work?](#how-does-a-replication-controller-work?)
+  - [What is a _replication controller_?](#what-is-a-_replication-controller_)
+  - [How does a replication controller work?](#how-does-a-replication-controller-work)
     - [Pod template](#pod-template)
     - [Labels](#labels)
   - [Responsibilities of the replication controller](#responsibilities-of-the-replication-controller)

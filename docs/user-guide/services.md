@@ -31,7 +31,7 @@ certainly want the docs that go with that version.</h1>
   - [Virtual IPs and service proxies](#virtual-ips-and-service-proxies)
   - [Multi-Port Services](#multi-port-services)
   - [Choosing your own IP address](#choosing-your-own-ip-address)
-    - [Why not use round-robin DNS?](#why-not-use-round-robin-dns?)
+    - [Why not use round-robin DNS?](#why-not-use-round-robin-dns)
   - [Discovering services](#discovering-services)
     - [Environment variables](#environment-variables)
     - [DNS](#dns)

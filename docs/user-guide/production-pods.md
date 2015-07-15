@@ -33,7 +33,7 @@ certainly want the docs that go with that version.</h1>
   - [Liveness and readiness probes (aka health checks)](#liveness-and-readiness-probes-(aka-health-checks))
   - [Lifecycle hooks and termination notice](#lifecycle-hooks-and-termination-notice)
   - [Termination message](#termination-message)
-  - [What's next?](#what's-next?)
+  - [What's next?](#whats-next)
 
 <!-- END MUNGE: GENERATED_TOC -->
 

@@ -29,7 +29,7 @@ certainly want the docs that go with that version.</h1>
   - [Viewing replication controller status](#viewing-replication-controller-status)
   - [Deleting replication controllers](#deleting-replication-controllers)
   - [Labels](#labels)
-  - [What's next?](#what's-next?)
+  - [What's next?](#whats-next)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
