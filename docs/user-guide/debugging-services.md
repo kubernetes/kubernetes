@@ -20,12 +20,34 @@ certainly want the docs that go with that version.</h1>
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-# My Service isn't working - how to debug
+# My Service is not working - how to debug
 
 An issue that comes up rather frequently for new installations of Kubernetes is
 that `Services` are not working properly.  You've run all your `Pod`s and
 `ReplicationController`s, but you get no response when you try to access them.
 This document will hopefully help you to figure out what's going wrong.
+
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [My Service is not working - how to debug](#my-service-is-not-working---how-to-debug)
+  - [Conventions](#conventions)
+  - [Running commands in a Pod](#running-commands-in-a-pod)
+  - [Setup](#setup)
+  - [Does the Service exist?](#does-the-service-exist)
+  - [Does the Service work by DNS?](#does-the-service-work-by-dns)
+    - [Does any Service exist in DNS?](#does-any-service-exist-in-dns)
+  - [Does the Service work by IP?](#does-the-service-work-by-ip)
+  - [Is the Service correct?](#is-the-service-correct)
+  - [Does the Service have any Endpoints?](#does-the-service-have-any-endpoints)
+  - [Are the Pods working?](#are-the-pods-working)
+  - [Is the kube-proxy working?](#is-the-kube-proxy-working)
+    - [Is kube-proxy running?](#is-kube-proxy-running)
+    - [Is kube-proxy writing iptables rules?](#is-kube-proxy-writing-iptables-rules)
+    - [Is kube-proxy proxying?](#is-kube-proxy-proxying)
+  - [Seek help](#seek-help)
+  - [More information](#more-information)
+
+<!-- END MUNGE: GENERATED_TOC -->
 
 ## Conventions
 
@@ -57,33 +79,32 @@ OUTPUT
 
 ## Running commands in a Pod
 
-For many steps here will will want to see what a `Pod` running in the cluster
+For many steps here you will want to see what a `Pod` running in the cluster
 sees.  Kubernetes does not directly support interactive `Pod`s (yet), but you can
 approximate it:
 
 ```sh
 $ cat <<EOF | kubectl create -f -
-> apiVersion: v1
-> kind: Pod
-> metadata:
->   name: busybox-sleep
-> spec:
->   containers:
->   - name: busybox
->     image: busybox
->     args:
->     - sleep
->     - "1000000"
-> EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-sleep
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    args:
+    - sleep
+    - "1000000"
+EOF
 pods/busybox-sleep
 ```
 
 Now, when you need to run a command (even an interactive shell) in a `Pod`-like
-context:
+context, use:
 
 ```sh
-$ kubectl exec busybox-sleep hostname
-busybox-sleep
+$ kubectl exec busybox-sleep -- <COMMAND>
 ```
 
 or
@@ -281,7 +302,7 @@ debugging your own `Service`, debug DNS.
 
 ## Does the Service work by IP?
 
-The next thing to test is whether your `Service` worksat all.  From a
+The next thing to test is whether your `Service` works at all.  From a
 `Node` in your cluster, access the `Service`'s IP (from `kubectl get` above).
 
 ```sh
@@ -509,6 +530,9 @@ Contact us on
 [IRC](http://webchat.freenode.net/?channels=google-containers) or
 [email](https://groups.google.com/forum/#!forum/google-containers) or
 [GitHub](https://github.com/GoogleCloudPlatform/kubernetes).
+
+## More information
+Visit [troubleshooting document](../troubleshooting.md) for more information. 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
