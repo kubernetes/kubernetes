@@ -89,7 +89,7 @@ commands in those containers, we strongly encourage enabling this plug-in.
 
 ### ServiceAccount
 
-This plug-in implements automation for [serviceAccounts](../service-accounts.md).
+This plug-in implements automation for [serviceAccounts](../user-guide/service-accounts.md).
 We strongly recommend using this plug-in if you intend to make use of Kubernetes ```ServiceAccount``` objects.
 
 ### SecurityContextDeny
