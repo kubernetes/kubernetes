@@ -187,7 +187,7 @@ func main() {
 	// - If verify is true: exit 0 if no changes needed, exit 1 if changes
 	//   needed.
 	// - If verify is false: exit 0 if changes successfully made or no
-	//   changes needed.
+	//   changes needed, exit 1 if manual changes are needed.
 	var changesNeeded bool
 
 	err := filepath.Walk(leaf, newWalkFunc(&fp, &changesNeeded))
@@ -195,8 +195,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(2)
 	}
-	if changesNeeded && *verify {
-		fmt.Fprintf(os.Stderr, "FAIL: changes needed but not made due to --verify\n")
+	if changesNeeded {
+		if *verify {
+			fmt.Fprintf(os.Stderr, "FAIL: changes needed but not made due to --verify\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "FAIL: some manual changes are still required.\n")
+		}
 		os.Exit(1)
 	}
 }
