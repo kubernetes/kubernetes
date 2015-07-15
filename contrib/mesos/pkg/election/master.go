@@ -88,14 +88,12 @@ func Notify(m MasterElector, path, id string, s Service, abort <-chan struct{}) 
 						}
 						func() {
 							n.lock.Lock()
-
 							n.desired = electedMaster
-							if n.desired != n.current {
-								n.lock.Unlock()
+							newMaster := n.desired != n.current
+							n.lock.Unlock()
 
+							if newMaster {
 								n.changed <- struct{}{}
-							} else {
-								n.lock.Unlock()
 							}
 						}()
 					}
