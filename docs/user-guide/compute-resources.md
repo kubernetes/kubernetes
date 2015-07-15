@@ -23,14 +23,18 @@ certainly want the docs that go with that version.</h1>
 # Compute Resources
 
 ** Table of Contents**
-- Compute Resources
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Compute Resources](#compute-resources)
   - [Container and Pod Resource Limits](#container-and-pod-resource-limits)
   - [How Pods with Resource Limits are Scheduled](#how-pods-with-resource-limits-are-scheduled)
   - [How Pods with Resource Limits are Run](#how-pods-with-resource-limits-are-run)
   - [Monitoring Compute Resource Usage](#monitoring-compute-resource-usage)
   - [Troubleshooting](#troubleshooting)
-    - [Detecting Resource Starved Containers](#detecting-resource-starved-containers)
+    - [My pods are pending with event message failedScheduling](#my-pods-are-pending-with-event-message-failedscheduling)
+    - [My container is terminated](#my-container-is-terminated)
   - [Planned Improvements](#planned-improvements)
+
+<!-- END MUNGE: GENERATED_TOC -->
 
 When specifying a [pod](pods.md), you can optionally specify how much CPU and memory (RAM) each
 container needs.  When containers have resource limits, the scheduler is able to make better
@@ -134,6 +138,7 @@ then pod resource usage can be retrieved from the monitoring system.
 
 ## Troubleshooting
 
+### My pods are pending with event message failedScheduling
 If the scheduler cannot find any node where a pod can fit, then the pod will remain unscheduled
 until a place can be found.    An event will be produced each time the scheduler fails to find a
 place for the pod, like this:
@@ -159,8 +164,8 @@ The [resource quota](../admin/resource-quota.md) feature can be configured
 to limit the total amount of resources that can be consumed.  If used in conjunction
 with namespaces, it can prevent one team from hogging all the resources.
 
-### Detecting Resource Starved Containers
-To check if a container is being killed because it is hitting a resource limit, call `kubectl describe pod`
+### My container is terminated 
+Your container may be terminated because it's resource-starved. To check if a container is being killed because it is hitting a resource limit, call `kubectl describe pod`
 on the pod you are interested in:
 
 ```
