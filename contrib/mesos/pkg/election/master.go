@@ -46,8 +46,8 @@ type Service interface {
 }
 
 type notifier struct {
-	lock sync.Mutex
-	cond *sync.Cond
+	lock    sync.Mutex
+	changed chan struct{} // to notify the service loop about changed state
 
 	// desired is updated with every change, current is updated after
 	// Start()/Stop() finishes. 'cond' is used to signal that a change
@@ -65,7 +65,7 @@ type notifier struct {
 // elected master starts/stops matching 'id'. Never returns.
 func Notify(m MasterElector, path, id string, s Service, abort <-chan struct{}) {
 	n := &notifier{id: Master(id), service: s}
-	n.cond = sync.NewCond(&n.lock)
+	n.changed = make(chan struct{})
 	finished := runtime.After(func() {
 		runtime.Until(func() {
 			for {
@@ -88,10 +88,14 @@ func Notify(m MasterElector, path, id string, s Service, abort <-chan struct{}) 
 						}
 						func() {
 							n.lock.Lock()
-							defer n.lock.Unlock()
+
 							n.desired = electedMaster
 							if n.desired != n.current {
-								n.cond.Signal()
+								n.lock.Unlock()
+
+								n.changed <- struct{}{}
+							} else {
+								n.lock.Unlock()
 							}
 						}()
 					}
@@ -104,31 +108,23 @@ func Notify(m MasterElector, path, id string, s Service, abort <-chan struct{}) 
 
 // serviceLoop waits for changes, and calls Start()/Stop() as needed.
 func (n *notifier) serviceLoop(abort <-chan struct{}) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
 	for {
 		select {
 		case <-abort:
 			return
-		default:
-			for n.desired == n.current {
-				ch := runtime.After(n.cond.Wait)
-				select {
-				case <-abort:
-					n.cond.Signal() // ensure that Wait() returns
-					<-ch
-					return
-				case <-ch:
-					// we were notified and have the lock, proceed..
+		case <-n.changed:
+			func() {
+				n.lock.Lock()
+				defer n.lock.Unlock()
+
+				if n.current != n.id && n.desired == n.id {
+					n.service.Validate(n.desired, n.current)
+					n.service.Start()
+				} else if n.current == n.id && n.desired != n.id {
+					n.service.Stop()
 				}
-			}
-			if n.current != n.id && n.desired == n.id {
-				n.service.Validate(n.desired, n.current)
-				n.service.Start()
-			} else if n.current == n.id && n.desired != n.id {
-				n.service.Stop()
-			}
-			n.current = n.desired
+				n.current = n.desired
+			}()
 		}
 	}
 }
