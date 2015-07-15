@@ -106,6 +106,7 @@ If you don't have much familiarity with Kubernetes, we recommend you read the fo
   * [Specifying commands and requesting capabilities](containers.md)
   * [Downward API: accessing system configuration from a pod](downward-api.md)
   * [Images and registries](images.md)
+  * [Migrating from docker-cli to kubectl](docker-cli-to-kubectl.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
