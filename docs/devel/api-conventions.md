@@ -61,7 +61,7 @@ using resources with kubectl can be found in (working_with_resources.md).*
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-The conventions of the [Kubernetes API](api.md) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
+The conventions of the [Kubernetes API](../api.md) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
 
 The general style of the Kubernetes API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. Kubernetes also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields. Where relevant HTTP header fields exist, they should mirror the content of JSON fields, but the information should not be represented only in the HTTP header.
 
@@ -95,7 +95,7 @@ Kinds are grouped into three categories:
 
    Most objects defined in the system should have an endpoint that returns the full set of resources, as well as zero or more endpoints that return subsets of the full list. Some objects may be singletons (the current user, the system defaults) and may not have lists.
 
-   In addition, all lists that return objects with labels should support label filtering (see [user-guide/labels.md](user-guide/labels.md), and most lists should support filtering by fields.
+   In addition, all lists that return objects with labels should support label filtering (see [docs/user-guide/labels.md](../user-guide/labels.md), and most lists should support filtering by fields.
 
    Examples: PodLists, ServiceLists, NodeLists
 
@@ -128,17 +128,17 @@ These fields are required for proper decoding of the object. They may be populat
 
 Every object kind MUST have the following metadata in a nested object field called "metadata":
 
-* namespace: a namespace is a DNS compatible subdomain that objects are subdivided into. The default namespace is 'default'.  See [admin/namespaces.md](admin/namespaces.md) for more.
-* name: a string that uniquely identifies this object within the current namespace (see [user-guide/identifiers.md](user-guide/identifiers.md)). This value is used in the path when retrieving an individual object.
-* uid: a unique in time and space value (typically an RFC 4122 generated identifier, see [user-guide/identifiers.md](user-guide/identifiers.md)) used to distinguish between objects with the same name that have been deleted and recreated
+* namespace: a namespace is a DNS compatible subdomain that objects are subdivided into. The default namespace is 'default'.  See [docs/admin/namespaces.md](../admin/namespaces.md) for more.
+* name: a string that uniquely identifies this object within the current namespace (see [docs/user-guide/identifiers.md](../user-guide/identifiers.md)). This value is used in the path when retrieving an individual object.
+* uid: a unique in time and space value (typically an RFC 4122 generated identifier, see [docs/user-guide/identifiers.md](../user-guide/identifiers.md)) used to distinguish between objects with the same name that have been deleted and recreated
 
 Every object SHOULD have the following metadata in a nested object field called "metadata":
 
 * resourceVersion: a string that identifies the internal version of this object that can be used by clients to determine when objects have changed. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. (see [concurrency control](#concurrency-control-and-consistency), below, for more details)
 * creationTimestamp: a string representing an RFC 3339 date of the date and time an object was created
 * deletionTimestamp: a string representing an RFC 3339 date of the date and time after which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time.
-* labels: a map of string keys and values that can be used to organize and categorize objects (see [user-guide/labels.md](user-guide/labels.md))
-* annotations: a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object (see [user-guide/annotations.md](user-guide/annotations.md))
+* labels: a map of string keys and values that can be used to organize and categorize objects (see [docs/user-guide/labels.md](../user-guide/labels.md))
+* annotations: a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object (see [docs/user-guide/annotations.md](../user-guide/annotations.md))
 
 Labels are intended for organizational purposes by end users (select the pods that match this label query). Annotations enable third-party automation and tooling to decorate objects with additional metadata for their own use.
 
@@ -171,11 +171,11 @@ In order to preserve extensibility, in the future, we intend to explicitly conve
 
 Note that historical information status (e.g., last transition time, failure counts) is only provided at best effort, and is not guaranteed to not be lost.
 
-Status information that may be large (especially unbounded in size, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](design/resources.md#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
+Status information that may be large (especially unbounded in size, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](../design/resources.md#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
 
 #### References to related objects
 
-References to loosely coupled sets of objects, such as [pods](user-guide/pods.md) overseen by a [replication controller](user-guide/replication-controller.md), are usually best referred to using a [label selector](user-guide/labels.md). In order to ensure that GETs of individual objects remain bounded in time and space, these sets may be queried via separate API queries, but will not be expanded in the referring object's status.
+References to loosely coupled sets of objects, such as [pods](../user-guide/pods.md) overseen by a [replication controller](../user-guide/replication-controller.md), are usually best referred to using a [label selector](../user-guide/labels.md). In order to ensure that GETs of individual objects remain bounded in time and space, these sets may be queried via separate API queries, but will not be expanded in the referring object's status.
 
 References to specific objects, especially specific resource versions and/or specific fields of those objects, are specified using the `ObjectReference` type. Unlike partial URLs, the ObjectReference type facilitates flexible defaulting of fields from the referring object or other contextual information.
 
@@ -242,7 +242,7 @@ Kubernetes by convention exposes additional verbs as new root endpoints with sin
 
 These are verbs which change the fundamental type of data returned (watch returns a stream of JSON instead of a single JSON object). Support of additional verbs is not required for all object types.
 
-Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [user-guide/accessing-the-cluster.md](user-guide/accessing-the-cluster.md).
+Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [docs/user-guide/accessing-the-cluster.md](../user-guide/accessing-the-cluster.md).
 
 When resources wish to expose alternative actions that are closely coupled to a single resource, they should do so using new sub-resources. An example is allowing automated processes to update the "status" field of a Pod. The `/pods` endpoint only allows updates to "metadata" and "spec", since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted. Likewise, some actions like "stop" or "scale" are best represented as REST sub-resources that are POSTed to.  The POST action may require a simple kind to be provided if the action requires parameters, or function without a request body.
 
@@ -332,7 +332,7 @@ labels:
 
 ## Idempotency
 
-All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [user-guide/identifiers.md](user-guide/identifiers.md) for details.
+All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [docs/user-guide/identifiers.md](../user-guide/identifiers.md) for details.
 
 Names generated by the system may be requested using `metadata.generateName`. GenerateName indicates that the name should be made unique by the server prior to persisting it. A non-empty value for the field indicates the name will be made unique (and the name returned to the client will be different than the name passed). The value of this field will be combined with a unique suffix on the server if the Name field has not been provided. The provided value must be valid within the rules for Name, and may be truncated by the length of the suffix required to make the value unique on the server. If this field is specified, and Name is not present, the server will NOT return a 409 if the generated name exists - instead, it will either return 201 Created or 504 with Reason `ServerTimeout` indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).
 
@@ -633,5 +633,5 @@ TODO: Document events (refer to another doc for details)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/api-conventions.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api-conventions.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
