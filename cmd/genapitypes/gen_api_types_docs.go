@@ -69,13 +69,58 @@ func gen_apitypes_doc(outDir, inDir string) {
 	}
 }
 
+func findTopLevelObjects(file []byte) map[string]struct{} {
+	apiDeclaration := swagger.ApiDeclaration{}
+	if err := json.Unmarshal(file, &apiDeclaration); err != nil {
+		glog.Fatal(err)
+	}
+	apiVersion := apiDeclaration.ApiVersion + "."
+
+	subSet := make(map[string]struct{})
+	topSet := make(map[string]struct{})
+
+	for _, m := range apiDeclaration.Models.List {
+		modelName := strings.TrimLeft(m.Name, apiVersion)
+		if _, ok := subSet[modelName]; ok {
+			continue
+		}
+		topSet[modelName] = struct{}{}
+		for _, p := range m.Model.Properties.List {
+			if p.Property.DataTypeFields.Type != nil {
+				if *p.Property.DataTypeFields.Type == "array" {
+					if p.Property.DataTypeFields.Items.Ref != nil {
+						//don't add the ref into subSet if the model is for a list for a top level object, like PodList
+						if (m.Name[len(m.Name)-4:] == "
+						printRef(buf, p.Property.DataTypeFields.Items.Ref, apiVersion)
+					} else if p.Property.DataTypeFields.Items.Type != nil {
+						fmt.Fprintf(buf, "[]"+*p.Property.DataTypeFields.Items.Type)
+					}
+				} else {
+					fmt.Fprintf(buf, *p.Property.DataTypeFields.Type)
+				}
+			} else {
+				printRef(buf, p.Property.DataTypeFields.Ref, apiVersion)
+			}
+			fmt.Fprintf(buf, "\n  * **_description_**: "+p.Property.Description+"\n")
+		}
+
+	}
+}
+
 func gen_apitype_doc_for_version(outDir string, file []byte) (int, error) {
 	apiDeclaration := swagger.ApiDeclaration{}
 	if err := json.Unmarshal(file, &apiDeclaration); err != nil {
 		glog.Fatal(err)
 	}
 	apiVersion := apiDeclaration.ApiVersion + "."
+
+	refSet := make(map[string]struct{})
+
 	for _, m := range apiDeclaration.Models.List {
+		modelName := strings.TrimLeft(m.Name, apiVersion)
+		if _, ok := refSet[modelName]; ok {
+			continue
+		}
 		buf := new(bytes.Buffer)
 		fmt.Fprintf(buf, "###"+strings.TrimLeft(m.Name, apiVersion)+"###\n")
 		if len(m.Model.Description) > 0 {
