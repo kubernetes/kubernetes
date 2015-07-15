@@ -19,8 +19,6 @@ package election
 import (
 	"testing"
 	"time"
-
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
 )
 
 type slowService struct {
@@ -64,11 +62,12 @@ func (s *slowService) Stop() {
 	s.changes <- false
 }
 
-func Test(t *testing.T) {
+func TestNotify(t *testing.T) {
 	m := NewFake()
 	changes := make(chan bool, 1500)
 	done := make(chan struct{})
 	s := &slowService{t: t, changes: changes, done: done}
+	defer close(done)
 
 	// change master to "notme" such that the initial m.Elect call inside Notify
 	// will trigger an obversable event. We will wait for it to make sure the
@@ -77,33 +76,36 @@ func Test(t *testing.T) {
 	temporaryWatch := m.mux.Watch()
 	ch := temporaryWatch.ResultChan()
 
-	notifyDone := runtime.After(func() { Notify(m, "", "me", s, done) })
+	go Notify(m, "", "me", s, done)
 
 	// wait for the event triggered by the initial m.Elect of Notify. Then drain
 	// the channel to not block anything.
 	<-ch
 	temporaryWatch.Stop()
-	for {
-		_, ok := <-ch
-		if !ok {
-			break
+	for _ = range ch {
+	}
+
+	for i := 0; i < 500; i++ {
+		for _, key := range []string{"me", "notme", "alsonotme"} {
+			m.ChangeMaster(Master(key))
 		}
 	}
 
-	go func() {
-		defer close(done)
-		for i := 0; i < 500; i++ {
-			for _, key := range []string{"me", "notme", "alsonotme"} {
-				m.ChangeMaster(Master(key))
-			}
+	// elections that don't include "me" don't trigger change events
+	const want = 1000
+	timeout := time.After(100 * time.Millisecond)
+	got := 0
+
+outer:
+	for ; got < want; got++ {
+		select {
+		case <-changes:
+		case <-timeout:
+			break outer
 		}
-	}()
+	}
 
-	<-notifyDone
-	close(changes)
-
-	changesNum := len(changes)
-	if changesNum > 1000 || changesNum == 0 {
-		t.Errorf("unexpected number of changes: %v", changesNum)
+	if got != want {
+		t.Errorf("unexpected number of changes: got, want: %v, %v", got, want)
 	}
 }
