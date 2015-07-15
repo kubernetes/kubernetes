@@ -116,7 +116,9 @@ $ kubectl exec -ti busybox-sleep sh
 
 ## Setup
 
-For the purposes of this walk-through, let's run some `Pod`s.
+For the purposes of this walk-through, let's run some `Pod`s.  Since you're
+probably debugging your own `Service` you can substitute your own details, or you
+can follow along and get a second data point.
 
 ```sh
 $ kubectl run hostnames --image=gcr.io/google_containers/serve_hostname \
@@ -191,7 +193,8 @@ $ kubectl get svc hostnames
 Error from server: service "hostnames" not found
 ```
 
-So we have a culprit, let's create the `Service`:
+So we have a culprit, let's create the `Service`.  As before, this is for the
+walk-through - you can use your own `Service`'s details here.
 
 ```sh
 $ kubectl expose rc hostnames --port=80 --target-port=9376
@@ -235,11 +238,11 @@ pod$ nslookup hostnames
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
-Name:   hostnames.default.svc.cluster.local
+Name:   hostnames
 Address: 10.0.1.175
 ```
 
-If this fails, perhaps because your `Pod` and `Service` are in different
+If this fails, perhaps your `Pod` and `Service` are in different
 `Namespace`s, try a namespace-qualified name:
 
 ```sh
@@ -247,11 +250,12 @@ pod$ nslookup hostnames.default
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
-Name:   hostnames.default.svc.cluster.local
+Name:   hostnames.default
 Address: 10.0.1.175
 ```
 
-If this still fails, try a fully-qualified name:
+If this works, you'll need to ensure that `Pod`s and `Service`s run in the same
+`Namespace`.  If this still fails, try a fully-qualified name:
 
 ```sh
 pod$ nslookup hostnames.default.svc.cluster.local
@@ -261,6 +265,10 @@ Address:        10.0.0.10#53
 Name:   hostnames.default.svc.cluster.local
 Address: 10.0.1.175
 ```
+
+Note the suffix here: "default.svc.cluster.local".  The "default" is the
+`Namespace` we're operating in.  The "svc" denotes that this is a `Service`.
+The "cluster.local" is your cluster domain.
 
 You can also try this from a `Node` in the cluster (note: 10.0.0.10 is my DNS
 `Service`):
@@ -278,8 +286,8 @@ If you are able to do a fully-qualified name lookup but not a relative one, you
 need to check that your `kubelet` is running with the right flags.
 The `--cluster_dns` flag needs to point to your DNS `Service`'s IP and the
 `--cluster_domain` flag needs to be your cluster's domain - we assumed
-"cluster.local" in this document, but your might be different, in which case
-you should change that in all of the commands.
+"cluster.local" in this document, but yours might be different, in which case
+you should change that in all of the commands above.
 
 ### Does any Service exist in DNS?
 
