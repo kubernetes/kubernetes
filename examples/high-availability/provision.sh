@@ -32,7 +32,13 @@ function initialize {
 
     ### Important : The kube version MUST match the containers in the manifests.
     ### Otherwise lots of API errors.
-    yum install -y http://cbs.centos.org/kojifiles/packages/kubernetes/0.17.1/3.el7/x86_64/kubernetes-node-0.17.1-3.el7.x86_64.rpm
+    ### Enable rawhide and install kube 1x.
+    yum install -y yum-utils fedora-repos-rawhide
+    yum-config-manager --enable rawhide
+    yum list --show-duplicates kubernetes*
+    yum install -y kubernetes-node-1.0.0-0.2.git2c27b1f.fc23
+    yum-config-manager --disable rawhide
+    
     mkdir -p -m 777 /etc/kubernetes/manifests
     ### just to make it easy to hack around as non root user
     groupadd docker
@@ -141,7 +147,7 @@ function install_components {
             start_kubelet
 
             ### precaution to make sure etcd is writable, flush iptables.
-             iptables -F
+             iptables -wF
         ### nodes: these will each run their own api server.
     else
         ### Make sure etcd running, flannel needs it.
@@ -171,7 +177,7 @@ function install_components {
 
 initialize
 install_components
-iptables -F
+iptables -wF
 
 if [ "`hostname`" == "kube2.ha" ]; then
     poll
