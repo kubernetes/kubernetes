@@ -1,46 +1,91 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+require 'date'
 
-# All Vagrant configuration is done below. The "2" in Vagrant.configure
-# configures the configuration version (we support older styles for
-# backwards compatibility). Please don't change it unless you know what
-# you're doing.
-Vagrant.configure(2) do |config|
-  config.vm.box = "chef/centos-7.0"
+### This is a new provider, different then cloudbau's.  
+### RUN: vagrant plugin uninstall vagrant-openstack-plugin"
+### Then RUN: "vagrant plugin install vagrant-openstack-provider"
+require 'vagrant-openstack-provider'
 
-#  config.vm.network "public_network"
+Total=3
 
-  config.vm.define "master", primary: true do |master|
-    master.vm.hostname = "master.vms.local"
-    master.vm.network "private_network", ip: "192.168.1.100"
+VAGRANTFILE_API_VERSION = "2"
+
+# Openstack + Hostmanager providers are best used with latest versions.
+Vagrant.require_version ">= 1.7"
+
+### If you want to change variables in all.yml, use this snippet.
+### Just add a new line below as necessary...
+### Commented out since its not really required for now.
+# text = File.read('../group_vars/all.yml')
+# new_contents = new_contents.gsub("dns_setup: true", "dns_setup: false")
+# File.open('../group_vars/all.yml', "w") {|file| file.puts new_contents }
+
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  prefix = DateTime.now.strftime('%s')
+ 
+  ### vagrant up --provision-with=shell works, but name doesnt :( 
+  config.vm.provision "bootstrap", type: "shell" do |s|
+     s.path ="provision.sh"
   end
+  (1..Total).each do |i|    
+    # multi vm config
+    name = "kubernetes-vm-#{i}"
+    config.hostmanager.enabled = true
+    config.hostmanager.include_offline = false
+  
+    config.vm.define "#{name}" do |n|
+      # common config
+      n.vm.box = "dummy"
+      n.vm.box_url = "https://github.com/cloudbau/vagrant-openstack-plugin/raw/master/dummy.box"
 
-  (1..1).each do |i|
-    config.vm.define "node-#{i}" do |node|
-      node.vm.hostname = "node-#{i}.vms.local"
-      node.vm.network "private_network", ip: "192.168.1.1#{i}"
-      node.vm.provision :ansible do |ansible|
-        ansible.host_key_checking = false
-        ansible.extra_vars = {
-          ansible_ssh_user: 'vagrant',
-          ansible_ssh_pass: 'vagrant',
-          user: 'vagrant'
-        }
-        #ansible.verbose = 'vvv'
-        ansible.playbook = "../cluster.yml"
-        ansible.inventory_path = "vinventory"
-
-        ansible.limit = 'all'
+      # Make sure the private key from the key pair is provided
+      n.ssh.username = "fedora"
+      n.ssh.private_key_path = "~/.ssh/id_rsa"
+      n.vm.provider :openstack do |os|
+     
+        ### The below parameters need to be modified per your openstack instance. 
+        os.username     = ENV['OS_USERNAME']
+        os.password     = ENV['OS_PASSWORD']
+        os.flavor       = "m1.small"
+        os.image = "Fedora 22 Cloud Base x86_64 (final)"
+        os.openstack_auth_url     = "http://os1-public.osop.rhcloud.com:5000/v2.0/tokens/"
+        os.security_groups    = ['default','newgroup']
+        os.openstack_compute_url = "http://os1-public.osop.rhcloud.com:8774/v2/4f8086dadf9b4e929b7d9f88aa5d548d"
+        os.server_name = name 
+        config.ssh.username = "fedora"           # login for the VM
+        config.vm.boot_timeout = 60*10
+        ### Dont screw this up.  AUTH can fail if you don't have tenant correct ~
+        os.tenant_name = "ENG Emerging Tech"
+        os.keypair_name = "JPeerindex"
+        os.region = "OS1Public"
+        os.floating_ip_pool   = 'os1_public'
+        ### Floating IP AUTO may or may not be a viable option for your openstack instance.
+        #os.floating_ip = "auto"
       end
+      n.vm.provision "bootstrap", type:"shell", path: "provision.sh"
     end
   end
+ 
+   # This is how we create the ansible inventory, see it in .vagrant
+   # if you want to debug, run 'VAGRANT_LOG=info vagrant up'
+   # and you'll see exactly how the cluster comes up via ansible inv.
+   groups = {
+      "etcd" => ["kubernetes-vm-1"],
+      "masters" => ["kubernetes-vm-2"],
+      "nodes" => ["kubernetes-vm-3"],
+      "all_groups:children" => ["etcd","masters","nodes"]
+   }
+  
+   # This sets up both flannel and kube.
+  config.vm.provision "ansible" do |ansible|
+    ansible.groups = groups
+    ansible.playbook = "../cluster.yml"
+    ansible.limit = "all" #otherwise the metadata wont be there for ipv4?  
+    ansible.extra_vars = {
+    }
 
-
-  config.vm.provider "virtualbox" do |vb|
-    # Display the VirtualBox GUI when booting the machine
-    vb.gui = false
-    # Customize the amount of memory on the VM:
-    vb.memory = "2048"
-    # vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
   end
+
 end

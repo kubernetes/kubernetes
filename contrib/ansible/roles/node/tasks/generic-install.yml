@@ -1,3 +1,10 @@
+- name: Install Docker
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+    name: docker
+    state: latest
+  notify:
+    - restart daemons 
 - name: Install kubernetes
   action: "{{ ansible_pkg_mgr }}"
   args:
