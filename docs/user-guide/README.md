@@ -32,7 +32,7 @@ certainly want the docs that go with that version.</h1>
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-The user guide is intended for anyone who wants to run programs and services on an existing Kubernetes cluster.  Setup and administration of a Kubernetes cluster is described in the [Cluster Admin Guide](../../docs/admin/README.md). The [Developer Guide](../../docs/devel/developer-guide.md) is for anyone wanting to either write code which directly accesses the kubernetes API, or to contribute directly to the kubernetes project.
+The user guide is intended for anyone who wants to run programs and services on an existing Kubernetes cluster.  Setup and administration of a Kubernetes cluster is described in the [Cluster Admin Guide](../../docs/admin/README.md). The [Developer Guide](../../docs/devel/README.md) is for anyone wanting to either write code which directly accesses the kubernetes API, or to contribute directly to the kubernetes project.
 
 Please ensure you have completed the [prerequisites for running examples from the user guide](prereqs.md).
 
