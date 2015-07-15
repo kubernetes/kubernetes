@@ -105,7 +105,7 @@ func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filena
 }
 
 func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if os.Args[1] == "rollingupdate" {
+	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}
 	deploymentKey, filename, image, oldName, err := validateArguments(cmd, args)

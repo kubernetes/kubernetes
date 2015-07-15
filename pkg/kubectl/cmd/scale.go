@@ -65,7 +65,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // RunScale executes the scaling
 func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if os.Args[1] == "resize" {
+	if len(os.Args) > 1 && os.Args[1] == "resize" {
 		printDeprecationWarning("scale", "resize")
 	}
 
