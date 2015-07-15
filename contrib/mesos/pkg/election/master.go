@@ -17,12 +17,8 @@ limitations under the License.
 package election
 
 import (
-	"sync"
-
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-
-	"github.com/golang/glog"
 )
 
 // MasterElector is an interface for services that can elect masters.
@@ -45,84 +41,45 @@ type Service interface {
 	Stop()
 }
 
-type notifier struct {
-	lock    sync.Mutex
-	changed chan struct{} // to notify the service loop about changed state
-
-	// desired is updated with every change, current is updated after
-	// Start()/Stop() finishes. 'cond' is used to signal that a change
-	// might be needed. This handles the case where mastership flops
-	// around without calling Start()/Stop() excessively.
-	desired, current Master
-
-	// for comparison, to see if we are master.
-	id Master
-
-	service Service
-}
-
 // Notify runs Elect() on m, and calls Start()/Stop() on s when the
-// elected master starts/stops matching 'id'. Never returns.
+// elected master starts/stops matching 'id'. It only returns when the abort
+// channel is closed.
 func Notify(m MasterElector, path, id string, s Service, abort <-chan struct{}) {
-	n := &notifier{id: Master(id), service: s}
-	n.changed = make(chan struct{})
-	finished := runtime.After(func() {
-		runtime.Until(func() {
-			for {
-				w := m.Elect(path, id)
-				for {
-					select {
-					case <-abort:
-						return
-					case event, open := <-w.ResultChan():
-						if !open {
-							break
-						}
-						if event.Type != watch.Modified {
-							continue
-						}
-						electedMaster, ok := event.Object.(Master)
-						if !ok {
-							glog.Errorf("Unexpected object from election channel: %v", event.Object)
-							break
-						}
-						func() {
-							n.lock.Lock()
-							n.desired = electedMaster
-							newMaster := n.desired != n.current
-							n.lock.Unlock()
-
-							if newMaster {
-								n.changed <- struct{}{}
-							}
-						}()
-					}
-				}
-			}
-		}, 0, abort)
-	})
-	runtime.Until(func() { n.serviceLoop(finished) }, 0, abort)
-}
-
-// serviceLoop waits for changes, and calls Start()/Stop() as needed.
-func (n *notifier) serviceLoop(abort <-chan struct{}) {
 	for {
 		select {
 		case <-abort:
 			return
-		case <-n.changed:
-			func() {
-				n.lock.Lock()
-				defer n.lock.Unlock()
+		default:
+			notify(m, path, Master(id), s, abort)
+		}
+	}
+}
 
-				if n.current != n.id && n.desired == n.id {
-					n.service.Validate(n.desired, n.current)
-					n.service.Start()
-				} else if n.current == n.id && n.desired != n.id {
-					n.service.Stop()
-				}
-				n.current = n.desired
-			}()
+func notify(m MasterElector, path string, id Master, s Service, abort <-chan struct{}) {
+	defer util.HandleCrash()
+	w := m.Elect(path, string(id))
+	defer w.Stop()
+	events := w.ResultChan()
+
+	var current Master
+	for {
+		select {
+		case <-abort:
+			return
+		case event, open := <-events:
+			desired, ok := event.Object.(Master)
+			switch {
+			case !open:
+				return
+			case !ok || event.Type != watch.Modified:
+				continue
+			case current != id && desired == id:
+				s.Validate(desired, current)
+				s.Start()
+			case current == id && desired != id:
+				s.Stop()
+			}
+			current = desired
 		}
 	}
 }

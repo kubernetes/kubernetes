@@ -64,7 +64,7 @@ func (s *slowService) Stop() {
 	s.changes <- false
 }
 
-func Test(t *testing.T) {
+func TestNotify(t *testing.T) {
 	m := NewFake()
 	changes := make(chan bool, 1500)
 	done := make(chan struct{})
@@ -102,8 +102,8 @@ func Test(t *testing.T) {
 	<-notifyDone
 	close(changes)
 
-	changesNum := len(changes)
-	if changesNum > 1000 || changesNum == 0 {
-		t.Errorf("unexpected number of changes: %v", changesNum)
+	// elections that don't include "me" don't trigger change events
+	if got, want := len(changes), 1000; got != want {
+		t.Errorf("unexpected number of changes: got, want: %v, %v", got, want)
 	}
 }
