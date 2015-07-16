@@ -9,6 +9,7 @@
     - kube-scheduler
     - kube-controller-manager
     - kubectl
+  notify: restart daemons
 
 - name: Copy master service files
   copy:

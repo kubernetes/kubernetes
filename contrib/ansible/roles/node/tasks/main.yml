@@ -10,9 +10,13 @@
 
 - include: packageManagerInstall.yml
   when: source_type == "packageManager"
+  tags:
+    - binary-update
 
 - include: localBuildInstall.yml
   when: source_type == "localBuild"
+  tags:
+    - binary-update
 
 - name: Make sure manifest directory exists
   file: path={{ kube_manifest_dir }} state=directory

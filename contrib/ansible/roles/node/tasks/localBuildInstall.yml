@@ -8,6 +8,8 @@
     - kubelet
     - kube-proxy
     - kubectl
+  notify:
+    - restart daemons
 
 - name: Copy node service files
   copy:
