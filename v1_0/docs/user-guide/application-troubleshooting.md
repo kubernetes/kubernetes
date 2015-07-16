@@ -9,7 +9,7 @@ layout: docwithnav
 
 This guide is to help users debug applications that are deployed into Kubernetes and not behaving correctly.
 This is *not* a guide for people who want to debug their cluster.  For that you should check out
-[this guide](../admin/cluster-troubleshooting.md)
+[this guide](../admin/cluster-troubleshooting.html)
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -56,7 +56,7 @@ there are insufficient resources of one type or another that prevent scheduling.
 your pod.  Reasons include:
 
 * **You don't have enough resources**:  You may have exhausted the supply of CPU or Memory in your cluster, in this case
-you need to delete Pods, adjust resource requests, or add new nodes to your cluster. See [Compute Resources document](compute-resources.md#my-pods-are-pending-with-event-message-failedscheduling) for more information. 
+you need to delete Pods, adjust resource requests, or add new nodes to your cluster. See [Compute Resources document](compute-resources.html#my-pods-are-pending-with-event-message-failedscheduling) for more information. 
 
 * **You are using ```hostPort```**:  When you bind a Pod to a ```hostPort``` there are a limited number of places that pod can be
 scheduled.  In most cases, ```hostPort``` is unnecessary, try using a Service object to expose your Pod.  If you do require
@@ -160,9 +160,9 @@ check:
    * Is your application serving on the port that you configured?  Kubernetes doesn't do port remapping, so if your application serves on 8080, the ```containerPort``` field needs to be 8080.
 
 #### More information 
-If none of the above solves your problem, follow the instructions in [Debugging Service document](debugging-services.md) to make sure that your `Service` is running, has `Endpoints`, and your `Pods` are actually serving; you have DNS working, iptables rules installed, and kube-proxy does not seem to be misbehaving. 
+If none of the above solves your problem, follow the instructions in [Debugging Service document](debugging-services.html) to make sure that your `Service` is running, has `Endpoints`, and your `Pods` are actually serving; you have DNS working, iptables rules installed, and kube-proxy does not seem to be misbehaving. 
 
-You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
+You may also visit [troubleshooting document](../troubleshooting.html) for more information. 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

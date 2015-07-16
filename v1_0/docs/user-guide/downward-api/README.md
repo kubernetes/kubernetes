@@ -14,7 +14,7 @@ namespace using the [downward API](https://github.com/GoogleCloudPlatform/kubern
 
 This example assumes you have a Kubernetes cluster installed and running, and that you have
 installed the ```kubectl``` command line tool somewhere in your path. Please see the [getting
-started](../../../docs/getting-started-guides/) for installation instructions for your platform.
+started](../../../docs/getting-started-guides/README.html) for installation instructions for your platform.
 
 ## Step One: Create the pod
 

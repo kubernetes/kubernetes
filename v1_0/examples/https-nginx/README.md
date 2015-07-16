@@ -19,7 +19,7 @@ $ make keys secret KEY=/tmp/nginx.key CERT=/tmp/nginx.crt SECRET=/tmp/secret.jso
 
 ### Create a https nginx application running in a kubernetes cluster
 
-You need a [running kubernetes cluster](../../docs/getting-started-guides/) for this to work.
+You need a [running kubernetes cluster](../../docs/getting-started-guides/README.html) for this to work.
 
 ```
 $ kubectl create -f /tmp/secret.json
@@ -64,7 +64,7 @@ $ curl https://nodeip:30744 -k
 ...
 ```
 
-For more information on how to run this in a kubernetes cluster, please see the [user-guide](../../docs/user-guide/connecting-applications.md).
+For more information on how to run this in a kubernetes cluster, please see the [user-guide](../../docs/user-guide/connecting-applications.html).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

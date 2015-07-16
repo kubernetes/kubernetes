@@ -9,7 +9,7 @@ layout: docwithnav
 
 # Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](../../build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](../../build/README.html).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -274,8 +274,8 @@ go run hack/e2e.go -v -ctl='delete pod foobar'
 
 ## Conformance testing
 End-to-end testing, as described above, is for [development
-distributions](writing-a-getting-started-guide.md).  A conformance test is used on
-a [versioned distro](writing-a-getting-started-guide.md).
+distributions](writing-a-getting-started-guide.html).  A conformance test is used on
+a [versioned distro](writing-a-getting-started-guide.html).
 
 The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not
 require support for up/push/down and other operations.  To run a conformance test, you need to know the
@@ -284,7 +284,7 @@ intended to run against a cluster at a specific binary release of Kubernetes.
 See [conformance-test.sh](../../hack/conformance-test.sh).
 
 ## Testing out flaky tests
-[Instructions here](flaky-tests.md)
+[Instructions here](flaky-tests.html)
 
 ## Regenerating the CLI documentation
 

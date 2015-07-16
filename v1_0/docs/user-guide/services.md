@@ -34,8 +34,8 @@ layout: docwithnav
 
 ## Overview
 
-Kubernetes [`Pods`](pods.md) are mortal. They are born and they die, and they
-are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
+Kubernetes [`Pods`](pods.html) are mortal. They are born and they die, and they
+are not resurrected.  [`ReplicationControllers`](replication-controller.html) in
 particular create and destroy `Pods` dynamically (e.g. when scaling up or down
 or when doing rolling updates).  While each `Pod` gets its own IP address, even
 those IP addresses cannot be relied upon to be stable over time. This leads to
@@ -49,7 +49,7 @@ Enter `Services`.
 A Kubernetes `Service` is an abstraction which defines a logical set of `Pods`
 and a policy by which to access them - sometimes called a micro-service.  The
 set of `Pods` targeted by a `Service` is (usually) determined by a [`Label
-Selector`](labels.md#label-selectors) (see below for why you might want a
+Selector`](labels.html#label-selectors) (see below for why you might want a
 `Service` without a selector).
 
 As an example, consider an image-processing backend which is running with 3
@@ -119,7 +119,7 @@ abstract other kinds of backends.  For example:
   * You want to have an external database cluster in production, but in test
     you use your own databases.
   * You want to point your service to a service in another
-    [`Namespace`](namespaces.md) or on another cluster.
+    [`Namespace`](namespaces.html) or on another cluster.
   * You are migrating your workload to Kubernetes and some of your backends run
     outside of Kubernetes.
 
@@ -292,7 +292,7 @@ variables will not be populated.  DNS does not have this restriction.
 ### DNS
 
 An optional (though strongly recommended) [cluster
-add-on](../../cluster/addons/README.md) is a DNS server.  The
+add-on](../../cluster/addons/README.html) is a DNS server.  The
 DNS server watches the Kubernetes API for new `Services` and creates a set of
 DNS records for each.  If DNS has been enabled throughout the cluster then all
 `Pods` should be able to do name resolution of `Services` automatically.

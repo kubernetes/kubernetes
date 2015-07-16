@@ -36,7 +36,7 @@ For a detailed description of the Kubernetes resource model, see [Resources](htt
 
 Step 0: Prerequisites
 -----------------------------------------
-This example requires a running Kubernetes cluster.  See the [Getting Started guides](../../../docs/getting-started-guides/) for how to get started.
+This example requires a running Kubernetes cluster.  See the [Getting Started guides](../../../docs/getting-started-guides/README.html) for how to get started.
 
 Change to the `<kubernetes>/examples/limitrange` directory if you're not already there.
 

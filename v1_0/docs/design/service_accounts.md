@@ -27,10 +27,10 @@ They also may interact with services other than the Kubernetes API, such as:
 ## Design Overview
 A service account binds together several things:
   - a *name*, understood by users, and perhaps by peripheral systems, for an identity
-  - a *principal* that can be authenticated and [authorized](../admin/authorization.md)
-  - a [security context](security_context.md), which defines the Linux Capabilities, User IDs, Groups IDs, and other
+  - a *principal* that can be authenticated and [authorized](../admin/authorization.html)
+  - a [security context](security_context.html), which defines the Linux Capabilities, User IDs, Groups IDs, and other
     capabilities and controls on interaction with the file system and OS.
-  - a set of [secrets](secrets.md), which a container may use to
+  - a set of [secrets](secrets.html), which a container may use to
     access various networked resources.
 
 ## Design Discussion

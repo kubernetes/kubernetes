@@ -151,7 +151,7 @@ If all else fails, ask questions on IRC at #google-containers.
 
 
 ### Next steps
-Move on to [adding one or more workers](worker.md)
+Move on to [adding one or more workers](worker.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -185,7 +185,7 @@ We can add node units like so:
 
 ## Launch the "k8petstore" example app
 
-The [k8petstore example](../../examples/k8petstore/) is available as a
+The [k8petstore example](../../examples/k8petstore/README.html) is available as a
 [juju action](https://jujucharms.com/docs/devel/actions).
 
     juju action do kubernetes-master/0

@@ -79,7 +79,7 @@ distinguish distinct entities, and reference particular entities across operatio
 
 A *Namespace* provides an authorization scope for accessing content associated with the *Namespace*.
 
-See [Authorization plugins](../admin/authorization.md)
+See [Authorization plugins](../admin/authorization.html)
 
 ### Limit Resource Consumption
 
@@ -88,12 +88,12 @@ A *Namespace* provides a scope to limit resource consumption.
 A *LimitRange* defines min/max constraints on the amount of resources a single entity can consume in
 a *Namespace*.
 
-See [Admission control: Limit Range](admission_control_limit_range.md)
+See [Admission control: Limit Range](admission_control_limit_range.html)
 
 A *ResourceQuota* tracks aggregate usage of resources in the *Namespace* and allows cluster operators
 to define *Hard* resource usage limits that a *Namespace* may consume.
 
-See [Admission control: Resource Quota](admission_control_resource_quota.md)
+See [Admission control: Resource Quota](admission_control_resource_quota.html)
 
 ### Finalizers
 

@@ -90,7 +90,7 @@ In your git repo (you still have `${VER}` set from above right?):
 
 #### Writing Release Notes
 
-[This helpful guide](making-release-notes.md) describes how to write release
+[This helpful guide](making-release-notes.html) describes how to write release
 notes for a major/minor release. In the release template on GitHub, leave the
 last PR number that the tool finds for the `.0` release, so the next releaser
 doesn't have to hunt.
@@ -102,7 +102,7 @@ doesn't have to hunt.
 We cut `vX.Y.Z` releases from the `release-vX.Y` branch after all cherry picks
 to the branch have been resolved. You should ensure all outstanding cherry picks
 have been reviewed and merged and the branch validated on Jenkins (validation
-TBD). See the [Cherry Picks](cherry-picks.md) for more information on how to
+TBD). See the [Cherry Picks](cherry-picks.html) for more information on how to
 manage cherry picks prior to cutting the release.
 
 #### Tagging and Merging

@@ -306,11 +306,11 @@ status:
 ## What's next?
 
 Learn about additional debugging tools, including:
-* [Logging](logging.md)
-* [Monitoring](monitoring.md)
-* [Getting into containers via `exec`](getting-into-containers.md)
-* [Connecting to containers via proxies](connecting-to-applications-proxy.md)
-* [Connecting to containers via port forwarding](connecting-to-applications-port-forward.md)
+* [Logging](logging.html)
+* [Monitoring](monitoring.html)
+* [Getting into containers via `exec`](getting-into-containers.html)
+* [Connecting to containers via proxies](connecting-to-applications-proxy.html)
+* [Connecting to containers via port forwarding](connecting-to-applications-port-forward.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

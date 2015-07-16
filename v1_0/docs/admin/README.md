@@ -8,12 +8,12 @@ layout: docwithnav
 # Kubernetes Cluster Admin Guide
 
 The cluster admin guide is for anyone creating or administering a Kubernetes cluster.
-It assumes some familiarity with concepts in the [User Guide](../user-guide/README.md).
+It assumes some familiarity with concepts in the [User Guide](../user-guide/README.html).
 
 ## Planning a cluster
 
 There are many different examples of how to setup a kubernetes cluster.  Many of them are listed in this
-[matrix](../getting-started-guides/README.md).  We call each of the combinations in this matrix a *distro*.
+[matrix](../getting-started-guides/README.html).  We call each of the combinations in this matrix a *distro*.
 
 Before choosing a particular guide, here are some things to consider:
  - Are you just looking to try out Kubernetes on your laptop, or build a high-availability many-node cluster? Both
@@ -29,55 +29,55 @@ Before choosing a particular guide, here are some things to consider:
  - Not all distros are maintained as actively.  Prefer ones which are listed as tested on a more recent version of
    Kubernetes.
  - If you are configuring kubernetes on-premises, you will need to consider what [networking
-   model](networking.md) fits best.
- - If you are designing for very [high-availability](availability.md), you may want multiple clusters in multiple zones.
+   model](networking.html) fits best.
+ - If you are designing for very [high-availability](availability.html), you may want multiple clusters in multiple zones.
 
 ## Setting up a cluster
 
-Pick one of the Getting Started Guides from the [matrix](../getting-started-guides/README.md) and follow it.
+Pick one of the Getting Started Guides from the [matrix](../getting-started-guides/README.html) and follow it.
 If none of the Getting Started Guides fits, you may want to pull ideas from several of the guides.
 
-One option for custom networking is *OpenVSwitch GRE/VxLAN networking* ([ovs-networking.md](ovs-networking.md)), which
+One option for custom networking is *OpenVSwitch GRE/VxLAN networking* ([ovs-networking.md](ovs-networking.html)), which
 uses OpenVSwitch to set up networking between pods across
   Kubernetes nodes.
 
 If you are modifying an existing guide which uses Salt, this document explains [how Salt is used in the Kubernetes
-project.](salt.md).
+project.](salt.html).
 
 ## Upgrading a cluster
-[Upgrading a cluster](cluster-management.md).
+[Upgrading a cluster](cluster-management.html).
 
 ## Managing nodes
 
-[Managing nodes](node.md).
+[Managing nodes](node.html).
 
 ## Optional Cluster Services
 
-* **DNS Integration with SkyDNS** ([dns.md](dns.md)):
+* **DNS Integration with SkyDNS** ([dns.md](dns.html)):
   Resolving a DNS name directly to a Kubernetes service.
 
-* **Logging** with [Kibana](../user-guide/logging.md)
+* **Logging** with [Kibana](../user-guide/logging.html)
 
 ## Multi-tenant support
 
-* **Namespaces** ([namespaces.md](namespaces.md)): Namespaces help different
+* **Namespaces** ([namespaces.md](namespaces.html)): Namespaces help different
   projects, teams, or customers to share a kubernetes cluster.
 
-* **Resource Quota** ([resource-quota.md](resource-quota.md)) 
+* **Resource Quota** ([resource-quota.md](resource-quota.html)) 
 
 ## Security
 
-* **Kubernetes Container Environment** ([docs/user-guide/container-environment.md](../user-guide/container-environment.md)):
+* **Kubernetes Container Environment** ([docs/user-guide/container-environment.md](../user-guide/container-environment.html)):
   Describes the environment for Kubelet managed containers on a Kubernetes
   node.
 
-* **Securing access to the API Server** [accessing the api](accessing-the-api.md)
+* **Securing access to the API Server** [accessing the api](accessing-the-api.html)
 
-* **Authentication**  [authentication](authentication.md)
+* **Authentication**  [authentication](authentication.html)
 
-* **Authorization** [authorization](authorization.md)
+* **Authorization** [authorization](authorization.html)
 
-* **Admission Controllers** [admission_controllers](admission-controllers.md)
+* **Admission Controllers** [admission_controllers](admission-controllers.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

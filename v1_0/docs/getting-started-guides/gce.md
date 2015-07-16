@@ -61,7 +61,7 @@ wget -q -O - https://get.k8s.io | bash
 
 Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster.
 
-By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.md), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.md) services.
+By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.html), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.html) services.
 
 The script run by the commands above creates a cluster with the name/prefix "kubernetes". It defines one specific cluster config, so you can't run it more than once.
 
@@ -73,7 +73,7 @@ cluster/kube-up.sh
 ```
 If you want more than one cluster running in your project, want to use a different name, or want a different number of worker nodes, see the `<kubernetes>/cluster/gce/config-default.sh` file for more fine-grained configuration before you start up your cluster.
 
-If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
+If you run into trouble, please see the section on [troubleshooting](gce.html#troubleshooting), post to the
 [google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at #google-containers on freenode.
 
 The next few steps will show you:
@@ -88,7 +88,7 @@ The next few steps will show you:
 The cluster startup script will leave you with a running cluster and a ```kubernetes``` directory on your workstation.
 The next step is to make sure the `kubectl` tool is in your path.
 
-The [kubectl](../user-guide/kubectl/kubectl.md) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
+The [kubectl](../user-guide/kubectl/kubectl.html) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
 You will use it to look at your new cluster and bring up example apps.
 
 Add the appropriate binary folder to your ```PATH``` to access kubectl:
@@ -116,7 +116,7 @@ Once `kubectl` is in your path, you can use it to look at your cluster. E.g., ru
 $ kubectl get --all-namespaces services
 ```
 
-should show a set of [services](../user-guide/services.md) that look something like this:
+should show a set of [services](../user-guide/services.html) that look something like this:
 
 ```shell
 NAMESPACE     NAME                  LABELS                                                                           SELECTOR                IP(S)       PORT(S)
@@ -129,7 +129,7 @@ kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernete
 kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
                                                                                                                                                             8086/TCP
 ```
-Similarly, you can take a look at the set of [pods](../user-guide/pods.md) that were created during cluster startup.
+Similarly, you can take a look at the set of [pods](../user-guide/pods.html) that were created during cluster startup.
 You can do this via the
 
 ```shell
@@ -155,9 +155,9 @@ Some of the pods may take a few seconds to start up (during this time they'll sh
 
 #### Run some examples
 
-Then, see [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
+Then, see [a simple nginx example](../../docs/user-guide/simple-nginx.html) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../examples/).  The [guestbook example](../../examples/guestbook/) is a good "getting started" walkthrough.
+For more complete applications, please look in the [examples directory](../../examples/README.html).  The [guestbook example](../../examples/guestbook/README.html) is a good "getting started" walkthrough.
 
 ### Tearing down the cluster
 To remove/delete/teardown the cluster, use the `kube-down.sh` script.

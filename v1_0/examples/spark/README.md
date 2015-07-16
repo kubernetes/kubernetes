@@ -26,15 +26,15 @@ The Docker images are heavily based on https://github.com/mattf/docker-spark
 This example assumes you have a Kubernetes cluster installed and
 running, and that you have installed the ```kubectl``` command line
 tool somewhere in your path. Please see the [getting
-started](../../docs/getting-started-guides/) for installation
+started](../../docs/getting-started-guides/README.html) for installation
 instructions for your platform.
 
 ## Step One: Start your Master service
 
-The Master [service](../../docs/user-guide/services.md) is the master (or head) service for a Spark
+The Master [service](../../docs/user-guide/services.html) is the master (or head) service for a Spark
 cluster.
 
-Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/user-guide/pods.md) running
+Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/user-guide/pods.html) running
 the Master service.
 
 ```shell
@@ -94,7 +94,7 @@ program.
 The Spark workers need the Master service to be running.
 
 Use the [`examples/spark/spark-worker-controller.json`](spark-worker-controller.json) file to create a
-[replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
+[replication controller](../../docs/user-guide/replication-controller.html) that manages the worker pods.
 
 ```shell
 $ kubectl create -f examples/spark/spark-worker-controller.json

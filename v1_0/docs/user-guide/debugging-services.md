@@ -525,7 +525,7 @@ Contact us on
 [GitHub](https://github.com/GoogleCloudPlatform/kubernetes).
 
 ## More information
-Visit [troubleshooting document](../troubleshooting.md) for more information. 
+Visit [troubleshooting document](../troubleshooting.html) for more information. 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

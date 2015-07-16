@@ -38,7 +38,7 @@ convenient).
    go get github.com/vmware/govmomi/govc
    ```
 
-5. Get or build a [binary release](binary_release.md)
+5. Get or build a [binary release](binary_release.html)
 
 ### Setup
 

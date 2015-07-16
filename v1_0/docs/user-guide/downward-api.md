@@ -77,8 +77,8 @@ spec:
 ```
 
 Some more thorough examples:
-   * [environment variables](environment-guide/)
-   * [downward API](downward-api/)
+   * [environment variables](environment-guide/README.html)
+   * [downward API](downward-api/README.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

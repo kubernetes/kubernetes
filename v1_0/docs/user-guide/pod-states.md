@@ -13,7 +13,7 @@ This document covers the lifecycle of a pod.  It is not an exhaustive document, 
 
 ## Pod Phase
 
-As consistent with the overall [API convention](../devel/api-conventions.md#typical-status-properties), phase is a simple, high-level summary of the phase of the lifecycle of a pod. It is not intended to be a comprehensive rollup of observations of container-level or even pod-level conditions or other state, nor is it intended to be a comprehensive state machine.
+As consistent with the overall [API convention](../devel/api-conventions.html#typical-status-properties), phase is a simple, high-level summary of the phase of the lifecycle of a pod. It is not intended to be a comprehensive rollup of observations of container-level or even pod-level conditions or other state, nor is it intended to be a comprehensive state machine.
 
 The number and meanings of `PodPhase` values are tightly guarded.  Other than what is documented here, nothing should be assumed about pods with a given `PodPhase`.
 
@@ -51,9 +51,9 @@ More detailed information about the current (and previous) container statuses ca
 
 ## RestartPolicy
 
-The possible values for RestartPolicy are `Always`, `OnFailure`, or `Never`. If RestartPolicy is not set, the default value is `Always`. RestartPolicy applies to all containers in the pod. RestartPolicy only refers to restarts of the containers by the Kubelet on the same node. As discussed in the [pods document](pods.md#durability-of-pods-or-lack-thereof), once bound to a node, a pod will never be rebound to another node. This means that some kind of controller is necessary in order for a pod to survive node failure, even if just a single pod at a time is desired.
+The possible values for RestartPolicy are `Always`, `OnFailure`, or `Never`. If RestartPolicy is not set, the default value is `Always`. RestartPolicy applies to all containers in the pod. RestartPolicy only refers to restarts of the containers by the Kubelet on the same node. As discussed in the [pods document](pods.html#durability-of-pods-or-lack-thereof), once bound to a node, a pod will never be rebound to another node. This means that some kind of controller is necessary in order for a pod to survive node failure, even if just a single pod at a time is desired.
 
-The only controller we have today is [`ReplicationController`](replication-controller.md).  `ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`.  `ReplicationController` should refuse to instantiate any pod that has a different restart policy.
+The only controller we have today is [`ReplicationController`](replication-controller.html).  `ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`.  `ReplicationController` should refuse to instantiate any pod that has a different restart policy.
 
 There is a legitimate need for a controller which keeps pods with other policies alive. Pods having any of the other policies (`OnFailure` or `Never`) eventually terminate, at which point the controller should stop recreating them.  Because of this fundamental distinction, let's hypothesize a new controller, called [`JobController`](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624) for the sake of this document, which can implement this policy.
 

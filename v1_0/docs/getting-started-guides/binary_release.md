@@ -27,7 +27,7 @@ cd kubernetes
 make release
 ```
 
-For more details on the release process see the [`build/` directory](../../build/)
+For more details on the release process see the [`build/` directory](../../build/README.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

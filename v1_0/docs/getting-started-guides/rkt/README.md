@@ -91,9 +91,9 @@ Note: CoreOS is not supported as the master using the automated launch
 scripts. The master node is always Ubuntu.
 
 ### Getting started with your cluster
-See [a simple nginx example](../../../docs/user-guide/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../../../docs/user-guide/simple-nginx.html) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../../examples/).
+For more complete applications, please look in the [examples directory](../../../examples/README.html).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

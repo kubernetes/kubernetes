@@ -9,7 +9,7 @@ layout: docwithnav
 
 
 In Kubernetes, authorization happens as a separate step from authentication.
-See the [authentication documentation](authentication.md) for an 
+See the [authentication documentation](authentication.html) for an 
 overview of authentication.
 
 Authorization applies to all HTTP accesses on the main apiserver port. (The

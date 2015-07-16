@@ -9,7 +9,7 @@ layout: docwithnav
 Developers can use `kubectl exec` to run commands in a container. This guide demonstrates two use cases.
 
 ##Using kubectl exec to check the environment variables of a container
-Kubernetes exposes [services](services.md#environment-variables) through environment variables. It is convenient to check these environment variables using `kubectl exec`.
+Kubernetes exposes [services](services.html#environment-variables) through environment variables. It is convenient to check these environment variables using `kubectl exec`.
 
 
 We first create a pod and a service,

@@ -43,7 +43,7 @@ Other views (Pods, Nodes, Replication Controllers, Services, and Events) simply 
 ![kubernetes UI - Nodes](k8s-ui-nodes.png)
 
 ## More Information 
-For more information, see the [Kubernetes UI development document](../../www/README.md) in the www directory.
+For more information, see the [Kubernetes UI development document](../../www/README.html) in the www directory.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

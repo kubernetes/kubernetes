@@ -74,12 +74,12 @@ commands in those containers, we strongly encourage enabling this plug-in.
 
 ### ServiceAccount
 
-This plug-in implements automation for [serviceAccounts](../user-guide/service-accounts.md).
+This plug-in implements automation for [serviceAccounts](../user-guide/service-accounts.html).
 We strongly recommend using this plug-in if you intend to make use of Kubernetes ```ServiceAccount``` objects.
 
 ### SecurityContextDeny
 
-This plug-in will deny any pod with a [SecurityContext](../user-guide/security-context.md) that defines options that were not available on the ```Container```.
+This plug-in will deny any pod with a [SecurityContext](../user-guide/security-context.html) that defines options that were not available on the ```Container```.
 
 ### ResourceQuota
 
@@ -87,7 +87,7 @@ This plug-in will observe the incoming request and ensure that it does not viola
 enumerated in the ```ResourceQuota``` object in a ```Namespace```.  If you are using ```ResourceQuota```
 objects in your Kubernetes deployment, you MUST use this plug-in to enforce quota constraints.
 
-See the [resourceQuota design doc](../design/admission_control_resource_quota.md).
+See the [resourceQuota design doc](../design/admission_control_resource_quota.html).
 
 It is strongly encouraged that this plug-in is configured last in the sequence of admission control plug-ins.  This is
 so that quota is not prematurely incremented only for the request to be rejected later in admission control.
@@ -98,7 +98,7 @@ This plug-in will observe the incoming request and ensure that it does not viola
 enumerated in the ```LimitRange``` object in a ```Namespace```.  If you are using ```LimitRange``` objects in
 your Kubernetes deployment, you MUST use this plug-in to enforce those constraints.
 
-See the [limitRange design doc](../design/admission_control_limit_range.md).
+See the [limitRange design doc](../design/admission_control_limit_range.html).
 
 ### NamespaceExists
 

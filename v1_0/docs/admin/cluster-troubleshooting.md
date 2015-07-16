@@ -7,7 +7,7 @@ layout: docwithnav
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Cluster Troubleshooting
 Most of the time, if you encounter problems, it is your application that is having problems.  For application
-problems please see the [application troubleshooting guide](../user-guide/application-troubleshooting.md). You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
+problems please see the [application troubleshooting guide](../user-guide/application-troubleshooting.html). You may also visit [troubleshooting document](../troubleshooting.html) for more information. 
 
 ## Listing your cluster
 The first thing to debug in your cluster is if your nodes are all registered correctly.

@@ -14,7 +14,7 @@ environment information about itself, and a backend pod that it has
 accessed through the service. The goal is to illuminate the
 environment metadata available to running containers inside the
 Kubernetes cluster. The documentation for the kubernetes environment
-is [here](../../../docs/user-guide/container-environment.md).
+is [here](../../../docs/user-guide/container-environment.html).
 
 ![Diagram](diagram.png)
 
@@ -23,13 +23,13 @@ Prerequisites
 This example assumes that you have a Kubernetes cluster installed and
 running, and that you have installed the `kubectl` command line tool
 somewhere in your path.  Please see the [getting
-started](../../../docs/getting-started-guides/) for installation instructions
+started](../../../docs/getting-started-guides/README.html) for installation instructions
 for your platform.
 
 Optional: Build your own containers
 -----------------------------------
 The code for the containers is under
-[containers/](containers/)
+[containers/](containers/README.html)
 
 Get everything running
 ----------------------
@@ -74,8 +74,8 @@ Backend Namespace: default
 ```
 
 First the frontend pod's information is printed. The pod name and
-[namespace](../../../docs/design/namespaces.md) are retreived from the
-[Downward API](../../../docs/user-guide/downward-api.md). Next, `USER_VAR` is the name of
+[namespace](../../../docs/design/namespaces.html) are retreived from the
+[Downward API](../../../docs/user-guide/downward-api.html). Next, `USER_VAR` is the name of
 an environment variable set in the [pod
 definition](show-rc.yaml). Then, the dynamic kubernetes environment
 variables are scanned and printed. These are used to find the backend

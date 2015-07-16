@@ -7,7 +7,7 @@ layout: docwithnav
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Welcome to k8PetStore
 
-This is a follow up to the [Guestbook Example](../guestbook/README.md)'s [Go implementation](../guestbook-go/).
+This is a follow up to the [Guestbook Example](../guestbook/README.html)'s [Go implementation](../guestbook-go/README.html).
 
 - It leverages the same components (redis, Go REST API) as the guestbook application
 - It comes with visualizations for graphing whats happening in Redis transactions, along with commandline printouts of transaction throughput

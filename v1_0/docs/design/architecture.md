@@ -20,13 +20,13 @@ The Kubernetes node has the services necessary to run application containers and
 Each node runs Docker, of course.  Docker takes care of the details of downloading images and running containers.
 
 ### Kubelet
-The **Kubelet** manages [pods](../user-guide/pods.md) and their containers, their images, their volumes, etc. 
+The **Kubelet** manages [pods](../user-guide/pods.html) and their containers, their images, their volumes, etc. 
 
 ### Kube-Proxy
 
-Each node also runs a simple network proxy and load balancer (see the [services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ) for more details).  This reflects `services` (see [the services doc](../user-guide/services.md) for more details) as defined in the Kubernetes API on each node and can do simple TCP and UDP stream forwarding (round robin) across a set of backends.
+Each node also runs a simple network proxy and load balancer (see the [services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ) for more details).  This reflects `services` (see [the services doc](../user-guide/services.html) for more details) as defined in the Kubernetes API on each node and can do simple TCP and UDP stream forwarding (round robin) across a set of backends.
 
-Service endpoints are currently found via [DNS](../admin/dns.md) or through environment variables (both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) and Kubernetes {FOO}_SERVICE_HOST and {FOO}_SERVICE_PORT variables are supported).  These variables resolve to ports managed by the service proxy.
+Service endpoints are currently found via [DNS](../admin/dns.html) or through environment variables (both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) and Kubernetes {FOO}_SERVICE_HOST and {FOO}_SERVICE_PORT variables are supported).  These variables resolve to ports managed by the service proxy.
 
 ## The Kubernetes Control Plane
 
@@ -38,7 +38,7 @@ All persistent master state is stored in an instance of `etcd`.  This provides a
 
 ### Kubernetes API Server
 
-The apiserver serves up the [Kubernetes API](../api.md). It is intended to be a CRUD-y server, with most/all business logic implemented in separate components or in plug-ins. It mainly processes REST operations, validates them, and updates the corresponding objects in `etcd` (and eventually other stores).
+The apiserver serves up the [Kubernetes API](../api.html). It is intended to be a CRUD-y server, with most/all business logic implemented in separate components or in plug-ins. It mainly processes REST operations, validates them, and updates the corresponding objects in `etcd` (and eventually other stores).
 
 ### Scheduler
 
@@ -48,7 +48,7 @@ The scheduler binds unscheduled pods to nodes via the `/binding` API. The schedu
 
 All other cluster-level functions are currently performed by the Controller Manager. For instance, `Endpoints` objects are created and updated by the endpoints controller, and nodes are discovered, managed, and monitored by the node controller. These could eventually be split into separate components to make them independently pluggable.
 
-The [`replicationcontroller`](../user-guide/replication-controller.md) is a mechanism that is layered on top of the simple [`pod`](../user-guide/pods.md) API. We eventually plan to port it to a generic plug-in mechanism, once one is implemented.
+The [`replicationcontroller`](../user-guide/replication-controller.html) is a mechanism that is layered on top of the simple [`pod`](../user-guide/pods.html) API. We eventually plan to port it to a generic plug-in mechanism, once one is implemented.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

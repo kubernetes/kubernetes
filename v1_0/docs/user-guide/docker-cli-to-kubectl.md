@@ -25,7 +25,7 @@ In this doc, we introduce the kubernetes command line to for interacting with th
 
 #### docker run
 
-How do I run an nginx container and expose it to the world? Checkout [kubectl run](kubectl/kubectl_run.md).
+How do I run an nginx container and expose it to the world? Checkout [kubectl run](kubectl/kubectl_run.html).
 
 With docker:
 ```
@@ -48,11 +48,11 @@ NAME         LABELS          SELECTOR        IP(S)     PORT(S)
 nginx-http   run=nginx-app   run=nginx-app             80/TCP
 ```
 
-With kubectl, we create a [replication controller](replication-controller.md) which will make sure that N pods are running nginx (where in is the number of replicas stated in the spec, which defaults to 1). We also create a [service](services.md) with a selector that matches the replication controller's selector. See the [quick-start.md](quick-start.md) guide for more information.
+With kubectl, we create a [replication controller](replication-controller.html) which will make sure that N pods are running nginx (where in is the number of replicas stated in the spec, which defaults to 1). We also create a [service](services.html) with a selector that matches the replication controller's selector. See the [quick-start.md](quick-start.html) guide for more information.
 
 #### docker ps
 
-How do I list what is currently running? Checkout [kubectl get](kubectl/kubectl_get.md).
+How do I list what is currently running? Checkout [kubectl get](kubectl/kubectl_get.html).
 
 With docker:
 ```
@@ -70,7 +70,7 @@ nginx-app-5jyvm   1/1       Running   0          1h
 
 #### docker exec
 
-How do I execute a command in a container? Checkout [kubectl exec](kubectl/kubectl_exec.md).
+How do I execute a command in a container? Checkout [kubectl exec](kubectl/kubectl_exec.html).
 
 With docker:
 ```
@@ -105,11 +105,11 @@ $ kubectl exec -ti nginx-app-5jyvm -- /bin/sh
 # exit
 ```
 
-For more information see [Getting into containers](getting-into-containers.md).
+For more information see [Getting into containers](getting-into-containers.html).
 
 #### docker logs
 
-How do I follow stdout/stderr of a running process? Checkout [kubectl logs](kubectl/kubectl_logs.md).
+How do I follow stdout/stderr of a running process? Checkout [kubectl logs](kubectl/kubectl_logs.html).
 
 
 With docker:
@@ -134,11 +134,11 @@ $ kubectl logs --previous nginx-app-zibvs
 10.240.63.110 - - [14/Jul/2015:01:09:02 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.26.0" "-"
 ```
 
-See [Logging](logging.md) for more information.
+See [Logging](logging.html) for more information.
 
 #### docker stop and docker rm
 
-How do I stop and delete a running process? Checkout [kubectl delete](kubectl/kubectl_delete.md).
+How do I stop and delete a running process? Checkout [kubectl delete](kubectl/kubectl_delete.html).
 
 With docker
 ```
@@ -170,11 +170,11 @@ Notice that we don't delete the pod directly. With kubectl we want to delete the
 
 #### docker login
 
-There is no direct analog of 'docker login' in kubectl. If you are interested in using Kubernetes with a private registry, see [Using a Private Registry](images.md#using-a-private-registry).
+There is no direct analog of 'docker login' in kubectl. If you are interested in using Kubernetes with a private registry, see [Using a Private Registry](images.html#using-a-private-registry).
 
 #### docker version
 
-How do I get the version of my client and server? Checkout [kubectl version](kubectl/kubectl_version.md).
+How do I get the version of my client and server? Checkout [kubectl version](kubectl/kubectl_version.html).
 
 With docker:
 ```
@@ -200,7 +200,7 @@ Server Version: version.Info{Major:"0", Minor:"21+", GitVersion:"v0.21.1-411-g32
 
 #### docker info
 
-How do I get miscellaneous info about my environment and configuration? Checkout [kubectl cluster-info](kubectl/kubectl_cluster-info.md).
+How do I get miscellaneous info about my environment and configuration? Checkout [kubectl cluster-info](kubectl/kubectl_cluster-info.html).
 
 With docker:
 ```

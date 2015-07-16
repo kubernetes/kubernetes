@@ -122,7 +122,7 @@ a pod tries to egress beyond GCE's project the packets must be SNAT'ed
 
 With the primary aim of providing IP-per-pod-model, other implementations exist
 to serve the purpose outside of GCE.
-  - [OpenVSwitch with GRE/VxLAN](../admin/ovs-networking.md)
+  - [OpenVSwitch with GRE/VxLAN](../admin/ovs-networking.html)
   - [Flannel](https://github.com/coreos/flannel#flannel)
   - [L2 networks](http://blog.oddbit.com/2014/08/11/four-ways-to-connect-a-docker/)
     ("With Linux Bridge devices" section)
@@ -133,7 +133,7 @@ to serve the purpose outside of GCE.
 
 ## Pod to service
 
-The [service](../user-guide/services.md) abstraction provides a way to group pods under a
+The [service](../user-guide/services.html) abstraction provides a way to group pods under a
 common access policy (e.g. load-balanced).  The implementation of this creates a
 virtual IP which clients can access and which is transparently proxied to the
 pods in a Service.  Each node runs a kube-proxy process which programs

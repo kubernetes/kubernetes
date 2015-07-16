@@ -63,7 +63,7 @@ If these already exist, make sure you want them to be used here.
 NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS_SSH_KEY` key to point to your private key.
 
 ### Alternatives
-A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
+A contributed [example](aws-coreos.html) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
 AWS CloudFormation or EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
@@ -84,11 +84,11 @@ By default, `kubectl` will use the `kubeconfig` file generated during the cluste
 For more information, please read [kubeconfig files](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubeconfig-file.md)
 
 ### Examples
-See [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../../docs/user-guide/simple-nginx.html) to try out your new cluster.
 
-The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/)
+The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/README.html)
 
-For more complete applications, please look in the [examples directory](../../examples/)
+For more complete applications, please look in the [examples directory](../../examples/README.html)
 
 ## Tearing down the cluster
 Make sure the environment variables you used to provision your cluster are still exported, then call the following script inside the

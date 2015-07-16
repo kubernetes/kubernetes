@@ -21,7 +21,7 @@ layout: docwithnav
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-When specifying a [pod](pods.md), you can optionally specify how much CPU and memory (RAM) each
+When specifying a [pod](pods.html), you can optionally specify how much CPU and memory (RAM) each
 container needs.  When containers have resource limits, the scheduler is able to make better
 decisions about which nodes to place pods on, and contention for resources can be handled in a
 consistent manner.
@@ -31,8 +31,8 @@ in units of cores.  Memory is specified in units of bytes.
 
 CPU and RAM are collectively referred to as *compute resources*, or just *resources*.  Compute
 resources are measureable quantities which can be requested, allocated, and consumed.  They are
-distinct from [API resources](working-with-resources.md).  API resources, such as pods and
-[services](services.md) are objects that can be written to and retrieved from the Kubernetes API
+distinct from [API resources](working-with-resources.html).  API resources, such as pods and
+[services](services.html) are objects that can be written to and retrieved from the Kubernetes API
 server.
 
 ## Container and Pod Resource Limits
@@ -96,8 +96,7 @@ runner (Docker or rkt).
 
 When using Docker:
 - The `spec.container[].resources.limits.cpu` is multiplied by 1024, converted to an integer, and
-  used as the value of the [`--cpu-shares`](
-  https://docs.docker.com/reference/run/#runtime-constraints-on-resources) flag to the `docker run`
+  used as the value of the [`--cpu-shares`](%0A%20%20https://docs.docker.com/reference/run/README.html#runtime-constraints-on-resources) flag to the `docker run`
   command.
 - The `spec.container[].resources.limits.memory` is converted to an integer, and used as the value
   of the [`--memory`](https://docs.docker.com/reference/run/#runtime-constraints-on-resources) flag
@@ -118,7 +117,7 @@ To determine if a container cannot be scheduled or is being killed due to resour
 
 The resource usage of a pod is reported as part of the Pod status.
 
-If [optional monitoring](../../cluster/addons/cluster-monitoring/README.md) is configured for your cluster,
+If [optional monitoring](../../cluster/addons/cluster-monitoring/README.html) is configured for your cluster,
 then pod resource usage can be retrieved from the monitoring system.
 
 ## Troubleshooting
@@ -145,7 +144,7 @@ Here are some example command lines that extract just the necessary information:
 - `kubectl get nodes -o yaml | grep '\sname\|cpu\|memory'`
 - `kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, cap: .status.capacity}'`
 
-The [resource quota](../admin/resource-quota.md) feature can be configured
+The [resource quota](../admin/resource-quota.html) feature can be configured
 to limit the total amount of resources that can be consumed.  If used in conjunction
 with namespaces, it can prevent one team from hogging all the resources.
 
@@ -203,11 +202,11 @@ We can see that this container was terminated because `reason:OOM Killed`, where
 
 The current system only allows resource quantities to be specified on a container.
 It is planned to improve accounting for resources which are shared by all containers in a pod,
-such as [EmptyDir volumes](volumes.md#emptydir).
+such as [EmptyDir volumes](volumes.html#emptydir).
 
 The current system only supports container limits for CPU and Memory.
 It is planned to add new resource types, including a node disk space
-resource, and a framework for adding custom [resource types](../design/resources.md#resource-types).
+resource, and a framework for adding custom [resource types](../design/resources.html#resource-types).
 
 The current system does not facilitate overcommitment of resources because resources reserved
 with container limits are assured.  It is planned to support multiple levels of [Quality of

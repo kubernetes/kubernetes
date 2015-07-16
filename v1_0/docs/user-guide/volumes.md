@@ -14,7 +14,7 @@ container starts with a clean slate.  Second, when running containers together
 in a `Pod` it is often necessary to share files between those containers.  The
 Kubernetes `Volume` abstraction solves both of these problems.
 
-Familiarity with [pods](pods.md) is suggested.
+Familiarity with [pods](pods.html) is suggested.
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -259,7 +259,7 @@ writers simultaneously.
 __Important: You must have your own NFS server running with the share exported
 before you can use it__
 
-See the [NFS example](../../examples/nfs/) for more details.
+See the [NFS example](../../examples/nfs/README.html) for more details.
 
 For example, [this file](../../examples/nfs/nfs-web-pod.yaml) demonstrates how to
 specify the usage of an NFS volume within a pod.
@@ -287,7 +287,7 @@ and then serve it in parallel from as many pods as you need.  Unfortunately,
 iSCSI volumes can only be mounted by a single consumer in read-write mode - no
 simultaneous readers allowed.
 
-See the [iSCSI example](../../examples/iscsi/) for more details.
+See the [iSCSI example](../../examples/iscsi/README.html) for more details.
 
 ### glusterfs
 
@@ -302,7 +302,7 @@ simultaneously.
 __Important: You must have your own GlusterFS installation running before you
 can use it__
 
-See the [GlusterFS example](../../examples/glusterfs/) for more details.
+See the [GlusterFS example](../../examples/glusterfs/README.html) for more details.
 
 ### rbd
 
@@ -322,7 +322,7 @@ and then serve it in parallel from as many pods as you need.  Unfortunately,
 RBD volumes can only be mounted by a single consumer in read-write mode - no
 simultaneous readers allowed.
 
-See the [RBD example](../../examples/rbd/) for more details.
+See the [RBD example](../../examples/rbd/README.html) for more details.
 
 ### gitRepo
 
@@ -342,16 +342,16 @@ non-volatile storage.
 __Important: You must create a secret in the Kubernetes API before you can use
 it__
 
-Secrets are described in more detail [here](secrets.md).
+Secrets are described in more detail [here](secrets.html).
 
 ### persistentVolumeClaim
 
 A `persistentVolumeClaim` volume is used to mount a
-[PersistentVolume](persistent-volumes.md) into a pod.  PersistentVolumes are a
+[PersistentVolume](persistent-volumes.html) into a pod.  PersistentVolumes are a
 way for users to "claim" durable storage (such as a GCE PersistentDisk or an
 iSCSI volume) without knowing the details of the particular cloud environment.
 
-See the [PersistentVolumes example](persistent-volumes/) for more
+See the [PersistentVolumes example](persistent-volumes/README.html) for more
 details.
 
 ## Resources
@@ -363,7 +363,7 @@ medium of the filesystem holding the kubelet root dir (typically
 pods.
 
 In the future, we expect that `emptyDir` and `hostPath` volumes will be able to
-request a certain amount of space using a [resource](compute-resources.md)
+request a certain amount of space using a [resource](compute-resources.html)
 specification, and to select the type of media to use, for clusters that have
 several media types.
 
