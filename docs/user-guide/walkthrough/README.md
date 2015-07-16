@@ -20,60 +20,33 @@ certainly want the docs that go with that version.</h1>
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-# Kubernetes 101 - Kubectl CLI & Pods
+# Kubernetes 101 - Kubectl CLI and Pods
 
 For Kubernetes 101, we will cover kubectl, pods, volumes, and multiple containers
 
 In order for the kubectl usage examples to work, make sure you have an examples directory locally, either from [a release](https://github.com/GoogleCloudPlatform/kubernetes/releases) or [the source](https://github.com/GoogleCloudPlatform/kubernetes).
 
-Table of Contents
-- [Kubectl CLI](#kubectl-cli)
-  - [Install Kubectl](#install-kubectl)
-  - [Configure Kubectl](#configure-kubectl)
-- [Pods](#pods)
-  - [Pod Definition](#pod-definition)
-  - [Pod Management](#pod-management)
-  - [Volumes](#volumes)
-  - [Multiple Containers](#multiple-containers)
-- [What's Next?](#whats-next)
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+- [Kubernetes 101 - Kubectl CLI and Pods](#kubernetes-101---kubectl-cli-and-pods)
+  - [Kubectl CLI](#kubectl-cli)
+  - [Pods](#pods)
+      - [Pod Definition](#pod-definition)
+      - [Pod Management](#pod-management)
+      - [Volumes](#volumes)
+        - [Volume Types](#volume-types)
+      - [Multiple Containers](#multiple-containers)
+  - [What's Next?](#whats-next)
 
+<!-- END MUNGE: GENERATED_TOC -->
 
 ## Kubectl CLI
 
-The easiest way to interact with Kubernetes is via the command-line interface.
-
-If you downloaded a pre-compiled release, kubectl should be under `platforms/<os>/<arch>`.
-
-If you built from source, kubectl should be either under `_output/local/bin/<os>/<arch>` or `_output/dockerized/bin/<os>/<arch>`.
+The easiest way to interact with Kubernetes is via the [kubectl](../kubectl/kubectl.md) command-line interface.
 
 For more info about kubectl, including its usage, commands, and parameters, see the [kubectl CLI reference](../kubectl/kubectl.md).
 
-#### Install Kubectl
-
-The kubectl binary doesn't have to be installed to be executable, but the rest of the walkthrough will assume that it's in your PATH.
-
-The simplest way to install is to copy or move kubectl into a dir already in PATH (like `/usr/local/bin`).
-
-An alternate method, useful if you're building from source and want to rebuild without re-installing is to use `./cluster/kubectl.sh` instead of kubectl. That script will auto-detect the location of kubectl and proxy commands to it (ex: `./cluster/kubectl.sh cluster-info`).
-
-#### Configure Kubectl
-
-If you used `./cluster/kube-up.sh` to deploy your Kubernetes cluster, kubectl should already be locally configured.
-
-By default, kubectl configuration lives at `~/.kube/config`.
-
-If your cluster was deployed by other means (e.g. a [getting started guide](../../getting-started-guides/README.md)), you may want to configure the path to the Kubernetes apiserver in your shell environment:
-
-```sh
-export KUBERNETES_MASTER=http://<ip>:<port>/api
-```
-
-Check that kubectl is properly configured by getting the cluster state:
-
-```sh
-kubectl cluster-info
-```
-
+If you haven't installed and configured kubectl, finish the [prerequisites](../prereqs.md) before continuing.
 
 ## Pods
 In Kubernetes, a group of one or more containers is called a _pod_. Containers in a pod are deployed together, and are started, stopped, and replicated as a group.
@@ -108,13 +81,13 @@ See the [design document](../../../DESIGN.md) for more details.
 Create a pod containing an nginx server ([pod-nginx.yaml](pod-nginx.yaml)):
 
 ```sh
-kubectl create -f docs/user-guide/walkthrough/pod-nginx.yaml
+$ kubectl create -f docs/user-guide/walkthrough/pod-nginx.yaml
 ```
 
 List all pods:
 
 ```sh
-kubectl get pods
+$ kubectl get pods
 ```
 
 On most providers, the pod IPs are not externally accessible. The easiest way to test that the pod is working is to create a busybox pod and exec commands on it remotely. See the [command execution documentation](../kubectl/kubectl_exec.md) for details.
@@ -122,13 +95,13 @@ On most providers, the pod IPs are not externally accessible. The easiest way to
 Provided the pod IP is accessible, you should be able to access its http endpoint with curl on port 80:
 
 ```sh
-curl http://$(kubectl get pod nginx -o=template -t={{.status.podIP}})
+$ curl http://$(kubectl get pod nginx -o=template -t={{.status.podIP}})
 ```
 
 Delete the pod by name:
 
 ```sh
-kubectl delete pod nginx
+$ kubectl delete pod nginx
 ```
 
 
