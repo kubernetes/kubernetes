@@ -71,7 +71,7 @@ The [`command`](containers.md#containers-and-commands) overrides the Docker cont
 
 This pod can be created using the `create` command:
 ```bash
-$ kubectl create -f hello-world.yaml
+$ kubectl create -f ./hello-world.yaml
 pods/hello-world
 ```
 `kubectl` prints the resource type and name of the resource created when successful.
@@ -80,7 +80,7 @@ pods/hello-world
 
 If you’re not sure you specified the resource correctly, you can ask `kubectl` to validate it for you:
 ```bash
-$ kubectl create -f hello-world.yaml --validate
+$ kubectl create -f ./hello-world.yaml --validate
 ```
 
 Let’s say you specified `entrypoint` instead of `command`. You’d see output as follows:

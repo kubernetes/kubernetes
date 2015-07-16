@@ -43,7 +43,7 @@ Note that the delete command does NOT do resource version checks, so if someone
 submits an update to a resource right when you submit a delete, their update
 will be lost along with the rest of the resource.`
 	delete_example = `// Delete a pod using the type and name specified in pod.json.
-$ kubectl delete -f pod.json
+$ kubectl delete -f ./pod.json
 
 // Delete a pod based on the type and name in the JSON passed into stdin.
 $ cat pod.json | kubectl delete -f -

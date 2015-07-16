@@ -58,8 +58,8 @@ This [guide](../walkthrough/k8s201.md#health-checking) has more information on h
 ## Get your hands dirty
 To show the health check is actually working, first create the pods:
 ```
-# kubectl create -f exec-liveness.yaml
-# kubectl create -f http-liveness.yaml
+# kubectl create -f docs/user-guide/liveness/exec-liveness.yaml
+# kubectl create -f docs/user-guide/liveness/http-liveness.yaml
 ```
 
 Check the status of the pods once they are created:

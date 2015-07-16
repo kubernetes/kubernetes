@@ -91,7 +91,7 @@ data:
 ```
 As with other resources, this secret can be instantiated using `create` and can be viewed with `get`:
 ```bash
-$ kubectl create -f secret.yaml
+$ kubectl create -f ./secret.yaml
 secrets/mysecret
 $ kubectl get secrets
 NAME                  TYPE                                  DATA
@@ -154,7 +154,7 @@ $ echo $(cat ~/.dockercfg)
 $ cat ~/.dockercfg | base64
 eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
 
-$ cat > image-pull-secret.yaml <<EOF
+$ cat > /tmp/image-pull-secret.yaml <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -164,7 +164,7 @@ data:
 type: kubernetes.io/dockercfg
 EOF
 
-$ kubectl create -f image-pull-secret.yaml
+$ kubectl create -f ./image-pull-secret.yaml
 secrets/myregistrykey
 ```
 
@@ -342,7 +342,7 @@ spec:
 
 The message is recorded along with the other state of the last (i.e., most recent) termination:
 ```bash
-$ kubectl create -f pod.yaml
+$ kubectl create -f ./pod.yaml
 pods/pod-w-message
 $ sleep 70
 $ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}"

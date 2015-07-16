@@ -43,7 +43,7 @@ output every second [counter-pod.yaml](../../examples/blog-logging/counter-pod.y
 ```
 we can run the pod:
 ```
- $ kubectl create -f counter-pod.yaml
+ $ kubectl create -f ./counter-pod.yaml
  pods/counter
 ```
 and then fetch the logs:

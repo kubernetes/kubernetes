@@ -122,7 +122,7 @@ Note that we've defined a volume mount for `/var/lib/mysql`, and specified a vol
 Once you've edited the file to set your database password, create the pod as follows, where `<kubernetes>` is the path to your Kubernetes installation:
 
 ```shell
-$ kubectl create -f mysql.yaml
+$ kubectl create -f examples/mysql-wordpress-pd/mysql.yaml
 ```
 
 It may take a short period before the new pod reaches the `Running` state.
@@ -171,7 +171,7 @@ spec:
 Start the service like this:
 
 ```shell
-$ kubectl create -f mysql-service.yaml
+$ kubectl create -f examples/mysql-wordpress-pd/mysql-service.yaml
 ```
 
 You can see what services are running via:
@@ -221,7 +221,7 @@ spec:
 Create the pod:
 
 ```shell
-$ kubectl create -f wordpress.yaml
+$ kubectl create -f examples/mysql-wordpress-pd/wordpress.yaml
 ```
 
 And list the pods to check that the status of the new pod changes
@@ -260,7 +260,7 @@ Note also that we've set the service port to 80.  We'll return to that shortly.
 Start the service:
 
 ```shell
-$ kubectl create -f wordpress-service.yaml
+$ kubectl create -f examples/mysql-wordpress-pd/wordpress-service.yaml
 ```
 
 and see it in the list of services:
@@ -307,8 +307,8 @@ Set up your WordPress blog and play around with it a bit.  Then, take down its p
 If you are just experimenting, you can take down and bring up only the pods:
 
 ```shell
-$ kubectl delete -f wordpress.yaml
-$ kubectl delete -f mysql.yaml
+$ kubectl delete -f examples/mysql-wordpress-pd/wordpress.yaml
+$ kubectl delete -f examples/mysql-wordpress-pd/mysql.yaml
 ```
 
 When you restart the pods again (using the `create` operation as described above), their services will pick up the new pods based on their labels.

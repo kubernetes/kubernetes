@@ -53,7 +53,7 @@ We can use these environment variables in applications to find the service.
 It is convenient to use `kubectl exec` to check if the volumes are mounted as expected.
 We first create a Pod with a volume mounted at /data/redis,
 ```
-kubectl create -f docs/user-guide/walkthrough/pod2.yaml
+kubectl create -f docs/user-guide/walkthrough/pod-redis.yaml
 ```
 wait until the pod is Running and Ready,
 ```
