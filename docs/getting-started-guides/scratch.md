@@ -471,7 +471,7 @@ You will need to run one or more instances of etcd.
   - Alternative: run 3 or 5 etcd instances.
     - Log can be written to non-durable storage because storage is replicated. 
     - run a single apiserver which connects to one of the etc nodes.
- See [Availability](../admin/availability.md) for more discussion on factors affecting cluster
+ See [cluster-troubleshooting](../admin/cluster-troubleshooting.md) for more discussion on factors affecting cluster
 availability.
 
 To run an etcd instance:
