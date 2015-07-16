@@ -103,9 +103,9 @@ Example addons are:
 * [DNS](../../cluster/addons/dns/) provides cluster local DNS.
 * [kube-ui](../../cluster/addons/kube-ui/) provides a graphical UI for the
   cluster.
-* [fluentd-elasticsearch](../../cluster/addons/fluentd-elasticsearch) provides
-  log storage. Also see the [gcp version](../../cluster/addons/fluentd-gcp).
-* [cluster-monitoring](../../cluster/addons/cluster-monitoring) provides
+* [fluentd-elasticsearch](../../cluster/addons/fluentd-elasticsearch/) provides
+  log storage. Also see the [gcp version](../../cluster/addons/fluentd-gcp/).
+* [cluster-monitoring](../../cluster/addons/cluster-monitoring/) provides
   monitoring for the cluster.
 
 ## Node components
