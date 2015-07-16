@@ -97,7 +97,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 	generators := map[string]kubectl.Generator{
 		"run/v1":     kubectl.BasicReplicationController{},
-		"service/v1": kubectl.ServiceGenerator{},
+		"service/v1": kubectl.ServiceGeneratorV1{},
+		"service/v2": kubectl.ServiceGeneratorV2{},
 	}
 
 	clientConfig := optionalClientConfig

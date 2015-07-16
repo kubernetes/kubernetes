@@ -178,6 +178,7 @@ runTests() {
   rc_status_replicas_field=".status.replicas"
   rc_container_image_field=".spec.template.spec.containers"
   port_field="(index .spec.ports 0).port"
+  port_name="(index .spec.ports 0).name"
   image_field="(index .spec.containers 0).image"
 
   # Passing no arguments to create is an error
@@ -623,20 +624,24 @@ __EOF__
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
   kubectl expose rc frontend --port=80 "${kube_flags[@]}"
-  # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend' "{{$port_field}}" '80'
+  # Post-condition: service exists and the port is unnamed
+  kube::test::get_object_assert 'service frontend' "{{$port_name}} {{$port_field}}" '<no value> 80'
   # Command
   kubectl expose service frontend --port=443 --name=frontend-2 "${kube_flags[@]}"
-  # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend-2' "{{$port_field}}" '443'
+  # Post-condition: service exists and the port is unnamed
+  kube::test::get_object_assert 'service frontend-2' "{{$port_name}} {{$port_field}}" '<no value> 443'
   # Command
   kubectl create -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   kubectl expose pod valid-pod --port=444 --name=frontend-3 "${kube_flags[@]}"
-  # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend-3' "{{$port_field}}" '444'
+  # Post-condition: service exists and the port is unnamed
+  kube::test::get_object_assert 'service frontend-3' "{{$port_name}} {{$port_field}}" '<no value> 444'
+  # Create a service using service/v1 generator
+  kubectl expose rc frontend --port=80 --name=frontend-4 --generator=service/v1 "${kube_flags[@]}"
+  # Post-condition: service exists and the port is named default.
+  kube::test::get_object_assert 'service frontend-4' "{{$port_name}} {{$port_field}}" 'default 80'
   # Cleanup services
   kubectl delete pod valid-pod "${kube_flags[@]}"
-  kubectl delete service frontend{,-2,-3} "${kube_flags[@]}"
+  kubectl delete service frontend{,-2,-3,-4} "${kube_flags[@]}"
 
   ### Perform a rolling update with --image
   # Command

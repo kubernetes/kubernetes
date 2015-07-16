@@ -25,9 +25,29 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-type ServiceGenerator struct{}
+// The only difference between ServiceGeneratorV1 and V2 is that the service port is named "default" in V1, while it is left unnamed in V2.
+type ServiceGeneratorV1 struct{}
 
-func (ServiceGenerator) ParamNames() []GeneratorParam {
+func (ServiceGeneratorV1) ParamNames() []GeneratorParam {
+	return paramNames()
+}
+
+func (ServiceGeneratorV1) Generate(params map[string]string) (runtime.Object, error) {
+	params["port-name"] = "default"
+	return generate(params)
+}
+
+type ServiceGeneratorV2 struct{}
+
+func (ServiceGeneratorV2) ParamNames() []GeneratorParam {
+	return paramNames()
+}
+
+func (ServiceGeneratorV2) Generate(params map[string]string) (runtime.Object, error) {
+	return generate(params)
+}
+
+func paramNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"default-name", true},
 		{"name", false},
@@ -40,10 +60,11 @@ func (ServiceGenerator) ParamNames() []GeneratorParam {
 		{"protocol", false},
 		{"container-port", false}, // alias of target-port
 		{"target-port", false},
+		{"port-name", false},
 	}
 }
 
-func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, error) {
+func generate(params map[string]string) (runtime.Object, error) {
 	selectorString, found := params["selector"]
 	if !found || len(selectorString) == 0 {
 		return nil, fmt.Errorf("'selector' is a required parameter.")
@@ -77,6 +98,11 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	if err != nil {
 		return nil, err
 	}
+	servicePortName, found := params["port-name"]
+	if !found {
+		// Leave the port unnamed.
+		servicePortName = ""
+	}
 	service := api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
@@ -86,7 +112,7 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 			Selector: selector,
 			Ports: []api.ServicePort{
 				{
-					Name:     "default",
+					Name:     servicePortName,
 					Port:     port,
 					Protocol: api.Protocol(params["protocol"]),
 				},
