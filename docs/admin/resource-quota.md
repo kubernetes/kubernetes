@@ -37,6 +37,8 @@ Resource Quota is enforced in a particular namespace when there is a
 `ResourceQuota` object in that namespace.  There should be at most one
 `ResourceQuota` object in a namespace.
 
+See [ResourceQuota design doc](../design/admission_control_resource_quota.md) for more information.
+
 ##  Object Count Quota
 The number of objects of a given type can be restricted.  The following types
 are supported:
@@ -46,9 +48,9 @@ are supported:
 | pods | Total number of pods  |
 | services | Total number of services |
 | replicationcontrollers | Total number of replication controllers |
-| resourcequotas | Total number of resource quotas |
+| resourcequotas | Total number of [resource quotas](admission-controllers.md#resourcequota) |
 | secrets | Total number of secrets |
-| persistentvolumeclaims | Total number of persistent volume claims |
+| persistentvolumeclaims | Total number of [persistent volume claims](../user-guide/persistent-volumes.md#persistentvolumeclaims) |
 
 For example, `pods` quota counts and enforces a maximum on the number of `pods`
 created in a single namespace.
@@ -121,6 +123,9 @@ Sometimes more complex policies may be desired, such as:
 Such policies could be implemented using ResourceQuota as a building-block, by
 writing a 'controller' which watches the quota usage and adjusts the quota
 hard limits of each namespace.
+
+## Example
+See a [detailed example for how to use resource quota](../user-guide/resourcequota/). 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

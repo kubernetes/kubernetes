@@ -52,7 +52,7 @@ certainly want the docs that go with that version.</h1>
 Kubernetes [`Pods`](pods.md) are mortal. They are born and they die, and they
 are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
 particular create and destroy `Pods` dynamically (e.g. when scaling up or down
-or when doing rolling updates).  While each `Pod` gets its own IP address, even
+or when doing [rolling updates](kubectl/kubectl_rolling-update.md)).  While each `Pod` gets its own IP address, even
 those IP addresses cannot be relied upon to be stable over time. This leads to
 a problem: if some set of `Pods` (let's call them backends) provides
 functionality to other `Pods` (let's call them frontends) inside the Kubernetes

@@ -21,7 +21,7 @@ certainly want the docs that go with that version.</h1>
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 ## Overview
-This example shows two types of pod health checks: HTTP checks and container execution checks.
+This example shows two types of pod [health checks](../production-pods.md#liveness-and-readiness-probes-aka-health-checks): HTTP checks and container execution checks.
 
 The [exec-liveness.yaml](exec-liveness.yaml) demonstrates the container execution check.
 ```
@@ -33,9 +33,9 @@ The [exec-liveness.yaml](exec-liveness.yaml) demonstrates the container executio
       initialDelaySeconds: 15
       timeoutSeconds: 1
 ```
-Kubelet executes the command cat /tmp/health in the container and reports failure if the command returns a non-zero exit code.
+Kubelet executes the command `cat /tmp/health` in the container and reports failure if the command returns a non-zero exit code.
 
-Note that the container removes the /tmp/health file after 10 seconds,
+Note that the container removes the `/tmp/health` file after 10 seconds,
 ```
 echo ok > /tmp/health; sleep 10; rm -rf /tmp/health; sleep 600
 ```

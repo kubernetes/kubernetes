@@ -64,6 +64,12 @@ If you don't have much familiarity with Kubernetes, we recommend you read the fo
 [**Overview**](overview.md)
 : A brief overview of Kubernetes concepts.
 
+[**Cluster**](../admin/README.md)
+: A cluster is a set of physical or virtual machines and other infrastructure resources used by Kubernetes to run your applications.
+
+[**Node**](../admin/node.md)
+: A node is a physical or virtual machine running Kubernetes, onto which pods can be scheduled.
+
 [**Pod**](pods.md)
 : A pod is a co-located group of containers and volumes.
 
@@ -107,6 +113,8 @@ If you don't have much familiarity with Kubernetes, we recommend you read the fo
   * [Downward API: accessing system configuration from a pod](downward-api.md)
   * [Images and registries](images.md)
   * [Migrating from docker-cli to kubectl](docker-cli-to-kubectl.md)
+  * [Assign pods to selected nodes](node-selection/)
+  * [Perform a rolling update on a running group of pods](update-demo/)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
