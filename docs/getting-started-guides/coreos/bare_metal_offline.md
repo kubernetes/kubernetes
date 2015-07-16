@@ -32,7 +32,7 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 3. Update the DHCP config to reflect the host needing deployment
 4. Setup nodes to deploy CoreOS creating a etcd cluster. 
 5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/). 
-6. Installing the CoreOS slaves to become Kubernetes minions.
+6. Installing the CoreOS slaves to become Kubernetes nodes.
 
 ## This Guides variables
 | Node Description              | MAC               | IP          |
@@ -213,7 +213,7 @@ Now for the good stuff!
 ## Cloud Configs
 The following config files are tailored for the OFFLINE version of a Kubernetes deployment.
 
-These are based on the work found here: [master.yml](http://docs.k8s.io/getting-started-guides/coreos/cloud-configs/master.yaml), [node.yml](http://docs.k8s.io/getting-started-guides/coreos/cloud-configs/node.yaml)
+These are based on the work found here: [master.yml](cloud-configs/master.yaml), [node.yml](cloud-configs/node.yaml)
 
 To make the setup work, you need to replace a few placeholders:
 
@@ -622,7 +622,7 @@ Now that the CoreOS with Kubernetes installed is up and running lets spin up som
 
 See [a simple nginx example](../../../examples/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../../examples).
+For more complete applications, please look in the [examples directory](../../../examples/).
 
 ## Helping commands for debugging
 
@@ -649,7 +649,7 @@ Check system status of services on a minion node:
 List Kubernetes
 
     kubectl get pods
-    kubectl get minions
+    kubectl get nodes
 
 
 Kill all pods:

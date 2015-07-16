@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	target  int
+	last    int
 	current int
 	token   string
 )
@@ -42,20 +42,20 @@ func (a ByMerged) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByMerged) Less(i, j int) bool { return a[i].MergedAt.Before(*a[j].MergedAt) }
 
 func init() {
-	flag.IntVar(&target, "last-release-pr", 0, "The PR number of the last versioned release.")
+	flag.IntVar(&last, "last-release-pr", 0, "The PR number of the last versioned release.")
 	flag.IntVar(&current, "current-release-pr", 0, "The PR number of the current versioned release.")
-	flag.StringVar(&token, "api-token", "", "Github api token for rate limiting. See https://developer.github.com/v3/#rate-limiting.")
+	flag.StringVar(&token, "api-token", "", "Github api token for rate limiting. Background: https://developer.github.com/v3/#rate-limiting and create a token: https://github.com/settings/tokens")
 }
 
 func main() {
 	flag.Parse()
 	// Automatically determine this from github.
-	if target == 0 {
+	if last == 0 {
 		fmt.Printf("--last-release-pr is required.\n")
 		os.Exit(1)
 	}
 	if current == 0 {
-		fmt.Printf("--curent-release-pr is required.\n")
+		fmt.Printf("--current-release-pr is required.\n")
 		os.Exit(1)
 	}
 	var tc *http.Client
@@ -85,34 +85,43 @@ func main() {
 	buffer := &bytes.Buffer{}
 	prs := []*github.PullRequest{}
 	var lastVersionMerged *time.Time
-	var currentVersionCreated *time.Time
+	var currentVersionMerged *time.Time
 	for !done {
 		opts.Page++
+		fmt.Printf("Fetching PR list page %2d\n", opts.Page)
 		results, _, err := client.PullRequests.List("GoogleCloudPlatform", "kubernetes", &opts)
 		if err != nil {
 			fmt.Printf("Error contacting github: %v", err)
 			os.Exit(1)
 		}
+		unmerged := 0
+		merged := 0
 		for ix := range results {
 			result := &results[ix]
 			// Skip Closed but not Merged PRs
 			if result.MergedAt == nil {
+				unmerged++
 				continue
 			}
-			if *result.Number == target {
+			if *result.Number == last {
 				done = true
 				lastVersionMerged = result.MergedAt
+				fmt.Printf(" ... found last PR %d.\n", last)
 				break
 			}
 			if *result.Number == current {
-				currentVersionCreated = result.CreatedAt
+				currentVersionMerged = result.MergedAt
+				fmt.Printf(" ... found current PR %d.\n", current)
 			}
 			prs = append(prs, result)
+			merged++
 		}
+		fmt.Printf(" ... %d merged PRs, %d unmerged PRs.\n", merged, unmerged)
 	}
+	fmt.Printf("Compiling pretty-printed list of PRs...\n")
 	sort.Sort(ByMerged(prs))
 	for _, pr := range prs {
-		if lastVersionMerged.Before(*pr.MergedAt) && pr.MergedAt.Before(*currentVersionCreated) {
+		if lastVersionMerged.Before(*pr.MergedAt) && (pr.MergedAt.Before(*currentVersionMerged) || (*pr.Number == current)) {
 			fmt.Fprintf(buffer, "   * %s #%d (%s)\n", *pr.Title, *pr.Number, *pr.User.Login)
 		}
 	}

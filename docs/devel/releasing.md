@@ -1,7 +1,138 @@
 # Releasing Kubernetes
 
-This document explains how to create a Kubernetes release (as in version) and
-how the version information gets embedded into the built binaries.
+This document explains how to cut a release, and the theory behind it. If you
+just want to cut a release and move on with your life, you can stop reading
+after the first section.
+
+## How to cut a Kubernetes release
+
+Regardless of whether you are cutting a major or minor version, cutting a
+release breaks down into four pieces:
+
+1. Selecting release components.
+1. Tagging and merging the release in Git.
+1. Building and pushing the binaries.
+1. Writing release notes.
+
+You should progress in this strict order.
+
+### Building a New Major/Minor Version (`vX.Y.0`)
+
+#### Selecting Release Components
+
+When cutting a major/minor release, your first job is to find the branch
+point. We cut `vX.Y.0` releases directly from `master`, which is also the the
+branch that we have most continuous validation on. Go first to [the main GCE
+Jenkins end-to-end job](http://go/k8s-test/job/kubernetes-e2e-gce) and next to [the
+Critical Builds page](http://go/k8s-test/view/Critical%20Builds) and hopefully find a
+recent Git hash that looks stable across at least `kubernetes-e2e-gce` and
+`kubernetes-e2e-gke-ci`. First glance through builds and look for nice solid
+rows of green builds, and then check temporally with the other Critical Builds
+to make sure they're solid around then as well. Once you find some greens, you
+can find the Git hash for a build by looking at the "Console Log", then look for
+`githash=`. You should see a line line:
+
+```
++ githash=v0.20.2-322-g974377b
+```
+
+Because Jenkins builds frequently, if you're looking between jobs
+(e.g. `kubernetes-e2e-gke-ci` and `kubernetes-e2e-gce`), there may be no single
+`githash` that's been run on both jobs. In that case, take the a green
+`kubernetes-e2e-gce` build (but please check that it corresponds to a temporally
+similar build that's green on `kubernetes-e2e-gke-ci`). Lastly, if you're having
+trouble understanding why the GKE continuous integration clusters are failing
+and you're trying to cut a release, don't hesistate to contact the GKE
+oncall.
+
+Before proceeding to the next step:
+```
+export BRANCHPOINT=v0.20.2-322-g974377b
+```
+Where `v0.20.2-322-g974377b` is the git hash you decided on. This will become
+our (retroactive) branch point.
+
+#### Branching, Tagging and Merging
+Do the following:
+
+1. `export VER=x.y` (e.g. `0.20` for v0.20)
+1. cd to the base of the repo
+1. `git fetch upstream && git checkout -b release-${VER} ${BRANCHPOINT}` (you did set `${BRANCHPOINT}`, right?)
+1. Make sure you don't have any files you care about littering your repo (they
+   better be checked in or outside the repo, or the next step will delete them).
+1. `make clean && git reset --hard HEAD && git clean -xdf`
+1. `make` (TBD: you really shouldn't have to do this, but the swagger output step requires it right now)
+1. `./build/mark-new-version.sh v${VER}.0` to mark the new release and get further
+   instructions. This creates a series of commits on the branch you're working
+   on (`release-${VER}`), including forking our documentation for the release,
+   the release version commit (which is then tagged), and the post-release
+   version commit.
+1. Follow the instructions given to you by that script. They are canon for the
+   remainder of the Git process. If you don't understand something in that
+   process, please ask!
+
+**TODO**: how to fix tags, etc., if you have to shift the release branchpoint.
+
+#### Building and Pushing Binaries
+
+In your git repo (you still have `${VER}` set from above right?):
+
+1. `git checkout upstream/master && build/build-official-release.sh v${VER}.0` (the `build-official-release.sh` script is version agnostic, so it's best to run it off `master` directly).
+1. Follow the instructions given to you by that script.
+1. At this point, you've done all the Git bits, you've got all the binary bits pushed, and you've got the template for the release started on GitHub.
+
+#### Writing Release Notes
+
+[This helpful guide](making-release-notes.md) describes how to write release
+notes for a major/minor release. In the release template on GitHub, leave the
+last PR number that the tool finds for the `.0` release, so the next releaser
+doesn't have to hunt.
+
+### Building a New Patch Release (`vX.Y.Z` for `Z > 0`)
+
+#### Selecting Release Components
+
+We cut `vX.Y.Z` releases from the `release-vX.Y` branch after all cherry picks
+to the branch have been resolved. You should ensure all outstanding cherry picks
+have been reviewed and merged and the branch validated on Jenkins (validation
+TBD). See the [Cherry Picks](cherry-picks.md) for more information on how to
+manage cherry picks prior to cutting the release.
+
+#### Tagging and Merging
+
+Do the following (you still have `${VER}` set and you're still working on the
+`release-${VER}` branch, right?):
+
+1. `export PATCH=Z` where `Z` is the patch level of `vX.Y.Z`
+1. `make` (TBD: you really shouldn't have to do this, but the swagger output step requires it right now)
+1. `./build/mark-new-version.sh v${VER}.${PATCH}` to mark the new release and get further
+   instructions. This creates a series of commits on the branch you're working
+   on (`release-${VER}`), including forking our documentation for the release,
+   the release version commit (which is then tagged), and the post-release
+   version commit.
+1. Follow the instructions given to you by that script. They are canon for the
+   remainder of the Git process. If you don't understand something in that
+   process, please ask!
+
+**TODO**: how to fix tags, etc., if the release is changed.
+
+#### Building and Pushing Binaries
+
+In your git repo (you still have `${VER}` and `${PATCH}` set from above right?):
+
+1. `git checkout upstream/master && build/build-official-release.sh
+   v${VER}.${PATCH}` (the `build-official-release.sh` script is version
+   agnostic, so it's best to run it off `master` directly).
+1. Follow the instructions given to you by that script. At this point, you've
+   done all the Git bits, you've got all the binary bits pushed, and you've got
+   the template for the release started on GitHub.
+
+#### Writing Release Notes
+
+Release notes for a patch release are relatives fast: `git log release-${VER}`
+(If you followed the procedure in the first section, all the cherry-picks will
+have the pull request number in the commit log). Unless there's some reason not
+to, just include all the PRs back to the last release.
 
 ## Origin of the Sources
 
@@ -97,7 +228,7 @@ others around it will either have `v0.4-dev` or `v0.5-dev`.
 
 The diagram below illustrates it.
 
-![Diagram of git commits involved in the release](./releasing.png)
+![Diagram of git commits involved in the release](releasing.png)
 
 After working on `v0.4-dev` and merging PR 99 we decide it is time to release
 `v0.5`. So we start a new branch, create one commit to update
@@ -116,7 +247,8 @@ We then send PR 100 with both commits in it.
 Once the PR is accepted, we can use `git tag -a` to create an annotated tag
 *pointing to the one commit* that has `v0.5` in `pkg/version/base.go` and push
 it to GitHub. (Unfortunately GitHub tags/releases are not annotated tags, so
-this needs to be done from a git client and pushed to GitHub using SSH.)
+this needs to be done from a git client and pushed to GitHub using SSH or
+HTTPS.)
 
 ## Parallel Commits
 

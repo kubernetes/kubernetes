@@ -1,4 +1,20 @@
 # Networking in Kubernetes
+**Table of Contents**
+<!-- BEGIN GENERATED TOC -->
+- [Networking in Kubernetes](#networking-in-kubernetes)
+  - [Summary](#summary)
+  - [Docker model](#docker-model)
+  - [Kubernetes model](#kubernetes-model)
+  - [How to achieve this](#how-to-achieve-this)
+    - [Google Compute Engine (GCE)](#google-compute-engine-(gce))
+    - [L2 networks and linux bridging](#l2-networks-and-linux-bridging)
+    - [Flannel](#flannel)
+    - [OpenVSwitch](#openvswitch)
+    - [Weave](#weave)
+    - [Calico](#calico)
+  - [Other reading](#other-reading)
+
+<!-- END GENERATED TOC -->
 
 Kubernetes approaches networking somewhat differently than Docker does by
 default.  There are 4 distinct networking problems to solve:
@@ -155,7 +171,7 @@ people have reported success with Flannel and Kubernetes.
 
 ### OpenVSwitch
 
-[OpenVSwitch](./ovs-networking.md) is a somewhat more mature but also
+[OpenVSwitch](ovs-networking.md) is a somewhat more mature but also
 complicated way to build an overlay network.  This is endorsed by several of the
 "Big Shops" for networking.
 

@@ -1833,6 +1833,16 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 0,
 		},
+		{
+			// For now we open firewalls, and its insecure if we open 10250, remove this
+			// when we have better protections in place.
+			name: "invalid port type=LoadBalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(12345)})
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {

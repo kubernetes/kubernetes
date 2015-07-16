@@ -167,7 +167,7 @@ You will need binaries for:
 #### Downloading and Extracting Kubernetes Binaries
 A Kubernetes binary release includes all the Kubernetes binaries as well as the supported release of etcd.
 You can use a Kubernetes binary release (recommended) or build your Kubernetes binaries following the instructions in the
-[Developer Documentation]( ../devel/README.md).  Only using a binary release is covered in this guide.
+[Developer Documentation](../devel/README.md).  Only using a binary release is covered in this guide.
 
 Download the [latest binary release](
 https://github.com/GoogleCloudPlatform/kubernetes/releases/latest) and unzip it.
@@ -255,8 +255,7 @@ The admin user (and any users) need:
 
 Your tokens and passwords need to be stored in a file for the apiserver
 to read.  This guide uses `/var/lib/kube-apiserver/known_tokens.csv`.
-The format for this file is described in the [authentication documentation](
-../authentication.md).
+The format for this file is described in the [authentication documentation](../authentication.md).
 
 For distributing credentials to clients, the convention in Kubernetes is to put the credentials
 into a [kubeconfig file](../kubeconfig-file.md).
@@ -484,7 +483,7 @@ To run the apiserver:
 
 Here are some apiserver flags you may need to set:
   - `--cloud-provider=`
-  - `--cloud-config=` if cloud provider requires a config file (GCE, AWS). If so, need to put config file into apiserver image or mount through hostDir.
+  - `--cloud-config=` if cloud provider requires a config file (GCE, AWS). If so, need to put config file into apiserver image or mount through hostPath.
   - `--address=${MASTER_IP}`.  
    - or `--bind-address=127.0.0.1` and `--address=127.0.0.1` if you want to run a proxy on the master node.
   - `--cluster-name=$CLUSTER_NAME`
@@ -509,61 +508,75 @@ If you are using the HTTPS approach, then set:
 *TODO* document proxy-ssh setup.
 
 #### Apiserver pod template
-*TODO*: convert to version v1.
 
 ```json
 {
-"apiVersion": "v1beta3",
-"kind": "Pod",
-"metadata": {"name":"kube-apiserver"},
-"spec":{
-"hostNetwork": true,
-"containers":[
-    {
-    "name": "kube-apiserver",
-    "image": "${APISERVER_IMAGE}",
-    "command": [
-                 "/bin/sh",
-                 "-c",
-                 "/usr/local/bin/kube-apiserver $ARGS"
-               ],
-    "livenessProbe": {
-      "httpGet": {
-        "path": "/healthz",
-        "port": 8080
-      },
-      "initialDelaySeconds": 15,
-      "timeoutSeconds": 15
-    },
-    "ports":[
-      { "name": "https",
-        "containerPort": 443,
-        "hostPort": 443},
-      { "name": "local",
-        "containerPort": 8080,
-        "hostPort": 8080}
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-apiserver"
+  },
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "kube-apiserver",
+        "image": "${APISERVER_IMAGE}",
+        "command": [
+          "/bin/sh",
+          "-c",
+          "/usr/local/bin/kube-apiserver $ARGS"
         ],
-    "volumeMounts": [
-        { "name": "srvkube",
-        "mountPath": "/srv/kubernetes",
-        "readOnly": true},
-        { "name": "etcssl",
-        "mountPath": "/etc/ssl",
-        "readOnly": true},
-      ]
-    }
-],
-"volumes":[
-  { "name": "srvkube",
-    "hostPath": {
-        "path": "/srv/kubernetes"}
-  },
-  { "name": "etcssl",
-    "hostPath": {
-        "path": "/etc/ssl"}
-  },
-]
-}}
+        "ports": [
+          {
+            "name": "https",
+            "hostPort": 443,
+            "containerPort": 443
+          },
+          {
+            "name": "local",
+            "hostPort": 8080,
+            "containerPort": 8080
+          }
+        ],
+        "volumeMounts": [
+          {
+            "name": "srvkube",
+            "mountPath": "/srv/kubernetes",
+            "readOnly": true
+          },
+          {
+            "name": "etcssl",
+            "mountPath": "/etc/ssl",
+            "readOnly": true
+          }
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 8080
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ],
+    "volumes": [
+      {
+        "name": "srvkube",
+        "hostPath": {
+          "path": "/srv/kubernetes"
+        }
+      },
+      {
+        "name": "etcssl",
+        "hostPath": {
+          "path": "/etc/ssl"
+        }
+      }
+    ]
+  }
+}
 ```
 
 The `/etc/ssl` mount allows the apiserver to find the SSL root certs so it can
@@ -604,36 +617,37 @@ Otherwise, you will need to manually create node objects.
 
 ### Scheduler
 
-*TODO*: convert to version v1.
-
 Complete this template for the scheduler pod:
-```
+```json
 {
-"apiVersion": "v1beta3",
-"kind": "Pod",
-"metadata": {"name":"kube-scheduler"},
-"spec":{
-"hostNetwork": true,
-"containers":[
-    {
-    "name": "kube-scheduler",
-    "image": "$SCHEDULER_IMAGE",
-    "command": [
-                 "/bin/sh",
-                 "-c",
-                 "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080"
-               ],
-    "livenessProbe": {
-      "httpGet": {
-        "path": "/healthz",
-        "port": 10251
-      },
-      "initialDelaySeconds": 15,
-      "timeoutSeconds": 15
-    },
-    }
-],
-}}
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-scheduler"
+  },
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "kube-scheduler",
+        "image": "$SCHEDULER_IMAGE",
+        "command": [
+          "/bin/sh",
+          "-c",
+          "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080"
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 10251
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ]
+  }
+}
 ```
 Optionally, you may want to mount `/var/log` as well and redirect output there.
 
@@ -656,51 +670,62 @@ Flags to consider using with controller manager.
  - `--master=127.0.0.1:8080`
 
 Template for controller manager pod:
-```
+```json
 {
-"apiVersion": "v1beta3",
-"kind": "Pod",
-"metadata": {"name":"kube-controller-manager"},
-"spec":{
-"hostNetwork": true,
-"containers":[
-    {
-    "name": "kube-controller-manager",
-    "image": "$CNTRLMNGR_IMAGE",
-    "command": [
-                 "/bin/sh",
-                 "-c",
-                 "/usr/local/bin/kube-controller-manager $ARGS"
-               ],
-    "livenessProbe": {
-      "httpGet": {
-        "path": "/healthz",
-        "port": 10252
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kube-controller-manager"
+  },
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "kube-controller-manager",
+        "image": "$CNTRLMNGR_IMAGE",
+        "command": [
+          "/bin/sh",
+          "-c",
+          "/usr/local/bin/kube-controller-manager $ARGS"
+        ],
+        "volumeMounts": [
+          {
+            "name": "srvkube",
+            "mountPath": "/srv/kubernetes",
+            "readOnly": true
+          },
+          {
+            "name": "etcssl",
+            "mountPath": "/etc/ssl",
+            "readOnly": true
+          }
+        ],
+        "livenessProbe": {
+          "httpGet": {
+            "path": "/healthz",
+            "port": 10252
+          },
+          "initialDelaySeconds": 15,
+          "timeoutSeconds": 15
+        }
+      }
+    ],
+    "volumes": [
+      {
+        "name": "srvkube",
+        "hostPath": {
+          "path": "/srv/kubernetes"
+        }
       },
-      "initialDelaySeconds": 15,
-      "timeoutSeconds": 15
-    },
-    "volumeMounts": [
-        { "name": "srvkube",
-        "mountPath": "/srv/kubernetes",
-        "readOnly": true},
-        { "name": "etcssl",
-        "mountPath": "/etc/ssl",
-        "readOnly": true},
-      ]
-    }
-],
-"volumes":[
-  { "name": "srvkube",
-    "hostPath": {
-        "path": "/srv/kubernetes"}
-  },
-  { "name": "etcssl",
-    "hostPath": {
-        "path": "/etc/ssl"}
-  },
-]
-}}
+      {
+        "name": "etcssl",
+        "hostPath": {
+          "path": "/etc/ssl"
+        }
+      }
+    ]
+  }
+}
 ```
 
 
@@ -733,7 +758,7 @@ At this point you should be able to run through one of the basic examples, such 
 
 ### Running the Conformance Test
 
-You may want to try to run the [Conformance test](../hack/conformance.sh).  Any failures may give a hint as to areas that need more attention.
+You may want to try to run the [Conformance test](../../hack/conformance-test.sh).  Any failures may give a hint as to areas that need more attention.
 
 ### Networking
 

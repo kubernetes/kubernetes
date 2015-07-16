@@ -35,7 +35,7 @@ public class KubernetesSeedProvider implements SeedProvider {
     
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Address {
-        public String IP;
+        public String ip;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -102,7 +102,8 @@ public class KubernetesSeedProvider implements SeedProvider {
         List<InetAddress> list = new ArrayList<InetAddress>();
         String host = "https://kubernetes.default.cluster.local";
         String serviceName = getEnvOrDefault("CASSANDRA_SERVICE", "cassandra");
-        String path = "/api/v1/namespaces/default/endpoints/";
+        String podNamespace = getEnvOrDefault("POD_NAMESPACE", "default");
+        String path = String.format("/api/v1/namespaces/%s/endpoints/", podNamespace);
         try {
             String token = getServiceAccountToken();
 
@@ -110,6 +111,7 @@ public class KubernetesSeedProvider implements SeedProvider {
             ctx.init(null, trustAll, new SecureRandom());
 
             URL url = new URL(host + path + serviceName);
+            logger.info("Getting endpoints from " + url);
             HttpsURLConnection conn = (HttpsURLConnection)url.openConnection();
 
             // TODO: Remove this once the CA cert is propogated everywhere, and replace
@@ -125,11 +127,14 @@ public class KubernetesSeedProvider implements SeedProvider {
                 if (endpoints.subsets != null && !endpoints.subsets.isEmpty()){
                     for (Subset subset : endpoints.subsets) {
                         for (Address address : subset.addresses) {
-                            list.add(InetAddress.getByName(address.IP));
+                            list.add(InetAddress.getByName(address.ip));
                         }
                     }
                 }
-            }
+		logger.info("Available endpoints: " + list);
+            } else {
+		logger.warn("Endpoints are not available");
+	    }
         } catch (IOException | NoSuchAlgorithmException | KeyManagementException ex) {
 	    logger.warn("Request to kubernetes apiserver failed", ex); 
         }

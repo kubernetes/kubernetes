@@ -38,10 +38,8 @@ Here is my command and output:
 ```console
 # kubectl create -f examples/iscsi/iscsi.json
 # kubectl get pods
-POD       IP            CONTAINER(S)   IMAGE(S)           HOST                                    LABELS    STATUS    CREATED         MESSAGE
-iscsipd   10.244.3.14                                     kubernetes-minion-bz1p/104.154.61.231   <none>    Running   About an hour   
-                        iscsipd-rw     kubernetes/pause                                                     Running   About an hour   
-                        iscsipd-ro     kubernetes/pause                                                     Running   About an hour   
+NAME      READY     STATUS    RESTARTS   AGE
+iscsipd   2/2       RUNNING   0           2m
 ```
 
 On the Kubernetes node, I got these in mount output

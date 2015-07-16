@@ -120,8 +120,8 @@ kube-system   kube-ui               k8s-app=kube-ui,kubernetes.io/cluster-servic
 kube-system   monitoring-grafana    kubernetes.io/cluster-service=true,kubernetes.io/name=Grafana                    k8s-app=influxGrafana   10.0.41.246    80/TCP
 kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernetes.io/name=Heapster                   k8s-app=heapster        10.0.59.48     80/TCP
 kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
-                                                                                                                                                            8086/TCP```
-
+                                                                                                                                                            8086/TCP
+```
 Similarly, you can take a look at the set of [pods](../pods.md) that were created during cluster startup.
 You can do this via the
 
@@ -150,7 +150,7 @@ Some of the pods may take a few seconds to start up (during this time they'll sh
 
 Then, see [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../examples).  The [guestbook example](../../examples/guestbook) is a good "getting started" walkthrough.
+For more complete applications, please look in the [examples directory](../../examples/).  The [guestbook example](../../examples/guestbook/) is a good "getting started" walkthrough.
 
 ### Tearing down the cluster
 To remove/delete/teardown the cluster, use the `kube-down.sh` script.

@@ -102,7 +102,7 @@ KUBERNETES_MASTER to point at the ip of `kubernetes-master/0`.
 No pods will be available before starting a container:
 
     kubectl get pods
-    POD  CONTAINER(S)   IMAGE(S)   HOST  LABELS  STATUS
+    NAME             READY     STATUS    RESTARTS   AGE
 
     kubectl get replicationcontrollers
     CONTROLLER  CONTAINER(S)  IMAGE(S)  SELECTOR  REPLICAS
@@ -178,7 +178,7 @@ We can add minion units like so:
 
 ## Launch the "k8petstore" example app
 
-The [k8petstore example](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/k8petstore) is available as a
+The [k8petstore example](../../examples/k8petstore/) is available as a
 [juju action](https://jujucharms.com/docs/devel/actions).
 
     juju action do kubernetes-master/0

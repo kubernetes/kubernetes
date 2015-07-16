@@ -202,6 +202,42 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
+	Describe("Kubectl label", func() {
+		var podPath string
+		var nsFlag string
+		BeforeEach(func() {
+			podPath = filepath.Join(testContext.RepoRoot, "examples/pod.yaml")
+			By("creating the pod")
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			runKubectl("create", "-f", podPath, nsFlag)
+			checkPodsRunningReady(c, ns, []string{simplePodName}, podStartTimeout)
+		})
+		AfterEach(func() {
+			cleanup(podPath, ns, simplePodSelector)
+		})
+
+		It("should update the label on a resource", func() {
+			labelName := "testing-label"
+			labelValue := "testing-label-value"
+
+			By("adding the label " + labelName + " with value " + labelValue + " to a pod")
+			runKubectl("label", "pods", simplePodName, labelName+"="+labelValue, nsFlag)
+			By("verifying the pod has the label " + labelName + " with the value " + labelValue)
+			output := runKubectl("get", "pod", simplePodName, "-L", labelName, nsFlag)
+			if !strings.Contains(output, labelValue) {
+				Failf("Failed updating label " + labelName + " to the pod " + simplePodName)
+			}
+
+			By("removing the label " + labelName + " of a pod")
+			runKubectl("label", "pods", simplePodName, labelName+"-", nsFlag)
+			By("verifying the pod doesn't have the label " + labelName)
+			output = runKubectl("get", "pod", simplePodName, "-L", labelName, nsFlag)
+			if strings.Contains(output, labelValue) {
+				Failf("Failed removing label " + labelName + " of the pod " + simplePodName)
+			}
+		})
+	})
+
 })
 
 func curl(addr string) (string, error) {

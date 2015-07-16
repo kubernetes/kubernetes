@@ -78,8 +78,8 @@ kubectl get pods
 You'll see a single phabricator pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
 
 ```
-POD                           IP           CONTAINER(S)  IMAGE(S)                  HOST                                                      LABELS                                   STATUS
-phabricator-controller-02qp4  10.244.1.34  phabricator   fgrzadkowski/phabricator  kubernetes-minion-2.c.myproject.internal/130.211.141.151  name=phabricator
+NAME                           READY     STATUS    RESTARTS   AGE
+phabricator-controller-9vy68   1/1       Running   0          1m
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
@@ -158,7 +158,7 @@ $ kubectl create -f examples/phabricator/authenticator-controller.json
 
 ### Step Four: Turn up the phabricator service
 
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](http://docs.k8s.io/services.md) before proceeding.
+A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](../../docs/services.md) before proceeding.
 
 The pod that you created in Step One has the label `name=phabricator`. The selector field of the service determines which pods will receive the traffic sent to the service. Since we are setting up a service for an external application we also need to request external static IP address (otherwise it will be assigned dynamically):
 
@@ -203,7 +203,7 @@ phabricator
 To play with the service itself, find the external IP of the load balancer:
 
 ```shell
-$ kubectl get services guestbook -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}'
+$ kubectl get services phabricator -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}{{"\n"}}'
 ```
 
 and then visit port 80 of that IP address.

@@ -52,15 +52,15 @@ before proceeding.
 
 ```shell
 $ kubectl get pods
-POD                 IP                  CONTAINER(S)        IMAGE(S)             HOST                          LABELS                      STATUS
-zookeeper           192.168.86.4        zookeeper           mattf/zookeeper      172.18.145.8/172.18.145.8     name=zookeeper              Running
+NAME        READY     STATUS    RESTARTS   AGE
+zookeeper   1/1       Running   0          43s
 ```
 
 ### Check to see if ZooKeeper is accessible
 
 ```shell
 $ kubectl get services
-NAME                LABELS                                    SELECTOR            IP                  PORT
+NAME                LABELS                                    SELECTOR            IP(S)               PORT(S)
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 
@@ -94,7 +94,7 @@ Ensure that the Nimbus service is running and functional.
 
 ```shell
 $ kubectl get services
-NAME                LABELS                                    SELECTOR            IP                  PORT
+NAME                LABELS                                    SELECTOR            IP(S)               PORT(S)
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 nimbus              name=nimbus                               name=nimbus         10.254.115.208      6627

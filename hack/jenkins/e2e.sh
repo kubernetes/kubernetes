@@ -66,15 +66,42 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
 fi
 
 # Specialized tests which should be skipped by default for projects.
-GCE_DEFAULT_SKIP_TEST_REGEX="Skipped|Density|Reboot|Restart|Example"
+GCE_DEFAULT_SKIP_TEST_REGEX="\
+Skipped|\
+Reboot|\
+Restart|\
+Example\
+"
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TEST_REGEX="Elasticsearch|Shell.*services|MaxPods.*"
+GCE_FLAKY_TEST_REGEX="\
+MaxPods.*\
+"
 # Tests which are not able to be run in parallel.
-GCE_PARALLEL_SKIP_TEST_REGEX="${GCE_DEFAULT_SKIP_TEST_REGEX}|Etcd|NetworkingNew|Nodes\sNetwork|Nodes\sResize|MaxPods"
+GCE_PARALLEL_SKIP_TEST_REGEX="\
+${GCE_DEFAULT_SKIP_TEST_REGEX}\
+|Etcd\
+|NetworkingNew\
+|Nodes\sNetwork\
+|Nodes\sResize\
+|MaxPods\
+|Shell.*services\
+"
 # Tests which are known to be flaky when run in parallel.
 # TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
-GCE_PARALLEL_FLAKY_TEST_REGEX="Addon|Elasticsearch|Hostdir.*MOD|Networking.*intra|PD|ServiceAccounts|Service\sendpoints\slatency|Services.*change\sthe\stype|Services.*functioning\sexternal\sload\sbalancer|Services.*identically\snamed|Services.*release.*load\sbalancer|Shell|multiport\sendpoints"
+GCE_PARALLEL_FLAKY_TEST_REGEX="\
+Elasticsearch\
+|Hostdir.*MOD\
+|Networking.*intra\
+|PD\
+|ServiceAccounts\
+|Service\sendpoints\slatency\
+|Services.*change\sthe\stype\
+|Services.*functioning\sexternal\sload\sbalancer\
+|Services.*identically\snamed\
+|Services.*release.*load\sbalancer\
+|multiport\sendpoints\
+"
 
 # Define environment variables based on the Jenkins project name.
 case ${JOB_NAME} in
@@ -136,7 +163,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-scalability)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability"}
     : ${E2E_NETWORK:="e2e-scalability"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Performance\ssuite|should\sbe\sable\sto\shandle"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Performance\ssuite"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
@@ -161,6 +188,19 @@ case ${JOB_NAME} in
     MASTER_SIZE="n1-standard-1"
     MINION_SIZE="n1-standard-1"
     NUM_MINIONS="2"
+    ;;
+
+  # Runs non-flaky tests on GCE on the release-latest branch,
+  # sequentially. As a reminder, if you need to change the skip list
+  # or flaky test list on the release branch, you'll need to propose a
+  # pull request directly to the release branch itself.
+  kubernetes-e2e-gce-release)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-gce-release"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
+    : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
 esac
 
@@ -201,13 +241,19 @@ echo "Test Environment:"
 printenv | sort
 echo "--------------------------------------------------------------------------------"
 
-if [[ "${E2E_UP,,}" == "true" ]]; then
+# We get the Kubernetes tarballs on either cluster creation or when we want to
+# replace existing ones in a multi-step job (e.g. a cluster upgrade).
+if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; then
     if [[ ${KUBE_RUN_FROM_OUTPUT:-} =~ ^[yY]$ ]]; then
         echo "Found KUBE_RUN_FROM_OUTPUT=y; will use binaries from _output"
         cp _output/release-tars/kubernetes*.tar.gz .
     else
         echo "Pulling binaries from GCS"
-        if [[ $(find . | wc -l) != 1 ]]; then
+        # In a multi-step job, clean up just the kubernetes build files.
+        # Otherwise, we want a completely empty directory.
+        if [[ "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; then
+            rm -rf kubernetes*
+        elif [[ $(find . | wc -l) != 1 ]]; then
             echo $PWD not empty, bailing!
             exit 1
         fi
@@ -217,6 +263,9 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
         # other.
         export KUBE_SKIP_UPDATE=y
         sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update -q" || true
+        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update preview -q" || true
+        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update alpha -q" || true
+        sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update beta -q" || true
 
         if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
             # Use an explicit pinned version like "ci/v0.10.0-101-g6c814c4" or
@@ -225,38 +274,6 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
             bucket="${varr[0]}"
             githash="${varr[1]}"
             echo "$bucket / $githash"
-        elif [[ ${JENKINS_USE_SERVER_VERSION:-} =~ ^[yY]$ ]]; then
-            # For GKE, we can get the server-specified version.
-            # We'll pull our TARs for tests from the release bucket.
-            bucket="release"
-
-            # Get the latest available API version from the GKE apiserver.
-            # Trim whitespace out of the error message. This gives us something
-            # like: ERROR:(gcloud.alpha.container.clusters.create)ResponseError:
-            #       code=400,message=cluster.cluster_api_versionmustbeoneof:
-            #       0.15.0,0.16.0.
-            # The command should error, so we throw an || true on there.
-            create_args=(
-              "this-wont-work"
-              "--zone=us-central1-f"
-            )
-            if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
-              create_args+=("--cluster-version=0.0.0")
-            else
-              create_args+=("--cluster-api-version=0.0.0")
-            fi
-            msg=$(gcloud ${CMD_GROUP:-alpha} container clusters create "${create_args[@]}" 2>&1 \
-                | tr -d '[[:space:]]') || true
-            # Strip out everything before the final colon, which gives us just
-            # the allowed versions; something like "0.15.0,0.16.0." or "0.16.0."
-            msg=${msg##*:}
-            # Take off the final period, which gives us just comma-separated
-            # allowed versions; something like "0.15.0,0.16.0" or "0.16.0"
-            msg=${msg%%\.}
-            # Split the version string by comma and read into an array, using
-            # the last element as the githash, which will be like "v0.16.0".
-            IFS=',' read -a varr <<< "${msg}"
-            githash="v${varr[${#varr[@]} - 1]}"
         else
             # The "ci" bucket is for builds like "v0.15.0-468-gfa648c1"
             bucket="ci"

@@ -22,7 +22,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ma
 
 *3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it should also work on most Ubuntu versions*
 
-*4 Dependences of this guide: etcd-2.0.9, flannel-0.4.0, k8s-0.18.0, but it may work with higher versions*
+*4 Dependences of this guide: etcd-2.0.12, flannel-0.4.0, k8s-0.19.3, but it may work with higher versions*
 
 *5 All the remote servers can be ssh logged in without a password by using key authentication* 
 
@@ -35,7 +35,7 @@ then `$ cd kubernetes/cluster/ubuntu`.
 
 Then run `$ ./build.sh`, this will download all the needed binaries into `./binaries`.
 
-You can customize your etcd version, flannel version, k8s version by changing variable `ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, default etcd version is 2.0.9, flannel version is 0.4.0 and K8s version is 0.18.0.
+You can customize your etcd version, flannel version, k8s version by changing variable `ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, default etcd version is 2.0.12, flannel version is 0.4.0 and K8s version is 0.19.3.
 
 Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `kube-scheduler`, `kubelet`, `kube-proxy`, `etcd`, `etcdctl` and `flannel` in the binaries/master or binaries/minion directory.
 
@@ -55,7 +55,7 @@ First configure the cluster information in cluster/ubuntu/config-default.sh, bel
 ```
 export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 
-export roles=("ai" "i" "i")
+export roles="ai i i"
 
 export NUM_MINIONS=${NUM_MINIONS:-3}
 
@@ -120,7 +120,7 @@ NAME            LABELS                                 STATUS
 
 ```
 
-Also you can run kubernetes [guest-example](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook) to build a redis backend cluster on the k8s．
+Also you can run kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
 
 
 #### Deploy addons

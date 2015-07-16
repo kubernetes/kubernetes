@@ -60,7 +60,7 @@ var _ = Describe("Pod Disks", func() {
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
-		SkipUnlessProviderIs("gce", "aws")
+		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
 		diskName, err := createPD()
@@ -113,7 +113,7 @@ var _ = Describe("Pod Disks", func() {
 	})
 
 	It("should schedule a pod w/ a readonly PD on two hosts, then remove both.", func() {
-		SkipUnlessProviderIs("gce")
+		SkipUnlessProviderIs("gce", "gke")
 
 		By("creating PD")
 		diskName, err := createPD()
@@ -166,6 +166,7 @@ var _ = Describe("Pod Disks", func() {
 				Logf("Couldn't delete PD. Sleeping 5 seconds")
 				continue
 			}
+			Logf("Successfully deleted PD %q", diskName)
 			break
 		}
 		expectNoError(err, "Error deleting PD")
@@ -173,7 +174,7 @@ var _ = Describe("Pod Disks", func() {
 })
 
 func createPD() (string, error) {
-	if testContext.Provider == "gce" {
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		pdName := fmt.Sprintf("%s-%s", testContext.prefix, string(util.NewUUID()))
 
 		zone := testContext.CloudConfig.Zone
@@ -195,7 +196,7 @@ func createPD() (string, error) {
 }
 
 func deletePD(pdName string) error {
-	if testContext.Provider == "gce" {
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		zone := testContext.CloudConfig.Zone
 
 		// TODO: make this hit the compute API directly.
@@ -215,7 +216,7 @@ func deletePD(pdName string) error {
 }
 
 func detachPD(hostName, pdName string) error {
-	if testContext.Provider == "gce" {
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		instanceName := strings.Split(hostName, ".")[0]
 
 		zone := testContext.CloudConfig.Zone
@@ -257,7 +258,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 		},
 	}
 
-	if testContext.Provider == "gce" {
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		pod.Spec.Volumes = []api.Volume{
 			{
 				Name: "testpd",

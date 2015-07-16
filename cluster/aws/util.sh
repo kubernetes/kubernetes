@@ -30,8 +30,13 @@ ASG_NAME="${NODE_INSTANCE_PREFIX}-group"
 # We could allow the master disk volume id to be specified in future
 MASTER_DISK_ID=
 
+# Defaults: ubuntu -> vivid
+if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+  KUBE_OS_DISTRIBUTION=vivid
+fi
+
 case "${KUBE_OS_DISTRIBUTION}" in
-  ubuntu|wheezy|coreos)
+  trusty|wheezy|jessie|vivid|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -76,10 +81,6 @@ function get_vpc_id {
 
 function get_subnet_id {
   python -c "import json,sys; lst = [str(subnet['SubnetId']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1' and subnet['AvailabilityZone'] == '$2']; print ''.join(lst)"
-}
-
-function get_cidr {
-  python -c "import json,sys; lst = [str(subnet['CidrBlock']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1' and subnet['AvailabilityZone'] == '$2']; print ''.join(lst)"
 }
 
 function get_igw_id {
@@ -221,11 +222,17 @@ function detect-security-groups {
 #   AWS_IMAGE
 function detect-image () {
 case "${KUBE_OS_DISTRIBUTION}" in
-  ubuntu|coreos)
-    detect-ubuntu-image
+  trusty|coreos)
+    detect-trusty-image
+    ;;
+  vivid)
+    detect-vivid-image
     ;;
   wheezy)
     detect-wheezy-image
+    ;;
+  jessie)
+    detect-jessie-image
     ;;
   *)
     echo "Please specify AWS_IMAGE directly (distro not recognized)"
@@ -234,12 +241,12 @@ case "${KUBE_OS_DISTRIBUTION}" in
 esac
 }
 
-# Detects the AMI to use for ubuntu (considering the region)
+# Detects the AMI to use for trusty (considering the region)
 # Used by CoreOS & Ubuntu
 #
 # Vars set:
 #   AWS_IMAGE
-function detect-ubuntu-image () {
+function detect-trusty-image () {
   # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
   # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
   # This will need to be updated from time to time as amis are deprecated
@@ -678,8 +685,9 @@ function kube-up {
 
   import-public-key ${AWS_SSH_KEY_NAME} ${AWS_SSH_KEY}.pub
 
-  VPC_ID=$(get_vpc_id)
-
+  if [[ -z "${VPC_ID:-}" ]]; then
+    VPC_ID=$(get_vpc_id)
+  fi
   if [[ -z "$VPC_ID" ]]; then
 	  echo "Creating vpc."
 	  VPC_ID=$($AWS_CMD create-vpc --cidr-block $INTERNAL_IP_BASE.0/16 | json_val '["Vpc"]["VpcId"]')
@@ -691,13 +699,15 @@ function kube-up {
 
   echo "Using VPC $VPC_ID"
 
-  SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
+  if [[ -z "${SUBNET_ID:-}" ]]; then
+    SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
+  fi
   if [[ -z "$SUBNET_ID" ]]; then
     echo "Creating subnet."
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
     add-tag $SUBNET_ID KubernetesCluster ${CLUSTER_ID}
   else
-    EXISTING_CIDR=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_cidr $VPC_ID $ZONE)
+    EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock --output text)
     echo "Using existing CIDR $EXISTING_CIDR"
     INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
     MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}

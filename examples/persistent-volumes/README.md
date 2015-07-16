@@ -20,21 +20,17 @@ support local storage on the host at this time.  There is no guarantee your pod 
 ```
 
 // this will be nginx's webroot
-mkdir /tmp/data01
-echo 'I love Kubernetes storage!' > /tmp/data01/index.html
+$ mkdir /tmp/data01
+$ echo 'I love Kubernetes storage!' > /tmp/data01/index.html
 
 ```
 
 PVs are created by posting them to the API server.
 
 ```
-
-kubectl create -f examples/persistent-volumes/volumes/local-01.yaml
-kubectl get pv
-
-NAME        LABELS       CAPACITY            ACCESSMODES         STATUS              CLAIM
-pv0001      map[]        10737418240         RWO                 Available                            
-
+$ kubectl create -f examples/persistent-volumes/volumes/local-01.yaml
+NAME      LABELS       CAPACITY      ACCESSMODES   STATUS      CLAIM     REASON
+pv0001    type=local   10737418240   RWO           Available 
 ```
 
 ## Requesting storage
@@ -46,9 +42,9 @@ Claims must be created in the same namespace as the pods that use them.
 
 ```
 
-kubectl create -f examples/persistent-volumes/claims/claim-01.yaml
-kubectl get pvc
+$ kubectl create -f examples/persistent-volumes/claims/claim-01.yaml
 
+$ kubectl get pvc
 NAME                LABELS              STATUS              VOLUME
 myclaim-1           map[]                                   
            
@@ -56,17 +52,13 @@ myclaim-1           map[]
 # A background process will attempt to match this claim to a volume.
 # The eventual state of your claim will look something like this:
 
-kubectl get pvc
+$ kubectl get pvc
+NAME        LABELS    STATUS    VOLUME
+myclaim-1   map[]     Bound     pv0001
 
-NAME        LABELS    STATUS    VOLUME                                                          
-myclaim-1   map[]     Bound     f5c3a89a-e50a-11e4-972f-80e6500a981e    
-
-
-kubectl get pv
-
-NAME                LABELS              CAPACITY            ACCESSMODES         STATUS    CLAIM
-pv0001              map[]               10737418240         RWO                 Bound     myclaim-1 / 6bef4c40-e50b-11e4-972f-80e6500a981e          
-
+$ kubectl get pv
+NAME      LABELS       CAPACITY      ACCESSMODES   STATUS    CLAIM               REASON
+pv0001    type=local   10737418240   RWO           Bound     default/myclaim-1 
 ```
 
 ## Using your claim as a volume
@@ -74,19 +66,15 @@ pv0001              map[]               10737418240         RWO                 
 Claims are used as volumes in pods.  Kubernetes uses the claim to look up its bound PV.  The PV is then exposed to the pod.
 
 ```
+$ kubectl create -f examples/persistent-volumes/simpletest/pod.yaml
 
-kubectl create -f examples/persistent-volumes/simpletest/pod.yaml
+$ kubectl get pods
+NAME      READY     STATUS    RESTARTS   AGE
+mypod     1/1       Running   0          1h
 
-kubectl get pods
-
-POD       IP           CONTAINER(S)   IMAGE(S)   HOST                  LABELS    STATUS    CREATED
-mypod     172.17.0.2   myfrontend     nginx      127.0.0.1/127.0.0.1   <none>    Running   12 minutes
-
-
-kubectl create -f examples/persistent-volumes/simpletest/service.json
-kubectl get services
-
-NAME              LABELS                                    SELECTOR            IP           PORT(S)
+$ kubectl create -f examples/persistent-volumes/simpletest/service.json
+$ kubectl get services
+NAME              LABELS                                    SELECTOR            IP(S)        PORT(S)
 frontendservice   <none>                                    name=frontendhttp   10.0.0.241   3000/TCP
 kubernetes        component=apiserver,provider=kubernetes   <none>              10.0.0.2     443/TCP
 

@@ -52,7 +52,7 @@ allowed.  The values are arbitrary data, encoded using base64. The values of
 username and password in the example above, before base64 encoding,
 are `value-1` and `value-2`, respectively, with carriage return and newline characters at the end.
 
-Create the secret using [`kubectl create`](kubectl-create.md).
+Create the secret using [`kubectl create`](kubectl_create.md).
 
 Once the secret is created, you can:
   - create pods that automatically use it via a [Service Account](service_accounts.md).
@@ -98,15 +98,13 @@ You can package many files into one secret, or use many secrets,
 whichever is convenient.
 
 ### Manually specifying an imagePullSecret
-Use of imagePullSecrets is desribed in the [images documentation](
-images.md#specifying-imagepullsecrets-on-a-pod)
+Use of imagePullSecrets is desribed in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)
 ### Automatic use of Manually Created Secrets
 
 *This feature is planned but not implemented.  See [issue
 9902](https://github.com/GoogleCloudPlatform/kubernetes/issues/9902).*
 
-You can reference manually created secrets from a [service account](
-service_accounts.md).
+You can reference manually created secrets from a [service account](service_accounts.md).
 Then, pods which use that service account will have
 `volumeMounts` and/or `imagePullSecrets` added to them.
 The secrets will be mounted at **TBD**.

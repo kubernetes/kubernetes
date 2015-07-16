@@ -33,7 +33,7 @@ $ kubectl create -f examples/glusterfs/glusterfs-endpoints.json
 
 You can verify that the endpoints are successfully created by running
 ```shell
-$ kubect get endpoints
+$ kubectl get endpoints
 NAME                ENDPOINTS
 glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
 ```
@@ -67,13 +67,14 @@ You can verify that the pod is running:
 
 ```shell
 $ kubectl get pods
-POD         IP            CONTAINER(S)   IMAGE(S)              HOST                                  LABELS    STATUS    CREATED          MESSAGE
-glusterfs   10.244.2.13                                        kubernetes-minion-151f/23.236.54.97   <none>    Running   About a minute   
-                          glusterfs      kubernetes/pause                                                      Running   About a minute   
+NAME             READY     STATUS    RESTARTS   AGE
+glusterfs        1/1       Running   0          3m
 
+$ kubectl get pods glusterfs -t '{{.status.hostIP}}{{"\n"}}'
+10.240.169.172
 ```
 
-You may ssh to the host and run 'mount' to see if the Glusterfs volume is mounted,
+You may ssh to the host (the hostIP) and run 'mount' to see if the Glusterfs volume is mounted,
 ```shell
 $ mount | grep kube_vol
 10.240.106.152:kube_vol on /var/lib/kubelet/pods/f164a571-fa68-11e4-ad5c-42010af019b7/volumes/kubernetes.io~glusterfs/glusterfsvol type fuse.glusterfs (rw,relatime,user_id=0,group_id=0,default_permissions,allow_other,max_read=131072)

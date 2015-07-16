@@ -220,6 +220,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/celery-rabbitmq": {
 			"celery-controller":   &api.ReplicationController{},
 			"flower-controller":   &api.ReplicationController{},
+			"flower-service":      &api.Service{},
 			"rabbitmq-controller": &api.ReplicationController{},
 			"rabbitmq-service":    &api.Service{},
 		},
@@ -251,7 +252,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 		},
 		"../examples/limitrange": {
 			"invalid-pod": &api.Pod{},
-			"limit-range": &api.LimitRange{},
+			"limits":      &api.LimitRange{},
+			"namespace":   &api.Namespace{},
 			"valid-pod":   &api.Pod{},
 		},
 		"../examples/logging-demo": {

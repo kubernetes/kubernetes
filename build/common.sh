@@ -118,6 +118,7 @@ readonly KUBE_DOCKER_WRAPPED_BINARIES=(
 #   DOCKER_MOUNT_ARGS
 function kube::build::verify_prereqs() {
   kube::log::status "Verifying Prerequisites...."
+  kube::build::ensure_tar
 
   if [[ "${1-}" != "clean" ]]; then
     if [[ -z "$(which docker)" ]]; then
@@ -192,6 +193,27 @@ function kube::build::verify_prereqs() {
 
 function kube::build::is_osx() {
   [[ "$(uname)" == "Darwin" ]]
+}
+
+function kube::build::ensure_tar() {
+  if [[ -n "${TAR:-}" ]]; then
+    return
+  fi
+
+  # Find gnu tar if it is available, bomb out if not.
+  TAR=tar
+  if which gtar &>/dev/null; then
+      TAR=gtar
+  else
+      if which gnutar &>/dev/null; then
+	  TAR=gnutar
+      fi
+  fi
+  if ! "${TAR}" --version | grep -q GNU; then
+    echo "  !!! Cannot find GNU tar. Build on Linux or install GNU tar"
+    echo "      on Mac OS X (brew install gnu-tar)."
+    return 1
+  fi
 }
 
 function kube::build::clean_output() {
@@ -332,12 +354,14 @@ function kube::build::source_targets() {
 
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
+  kube::build::ensure_tar
+
   local -r build_context_dir="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 
   kube::build::build_image_cross
 
   mkdir -p "${build_context_dir}"
-  tar czf "${build_context_dir}/kube-source.tar.gz" $(kube::build::source_targets)
+  "${TAR}" czf "${build_context_dir}/kube-source.tar.gz" $(kube::build::source_targets)
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
@@ -760,29 +784,12 @@ function kube::release::package_full_tarball() {
 # of the files to be packaged.  This assumes that ${2}/kubernetes is what is
 # being packaged.
 function kube::release::create_tarball() {
+  kube::build::ensure_tar
+
   local tarfile=$1
   local stagingdir=$2
 
-  # Find gnu tar if it is available
-  local tar=tar
-  if which gtar &>/dev/null; then
-      tar=gtar
-  else
-      if which gnutar &>/dev/null; then
-	  tar=gnutar
-      fi
-  fi
-
-  local tar_cmd=("$tar" "czf" "${tarfile}" "-C" "${stagingdir}" "kubernetes")
-  if "$tar" --version | grep -q GNU; then
-    tar_cmd=("${tar_cmd[@]}" "--owner=0" "--group=0")
-  else
-    echo "  !!! GNU tar not available.  User names will be embedded in output and"
-    echo "      release tars are not official. Build on Linux or install GNU tar"
-    echo "      on Mac OS X (brew install gnu-tar)"
-  fi
-
-  "${tar_cmd[@]}"
+  "${TAR}" czf "${tarfile}" -C "${stagingdir}" kubernetes --owner=0 --group=0
 }
 
 # ---------------------------------------------------------------------------
@@ -840,6 +847,8 @@ function kube::release::gcs::ensure_release_bucket() {
 }
 
 function kube::release::gcs::stage_and_hash() {
+  kube::build::ensure_tar
+
   # Split the args into srcs... and dst
   local -r args=( "$@" )
   local -r split=$((${#args[@]}-1)) # Split point for src/dst args
@@ -850,7 +859,7 @@ function kube::release::gcs::stage_and_hash() {
     srcdir=$(dirname ${src})
     srcthing=$(basename ${src})
     mkdir -p ${GCS_STAGE}/${dst}
-    tar c -C ${srcdir} ${srcthing} | tar x -C ${GCS_STAGE}/${dst}
+    "${TAR}" c -C ${srcdir} ${srcthing} | "${TAR}" x -C ${GCS_STAGE}/${dst}
   done
 }
 

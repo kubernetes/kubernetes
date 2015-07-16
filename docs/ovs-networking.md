@@ -3,7 +3,7 @@
 This document describes how OpenVSwitch is used to setup networking between pods across nodes.
 The tunnel type could be GRE or VxLAN. VxLAN is preferable when large scale isolation needs to be performed within the network.
 
-![ovs-networking](./ovs-networking.png "OVS Networking")
+![ovs-networking](ovs-networking.png "OVS Networking")
 
 The vagrant setup in Kubernetes does the following:
 

@@ -1,5 +1,5 @@
 **Note: this is a design doc, which describes features that have not been completely implemented.
-User documentation of the current state is [here](../resources.md).  The tracking issue for
+User documentation of the current state is [here](../compute_resources.md).  The tracking issue for
 implementation of this model is
 [#168](https://github.com/GoogleCloudPlatform/kubernetes/issues/168).  Currently, only memory and
 cpu limits on containers (not pods) are supported.  "memory" is in bytes and "cpu" is in
@@ -149,7 +149,7 @@ The following are planned future extensions to the resource model, included here
 
 ## Usage data
 
-Because resource usage and related metrics change continuously, need to be tracked over time (i.e., historically), can be characterized in a variety of ways, and are fairly voluminous, we will not include usage in core API objects, such as [Pods](pods.md) and Nodes, but will provide separate APIs for accessing and managing that data. See the Appendix for possible representations of usage data, but the representation we'll use is TBD.
+Because resource usage and related metrics change continuously, need to be tracked over time (i.e., historically), can be characterized in a variety of ways, and are fairly voluminous, we will not include usage in core API objects, such as [Pods](../pods.md) and Nodes, but will provide separate APIs for accessing and managing that data. See the Appendix for possible representations of usage data, but the representation we'll use is TBD.
 
 Singleton values for observed and predicted future usage will rapidly prove inadequate, so we will support the following structure for extended usage information: 
 

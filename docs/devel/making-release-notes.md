@@ -2,17 +2,21 @@
 This documents the process for making release notes for a release.
 
 ### 1) Note the PR number of the previous release
-Find the PR that was merged with the previous release.  Remember this number
+Find the most-recent PR that was merged with the previous .0 release.  Remember this as $LASTPR.
 _TODO_: Figure out a way to record this somewhere to save the next release engineer time.
 
-### 2) Build the release-notes tool
+Find the most-recent PR that was merged with the current .0 release.  Remeber this as $CURRENTPR.
+
+### 2) Run the release-notes tool
 ```bash
-${KUBERNETES_ROOT}/build/make-release-notes.sh <pr-number-from-1>
+${KUBERNETES_ROOT}/build/make-release-notes.sh $LASTPR $CURRENTPR
 ```
 
 ### 3) Trim the release notes
-This generates a list of the entire set of PRs merged since the last release.  It is likely long
-and many PRs aren't worth mentioning.
+This generates a list of the entire set of PRs merged since the last minor
+release.  It is likely long and many PRs aren't worth mentioning.  If any of the
+PRs were cherrypicked into patches on the last minor release, you should exclude
+them from the current release's notes.
 
 Open up ```candidate-notes.md``` in your favorite editor.
 

@@ -39,5 +39,10 @@ KUBE_GCS_LATEST_CONTENTS=${KUBE_RELEASE_VERSION}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "$KUBE_ROOT/build/common.sh"
 
+if ${KUBE_ROOT}/cluster/kubectl.sh version | grep Client | grep dirty; then
+  echo "!!! Tag at invalid point, or something else is bad. Build is dirty. Don't push this build." >&2
+  exit 1
+fi
+
 kube::release::gcs::release
 kube::release::gcs::publish_latest_official

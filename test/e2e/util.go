@@ -113,6 +113,7 @@ type TestContextType struct {
 	OutputDir      string
 	prefix         string
 	MinStartupPods int
+	UpgradeTarget  string
 }
 
 var testContext TestContextType
@@ -159,6 +160,7 @@ func (s *podStore) Stop() {
 type RCConfig struct {
 	Client        *client.Client
 	Image         string
+	Command       []string
 	Name          string
 	Namespace     string
 	PollInterval  time.Duration
@@ -281,11 +283,24 @@ func podRunningReady(p *api.Pod) (bool, error) {
 	return true, nil
 }
 
+// check if a Pod is controlled by a Replication Controller in the List
+func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api.Pod) bool {
+	for _, rc := range rcs.Items {
+		selector := labels.SelectorFromSet(rc.Spec.Selector)
+		if selector.Matches(labels.Set(pod.ObjectMeta.Labels)) {
+			return true
+		}
+	}
+	return false
+}
+
 // waitForPodsRunningReady waits up to timeout to ensure that all pods in
-// namespace ns are running and ready, requiring that it finds at least minPods.
-// It has separate behavior from other 'wait for' pods functions in that it re-
-// queries the list of pods on every iteration. This is useful, for example, in
-// cluster startup, because the number of pods increases while waiting.
+// namespace ns are either running and ready, or failed but controlled by a
+// replication controller. Also, it ensures that at least minPods are running
+// and ready. It has separate behavior from other 'wait for' pods functions in
+// that it requires the list of pods on every iteration. This is useful, for
+// example, in cluster startup, because the number of pods increases while
+// waiting.
 func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) error {
 	c, err := loadClient()
 	if err != nil {
@@ -295,24 +310,48 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
 	if wait.Poll(poll, timeout, func() (bool, error) {
-		// We get the new list of pods in every iteration beause more pods come
-		// online during startup and we want to ensure they are also checked.
+		// We get the new list of pods and replication controllers in every
+		// iteration because more pods come online during startup and we want to
+		// ensure they are also checked.
+		rcList, err := c.ReplicationControllers(ns).List(labels.Everything())
+		if err != nil {
+			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
+			return false, nil
+		}
+		replicas := 0
+		for _, rc := range rcList.Items {
+			replicas += rc.Spec.Replicas
+		}
+
 		podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		nOk, badPods := 0, []api.Pod{}
+		nOk, replicaOk, badPods := 0, 0, []api.Pod{}
 		for _, pod := range podList.Items {
 			if res, err := podRunningReady(&pod); res && err == nil {
 				nOk++
+				if hasReplicationControllersForPod(rcList, pod) {
+					replicaOk++
+				}
 			} else {
-				badPods = append(badPods, pod)
+				if pod.Status.Phase != api.PodFailed {
+					Logf("The status of Pod %s is %s, waiting for it to be either Running or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
+					badPods = append(badPods, pod)
+				} else if !hasReplicationControllersForPod(rcList, pod) {
+					Logf("Pod %s is Failed, but it's not controlled by a ReplicationController", pod.ObjectMeta.Name)
+					badPods = append(badPods, pod)
+				}
+				//ignore failed pods that are controlled by a replication controller
 			}
 		}
+
 		Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
 			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
-		if nOk == len(podList.Items) && nOk >= minPods {
+		Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
+
+		if replicaOk == replicas && nOk >= minPods && len(badPods) == 0 {
 			return true, nil
 		}
 		logPodStates(badPods)
@@ -895,6 +934,7 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
 	for time.Now().Sub(start) < (60 * time.Second) {
+		err = nil
 		logs, err = c.Get().
 			Prefix("proxy").
 			Resource("nodes").
@@ -902,14 +942,17 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 			Suffix("containerLogs", ns, podStatus.Name, containerName).
 			Do().
 			Raw()
-		fmt.Sprintf("pod logs:%v\n", string(logs))
-		By(fmt.Sprintf("pod logs:%v\n", string(logs)))
-		if strings.Contains(string(logs), "Internal Error") {
-			By(fmt.Sprintf("Failed to get logs from node %q pod %q container %q: %v",
-				podStatus.Spec.NodeName, podStatus.Name, containerName, string(logs)))
+		if err == nil && strings.Contains(string(logs), "Internal Error") {
+			err = fmt.Errorf("Fetched log contains \"Internal Error\": %q.", string(logs))
+		}
+		if err != nil {
+			By(fmt.Sprintf("Warning: Failed to get logs from node %q pod %q container %q. %v",
+				podStatus.Spec.NodeName, podStatus.Name, containerName, err))
 			time.Sleep(5 * time.Second)
 			continue
+
 		}
+		By(fmt.Sprintf("Succesfully fetched pod logs:%v\n", string(logs)))
 		break
 	}
 
@@ -1016,9 +1059,10 @@ func RunRC(config RCConfig) error {
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:  config.Name,
-							Image: config.Image,
-							Ports: []api.ContainerPort{{ContainerPort: 80}},
+							Name:    config.Name,
+							Image:   config.Image,
+							Command: config.Command,
+							Ports:   []api.ContainerPort{{ContainerPort: 80}},
 						},
 					},
 				},
@@ -1428,8 +1472,9 @@ func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 func isNodeReadySetAsExpected(node *api.Node, wantReady bool) bool {
 	// Check the node readiness condition (logging all).
 	for i, cond := range node.Status.Conditions {
-		Logf("Node %s condition %d/%d: type: %v, status: %v",
-			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status)
+		Logf("Node %s condition %d/%d: type: %v, status: %v, reason: %q, message: %q, last transistion time: %v",
+			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status,
+			cond.Reason, cond.Message, cond.LastTransitionTime)
 		// Ensure that the condition type is readiness and the status
 		// matches as desired.
 		if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
@@ -1462,15 +1507,28 @@ func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time
 }
 
 // checks whether all registered nodes are ready
-func allNodesReady(c *client.Client) error {
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
-	Expect(err).NotTo(HaveOccurred())
+func allNodesReady(c *client.Client, timeout time.Duration) error {
+	Logf("Waiting up to %v for all nodes to be ready", timeout)
+
 	var notReady []api.Node
-	for _, node := range nodes.Items {
-		if isNodeReadySetAsExpected(&node, false) {
-			notReady = append(notReady, node)
+	err := wait.Poll(poll, timeout, func() (bool, error) {
+		notReady = nil
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		if err != nil {
+			return false, err
 		}
+		for _, node := range nodes.Items {
+			if !isNodeReadySetAsExpected(&node, true) {
+				notReady = append(notReady, node)
+			}
+		}
+		return len(notReady) == 0, nil
+	})
+
+	if err != nil && err != wait.ErrWaitTimeout {
+		return err
 	}
+
 	if len(notReady) > 0 {
 		return fmt.Errorf("Not ready nodes: %v", notReady)
 	}
@@ -1667,4 +1725,22 @@ func writePerfData(c *client.Client, dirName string, postfix string) error {
 		}
 	}
 	return nil
+}
+
+// parseKVLines parses output that looks like lines containing "<key>: <val>"
+// and returns <val> if <key> is found. Otherwise, it returns the empty string.
+func parseKVLines(output, key string) string {
+	delim := ":"
+	key = key + delim
+	for _, line := range strings.Split(output, "\n") {
+		pieces := strings.SplitAfterN(line, delim, 2)
+		if len(pieces) != 2 {
+			continue
+		}
+		k, v := pieces[0], pieces[1]
+		if k == key {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }

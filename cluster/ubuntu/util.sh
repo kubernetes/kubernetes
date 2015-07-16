@@ -146,39 +146,51 @@ function verify-cluster {
 
 function verify-master(){
   # verify master has all required daemons
-  echo "Validating master"
+  printf "Validating master"
   local -a required_daemon=("kube-apiserver" "kube-controller-manager" "kube-scheduler")
   local validated="1"
   until [[ "$validated" == "0" ]]; do
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
-      ssh "$MASTER" "pgrep -f ${daemon}" >/dev/null 2>&1 || {
+      ssh $SSH_OPTS "$MASTER" "pgrep -f ${daemon}" >/dev/null 2>&1 || {
         printf "."
         validated="1"
         sleep 2
       }
     done
   done
+  printf "\n"
 
 }
 
 function verify-minion(){
   # verify minion has all required daemons
-  echo "Validating ${1}"
+  printf "Validating ${1}"
   local -a required_daemon=("kube-proxy" "kubelet" "docker")
   local validated="1"
   until [[ "$validated" == "0" ]]; do
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
-      ssh "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
+      ssh $SSH_OPTS "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
         printf "."
         validated="1"
         sleep 2
       }
     done
   done
+  printf "\n"
+}
+
+function genServiceAccountsKey() {
+    SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
+    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/tmp/kube-serviceaccount.key"}
+    # Generate ServiceAccount key if needed
+    if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+      mkdir -p "$(dirname ${SERVICE_ACCOUNT_KEY})"
+      openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+    fi
 }
 
 function create-etcd-opts(){
@@ -198,13 +210,17 @@ KUBE_APISERVER_OPTS="--address=0.0.0.0 \
 --port=8080 \
 --etcd_servers=http://127.0.0.1:4001 \
 --logtostderr=true \
---service-cluster-ip-range=${1}"
+--service-cluster-ip-range=${1} \
+--admission_control=${2} \
+--service_account_key_file=/tmp/kube-serviceaccount.key \
+--service_account_lookup=false "
 EOF
 }
 
 function create-kube-controller-manager-opts(){
   cat <<EOF > ~/kube/default/kube-controller-manager
 KUBE_CONTROLLER_MANAGER_OPTS="--master=127.0.0.1:8080 \
+--service_account_private_key_file=/tmp/kube-serviceaccount.key \
 --logtostderr=true"
 EOF
 
@@ -305,7 +321,7 @@ function detect-minions {
 }
 
 # Instantiate a kubernetes cluster on ubuntu
-function kube-up {
+function kube-up() {
   KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
@@ -359,9 +375,10 @@ function provision-master() {
 
   # remote login to MASTER and use sudo to configue k8s master
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
+                            genServiceAccountsKey; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-flanneld-opts; \
@@ -400,8 +417,9 @@ function provision-masterandminion() {
   # remote login to the node and use sudo to configue k8s
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
                             setClusterInfo; \
+                            genServiceAccountsKey; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";

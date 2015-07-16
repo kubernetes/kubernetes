@@ -102,7 +102,7 @@ scp host2:/path/to/home2/.kube/config path/to/other/.kube/config
 
 export $KUBECONFIG=path/to/other/.kube/config
 ```
-Detailed examples and explanation of `kubeconfig` loading/merging rules can be found in [kubeconfig-file.md](http://docs.k8s.io/kubeconfig-file.md).
+Detailed examples and explanation of `kubeconfig` loading/merging rules can be found in [kubeconfig-file.md](kubeconfig-file.md).
 
 
 

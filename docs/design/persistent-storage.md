@@ -112,7 +112,7 @@ spec:
 
 kubectl get pv
 
-NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM
+NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM              REASON
 pv0001              map[]               10737418240         RWO                 Pending    
 
 
@@ -157,7 +157,7 @@ myclaim-1           map[]               pending
 
 kubectl get pv
 
-NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM
+NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM                                                        REASON
 pv0001              map[]               10737418240         RWO                 Bound               myclaim-1 / f4b3d283-c0ef-11e4-8be4-80e6500a981e
 
 

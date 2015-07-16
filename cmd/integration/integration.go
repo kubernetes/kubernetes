@@ -152,6 +152,8 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		glog.Fatalf("no public address for %s", host)
 	}
 
+	// Enable v1beta3 in master only if we are starting the components for that api version.
+	enableV1Beta3 := apiVersion == "v1beta3"
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
 		EtcdHelper:            helper,
@@ -160,6 +162,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		EnableLogsSupport:     false,
 		EnableProfiling:       true,
 		APIPrefix:             "/api",
+		EnableV1Beta3:         enableV1Beta3,
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,

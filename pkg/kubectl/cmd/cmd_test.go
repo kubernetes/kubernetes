@@ -24,6 +24,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -35,6 +36,7 @@ import (
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type internalType struct {
@@ -291,8 +293,11 @@ func ExamplePrintPodWithWideFormat() {
 	}
 	nodeName := "kubernetes-minion-abcd"
 	cmd := NewCmdRun(f, os.Stdout)
-	ctrl := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "test1"},
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "test1",
+			CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
+		},
 		Spec: api.PodSpec{
 			Containers: make([]api.Container, 2),
 			NodeName:   nodeName,
@@ -305,13 +310,79 @@ func ExamplePrintPodWithWideFormat() {
 			},
 		},
 	}
-	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
 	// NAME      READY     STATUS     RESTARTS   AGE       NODE
-	// test1     1/2       podPhase   6          292y      kubernetes-minion-abcd
+	// test1     1/2       podPhase   6          10y       kubernetes-minion-abcd
+}
+
+func ExamplePrintServiceWithNamespacesAndLabels() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, []string{"l1"})
+	tf.Client = &client.FakeRESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := NewCmdRun(f, os.Stdout)
+	svc := &api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "svc1",
+					Namespace: "ns1",
+					Labels: map[string]string{
+						"l1": "value",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{Protocol: "UDP", Port: 53},
+						{Protocol: "TCP", Port: 53},
+					},
+					Selector: map[string]string{
+						"s": "magic",
+					},
+					ClusterIP: "10.1.1.1",
+				},
+				Status: api.ServiceStatus{},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "svc2",
+					Namespace: "ns2",
+					Labels: map[string]string{
+						"l1": "dolla-bill-yall",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{Protocol: "TCP", Port: 80},
+						{Protocol: "TCP", Port: 8080},
+					},
+					Selector: map[string]string{
+						"s": "kazam",
+					},
+					ClusterIP: "10.1.1.2",
+				},
+				Status: api.ServiceStatus{},
+			}},
+	}
+	ld := util.NewLineDelimiter(os.Stdout, "|")
+	defer ld.Flush()
+	err := f.PrintObject(cmd, svc, ld)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// |NAMESPACE   NAME      LABELS               SELECTOR   IP(S)      PORT(S)    L1|
+	// |ns1         svc1      l1=value             s=magic    10.1.1.1   53/UDP     value|
+	// |                                                                 53/TCP     |
+	// |ns2         svc2      l1=dolla-bill-yall   s=kazam    10.1.1.2   80/TCP     dolla-bill-yall|
+	// |                                                                 8080/TCP   |
+	// ||
 }
 
 func TestNormalizationFuncGlobalExistance(t *testing.T) {

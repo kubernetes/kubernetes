@@ -64,13 +64,13 @@ project.](salt.md).
   Describes the environment for Kubelet managed containers on a Kubernetes
   node.
 
-* **Securing access to the API Server** [accessing the api]( accessing_the_api.md)
+* **Securing access to the API Server** [accessing the api](accessing_the_api.md)
 
-* **Authentication**  [authentication]( authentication.md)
+* **Authentication**  [authentication](authentication.md)
 
-* **Authorization** [authorization]( authorization.md)
+* **Authorization** [authorization](authorization.md)
 
-* **Admission Controllers** [admission_controllers]( admission_controllers.md)
+* **Admission Controllers** [admission_controllers](admission_controllers.md)
 
 
 
