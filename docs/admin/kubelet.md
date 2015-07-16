@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/kubelet.md).
+[here](http://releases.k8s.io/release-1.0/docs/admin/kubelet.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -120,5 +120,5 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubelet.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kubelet.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
