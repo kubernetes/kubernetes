@@ -23,9 +23,9 @@ certainly want the docs that go with that version.</h1>
 # Kubernetes CLI/Configuration Roadmap
 
 See also issues with the following labels:
-* [area/config-deployment](https://github.com/GoogleCloudPlatform/kubernetes/labels/area%2Fconfig-deployment)
-* [component/CLI](https://github.com/GoogleCloudPlatform/kubernetes/labels/component%2FCLI)
-* [component/client](https://github.com/GoogleCloudPlatform/kubernetes/labels/component%2Fclient)
+* [area/app-config-deployment](https://github.com/GoogleCloudPlatform/kubernetes/labels/area/app-config-deployment)
+* [component/CLI](https://github.com/GoogleCloudPlatform/kubernetes/labels/component/CLI)
+* [component/client](https://github.com/GoogleCloudPlatform/kubernetes/labels/component/client)
 
 1. Create services before other objects, or at least before objects that depend upon them. Namespace-relative DNS mitigates this some, but most users are still using service environment variables. [#1768](https://github.com/GoogleCloudPlatform/kubernetes/issues/1768)
 1. Finish rolling update [#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)

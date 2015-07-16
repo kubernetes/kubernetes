@@ -44,8 +44,8 @@ These scripts should be used to deploy development environments for Kubernetes. 
 NOTE: The rackspace scripts do NOT rely on `saltstack` and instead rely on cloud-init for configuration.
 
 The current cluster design is inspired by:
-- [corekube](https://github.com/metral/corekube/)
-- [Angus Lees](https://github.com/anguslees/kube-openstack/)
+- [corekube](https://github.com/metral/corekube)
+- [Angus Lees](https://github.com/anguslees/kube-openstack)
 
 ## Prerequisites
 1. Python2.7

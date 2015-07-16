@@ -23,7 +23,7 @@ certainly want the docs that go with that version.</h1>
 ## kubernetes API client libraries
 
 ### Supported
-   * [Go](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/pkg/client)
+   * [Go](../../pkg/client/)
 
 ### User Contributed
 *Note: Libraries provided by outside parties are supported by their authors, not the core Kubernetes team*

@@ -53,7 +53,7 @@ $ ./cluster/kube-up.sh
 You can use bash job control to run this in the background (note that you must use the default port -- 8001 -- for the following demonstration to work properly).
 This can sometimes spew to the output so you could also run it in a different terminal. You have to run `kubectl proxy` in the root of the
 Kubernetes repository. Otherwise you will get "404 page not found" errors as the paths will not match. You can find more information about `kubectl proxy`
-[here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl_proxy.md).
+[here](../../../docs/user-guide/kubectl/kubectl_proxy.md).
 
 ```
 $ kubectl proxy --www=examples/update-demo/local/ &

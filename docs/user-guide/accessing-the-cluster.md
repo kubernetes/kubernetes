@@ -126,7 +126,7 @@ with future high-availability support.
 
 There are [client libraries](../devel/client-libraries.md) for accessing the API
 from several languages.  The Kubernetes project-supported
-[Go](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/pkg/client)
+[Go](../../pkg/client/)
 client library can use the same [kubeconfig file](kubeconfig-file.md)
 as the kubectl CLI does to locate and authenticate to the apiserver.  
 
