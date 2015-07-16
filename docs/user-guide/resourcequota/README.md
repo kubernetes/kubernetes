@@ -22,7 +22,7 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 Resource Quota
 ========================================
-This example demonstrates how resource quota and limits can be applied to a Kubernetes namespace.
+This example demonstrates how [resource quota](../../admin/admission-controllers.md#resourcequota) and [limits](../../admin/admission-controllers.md#limitranger) can be applied to a Kubernetes namespace. See [ResourceQuota design doc](../../design/admission_control_resource_quota.md) for more information.
 
 This example assumes you have a functional Kubernetes setup.
 

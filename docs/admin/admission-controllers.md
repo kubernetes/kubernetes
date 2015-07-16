@@ -102,7 +102,7 @@ This plug-in will observe the incoming request and ensure that it does not viola
 enumerated in the ```ResourceQuota``` object in a ```Namespace```.  If you are using ```ResourceQuota```
 objects in your Kubernetes deployment, you MUST use this plug-in to enforce quota constraints.
 
-See the [resourceQuota design doc](../design/admission_control_resource_quota.md).
+See the [resourceQuota design doc](../design/admission_control_resource_quota.md) and the [example of Resource Quota](../user-guide/resourcequota/).
 
 It is strongly encouraged that this plug-in is configured last in the sequence of admission control plug-ins.  This is
 so that quota is not prematurely incremented only for the request to be rejected later in admission control.
@@ -113,7 +113,7 @@ This plug-in will observe the incoming request and ensure that it does not viola
 enumerated in the ```LimitRange``` object in a ```Namespace```.  If you are using ```LimitRange``` objects in
 your Kubernetes deployment, you MUST use this plug-in to enforce those constraints.
 
-See the [limitRange design doc](../design/admission_control_limit_range.md).
+See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](../user-guide/limitrange/).
 
 ### NamespaceExists
 

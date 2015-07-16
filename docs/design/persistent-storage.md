@@ -28,7 +28,7 @@ This document proposes a model for managing persistent, cluster-scoped storage f
 
 Two new API kinds:
 
-A `PersistentVolume` (PV) is a storage resource provisioned by an administrator.  It is analogous to a node.
+A `PersistentVolume` (PV) is a storage resource provisioned by an administrator.  It is analogous to a node. See [Persistent Volume Guide](../user-guide/persistent-volumes/) for how to use it.
 
 A `PersistentVolumeClaim` (PVC) is a user's request for a persistent volume to use in a pod. It is analogous to a pod.  
 

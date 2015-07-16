@@ -36,7 +36,7 @@ NAME           LABELS                                 STATUS
 ```
 
 If the status of any node is ```Unknown``` or ```NotReady``` your cluster is broken, double check that all containers are running properly, and if all else fails, contact us on IRC at
-```#google-containers``` for advice.
+[```#google-containers```](http://webchat.freenode.net/?channels=google-containers) for advice.
 
 ### Run an application
 ```sh

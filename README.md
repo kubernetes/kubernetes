@@ -33,17 +33,25 @@ While the concepts and architecture in Kubernetes represent years of experience 
 
 Kubernetes works with the following concepts:
 
-**Clusters** are the compute resources on top of which your containers are built. Kubernetes can run anywhere! See the [Getting Started Guides](docs/getting-started-guides) for instructions for a variety of services.
+[**Cluster**](docs/admin/README.md)
+: A cluster is a set of physical or virtual machines and other infrastructure resources used by Kubernetes to run your applications. Kubernetes can run anywhere! See the [Getting Started Guides](docs/getting-started-guides) for instructions for a variety of services.
 
-**Pods** are a colocated group of Docker containers with shared volumes. They're the smallest deployable units that can be created, scheduled, and managed with Kubernetes. Pods can be created individually, but it's recommended that you use a replication controller even if creating a single pod. [More about pods](docs/pods.md).
+[**Node**](docs/admin/node.md)
+: A node is a physical or virtual machine running Kubernetes, onto which pods can be scheduled.
 
-**Replication controllers** manage the lifecycle of pods. They ensure that a specified number of pods are running
-at any given time, by creating or killing pods as required. [More about replication controllers](docs/replication-controller.md).
+[**Pod**](docs/user-guide/pods.md)
+: Pods are a colocated group of application containers with shared volumes. They're the smallest deployable units that can be created, scheduled, and managed with Kubernetes. Pods can be created individually, but it's recommended that you use a replication controller even if creating a single pod.
 
-**Services** provide a single, stable name and address for a set of pods.
-They act as basic load balancers. [More about services](docs/services.md).
+[**Replication controller**](docs/user-guide/replication-controller.md)
+: Replication controllers manage the lifecycle of pods. They ensure that a specified number of pods are running
+at any given time, by creating or killing pods as required.
 
-**Labels** are used to organize and select groups of objects based on key:value pairs. [More about labels](docs/labels.md).
+[**Service**](docs/user-guide/services.md)
+: Services provide a single, stable name and address for a set of pods.
+They act as basic load balancers.
+
+[**Label**](docs/user-guide/labels.md)
+: Labels are used to organize and select groups of objects based on key:value pairs.
 
 ## Documentation
 

@@ -174,6 +174,9 @@ resourcequotas          1       1
 services                3       5
 ```
 
+## More information 
+See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../user-guide/resourcequota) for more information.
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()

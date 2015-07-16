@@ -104,7 +104,7 @@ Eventually, user specified reasons may be [added to the API](https://github.com/
 
 
 ### Hook Handler Execution
-When a management hook occurs, the management system calls into any registered hook handlers in the container for that hook.  These hook handler calls are synchronous in the context of the pod containing the container. Note:this means that hook handler execution blocks any further management of the pod.  If your hook handler blocks, no other management (including health checks) will occur until the hook handler completes.  Blocking hook handlers do *not* affect management of other Pods.  Typically we expect that users will make their hook handlers as lightweight as possible, but there are cases where long running commands make sense (e.g. saving state prior to container stop)
+When a management hook occurs, the management system calls into any registered hook handlers in the container for that hook.  These hook handler calls are synchronous in the context of the pod containing the container. Note:this means that hook handler execution blocks any further management of the pod.  If your hook handler blocks, no other management (including [health checks](production-pods.md#liveness-and-readiness-probes-aka-health-checks)) will occur until the hook handler completes.  Blocking hook handlers do *not* affect management of other Pods.  Typically we expect that users will make their hook handlers as lightweight as possible, but there are cases where long running commands make sense (e.g. saving state prior to container stop)
 
 For hooks which have parameters, these parameters are passed to the event handler as a set of key/value pairs.  The details of this parameter passing is handler implementation dependent (see below).
 

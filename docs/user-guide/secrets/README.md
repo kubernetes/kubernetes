@@ -22,8 +22,7 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Secrets example
 
-Following this example, you will create a secret and a pod that consumes that secret in a volume.
-You can learn more about secrets [Here](../secrets.md).
+Following this example, you will create a [secret](../secrets.md) and a [pod](../pods.md) that consumes that secret in a [volume](../volumes.md). See [Secrets design document](../../design/secrets.md) for more information. 
 
 ## Step Zero: Prerequisites
 
