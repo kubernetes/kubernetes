@@ -37,30 +37,6 @@ func TestGetRegion(t *testing.T) {
 	}
 }
 
-func TestGetHostTag(t *testing.T) {
-	tests := []struct {
-		host     string
-		expected string
-	}{
-		{
-			host:     "kubernetes-minion-559o",
-			expected: "kubernetes-minion",
-		},
-		{
-			host:     "gke-test-ea6e8c80-node-8ytk",
-			expected: "gke-test-ea6e8c80-node",
-		},
-	}
-
-	gce := &GCECloud{}
-	for _, test := range tests {
-		hostTag := gce.computeHostTag(test.host)
-		if hostTag != test.expected {
-			t.Errorf("expected: %s, saw: %s for %s", test.expected, hostTag, test.host)
-		}
-	}
-}
-
 func TestComparingHostURLs(t *testing.T) {
 	tests := []struct {
 		host1       string
