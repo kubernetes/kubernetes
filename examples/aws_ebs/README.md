@@ -27,7 +27,7 @@ Create a volume in the same region as your node add your volume
 information in the pod description file aws-ebs-web.yaml then create
 the pod:
 ```shell
-  $ kubectl create -f aws-ebs-web.yaml
+  $ kubectl create -f examples/aws_ebs/aws-ebs-web.yaml
 ```
 Add some data to the volume if is empty:
 ```shell

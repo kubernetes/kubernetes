@@ -93,7 +93,7 @@ spec:
 Change to the `<kubernetes>/examples/guestbook` directory if you're not already there. Create the redis master pod in your Kubernetes cluster by running:
 
 ```shell
-$ kubectl create -f redis-master-controller.yaml
+$ kubectl create -f examples/guestbook/redis-master-controller.yaml
 replicationcontrollers/redis-master
 ```
 
@@ -208,7 +208,7 @@ spec:
 Create the service by running:
 
 ```shell
-$ kubectl create -f redis-master-service.yaml
+$ kubectl create -f examples/guestbook/redis-master-service.yaml
 services/redis-master
 ```
 Then check the list of services, which should include the redis-master:
@@ -276,7 +276,7 @@ spec:
 and create the replication controller by running:
 
 ```shell
-$ kubectl create -f redis-slave-controller.yaml
+$ kubectl create -f examples/guestbook/redis-slave-controller.yaml
 replicationcontrollers/redis-slave
 
 $ kubectl get rc
@@ -324,7 +324,7 @@ This time the selector for the service is `name=redis-slave`, because that ident
 Now that you have created the service specification, create it in your cluster by running:
 
 ```shell
-$ kubectl create -f redis-slave-service.yaml
+$ kubectl create -f examples/guestbook/redis-slave-service.yaml
 services/redis-slave
 
 $ kubectl get services
@@ -367,7 +367,7 @@ spec:
 Using this file, you can turn up your frontend with:
 
 ```shell
-$ kubectl create -f frontend-controller.yaml
+$ kubectl create -f examples/guestbook/frontend-controller.yaml
 replicationcontrollers/frontend
 ```
 
@@ -476,7 +476,7 @@ To do this, uncomment the `type: LoadBalancer` line in the `frontend-service.yam
 Create the service like this:
 
 ```shell
-$ kubectl create -f frontend-service.yaml
+$ kubectl create -f examples/guestbook/frontend-service.yaml
 services/frontend
 ```
 

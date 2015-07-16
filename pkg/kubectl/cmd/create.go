@@ -36,7 +36,7 @@ const (
 
 JSON and YAML formats are accepted.`
 	create_example = `// Create a pod using the data in pod.json.
-$ kubectl create -f pod.json
+$ kubectl create -f ./pod.json
 
 // Create a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl create -f -`

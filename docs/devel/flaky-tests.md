@@ -56,7 +56,7 @@ spec:
 Note that we omit the labels and the selector fields of the replication controller, because they will be populated from the labels field of the pod template by default.
 
 ```
-kubectl create -f controller.yaml
+kubectl create -f ./controller.yaml
 ```
 
 This will spin up 24 instances of the test.  They will run to completion, then exit, and the kubelet will restart them, accumulating more and more runs of the test.

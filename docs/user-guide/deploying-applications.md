@@ -64,7 +64,7 @@ Some differences compared to specifying just a pod are that the `kind` is `Repli
 
 This replication controller can be created using `create`, just as with pods:
 ```bash
-$ kubectl create -f nginx-rc.yaml
+$ kubectl create -f ./nginx-rc.yaml
 replicationcontrollers/my-nginx
 ```
 

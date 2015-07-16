@@ -78,7 +78,7 @@ spec:
 
 Multiple resources can be created the same way as a single resource:
 ```bash
-$ kubectl create -f nginx-app.yaml
+$ kubectl create -f ./nginx-app.yaml
 services/my-nginx-svc
 replicationcontrollers/my-nginx
 ```
@@ -87,12 +87,12 @@ The resources will be created in the order they appear in the file. Therefore, i
 
 `kubectl create` also accepts multiple `-f` arguments:
 ```bash
-$ kubectl create -f nginx-svc.yaml -f nginx-rc.yaml
+$ kubectl create -f ./nginx-svc.yaml -f ./nginx-rc.yaml
 ```
 
 And a directory can be specified rather than or in addition to individual files:
 ```bash
-$ kubectl create -f nginx/
+$ kubectl create -f ./nginx/
 ```
 `kubectl` will read any files with suffixes `.yaml`, `.yml`, or `.json`.
 
@@ -107,7 +107,7 @@ replicationcontrollers/nginx
 
 Resource creation isn’t the only operation that `kubectl` can perform in bulk. It can also extract resource names from configuration files in order to perform other operations, in particular to delete the same resources you created:
 ```bash
-$ kubectl delete -f nginx/
+$ kubectl delete -f ./nginx/
 replicationcontrollers/my-nginx
 services/my-nginx-svc
 ```
@@ -126,7 +126,7 @@ services/my-nginx-svc
 
 Because `kubectl` outputs resource names in the same syntax it accepts, it’s easy to chain operations using `$()` or `xargs`:
 ```bash
-$ kubectl get $(kubectl create -f nginx/ | grep my-nginx)
+$ kubectl get $(kubectl create -f ./nginx/ | grep my-nginx)
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 my-nginx     nginx          nginx      app=nginx   2
 NAME           LABELS      SELECTOR    IP(S)          PORT(S)
@@ -158,7 +158,7 @@ and
 ```
 The labels allow us to slice and dice our resources along any dimension specified by a label:
 ```bash
-$ kubectl create -f guestbook-fe.yaml -f redis-master.yaml -f redis-slave.yaml
+$ kubectl create -f ./guestbook-fe.yaml -f ./redis-master.yaml -f ./redis-slave.yaml
 replicationcontrollers/guestbook-fe
 replicationcontrollers/guestbook-redis-master
 replicationcontrollers/guestbook-redis-slave
@@ -339,7 +339,7 @@ spec:
 ```
 and roll it out:
 ```bash
-$ kubectl rolling-update my-nginx -f nginx-rc.yaml
+$ kubectl rolling-update my-nginx -f ./nginx-rc.yaml
 Creating my-nginx-v4
 At beginning of loop: my-nginx replicas: 4, my-nginx-v4 replicas: 1
 Updating my-nginx replicas: 4, my-nginx-v4 replicas: 1
@@ -380,10 +380,9 @@ The patch is specified using json.
 
 For more significant changes, you can `get` the resource, edit it, and then `replace` the resource with the updated version:
 ```bash
-$ export TMP=/tmp/nginx.yaml
-$ kubectl get rc my-nginx-v4 -o yaml > $TMP
-$ emacs $TMP
-$ kubectl replace -f $TMP
+$ kubectl get rc my-nginx-v4 -o yaml > /tmp/nginx.yaml
+$ vi /tmp/nginx.yaml
+$ kubectl replace -f /tmp/nginx.yaml
 replicationcontrollers/my-nginx-v4
 $ rm $TMP
 ```
@@ -392,7 +391,7 @@ The system ensures that you don’t clobber changes made by other users or compo
 
 In some cases, you may need to update resource fields that cannot be updated once initialized, or you may just want to make a recursive change immediately, such as to fix broken pods created by a replication controller. To change such fields, use `replace --force`, which deletes and re-creates the resource. In this case, you can simply modify your original configuration file:
 ```bash
-$ kubectl replace -f nginx-rc.yaml --force
+$ kubectl replace -f ./nginx-rc.yaml --force
 replicationcontrollers/my-nginx-v4
 replicationcontrollers/my-nginx-v4
 ```

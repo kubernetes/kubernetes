@@ -35,7 +35,7 @@ Currently, you can look at:
 
 Example from command line (the DNS lookup looks better from a web browser):
 ```
-$ kubectl create -f pod.json
+$ kubectl create -f examples/explorer/pod.json
 $ kubectl proxy &
 Starting to serve on localhost:8001
 

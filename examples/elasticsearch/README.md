@@ -125,13 +125,13 @@ data:
 ```
 which can be used to create the secret in your namespace:
 ```
-kubectl create -f apiserver-secret.yaml --namespace=mytunes
+kubectl create -f examples/elasticsearch/apiserver-secret.yaml --namespace=mytunes
 secrets/apiserver-secret
 
 ```
 Now you are ready to create the replication controller which will then create the pods:
 ```
-$ kubectl create -f music-rc.yaml --namespace=mytunes
+$ kubectl create -f examples/elasticsearch/music-rc.yaml --namespace=mytunes
 replicationcontrollers/music-db
 
 ```
@@ -156,7 +156,7 @@ spec:
 ```
 Let's create the service with an external load balancer:
 ```
-$ kubectl create -f music-service.yaml --namespace=mytunes
+$ kubectl create -f examples/elasticsearch/music-service.yaml --namespace=mytunes
 services/music-server
 
 ```

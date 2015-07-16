@@ -35,13 +35,13 @@ const (
 
 JSON and YAML formats are accepted.`
 	replace_example = `// Replace a pod using the data in pod.json.
-$ kubectl replace -f pod.json
+$ kubectl replace -f ./pod.json
 
 // Replace a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl replace -f -
 
 // Force replace, delete and then re-create the resource
-kubectl replace --force -f pod.json`
+kubectl replace --force -f ./pod.json`
 )
 
 func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {

@@ -52,7 +52,7 @@ mkfs.ext4 /dev/<name of device>
 Once your pod is created, run it on the Kubernetes master:
 
 ```console
-kubectl create -f your_new_pod.json
+kubectl create -f ./your_new_pod.json
 ```
 
 Here is my command and output:

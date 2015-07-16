@@ -104,7 +104,7 @@ example, run these on your desktop/laptop:
 
 Verify by creating a pod that uses a private image, e.g.:
 ```
-$ cat <<EOF > private-image-test-1.yaml
+$ cat <<EOF > /tmp/private-image-test-1.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -116,7 +116,7 @@ spec:
       command: [ "echo", "SUCCESS" ]
   imagePullPolicy: Always
 EOF
-$ kubectl create -f private-image-test-1.yaml
+$ kubectl create -f /tmp/private-image-test-1.yaml
 pods/private-image-test-1
 $
 ```
@@ -186,7 +186,7 @@ $ echo $(cat ~/.dockercfg)
 $ cat ~/.dockercfg | base64
 eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
 
-$ cat > image-pull-secret.yaml <<EOF
+$ cat > /tmp/image-pull-secret.yaml <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -196,7 +196,7 @@ data:
 type: kubernetes.io/dockercfg
 EOF
 
-$ kubectl create -f image-pull-secret.yaml
+$ kubectl create -f /tmp/image-pull-secret.yaml
 secrets/myregistrykey
 $
 ```

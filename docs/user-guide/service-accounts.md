@@ -62,13 +62,13 @@ default   1
 
 You can create additional serviceAccounts like this:
 ```
-$ cat > serviceaccount.yaml <<EOF
+$ cat > /tmp/serviceaccount.yaml <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: build-robot
 EOF
-$ kubectl create -f serviceaccount.json
+$ kubectl create -f /tmp/serviceaccount.json
 serviceacccounts/build-robot
 ```
 
