@@ -56,4 +56,10 @@ vagrant provision
 ### VirtualBox
 Nothing special with VirtualBox. Hopefully `vagrant up` just works.
 
+
+## Random Information
+If you just want to update the binaries on your systems (either pkgManager or localBuild) you can do so using the ansible binary-update tag. To do so with vagrant provision you would need to run
+```
+ANSIBLE_TAGS="binary-update" vagrant provision
+```
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/ansible/vagrant/README.md?pixel)]()

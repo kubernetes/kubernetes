@@ -8,6 +8,7 @@ require "yaml"
 require 'vagrant-openstack-provider'
 
 $num_nodes = (ENV['NUM_NODES'] || 2).to_i
+ansible_tags = ENV['ANSIBLE_TAGS']
 
 VAGRANTFILE_API_VERSION = "2"
 
@@ -119,13 +120,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     n.vm.hostname = name
     set_provider(n)
 
-    # This set up the vagrant hosts before we run the main playbook
-    # Today this just creates /etc/hosts so machines can talk via their
-    # 'internal' IPs instead of the openstack public ip.
-    n.vm.provision :ansible do |ansible|
-      ansible.groups = groups
-      ansible.playbook = "./vagrant-ansible.yml"
-      ansible.limit = "all" #otherwise the metadata wont be there for ipv4?
+    if ansible_tags.nil?
+      # This set up the vagrant hosts before we run the main playbook
+      # Today this just creates /etc/hosts so machines can talk via their
+      # 'internal' IPs instead of the openstack public ip.
+      n.vm.provision :ansible do |ansible|
+        ansible.groups = groups
+        ansible.playbook = "./vagrant-ansible.yml"
+        ansible.limit = "all" #otherwise the metadata wont be there for ipv4?
+      end
     end
 
     # This sets up both flannel and kube.
@@ -133,6 +136,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       ansible.groups = groups
       ansible.playbook = "../cluster.yml"
       ansible.limit = "all" #otherwise the metadata wont be there for ipv4?
+      ansible.tags = ansible_tags
     end
   end
 end
