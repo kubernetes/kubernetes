@@ -31,7 +31,7 @@ write_files:
         "metadata": {
           "name": "%s",
           "labels": { "environment": "%s" }
-        }' "${node_id}" "${env_label}" \
+        }}' "${node_id}" "${env_label}" \
         | /opt/bin/kubectl create -s "${master_url}" -f -
 
   - path: /etc/kubernetes/manifests/fluentd.manifest
