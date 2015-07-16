@@ -151,16 +151,18 @@ kubectl create -f examples/meteor/mongo-service.json
 
 Wait until Mongo is started completely and then start up your Meteor app:
 ```
-kubectl create -f examples/meteor/meteor-controller.json
 kubectl create -f examples/meteor/meteor-service.json
+kubectl create -f examples/meteor/meteor-controller.json
 ```
 
 Note that [`meteor-service.json`](meteor-service.json) creates a load balancer, so
 your app should be available through the IP of that load balancer once
-the Meteor pods are started. You can find the IP of your load balancer
+the Meteor pods are started. We also created the service before creating the rc to
+aid the scheduler in placing pods, as the scheduler ranks pod placement according to
+service anti-affinity (among other things). You can find the IP of your load balancer
 by running:
 ```
-kubectl get services/meteor --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
+kubectl get service meteor --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
 ```
 
 You will have to open up port 80 if it's not open yet in your
