@@ -53,8 +53,8 @@ shift 1
 declare -r PULLS=( "$@" )
 
 function join { local IFS="$1"; shift; echo "$*"; }
-declare -r PULLDASH=$(join - "${PULLS[@]/#/\#}") # Generates something like "#12345-#56789"
-declare -r PULLSUBJ=$(join " " "${PULLS[@]/#/\#}") # Generates something like "#12345 #56789"
+declare -r PULLDASH=$(join - "${PULLS[@]/#/#}") # Generates something like "#12345-#56789"
+declare -r PULLSUBJ=$(join " " "${PULLS[@]/#/#}") # Generates something like "#12345 #56789"
 
 echo "+++ Updating remotes..."
 git remote update
