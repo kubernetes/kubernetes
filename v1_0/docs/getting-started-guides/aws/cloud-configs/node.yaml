@@ -1,0 +1,81 @@
+#cloud-config
+
+write_files:
+  - path: /opt/bin/wupiao
+    owner: root
+    permissions: 0755
+    content: |
+      #!/bin/bash
+      # [w]ait [u]ntil [p]ort [i]s [a]ctually [o]pen
+      [ -n "$1" ] && [ -n "$2" ] && while ! curl --output /dev/null \
+        --silent --head --fail \
+        http://${1}:${2}; do sleep 1 && echo -n .; done;
+      exit $?
+
+coreos:
+  etcd2:
+    listen-client-urls: http://localhost:2379
+    advertise-client-urls: http://0.0.0.0:2379
+    initial-cluster: master=http://<master-private-ip>:2380
+    proxy: on
+  fleet:
+    etcd_servers: http://localhost:2379
+    metadata: k8srole=node
+  flannel:
+    etcd_endpoints: http://localhost:2379
+  locksmithd:
+    endpoint: http://localhost:2379
+  units:
+    - name: etcd2.service
+      command: start
+    - name: fleet.service
+      command: start
+    - name: flanneld.service
+      command: start
+    - name: docker.service
+      command: start
+      drop-ins:
+        - name: 50-docker-mirror.conf
+          content: |
+            [Service]
+            Environment=DOCKER_OPTS='--registry-mirror=http://<master-private-ip>:5000'
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Kubelet
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=network-online.target
+        After=network-online.target
+
+        [Service]
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubelet
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
+        # wait for kubernetes master to be up and ready
+        ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080
+        ExecStart=/opt/bin/kubelet \
+        --api-servers=<master-private-ip>:8080 \
+        --hostname-override=$private_ipv4
+        Restart=always
+        RestartSec=10
+    - name: kube-proxy.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Proxy
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=network-online.target
+        After=network-online.target
+
+        [Service]
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kube-proxy
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
+        # wait for kubernetes master to be up and ready
+        ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080
+        ExecStart=/opt/bin/kube-proxy \
+        --master=http://<master-private-ip>:8080
+        Restart=always
+        RestartSec=10
+  update:
+    group: alpha
+    reboot-strategy: off

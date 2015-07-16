@@ -1,0 +1,193 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl label \- Update the labels on a resource
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl label\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Update the labels on a resource.
+
+.PP
+A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to 63 characters.
+If \-\-overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
+If \-\-resource\-version is specified, then updates will use this resource version, otherwise the existing resource\-version will be used.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-all\fP=false
+    select all resources in the namespace of the specified resource types
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for label
+
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output format. One of: json|yaml|template|templatefile|wide.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+.PP
+\fB\-\-overwrite\fP=false
+    If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.
+
+.PP
+\fB\-\-resource\-version\fP=""
+    If non\-empty, the labels update will only succeed if this is the current resource\-version for the object. Only valid when specifying a single resource.
+
+.PP
+\fB\-l\fP, \fB\-\-selector\fP=""
+    Selector (label query) to filter on
+
+.PP
+\fB\-t\fP, \fB\-\-template\fP=""
+    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-version\fP=""
+    The API version to use when talking to the server
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-client\-certificate\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-client\-key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-cluster\fP=""
+    The name of the kubeconfig cluster to use
+
+.PP
+\fB\-\-context\fP=""
+    The name of the kubeconfig context to use
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to the kubeconfig file to use for CLI requests.
+
+.PP
+\fB\-\-log\-backtrace\-at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\-dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\-flush\-frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-match\-server\-version\fP=false
+    Require server version to match client version
+
+.PP
+\fB\-\-namespace\fP=""
+    If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-password\fP=""
+    Password for basic authentication to the API server.
+
+.PP
+\fB\-s\fP, \fB\-\-server\fP=""
+    The address and port of the Kubernetes API server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-token\fP=""
+    Bearer token for authentication to the API server.
+
+.PP
+\fB\-\-user\fP=""
+    The name of the kubeconfig user to use
+
+.PP
+\fB\-\-username\fP=""
+    Username for basic authentication to the API server.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-validate\fP=false
+    If true, use a schema to validate the input before sending it
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+// Update pod 'foo' with the label 'unhealthy' and the value 'true'.
+$ kubectl label pods foo unhealthy=true
+
+// Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
+$ kubectl label \-\-overwrite pods foo status=unhealthy
+
+// Update all pods in the namespace
+$ kubectl label pods \-\-all status=unhealthy
+
+// Update pod 'foo' only if the resource is unchanged from version 1.
+$ kubectl label pods foo status=unhealthy \-\-resource\-version=1
+
+// Update pod 'foo' by removing a label named 'bar' if it exists.
+// Does not require the \-\-overwrite flag.
+$ kubectl label pods foo bar\-
+
+.fi
+.RE
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!
