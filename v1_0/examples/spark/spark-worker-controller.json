@@ -1,0 +1,43 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "spark-worker-controller",
+    "labels": {
+      "name": "spark-worker"
+    }
+  },
+  "spec": {
+    "replicas": 3,
+    "selector": {
+      "name": "spark-worker"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "spark-worker",
+          "uses": "spark-master"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "spark-worker",
+            "image": "gcr.io/google_containers/spark-worker",
+            "ports": [
+              {
+                "hostPort": 8888,
+                "containerPort": 8888
+              }
+            ],
+            "resources": {
+              "limits": {
+                "cpu": "100m"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

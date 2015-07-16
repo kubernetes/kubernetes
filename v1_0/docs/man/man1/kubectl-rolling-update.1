@@ -1,0 +1,207 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl rolling\-update \- Perform a rolling update of the given ReplicationController.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl rolling\-update\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Perform a rolling update of the given ReplicationController.
+
+.PP
+Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
+new PodTemplate. The new\-controller.json must specify the same namespace as the
+existing replication controller and overwrite at least one (common) label in its replicaSelector.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-deployment\-label\-key\fP="deployment"
+    The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when \-\-image is specified, ignored otherwise
+
+.PP
+\fB\-\-dry\-run\fP=false
+    If true, print out the changes that would be made, but don't actually make them.
+
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=""
+    Filename or URL to file to use to create the new replication controller.
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for rolling\-update
+
+.PP
+\fB\-\-image\fP=""
+    Image to use for upgrading the replication controller.  Can not be used with \-\-filename/\-f
+
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output format. One of: json|yaml|template|templatefile|wide.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+.PP
+\fB\-\-poll\-interval\fP="3s"
+    Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-\-rollback\fP=false
+    If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout
+
+.PP
+\fB\-t\fP, \fB\-\-template\fP=""
+    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+
+.PP
+\fB\-\-timeout\fP="5m0s"
+    Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-\-update\-period\fP="1m0s"
+    Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-version\fP=""
+    The API version to use when talking to the server
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-client\-certificate\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-client\-key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-cluster\fP=""
+    The name of the kubeconfig cluster to use
+
+.PP
+\fB\-\-context\fP=""
+    The name of the kubeconfig context to use
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to the kubeconfig file to use for CLI requests.
+
+.PP
+\fB\-\-log\-backtrace\-at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\-dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\-flush\-frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-match\-server\-version\fP=false
+    Require server version to match client version
+
+.PP
+\fB\-\-namespace\fP=""
+    If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-password\fP=""
+    Password for basic authentication to the API server.
+
+.PP
+\fB\-s\fP, \fB\-\-server\fP=""
+    The address and port of the Kubernetes API server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-token\fP=""
+    Bearer token for authentication to the API server.
+
+.PP
+\fB\-\-user\fP=""
+    The name of the kubeconfig user to use
+
+.PP
+\fB\-\-username\fP=""
+    Username for basic authentication to the API server.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-validate\fP=false
+    If true, use a schema to validate the input before sending it
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+// Update pods of frontend\-v1 using new replication controller data in frontend\-v2.json.
+$ kubectl rolling\-update frontend\-v1 \-f frontend\-v2.json
+
+// Update pods of frontend\-v1 using JSON data passed into stdin.
+$ cat frontend\-v2.json | kubectl rolling\-update frontend\-v1 \-f \-
+
+// Update the pods of frontend\-v1 to frontend\-v2 by just changing the image, and switching the
+// name of the replication controller.
+$ kubectl rolling\-update frontend\-v1 frontend\-v2 \-\-image=image:v2
+
+// Update the pods of frontend by just changing the image, and keeping the old name
+$ kubectl rolling\-update frontend \-\-image=image:v2
+
+
+.fi
+.RE
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

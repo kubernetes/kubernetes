@@ -1,0 +1,3 @@
+config/
+secret.json
+*.log

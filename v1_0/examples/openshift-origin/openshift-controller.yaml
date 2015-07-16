@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ReplicationController
+metadata: 
+  labels: 
+    name: openshift
+  name: openshift
+spec: 
+  replicas: 1
+  selector: 
+    name: openshift
+  template: 
+    metadata: 
+      labels: 
+        name: openshift
+    spec: 
+      containers: 
+        - args: 
+            - start
+            - master
+            - --config=/config/master-config.yaml
+          image: "openshift/origin"
+          name: origin
+          ports: 
+            - containerPort: 8443
+              name: openshift
+          volumeMounts: 
+            - mountPath: /config
+              name: config
+              readOnly: true
+      volumes: 
+        - name: config
+          secret:
+            secretName: openshift-config
