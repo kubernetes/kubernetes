@@ -51,6 +51,15 @@ func (ec *fakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, er
 	return nil, nil
 }
 
+func (ec *fakeEtcdClient) DeleteDir(key string) (*etcd.Response, error) {
+	for p := range ec.writes {
+		if strings.HasPrefix(p, key) {
+			return nil, fmt.Errorf("%s: directory not empty", p)
+		}
+	}
+	return nil, nil
+}
+
 func (ec *fakeEtcdClient) RawGet(key string, sort, recursive bool) (*etcd.RawResponse, error) {
 	values := ec.Get(key)
 	if len(values) == 0 {
@@ -375,6 +384,8 @@ func TestServiceWithNamePort(t *testing.T) {
 
 	// update service
 	newService := service
+	newService.Spec.Ports = make([]kapi.ServicePort, len(service.Spec.Ports))
+	copy(newService.Spec.Ports, service.Spec.Ports)
 	newService.Spec.Ports[0].Name = "http2"
 	k2s.updateService(&service, &newService)
 	expectedValue = getHostPort(&newService)
