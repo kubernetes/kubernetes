@@ -63,8 +63,8 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 			return in
 		}
 
-		if u.Host != "" {
-			// We only care about relative links.
+		if u.Host != "" && u.Host != "github.com" {
+			// We only care about relative links and links within github.
 			return in
 		}
 
@@ -78,6 +78,14 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 				)
 			}
 			u.Path = newPath
+			if strings.HasPrefix(u.Path, "/") {
+				u.Host = "github.com"
+				u.Scheme = "https"
+			} else {
+				// Remove host and scheme from relative paths
+				u.Host = ""
+				u.Scheme = ""
+			}
 			// Make the visible text show the absolute path if it's
 			// not nested in or beneath the current directory.
 			if strings.HasPrefix(u.Path, "..") {
@@ -95,7 +103,7 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 		}
 		// If the current visible text is trying to be a file name, use
 		// the correct file name.
-		if (strings.Contains(visibleText, ".md") || strings.Contains(visibleText, "/")) && !strings.ContainsAny(visibleText, ` '"`+"`") {
+		if strings.HasSuffix(visibleText, ".md") && !strings.ContainsAny(visibleText, ` '"`+"`") {
 			visibleText = suggestedVisibleText
 		}
 
@@ -129,12 +137,24 @@ func cleanPath(dirPath, linkPath string) string {
 
 func checkPath(filePath, linkPath string) (newPath string, ok bool) {
 	dir := path.Dir(filePath)
-	if strings.HasPrefix(linkPath, "/") {
-		if !strings.HasPrefix(linkPath, "/GoogleCloudPlatform") {
-			// Any absolute paths that aren't relative to github.com are wrong.
-			// Try to fix.
-			linkPath = linkPath[1:]
+	absFilePrefixes := []string{
+		"/GoogleCloudPlatform/kubernetes/blob/master/",
+		"/GoogleCloudPlatform/kubernetes/tree/master/",
+	}
+	for _, prefix := range absFilePrefixes {
+		if strings.HasPrefix(linkPath, prefix) {
+			linkPath = strings.TrimPrefix(linkPath, prefix)
+			// Now linkPath is relative to the root of the repo. The below
+			// loop that adds ../ at the beginning of the path should find
+			// the right path.
+			break
 		}
+	}
+	if strings.HasPrefix(linkPath, "/") {
+		// These links might go to e.g. the github issues page, or a
+		// file at a particular revision, or another github project
+		// entirely.
+		return linkPath, true
 	}
 	linkPath = cleanPath(dir, linkPath)
 
@@ -174,7 +194,7 @@ func checkPath(filePath, linkPath string) (newPath string, ok bool) {
 					if info.IsDir() {
 						return newPath + "/", true
 					}
-					return newPath, true
+					return cleanPath(dir, newPath), true
 				}
 				newPath = path.Join("..", newPath)
 			}
