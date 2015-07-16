@@ -49,6 +49,7 @@ Examples:
 		{"check-links", checkLinks},
 		{"unversioned-warning", updateUnversionedWarning},
 		{"analytics", checkAnalytics},
+		{"kubectl-dash-f", checkKubectlFileTargets},
 	}
 	availableMungeList = func() string {
 		names := []string{}

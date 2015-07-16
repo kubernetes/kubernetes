@@ -64,7 +64,7 @@ spec:
 ```
 
 ```bash
-$ kubectl create -f <file with contents listed above>
+$ kubectl create -f ./my-nginx-rc.yaml
 replicationcontrollers/my-nginx
 ```
 

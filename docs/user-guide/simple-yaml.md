@@ -31,7 +31,7 @@ can be code reviewed, producing a more robust, reliable and archival system.
 
 ```bash
 cd kubernetes
-kubectl create -f pod.yaml
+kubectl create -f ./pod.yaml
 ```
 
 Where pod.yaml contains something like:
@@ -70,7 +70,7 @@ cluster.
 
 ```bash
 cd kubernetes
-kubectl create -f replication.yaml
+kubectl create -f ./replication.yaml
 ```
 
 Where ```replication.yaml``` contains:

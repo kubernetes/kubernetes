@@ -72,7 +72,7 @@ spec:
 
 This makes it accessible from any node in your cluster. Check the nodes the pod is running on:
 ```shell
-$ kubectl create -f nginxrc.yaml
+$ kubectl create -f ./nginxrc.yaml
 $ kubectl get pods -l app=nginx -o wide
 my-nginx-6isf4   1/1       Running   0          2h        e2e-test-beeps-minion-93ly
 my-nginx-t26zt   1/1       Running   0          2h        e2e-test-beeps-minion-93ly
@@ -191,7 +191,7 @@ spec:
 ```
 And perform a lookup of the nginx Service
 ```shell
-$ kubectl create -f curlpod.yaml
+$ kubectl create -f ./curlpod.yaml
 default/curlpod
 $ kubectl get pods curlpod
 NAME      READY     STATUS    RESTARTS   AGE
@@ -275,7 +275,7 @@ Noteworthy points about the nginx-app manifest:
 - Each container has access to the keys through a volume mounted at /etc/nginx/ssl. This is setup *before* the nginx server is started.
 
 ```shell
-$ kubectl delete rc,svc -l app=nginx; kubectl create -f nginx-app.yaml
+$ kubectl delete rc,svc -l app=nginx; kubectl create -f ./nginx-app.yaml
 replicationcontrollers/my-nginx
 services/nginxsvc
 services/nginxsvc
@@ -323,7 +323,7 @@ spec:
         - mountPath: /etc/nginx/ssl
           name: secret-volume
 
-$ kubectl create -f curlpod.yaml
+$ kubectl create -f ./curlpod.yaml
 $ kubectl get pods
 NAME             READY     STATUS    RESTARTS   AGE
 curlpod          1/1       Running   0          2m
@@ -375,7 +375,7 @@ $ curl https://104.197.63.17:30645 -k
 Lets now recreate the Service to use a cloud load balancer, just change the `Type` of Service in the nginx-app.yaml from `NodePort` to `LoadBalancer`:
 ```shell
 $ kubectl delete rc, svc -l app=nginx
-$ kubectl create -f nginx-app.yaml
+$ kubectl create -f ./nginx-app.yaml
 $ kubectl get svc -o json | grep -i ingress -A 5
                     "ingress": [
                         {

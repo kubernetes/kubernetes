@@ -194,7 +194,7 @@ Create a pod manifest: `pod.json`
 ### Create the pod using the kubectl command line tool
 
 ```bash
-kubectl create -f pod.json
+kubectl create -f ./pod.json
 ```
 
 ### Testing

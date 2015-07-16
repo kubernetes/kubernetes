@@ -198,7 +198,7 @@ EOPOD
 Send the pod description to Kubernetes using the `kubectl` CLI:
 
 ```bash
-$ kubectl create -f nginx.yaml
+$ kubectl create -f ./nginx.yaml
 pods/nginx
 ```
 
@@ -256,8 +256,8 @@ sed -e "s/{{ pillar\['dns_server'\] }}/10.10.10.10/g" \
 Now the kube-dns pod and service are ready to be launched:
 
 ```bash
-kubectl create -f skydns-rc.yaml
-kubectl create -f skydns-svc.yaml
+kubectl create -f ./skydns-rc.yaml
+kubectl create -f ./skydns-svc.yaml
 ```
 
 Check with `kubectl get pods --namespace=kube-system` that 3/3 containers of the pods are eventually up and running. Note that the kube-dns pods run in the `kube-system` namespace, not in  `default`.
@@ -286,7 +286,7 @@ EOF
 Then start the pod:
 
 ```bash
-kubectl create -f busybox.yaml
+kubectl create -f ./busybox.yaml
 ```
 
 When the pod is up and running, start a lookup for the Kubernetes master service, made available on 10.10.10.1 by default:

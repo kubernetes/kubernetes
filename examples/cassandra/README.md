@@ -104,13 +104,13 @@ The important thing to note here is the ```selector```. It is a query over label
 
 Create this service as follows:
 ```sh
-$ kubectl create -f cassandra-service.yaml
+$ kubectl create -f examples/cassandra/cassandra-service.yaml
 ```
 
 Now, as the service is running, we can create the first Cassandra pod using the mentioned specification.
 
 ```sh
-$ kubectl create -f cassandra.yaml
+$ kubectl create -f examples/cassandra/cassandra.yaml
 ```
 
 After a few moments, you should be able to see the pod running, plus its single container:
@@ -208,7 +208,7 @@ Most of this replication controller definition is identical to the Cassandra pod
 Create this controller:
 
 ```sh
-$ kubectl create -f cassandra-controller.yaml
+$ kubectl create -f examples/cassandra/cassandra-controller.yaml
 ```
 
 Now this is actually not that interesting, since we haven't actually done anything new.  Now it will get interesting.
@@ -267,13 +267,13 @@ For those of you who are impatient, here is the summary of the commands we ran i
 ```sh
 
 # create a service to track all cassandra nodes
-kubectl create -f cassandra-service.yaml
+kubectl create -f examples/cassandra/cassandra-service.yaml
 
 # create a single cassandra node
-kubectl create -f cassandra.yaml
+kubectl create -f examples/cassandra/cassandra.yaml
 
 # create a replication controller to replicate cassandra nodes
-kubectl create -f cassandra-controller.yaml
+kubectl create -f examples/cassandra/cassandra-controller.yaml
 
 # scale up to 2 nodes
 kubectl scale rc cassandra --replicas=2

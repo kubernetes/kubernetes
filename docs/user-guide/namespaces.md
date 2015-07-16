@@ -129,7 +129,7 @@ More information on the ```finalizers``` field can be found in the namespace [de
 
 Then run:
 ```
-kubectl create -f my-namespace.yaml
+kubectl create -f ./my-namespace.yaml
 ```
 
 ### Setting the namespace for a request

@@ -39,7 +39,7 @@ Rethinkdb will discover peer using endpoints provided by kubernetes service,
 so first create a service so the following pod can query its endpoint
 
 ```shell
-$kubectl create -f driver-service.yaml
+$kubectl create -f examples/rethinkdb/driver-service.yaml
 ```
 
 check out:
@@ -56,7 +56,7 @@ rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
 start fist server in cluster
 
 ```shell
-$kubectl create -f rc.yaml
+$kubectl create -f examples/rethinkdb/rc.yaml
 ```
 
 Actually, you can start servers as many as you want at one time, just modify the `replicas` in `rc.ymal`
@@ -99,8 +99,8 @@ Admin
 You need a separate pod (labeled as role:admin) to access Web Admin UI
 
 ```shell
-kubectl create -f admin-pod.yaml
-kubectl create -f admin-service.yaml
+kubectl create -f examples/rethinkdb/admin-pod.yaml
+kubectl create -f examples/rethinkdb/admin-service.yaml
 ```
 
 find the service
