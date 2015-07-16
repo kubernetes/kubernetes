@@ -26,6 +26,9 @@
 - include: cluster-logging.yml
   when: cluster_logging
 
+- include: kube-ui.yml
+  when: kube-ui
+
 #- name: Get kube-addons script from Kubernetes
 #  get_url:
 #    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/saltbase/salt/kube-addons/kube-addons.sh

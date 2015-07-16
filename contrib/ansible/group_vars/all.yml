@@ -58,6 +58,9 @@ cluster_logging: true
 # Turn to false to disable cluster monitoring with heapster and influxdb
 cluster_monitoring: true
 
+# Turn to false to disable the kube-ui addon for this cluster
+kube-ui: false
+
 # Turn this varable to 'false' to disable whole DNS configuration.
 dns_setup: true
 # How many replicas in the Replication Controller
