@@ -232,9 +232,9 @@ The traffic flow from slaves to masters can be described in two steps, like so:
 
 Kubernetes supports two primary modes of finding a service— environment variables and DNS.
 
-The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#environment-variables).
+The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](../../docs/user-guide/services.md#environment-variables).
 
-An alternative is to use the [cluster's DNS service](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the service name.
+An alternative is to use the [cluster's DNS service](../../docs/user-guide/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the service name.
 We'll use the DNS service for this example.  E.g., you can see the service name, `redis-master`, accessed as a `host` value in the PHP script in [Step 5](#step-five-create-the-frontend-replicated-pods).
 
 **Note**: **If your cluster does not have the DNS service enabled, then this example will not work out of the box.** You will need to edit `examples/guestbook/php-redis/index.php` to use environment variables for service discovery instead, then rebuild the container image from the `Dockerfile` in that directory.  (However, this is unlikely to be necessary. You can check for the DNS service in the list of the clusters' services.)
@@ -496,7 +496,7 @@ redis-slave             name=redis-slave                          name=redis-sla
 
 You'll want to set up your guestbook service so that it can be accessed from outside of the internal Kubernetes network. Above, we introduced one way to do that, using the `type: LoadBalancer` spec.
 
-More generally, Kubernetes supports two ways of exposing a service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#external-services).
+More generally, Kubernetes supports two ways of exposing a service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](../../docs/user-guide/services.md#external-services).
 
 If the `LoadBalancer` specification is used, it can take a short period for an external IP to show up in `kubectl get services` output, but you should shortly see it listed as well, e.g. like this:
 

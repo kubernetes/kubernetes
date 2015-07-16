@@ -35,7 +35,7 @@ certainly want the docs that go with that version.</h1>
 ## Introduction
 This document describes how to build a high-availability (HA) Kubernetes cluster.  This is a fairly advanced topic.
 Users who merely want to experiment with Kubernetes are encouraged to use configurations that are simpler to set up such as
-the simple [Docker based single node cluster instructions](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/docker.md),
+the simple [Docker based single node cluster instructions](../../docs/getting-started-guides/docker.md),
 or try [Google Container Engine](https://cloud.google.com/container-engine/) for hosted Kubernetes.
 
 Also, at this time high availability support for Kubernetes is not continuously tested in our end-to-end (e2e) testing.  We will

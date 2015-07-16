@@ -47,7 +47,7 @@ This example demonstrates how limits can be applied to a Kubernetes namespace to
 min/max resource limits per pod.  In addition, this example demonstrates how you can
 apply default resource limits to pods in the absence of an end-user specified value.
 
-For a detailed description of the Kubernetes resource model, see [Resources](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md)
+For a detailed description of the Kubernetes resource model, see [Resources](../../../docs/user-guide/compute-resources.md)
 
 Step 0: Prerequisites
 -----------------------------------------

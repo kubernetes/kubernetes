@@ -89,8 +89,7 @@ variety of uses cases:
    - Scheduler and Controller-manager will use the Secure Port too.  They
      will then be able to run on different machines than the apiserver.
    - A general mechanism will be provided for [giving credentials to
-     pods](
-     https://github.com/GoogleCloudPlatform/kubernetes/issues/1907).
+     pods](https://github.com/GoogleCloudPlatform/kubernetes/issues/1907).
    - Clients, like kubectl, will all support token-based auth, and the
      Localhost will no longer be needed, and will not be the default.
      However, the localhost port may continue to be an option for

@@ -51,16 +51,16 @@ export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 export KUBERNETES_PROVIDER=aws; curl -sS https://get.k8s.io | bash
 ```
 
-NOTE: This script calls [cluster/kube-up.sh](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/kube-up.sh)
-which in turn calls [cluster/aws/util.sh](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/aws/util.sh)
-using [cluster/aws/config-default.sh](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/aws/config-default.sh).
+NOTE: This script calls [cluster/kube-up.sh](../../cluster/kube-up.sh)
+which in turn calls [cluster/aws/util.sh](../../cluster/aws/util.sh)
+using [cluster/aws/config-default.sh](../../cluster/aws/config-default.sh).
 
 This process takes about 5 to 10 minutes. Once the cluster is up, the IP addresses of your master and node(s) will be printed,
 as well as information about the default services running in the cluster (monitoring, logging, dns). User credentials and security
 tokens are written in `~/.kube/kubeconfig`, they will be necessary to use the CLI or the HTTP Basic Auth.
 
 By default, the script will provision a new VPC and a 4 node k8s cluster in us-west-2a (Oregon) with `t2.micro` instances running on Ubuntu.
-You can override the variables defined in [config-default.sh](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/aws/config-default.sh) to change this behavior as follows:
+You can override the variables defined in [config-default.sh](../../cluster/aws/config-default.sh) to change this behavior as follows:
 
 ```bash
 export KUBE_AWS_ZONE=eu-west-1c
@@ -93,10 +93,10 @@ sudo cp kubernetes/platforms/darwin/amd64/kubectl /usr/local/bin/kubectl
 sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
 ```
 
-An up-to-date documentation page for this tool is available here: [kubectl manual](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
+An up-to-date documentation page for this tool is available here: [kubectl manual](../../docs/user-guide/kubectl/kubectl.md)
 
 By default, `kubectl` will use the `kubeconfig` file generated during the cluster startup for authenticating against the API.
-For more information, please read [kubeconfig files](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubeconfig-file.md)
+For more information, please read [kubeconfig files](../../docs/user-guide/kubeconfig-file.md)
 
 ### Examples
 See [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
@@ -114,7 +114,7 @@ cluster/kube-down.sh
 ```
 
 ## Further reading
-Please see the [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs) for more details on administering
+Please see the [Kubernetes docs](../../docs/) for more details on administering
 and using a Kubernetes cluster.
 
 
