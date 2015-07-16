@@ -55,6 +55,9 @@ $ kubectl describe pods/nginx
 // Describe pods by label name=myLabel
 $ kubectl describe po -l name=myLabel
 
+// Describe all pods
+$ kubectl describe pods --all
+
 // Describe all pods managed by the 'frontend' replication controller (rc-created pods
 // get the name of the rc as a prefix in the pod the name).
 $ kubectl describe pods frontend`
@@ -73,6 +76,7 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		ValidArgs: kubectl.DescribableResources(),
 	}
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
 	return cmd
 }
 
@@ -93,6 +97,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam(selector).
+		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()

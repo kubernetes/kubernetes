@@ -275,6 +275,7 @@ _kubectl_describe()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--all")
     flags+=("--help")
     flags+=("-h")
     flags+=("--selector=")

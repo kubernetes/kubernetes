@@ -35,6 +35,10 @@ or secrets.
 
 .SH OPTIONS
 .PP
+\fB\-\-all\fP=false
+    [\-all] to select all the specified resources
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for describe
 
@@ -154,6 +158,9 @@ $ kubectl describe pods/nginx
 
 // Describe pods by label name=myLabel
 $ kubectl describe po \-l name=myLabel
+
+// Describe all pods
+$ kubectl describe pods \-\-all
 
 // Describe all pods managed by the 'frontend' replication controller (rc\-created pods
 // get the name of the rc as a prefix in the pod the name).
