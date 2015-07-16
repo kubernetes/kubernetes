@@ -72,7 +72,7 @@ $ kubectl get svc my-nginx -o json | grep \"ip\"
                    "ip": "130.111.122.213"
 ```
 
-In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a [firewall to allow traffic on port 80](../../docs/services-firewalls.md).
+In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a [firewall to allow traffic on port 80](services-firewalls.md).
 
 ## Killing the application
 
