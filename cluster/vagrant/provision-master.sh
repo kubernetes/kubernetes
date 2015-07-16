@@ -28,6 +28,9 @@ rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
 # Disable network interface being managed by Network Manager (needed for Fedora 21+)
 NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
 sed -i 's/^NM_CONTROLLED=no/#NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
+
+systemctl restart network
+sleep 5
 systemctl restart network
 
 function release_not_found() {
