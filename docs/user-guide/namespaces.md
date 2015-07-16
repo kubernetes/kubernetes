@@ -61,6 +61,8 @@ The Namespace provides a unique scope for:
 
 ## Usage
 
+Look [here](namespaces/) for an in depth example of namespaces.
+
 ### Viewing namespaces
 You can list the current namespaces in a cluster using:
 ```sh
