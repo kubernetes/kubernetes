@@ -252,15 +252,12 @@ spec:
       containers:
       - image: endocode/flower
         name: flower
-        ports:
-        - containerPort: 5555
-          hostPort: 5555
         resources:
           limits:
             cpu: 100m
 ```
 
-This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed. This image uses the following command to start Flower:
+This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed through the service endpoint. This image uses the following command to start Flower:
 
 ```sh
 flower --broker=amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST:localhost}:5672//
