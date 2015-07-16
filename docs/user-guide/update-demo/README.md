@@ -36,8 +36,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 -->
-# Live update example
-This example demonstrates the usage of Kubernetes to perform a live update on a running group of [pods](../../../docs/user-guide/pods.md).
+# Rolling update example
+This example demonstrates the usage of Kubernetes to perform a [rolling update](../kubectl/kubectl_rolling-update.md) on a running group of [pods](../../../docs/user-guide/pods.md). See [here](../managing-deployments.md#updating-your-application-without-a-service-outage) to understand why you need a rolling update. Also check [rolling update design document](../../design/simple-rolling-update.md) for more information. 
 
 ### Step Zero: Prerequisites
 
@@ -64,7 +64,7 @@ I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 Now visit the the [demo website](http://localhost:8001/static).  You won't see anything much quite yet.
 
 ### Step Two: Run the replication controller
-Now we will turn up two replicas of an image.  They all serve on internal port 80.
+Now we will turn up two replicas of an [image](../images.md).  They all serve on internal port 80.
 
 ```bash
 $ kubectl create -f docs/user-guide/update-demo/nautilus-rc.yaml

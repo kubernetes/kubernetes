@@ -25,7 +25,7 @@ certainly want the docs that go with that version.</h1>
 Objects of type `secret` are intended to hold sensitive information, such as
 passwords, OAuth tokens, and ssh keys.  Putting this information in a `secret`
 is safer and more flexible than putting it verbatim in a `pod` definition or in
-a docker image.
+a docker image. See [Secrets design document](../design/secrets.md) for more information. 
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -56,7 +56,7 @@ a docker image.
 Creation of secrets can be manual (done by the user) or automatic (done by
 automation built into the cluster).
 
-A secret can be used with a pod in two ways: either as files in a volume mounted on one or more of
+A secret can be used with a pod in two ways: either as files in a [volume](volumes.md) mounted on one or more of
 its containers, or used by kubelet when pulling images for the pod.
 
 To use a secret, a pod needs to reference the secret.  This reference
@@ -141,6 +141,8 @@ own `volumeMounts` block, but only one `spec.volumes` is needed per secret.
 
 You can package many files into one secret, or use many secrets,
 whichever is convenient.
+
+See another example of creating a secret and a pod that consumes that secret in a volume [here](secrets/).
 
 ### Manually specifying an imagePullSecret
 Use of imagePullSecrets is desribed in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)

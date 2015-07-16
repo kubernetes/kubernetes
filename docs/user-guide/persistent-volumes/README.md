@@ -22,10 +22,12 @@ certainly want the docs that go with that version.</h1>
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # How To Use Persistent Volumes
 
-The purpose of this guide is to help you become familiar with Kubernetes Persistent Volumes.  By the end of the guide, we'll have
+The purpose of this guide is to help you become familiar with [Kubernetes Persistent Volumes](../persistent-volumes.md).  By the end of the guide, we'll have
 nginx serving content from your persistent volume.
 
 This guide assumes knowledge of Kubernetes fundamentals and that you have a cluster up and running.
+
+See [Persistent Storage design document](../../design/persistent-storage.md) for more information. 
 
 ## Provisioning
 
@@ -114,7 +116,7 @@ I love Kubernetes storage!
 ```
 
 Hopefully this simple guide is enough to get you started with PersistentVolumes.  If you have any questions, join
-```#google-containers``` on IRC and ask!
+[```#google-containers```](https://botbot.me/freenode/google-containers/) on IRC and ask!
 
 Enjoy!
 
