@@ -17,9 +17,11 @@
 # A library of helper functions and constant for debian os distro
 
 # $1: if 'true', we're building a master yaml, else a node
+# $3: if 'true', we are using test node configuration, else the default one
 function build-kube-env {
   local master=$1
   local file=$2
+  local test_node=$3
 
   rm -f ${file}
   cat >$file <<EOF
@@ -76,6 +78,12 @@ KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
 KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 EOF
   fi
+  if [[ "${test_node}" == "true" ]]; then
+    cat >>$file <<EOF
+TEST_NODE: $(yaml-quote "true")
+EOF
+  fi
+
 }
 
 # create-master-instance creates the master instance. If called with

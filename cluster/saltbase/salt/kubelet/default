@@ -40,6 +40,11 @@
   {% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
 {% endif -%}
 
+{% set test_args = "" -%}
+{% if grains.test is defined -%}
+  {% set test_args="--max-pods=100" %}
+{% endif -%}
+
 {% set config = "--config=/etc/kubernetes/manifests" -%}
 {% set hostname_override = "" -%}
 {% if grains.hostname_override is defined -%}
@@ -84,4 +89,4 @@
   {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
 {% endif %} 
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{test_args}}"

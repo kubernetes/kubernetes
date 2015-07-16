@@ -505,11 +505,15 @@ function yaml-quote {
 }
 
 function write-master-env {
-  build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
+  build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml" false
 }
 
 function write-node-env {
-  build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
+  build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml" false
+}
+
+function write-test-node-env {
+  build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml" true
 }
 
 # Create certificate pairs for the cluster.
@@ -692,7 +696,11 @@ function kube-up {
     scope_flags=("--no-scopes")
   fi
 
-  write-node-env
+  if [[ "${TEST_NODE:-}" == "true" ]]; then
+    write-test-node-env
+  else
+    write-node-env
+  fi
   create-node-instance-template
 
   gcloud preview managed-instance-groups --zone "${ZONE}" \
@@ -1004,7 +1012,11 @@ function prepare-push() {
 
   # Prepare node env vars and update MIG template
   if [[ "${1-}" == "true" ]]; then
-    write-node-env
+    if [[ "${TEST_NODE:-}" == "true" ]]; then
+      write-test-node-env
+    else
+      write-node-env
+    fi
 
     # TODO(mbforbes): Refactor setting scope flags.
     local -a scope_flags=()

@@ -562,6 +562,12 @@ function salt-set-apiserver() {
 EOF
 }
 
+function salt-set-test-grain() {
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  test: true
+EOF
+}
+
 function configure-salt() {
   fix-apt-sources
   mkdir -p /etc/salt/minion.d
@@ -573,6 +579,9 @@ function configure-salt() {
     fi
   else
     salt-node-role
+    if [[ "${TEST_NODE:-}" == "true" ]]; then
+      salt-set-test-grain
+    fi
     salt-docker-opts
     salt-set-apiserver
   fi
