@@ -48,7 +48,7 @@ This [Ansible](http://ansibleworks.com) playbook deploys Kubernetes on a CloudSt
     $ sudo pip install ansible
     $ sudo pip install cs
 
-[_cs_](http://github.com/exoscale/cs) is a python module for the CloudStack API.
+[_cs_](https://github.com/exoscale/cs) is a python module for the CloudStack API.
 
 Set your CloudStack endpoint, API keys and HTTP method used.
 

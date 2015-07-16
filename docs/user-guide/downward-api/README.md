@@ -23,7 +23,7 @@ certainly want the docs that go with that version.</h1>
 # Downward API example
 
 Following this example, you will create a pod with a containers that consumes the pod's name and
-namespace using the [downward API](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/downward_api.md).
+namespace using the [downward API](../downward-api.md).
 
 ## Step Zero: Prerequisites
 
