@@ -94,6 +94,7 @@ GCE_PARALLEL_SKIP_TESTS=(
     "Nodes\sNetwork"
     "Nodes\sResize"
     "MaxPods"
+    "Services.*restarting"
     "Shell.*services"
     )
 
