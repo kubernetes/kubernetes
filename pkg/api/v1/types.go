@@ -877,6 +877,8 @@ type PodSpec struct {
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	ServiceAccountName string `json:"serviceAccountName,omitempty" description:"name of the ServiceAccount to use to run this pod; see http://releases.k8s.io/HEAD/docs/service_accounts.md"`
+	// DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
+	DeprecatedServiceAccount string `json:"serviceAccount,omitempty" description:"deprecated; use serviceAccountName instead"`
 
 	// NodeName is a request to schedule this pod onto a specific node.  If it is non-empty,
 	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
