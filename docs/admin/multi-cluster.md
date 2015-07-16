@@ -20,87 +20,17 @@ certainly want the docs that go with that version.</h1>
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-# Availability
-
-This document collects advice on reasoning about and provisioning for high-availability when using Kubernetes clusters.
-
-## Failure modes
-
-This is an incomplete list of things that could go wrong, and how to deal with them.
-
-Root causes:
-  - VM(s) shutdown
-  - network partition within cluster, or between cluster and users.
-  - crashes in Kubernetes software 
-  - data loss or unavailability of persistent storage (e.g. GCE PD or AWS EBS volume).
-  - operator error misconfigures kubernetes software or application software.
-
-Specific scenarios:
-  - Apiserver VM shutdown or apiserver crashing
-    - Results
-      - unable to stop, update, or start new pods, services, replication controller
-      - existing pods and services should continue to work normally, unless they depend on the Kubernetes API
-  - Apiserver backing storage lost
-    - Results
-      - apiserver should fail to come up.
-      - kubelets will not be able to reach it but will continue to run the same pods and provide the same service proxying.
-      - manual recovery or recreation of apiserver state necessary before apiserver is restarted.
-  - Supporting services (node controller, replication controller manager, scheduler, etc) VM shutdown or crashes
-    - currently those are colocated with the apiserver, and their unavailability has similar consequences as apiserver
-    - in future, these will be replicated as well and may not be co-located
-    - they do not have own persistent state
-  - Node (thing that runs kubelet and kube-proxy and pods) shutdown
-    - Results
-      - pods on that Node stop running
-  - Kubelet software fault
-    - Results
-      - crashing kubelet cannot start new pods on the node
-      - kubelet might delete the pods or not
-      - node marked unhealthy
-      - replication controllers start new pods elsewhere
-  - Cluster operator error
-    - Results:
-      - loss of pods, services, etc
-      - lost of apiserver backing store
-      - users unable to read API
-      - etc
-
-Mitigations:
-- Action: Use IaaS providers automatic VM restarting feature for IaaS VMs.
-  - Mitigates: Apiserver VM shutdown or apiserver crashing
-  - Mitigates: Supporting services VM shutdown or crashes
-
-- Action use IaaS providers reliable storage (e.g GCE PD or AWS EBS volume) for VMs with apiserver+etcd.
-  - Mitigates: Apiserver backing storage lost
-
-- Action: Use Replicated APIserver feature (when complete: feature is planned but not implemented)
-  - Mitigates: Apiserver VM shutdown or apiserver crashing
-    - Will tolerate one or more simultaneous apiserver failures.
-  - Mitigates: Apiserver backing storage lost
-    - Each apiserver has independent storage.  Etcd will recover from loss of one member.  Risk of total data loss greatly reduced.
-
-- Action: Snapshot apiserver PDs/EBS-volumes periodically
-  - Mitigates: Apiserver backing storage lost
-  - Mitigates: Some cases of operator error
-  - Mitigates: Some cases of kubernetes software fault
-
-- Action: use replication controller and services in front of pods
-  - Mitigates: Node shutdown
-  - Mitigates: Kubelet software fault
-
-- Action: applications (containers) designed to tolerate unexpected restarts
-  - Mitigates: Node shutdown
-  - Mitigates: Kubelet software fault
-
-- Action: Multiple independent clusters (and avoid making risky changes to all clusters at once)
-  - Mitigates: Everything listed above.
-
-## Choosing Multiple Kubernetes Clusters
+# Considerations for running multiple Kubernetes clusters
 
 You may want to set up multiple kubernetes clusters, both to
 have clusters in different regions to be nearer to your users; and to tolerate failures and/or invasive maintenance.
+This document describes some of the issues to consider when making a decision about doing so.
 
-### Scope of a single cluster
+Note that at present,
+Kubernetes does not offer a mechanism to aggregate multiple clusters into a single virtual cluster. However,
+we [plan to do this in the future](../proposals/federation.md).
+
+## Scope of a single cluster
 
 On IaaS providers such as Google Compute Engine or Amazon Web Services, a VM exists in a
 [zone](https://cloud.google.com/compute/docs/zones) or [availability
@@ -124,7 +54,7 @@ Reasons to have multiple clusters include:
     below).
   - test clusters to canary new Kubernetes releases or other cluster software.
 
-### Selecting the right number of clusters
+## Selecting the right number of clusters
 The selection of the number of kubernetes clusters may be a relatively static choice, only revisited occasionally.
 By contrast, the number of nodes in a cluster and the number of pods in a service may be change frequently according to
 load and growth.
@@ -153,5 +83,5 @@ failures of a single cluster are not visible to end users.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/availability.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/multi-cluster.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
