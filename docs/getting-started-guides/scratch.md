@@ -186,7 +186,7 @@ you just need the bare binaries.  For etcd, kube-apiserver, kube-controller-mana
 we recommend that you run these as containers, so you need an image to be built.
 
 You have several choices for Kubernetes images:
-1. Use images hosted on Google Container Registry (GCR):
+- Use images hosted on Google Container Registry (GCR):
   - e.g `gcr.io/google_containers/kube-apiserver:$TAG`, where `TAG` is the latest
     release tag, which can be found on the [latest releases page](
     https://github.com/GoogleCloudPlatform/kubernetes/releases/latest). 
@@ -218,10 +218,10 @@ The remainder of the document assumes that the image identifiers have been chose
 ### Security Models
 
 There are two main options for security:
-1. Access the apiserver using HTTP.
+- Access the apiserver using HTTP.
   - Use a firewall for security.
   - This is easier to setup.
-1. Access the apiserver using HTTPS  
+- Access the apiserver using HTTPS  
   - Use https with certs, and credentials for user.
   - This is the recommended approach.
   - Configuring certs can be tricky.
