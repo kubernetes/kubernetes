@@ -448,7 +448,8 @@ replicationcontrollers/my-nginx-v4
 
 ## What's next?
 
-[Learn about how to use `kubectl` for application introspection and debugging.](introspection-and-debugging.md)
+- [Learn about how to use `kubectl` for application introspection and debugging.](introspection-and-debugging.md)
+- [Tips and tricks when working with config](config-best-practices.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
