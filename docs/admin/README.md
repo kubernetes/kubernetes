@@ -45,7 +45,7 @@ Before choosing a particular guide, here are some things to consider:
    Kubernetes.
  - If you are configuring kubernetes on-premises, you will need to consider what [networking
    model](networking.md) fits best.
- - If you are designing for very [high-availability](availability.md), you may want multiple clusters in multiple zones.
+ - If you are designing for very high-availability, you may want [clusters in multiple zones](multi-cluster.md).
 
 ## Setting up a cluster
 
