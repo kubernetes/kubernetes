@@ -249,7 +249,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"hazelcast-controller": &api.ReplicationController{},
 			"hazelcast-service":    &api.Service{},
 		},
-		"../examples/kubernetes-namespaces": {
+		"../docs/user-guide/namespaces": {
 			"namespace-dev":  &api.Namespace{},
 			"namespace-prod": &api.Namespace{},
 		},
