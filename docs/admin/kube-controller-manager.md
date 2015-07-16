@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/kube-controller-manager.md).
+[here](http://releases.k8s.io/release-1.0/docs/admin/kube-controller-manager.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -82,5 +82,5 @@ controller, and serviceaccounts controller.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kube-controller-manager.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kube-controller-manager.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
