@@ -178,11 +178,12 @@ func (sws SwaggerService) getDeclarations(req *restful.Request, resp *restful.Re
 	resp.WriteAsJson(decl)
 }
 
+// composeDeclaration uses all routes and parameters to create a ApiDeclaration
 func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix string) ApiDeclaration {
 	decl := ApiDeclaration{
 		SwaggerVersion: swaggerVersion,
 		BasePath:       sws.config.WebServicesUrl,
-		ResourcePath:   ws.RootPath(),
+		ResourcePath:   pathPrefix,
 		Models:         ModelList{},
 		ApiVersion:     ws.Version()}
 
