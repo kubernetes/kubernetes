@@ -1,0 +1,18 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'io.github.robwin:swagger2markup:0.6.0'
+    }
+}
+
+task gendocs << {
+  io.github.robwin.swagger2markup.Swagger2MarkupConverter
+    .from("./input.json")
+    .build()
+    .intoFolder("./");
+  println '*** generating docs to ./'
+}
