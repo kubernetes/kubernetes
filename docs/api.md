@@ -44,9 +44,9 @@ What constitutes a compatible change and how to change the API are detailed by t
 
 ## API versioning
 
-Fine-grain resource evolution alone makes it difficult to eliminate fields or restructure resource representations. Therefore, Kubernetes supports multiple API versions, each at a different API path prefix, such as `/api/v1beta3`. These are simply different interfaces to read and/or modify the same underlying resources. In general, all API resources are accessible via all API versions, though there may be some cases in the future where that is not true. 
+To make it easier to eliminate fields or restructure resource representations, Kubernetes supports multiple API versions, each at a different API path prefix, such as `/api/v1beta3`. These are simply different interfaces to read and/or modify the same underlying resources. In general, all API resources are accessible via all API versions, though there may be some cases in the future where that is not true. 
 
-Distinct API versions present more clear, consistent views of system resources and behavior than intermingled, independently evolved resources. They also provide a more straightforward mechanism for controlling access to end-of-lifed and/or experimental APIs.
+We chose to version at the API level rather than at the resource or field level to ensure that the API presents a clear, consistent view of system resources and behavior, and to enable controlling access to end-of-lifed and/or experimental APIs.
 
 The [API and release versioning proposal](design/versioning.md) describes the current thinking on the API version evolution process.
 
