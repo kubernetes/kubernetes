@@ -30,13 +30,98 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-If you are not sure what OSes and infrastructure is supported, the table below lists all the combinations which have
-been tested recently.
 
-For the easiest "kick the tires" experience, please try the [local docker](docker.md) guide.
+# Creating a Kubernetes Cluster
 
-If you are considering contributing a new guide, please read the
-[guidelines](../../docs/devel/writing-a-getting-started-guide.md).
+Kubernetes can run on a range of platforms, from your laptop, to VMs on a cloud provider, to rack of
+bare metal servers.  The effort required to setup a cluster varies from running a single command to
+crafting your own customized cluster.  We'll guide you in picking a solution that fits for your needs.
+
+## Picking the Right Solution
+
+If you just want to "kick the tires" on Kubernetes, we recommend the [local Docker-based](docker.md) solution.  
+
+The local Docker-based solution is one of several [Local cluster](#local-solutions) solutions
+that are quick to setup, but are limited to running on one machine.
+
+When you are ready to scale-up to more machines and higher availability, a [Hosted](#hosted-solutions)
+solution is the easiest to create and maintain.
+
+[Turn-key cloud solutions](#turn-key-cloud-solutions) require only a few commands to create
+and cover a wider range of cloud providers.
+
+[Custom solutions](#custom-solutions) require more effort to setup but cover and even 
+they vary from step-by-step instructions to general advice for setting up
+a kubernetes cluster from scratch. 
+
+### Local-machine Solutions
+Local-machine solutions create a single cluster with one or more kubernetes nodes on a single
+physical machine.  Setup is completely automated and doesn't require a cloud provider account.
+But their size and availability is limited to that of a single machine.
+
+The local-machine solutions are:
+  - [Local Docker-based](#local-solutions) (recommended starting point)
+  - [Vagrant](vagrant.md) (works on any platform with Vagrant: Linux, MacOS, or Windows.)
+  - [No-VM local cluster](locally.md) (Linux only)
+
+
+### Hosted Solutions
+[Google Container Engine](https://cloud.google.com/container-engine) offers managed Kubernetes
+clusters.
+
+### Turn-key Cloud Solutions
+These solutions allow you to create Kubernetes clusters on range of Cloud IaaS providers with only a
+few commands, and have active community support.
+- [GCE](gce.md)
+- [AWS](aws.md)
+- [Azure](coreos/azure/README.md)
+
+### Custom Solutions
+
+Kubernetes can run on a wide range of Cloud providers and bare-metal environments, and with many
+base operating systems.
+
+If you can find a guide below that matches your needs, use it.  It may be a little out of date, but
+it will be easier than starting from scratch.  If you do want to start from scratch, because you
+have special requirements, or just because you want to understand what is underneath a Kubernetes
+cluster, try the [Getting Started from Scratch](scratch.md) guide.
+
+If you are interested in supporting Kubernetes on a new platform, check out our [advice for
+writing a new solution](../../docs/devel/writing-a-getting-started-guide.md).
+
+#### Cloud
+These solutions are combinations of cloud provider and OS not covered by the above solutions.
+- [AWS + coreos](coreos.md)
+- [GCE + CoreOS](coreos.md)
+- [AWS + Ubuntu](juju.md)
+- [Joyent + Ubuntu](juju.md)
+- [Rackspace + CoreOS](rackspace.md)
+
+#### On-Premises VMs
+- [Vagrant](coreos.md) (uses CoreOS and flannel)
+- [CloudStack](cloudstack.md) (uses Ansible, CoreOS and flannel)
+- [Vmware](vsphere.md)  (uses Debian)
+- [juju.md](juju.md) (uses Juju, Ubuntu and flannel)
+- [Vmware](coreos.md)  (uses CoreOS and flannel)
+- [libvirt-coreos.md](libvirt-coreos.md)  (uses CoreOS)
+- [oVirt](ovirt.md)
+- [libvirt](fedora/flannel_multi_node_cluster.md) (uses Fedora and flannel)
+- [KVM](fedora/flannel_multi_node_cluster.md)  (uses Fedora and flannel)
+
+#### Bare Metal
+- [Offline](coreos/bare_metal_offline.md) (no internet required.  Uses CoreOS and Flannel)
+- [fedora/fedora_ansible_config.md](fedora/fedora_ansible_config.md)
+- [Fedora single node](fedora/fedora_manual_config.md) 
+- [Fedora multi node](fedora/flannel_multi_node_cluster.md) 
+- [Centos](centos/centos_manual_config.md)
+- [Ubuntu](ubuntu.md)
+- [Docker Multi Node](docker-multinode.md)
+
+#### Integrations
+- [Kubernetes on Mesos](mesos.md) (Uses GCE)
+
+## Table of Solutions
+Here are all the solutions mentioned above in table form.
 
 IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                              | Conforms | Support Level
 -------------------- | ------------ | ------ | ----------  | ---------------------------------------------     | ---------| ----------------------------
@@ -70,8 +155,8 @@ Local                |              |        | _none_      | [docs](locally.md) 
 libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.md)                         |          | Community (@lhuard1A)
 oVirt                |              |        |             | [docs](ovirt.md)                                  |          | Community (@simon3z)
 Rackspace            | CoreOS       | CoreOS | flannel     | [docs](rackspace.md)                              |          | Community (@doublerr)
+any                  | any          | any    | any         | [docs](scratch.md)                              |          | Community (@doublerr)
 
-Don't see anything above that meets your needs?  See our [Getting Started from Scratch](scratch.md) guide.
 
 *Note*: The above table is ordered by version test/used in notes followed by support level.
 
