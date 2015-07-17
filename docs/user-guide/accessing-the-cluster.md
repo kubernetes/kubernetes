@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [User Guide to Accessing the Cluster](#user-guide-to-accessing-the-cluster)
   - [Accessing the cluster API](#accessing-the-cluster-api)
     - [Accessing for the first time with kubectl](#accessing-for-the-first-time-with-kubectl)

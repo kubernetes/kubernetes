@@ -40,6 +40,7 @@ The `image` property of a container supports the same syntax as the `docker` com
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Images](#images)
   - [Updating Images](#updating-images)
   - [Using a Private Registry](#using-a-private-registry)

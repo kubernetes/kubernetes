@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Admission Controllers](#admission-controllers)
   - [What are they?](#what-are-they)
   - [Why do I need them?](#why-do-i-need-them)

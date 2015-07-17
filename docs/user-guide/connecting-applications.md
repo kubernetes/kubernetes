@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Kubernetes User Guide: Managing Applications: Connecting applications](#kubernetes-user-guide-managing-applications-connecting-applications)
 - [The Kubernetes model for connecting containers](#the-kubernetes-model-for-connecting-containers)
   - [Exposing pods to the cluster](#exposing-pods-to-the-cluster)

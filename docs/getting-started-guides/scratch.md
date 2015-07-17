@@ -48,6 +48,7 @@ steps that existing cluster setup scripts are making.
 **Table of Contents**
 
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
   - [Designing and Preparing](#designing-and-preparing)
     - [Learning](#learning)
     - [Cloud Provider](#cloud-provider)

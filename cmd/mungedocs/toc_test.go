@@ -27,19 +27,19 @@ func Test_buildTOC(t *testing.T) {
 		in  string
 		out string
 	}{
-		{"", ""},
-		{"Lorem ipsum\ndolor sit amet\n", ""},
+		{"", "\n"},
+		{"Lorem ipsum\ndolor sit amet\n", "\n"},
 		{
 			"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n",
-			"- [Title](#title)\n  - [Section Heading](#section-heading)\n",
+			"\n- [Title](#title)\n  - [Section Heading](#section-heading)\n",
 		},
 		{
 			"# Title\nLorem ipsum \n## Section Heading\ndolor sit amet\n```bash\n#!/bin/sh\n```",
-			"- [Title](#title)\n  - [Section Heading](#section-heading)\n",
+			"\n- [Title](#title)\n  - [Section Heading](#section-heading)\n",
 		},
 		{
 			"# Title\nLorem ipsum \n## Section Heading\n### Ok, why doesn't this work? ...add 4 *more* `symbols`!\ndolor sit amet\n",
-			"- [Title](#title)\n  - [Section Heading](#section-heading)\n    - [Ok, why doesn't this work? ...add 4 *more* `symbols`!](#ok-why-doesnt-this-work-add-4-more-symbols)\n",
+			"\n- [Title](#title)\n  - [Section Heading](#section-heading)\n    - [Ok, why doesn't this work? ...add 4 *more* `symbols`!](#ok-why-doesnt-this-work-add-4-more-symbols)\n",
 		},
 	}
 	for _, c := range cases {
@@ -63,7 +63,7 @@ func Test_updateTOC(t *testing.T) {
 		},
 		{
 			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN MUNGE: GENERATED_TOC -->\nold cruft\n<!-- END MUNGE: GENERATED_TOC -->\n## Section Heading\ndolor sit amet\n",
-			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN MUNGE: GENERATED_TOC -->\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n<!-- END MUNGE: GENERATED_TOC -->\n## Section Heading\ndolor sit amet\n",
+			"# Title\nLorem ipsum \n**table of contents**\n<!-- BEGIN MUNGE: GENERATED_TOC -->\n\n- [Title](#title)\n  - [Section Heading](#section-heading)\n\n<!-- END MUNGE: GENERATED_TOC -->\n## Section Heading\ndolor sit amet\n",
 		},
 	}
 	for _, c := range cases {

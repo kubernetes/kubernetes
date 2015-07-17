@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Kubernetes User Guide: Managing Applications](#kubernetes-user-guide-managing-applications)
   - [Quick walkthrough](#quick-walkthrough)
   - [Thorough walkthrough](#thorough-walkthrough)
