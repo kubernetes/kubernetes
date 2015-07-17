@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes User Guide: Managing Applications: Quick start
 
 **Table of Contents**
@@ -68,7 +69,9 @@ my-nginx-q7jo3   1/1       Running   0          29m
 ```
 
 Kubernetes will ensure that your application keeps running, by automatically restarting containers that fail, spreading containers across nodes, and recreating containers on new nodes when nodes fail.
+
 ## Exposing your application to the Internet
+
 Through integration with some cloud providers (for example Google Compute Engine and AWS EC2), Kubernetes enables you to request that it provision a public IP address for your application. To do this run:
 
 ```bash

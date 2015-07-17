@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Getting started with config files.
 
 In addition to the imperative style commands described [elsewhere](simple-nginx.md), Kubernetes
@@ -74,6 +75,7 @@ kubectl delete pods nginx
 ```
 
 ### Running a replicated set of containers from a configuration file
+
 To run replicated containers, you need a [Replication Controller](replication-controller.md).
 A replication controller is responsible for ensuring that a specific number of pods exist in the
 cluster.

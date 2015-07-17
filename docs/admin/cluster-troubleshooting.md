@@ -30,13 +30,16 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Cluster Troubleshooting
+
 This doc is about cluster troubleshooting; we assume you have already ruled out your application as the root cause of the
 problem you are experiencing. See
 the [application troubleshooting guide](../user-guide/application-troubleshooting.md) for tips on application debugging.
 You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
 
 ## Listing your cluster
+
 The first thing to debug in your cluster is if your nodes are all registered correctly.
 
 Run
@@ -48,15 +51,18 @@ kubectl get nodes
 And verify that all of the nodes you expect to see are present and that they are all in the ```Ready``` state.
 
 ## Looking at logs
+
 For now, digging deeper into the cluster requires logging into the relevant machines.  Here are the locations
 of the relevant log files.  (note that on systemd-based systems, you may need to use ```journalctl``` instead)
 
 ### Master
+
    * /var/log/kube-apiserver.log - API Server, responsible for serving the API
    * /var/log/kube-scheduler.log - Scheduler, responsible for making scheduling decisions
    * /var/log/kube-controller-manager.log - Controller that manages replication controllers
 
 ### Worker Nodes
+
    * /var/log/kubelet.log - Kubelet, responsible for running containers on the node
    * /var/log/kube-proxy.log - Kube Proxy, responsible for service load balancing
 

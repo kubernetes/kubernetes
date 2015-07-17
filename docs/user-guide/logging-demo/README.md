@@ -30,7 +30,9 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Elasticsearch/Kibana Logging Demonstration
+
 This directory contains two [pod](../../../docs/user-guide/pods.md) specifications which can be used as synthetic
 logging sources. The pod specification in [synthetic_0_25lps.yaml](synthetic_0_25lps.yaml)
 describes a pod that just emits a log message once every 4 seconds. The pod specification in

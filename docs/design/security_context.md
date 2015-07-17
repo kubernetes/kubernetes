@@ -30,8 +30,11 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Security Contexts
+
 ## Abstract
+
 A security context is a set of constraints that are applied to a container in order to achieve the following goals (from [security design](security.md)):
 
 1.  Ensure a clear isolation between container and the underlying host it runs on
@@ -53,11 +56,13 @@ to the container process.
 Support for user namespaces has recently been [merged](https://github.com/docker/libcontainer/pull/304) into Docker's libcontainer project and should soon surface in Docker itself. It will make it possible to assign a range of unprivileged uids and gids from the host to each container, improving the isolation between host and container and between containers.
 
 ### External integration with shared storage
+
 In order to support external integration with shared storage, processes running in a Kubernetes cluster 
 should be able to be uniquely identified by their Unix UID, such that a chain of  ownership can be established. 
 Processes in pods will need to have consistent UID/GID/SELinux category labels in order to access shared disks.
 
 ## Constraints and Assumptions
+
 * It is out of the scope of this document to prescribe a specific set 
   of constraints to isolate containers from their host. Different use cases need different
   settings.
@@ -96,6 +101,7 @@ be addressed with security contexts:
 ## Proposed Design
 
 ### Overview
+
 A *security context* consists of a set of constraints that determine how a container
 is secured before getting created and run. A security context resides on the container and represents the runtime parameters that will
 be used to create and run the container via container APIs. A *security context provider* is passed to the Kubelet so it can have a chance

@@ -456,6 +456,7 @@ The following HTTP status codes may be returned by the API.
   * Returned in response to HTTP OPTIONS requests.
 
 #### Error codes
+
 * `307 StatusTemporaryRedirect`
   * Indicates that the address for the requested resource has changed.
   * Suggested client recovery behavior

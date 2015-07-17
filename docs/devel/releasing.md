@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Releasing Kubernetes
 
 This document explains how to cut a release, and the theory behind it. If you
@@ -87,6 +88,7 @@ Where `v0.20.2-322-g974377b` is the git hash you decided on. This will become
 our (retroactive) branch point.
 
 #### Branching, Tagging and Merging
+
 Do the following:
 
 1. `export VER=x.y` (e.g. `0.20` for v0.20)

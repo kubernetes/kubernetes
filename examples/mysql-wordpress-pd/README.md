@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Persistent Installation of MySQL and WordPress on Kubernetes
 
 This example describes how to run a persistent installation of [Wordpress](https://wordpress.org/) using the [volumes](../../docs/user-guide/volumes.md) feature of Kubernetes, and [Google Compute Engine](https://cloud.google.com/compute/docs/disks) [persistent disks](../../docs/user-guide/volumes.md#gcepersistentdisk).

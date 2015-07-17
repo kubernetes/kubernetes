@@ -39,6 +39,7 @@ Getting started on [Fedora](http://fedoraproject.org)
 - [Instructions](#instructions)
 
 ## Prerequisites
+
 1. You need 2 or more machines with Fedora installed.
 
 ## Instructions

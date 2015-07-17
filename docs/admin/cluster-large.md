@@ -30,9 +30,11 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes Large Cluster
 
 ## Support
+
 At v1.0, Kubernetes supports clusters up to 100 nodes with 30 pods per node and 1-2 container per pod (as defined in the [1.0 roadmap](../../docs/roadmap.md#reliability-and-performance)).
 
 ## Setup
@@ -59,6 +61,7 @@ To avoid running into cloud provider quota issues, when creating a cluster with 
 * Gating the setup script so that it brings up new node VMs in smaller batches with waits in between, because some cloud providers rate limit the creation of VMs.
 
 ### Addon Resources
+
 To prevent memory leaks or other resource issues in [cluster addons](../../cluster/addons/) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](https://github.com/GoogleCloudPlatform/kubernetes/pull/10653/files) and [#10778](https://github.com/GoogleCloudPlatform/kubernetes/pull/10778/files)).
 
 For example:

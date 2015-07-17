@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes Cluster Admin Guide: Cluster Components
 
 This document outlines the various binary components that need to run to
@@ -92,6 +93,7 @@ These controllers include:
 selects a node for them to run on.
 
 ### addons
+
 Addons are pods and services that implement cluster features. They don't run on
 the master VM, but currently the default setup scripts that make the API calls
 to create these pods and services does run on the master VM. See:

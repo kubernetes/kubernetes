@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Adding a Kubernetes worker node via Docker.
 
 
@@ -44,6 +45,7 @@ For each worker node, there are three steps:
    * [Add the worker to the cluster](#add-the-node-to-the-cluster)
 
 ### Set up Flanneld on the worker node
+
 As before, the Flannel daemon is going to provide network connectivity.
 
 _Note_:
@@ -52,6 +54,7 @@ Please install Docker 1.6.2 or wait for Docker 1.7.1.
 
 
 #### Set up a bootstrap docker
+
 As previously, we need a second instance of the Docker daemon running to bootstrap the flannel networking.
 
 Run:
@@ -65,6 +68,7 @@ If you are running this on a long running system, rather than experimenting, you
 across reboots and failures.
 
 #### Bring down Docker
+
 To re-configure Docker to use flannel, we need to take docker down, run flannel and then restart Docker.
 
 Turning down Docker is system dependent, it may be:
@@ -99,6 +103,7 @@ sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from
 
 
 #### Edit the docker configuration
+
 You now need to edit the docker configuration to activate new flags.  Again, this is system specific.
 
 This may be in ```/etc/default/docker``` or ```/etc/systemd/service/docker.service``` or it may be elsewhere.
@@ -110,6 +115,7 @@ Regardless, you need to add the following to the docker command line:
 ```
 
 #### Remove the existing Docker bridge
+
 Docker creates a bridge named ```docker0``` by default.  You need to remove this:
 
 ```sh
@@ -120,6 +126,7 @@ sudo brctl delbr docker0
 You may need to install the ```bridge-utils``` package for the ```brctl``` binary.
 
 #### Restart Docker
+
 Again this is system dependent, it may be:
 
 ```sh
@@ -133,7 +140,9 @@ systemctl start docker
 ```
 
 ### Start Kubernetes on the worker node
+
 #### Run the kubelet
+
 Again this is similar to the above, but the ```--api_servers``` now points to the master we set up in the beginning.
 
 ```sh
@@ -141,6 +150,7 @@ sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.
 ```
 
 #### Run the service proxy
+
 The service proxy provides load-balancing between groups of containers defined by Kubernetes ```Services```
 
 ```sh

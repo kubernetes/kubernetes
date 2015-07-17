@@ -30,11 +30,13 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Getting started with Vagrant
 
 Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/develop on your local machine (Linux, Mac OS X).
 
 ### Prerequisites
+
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install one of:
    1. The latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
@@ -371,6 +373,7 @@ export KUBERNETES_MINION_MEMORY=2048
 ```
 
 #### I ran vagrant suspend and nothing works!
+
 ```vagrant suspend``` seems to mess up the network.  It's not supported at this time.
 
 

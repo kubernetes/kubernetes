@@ -30,10 +30,12 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Clustering in Kubernetes
 
 
 ## Overview
+
 The term "clustering" refers to the process of having all members of the kubernetes cluster find and trust each other.  There are multiple different ways to achieve clustering with different security and usability profiles.  This document attempts to lay out the user experiences for clustering that Kubernetes aims to address.
 
 Once a cluster is established, the following is true:

@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Cluster Admin Guide to Service Accounts
 
 *This is a Cluster Administrator guide to service accounts.  It assumes knowledge of
@@ -57,7 +58,7 @@ for a number of reasons:
     accounts for components of that system.  Because service accounts can be created
     ad-hoc and have namespaced names, such config is portable. 
 
-##  Service account automation
+## Service account automation
 
 Three separate components cooperate to implement the automation around service accounts:
   - A Service account admission controller
@@ -78,6 +79,7 @@ It acts synchronously to modify pods as they are created or updated. When this p
   6. It adds a `volumeSource` to each container of the pod mounted at `/var/run/secrets/kubernetes.io/serviceaccount`.
 
 ### Token Controller
+
 TokenController runs as part of controller-manager. It acts asynchronously. It:
 - observes serviceAccount creation and creates a corresponding Secret to allow API access.
 - observes serviceAccount deletion and deletes all corresponding ServiceAccountToken Secrets

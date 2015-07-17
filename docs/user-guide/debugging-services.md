@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # My Service is not working - how to debug
 
 An issue that comes up rather frequently for new installations of Kubernetes is
@@ -551,6 +552,7 @@ Contact us on
 [GitHub](https://github.com/GoogleCloudPlatform/kubernetes).
 
 ## More information
+
 Visit [troubleshooting document](../troubleshooting.md) for more information. 
 
 

@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # DNS Integration with Kubernetes
 
 As of kubernetes 0.8, DNS is offered as a [cluster add-on](../../cluster/addons/README.md).

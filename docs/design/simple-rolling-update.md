@@ -30,12 +30,15 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Simple rolling update
+
 This is a lightweight design document for simple [rolling update](../user-guide/kubectl/kubectl_rolling-update.md) in ```kubectl```. 
 
 Complete execution flow can be found [here](#execution-details). See the [example of rolling update](../user-guide/update-demo/) for more information. 
 
 ### Lightweight rollout
+
 Assume that we have a current replication controller named ```foo``` and it is running image ```image:v1```
 
 ```kubectl rolling-update foo [foo-v2] --image=myimage:v2```
@@ -51,6 +54,7 @@ and the old 'foo' replication controller is deleted.  For the purposes of the ro
 The value of that label is the hash of the complete JSON representation of the```foo-next``` or```foo``` replication controller.  The name of this label can be overridden by the user with the ```--deployment-label-key``` flag.
 
 #### Recovery
+
 If a rollout fails or is terminated in the middle, it is important that the user be able to resume the roll out.
 To facilitate recovery in the case of a crash of the updating process itself, we add the following annotations to each replication controller in the ```kubernetes.io/``` annotation namespace:
    * ```desired-replicas``` The desired number of replicas for this replication controller (either N or zero)
@@ -68,6 +72,7 @@ it is assumed that the rollout is nearly completed, and ```foo-next``` is rename
 
 
 ### Aborting a rollout
+
 Abort is assumed to want to reverse a rollout in progress.
 
 ```kubectl rolling-update foo [foo-v2] --rollback```
@@ -87,6 +92,7 @@ If the user doesn't specify a ```foo-next``` name, then it is either discovered 
 then ```foo-next``` is synthesized using the pattern ```<controller-name>-<hash-of-next-controller-JSON>```
 
 #### Initialization
+
    * If ```foo``` and ```foo-next``` do not exist:
       * Exit, and indicate an error to the user, that the specified controller doesn't exist.
    * If ```foo``` exists, but ```foo-next``` does not:
@@ -102,6 +108,7 @@ then ```foo-next``` is synthesized using the pattern ```<controller-name>-<hash-
       * Goto Rollout
 
 #### Rollout
+
    * While size of ```foo-next``` < ```desired-replicas``` annotation on ```foo-next```
       * increase size of ```foo-next```
       * if size of ```foo``` > 0
@@ -109,11 +116,13 @@ then ```foo-next``` is synthesized using the pattern ```<controller-name>-<hash-
    * Goto Rename
 
 #### Rename
+
    * delete ```foo```
    * create ```foo``` that is identical to ```foo-next```
    * delete ```foo-next```
 
 #### Abort
+
    * If ```foo-next``` doesn't exist
       * Exit and indicate to the user that they may want to simply do a new rollout with the old version
    * If ```foo``` doesn't exist

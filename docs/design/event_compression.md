@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes Event Compression
 
 This document captures the design of event compression.
@@ -40,11 +41,13 @@ This document captures the design of event compression.
 Kubernetes components can get into a state where they generate tons of events which are identical except for the timestamp. For example, when pulling a non-existing image, Kubelet will repeatedly generate ```image_not_existing``` and ```container_is_waiting``` events until upstream components correct the image. When this happens, the spam from the repeated events makes the entire event mechanism useless. It also appears to cause memory pressure in etcd (see [#3853](https://github.com/GoogleCloudPlatform/kubernetes/issues/3853)).
 
 ## Proposal
+
 Each binary that generates events (for example, ```kubelet```) should keep track of previously generated events so that it can collapse recurring events into a single event instead of creating a new instance for each new event.
 
 Event compression should be best effort (not guaranteed). Meaning, in the worst case, ```n``` identical (minus timestamp) events may still result in ```n``` event entries.
 
 ## Design
+
 Instead of a single Timestamp, each event object [contains](../../pkg/api/types.go#L1111) the following fields:
  * ```FirstTimestamp util.Time``` 
    * The date/time of the first occurrence of the event.
@@ -78,11 +81,13 @@ Each binary that generates events:
      * An entry for the event is also added to the previously generated events cache.
 
 ## Issues/Risks
+
  * Compression is not guaranteed, because each component keeps track of event history in memory
    * An application restart causes event history to be cleared, meaning event history is not preserved across application restarts and compression will not occur across component restarts.
    * Because an LRU cache is used to keep track of previously generated events, if too many unique events are generated, old events will be evicted from the cache, so events will only be compressed until they age out of the events cache, at which point any new instance of the event will cause a new entry to be created in etcd.
 
 ## Example
+
 Sample kubectl output
 
 ```
@@ -104,6 +109,7 @@ Thu, 12 Feb 2015 01:13:20 +0000   Thu, 12 Feb 2015 01:13:20 +0000   1           
 This demonstrates what would have been 20 separate entries (indicating scheduling failure) collapsed/compressed down to 5 entries.
 
 ## Related Pull Requests/Issues
+
  * Issue [#4073](https://github.com/GoogleCloudPlatform/kubernetes/issues/4073): Compress duplicate events
  * PR [#4157](https://github.com/GoogleCloudPlatform/kubernetes/issues/4157): Add "Update Event" to Kubernetes API
  * PR [#4206](https://github.com/GoogleCloudPlatform/kubernetes/issues/4206): Modify Event struct to allow compressing multiple recurring events in to a single event

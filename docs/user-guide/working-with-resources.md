@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Working with Resources
 
 *This document is aimed at users who have worked through some of the examples,
@@ -40,6 +41,7 @@ refer to the [api conventions](../devel/api-conventions.md) and
 the [api document](../api.md).*
 
 ## Resources are Automatically Modified
+
 When you create a resource such as pod, and then retrieve the created
 resource, a number of the fields of the resource are added.
 You can see this at work in the following example:
@@ -78,6 +80,7 @@ The system adds fields in several ways:
 The API will generally not modify fields that you have set; it just sets ones which were unspecified.
 
 ## <a name="finding_schema_docs"></a>Finding Documentation on Resource Fields
+
 You can browse auto-generated API documentation at the [project website](http://kubernetes.io/third_party/swagger-ui/) or directly from your cluster, like this:
   - Run `kubectl proxy --api-prefix=/`
   - Go to `http://localhost:8001/swagger-ui` in your browser.

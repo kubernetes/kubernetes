@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Kubernetes DNS example
 
 This is a toy example demonstrating how to use kubernetes DNS.
@@ -174,6 +175,7 @@ If you prefer not using namespace, then all your services can be addressed using
 
 
 ### tl; dr;
+
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial. Remember to set first `$CLUSTER_NAME` and `$USER_NAME` to the values found in `~/.kube/config`.
 
 ```sh

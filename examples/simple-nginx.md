@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Running your first containers in Kubernetes
 
 Ok, you've run one of the [getting started guides](../docs/getting-started-guides/) and you have
@@ -65,6 +66,7 @@ kubectl stop rc my-nginx
 ```
 
 ### Exposing your pods to the internet.
+
 On some platforms (for example Google Compute Engine) the kubectl command can integrate with your cloud provider to add a [public IP address](../docs/user-guide/services.md#external-services) for the pods,
 to do this run:
 
@@ -81,6 +83,7 @@ kubectl get services
 In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a firewall to allow traffic on port 80.
 
 ### Next: Configuration files
+
 Most people will eventually want to use declarative configuration files for creating/modifying their applications.  A [simplified introduction](../docs/user-guide/simple-yaml.md)
 is given in a different document.
 
