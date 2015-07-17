@@ -135,57 +135,24 @@ echo "+++ Committing version change"
 git add "${VERSION_FILE}"
 git commit -m "Kubernetes version ${NEW_VERSION}-dev"
 
-echo "+++ Constructing backmerge branches"
-
-function return_to_kansas {
-  git checkout -f "${current_branch}"
-}
-trap return_to_kansas EXIT
-
-backmerge="v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}-merge-to-master"
-backmergetmp="${backmerge}-tmp-$(date +%s)"
-
-# Now we create a temporary branch to revert the doc commit, then
-# create the backmerge branch for the convenience of the user.
-git checkout -b "${backmergetmp}"
-git revert "${dochash}" --no-edit
-git checkout -b "${backmerge}" "${fetch_remote}/master"
-git merge -s recursive -X ours "${backmergetmp}" -m "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH} merge to master"
-
-git checkout "${current_branch}"
-git branch -D "${backmergetmp}"
-
 echo ""
 echo "Success you must now:"
 echo ""
 echo "- Push the tag:"
 echo "   git push ${push_url} v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 echo "   - Please note you are pushing the tag live BEFORE your PRs."
-echo "       You need this so the builds pick up the right tag info."
+echo "       You need this so the builds pick up the right tag info (and so your reviewers can see it)."
 echo "       If something goes wrong further down please fix the tag!"
 echo "       Either delete this tag and give up, fix the tag before your next PR,"
 echo "       or find someone who can help solve the tag problem!"
 echo ""
 
-if [[ "${VERSION_PATCH}" != "0" ]]; then
-  echo "- Send branch: ${current_branch} as a PR to ${release_branch} <-- NOTE THIS"
-  echo "- Get someone to review and merge that PR"
-  echo ""
-fi
-
-echo "- I created the branch ${backmerge} for you. What I don't know is if this is"
-echo "  the latest version. If it is, AND ONLY IF IT IS, submit this branch as a pull"
-echo "  request to master:"
-echo ""
-echo "   git push <personal> ${backmerge}"
-echo ""
-echo "  and get someone to approve that PR. I know this branch looks odd. The purpose of this"
-echo "  branch is to get the tag for the version onto master for things like 'git describe'."
-echo ""
-echo "  IF THIS IS NOT THE LATEST VERSION YOU WILL CAUSE TIME TO GO BACKWARDS. DON'T DO THAT, PLEASE."
-echo ""
-
 if [[ "${VERSION_PATCH}" == "0" ]]; then
-  echo "- Push the new release branch"
+  echo "- Send branch: ${current_branch} as a PR to ${push_url}/master"
+  echo "   For major/minor releases, this gets the branch tag merged and changes the version numbers."
+  echo "- Push the new release branch:"
   echo "   git push ${push_url} ${current_branch}:${release_branch}"
+else
+  echo "- Send branch: ${current_branch} as a PR to ${release_branch} <-- NOTE THIS"
+  echo "  Get someone to review and merge that PR"
 fi
