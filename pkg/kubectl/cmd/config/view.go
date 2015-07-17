@@ -107,7 +107,7 @@ func (o ViewOptions) Run(out io.Writer, printer kubectl.ResourcePrinter) error {
 		clientcmdapi.ShortenConfig(config)
 	}
 
-	err = printer.PrintObj(config, out)
+	err = printer.PrintObj(config, nil, out)
 	if err != nil {
 		return err
 	}

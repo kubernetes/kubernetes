@@ -25,7 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +63,7 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7`
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	p := kubectl.NewHumanReadablePrinter(false, false, false, []string{})
+	p := kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
 	validArgs := p.HandledResources()
 
 	cmd := &cobra.Command{
@@ -122,7 +121,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			return err
 		}
 
-		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
+		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces, true)
 		if err != nil {
 			return err
 		}
@@ -139,7 +138,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 		// print the current object
 		if !isWatchOnly {
-			if err := printer.PrintObj(obj, out); err != nil {
+			if err := printer.PrintObj(obj, nil, out); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
 		}
@@ -151,7 +150,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		}
 
 		kubectl.WatchLoop(w, func(e watch.Event) error {
-			return printer.PrintObj(e.Object, out)
+			return printer.PrintObj(e.Object, &e.Type, out)
 		})
 		return nil
 	}
@@ -189,15 +188,15 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			return err
 		}
 
-		return printer.PrintObj(obj, out)
+		return printer.PrintObj(obj, nil, out)
 	}
 
 	// use the default printer for each object
 	return b.Do().Visit(func(r *resource.Info) error {
-		printer, err := f.PrinterForMapping(cmd, r.Mapping, allNamespaces)
+		printer, err := f.PrinterForMapping(cmd, r.Mapping, allNamespaces, false)
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(r.Object, out)
+		return printer.PrintObj(r.Object, nil, out)
 	})
 }
