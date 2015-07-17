@@ -105,6 +105,7 @@ kubectl logs ${POD_NAME} ${CONTAINER_NAME}
 ```
 
 If your container has previously crashed, you can access the previous container's crash log with:
+
 ```sh
 kubectl logs --previous ${POD_NAME} ${CONTAINER_NAME}
 ```
@@ -118,6 +119,7 @@ kubectl exec ${POD_NAME} -c ${CONTAINER_NAME} -- ${CMD} ${ARG1} ${ARG2} ... ${AR
 Note that ```-c ${CONTAINER_NAME}``` is optional and can be omitted for Pods that only contain a single container.
 
 As an example, to look at the logs from a running Cassandra pod, you might run
+
 ```sh
 kubectl exec cassandra -- cat /var/log/cassandra/system.log
 ```
@@ -153,6 +155,7 @@ IP addresses in the Service's endpoints.
 #### My service is missing endpoints
 If you are missing endpoints, try listing pods using the labels that Service uses.  Imagine that you have
 a Service where the labels are:
+
 ```yaml
 ...
 spec:
@@ -162,6 +165,7 @@ spec:
 ```
 
 You can use:
+
 ```
 kubectl get pods --selector=name=nginx,type=frontend
 ```

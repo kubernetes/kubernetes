@@ -61,6 +61,7 @@ In this case, we shall not run a single Hazelcast pod, because the discovery mec
 In Kubernetes a _[Service](../../docs/user-guide/services.md)_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Hazelcast cluster.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods available via the Kubernetes API.  This is actually how our discovery mechanism works, by relying on the service to discover other Hazelcast pods.
 
 Here is the service description:
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -78,6 +79,7 @@ spec:
 The important thing to note here is the `selector`. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is `name: hazelcast`.  If you look at the Replication Controller specification below, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
 
 Create this service as follows:
+
 ```sh
 $ kubectl create -f examples/hazelcast/hazelcast-service.yaml
 ```
@@ -138,6 +140,7 @@ $ kubectl create -f examples/hazelcast/hazelcast-controller.yaml
 ```
 
 After the controller provisions successfully the pod, you can query the service endpoints:
+
 ```sh
 $ kubectl get endpoints hazelcast -o json
 {
@@ -184,6 +187,7 @@ You can see that the _Service_ has found the pod created by the replication cont
 Now it gets even more interesting.
 
 Let's scale our cluster to 2 pods:
+
 ```sh
 $ kubectl scale rc hazelcast --replicas=2
 ```
@@ -229,8 +233,11 @@ Members [2] {
 2015-07-10 13:26:47.723  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Started Application in 13.792 seconds (JVM running for 14.542)```
 
 Now let's scale our cluster to 4 nodes:
+
 ```sh
+
 $ kubectl scale rc hazelcast --replicas=4
+
 ```
 
 Examine the status again by checking the logs and you should see the 4 members connected.
@@ -239,6 +246,7 @@ Examine the status again by checking the logs and you should see the 4 members c
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
 
 ```sh
+
 # create a service to track all hazelcast nodes
 kubectl create -f examples/hazelcast/hazelcast-service.yaml
 
@@ -250,6 +258,7 @@ kubectl scale rc hazelcast --replicas=2
 
 # scale up to 4 nodes
 kubectl scale rc hazelcast --replicas=4
+
 ```
 
 ### Hazelcast Discovery Source

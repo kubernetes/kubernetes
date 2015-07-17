@@ -64,6 +64,7 @@ This document describes how to deploy kubernetes on multiple hosts to set up a m
      }
 }
 ```
+
 **NOTE:** Choose an IP range that is *NOT* part of the public IP address range.
 
 * Add the configuration to the etcd server on fed-master.

@@ -61,6 +61,7 @@ A service account binds together several things:
 ## Design Discussion
 
 A new object Kind is added:
+
 ```go
 type ServiceAccount struct {
     TypeMeta   `json:",inline" yaml:",inline"`

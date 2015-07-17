@@ -133,6 +133,7 @@ type: LoadBalancer
 The external load balancer allows us to access the service from outside via an external IP, which is 104.197.19.120 in this case. 
 
 Note that you may need to create a firewall rule to allow the traffic, assuming you are using Google Compute Engine:
+
 ```
 $ gcloud compute firewall-rules create rethinkdb --allow=tcp:8080
 ```
@@ -154,7 +155,7 @@ since the ui is not stateless when playing with Web Admin UI will cause `Connect
   * `gen_pod.sh` is using to generate pod templates for my local cluster,
 the generated pods which is using `nodeSelector` to force k8s to schedule containers to my designate nodes, for I need to access persistent data on my host dirs. Note that one needs to label the node before 'nodeSelector' can work, see this [tutorial](../../docs/user-guide/node-selection/)
 
-  * see [/antmanler/rethinkdb-k8s](https://github.com/antmanler/rethinkdb-k8s) for detail
+  * see [antmanler/rethinkdb-k8s](https://github.com/antmanler/rethinkdb-k8s) for detail
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

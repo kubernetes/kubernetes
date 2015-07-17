@@ -36,6 +36,7 @@ _Labels_ are key/value pairs that are attached to objects, such as pods.
 Labels are intended to be used to specify identifying attributes of objects that are meaningful and relevant to users, but which do not directly imply semantics to the core system.
 Labels can be used to organize and to select subsets of objects.  Labels can be attached to objects at creation time and subsequently added and modified at any time.
 Each object can have a set of key/value labels defined.  Each Key must be unique for a given object.
+
 ```
 "labels": {
   "key1" : "value1",
@@ -85,6 +86,7 @@ An empty label selector (that is, one with zero requirements) selects every obje
 
 _Equality-_ or _inequality-based_ requirements allow filtering by label keys and values. Matching objects must have all of the specified labels (both keys and values), though they may have additional labels as well.
 Three kinds of operators are admitted `=`,`==`,`!=`. The first two represent _equality_ and are simply synonyms. While the latter represents _inequality_. For example:
+
 ```
 environment = production
 tier != frontend
@@ -98,11 +100,13 @@ One could filter for resources in `production` but not `frontend` using the comm
 ### _Set-based_ requirement
 
 _Set-based_ label requirements allow filtering keys according to a set of values. Matching objects must have all of the specified labels (i.e. all keys and at least one of the values specified for each key). Three kind of operators are supported: `in`,`notin` and exists (only the key identifier). For example:
+
 ```
 environment in (production, qa)
 tier notin (frontend, backend)
 partition
 ```
+
 The first example selects all resources with key equal to `environment` and value equal to `production` or `qa`.
 The second example selects all resources with key equal to `tier` and value other than `frontend` and `backend`.
 The third example selects all resources including a label with key `partition`; no values are checked.

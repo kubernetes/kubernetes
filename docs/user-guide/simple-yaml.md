@@ -108,6 +108,7 @@ spec:
 ```
 
 To delete the replication controller (and the pods it created):
+
 ```bash
 kubectl delete rc nginx
 ```

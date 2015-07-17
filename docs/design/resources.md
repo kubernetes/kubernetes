@@ -87,23 +87,27 @@ Internally (i.e., everywhere else), Kubernetes will represent resource quantitie
 Both users and a number of system components, such as schedulers, (horizontal) auto-scalers, (vertical) auto-sizers, load balancers, and worker-pool managers need to reason about resource requirements of workloads, resource capacities of nodes, and resource usage. Kubernetes divides specifications of *desired state*, aka the Spec, and representations of *current state*, aka the Status. Resource requirements and total node capacity fall into the specification category, while resource usage, characterizations derived from usage (e.g., maximum usage, histograms), and other resource demand signals (e.g., CPU load) clearly fall into the status category and are discussed in the Appendix for now.
 
 Resource requirements for a container or pod should have the following form:
+
 ```
 resourceRequirementSpec: [
   request:   [ cpu: 2.5, memory: "40Mi" ],
   limit:     [ cpu: 4.0, memory: "99Mi" ],
 ]
 ```
+
 Where:
 * _request_ [optional]: the amount of resources being requested, or that were requested and have been allocated. Scheduler algorithms will use these quantities to test feasibility (whether a pod will fit onto a node).  If a container (or pod) tries to use more resources than its _request_, any associated SLOs are voided &mdash; e.g., the program it is running may be throttled (compressible resource types), or the attempt may be denied. If _request_ is omitted for a container, it defaults to _limit_ if that is explicitly specified, otherwise to an implementation-defined value; this will always be 0 for a user-defined resource type. If _request_ is omitted for a pod, it defaults to the sum of the (explicit or implicit) _request_ values for the containers it encloses.
 
 * _limit_ [optional]: an upper bound or cap on the maximum amount of resources that will be made available to a container or pod; if a container or pod uses more resources than its _limit_, it may be terminated. The _limit_ defaults to "unbounded"; in practice, this probably means the capacity of an enclosing container, pod, or node, but may result in non-deterministic behavior, especially for memory.
 
 Total capacity for a node should have a similar structure:
+
 ```
 resourceCapacitySpec: [
   total:     [ cpu: 12,  memory: "128Gi" ]
 ]
 ```
+
 Where:
 * _total_: the total allocatable resources of a node.  Initially, the resources at a given scope will bound the resources of the sum of inner scopes. 
 
@@ -149,6 +153,7 @@ rather than decimal ones: "64MiB" rather than "64MB".
 
 ## Resource metadata
 A resource type may have an associated read-only ResourceType structure, that contains metadata about the type.  For example:
+
 ```
 resourceTypes: [
   "kubernetes.io/memory": [
@@ -194,6 +199,7 @@ resourceStatus: [
 ```
 
 where a `<CPU-info>` or `<memory-info>` structure looks like this:
+
 ```
 {
     mean: <value>    # arithmetic mean
@@ -209,6 +215,7 @@ where a `<CPU-info>` or `<memory-info>` structure looks like this:
     ]
  }
 ```
+
 All parts of this structure are optional, although we strongly encourage including quantities for 50, 90, 95, 99, 99.5, and 99.9 percentiles.  _[In practice, it will be important to include additional info such as the length of the time window over which the averages are calculated, the confidence level, and information-quality metrics such as the number of dropped or discarded data points.]_
 and predicted 
 

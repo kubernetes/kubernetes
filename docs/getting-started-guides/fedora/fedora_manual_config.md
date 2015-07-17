@@ -52,6 +52,7 @@ The kubernetes package provides a few services: kube-apiserver, kube-scheduler, 
 **System Information:**
 
 Hosts:
+
 ```
 fed-master = 192.168.121.9
 fed-node = 192.168.121.65
@@ -66,6 +67,7 @@ fed-node = 192.168.121.65
 ```
 yum -y install --enablerepo=updates-testing kubernetes
 ```
+
 * Install etcd and iptables
 
 ```
@@ -121,6 +123,7 @@ KUBE_API_ARGS=""
 ```
 
 * Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1, if not, you will get the error like "connection refused"
+
 ```
 ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
 ```
@@ -210,6 +213,7 @@ kubectl get nodes
 NAME                LABELS              STATUS
 fed-node          name=fed-node-label     Ready
 ```
+
 * Deletion of nodes:
 
 To delete _fed-node_ from your kubernetes cluster, one should run the following on fed-master (Please do not do it, it is just for information):

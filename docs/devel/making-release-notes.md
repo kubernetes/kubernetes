@@ -40,6 +40,7 @@ _TODO_: Figure out a way to record this somewhere to save the next release engin
 Find the most-recent PR that was merged with the current .0 release.  Remeber this as $CURRENTPR.
 
 ### 2) Run the release-notes tool
+
 ```bash
 ${KUBERNETES_ROOT}/build/make-release-notes.sh $LASTPR $CURRENTPR
 ```

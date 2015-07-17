@@ -54,6 +54,7 @@ In this guide I will demonstrate how to deploy a Kubernetes cluster to Azure clo
 ## Let's go!
 
 To get started, you need to checkout the code:
+
 ```
 git clone https://github.com/GoogleCloudPlatform/kubernetes
 cd kubernetes/docs/getting-started-guides/coreos/azure/
@@ -89,12 +90,15 @@ azure_wrapper/info: Saved state into `./output/kube_1c1496016083b4_deployment.ym
 ```
 
 Let's login to the master node like so:
+
 ```
 ssh -F  ./output/kube_1c1496016083b4_ssh_conf kube-00
 ```
+
 > Note: config file name will be different, make sure to use the one you see.
 
 Check there are 2 nodes in the cluster:
+
 ```
 core@kube-00 ~ $ kubectl get nodes
 NAME                LABELS                   STATUS
@@ -105,6 +109,7 @@ kube-02             environment=production   Ready
 ## Deploying the workload
 
 Let's follow the Guestbook example now:
+
 ```
 cd guestbook-example
 kubectl create -f examples/guestbook/redis-master-controller.yaml
@@ -116,12 +121,15 @@ kubectl create -f examples/guestbook/frontend-service.yaml
 ```
 
 You need to wait for the pods to get deployed, run the following and wait for `STATUS` to change from `Unknown`, through `Pending` to `Running`.
+
 ```
 kubectl get pods --watch
 ```
+
 > Note: the most time it will spend downloading Docker container images on each of the nodes.
 
 Eventually you should see:
+
 ```
 NAME                 READY     STATUS    RESTARTS   AGE
 frontend-8anh8       1/1       Running   0          1m
@@ -139,10 +147,13 @@ Two single-core nodes are certainly not enough for a production system of today,
 You will need to open another terminal window on your machine and go to the same working directory (e.g. `~/Workspace/weave-demos/coreos-azure`).
 
 First, lets set the size of new VMs:
+
 ```
 export AZ_VM_SIZE=Large
 ```
+
 Now, run scale script with state file of the previous deployment and number of nodes to add:
+
 ```
 ./scale-kubernetes-cluster.js ./output/kube_1c1496016083b4_deployment.yml 2
 ...
@@ -158,9 +169,11 @@ azure_wrapper/info: The hosts in this deployment are:
   'kube-04' ]
 azure_wrapper/info: Saved state into `./output/kube_8f984af944f572_deployment.yml`
 ```
+
 > Note: this step has created new files in `./output`.
 
 Back on `kube-00`:
+
 ```
 core@kube-00 ~ $ kubectl get nodes
 NAME        LABELS                   STATUS
@@ -181,14 +194,18 @@ frontend       php-redis      kubernetes/example-guestbook-php-redis:v2   name=f
 redis-master   master         redis                                       name=redis-master   1
 redis-slave    slave          kubernetes/redis-slave:v2                   name=redis-slave    2
 ```
+
 As there are 4 nodes, let's scale proportionally:
+
 ```
 core@kube-00 ~ $  kubectl scale --replicas=4 rc redis-slave
 scaled
 core@kube-00 ~ $  kubectl scale --replicas=4 rc frontend
 scaled
 ```
+
 Check what you have now:
+
 ```
 core@kube-00 ~ $ kubectl get rc
 CONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS

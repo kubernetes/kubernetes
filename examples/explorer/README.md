@@ -44,6 +44,7 @@ Currently, you can look at:
 `pod.json` is supplied as an example. You can control the port it serves on with the -port flag.
 
 Example from command line (the DNS lookup looks better from a web browser):
+
 ```
 $ kubectl create -f examples/explorer/pod.json
 $ kubectl proxy &

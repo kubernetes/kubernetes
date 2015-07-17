@@ -84,6 +84,7 @@ This means the resource must have a fully-qualified name (i.e. mycompany.org/shi
 
 ## Viewing and Setting Quotas
 Kubectl supports creating, updating, and viewing quotas
+
 ```
 $ kubectl namespace myspace
 $ cat <<EOF > quota.json

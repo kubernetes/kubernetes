@@ -48,6 +48,7 @@ Each salt-minion service is configured to interact with the **salt-master** serv
 [root@kubernetes-master] $ cat /etc/salt/minion.d/master.conf
 master: kubernetes-master
 ```
+
 The salt-master is contacted by each salt-minion and depending upon the machine information presented, the salt-master will provision the machine as either a kubernetes-master or kubernetes-minion with all the required capabilities needed to run Kubernetes.
 
 If you are running the Vagrant based environment, the **salt-api** service is running on the kubernetes-master.  It is configured to enable the vagrant user to introspect the salt cluster in order to find out about machines in the Vagrant environment via a REST API.

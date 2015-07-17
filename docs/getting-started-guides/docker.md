@@ -56,11 +56,13 @@ Here's a diagram of what the final result will look like:
 1. You need to have docker installed on one machine.
 
 ### Step One: Run etcd
+
 ```sh
 docker run --net=host -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
 ```
 
 ### Step Two: Run the master
+
 ```sh
 docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
 ```
@@ -69,6 +71,7 @@ This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md
 
 ### Step Three: Run the service proxy
 *Note, this could be combined with master above, but it requires --privileged for iptables manipulation*
+
 ```sh
 docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
@@ -81,6 +84,7 @@ binary
 
 *Note:*
 On OS/X you will need to set up port forwarding via ssh:
+
 ```sh
 boot2docker ssh -L8080:localhost:8080
 ```
@@ -92,6 +96,7 @@ kubectl get nodes
 ```
 
 This should print:
+
 ```
 NAME        LABELS    STATUS
 127.0.0.1   <none>    Ready
@@ -100,6 +105,7 @@ NAME        LABELS    STATUS
 If you are running different kubernetes clusters, you may need to specify ```-s http://localhost:8080``` to select the local cluster.
 
 ### Run an application
+
 ```sh
 kubectl -s http://localhost:8080 run-container nginx --image=nginx --port=80
 ```
@@ -107,17 +113,20 @@ kubectl -s http://localhost:8080 run-container nginx --image=nginx --port=80
 now run ```docker ps``` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
 
 ### Expose it as a service
+
 ```sh
 kubectl expose rc nginx --port=80
 ```
 
 This should print:
+
 ```
 NAME      LABELS    SELECTOR              IP          PORT(S)
 nginx     <none>    run=nginx             <ip-addr>   80/TCP
 ```
 
 Hit the webserver:
+
 ```sh
 curl <insert-ip-from-above-here>
 ```

@@ -100,6 +100,7 @@ See [a simple nginx example](../user-guide/simple-nginx.md) to try out your new 
 For more complete applications, please look in the [examples directory](../../examples/).
 
 ## Tearing down the cluster
+
 ```
 cluster/kube-down.sh
 ```

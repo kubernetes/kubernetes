@@ -53,6 +53,7 @@ In this doc, we introduce the kubernetes command line to for interacting with th
 How do I run an nginx container and expose it to the world? Checkout [kubectl run](kubectl/kubectl_run.md).
 
 With docker:
+
 ```
 $ docker run -d --restart=always --name nginx-app -p 80:80 nginx
 a9ec34d9878748d2f33dc20cb25c714ff21da8d40558b45bfaec9955859075d0
@@ -62,6 +63,7 @@ a9ec34d98787        nginx               "nginx -g 'daemon of   2 seconds ago    
 ```
 
 With kubectl:
+
 ```
 # start the pod running nginx
 $ kubectl run --image=nginx nginx-app
@@ -80,6 +82,7 @@ With kubectl, we create a [replication controller](replication-controller.md) wh
 How do I list what is currently running? Checkout [kubectl get](kubectl/kubectl_get.md).
 
 With docker:
+
 ```
 $ docker ps
 CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS              PORTS                         NAMES
@@ -87,6 +90,7 @@ a9ec34d98787        nginx               "nginx -g 'daemon of   About an hour ago
 ```
 
 With kubectl:
+
 ```
 $ kubectl get po
 NAME              READY     STATUS    RESTARTS   AGE
@@ -98,6 +102,7 @@ nginx-app-5jyvm   1/1       Running   0          1h
 How do I execute a command in a container? Checkout [kubectl exec](kubectl/kubectl_exec.md).
 
 With docker:
+
 ```
 $ docker ps
 CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS              PORTS                         NAMES
@@ -107,6 +112,7 @@ a9ec34d98787
 ```
 
 With kubectl:
+
 ```
 $ kubectl get po
 NAME              READY     STATUS    RESTARTS   AGE
@@ -119,12 +125,14 @@ What about interactive commands?
 
 
 With docker:
+
 ```
 $ docker exec -ti a9ec34d98787 /bin/sh
 # exit
 ```
 
 With kubectl:
+
 ```
 $ kubectl exec -ti nginx-app-5jyvm -- /bin/sh      
 # exit
@@ -138,6 +146,7 @@ How do I follow stdout/stderr of a running process? Checkout [kubectl logs](kube
 
 
 With docker:
+
 ```
 $ docker logs -f a9e
 192.168.9.1 - - [14/Jul/2015:01:04:02 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.35.0" "-"
@@ -145,6 +154,7 @@ $ docker logs -f a9e
 ```
 
 With kubectl:
+
 ```
 $ kubectl logs -f nginx-app-zibvs
 10.240.63.110 - - [14/Jul/2015:01:09:01 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.26.0" "-"
@@ -166,6 +176,7 @@ See [Logging](logging.md) for more information.
 How do I stop and delete a running process? Checkout [kubectl delete](kubectl/kubectl_delete.md).
 
 With docker
+
 ```
 $ docker ps
 CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS              PORTS                         NAMES
@@ -177,6 +188,7 @@ a9ec34d98787
 ```
 
 With kubectl:
+
 ```
 $ kubectl get rc nginx-app
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR        REPLICAS
@@ -202,6 +214,7 @@ There is no direct analog of 'docker login' in kubectl. If you are interested in
 How do I get the version of my client and server? Checkout [kubectl version](kubectl/kubectl_version.md).
 
 With docker:
+
 ```
 $ docker version
 Client version: 1.7.0
@@ -217,6 +230,7 @@ OS/Arch (server): linux/amd64
 ```
 
 With kubectl:
+
 ```
 $ kubectl version
 Client Version: version.Info{Major:"0", Minor:"20.1", GitVersion:"v0.20.1", GitCommit:"", GitTreeState:"not a git tree"}
@@ -228,6 +242,7 @@ Server Version: version.Info{Major:"0", Minor:"21+", GitVersion:"v0.21.1-411-g32
 How do I get miscellaneous info about my environment and configuration? Checkout [kubectl cluster-info](kubectl/kubectl_cluster-info.md).
 
 With docker:
+
 ```
 $ docker info
 Containers: 40
@@ -249,6 +264,7 @@ WARNING: No swap limit support
 ```
 
 With kubectl:
+
 ```
 $ kubectl cluster-info
 Kubernetes master is running at https://108.59.85.141

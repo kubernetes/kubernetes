@@ -98,6 +98,7 @@ We will now update the docker image to serve a different image by doing a rollin
 ```bash
 $ kubectl rolling-update update-demo-nautilus --update-period=10s -f docs/user-guide/update-demo/kitten-rc.yaml
 ```
+
 The rolling-update command in kubectl will do 2 things:
 
 1. Create a new [replication controller](../../../docs/user-guide/replication-controller.md) with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)

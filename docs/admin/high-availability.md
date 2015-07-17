@@ -131,6 +131,7 @@ for ```${NODE_IP}``` on each machine.
 
 #### Validating your cluster
 Once you copy this into all three nodes, you should have a clustered etcd set up.  You can validate with
+
 ```
 etcdctl member list
 ```
@@ -209,11 +210,12 @@ master election.  On each of the three apiserver nodes, we run a small utility a
 election protocol using etcd "compare and swap". If the apiserver node wins the election, it starts the master component it is managing (e.g. the scheduler), if it
 loses the election, it ensures that any master components running on the node (e.g. the scheduler) are stopped.
 
-In the future, we expect to more tightly integrate this lease-locking into the scheduler and controller-manager binaries directly, as described in the [high availability design proposal](proposals/high-availability.md)
+In the future, we expect to more tightly integrate this lease-locking into the scheduler and controller-manager binaries directly, as described in the [high availability design proposal](../proposals/high-availability.md)
 
 ### Installing configuration files
 
 First, create empty log files on each node, so that Docker will mount the files not make new directories:
+
 ```
 touch /var/log/kube-scheduler.log
 touch /var/log/kube-controller-manager.log
@@ -244,7 +246,7 @@ set the ```--apiserver``` flag to your replicated endpoint.
 
 ##Vagrant up!
 
-We indeed have an initial proof of concept tester for this, which is available [here](../examples/high-availability/).
+We indeed have an initial proof of concept tester for this, which is available [here](../../examples/high-availability/).
 
 It implements the major concepts (with a few minor reductions for simplicity), of the podmaster HA implementation alongside a quick smoke test using k8petstore.
 

@@ -152,6 +152,7 @@ then pod resource usage can be retrieved from the monitoring system.
 If the scheduler cannot find any node where a pod can fit, then the pod will remain unscheduled
 until a place can be found.    An event will be produced each time the scheduler fails to find a
 place for the pod, like this:
+
 ```
 $ kubectl describe pods/frontend | grep -A 3 Events
 Events:
@@ -217,11 +218,13 @@ The `Restart Count:  5` indicates that the `simmemleak` container in this pod wa
 Once [#10861](https://github.com/GoogleCloudPlatform/kubernetes/issues/10861) is resolved the reason for the termination of the last container will also be printed in this output.
 
 Until then you can call `get pod` with the `-o template -t ...` option to fetch the status of previously terminated containers:
+
 ```
 [13:59:01] $ ./cluster/kubectl.sh  get pod -o template -t '{{range.status.containerStatuses}}{{"Container Name: "}}{{.name}}{{"\r\nLastState: "}}{{.lastState}}{{end}}'  simmemleak-60xbc
 Container Name: simmemleak
 LastState: map[terminated:map[exitCode:137 reason:OOM Killed startedAt:2015-07-07T20:58:43Z finishedAt:2015-07-07T20:58:43Z containerID:docker://0e4095bba1feccdfe7ef9fb6ebffe972b4b14285d5acdec6f0d3ae8a22fad8b2]][13:59:03] clusterScaleDoc ~/go/src/github.com/GoogleCloudPlatform/kubernetes $ 
 ```
+
 We can see that this container was terminated because `reason:OOM Killed`, where *OOM* stands for Out Of Memory.
 
 ## Planned Improvements
