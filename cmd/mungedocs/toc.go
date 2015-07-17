@@ -46,6 +46,8 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 	return updatedMarkdown, nil
 }
 
+var specialChars = regexp.MustCompile("[^A-Za-z0-9-]")
+
 // builds table of contents for markdown file
 //
 // First scans for all section headers (lines that begin with "#" but not within code quotes)
@@ -76,8 +78,7 @@ func buildTOC(markdown []byte) ([]byte, error) {
 			indent := strings.Repeat("  ", numSharps-1)
 			bookmark := strings.Replace(strings.ToLower(heading), " ", "-", -1)
 			// remove ' and ? in bookmarks
-			bookmark = strings.Replace(bookmark, "?", "", -1)
-			bookmark = strings.Replace(bookmark, "'", "", -1)
+			bookmark = string(specialChars.ReplaceAll([]byte(bookmark), []byte{}))
 			tocLine := fmt.Sprintf("%s- [%s](#%s)\n", indent, heading, bookmark)
 			buffer.WriteString(tocLine)
 		}
