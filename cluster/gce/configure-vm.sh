@@ -331,24 +331,16 @@ function create-salt-master-auth() {
   fi
 }
 
-# TODO(roberthbailey): Remove the insecure kubeconfig configuration files
-# once the certs are being plumbed through for GKE.
-function create-salt-node-auth() {
-  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
-    if [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-      mkdir -p /srv/kubernetes
-      (umask 077;
-        echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
-        echo "${KUBELET_CERT}" | base64 -d > /srv/kubernetes/kubelet.crt;
-        echo "${KUBELET_KEY}" | base64 -d > /srv/kubernetes/kubelet.key)
-    fi
-  fi
-  kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+# This should happen both on cluster initialization and node upgrades.
+#
+#  - Uses CA_CERT, KUBELET_CERT, and KUBELET_KEY to generate a kubeconfig file
+#    for the kubelet to securely connect to the apiserver.
+function create-salt-kubelet-auth() {
+  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kubelet
-    if [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-      (umask 077;
-        cat > "${kubelet_kubeconfig_file}" <<EOF
+    (umask 077;
+      cat > "${kubelet_kubeconfig_file}" <<EOF
 apiVersion: v1
 kind: Config
 users:
@@ -368,35 +360,18 @@ contexts:
 current-context: service-account-context
 EOF
 )
-    else
-      (umask 077;
-      cat > "${kubelet_kubeconfig_file}" <<EOF
-apiVersion: v1
-kind: Config
-users:
-- name: kubelet
-  user:
-    token: ${KUBELET_TOKEN}
-clusters:
-- name: local
-  cluster:
-     insecure-skip-tls-verify: true
-contexts:
-- context:
-    cluster: local
-    user: kubelet
-  name: service-account-context
-current-context: service-account-context
-EOF
-)
-    fi
   fi
+}
 
-  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+# This should happen both on cluster initialization and node upgrades.
+#
+#  - Uses the CA_CERT and KUBE_PROXY_TOKEN to generate a kubeconfig file for
+#    the kube-proxy to securely connect to the apiserver.
+function create-salt-kubeproxy-auth() {
+  local -r kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
   if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-proxy
-    if [[ ! -z "${CA_CERT:-}" ]]; then
-      (umask 077;
+    (umask 077;
         cat > "${kube_proxy_kubeconfig_file}" <<EOF
 apiVersion: v1
 kind: Config
@@ -416,28 +391,6 @@ contexts:
 current-context: service-account-context
 EOF
 )
-    else
-      (umask 077;
-      cat > "${kube_proxy_kubeconfig_file}" <<EOF
-apiVersion: v1
-kind: Config
-users:
-- name: kube-proxy
-  user:
-    token: ${KUBE_PROXY_TOKEN}
-clusters:
-- name: local
-  cluster:
-     insecure-skip-tls-verify: true
-contexts:
-- context:
-    cluster: local
-    user: kube-proxy
-  name: service-account-context
-current-context: service-account-context
-EOF
-)
-    fi
   fi
 }
 
@@ -598,7 +551,8 @@ if [[ -z "${is_push}" ]]; then
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
     create-salt-master-auth
   else
-    create-salt-node-auth
+    create-salt-kubelet-auth
+    create-salt-kubeproxy-auth
   fi
   download-release
   configure-salt
