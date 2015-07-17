@@ -25,5 +25,4 @@ kubectl_replace.md
 kubectl_rolling-update.md
 kubectl_run.md
 kubectl_scale.md
-kubectl_stop.md
 kubectl_version.md
