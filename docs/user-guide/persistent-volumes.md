@@ -36,6 +36,7 @@ This document describes the current state of `PersistentVolumes` in Kubernetes. 
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Persistent Volumes and Claims](#persistent-volumes-and-claims)
   - [Introduction](#introduction)
   - [Lifecycle of a volume and claim](#lifecycle-of-a-volume-and-claim)

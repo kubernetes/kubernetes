@@ -41,6 +41,7 @@ using resources with kubectl can be found in (working_with_resources.md).*
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
   - [Types (Kinds)](#types-kinds)
     - [Resources](#resources)
     - [Objects](#objects)

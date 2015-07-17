@@ -38,6 +38,7 @@ This is *not* a guide for people who want to debug their cluster.  For that you 
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Application Troubleshooting](#application-troubleshooting)
   - [FAQ](#faq)
   - [Diagnosing the problem](#diagnosing-the-problem)

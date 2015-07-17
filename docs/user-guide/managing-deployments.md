@@ -36,6 +36,7 @@ You’ve deployed your application and exposed it via a service. Now what? Kuber
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Kubernetes User Guide: Managing Applications: Managing deployments](#kubernetes-user-guide-managing-applications-managing-deployments)
   - [Organizing resource configurations](#organizing-resource-configurations)
   - [Bulk operations in kubectl](#bulk-operations-in-kubectl)

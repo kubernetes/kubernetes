@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Kubernetes User Guide: Managing Applications: Working with pods and containers in production](#kubernetes-user-guide-managing-applications-working-with-pods-and-containers-in-production)
   - [Persistent storage](#persistent-storage)
   - [Distributing credentials](#distributing-credentials)
