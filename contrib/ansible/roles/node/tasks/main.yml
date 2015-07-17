@@ -3,10 +3,11 @@
   command: getenforce
   register: selinux
   changed_when: false
+  when: ansible_selinux
 
 - name: Set selinux permissive because tokens and selinux don't work together
   selinux: state=permissive policy=targeted
-  when: "'Enforcing' in selinux.stdout"
+  when: ansible_selinux and 'Enforcing' in selinux.stdout
 
 - include: packageManagerInstall.yml
   when: source_type == "packageManager"

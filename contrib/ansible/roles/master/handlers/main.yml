@@ -1,6 +1,6 @@
 ---
 - name: reload systemd
-  command: /usr/bin/systemctl --system daemon-reload
+  command: systemctl --system daemon-reload
   notify:
     - restart daemons
 

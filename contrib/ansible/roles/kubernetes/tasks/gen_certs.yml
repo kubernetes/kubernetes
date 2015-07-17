@@ -2,8 +2,11 @@
 - name: Install openssl for easy-rsa stuff
   action: "{{ ansible_pkg_mgr }}"
   args:
-    name: openssl
+    name: "{{ item }}"
     state: latest
+  with_items:
+    - openssl
+    - curl
 
 #- name: Get create ca cert script from Kubernetes
 #  get_url:
