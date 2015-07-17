@@ -1,4 +1,6 @@
 div #doccontent {
+	height: 100vh;
+	overflow:scroll;
 	padding-right: 10px;
 	h1 {
 		font-size: 45px;
@@ -38,8 +40,6 @@ div #doccontent {
 	h5 {
 		font-size: 20px;
 		line-height: 24px;
-		height: 100vh;
-		overflow:scroll;
 	}
 
 	li {

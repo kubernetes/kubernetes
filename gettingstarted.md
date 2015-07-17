@@ -69,5 +69,5 @@ techdetails:
         url: http://kubernetes.io/third_party/swagger-ui/
     kubecfg:
         label: Kubectl Command Tool
-        url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md
+        url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/user-guide/kubectl/kubectl.md
 ---
