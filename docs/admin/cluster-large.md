@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 # Kubernetes Large Cluster
 
 ## Support
-At v1.0, Kubernetes supports clusters up to 100 nodes with 30 pods per node and 1-2 container per pod (as defined in the [1.0 roadmap](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/roadmap.md#reliability-and-performance)).
+At v1.0, Kubernetes supports clusters up to 100 nodes with 30 pods per node and 1-2 container per pod (as defined in the [1.0 roadmap](../../docs/roadmap.md#reliability-and-performance)).
 
 ## Setup
 
