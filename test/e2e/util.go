@@ -187,7 +187,8 @@ type RCConfig struct {
 }
 
 func Logf(format string, a ...interface{}) {
-	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", a...)
+	fmt.Fprintf(GinkgoWriter, "[ E2E LOG "+time.Now().Format("2006-01-02-150405")+" ] "+format+"\n", a...)
+
 }
 
 func Failf(format string, a ...interface{}) {
@@ -1145,7 +1146,7 @@ func RunRC(config RCConfig) error {
 			dumpNodeDebugInfo(config.Client, containerRestartNodes.List())
 			return fmt.Errorf("%d containers failed which is more than allowed %d", failedContainers, maxContainerFailures)
 		}
-		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
+		if len(pods) < len(oldPods) {
 			// This failure mode includes:
 			// kubelet is dead, so node controller deleted pods and rc creates more
 			//	- diagnose by noting the pod diff below.
@@ -1155,6 +1156,10 @@ func RunRC(config RCConfig) error {
 			Logf("%v, pods that changed since the last iteration:", errorStr)
 			Diff(oldPods, pods).Print(util.NewStringSet())
 			return fmt.Errorf(errorStr)
+		}
+		//TODO: Convert this warning to failure after #10030 is fixed.
+		if len(pods) > config.Replicas {
+			Logf("WARNING: POD overshoot occured %d (actual pods) > %d (replicas) !!! See https://github.com/GoogleCloudPlatform/kubernetes/issues/10030. This is not necessarily a failure, but hopefully it will be repaired soon.", len(pods), config.Replicas)
 		}
 
 		if len(pods) > len(oldPods) || running > oldRunning {
