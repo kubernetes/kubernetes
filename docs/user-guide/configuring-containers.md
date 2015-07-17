@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes User Guide: Managing Applications: Configuring and launching containers
 
 **Table of Contents**
@@ -177,6 +178,7 @@ hello world
 ```
 
 ## Deleting pods
+
 When you’re done looking at the output, you should delete the pod:
 
 ```bash

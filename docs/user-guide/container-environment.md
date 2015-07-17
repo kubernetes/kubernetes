@@ -50,6 +50,7 @@ Documentation for other releases can be found at
 
 
 ## Overview
+
 This document describes the environment for Kubelet managed containers on a Kubernetes node (kNode).  In contrast to the Kubernetes cluster API, which provides an API for creating and managing containers, the Kubernetes container environment provides the container access to information about what else is going on in the cluster. 
 
 This cluster information makes it possible to build applications that are *cluster aware*.  
@@ -61,14 +62,17 @@ Another important part of the container environment is the file system that is a
 The following sections describe both the cluster information provided to containers, as well as the hooks and life-cycle that allows containers to interact with the management system.
 
 ## Cluster Information
+
 There are two types of information that are available within the container environment.  There is information about the container itself, and there is information about other objects in the system.
 
 ### Container Information
+
 Currently, the only information about the container that is available to the container is the Pod name for the pod in which the container is running.  This ID is set as the hostname of the container, and is accessible through all calls to access the hostname within the container (e.g. the hostname command, or the [gethostname][1] function call in libc).  Additionally, user-defined environment variables from the pod definition, are also available to the container, as are any environment variables specified statically in the Docker image.
 
 In the future, we anticipate expanding this information with richer information about the container.  Examples include available memory, number of restarts, and in general any state that you could get from the call to GET /pods on the API server.
 
 ### Cluster Information
+
 Currently the list of all services that are running at the time when the container was created via the Kubernetes Cluster API are available to the container as environment variables.  The set of environment variables matches the syntax of Docker links.
 
 For a service named **foo** that maps to a container port named **bar**, the following variables are defined:
@@ -81,11 +85,13 @@ FOO_SERVICE_PORT=<the port the service is running on>
 Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](../../cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
 
 ## Container Hooks
+
 *NB*: Container hooks are under active development, we anticipate adding additional hooks as the Kubernetes container management system evolves.*
 
 Container hooks provide information to the container about events in its management lifecycle.  For example, immediately after a container is started, it receives a *PostStart* hook.  These hooks are broadcast *into* the container with information about the life-cycle of the container.  They are different from the events provided by Docker and other systems which are *output* from the container.  Output events provide a log of what has already happened.  Input hooks provide real-time notification about things that are happening, but no historical log.  
 
 ### Hook Details
+
 There are currently two container hooks that are surfaced to containers, and two proposed hooks:
 
 *PreStart - ****Proposed***
@@ -114,11 +120,13 @@ Eventually, user specified reasons may be [added to the API](https://github.com/
 
 
 ### Hook Handler Execution
+
 When a management hook occurs, the management system calls into any registered hook handlers in the container for that hook.  These hook handler calls are synchronous in the context of the pod containing the container. Note:this means that hook handler execution blocks any further management of the pod.  If your hook handler blocks, no other management (including [health checks](production-pods.md#liveness-and-readiness-probes-aka-health-checks)) will occur until the hook handler completes.  Blocking hook handlers do *not* affect management of other Pods.  Typically we expect that users will make their hook handlers as lightweight as possible, but there are cases where long running commands make sense (e.g. saving state prior to container stop)
 
 For hooks which have parameters, these parameters are passed to the event handler as a set of key/value pairs.  The details of this parameter passing is handler implementation dependent (see below).
 
 ### Hook delivery guarantees
+
 Hook delivery is "at least one", which means that a hook may be called multiple times for any given event (e.g. "start" or "stop") and it is up to the hook implementer to be able to handle this
 correctly.
 
@@ -127,6 +135,7 @@ We expect double delivery to be rare, but in some cases if the ```kubelet``` res
 Likewise, we only make a single delivery attempt.  If (for example) an http hook receiver is down, and unable to take traffic, we do not make any attempts to resend.
 
 ### Hook Handler Implementations
+
 Hook handlers are the way that hooks are surfaced to containers.  Containers can select the type of hook handler they would like to implement.  Kubernetes currently supports two different hook handler types:
 
    * Exec - Executes a specific command (e.g. pre-stop.sh) inside the cgroup and namespaces of the container.  Resources consumed by the command are counted against the container.  Commands which print "ok" to standard out (stdout) are treated as healthy, any other output is treated as container failures (and will cause kubelet to forcibly restart the container).  Parameters are passed to the command as traditional linux command line flags (e.g. pre-stop.sh --reason=HEALTH)

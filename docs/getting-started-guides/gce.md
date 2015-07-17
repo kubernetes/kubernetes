@@ -188,6 +188,7 @@ Then, see [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try
 For more complete applications, please look in the [examples directory](../../examples/).  The [guestbook example](../../examples/guestbook/) is a good "getting started" walkthrough.
 
 ### Tearing down the cluster
+
 To remove/delete/teardown the cluster, use the `kube-down.sh` script.
 
 ```bash

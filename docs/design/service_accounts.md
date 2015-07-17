@@ -30,7 +30,8 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-#Service Accounts
+
+# Service Accounts
 
 ## Motivation
 
@@ -50,6 +51,7 @@ They also may interact with services other than the Kubernetes API, such as:
   - accessing files in an NFS volume attached to the pod
 
 ## Design Overview
+
 A service account binds together several things:
   - a *name*, understood by users, and perhaps by peripheral systems, for an identity
   - a *principal* that can be authenticated and [authorized](../admin/authorization.md)
@@ -137,6 +139,7 @@ are added to the map of tokens used by the authentication process in the apiserv
 might have some types that do not do anything on apiserver but just get pushed to the kubelet.)
 
 ### Pods
+
 The `PodSpec` is extended to have a `Pods.Spec.ServiceAccountUsername` field.  If this is unset, then a
 default value is chosen.  If it is set, then the corresponding value of `Pods.Spec.SecurityContext` is set by the
 Service Account Finalizer (see below).
@@ -144,6 +147,7 @@ Service Account Finalizer (see below).
 TBD: how policy limits which users can make pods with which service accounts.
 
 ### Authorization
+
 Kubernetes API Authorization Policies refer to users.  Pods created with a `Pods.Spec.ServiceAccountUsername` typically
 get a `Secret` which allows them to authenticate to the Kubernetes APIserver as a particular user.  So any
 policy that is desired can be applied to them.

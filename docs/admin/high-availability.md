@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # High Availability Kubernetes Clusters
 
 **Table of Contents**
@@ -43,6 +44,7 @@ Documentation for other releases can be found at
 <!-- END MUNGE: GENERATED_TOC -->
 
 ## Introduction
+
 This document describes how to build a high-availability (HA) Kubernetes cluster.  This is a fairly advanced topic.
 Users who merely want to experiment with Kubernetes are encouraged to use configurations that are simpler to set up such as
 the simple [Docker based single node cluster instructions](../../docs/getting-started-guides/docker.md),
@@ -52,6 +54,7 @@ Also, at this time high availability support for Kubernetes is not continuously 
 be working to add this continuous testing, but for now the single-node master installations are more heavily tested.
 
 ## Overview
+
 Setting up a truly reliable, highly available distributed system requires a number of steps, it is akin to
 wearing underwear, pants, a belt, suspenders, another pair of underwear, and another pair of pants.  We go into each
 of these steps in detail, but a summary is given here to help guide and orient the user.
@@ -68,6 +71,7 @@ Here's what the system should look like when it's finished:
 Ready? Let's get started.
 
 ## Initial set-up
+
 The remainder of this guide assumes that you are setting up a 3-node clustered master, where each machine is running some flavor of Linux.
 Examples in the guide are given for Debian distributions, but they should be easily adaptable to other distributions.
 Likewise, this set up should work whether you are running in a public or private cloud provider, or if you are running
@@ -78,6 +82,7 @@ instructions at [https://get.k8s.io](https://get.k8s.io)
 describe easy installation for single-master clusters on a variety of platforms.
 
 ## Reliable nodes
+
 On each master node, we are going to run a number of processes that implement the Kubernetes API.  The first step in making these reliable is
 to make sure that each automatically restarts when it fails.  To achieve this, we need to install a process watcher.  We choose to use
 the ```kubelet``` that we run on each of the worker nodes.  This is convenient, since we can use containers to distribute our binaries, we can
@@ -98,6 +103,7 @@ On systemd systems you ```systemctl enable kubelet``` and ```systemctl enable do
 
 
 ## Establishing a redundant, reliable data storage layer
+
 The central foundation of a highly available solution is a redundant, reliable storage layer.  The number one rule of high-availability is
 to protect the data.  Whatever else happens, whatever catches on fire, if you have the data, you can rebuild.  If you lose the data, you're
 done.
@@ -109,6 +115,7 @@ size of the cluster from three to five nodes.  If that is still insufficient, yo
 [even more redundancy to your storage layer](#even-more-reliable-storage).
 
 ### Clustering etcd
+
 The full details of clustering etcd are beyond the scope of this document, lots of details are given on the
 [etcd clustering page](https://github.com/coreos/etcd/blob/master/Documentation/clustering.md).  This example walks through
 a simple cluster set up, using etcd's built in discovery to build our cluster.
@@ -130,6 +137,7 @@ for ```${NODE_IP}``` on each machine.
 
 
 #### Validating your cluster
+
 Once you copy this into all three nodes, you should have a clustered etcd set up.  You can validate with
 
 ```
@@ -146,6 +154,7 @@ You can also validate that this is working with ```etcdctl set foo bar``` on one
 on a different node.
 
 ### Even more reliable storage
+
 Of course, if you are interested in increased data reliability, there are further options which makes the place where etcd
 installs it's data even more reliable than regular disks (belts *and* suspenders, ftw!).
 
@@ -162,9 +171,11 @@ for each node.  Throughout these instructions, we assume that this storage is mo
 
 
 ## Replicated API Servers
+
 Once you have replicated etcd set up correctly, we will also install the apiserver using the kubelet.
 
 ### Installing configuration files
+
 First you need to create the initial log file, so that Docker mounts a file instead of a directory:
 
 ```
@@ -183,12 +194,14 @@ Next, you need to create a ```/srv/kubernetes/``` directory on each node.  This 
 The easiest way to create this directory, may be to copy it from the master node of a working cluster, or you can manually generate these files yourself.
 
 ### Starting the API Server
+
 Once these files exist, copy the [kube-apiserver.yaml](high-availability/kube-apiserver.yaml) into ```/etc/kubernetes/manifests/``` on each master node.
 
 The kubelet monitors this directory, and will automatically create an instance of the ```kube-apiserver``` container using the pod definition specified
 in the file.
 
 ### Load balancing
+
 At this point, you should have 3 apiservers all working correctly.  If you set up a network load balancer, you should
 be able to access your cluster via that load balancer, and see traffic balancing between the apiserver instances.  Setting
 up a load balancer will depend on the specifics of your platform, for example instructions for the Google Cloud
@@ -203,6 +216,7 @@ For external users of the API (e.g. the ```kubectl``` command line interface, co
 them to talk to the external load balancer's IP address.
 
 ## Master elected components
+
 So far we have set up state storage, and we have set up the API server, but we haven't run anything that actually modifies
 cluster state, such as the controller manager and scheduler.  To achieve this reliably, we only want to have one actor modifying state at a time, but we want replicated
 instances of these actors, in case a machine dies.  To achieve this, we are going to use a lease-lock in etcd to perform
@@ -226,6 +240,7 @@ by copying [kube-scheduler.yaml](high-availability/kube-scheduler.yaml) and [kub
  directory.
 
 ### Running the podmaster
+
 Now that the configuration files are in place, copy the [podmaster.yaml](high-availability/podmaster.yaml) config file into ```/etc/kubernetes/manifests/```
 
 As before, the kubelet on the node monitors this directory, and will start an instance of the podmaster using the pod specification provided in ```podmaster.yaml```.
@@ -236,6 +251,7 @@ the kubelet will restart them.  If any of these nodes fail, the process will mov
 node.
 
 ## Conclusion
+
 At this point, you are done (yeah!) with the master components, but you still need to add worker nodes (boo!).
 
 If you have an existing cluster, this is as simple as reconfiguring your kubelets to talk to the load-balanced endpoint, and
@@ -244,7 +260,7 @@ restarting the kubelets on each node.
 If you are turning up a fresh cluster, you will need to install the kubelet and kube-proxy on each worker node, and
 set the ```--apiserver``` flag to your replicated endpoint.
 
-##Vagrant up!
+## Vagrant up!
 
 We indeed have an initial proof of concept tester for this, which is available [here](../../examples/high-availability/).
 

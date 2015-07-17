@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes Cluster Admin Guide
 
 The cluster admin guide is for anyone creating or administering a Kubernetes cluster.
@@ -72,6 +73,7 @@ If you are modifying an existing guide which uses Salt, this document explains [
 project.](salt.md).
 
 ## Upgrading a cluster
+
 [Upgrading a cluster](cluster-management.md).
 
 ## Managing nodes

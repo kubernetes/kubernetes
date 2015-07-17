@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Example of NFS volume
 
 See [nfs-web-pod.yaml](nfs-web-pod.yaml) for a quick example, how to use NFS volume
@@ -40,7 +41,8 @@ in a pod.
 The example below shows how to export a NFS share from a pod and import it
 into another one.
 
-###Prerequisites
+### Prerequisites
+
 The nfs server pod creates a privileged container, so if you are using a Salt based KUBERNETES_PROVIDER (**gce**, **vagrant**, **aws**), you have to enable the ability to create privileged containers by API.
 
 ```shell

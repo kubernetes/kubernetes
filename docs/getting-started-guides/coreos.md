@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Getting started on [CoreOS](http://coreos.com)
 
 There are multiple guides on running Kubernetes with [CoreOS](http://coreos.com):

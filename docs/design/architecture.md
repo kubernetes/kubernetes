@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes architecture
 
 A running Kubernetes cluster contains node agents (kubelet) and master components (APIs, scheduler, etc), on top of a distributed storage solution. This diagram shows our desired eventual state, though we're still working on a few things, like making kubelet itself (all our components, really) run within containers, and making the scheduler 100% pluggable.
@@ -45,6 +46,7 @@ The Kubernetes node has the services necessary to run application containers and
 Each node runs Docker, of course.  Docker takes care of the details of downloading images and running containers.
 
 ### Kubelet
+
 The **Kubelet** manages [pods](../user-guide/pods.md) and their containers, their images, their volumes, etc. 
 
 ### Kube-Proxy

@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Application Troubleshooting
 
 This guide is to help users debug applications that are deployed into Kubernetes and not behaving correctly.
@@ -54,9 +55,11 @@ This is *not* a guide for people who want to debug their cluster.  For that you 
 <!-- END MUNGE: GENERATED_TOC -->
 
 ## FAQ
+
 Users are highly encouraged to check out our [FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
 
 ## Diagnosing the problem
+
 The first step in troubleshooting is triage.  What is the problem?  Is it your Pods, your Replication Controller or
 your Service?
    * [Debugging Pods](#debugging-pods)
@@ -64,6 +67,7 @@ your Service?
    * [Debugging Services](#debugging-services)
 
 ### Debugging Pods
+
 The first step in debugging a Pod is taking a look at it.  Check the current state of the Pod and recent events with the following command:
 
 ```sh
@@ -75,6 +79,7 @@ Look at the state of the containers in the pod.  Are they all ```Running```?  Ha
 Continue debugging depending on the state of the pods.
 
 #### My pod stays pending
+
 If a Pod is stuck in ```Pending``` it means that it can not be scheduled onto a node.  Generally this is because
 there are insufficient resources of one type or another that prevent scheduling.  Look at the output of the
 ```kubectl describe ...``` command above.  There should be messages from the scheduler about why it can not schedule
@@ -89,6 +94,7 @@ scheduled.  In most cases, ```hostPort``` is unnecessary, try using a Service ob
 
 
 #### My pod stays waiting
+
 If a Pod is stuck in the ```Waiting``` state, then it has been scheduled to a worker node, but it can't run on that machine.
 Again, the information from ```kubectl describe ...``` should be informative.  The most common cause of ```Waiting``` pods is a failure to pull the image.  There are three things to check:
 * Make sure that you have the name of the image correct
@@ -130,6 +136,7 @@ but this should generally not be necessary given tools in the Kubernetes API. Th
 feature request on GitHub describing your use case and why these tools are insufficient.
 
 ### Debugging Replication Controllers
+
 Replication controllers are fairly straightforward.  They can either create Pods or they can't.  If they can't
 create pods, then please refer to the [instructions above](#debugging-pods) to debug your pods. 
 
@@ -137,6 +144,7 @@ You can also use ```kubectl describe rc ${CONTROLLER_NAME}``` to introspect even
 controller.
 
 ### Debugging Services
+
 Services provide load balancing across a set of pods.  There are several common problems that can make Services
 not work properly.  The following instructions should help debug Service problems.
 
@@ -153,6 +161,7 @@ For example, if your Service is for an nginx container with 3 replicas, you woul
 IP addresses in the Service's endpoints.
 
 #### My service is missing endpoints
+
 If you are missing endpoints, try listing pods using the labels that Service uses.  Imagine that you have
 a Service where the labels are:
 
@@ -179,6 +188,7 @@ selected don't have that port listed, then they won't be added to the endpoints 
 Verify that the pod's ```containerPort``` matches up with the Service's ```containerPort```
 
 #### Network traffic is not forwarded
+
 If you can connect to the service, but the connection is immediately dropped, and there are endpoints
 in the endpoints list, it's likely that the proxy can't contact your pods.
 
@@ -189,6 +199,7 @@ check:
    * Is your application serving on the port that you configured?  Kubernetes doesn't do port remapping, so if your application serves on 8080, the ```containerPort``` field needs to be 8080.
 
 #### More information 
+
 If none of the above solves your problem, follow the instructions in [Debugging Service document](debugging-services.md) to make sure that your `Service` is running, has `Endpoints`, and your `Pods` are actually serving; you have DNS working, iptables rules installed, and kube-proxy does not seem to be misbehaving. 
 
 You may also visit [troubleshooting document](../troubleshooting.md) for more information. 

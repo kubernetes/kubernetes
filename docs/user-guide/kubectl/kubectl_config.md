@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## kubectl config
 
 config modifies kubeconfig files
@@ -85,6 +86,7 @@ kubectl config SUBCOMMAND
 ```
 
 ### SEE ALSO
+
 * [kubectl](kubectl.md)	 - kubectl controls the Kubernetes cluster manager
 * [kubectl config set](kubectl_config_set.md)	 - Sets an individual value in a kubeconfig file
 * [kubectl config set-cluster](kubectl_config_set-cluster.md)	 - Sets a cluster entry in kubeconfig

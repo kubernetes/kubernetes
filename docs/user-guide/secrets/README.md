@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Secrets example
 
 Following this example, you will create a [secret](../secrets.md) and a [pod](../pods.md) that consumes that secret in a [volume](../volumes.md). See [Secrets design document](../../design/secrets.md) for more information. 

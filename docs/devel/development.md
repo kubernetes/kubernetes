@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Development Guide
 
 # Releases and Official Builds
@@ -45,6 +46,7 @@ Kubernetes is written in [Go](http://golang.org) programming language. If you ha
 Below, we outline one of the more common git workflows that core developers use. Other git workflows are also valid.
 
 ### Visual overview
+
 ![Git workflow](git_workflow.png)
 
 ### Fork the main repository
@@ -93,6 +95,7 @@ $ git push -f origin myfeature
 ```
 
 ### Creating a pull request
+
 1. Visit http://github.com/$YOUR_GITHUB_USERNAME/kubernetes
 2. Click the "Compare and pull request" button next to your "myfeature" branch.
 
@@ -102,6 +105,7 @@ $ git push -f origin myfeature
 Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not strictly required for building Kubernetes but it is required when managing dependencies under the Godeps/ tree, and is required by a number of the build and test scripts. Please make sure that ``godep`` is installed and in your ``$PATH``.
 
 ### Installing godep
+
 There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
 
 1) Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
@@ -124,6 +128,7 @@ export PATH=$PATH:$GOPATH/bin
 ```
 
 ### Using godep
+
 Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
 
 1) Devote a directory to this endeavor:
@@ -259,6 +264,7 @@ go run hack/e2e.go --down
 ```
 
 ### Flag options
+
 See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster, here is an overview:
 
 ```sh
@@ -309,6 +315,7 @@ go run hack/e2e.go -v -ctl='delete pod foobar'
 ```
 
 ## Conformance testing
+
 End-to-end testing, as described above, is for [development
 distributions](writing-a-getting-started-guide.md).  A conformance test is used on
 a [versioned distro](writing-a-getting-started-guide.md).
@@ -320,6 +327,7 @@ intended to run against a cluster at a specific binary release of Kubernetes.
 See [conformance-test.sh](../../hack/conformance-test.sh).
 
 ## Testing out flaky tests
+
 [Instructions here](flaky-tests.md)
 
 ## Regenerating the CLI documentation

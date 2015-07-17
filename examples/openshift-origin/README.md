@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## OpenShift Origin example
 
 This example shows how to run OpenShift Origin as a pod on an existing Kubernetes cluster.

@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes 101 - Kubectl CLI and Pods
 
 For Kubernetes 101, we will cover kubectl, pods, volumes, and multiple containers
@@ -59,6 +60,7 @@ For more info about kubectl, including its usage, commands, and parameters, see 
 If you haven't installed and configured kubectl, finish the [prerequisites](../prereqs.md) before continuing.
 
 ## Pods
+
 In Kubernetes, a group of one or more containers is called a _pod_. Containers in a pod are deployed together, and are started, stopped, and replicated as a group.
 
 See [pods](../../../docs/user-guide/pods.md) for more details.

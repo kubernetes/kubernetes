@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes User Guide: Managing Applications: Connecting applications
 
 **Table of Contents**
@@ -161,6 +162,7 @@ You should now be able to curl the nginx Service on `10.0.116.146:80` from any n
 Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](../../cluster/addons/dns/README.md).
 
 ### Environment Variables
+
 When a Pod is run on a Node, the kubelet adds a set of environment variables for each active Service. This introduces an ordering problem. To see why, inspect the environment of your running nginx pods:
 
 ```shell
@@ -186,6 +188,7 @@ NGINXSVC_SERVICE_PORT=80
 ```
 
 ### DNS
+
 Kubernetes offers a DNS cluster addon Service that uses skydns to automatically assign dns names to other Services. You can check if it’s running on your cluster:
 
 ```shell

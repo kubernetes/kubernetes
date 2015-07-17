@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Getting started on Amazon EC2 with CoreOS
 
 The example below creates an elastic Kubernetes cluster with a custom number of worker nodes and a master.

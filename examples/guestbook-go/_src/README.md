@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Building and releasing Guestbook Image
 
 This process employs building two docker images, one compiles the source and the other hosts the compiled binaries.

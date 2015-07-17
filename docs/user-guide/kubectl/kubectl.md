@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## kubectl
 
 kubectl controls the Kubernetes cluster manager
@@ -76,6 +77,7 @@ kubectl
 ```
 
 ### SEE ALSO
+
 * [kubectl api-versions](kubectl_api-versions.md)	 - Print available API versions.
 * [kubectl cluster-info](kubectl_cluster-info.md)	 - Display cluster info
 * [kubectl config](kubectl_config.md)	 - config modifies kubeconfig files

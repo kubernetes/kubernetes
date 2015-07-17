@@ -52,6 +52,7 @@ Getting started on AWS EC2
 3. You need an AWS [instance profile and role](http://docs.aws.amazon.com/IAM/latest/UserGuide/instance-profiles.html) with EC2 full access.
 
 ## Cluster turnup
+
 ### Supported procedure: `get-kube`
 
 ```bash
@@ -89,11 +90,14 @@ If these already exist, make sure you want them to be used here.
 NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS_SSH_KEY` key to point to your private key.
 
 ### Alternatives
+
 A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
 AWS CloudFormation or EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
+
 ### Command line administration tool: `kubectl`
+
 The cluster startup script will leave you with a ```kubernetes``` directory on your workstation.
 Alternately, you can download the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
 
@@ -113,6 +117,7 @@ By default, `kubectl` will use the `kubeconfig` file generated during the cluste
 For more information, please read [kubeconfig files](../../docs/user-guide/kubeconfig-file.md)
 
 ### Examples
+
 See [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
 
 The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/)
@@ -120,6 +125,7 @@ The "Guestbook" application is another popular example to get started with Kuber
 For more complete applications, please look in the [examples directory](../../examples/)
 
 ## Tearing down the cluster
+
 Make sure the environment variables you used to provision your cluster are still exported, then call the following script inside the
 `kubernetes` directory:
 
@@ -128,6 +134,7 @@ cluster/kube-down.sh
 ```
 
 ## Further reading
+
 Please see the [Kubernetes docs](../../docs/) for more details on administering
 and using a Kubernetes cluster.
 

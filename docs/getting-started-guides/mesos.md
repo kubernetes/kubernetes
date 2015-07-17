@@ -46,6 +46,7 @@ Getting started with Kubernetes on Mesos
         - [Test Guestbook App](#test-guestbook-app)
 
 ## About Kubernetes on Mesos
+
 <!-- TODO: Update, clean up. -->
 
 Mesos allows dynamic sharing of cluster resources between Kubernetes and other first-class Mesos frameworks such as [Hadoop][1], [Spark][2], and [Chronos][3].
@@ -97,6 +98,7 @@ $ export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
 ```
 
 ### Deploy etcd
+
 Start etcd and verify that it is running:
 
 ```bash
@@ -118,6 +120,7 @@ curl -L http://${KUBERNETES_MASTER_IP}:4001/v2/keys/
 If connectivity is OK, you will see an output of the available keys in etcd (if any).
 
 ### Start Kubernetes-Mesos Services
+
 Update your PATH to more easily run the Kubernetes-Mesos binaries:
 
 ```bash
@@ -176,6 +179,7 @@ $ disown -a
 ```
 
 #### Validate KM Services
+
 Add the appropriate binary folder to your ```PATH``` to access kubectl:
 
 ```bash

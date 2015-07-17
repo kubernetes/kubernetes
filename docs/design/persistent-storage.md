@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Persistent Storage
 
 This document proposes a model for managing persistent, cluster-scoped storage for applications requiring long lived data.

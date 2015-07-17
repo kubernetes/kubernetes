@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Guestbook Example
 
 This example shows how to build a simple multi-tier web application using Kubernetes and Docker. The application consists of a web front-end, Redis master for storage, and replicated set of Redis slaves, all for which we will create Kubernetes replication controllers, pods, and services.
@@ -37,6 +38,7 @@ This example shows how to build a simple multi-tier web application using Kubern
 If you are running a cluster in Google Container Engine (GKE), instead see the [Guestbook Example for Google Container Engine](https://cloud.google.com/container-engine/docs/tutorials/guestbook).
 
 ##### Table of Contents  
+
  * [Step Zero: Prerequisites](#step-zero) 
  * [Step One: Create the Redis master pod](#step-one) 
  * [Step Two: Create the Redis master service](#step-two) 
@@ -99,6 +101,7 @@ Use the `examples/guestbook-go/redis-master-controller.json` file to create a [r
     Note: The initial `docker pull` can take a few minutes, depending on network conditions.
 
 ### Step Two: Create the Redis master service <a id="step-two"></a>
+
 A Kubernetes '[service](../../docs/user-guide/services.md)' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables or DNS. 
 
 Services find the containers to load balance based on pod labels. The pod that you created in Step One has the label `app=redis` and `role=master`. The selector field of the service determines which pods will receive the traffic sent to the service.
@@ -123,6 +126,7 @@ Services find the containers to load balance based on pod labels. The pod that y
 
 
 ### Step Three: Create the Redis slave pods <a id="step-three"></a>
+
 The Redis master we created earlier is a single pod (REPLICAS = 1), while the Redis read slaves we are creating here are 'replicated' pods. In Kubernetes, a replication controller is responsible for managing the multiple instances of a replicated pod.
 
 1. Use the file [redis-slave-controller.json](redis-slave-controller.json) to create the replication controller by running the `kubectl create -f` *`filename`* command:

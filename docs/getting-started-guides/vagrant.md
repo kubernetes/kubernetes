@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Getting started with Vagrant
 
 Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/develop on your local machine (Linux, Mac OS X).
@@ -53,6 +54,7 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
     - [I want vagrant to sync folders via nfs!](#i-want-vagrant-to-sync-folders-via-nfs)
 
 ### Prerequisites
+
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install one of:
    1. Version 4.3.28 of Virtual Box from https://www.virtualbox.org/wiki/Download_Old_Builds_4_3
@@ -366,6 +368,7 @@ export KUBERNETES_MINION_MEMORY=2048
 ```
 
 #### I ran vagrant suspend and nothing works!
+
 ```vagrant suspend``` seems to mess up the network.  This is not supported at this time.
 
 #### I want vagrant to sync folders via nfs!

@@ -53,6 +53,7 @@ Here's a diagram of what the final result will look like:
 ![Kubernetes Single Node on Docker](k8s-singlenode-docker.png)
 
 ### Prerequisites
+
 1. You need to have docker installed on one machine.
 
 ### Step One: Run etcd
@@ -70,6 +71,7 @@ docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/go
 This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
 
 ### Step Three: Run the service proxy
+
 *Note, this could be combined with master above, but it requires --privileged for iptables manipulation*
 
 ```sh
@@ -77,6 +79,7 @@ docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2
 ```
 
 ### Test it out
+
 At this point you should have a running kubernetes cluster.  You can test this by downloading the kubectl 
 binary
 ([OS X](https://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/darwin/amd64/kubectl))
@@ -134,6 +137,7 @@ curl <insert-ip-from-above-here>
 Note that you will need run this curl command on your boot2docker VM if you are running on OS X.
 
 ### A note on turning down your cluster
+
 Many of these containers run under the management of the ```kubelet``` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
 the cluster, you need to first kill the kubelet container, and then any other containers.
 

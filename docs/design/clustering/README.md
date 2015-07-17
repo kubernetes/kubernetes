@@ -41,6 +41,7 @@ pip install seqdiag
 Just call `make` to regenerate the diagrams.
 
 ## Building with Docker
+
 If you are on a Mac or your pip install is messed up, you can easily build with docker.
 
 ```
