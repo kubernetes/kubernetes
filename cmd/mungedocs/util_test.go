@@ -161,8 +161,8 @@ func TestReplaceNonPreformattedCallOrder(t *testing.T) {
 		{"aoeu\n\n```\n\naoeu\n\n```\n\naoeu", []string{"aoeu\n\n", "\naoeu"}},
 		{"ao\neu\n```\naoeu\n\n\n", []string{"ao\neu\n"}},
 		{"aoeu ```aoeu``` aoeu", []string{"aoeu ```aoeu``` aoeu"}},
-		{"aoeu\n```\naoeu\n```", []string{"aoeu\n", ""}},
-		{"aoeu\n```\naoeu\n```\n", []string{"aoeu\n", ""}},
+		{"aoeu\n```\naoeu\n```", []string{"aoeu\n"}},
+		{"aoeu\n```\naoeu\n```\n", []string{"aoeu\n"}},
 		{"aoeu\n```\naoeu\n```\n\n", []string{"aoeu\n", "\n"}},
 	}
 
