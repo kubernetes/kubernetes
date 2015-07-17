@@ -368,8 +368,18 @@ installation, by following examples given in the Docker documentation.
 ### rkt
 
 [rkt](https://github.com/coreos/rkt) is an alternative to Docker.  You only need to install one of Docker or rkt.
+The minimum version required is [v0.5.6](https://github.com/coreos/rkt/releases/tag/v0.5.6).
 
-*TODO*: how to install and configure rkt.
+[systemd](http://www.freedesktop.org/wiki/Software/systemd/) is required on your node to run rkt.  The
+minimum version required to match rkt v0.5.6 is 
+[systemd 215](http://lists.freedesktop.org/archives/systemd-devel/2014-July/020903.html).
+
+[rkt metadata service](https://github.com/coreos/rkt/blob/master/Documentation/networking.md) is also required
+for rkt networking support.  You can start rkt metadata service by using command like
+`sudo systemd-run rkt metadata-service`
+
+Then you need to configure your kubelet with flag:
+  - `--container_runtime=rkt`
 
 ### kubelet
 
