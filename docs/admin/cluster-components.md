@@ -61,7 +61,7 @@ it by running more of them-- [high-availability.md](high-availability.md)).
 
 ### etcd
 
-```etcd``` is used as Kubernetes' backing store. All cluster data is stored here.
+[etcd](etcd.md) is used as Kubernetes' backing store. All cluster data is stored here.
 Proper administration of a Kubernetes cluster includes a backup plan for etcd's
 data.
 
