@@ -27,9 +27,9 @@ MINION_DISK_TYPE=pd-standard
 MINION_DISK_SIZE=${MINION_DISK_SIZE:-100GB}
 
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20150611}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20150715}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
-MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-container-vm-v20150611}
+MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-container-vm-v20150715}
 MINION_IMAGE_PROJECT=${KUBE_GCE_MINION_PROJECT:-google-containers}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 RKT_VERSION=${KUBE_RKT_VERSION:-0.5.5}
@@ -48,9 +48,9 @@ SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 ALLOCATE_NODE_CIDRS=true
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none           - No cluster monitoring setup 
-#   influxdb       - Heapster, InfluxDB, and Grafana 
-#   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging 
+#   none           - No cluster monitoring setup
+#   influxdb       - Heapster, InfluxDB, and Grafana
+#   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging
 #   googleinfluxdb - Enable influxdb and google (except GCM)
 #   standalone     - Heapster only. Metrics available via Heapster REST API.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-googleinfluxdb}"
