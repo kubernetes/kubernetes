@@ -80,6 +80,8 @@ interface.
 
 ## Launch Kubernetes cluster
 
+Kubernetes releases can be downloaded from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
+
 You will need to have the Kubernetes tools compiled before launching the cluster
 
     make all WHAT=cmd/kubectl
