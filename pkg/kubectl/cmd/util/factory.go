@@ -177,9 +177,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return getPorts(t.Spec.Template.Spec), nil
 			case *api.Pod:
 				return getPorts(t.Spec), nil
+			case *api.Service:
+				return getServicePorts(t.Spec), nil
 			default:
-				// TODO: support extracting ports from service:
-				// https://github.com/GoogleCloudPlatform/kubernetes/issues/11392
 				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 				if err != nil {
 					return nil, err
@@ -259,6 +259,15 @@ func getPorts(spec api.PodSpec) []string {
 		for _, port := range container.Ports {
 			result = append(result, strconv.Itoa(port.ContainerPort))
 		}
+	}
+	return result
+}
+
+// Extracts the ports exposed by a service from the given service spec.
+func getServicePorts(spec api.ServiceSpec) []string {
+	result := []string{}
+	for _, servicePort := range spec.Ports {
+		result = append(result, strconv.Itoa(servicePort.Port))
 	}
 	return result
 }
