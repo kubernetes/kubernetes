@@ -23,7 +23,7 @@ certainly want the docs that go with that version.</h1>
 # Secrets example
 
 Following this example, you will create a secret and a pod that consumes that secret in a volume.
-You can learn more about secrets [Here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/secrets.md).
+You can learn more about secrets [Here](../secrets.md).
 
 ## Step Zero: Prerequisites
 
