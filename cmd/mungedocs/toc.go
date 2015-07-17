@@ -75,9 +75,9 @@ func buildTOC(markdown []byte) ([]byte, error) {
 		if numSharps > 0 {
 			indent := strings.Repeat("  ", numSharps-1)
 			bookmark := strings.Replace(strings.ToLower(heading), " ", "-", -1)
-			// remove ' and ? in bookmarks
-			bookmark = strings.Replace(bookmark, "?", "", -1)
-			bookmark = strings.Replace(bookmark, "'", "", -1)
+			// remove symbols (except for -) in bookmarks
+			r := regexp.MustCompile("[^A-Za-z0-9-]")
+			bookmark = r.ReplaceAllString(bookmark, "")
 			tocLine := fmt.Sprintf("%s- [%s](#%s)\n", indent, heading, bookmark)
 			buffer.WriteString(tocLine)
 		}

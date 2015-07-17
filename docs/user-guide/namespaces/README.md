@@ -88,13 +88,13 @@ Use the file [`namespace-dev.json`](namespace-dev.json) which describes a develo
 Create the development namespace using kubectl.
 
 ```shell
-$ kubectl create -f docs/user-guide/kubernetes-namespaces/namespace-dev.json
+$ kubectl create -f docs/user-guide/namespaces/namespace-dev.json
 ```
 
 And then lets create the production namespace using kubectl.
 
 ```shell
-$ kubectl create -f docs/user-guide/kubernetes-namespaces/namespace-prod.json
+$ kubectl create -f docs/user-guide/namespaces/namespace-prod.json
 ```
 
 To be sure things are right, let's list all of the namespaces in our cluster.

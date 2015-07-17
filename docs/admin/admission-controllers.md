@@ -37,7 +37,7 @@ certainly want the docs that go with that version.</h1>
     - [ResourceQuota](#resourcequota)
     - [LimitRanger](#limitranger)
     - [NamespaceExists](#namespaceexists)
-    - [NamespaceAutoProvision (deprecated)](#namespaceautoprovision-(deprecated))
+    - [NamespaceAutoProvision (deprecated)](#namespaceautoprovision-deprecated)
     - [NamespaceLifecycle](#namespacelifecycle)
   - [Is there a recommended set of plug-ins to use?](#is-there-a-recommended-set-of-plug-ins-to-use)
 

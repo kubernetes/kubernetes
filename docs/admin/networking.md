@@ -29,7 +29,7 @@ certainly want the docs that go with that version.</h1>
   - [Docker model](#docker-model)
   - [Kubernetes model](#kubernetes-model)
   - [How to achieve this](#how-to-achieve-this)
-    - [Google Compute Engine (GCE)](#google-compute-engine-(gce))
+    - [Google Compute Engine (GCE)](#google-compute-engine-gce)
     - [L2 networks and linux bridging](#l2-networks-and-linux-bridging)
     - [Flannel](#flannel)
     - [OpenVSwitch](#openvswitch)

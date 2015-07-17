@@ -36,9 +36,9 @@ certainly want the docs that go with that version.</h1>
     - [Environment variables](#environment-variables)
     - [DNS](#dns)
   - [Headless services](#headless-services)
-  - [<a name="external"></a>External services](#<a-name="external"></a>external-services)
-    - [Type = NodePort](#type-=-nodeport)
-    - [Type = LoadBalancer](#type-=-loadbalancer)
+  - [External services](#external-services)
+    - [Type = NodePort](#type--nodeport)
+    - [Type = LoadBalancer](#type--loadbalancer)
   - [Shortcomings](#shortcomings)
   - [Future work](#future-work)
   - [The gory details of virtual IPs](#the-gory-details-of-virtual-ips)
@@ -342,7 +342,7 @@ they desire, but leaves them freedom to do discovery in their own way.
 Applications can still use a self-registration pattern and adapters for other
 discovery systems could easily be built upon this API.
 
-##<a name="external"></a>External services
+## External services
 
 For some parts of your application (e.g. frontends) you may want to expose a
 Service onto an external (outside of your cluster, maybe public internet) IP

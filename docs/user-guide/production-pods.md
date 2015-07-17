@@ -24,13 +24,13 @@ certainly want the docs that go with that version.</h1>
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [Kubernetes User Guide: Managing Applications: Working with pods and containers in production](#kubernetes-user-guide:-managing-applications:-working-with-pods-and-containers-in-production)
+- [Kubernetes User Guide: Managing Applications: Working with pods and containers in production](#kubernetes-user-guide-managing-applications-working-with-pods-and-containers-in-production)
   - [Persistent storage](#persistent-storage)
   - [Distributing credentials](#distributing-credentials)
   - [Authenticating with a private image registry](#authenticating-with-a-private-image-registry)
   - [Helper containers](#helper-containers)
   - [Resource management](#resource-management)
-  - [Liveness and readiness probes (aka health checks)](#liveness-and-readiness-probes-(aka-health-checks))
+  - [Liveness and readiness probes (aka health checks)](#liveness-and-readiness-probes-aka-health-checks)
   - [Lifecycle hooks and termination notice](#lifecycle-hooks-and-termination-notice)
   - [Termination message](#termination-message)
   - [What's next?](#whats-next)
