@@ -112,7 +112,7 @@ the following conditions mean the node is in sane state:
 ```
 
 If the Status of the Ready condition
-is Unknown or False for more than five minutes, then all of the Pods on the node are terminated.
+is Unknown or False for more than five minutes, then all of the Pods on the node are terminated by the Node Controller.
 
 ### Node Capacity
 
@@ -128,8 +128,8 @@ The information is gathered by Kubelet from the node.
 ## Node Management
 
 Unlike [Pods](../user-guide/pods.md) and [Services](../user-guide/services.md), a Node is not inherently
-created by Kubernetes: it is either created from cloud providers like Google Compute Engine,
-or from your physical or virtual machines. What this means is that when
+created by Kubernetes: it is either taken from cloud providers like Google Compute Engine,
+or from your pool of physical or virtual machines. What this means is that when
 Kubernetes creates a node, it is really just creating an object that represents the node in its internal state.
 After creation, Kubernetes will check whether the node is valid or not.
 For example, if you try to create a node from the following content:
@@ -154,8 +154,7 @@ ignored for any cluster activity, until it becomes valid. Note that Kubernetes
 will keep the object for the invalid node unless it is explicitly deleted by the client, and it will keep
 checking to see if it becomes valid.
 
-Currently, there are two agents that interacts with the Kubernetes node interface:
-Node Controller and Kube Admin.
+Currently, there are three components that interact with the Kubernetes node interface: Node Controller, Kubelet, and kubectl.
 
 ### Node Controller
 
