@@ -203,8 +203,9 @@ You have several choices for Kubernetes images:
   - Useful if you are using a private registry.
   - The release contains files such as `./kubernetes/server/bin/kube-apiserver.tar` which
     can be converted into docker images using a command like
-    `tar -C kube-apiserver -c . | docker import - kube-apiserver`
-  - *TODO*: test above command.
+    `docker load -i kube-apiserver.tar`
+  - You can verify if the image is loaded successfully with the right reposity and tag using
+    command like `docker images`
 
 For etcd, you can:
 - Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.0.12`
@@ -373,8 +374,18 @@ installation, by following examples given in the Docker documentation.
 ### rkt
 
 [rkt](https://github.com/coreos/rkt) is an alternative to Docker.  You only need to install one of Docker or rkt.
+The minimum version required is [v0.5.6](https://github.com/coreos/rkt/releases/tag/v0.5.6).
 
-*TODO*: how to install and configure rkt.
+[systemd](http://www.freedesktop.org/wiki/Software/systemd/) is required on your node to run rkt.  The
+minimum version required to match rkt v0.5.6 is 
+[systemd 215](http://lists.freedesktop.org/archives/systemd-devel/2014-July/020903.html).
+
+[rkt metadata service](https://github.com/coreos/rkt/blob/master/Documentation/networking.md) is also required
+for rkt networking support.  You can start rkt metadata service by using command like
+`sudo systemd-run rkt metadata-service`
+
+Then you need to configure your kubelet with flag:
+  - `--container_runtime=rkt`
 
 ### kubelet
 
