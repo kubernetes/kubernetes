@@ -1,19 +1,12 @@
 {% include dochead.html %}
 <div>
-	<table>
-		<tr>
-			<td>
-				<div id="wrapper">
-					{% include nav_v1_0.html %}
-				</div>
-			</td>
-			<td>
-				{% include documentation.html %}
-			</td>
-		</tr>
-	</table>
+	<div id="wrapper">
+		{% include nav_v1_0.html %}
+	</div>
+	<div class="bodywrapper">
+		{% include documentation.html %}
+	</div>
 </div>
-{% include footer.html %}
 <script type="text/javascript">
 	$(function() {
 	    var menu_ul = $('.menu > li > ul'),
@@ -39,4 +32,4 @@
 		that[ that.attr( 'href' ) === window.location.href ? 'addClass' : 'removeClass' ]( 'active' );
     });
 </script>
-
+{% include docfooter.html %}
