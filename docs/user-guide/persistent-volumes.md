@@ -43,7 +43,7 @@ This document describes the current state of `PersistentVolumes` in Kubernetes. 
   - [PersistentVolumeClaims](#persistentvolumeclaims)
     - [Access Modes](#access-modes)
     - [Resources](#resources)
-  - [<a name="claims-as-volumes"></a> Claims As Volumes](#<a-name="claims-as-volumes"></a>-claims-as-volumes)
+  - [Claims As Volumes](#claims-as-volumes)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -194,7 +194,7 @@ Claims use the same conventions as volumes when requesting storage with specific
 
 Claims, like pods, can request specific quantities of a resource.  In this case, the request is for storage.  The same [resource model](../design/resources.md) applies to both volumes and claims.
 
-## <a name="claims-as-volumes"></a> Claims As Volumes
+## Claims As Volumes
 
 Pods access storage by using the claim as a volume.  Claims must exist in the same namespace as the pod using the claim.  The cluster finds the claim in the pod's namespace and uses it to get the `PersistentVolume` backing the claim.  The volume is then mounted to the host and into the pod.
 
