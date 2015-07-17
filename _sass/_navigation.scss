@@ -6,7 +6,7 @@ ul, ul ul {
 	padding: 0;
 	list-style: none;
 }
-#wrapper {	
+#wrapper {
 	width: 250px;
 	height: 100vh;
 	margin: 10px;
@@ -17,7 +17,7 @@ ul, ul ul {
 	height: auto;
 }
 .menu > li > a {
-    width: 100%;
+	width: 100%;
 	height: 2em;
 	color:#505050;
 	line-height: 2em;
@@ -34,7 +34,6 @@ ul, ul ul {
 	position: center;
 }
 .menu ul li:last-child a {
-	
 }
 .menu > li > a:hover, .menu > li > a.active {
 	color: #428BCB;
@@ -44,11 +43,11 @@ ul, ul ul {
 }
 .menu > li > a:before {
 	content: '';
-    font-size: 36px;
+	font-size: 36px;
 	height: 1em;
-  	width: 1em;
+	width: 1em;
 	position: absolute;
-  	left: 0;
+	left: 0;
 	top: 50%;
 	margin: -.5em 0 0 0;
 }
@@ -80,4 +79,4 @@ ul, ul ul {
 
 .navSubMenu {
 	margin-left:.75em;
-}
+}

@@ -1,89 +1,90 @@
 div #doccontent {
-padding-right: 10px;
-h1 {
-font-size: 45px;
-font-family: $fontsMontserrat;
-font-weight: 700;
-line-height: normal;
-letter-spacing: 0em;
-padding-bottom: 12px;
-text-align: left;
-}
-  h2 {
-      font-size: 35px;
-      font-family: $fontsMontserrat;
-      font-weight: 700;
-      line-height: normal;
-      letter-spacing: 0em;
-      padding-bottom: 12px;
-      text-align: left;
-  }
-    h3 {
-font-size: 28px;
-font-family: $fontsMontserrat;
-font-weight: 700;
-text-align: left;
-line-height: 40px;
-letter-spacing: 0em;
-}
+	padding-right: 10px;
+	h1 {
+		font-size: 45px;
+		font-family: $fontsMontserrat;
+		font-weight: 700;
+		line-height: normal;
+		letter-spacing: 0em;
+		padding-bottom: 12px;
+		text-align: left;
+	}
+	h2 {
+		font-size: 35px;
+		font-family: $fontsMontserrat;
+		font-weight: 700;
+		line-height: normal;
+		letter-spacing: 0em;
+		padding-bottom: 12px;
+		text-align: left;
+	}
+	h3 {
+		font-size: 28px;
+		font-family: $fontsMontserrat;
+		font-weight: 700;
+		text-align: left;
+		line-height: 40px;
+		letter-spacing: 0em;
+	}
 
-.doccontent h4 {
-font-size: 24px;
-font-family: $fontsMuli;
-text-align: left;
-line-height: 32px;
-letter-spacing: 0em;
-}
+	h4 {
+		font-size: 24px;
+		font-family: $fontsMuli;
+		text-align: left;
+		line-height: 32px;
+		letter-spacing: 0em;
+	}
 
-.doccontent h5 {
-font-size: 20px;
-line-height: 24px;
-height: 100vh;
-overflow:scroll;
+	h5 {
+		font-size: 20px;
+		line-height: 24px;
+		height: 100vh;
+		overflow:scroll;
+	}
 
-  li {
-    color: $gray;
-    font-family: $fontsMuli;
-    font-size: 16px;
-    line-height: 25px;
-    letter-spacing: 0em;
-  }
+	li {
+		color: $gray;
+		font-family: $fontsMuli;
+		font-size: 16px;
+		line-height: 25px;
+		letter-spacing: 0em;
+	}
 
-  table {
-    color: $gray;
-    font-family: $fontsMuli;
-    font-size: 16px;
-    line-height: 25px;
-    letter-spacing: 0em;
-    thead {
-      color: black;
-    }
-  }
+	table {
+		color: $gray;
+		font-family: $fontsMuli;
+		font-size: 16px;
+		line-height: 25px;
+		letter-spacing: 0em;
+		thead {
+			color: black;
+		}
+	}
 
-  code {
-    color: black;
-    font-family: Monospace;
-    font-size: 14px;
-  }
+	code {
+		color: black;
+		font-family: Monospace;
+		font-size: 14px;
+	}
 
-  ul {
-      list-style-type: disc;
-      margin-left: 1.5em;
-      padding-left: 1.5em;
-  }
+	ul {
+		list-style-type: disc;
+		margin-left: 1.5em;
+		padding-left: 1.5em;
+	}
 
-  ol {
-      list-style-type: decimal;
-      margin-left: 1.5em;
-      padding-left: 1.5em;
-  }
+	ol {
+		list-style-type: decimal;
+		margin-left: 1.5em;
+		padding-left: 1.5em;
+	}
 
-  p {
-    padding-bottom: 10px;
-    padding-top: 10px;
-  }
+	p {
+		padding-bottom: 10px;
+		padding-top: 10px;
+	}
 
-    img {
-        max-width: 100%;
-    }
+	img {
+		max-width: 100%;
+	}
 }
