@@ -17,6 +17,8 @@ limitations under the License.
 package testclient
 
 import (
+	"sync"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -47,6 +49,7 @@ type ReactionFunc func(FakeAction) (runtime.Object, error)
 // Fake implements client.Interface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type Fake struct {
+	sync.Mutex
 	Actions []FakeAction
 	Watch   watch.Interface
 	Err     error
@@ -60,6 +63,9 @@ type Fake struct {
 // Invokes records the provided FakeAction and then invokes the ReactFn (if provided).
 // obj is expected to be of the same type a normal call would return.
 func (c *Fake) Invokes(action FakeAction, obj runtime.Object) (runtime.Object, error) {
+	c.Lock()
+	defer c.Unlock()
+
 	c.Actions = append(c.Actions, action)
 	if c.ReactFn != nil {
 		return c.ReactFn(action)
