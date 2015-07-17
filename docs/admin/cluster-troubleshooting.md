@@ -118,7 +118,7 @@ Mitigations:
   - Mitigates: Node shutdown
   - Mitigates: Kubelet software fault
 
-- Action: Multiple independent clusters (and avoid making risky changes to all clusters at once)
+- Action: [Multiple independent clusters](multi-cluster.md) (and avoid making risky changes to all clusters at once)
   - Mitigates: Everything listed above.
 
 
