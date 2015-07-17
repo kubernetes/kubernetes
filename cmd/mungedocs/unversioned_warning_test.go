@@ -23,7 +23,7 @@ import (
 )
 
 func TestUnversionedWarning(t *testing.T) {
-	warningBlock := beginUnversionedWarning + "\n" + unversionedWarning + "\n" + endUnversionedWarning + "\n"
+	warningBlock := beginUnversionedWarning + "\n" + makeUnversionedWarning("filename.md") + "\n" + endUnversionedWarning + "\n"
 	var cases = []struct {
 		in  string
 		out string
