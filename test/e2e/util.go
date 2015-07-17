@@ -859,9 +859,26 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	return cmd
 }
 
-func runKubectl(args ...string) string {
+// kubectlBuilder is used to build, custimize and execute a kubectl Command.
+// Add more functions to customize the builder as needed.
+type kubectlBuilder struct {
+	cmd *exec.Cmd
+}
+
+func newKubectlCommand(args ...string) *kubectlBuilder {
+	b := new(kubectlBuilder)
+	b.cmd = kubectlCmd(args...)
+	return b
+}
+
+func (b kubectlBuilder) withStdinData(data string) *kubectlBuilder {
+	b.cmd.Stdin = strings.NewReader(data)
+	return &b
+}
+
+func (b kubectlBuilder) exec() string {
 	var stdout, stderr bytes.Buffer
-	cmd := kubectlCmd(args...)
+	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
@@ -872,6 +889,11 @@ func runKubectl(args ...string) string {
 	Logf(stdout.String())
 	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
 	return strings.TrimSpace(stdout.String())
+}
+
+// runKubectl is a convenience wrapper over kubectlBuilder
+func runKubectl(args ...string) string {
+	return newKubectlCommand(args...).exec()
 }
 
 func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
