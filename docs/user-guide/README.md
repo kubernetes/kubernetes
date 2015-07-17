@@ -24,7 +24,7 @@ certainly want the docs that go with that version.</h1>
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [Kubernetes User Guide: Managing Applications](#kubernetes-user-guide:-managing-applications)
+- [Kubernetes User Guide: Managing Applications](#kubernetes-user-guide-managing-applications)
   - [Quick walkthrough](#quick-walkthrough)
   - [Thorough walkthrough](#thorough-walkthrough)
   - [Concept guide](#concept-guide)

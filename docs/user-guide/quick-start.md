@@ -24,7 +24,7 @@ certainly want the docs that go with that version.</h1>
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [Kubernetes User Guide: Managing Applications: Quick start](#kubernetes-user-guide:-managing-applications:-quick-start)
+- [Kubernetes User Guide: Managing Applications: Quick start](#kubernetes-user-guide-managing-applications-quick-start)
   - [Launching a simple application](#launching-a-simple-application)
   - [Exposing your application to the Internet](#exposing-your-application-to-the-internet)
   - [Killing the application](#killing-the-application)
