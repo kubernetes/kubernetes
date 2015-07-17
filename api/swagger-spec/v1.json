@@ -12417,6 +12417,10 @@
       "type": "string",
       "description": "name of the ServiceAccount to use to run this pod; see http://releases.k8s.io/v1.0.0/docs/service_accounts.md"
      },
+     "serviceAccount": {
+      "type": "string",
+      "description": "deprecated; use serviceAccountName instead"
+     },
      "nodeName": {
       "type": "string",
       "description": "node requested for this pod"
