@@ -36,6 +36,9 @@ function cleanup()
 
 trap cleanup EXIT SIGINT
 
+kube::log::status "Building apiserver"
+"${KUBE_ROOT}/hack/build-go.sh" cmd/kube-apiserver
+
 kube::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
