@@ -38,8 +38,8 @@ func Test_buildTOC(t *testing.T) {
 			"- [Title](#title)\n  - [Section Heading](#section-heading)\n",
 		},
 		{
-			"# Title\nLorem ipsum \n## Section Heading\n### Why doesn't this work?\ndolor sit amet\n",
-			"- [Title](#title)\n  - [Section Heading](#section-heading)\n    - [Why doesn't this work?](#why-doesnt-this-work)\n",
+			"# Title\nLorem ipsum \n## Section Heading\n### Ok, why doesn't this work? ...add 4 *more* `symbols`!\ndolor sit amet\n",
+			"- [Title](#title)\n  - [Section Heading](#section-heading)\n    - [Ok, why doesn't this work? ...add 4 *more* `symbols`!](#ok-why-doesnt-this-work-add-4-more-symbols)\n",
 		},
 	}
 	for _, c := range cases {
