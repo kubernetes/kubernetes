@@ -19,6 +19,9 @@ google_analytics: "UA-36037335-10"
 
 # Build settings
 markdown: kramdown
+kramdown:
+    input: GFM
+    hard_wrap: false
 sass:
     style: :compressed
 
