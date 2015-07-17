@@ -1,0 +1,16 @@
+	<div id="doccontent">
+			{{ content }}
+	</div>
+<script type="text/javascript">
+	$(function() {
+			 	$('.nav-link').click( function() {
+		        	var href = $(this).attr('href');
+					var containertest = href.indexOf('#');
+					history.pushState({}, null, href);
+					if(containertest == -1){
+						$('#doccontent').load(href + ' #doccontent > *');
+					}
+		        return false; // don't actually follow the link
+		     	});
+	});
+</script>

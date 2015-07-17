@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="description" content="{{site.description}}">
+  <meta name="viewport"
+   content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta property="og:title" content="{% if site.og.title %}{{site.og.title}}{% else %}{{site.title}}{% endif %}">
+  <meta property="og:site_name" content="{% if site.og.site_name %}{{site.og.site_name}}{% else %}{{site.title}}{% endif %}">
+  <meta property="og:description" content="{% if site.og.description %}{{site.og.description}}{% else %}{{site.description}}{% endif %}">
+  <meta property="og:type" content="{{site.og.type}}">
+  <meta property="og:url" content="{{site.url}}">
+  <meta property="og:image" content="{{site.url}}{{site.og.image}}">
+
+  <link rel="shortcut icon"
+   href="{{site.url}}/img/global/favicon.png" type="image/vnd.microsoft.icon" />
+  <!-- apple device icons -->
+  <link rel="apple-touch-icon"
+   href="{{site.url}}/img/global/apple_touch_icon_2X.jpg" />
+  <!-- end apple device icons -->
+  <link type="text/plain" rel="author" href="{{site.url}}/humans.txt" />
+  <link rel="stylesheet" href="{{site.url}}{{ "/css/main.css" | prepend: site.baseurl }}">
+  <link rel="canonical" href="{{ page.url | replace:'index.html','' | prepend: site.baseurl | prepend: site.url }}">
+  <title>{% if page.title %}{{ page.title }}{% else %}{{ site.title }}{% endif %}</title>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+  <script>
+    if ( !window.jQuery ) {
+        document.write('<script src="{{site.url}}/js/jquery-2.1.1.min.js"><\/script>');
+    }
+  </script>
+  <script type="text/javascript" src="{{site.url}}/js/script.js"></script>
+  <script>
+    var trackOutboundLink=function(n){ga("send","event","outbound","click",n,{hitCallback:function(){document.location=n}})};
+  </script>
+ </head>
+ <body>
+<header id="nav" class="mobile-menu-slide">
+ <div class="container">
+  <div class="row hidden-sm hidden-xs">
+   <div class="col-xs-12">
+    <a href="{{site.url}}/"><img src="{{site.url}}{{site.logo.desktop}}" alt="{{site.title}}" id="logo-desktop" /></a>
+    <nav>
+{% for link in site.nav %}
+     <a href="{% if false == link.external %}{{site.url}}{% endif %}{{link.url}}" {% if link.slug == page.slug %}class="active"{% endif %} {% if true == link.external %}onclick="trackOutboundLink('{{link.url}}'); return false;"{% endif %}>
+      <div>
+       {{link.label}}
+      </div>
+      <div class="underline">
+       &nbsp;
+      </div>
+     </a>
+{% endfor %}
+    </nav>
+    <a href="javascript:;" class="back-to-top"><svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 24 17" enable-background="new 0 0 24 17" xml:space="preserve"><g><path fill="#FFFFFF" d="M21.8,15.7c-3.2-3.9-6.5-7.9-9.7-11.8c-3.2,3.9-6.5,7.9-9.7,11.8c-1.1,1.3-2.9-0.6-1.9-1.9 c3.5-4.3,7.1-8.6,10.6-13c0.4-0.5,1.4-0.5,1.9,0c3.5,4.3,7.1,8.6,10.6,13C24.7,15.1,22.8,17,21.8,15.7z"/></g></svg></a>
+   </div>
+  </div>
+ </div>
+ <div class="visible-sm-block visible-xs-block">
+    <a href="javascript:;" id="mobile-menu-button" class="mobile-menu-slide"><span></span></a>
+    <a href="javascript:;" class="back-to-top"><svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 24 17" enable-background="new 0 0 24 17" xml:space="preserve"><g><path fill="#FFFFFF" d="M21.8,15.7c-3.2-3.9-6.5-7.9-9.7-11.8c-3.2,3.9-6.5,7.9-9.7,11.8c-1.1,1.3-2.9-0.6-1.9-1.9 c3.5-4.3,7.1-8.6,10.6-13c0.4-0.5,1.4-0.5,1.9,0c3.5,4.3,7.1,8.6,10.6,13C24.7,15.1,22.8,17,21.8,15.7z"/></g></svg></a>
+ </div>
+</header>
+<div id="mobile-nav-container" class="visible-sm-block visible-xs-block mobile-menu-slide">
+{% for link in site.nav %}
+  <a href="{% if false == link.external %}{{site.url}}{% endif %}{{link.url}}" {% if link.slug == page.slug %}class="active"{% endif %} {% if true == link.external %}onclick="trackOutboundLink('{{link.url}}'); return false;"{% endif %}>
+  <div></div>
+  <span>{{link.label}}</span>
+ </a>
+{% endfor %}
+</div>
