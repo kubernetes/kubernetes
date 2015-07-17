@@ -40,6 +40,7 @@ You may also visit [troubleshooting document](../troubleshooting.md) for more in
 The first thing to debug in your cluster is if your nodes are all registered correctly.
 
 Run
+
 ```
 kubectl get nodes
 ```

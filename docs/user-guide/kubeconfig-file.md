@@ -39,6 +39,7 @@ Multiple kubeconfig files are allowed.  At runtime they are loaded and merged to
 https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
 
 ## Example kubeconfig file
+
 ```
 apiVersion: v1
 clusters:
@@ -118,6 +119,7 @@ In order to more easily manipulate kubeconfig files, there are a series of subco
 See [kubectl/kubectl_config.md](kubectl/kubectl_config.md) for help.
 
 ### Example
+
 ```
 $kubectl config set-credentials myself --username=admin --password=secret
 $kubectl config set-cluster local-server --server=http://localhost:8080
@@ -126,7 +128,9 @@ $kubectl config use-context default-context
 $kubectl config set contexts.default-context.namespace the-right-prefix
 $kubectl config view
 ```
+
 produces this output
+
 ```
 clusters:
   local-server:
@@ -144,7 +148,9 @@ users:
     password: secret
 
 ```
+
 and a kubeconfig file that looks like this
+
 ```
 apiVersion: v1
 clusters:
@@ -168,6 +174,7 @@ users:
 ```
 
 #### Commands for the example file
+
 ```
 $kubectl config set preferences.colors true
 $kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1

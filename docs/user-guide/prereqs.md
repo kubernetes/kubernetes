@@ -38,6 +38,7 @@ You can find it in the [release](https://github.com/GoogleCloudPlatform/kubernet
 or if you build from source, kubectl should be either under _output/local/bin/<os>/<arch> or _output/dockerized/bin/<os>/<arch>.
 
 Next, make sure the kubectl tool is in your path, assuming you download a release:
+
 ```
 # OS X
 export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH

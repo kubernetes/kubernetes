@@ -96,6 +96,7 @@ Alternately, you can download and install the latest Kubernetes release from [th
 cd kubernetes
 cluster/kube-up.sh
 ```
+
 If you want more than one cluster running in your project, want to use a different name, or want a different number of worker nodes, see the `<kubernetes>/cluster/gce/config-default.sh` file for more fine-grained configuration before you start up your cluster.
 
 If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
@@ -154,12 +155,14 @@ kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernete
 kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
                                                                                                                                                             8086/TCP
 ```
+
 Similarly, you can take a look at the set of [pods](../user-guide/pods.md) that were created during cluster startup.
 You can do this via the
 
 ```shell
 $ kubectl get --all-namespaces pods
 ```
+
 command.
 
 You'll see a list of pods that looks something like this (the name specifics will be different):

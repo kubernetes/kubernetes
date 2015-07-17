@@ -172,6 +172,7 @@ DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 ```
+
 The `DNS_SERVER_IP` is defining the ip of dns server which must be in the service_cluster_ip_range.
 
 The `DNS_REPLICAS` describes how many dns pod running in the cluster.
@@ -213,6 +214,7 @@ Please try:
 1. Check `/var/log/upstart/etcd.log` for suspicious etcd log 
 
 2. Check `/etc/default/etcd`, as we do not have much input validation, a right config should be like:
+
 	```
 	ETCD_OPTS="-name infra1 -initial-advertise-peer-urls <http://ip_of_this_node:2380> -listen-peer-urls <http://ip_of_this_node:2380> -initial-cluster-token etcd-cluster-1 -initial-cluster infra1=<http://ip_of_this_node:2380>,infra2=<http://ip_of_another_node:2380>,infra3=<http://ip_of_another_node:2380> -initial-cluster-state new"
 	```

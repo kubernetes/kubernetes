@@ -62,6 +62,7 @@ To avoid running into cloud provider quota issues, when creating a cluster with 
 To prevent memory leaks or other resource issues in [cluster addons](../../cluster/addons/) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](https://github.com/GoogleCloudPlatform/kubernetes/pull/10653/files) and [#10778](https://github.com/GoogleCloudPlatform/kubernetes/pull/10778/files)).
 
 For example:
+
 ```YAML
       containers:
         - image: gcr.io/google_containers/heapster:v0.15.0

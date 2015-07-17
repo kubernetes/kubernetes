@@ -39,6 +39,7 @@ kubectl get nodes
 ```
 
 That should show something like:
+
 ```
 NAME           LABELS                                 STATUS
 10.240.99.26   kubernetes.io/hostname=10.240.99.26    Ready
@@ -49,6 +50,7 @@ If the status of any node is ```Unknown``` or ```NotReady``` your cluster is bro
 [```#google-containers```](http://webchat.freenode.net/?channels=google-containers) for advice.
 
 ### Run an application
+
 ```sh
 kubectl -s http://localhost:8080 run nginx --image=nginx --port=80
 ```
@@ -56,17 +58,20 @@ kubectl -s http://localhost:8080 run nginx --image=nginx --port=80
 now run ```docker ps``` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
 
 ### Expose it as a service
+
 ```sh
 kubectl expose rc nginx --port=80
 ```
 
 This should print:
+
 ```
 NAME      LABELS    SELECTOR              IP          PORT(S)
 nginx     <none>    run=nginx             <ip-addr>   80/TCP
 ```
 
 Hit the webserver:
+
 ```sh
 curl <insert-ip-from-above-here>
 ```

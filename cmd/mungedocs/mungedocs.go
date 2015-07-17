@@ -47,6 +47,7 @@ Examples:
 	allMunges = []munge{
 		{"table-of-contents", updateTOC},
 		{"check-links", checkLinks},
+		{"blank-lines-surround-preformatted", checkPreformatted},
 		{"unversioned-warning", updateUnversionedWarning},
 		{"analytics", checkAnalytics},
 		{"kubectl-dash-f", checkKubectlFileTargets},

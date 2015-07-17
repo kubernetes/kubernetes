@@ -25,7 +25,9 @@ import (
 
 var (
 	// Finds all preformatted block start/stops.
-	preformatRE = regexp.MustCompile("^```.*")
+	preformatRE    = regexp.MustCompile("^[\\s]*```.*")
+	notPreformatRE = regexp.MustCompile("^[\\s]*```.*```.*")
+	preformatEndRE = regexp.MustCompile(".*```.*")
 )
 
 // Splits a document up into a slice of lines.
@@ -120,35 +122,58 @@ func endMungeTag(desc string) string {
 // Calls 'replace' for all sections of the document not in ``` / ``` blocks. So
 // that you don't have false positives inside those blocks.
 func replaceNonPreformatted(input []byte, replace func([]byte) []byte) []byte {
+	f := splitByPreformatted(input)
 	output := []byte(nil)
+	for _, block := range f {
+		if block.preformatted {
+			output = append(output, block.data...)
+		} else {
+			output = append(output, replace(block.data)...)
+		}
+	}
+	return output
+}
+
+type fileBlock struct {
+	preformatted bool
+	data         []byte
+}
+
+type fileBlocks []fileBlock
+
+func splitByPreformatted(input []byte) fileBlocks {
+	f := fileBlocks{}
+
 	cur := []byte(nil)
-	keepBlock := true
+	preformatted := false
 	// SplitAfter keeps the newline, so you don't have to worry about
 	// omitting it on the last line or anything. Also, the documentation
 	// claims it's unicode safe.
 	for _, line := range bytes.SplitAfter(input, []byte("\n")) {
-		if keepBlock {
-			if preformatRE.Match(line) {
-				cur = replace(cur)
-				output = append(output, cur...)
+		if !preformatted {
+			if preformatRE.Match(line) && !notPreformatRE.Match(line) {
+				if len(cur) > 0 {
+					f = append(f, fileBlock{false, cur})
+				}
 				cur = []byte{}
-				keepBlock = false
+				preformatted = true
 			}
 			cur = append(cur, line...)
 		} else {
 			cur = append(cur, line...)
-			if preformatRE.Match(line) {
-				output = append(output, cur...)
+			if preformatEndRE.Match(line) {
+				if len(cur) > 0 {
+					f = append(f, fileBlock{true, cur})
+				}
 				cur = []byte{}
-				keepBlock = true
+				preformatted = false
 			}
 		}
 	}
-	if keepBlock {
-		cur = replace(cur)
+	if len(cur) > 0 {
+		f = append(f, fileBlock{preformatted, cur})
 	}
-	output = append(output, cur...)
-	return output
+	return f
 }
 
 // As above, but further uses exp to parse the non-preformatted sections.

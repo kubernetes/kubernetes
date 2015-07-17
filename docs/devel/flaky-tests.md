@@ -42,6 +42,7 @@ _Note: these instructions are mildly hacky for now, as we get run once semantics
 There is a testing image ```brendanburns/flake``` up on the docker hub.  We will use this image to test our fix.
 
 Create a replication controller with the following config:
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -63,6 +64,7 @@ spec:
         - name: REPO_SPEC
           value: https://github.com/GoogleCloudPlatform/kubernetes
 ```
+
 Note that we omit the labels and the selector fields of the replication controller, because they will be populated from the labels field of the pod template by default.
 
 ```

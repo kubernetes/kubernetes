@@ -52,6 +52,8 @@ Getting started on AWS EC2
 3. You need an AWS [instance profile and role](http://docs.aws.amazon.com/IAM/latest/UserGuide/instance-profiles.html) with EC2 full access.
 
 ## Cluster turnup
+### Supported procedure: `get-kube`
+
 ```bash
 #Using wget
 export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash

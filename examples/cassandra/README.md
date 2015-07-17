@@ -96,6 +96,7 @@ In theory could create a single Cassandra pod right now but since `KubernetesSee
 In Kubernetes a _[Service](../../docs/user-guide/services.md)_ describes a set of Pods that perform the same task.  For example, the set of Pods in a Cassandra cluster can be a Kubernetes Service, or even just the single Pod we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set of Pods.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
 
 Here is the service description:
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -113,6 +114,7 @@ spec:
 The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=cassandra```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
 
 Create this service as follows:
+
 ```sh
 $ kubectl create -f examples/cassandra/cassandra-service.yaml
 ```
@@ -224,6 +226,7 @@ $ kubectl create -f examples/cassandra/cassandra-controller.yaml
 Now this is actually not that interesting, since we haven't actually done anything new.  Now it will get interesting.
 
 Let's scale our cluster to 2:
+
 ```sh
 $ kubectl scale rc cassandra --replicas=2
 ```
@@ -253,11 +256,13 @@ UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e
 ```
 
 Now let's scale our cluster to 4 nodes:
+
 ```sh
 $ kubectl scale rc cassandra --replicas=4
 ```
 
 In a few moments, you can examine the status again:
+
 ```sh
 $ kubectl exec -ti cassandra -- nodetool status
 Datacenter: datacenter1

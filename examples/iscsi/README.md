@@ -85,6 +85,7 @@ On the Kubernetes node, I got these in mount output
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod.
+
 ```console
 # docker ps
 CONTAINER ID        IMAGE                                                COMMAND                CREATED             STATUS              PORTS               NAMES
@@ -93,6 +94,7 @@ cc051196e7af        kubernetes/pause:latest                              "/pause
 ```
 
 Run *docker inspect* and I found the Containers mounted the host directory into the their */mnt/iscsipd* directory.
+
 ```console 
 # docker inspect --format '{{index .Volumes "/mnt/iscsipd"}}' cc051196e7af
 /var/lib/kubelet/pods/75e0af2b-f8e8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-rw

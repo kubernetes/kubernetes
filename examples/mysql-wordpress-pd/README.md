@@ -58,6 +58,7 @@ gcloud config set project <project-name>
 ```
 
 Next, start up a Kubernetes cluster:
+
 ```shell
 wget -q -O - https://get.k8s.io | bash
 ```
@@ -280,11 +281,13 @@ $ kubectl get services
 ```
 
 Then, find the external IP for your WordPress service by running:
+
 ```
 $ kubectl get services/wpfrontend --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
 ```
 
 or by listing the forwarding rules for your project:
+
 ```shell
 $ gcloud compute forwarding-rules list
 ```

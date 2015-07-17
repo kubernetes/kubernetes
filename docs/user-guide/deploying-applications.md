@@ -52,6 +52,7 @@ Kubernetes creates and manages sets of replicated containers (actually, replicat
 A replication controller simply ensures that a specified number of pod "replicas" are running at any one time. If there are too many, it will kill some. If there are too few, it will start more. It’s analogous to Google Compute Engine’s [Instance Group Manager](https://cloud.google.com/compute/docs/instance-groups/manager/) or AWS’s [Auto-scaling Group](http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroup.html) (with no scaling policies).
 
 The replication controller created to run nginx by `kubctl run` in the [Quick start](quick-start.md) could be specified using YAML as follows:
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -70,9 +71,11 @@ spec:
         ports:
         - containerPort: 80
 ```
+
 Some differences compared to specifying just a pod are that the `kind` is `ReplicationController`, the number of `replicas` desired is specified, and the pod specification is under the `template` field. The names of the pods don’t need to be specified explicitly because they are generated from the name of the replication controller.
 
 This replication controller can be created using `create`, just as with pods:
+
 ```bash
 $ kubectl create -f ./nginx-rc.yaml
 replicationcontrollers/my-nginx
@@ -83,23 +86,28 @@ Unlike in the case where you directly create pods, a replication controller repl
 ## Viewing replication controller status
 
 You can view the replication controller you created using `get`:
+
 ```bash
 $ kubectl get rc
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 my-nginx     nginx          nginx      app=nginx   2
 ```
+
 This tells you that your controller will ensure that you have two nginx replicas.
 
 You can see those replicas using `get`, just as with pods you created directly:
+
 ```bash
 $ kubectl get pods
 NAME             READY     STATUS    RESTARTS   AGE
 my-nginx-065jq   1/1       Running   0          51s
 my-nginx-buaiq   1/1       Running   0          51s
 ```
+
 ## Deleting replication controllers
 
 When you want to kill your application, delete your replication controller, as in the [Quick start](quick-start.md):
+
 ```bash
 $ kubectl delete rc my-nginx
 replicationcontrollers/my-nginx
@@ -112,6 +120,7 @@ If you try to delete the pods before deleting the replication controller, it wil
 ## Labels
 
 Kubernetes uses user-defined key-value attributes called [*labels*](labels.md) to categorize and identify sets of resources, such as pods and replication controllers. The example above specified a single label in the pod template, with key `app` and value `nginx`. All pods created carry that label, which can be viewed using `-L`:
+
 ```bash
 $ kubectl get pods -L app
 NAME             READY     STATUS    RESTARTS   AGE       APP
@@ -120,6 +129,7 @@ my-nginx-lg99z   0/1       Running   0          3s        nginx
 ```
 
 The labels from the pod template are copied to the replication controller’s labels by default, as well -- all resources in Kubernetes support labels:
+
 ```bash
 $ kubectl get rc my-nginx -L app
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS   APP
@@ -127,6 +137,7 @@ my-nginx     nginx          nginx      app=nginx   2          nginx
 ```
 
 More importantly, the pod template’s labels are used to create a [`selector`](labels.md#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](kubectl/kubectl_get.md):
+
 ```bash
 $ kubectl get rc my-nginx -o template --template="{{.spec.selector}}"
 map[app:nginx]

@@ -38,6 +38,7 @@ started page. Here we describe how to set up a cluster to ingest logs into Elast
 alternative to Google Cloud Logging.
 
 To use Elasticsearch and Kibana for cluster logging you should set the following environment variable as shown below:
+
 ```
 KUBE_LOGGING_DESTINATION=elasticsearch
 ```
@@ -160,6 +161,7 @@ status page for Elasticsearch.
 
 You can now type Elasticsearch queries directly into the browser. Alternatively you can query Elasticsearch
 from your local machine using `curl` but first you need to know what your bearer token is:
+
 ```
 $ kubectl config view --minify
 apiVersion: v1
@@ -185,6 +187,7 @@ users:
 ```
 
 Now you can issue requests to Elasticsearch:
+
 ```
 $ curl --header "Authorization: Bearer JsUe2Z3cXqa17UQqQ8qWGGf4nOSLwSnp" --insecure https://146.148.94.154/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging/
 {
@@ -202,7 +205,9 @@ $ curl --header "Authorization: Bearer JsUe2Z3cXqa17UQqQ8qWGGf4nOSLwSnp" --insec
 }
 
 ```
+
 Note that you need the trailing slash at the end of the service proxy URL. Here is an example of a search:
+
 ```
 $ curl --header "Authorization: Bearer JsUe2Z3cXqa17UQqQ8qWGGf4nOSLwSnp" --insecure https://146.148.94.154/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging/_search?pretty=true
 {
