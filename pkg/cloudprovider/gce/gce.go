@@ -479,6 +479,19 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 			return err
 		}
 	}
+
+	// Try to verify that the correct number of nodes are now in the target pool.
+	// We've been bitten by a bug here before (#11327) where all nodes were
+	// accidentally removed and want to make similar problems easier to notice.
+	updatedPool, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
+	if err != nil {
+		return err
+	}
+	if len(updatedPool.Instances) != len(hosts) {
+		glog.Errorf("Unexpected number of instances (%d) in target pool %s after updating (expected %d). Instances in updated pool: %s",
+			len(updatedPool.Instances), name, len(hosts), strings.Join(updatedPool.Instances, ","))
+		return fmt.Errorf("Unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), name, len(hosts))
+	}
 	return nil
 }
 
