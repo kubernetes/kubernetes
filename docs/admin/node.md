@@ -102,6 +102,7 @@ setting the Status of the condition, has not heard from the
 node recently (currently 40 seconds).
 Node condition is represented as a json object. For example,
 the following conditions mean the node is in sane state:
+
 ```json
 "conditions": [
   {
@@ -133,6 +134,7 @@ or from your pool of physical or virtual machines. What this means is that when
 Kubernetes creates a node, it is really just creating an object that represents the node in its internal state.
 After creation, Kubernetes will check whether the node is valid or not.
 For example, if you try to create a node from the following content:
+
 ```json
 {
   "kind": "Node",
@@ -204,6 +206,7 @@ Making a node unscheduleable will prevent new pods from being scheduled to that
 node, but will not affect any existing pods on the node.  This is useful as a
 preparatory step before a node reboot, etc.  For example, to mark a node
 unschedulable, run this command:
+
 ```
 kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
 ```
@@ -222,6 +225,7 @@ processes not in containers.
 
 If you want to explicitly reserve resources for non-Pod processes, you can create a placeholder
 pod.  Use the following template:
+
 ```
 apiVersion: v1
 kind: Pod
@@ -236,6 +240,7 @@ spec:
         cpu: 100m
         memory: 100Mi
 ```
+
 Set the `cpu` and `memory` values to the amount of resources you want to reserve.
 Place the file in the manifest directory (`--config=DIR` flag of kubelet).  Do this
 on each kubelet where you want to reserve resources.

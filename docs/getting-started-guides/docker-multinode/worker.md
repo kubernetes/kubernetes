@@ -55,6 +55,7 @@ Please install Docker 1.6.2 or wait for Docker 1.7.1.
 As previously, we need a second instance of the Docker daemon running to bootstrap the flannel networking.
 
 Run:
+
 ```sh
 sudo sh -c 'docker -d -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null &'
 ```
@@ -83,6 +84,7 @@ or it may be something else.
 #### Run flannel
 
 Now run flanneld itself, this call is slightly different from the above, since we point it at the etcd instance on the master.
+
 ```sh
 sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001
 ```
@@ -90,6 +92,7 @@ sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privile
 The previous command should have printed a really long hash, copy this hash.
 
 Now get the subnet settings from flannel:
+
 ```
 sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from-above-here> cat /run/flannel/subnet.env
 ```
@@ -101,6 +104,7 @@ You now need to edit the docker configuration to activate new flags.  Again, thi
 This may be in ```/etc/default/docker``` or ```/etc/systemd/service/docker.service``` or it may be elsewhere.
 
 Regardless, you need to add the following to the docker command line:
+
 ```sh
 --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}
 ```
@@ -123,6 +127,7 @@ sudo /etc/init.d/docker start
 ```
 
 it may be:
+
 ```sh
 systemctl start docker
 ```

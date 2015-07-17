@@ -298,6 +298,7 @@ many distinct files to make:
 
 You can make the files by copying the `$HOME/.kube/config`, by following the code
 in `cluster/gce/configure-vm.sh` or by using the following template:
+
 ```
 apiVersion: v1
 kind: Config
@@ -316,6 +317,7 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 ```
+
 Put the kubeconfig(s) on every node.  The examples later in this
 guide assume that there are kubeconfigs in `/var/lib/kube-proxy/kubeconfig` and
 `/var/lib/kubelet/kubeconfig`.
@@ -342,6 +344,7 @@ The minimum required Docker version will vary as the kubelet version changes.  T
 If you previously had Docker installed on a node without setting Kubernetes-specific
 options, you may have a Docker-created bridge and iptables rules.  You may want to remove these
 as follows before proceeding to configure Docker for Kubernetes.
+
 ```
 iptables -t nat -F 
 ifconfig docker0 down
@@ -615,13 +618,17 @@ Place the completed pod template into the kubelet config dir
 `/etc/kubernetes/manifests`).
 
 Next, verify that kubelet has started a container for the apiserver:
+
 ```
 $ sudo docker ps | grep apiserver:
-5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695   ```
+5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695
+
 ```
 
 Then try to connect to the apiserver:
+
 ```
+
 $ echo $(curl -s http://localhost:8080/healthz)
 ok
 $ curl -s http://localhost:8080/api
@@ -631,6 +638,7 @@ $ curl -s http://localhost:8080/api
     "v1"
   ]
 }
+
 ```
 
 If you have selected the `--register-node=true` option for kubelets, they will now being self-registering with the apiserver.
@@ -640,7 +648,9 @@ Otherwise, you will need to manually create node objects.
 ### Scheduler
 
 Complete this template for the scheduler pod:
+
 ```json
+
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -670,7 +680,9 @@ Complete this template for the scheduler pod:
     ]
   }
 }
+
 ```
+
 Optionally, you may want to mount `/var/log` as well and redirect output there.
 
 Start as described for apiserver.
@@ -688,11 +700,13 @@ Flags to consider using with controller manager.
  - `--allocate-node-cidrs=`
    - *TODO*: explain when you want controller to do this and when you wanna do it another way.
  - `--cloud-provider=` and `--cloud-config` as described in apiserver section.
- - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../service-accounts.md) feature.  
+ - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../user-guide/service-accounts.md) feature.  
  - `--master=127.0.0.1:8080`
 
 Template for controller manager pod:
+
 ```json
+
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -748,6 +762,7 @@ Template for controller manager pod:
     ]
   }
 }
+
 ```
 
 

@@ -142,6 +142,7 @@ $ kubectl logs spark-master
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.1.15:44839 with 1 cores, 2.6 GB RAM
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.0.19:60970 with 1 cores, 2.6 GB RAM
 ```
+
 ## Step Three: Do something with the cluster
 
 Get the address and port of the Master service.
@@ -196,6 +197,7 @@ SparkContext available as sc, HiveContext available as sqlContext.
 >>> sc.parallelize(range(1000)).map(lambda x:socket.gethostname()).distinct().collect()
 ['spark-worker-controller-u40r2', 'spark-worker-controller-hifwi', 'spark-worker-controller-vpgyg']
 ```
+
 ## Result
 
 You now have services, replication controllers, and pods for the Spark master and Spark workers.

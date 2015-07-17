@@ -179,6 +179,7 @@ type SELinuxOptions struct {
 	Level string
 }
 ```
+
 ### Admission
 
 It is up to an admission plugin to determine if the security context is acceptable or not.  At the

@@ -131,6 +131,7 @@ vagrant ssh master
 ```
 
 To view the services on any of the nodes:
+
 ```sh
 vagrant ssh minion-1
 [vagrant@kubernetes-master ~] $ sudo su
@@ -147,17 +148,20 @@ vagrant ssh minion-1
 With your Kubernetes cluster up, you can manage the nodes in your cluster with the regular Vagrant commands.
 
 To push updates to new Kubernetes code after making source changes:
+
 ```sh
 ./cluster/kube-push.sh
 ```
 
 To stop and then restart the cluster:
+
 ```sh
 vagrant halt
 ./cluster/kube-up.sh
 ```
 
 To destroy the cluster:
+
 ```sh
 vagrant destroy
 ```

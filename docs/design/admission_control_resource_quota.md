@@ -185,7 +185,7 @@ services                3       5
 ```
 
 ## More information 
-See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../user-guide/resourcequota) for more information.
+See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more information.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

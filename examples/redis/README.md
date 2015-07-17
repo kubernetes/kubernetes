@@ -49,6 +49,7 @@ Here is the config for the initial master and sentinel pod: [redis-master.yaml](
 
 
 Create this master as follows:
+
 ```sh
 kubectl create -f examples/redis/redis-master.yaml
 ```
@@ -61,6 +62,7 @@ In Redis, we will use a Kubernetes Service to provide a discoverable endpoints f
 Here is the definition of the sentinel service: [redis-sentinel-service.yaml](redis-sentinel-service.yaml)
 
 Create this service:
+
 ```sh
 kubectl create -f examples/redis/redis-sentinel-service.yaml
 ```
@@ -83,6 +85,7 @@ kubectl create -f examples/redis/redis-controller.yaml
 We'll do the same thing for the sentinel.  Here is the controller config: [redis-sentinel-controller.yaml](redis-sentinel-controller.yaml)
 
 We create it as follows:
+
 ```sh
 kubectl create -f examples/redis/redis-sentinel-controller.yaml
 ```
@@ -106,6 +109,7 @@ Unlike our original redis-master pod, these pods exist independently, and they u
 The final step in the cluster turn up is to delete the original redis-master pod that we created manually.  While it was useful for bootstrapping discovery in the cluster, we really don't want the lifespan of our sentinel to be tied to the lifespan of one of our redis servers, and now that we have a successful, replicated redis sentinel service up and running, the binding is unnecessary.
 
 Delete the master as follows:
+
 ```sh
 kubectl delete pods redis-master
 ```

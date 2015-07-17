@@ -64,6 +64,7 @@ though a [Getting started guide](../getting-started-guides/README.md),
 or someone else setup the cluster and provided you with credentials and a location.
 
 Check the location and credentials that kubectl knows about with this command:
+
 ```
 kubectl config view
 ```
@@ -91,12 +92,15 @@ curl or wget, or a browser, there are several ways to locate and authenticate:
 The following command runs kubectl in a mode where it acts as a reverse proxy.  It handles
 locating the apiserver and authenticating.
 Run it like this:
+
 ```
 kubectl proxy --port=8080 &
 ```
+
 See [kubectl proxy](kubectl/kubectl_proxy.md) for more details.
 
 Then you can explore the API with curl, wget, or a browser, like so:
+
 ```
 $ curl http://localhost:8080/api/
 {
@@ -105,9 +109,11 @@ $ curl http://localhost:8080/api/
   ]
 }
 ```
+
 #### Without kubectl proxy
 It is also possible to avoid using kubectl proxy by passing an authentication token
 directly to the apiserver, like this:
+
 ```
 $ APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " ")
 $ TOKEN=$(kubectl config view | grep token | cut -f 2 -d ":" | tr -d " ")
@@ -207,6 +213,7 @@ You have several options for connecting to nodes, pods and services from outside
 
 Typically, there are several services which are started on a cluster by default. Get a list of these
 with the `kubectl cluster-info` command:
+
 ```
 $ kubectl cluster-info
 
@@ -217,6 +224,7 @@ $ kubectl cluster-info
   grafana is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/monitoring-grafana
   heapster is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/monitoring-heapster
 ```
+
 This shows the proxy-verb URL for accessing each service.
 For example, this cluster has cluster-level logging enabled (using Elasticsearch), which can be reached
 at `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/` if suitable credentials are passed, or through a kubectl proxy at, for example:
@@ -232,6 +240,7 @@ about namespaces? 'proxy' verb? -->
 ##### Examples
  * To access the Elasticsearch service endpoint `_search?q=user:kimchy`, you would use:   `http://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_search?q=user:kimchy`
  * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_cluster/health?pretty=true`
+
   ```
   {
 	 "cluster_name" : "kubernetes_logging",

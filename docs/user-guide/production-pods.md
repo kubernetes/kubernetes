@@ -54,6 +54,7 @@ You’ve seen [how to configure and deploy pods and containers](configuring-cont
 The container file system only lives as long as the container does, so when a container crashes and restarts, changes to the filesystem will be lost and the container will restart from a clean slate. To access more-persistent storage, outside the container file system, you need a [*volume*](volumes.md). This is especially important to stateful applications, such as key-value stores and databases.
 
 For example, [Redis](http://redis.io/) is a key-value cache and store, which we use in the [guestbook](../../examples/guestbook/) and other examples. We can add a volume to it to store persistent data as follows:
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -80,6 +81,7 @@ spec:
         - mountPath: /redis-master-data
           name: data   # must match the name of the volume, above
 ```
+
 `emptyDir` volumes live for the lifespan of the [pod](pods.md), which is longer than the lifespan of any one container, so if the container fails and is restarted, our storage will live on.
 
 In addition to the local disk storage provided by `emptyDir`, Kubernetes supports many different network-attached storage solutions, including PD on GCE and EBS on EC2, which are preferred for critical data, and will handle details such as mounting and unmounting the devices on the nodes. See [the volumes doc](volumes.md) for more details.
@@ -89,6 +91,7 @@ In addition to the local disk storage provided by `emptyDir`, Kubernetes support
 Many applications need credentials, such as passwords, OAuth tokens, and TLS keys, to authenticate with other applications, databases, and services. Storing these credentials in container images or environment variables is less than ideal, since the credentials can then be copied by anyone with access to the image, pod/container specification, host file system, or host Docker daemon. 
 
 Kubernetes provides a mechanism, called [*secrets*](secrets.md), that facilitates delivery of sensitive credentials to applications. A `Secret` is a simple resource containing a map of data. For instance, a simple secret with a username and password might look as follows:
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -99,7 +102,9 @@ data:
   password: dmFsdWUtMg0K
   username: dmFsdWUtMQ0K
 ```
+
 As with other resources, this secret can be instantiated using `create` and can be viewed with `get`:
+
 ```bash
 $ kubectl create -f ./secret.yaml
 secrets/mysecret
@@ -150,6 +155,7 @@ Secrets can also be used to pass [image registry credentials](images.md#using-a-
 
 First, create a `.dockercfg` file, such as running `docker login <registry.domain>`.
 Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
+
 ```
 $ docker login
 Username: janedoe
@@ -180,6 +186,7 @@ secrets/myregistrykey
 
 Now, you can create pods which reference that secret by adding an `imagePullSecrets`
 section to a pod definition.
+
 ```
 apiVersion: v1
 kind: Pod
@@ -198,6 +205,7 @@ spec:
 [Pods](pods.md) support running multiple containers co-located together. They can be used to host vertically integrated application stacks, but their primary motivation is to support auxiliary helper programs that assist the primary application. Typical examples are data pullers, data pushers, and proxies.
 
 Such containers typically need to communicate with one another, often through the file system. This can be achieved by mounting the same volume into both containers. An example of this pattern would be a web server with a [program that polls a git repository](../../contrib/git-sync/) for new updates:
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -238,6 +246,7 @@ More examples can be found in our [blog article](http://blog.kubernetes.io/2015/
 Kubernetes’s scheduler will place applications only where they have adequate CPU and memory, but it can only do so if it knows how much [resources they require](compute-resources.md). The consequence of specifying too little CPU is that the containers could be starved of CPU if too many other containers were scheduled onto the same node. Similarly, containers could die unpredictably due to running out of memory if no memory were requested, which can be especially likely for large-memory applications. 
 
 If no resource requirements are specified, a nominal amount of resources is assumed. (This default is applied via a [LimitRange](limitrange/) for the default [Namespace](namespaces.md). It can be viewed with `kubectl describe limitrange limits`.) You may explicitly specify the amount of resources required as follows:
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -262,6 +271,7 @@ spec:
             # memory units are bytes
             memory: 64Mi
 ```
+
 The container will die due to OOM (out of memory) if it exceeds its specified limit, so specifying a value a little higher than expected generally improves reliability.
 
 If you’re not sure how much resources to request, you can first launch the application without specifying resources, and use [resource usage monitoring](monitoring.md) to determine appropriate values.
@@ -271,6 +281,7 @@ If you’re not sure how much resources to request, you can first launch the app
 Many applications running for long periods of time eventually transition to broken states, and cannot recover except by restarting them. Kubernetes provides [*liveness probes*](pod-states.md#container-probes) to detect and remedy such situations.
 
 A common way to probe an application is using HTTP, which can be specified as follows:
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -308,6 +319,7 @@ Kubernetes will send SIGTERM to applications, which can be handled in order to e
 Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*](container-environment.md#container-hooks), which will execute prior to sending SIGTERM. 
 
 The specification of a pre-stop hook is similar to that of probes, but without the timing-related parameters. For example:
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -337,6 +349,7 @@ spec:
 In order to achieve a reasonably high level of availability, especially for actively developed applications, it’s important to debug failures quickly. Kubernetes can speed debugging by surfacing causes of fatal errors in a way that can be display using [`kubectl`](kubectl/kubectl.md) or the [UI](ui.md), in addition to general [log collection](logging.md). It is possible to specify a `terminationMessagePath` where a container will write its “death rattle”, such as assertion failure messages, stack traces, exceptions, and so on. The default path is `/dev/termination-log`.
 
 Here is a toy example:
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -351,6 +364,7 @@ spec:
 ```
 
 The message is recorded along with the other state of the last (i.e., most recent) termination:
+
 ```bash
 $ kubectl create -f ./pod.yaml
 pods/pod-w-message
