@@ -1,8 +1,8 @@
 ---
 layout: docwithnav
-permalink: /v1_0/
+permalink: /v1.0/
 show_in_nav: true
-slug: v1_0
+slug: v1.0
 hero:
     title: Kubernetes Documentation
     text: Version 1.0
