@@ -24,7 +24,7 @@ certainly want the docs that go with that version.</h1>
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [Kubernetes User Guide: Managing Applications: Deploying continuously running applications](#kubernetes-user-guide:-managing-applications:-deploying-continuously-running-applications)
+- [Kubernetes User Guide: Managing Applications: Deploying continuously running applications](#kubernetes-user-guide-managing-applications-deploying-continuously-running-applications)
   - [Launching a set of replicas using a configuration file](#launching-a-set-of-replicas-using-a-configuration-file)
   - [Viewing replication controller status](#viewing-replication-controller-status)
   - [Deleting replication controllers](#deleting-replication-controllers)

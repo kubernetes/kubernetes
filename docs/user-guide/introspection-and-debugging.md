@@ -28,10 +28,10 @@ your pods. But there are a number of ways to get even more information about you
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [Kubernetes User Guide: Managing Applications: Application Introspection and Debugging](#kubernetes-user-guide:-managing-applications:-application-introspection-and-debugging)
-  - [Using ```kubectl describe pod``` to fetch details about pods](#using-```kubectl-describe-pod```-to-fetch-details-about-pods)
-  - [Example: debugging Pending Pods](#example:-debugging-pending-pods)
-  - [Example: debugging a down/unreachable node](#example:-debugging-a-down/unreachable-node)
+- [Kubernetes User Guide: Managing Applications: Application Introspection and Debugging](#kubernetes-user-guide-managing-applications-application-introspection-and-debugging)
+  - [Using ```kubectl describe pod``` to fetch details about pods](#using-kubectl-describe-pod-to-fetch-details-about-pods)
+  - [Example: debugging Pending Pods](#example-debugging-pending-pods)
+  - [Example: debugging a down/unreachable node](#example-debugging-a-downunreachable-node)
   - [What's next?](#whats-next)
 
 <!-- END MUNGE: GENERATED_TOC -->
