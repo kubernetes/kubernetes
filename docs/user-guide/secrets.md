@@ -39,6 +39,7 @@ a docker image. See [Secrets design document](../design/secrets.md) for more inf
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Secrets](#secrets)
   - [Overview of Secrets](#overview-of-secrets)
     - [Service Accounts Automatically Create and Use Secrets with API Credentials](#service-accounts-automatically-create-and-use-secrets-with-api-credentials)

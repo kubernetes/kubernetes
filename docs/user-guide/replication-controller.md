@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Replication Controller](#replication-controller)
   - [What is a _replication controller_?](#what-is-a-replication-controller)
   - [How does a replication controller work?](#how-does-a-replication-controller-work)

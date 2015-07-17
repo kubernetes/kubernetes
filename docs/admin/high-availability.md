@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [High Availability Kubernetes Clusters](#high-availability-kubernetes-clusters)
   - [Introduction](#introduction)
   - [Overview](#overview)

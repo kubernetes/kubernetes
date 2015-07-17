@@ -54,6 +54,7 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 // builds the ToC.
 func buildTOC(markdown []byte) ([]byte, error) {
 	var buffer bytes.Buffer
+	buffer.WriteString("\n")
 	scanner := bufio.NewScanner(bytes.NewReader(markdown))
 	inBlockQuotes := false
 	for scanner.Scan() {
