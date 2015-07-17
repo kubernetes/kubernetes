@@ -27,7 +27,7 @@ describes a pod that just emits a log message once every 4 seconds. The pod spec
 [synthetic_10lps.yaml](synthetic_10lps.yaml)
 describes a pod that just emits 10 log lines per second.
 
-To observe the ingested log lines when using Google Cloud Logging please see the getting
+See [logging document](../logging.md) for more details about logging. To observe the ingested log lines when using Google Cloud Logging please see the getting
 started instructions
 at [Cluster Level Logging to Google Cloud Logging](../../../docs/getting-started-guides/logging.md).
 To observe the ingested log lines when using Elasticsearch and Kibana please see the getting

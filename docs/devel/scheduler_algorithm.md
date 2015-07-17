@@ -31,7 +31,7 @@ The purpose of filtering the nodes is to filter out the nodes that do not meet c
 - `PodFitsResources`: Check if the free resource (CPU and Memory) meets the requirement of the Pod. The free resource is measured by the capacity minus the sum of limits of all Pods on the node.
 - `PodFitsPorts`: Check if any HostPort required by the Pod is already occupied on the node.
 - `PodFitsHost`: Filter out all nodes except the one specified in the PodSpec's NodeName field.
-- `PodSelectorMatches`: Check if the labels of the node match the labels specified in the Pod's `nodeSelector` field.
+- `PodSelectorMatches`: Check if the labels of the node match the labels specified in the Pod's `nodeSelector` field ([Here](../user-guide/node-selection/) is an example of how to use `nodeSelector` field).
 - `CheckNodeLabelPresence`: Check if all the specified labels exist on a node or not, regardless of the value. 
 
 The details of the above predicates can be found in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](../../plugin/pkg/scheduler/algorithm/predicates/predicates.go). All predicates mentioned above can be used in combination to perform a sophisticated filtering policy. Kubernetes uses some, but not all, of these predicates by default. You can see which ones are used by default in [plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](../../plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go).

@@ -23,8 +23,8 @@ certainly want the docs that go with that version.</h1>
 
 ## Abstract
 
-A proposal for the distribution of secrets (passwords, keys, etc) to the Kubelet and to
-containers inside Kubernetes using a custom volume type.
+A proposal for the distribution of [secrets](../user-guide/secrets.md) (passwords, keys, etc) to the Kubelet and to
+containers inside Kubernetes using a custom [volume](../user-guide/volumes.md#secrets) type. See the [secrets example](../user-guide/secrets/) for more information. 
 
 ## Motivation
 
