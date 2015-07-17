@@ -106,7 +106,7 @@ Key | Value
 
 These keys may be leveraged by the Salt sls files to branch behavior.
 
-In addition, a cluster may be running a Debian based operating system or Red Hat based operating system (Centos, Fedora, RHEL, etc.).  As a result, its important to sometimes distinguish behavior based on operating system using if branches like the following.
+In addition, a cluster may be running a Debian based operating system or Red Hat based operating system (Centos, Fedora, RHEL, etc.).  As a result, it's important to sometimes distinguish behavior based on operating system using if branches like the following.
 
 ```
 {% if grains['os_family'] == 'RedHat' %}
@@ -122,7 +122,7 @@ In addition, a cluster may be running a Debian based operating system or Red Hat
 
 ## Future enhancements (Networking)
 
-Per pod IP configuration is provider-specific, so when making networking changes, its important to sandbox these as all providers may not use the same mechanisms (iptables, openvswitch, etc.)
+Per pod IP configuration is provider-specific, so when making networking changes, it's important to sandbox these as all providers may not use the same mechanisms (iptables, openvswitch, etc.)
 
 We should define a grains.conf key that captures more specifically what network configuration environment is being used to avoid future confusion across providers.
 

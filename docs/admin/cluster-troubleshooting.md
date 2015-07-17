@@ -31,8 +31,10 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Cluster Troubleshooting
-Most of the time, if you encounter problems, it is your application that is the root cause.  For application
-problems please see the [application troubleshooting guide](../user-guide/application-troubleshooting.md). You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
+This doc is about cluster troubleshooting; we assume you have already ruled out your application as the root cause of the
+problem you are experiencing. See
+the [application troubleshooting guide](../user-guide/application-troubleshooting.md) for tips on application debugging.
+You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
 
 ## Listing your cluster
 The first thing to debug in your cluster is if your nodes are all registered correctly.
