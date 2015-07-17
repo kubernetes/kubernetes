@@ -54,6 +54,10 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 `
 
+func makeUnversionedWarning(fileName string) string {
+	return fmt.Sprintf(unversionedWarningFmt, fileName)
+}
+
 // inserts/updates a warning for unversioned docs
 func updateUnversionedWarning(file string, markdown []byte) ([]byte, error) {
 	lines := splitLines(markdown)
@@ -64,5 +68,5 @@ func updateUnversionedWarning(file string, markdown []byte) ([]byte, error) {
 	if !hasMacroBlock(lines, beginUnversionedWarning, endUnversionedWarning) {
 		lines = append([]string{beginUnversionedWarning, endUnversionedWarning}, lines...)
 	}
-	return updateMacroBlock(lines, beginUnversionedWarning, endUnversionedWarning, fmt.Sprintf(unversionedWarningFmt, file))
+	return updateMacroBlock(lines, beginUnversionedWarning, endUnversionedWarning, makeUnversionedWarning(file))
 }
