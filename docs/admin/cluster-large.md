@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 # Kubernetes Large Cluster
 
 ## Support
-At v1.0, Kubernetes supports clusters up to 100 nodes with 30-50 pods per node and 1-2 container per pod (as defined in the [1.0 roadmap](../../docs/roadmap.md#reliability-and-performance)).
+At v1.0, Kubernetes supports clusters up to 100 nodes with 30 pods per node and 1-2 container per pod (as defined in the [1.0 roadmap](../../docs/roadmap.md#reliability-and-performance)).
 
 ## Setup
 
@@ -41,7 +41,7 @@ Normally the number of nodes in a cluster is controlled by the the value `NUM_MI
 
 Simply changing that value to something very large, however, may cause the setup script to fail for many cloud providers. A GCE deployment, for example, will run in to quota issues and fail to bring the cluster up.
 
-When setting up a large Kubernetes cluster, the following must be taken into consideration.
+When setting up a large Kubernetes cluster, the following issues must be considered.
 
 ### Quota Issues
 
@@ -56,7 +56,7 @@ To avoid running into cloud provider quota issues, when creating a cluster with 
     * Forwarding rules
     * Routes
     * Target pools
-* Gating the setup script so that it brings up new node VMs in smaller batches with waits in between, because some cloud providers limit the number of VMs you can create during a given period.
+* Gating the setup script so that it brings up new node VMs in smaller batches with waits in between, because some cloud providers rate limit the creation of VMs.
 
 ### Addon Resources
 To prevent memory leaks or other resource issues in [cluster addons](../../cluster/addons/) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](https://github.com/GoogleCloudPlatform/kubernetes/pull/10653/files) and [#10778](https://github.com/GoogleCloudPlatform/kubernetes/pull/10778/files)).
