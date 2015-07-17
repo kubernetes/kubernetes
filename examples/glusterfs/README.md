@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Glusterfs
 
 [Glusterfs](http://www.gluster.org) is an open source scale-out filesystem. These examples provide information about how to allow containers use Glusterfs volumes.
@@ -41,6 +42,7 @@ The example assumes that you have already set up a Glusterfs server cluster and 
 Set up Glusterfs server cluster; install Glusterfs client package on the Kubernetes nodes. ([Guide](https://www.howtoforge.com/high-availability-storage-with-glusterfs-3.2.x-on-debian-wheezy-automatic-file-replication-mirror-across-two-storage-servers))
 
 ### Create endpoints
+
 Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
 
 ```

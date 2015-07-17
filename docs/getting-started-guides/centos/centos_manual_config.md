@@ -37,10 +37,13 @@ Getting started on [CentOS](http://centos.org)
 
     - [Prerequisites](#prerequisites)
     - [Starting a cluster](#starting-a-cluster)
+
 ## Prerequisites
+
 You need two machines with CentOS installed on them.
 
 ## Starting a cluster
+
 This is a getting started guide for CentOS.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
 This guide will only get ONE node working.  Multiple nodes requires a functional [networking configuration](../../admin/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.

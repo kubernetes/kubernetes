@@ -48,6 +48,7 @@ Examples:
 		{"table-of-contents", updateTOC},
 		{"check-links", checkLinks},
 		{"blank-lines-surround-preformatted", checkPreformatted},
+		{"header-lines", checkHeaderLines},
 		{"unversioned-warning", updateUnversionedWarning},
 		{"analytics", checkAnalytics},
 		{"kubectl-dash-f", checkKubectlFileTargets},

@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # So you want to change the API?
 
 The Kubernetes API has two major components - the internal structures and
@@ -365,6 +366,7 @@ $ hack/update-swagger-spec.sh
 The API spec changes should be in a commit separate from your other changes.
 
 ## Incompatible API changes
+
 If your change is going to be backward incompatible or might be a breaking change for API
 consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
 the change gets in. If you are unsure, ask. Also make sure that the change gets documented in

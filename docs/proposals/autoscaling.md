@@ -30,7 +30,9 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Abstract
+
 Auto-scaling is a data-driven feature that allows users to increase or decrease capacity as needed by controlling the
 number of pods deployed within the system automatically.  
 
@@ -230,6 +232,7 @@ Since an auto-scaler is a durable object it is best represented as a resource.
 ```
 
 #### Boundary Definitions
+
 The `AutoScaleThreshold` definitions provide the boundaries for the auto-scaler.  By defining comparisons that form a range
 along with positive and negative increments you may define bi-directional scaling.  For example the upper bound may be
 specified as "when requests per second rise above 50 for 30 seconds scale the application up by 1" and a lower bound may
@@ -251,6 +254,7 @@ Of note: If the statistics gathering mechanisms can be initialized with a regist
 potentially piggyback on this registry.
 
 ### Multi-target Scaling Policy
+
 If multiple scalable targets satisfy the `TargetSelector` criteria the auto-scaler should be configurable as to which
 target(s) are scaled.  To begin with, if multiple targets are found the auto-scaler will scale the largest target up
 or down as appropriate.  In the future this may be more configurable.  

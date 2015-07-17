@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Authorization Plugins
 
 
@@ -53,6 +54,7 @@ The following implementations are available, and are selected by flag:
 `ABAC` allows for user-configured authorization policy.  ABAC stands for Attribute-Based Access Control.
 
 ## ABAC Mode
+
 ### Request Attributes
 
 A request has 4 attributes that can be considered for authorization:
@@ -105,6 +107,7 @@ To permit any user to do something, write a policy with the user property unset.
 To permit an action Policy with an unset namespace applies regardless of namespace.
 
 ### Examples
+
  1. Alice can do anything: `{"user":"alice"}`
  2. Kubelet can read any pods: `{"user":"kubelet", "resource": "pods", "readonly": true}`
  3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`

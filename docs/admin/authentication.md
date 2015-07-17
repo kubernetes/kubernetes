@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Authentication Plugins
 
 Kubernetes uses client certificates, tokens, or http basic auth to authenticate users for API calls.

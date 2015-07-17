@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # User Guide to Accessing the Cluster
 
 **Table of Contents**
@@ -55,7 +56,9 @@ Documentation for other releases can be found at
 <!-- END MUNGE: GENERATED_TOC -->
 
 ## Accessing the cluster API
+
 ### Accessing for the first time with kubectl
+
 When accessing the Kubernetes API for the first time, we suggest using the
 kubernetes CLI, `kubectl`.
 
@@ -74,6 +77,7 @@ Many of the [examples](../../examples/) provide an introduction to using
 kubectl and complete documentation is found in the [kubectl manual](kubectl/kubectl.md).
 
 ### Directly accessing the REST API
+
 Kubectl handles locating and authenticating to the apiserver.
 If you want to directly access the REST API with an http client like
 curl or wget, or a browser, there are several ways to locate and authenticate:
@@ -112,6 +116,7 @@ $ curl http://localhost:8080/api/
 ```
 
 #### Without kubectl proxy
+
 It is also possible to avoid using kubectl proxy by passing an authentication token
 directly to the apiserver, like this:
 
@@ -176,6 +181,7 @@ In each case, the credentials of the pod are used to communicate securely with t
 
 
 ## Accessing services running on the cluster
+
 The previous section was about connecting the Kubernetes API server.  This section is about
 connecting to other services running on Kubernetes cluster.  In kubernetes, the
 [nodes](../admin/node.md), [pods](pods.md) and [services](services.md) all have
@@ -184,6 +190,7 @@ routable, so they will not be reachable from a machine outside the cluster,
 such as your desktop machine.
 
 ### Ways to connect
+
 You have several options for connecting to nodes, pods and services from outside the cluster:
   - Access services through public IPs.
     - Use a service with type `NodePort` or `LoadBalancer` to make the service reachable outside
@@ -233,12 +240,14 @@ at `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch
 (See [above](#accessing-the-cluster-api) for how to pass credentials or use kubectl proxy.)
 
 #### Manually constructing apiserver proxy URLs
+
 As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:  
 `http://`*`kubernetes_master_address`*`/`*`service_path`*`/`*`service_name`*`/`*`service_endpoint-suffix-parameter`*
 <!--- TODO: update this part of doc because it doesn't seem to be valid. What
 about namespaces? 'proxy' verb? -->
 
 ##### Examples
+
  * To access the Elasticsearch service endpoint `_search?q=user:kimchy`, you would use:   `http://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_search?q=user:kimchy`
  * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_cluster/health?pretty=true`
 
@@ -258,6 +267,7 @@ about namespaces? 'proxy' verb? -->
   ```
 
 #### Using web browsers to access services running on the cluster
+
 You may be able to put an apiserver proxy url into the address bar of a browser. However:
   - Web browsers cannot usually pass tokens, so you may need to use basic (password) auth.  Apiserver can be configured to accept basic auth,
     but your cluster may not be configured to accept basic auth.
@@ -265,9 +275,11 @@ You may be able to put an apiserver proxy url into the address bar of a browser.
     way that is unaware of the proxy path prefix.
 
 ## Requesting redirects
+
 The redirect capabilities have been deprecated and removed.  Please use a proxy (see below) instead.
 
 ## So Many Proxies
+
 There are several different proxies you may encounter when using kubernetes:
   1. The [kubectl proxy](#directly-accessing-the-rest-api):
     - runs on a user's desktop or in a pod

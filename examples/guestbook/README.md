@@ -346,6 +346,7 @@ redis-slave             name=redis-slave                          name=redis-sla
 ```
 
 ### Step Five: Create the frontend replicated pods
+
 <a href="#step-five-create-the-frontend-replicated-pods"></a>
 
 A frontend pod is a simple PHP server that is configured to talk to either the slave or master services, depending on whether the client request is a read or a write. It exposes a simple AJAX interface, and serves an Angular-based UX.
@@ -504,6 +505,7 @@ redis-slave             name=redis-slave                          name=redis-sla
 
 
 #### Accessing the guestbook site externally
+
 <a href="#accessing-the-guestbook-site-externally"></a>
 
 You'll want to set up your guestbook service so that it can be accessed from outside of the internal Kubernetes network. Above, we introduced one way to do that, using the `type: LoadBalancer` spec.

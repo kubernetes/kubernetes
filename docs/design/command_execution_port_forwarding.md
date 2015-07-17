@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Container Command Execution & Port Forwarding in Kubernetes
 
 ## Abstract
@@ -87,12 +88,14 @@ won't be able to work with this mechanism, unless adapters can be written.
 ## Process Flow
 
 ### Remote Command Execution Flow
+
 1. The client connects to the Kubernetes Master to initiate a remote command execution
 request
 2. The Master proxies the request to the Kubelet where the container lives
 3. The Kubelet executes nsenter + the requested command and streams stdin/stdout/stderr back and forth between the client and the container
 
 ### Port Forwarding Flow
+
 1. The client connects to the Kubernetes Master to initiate a remote command execution
 request
 2. The Master proxies the request to the Kubelet where the container lives

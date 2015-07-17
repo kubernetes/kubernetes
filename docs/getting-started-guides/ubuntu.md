@@ -48,6 +48,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ku
 [Cloud team from Zhejiang University](https://github.com/ZJU-SEL) will maintain this work.
 
 ## Prerequisites
+
 *1 The nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge* 
 
 *2 All machines can communicate with each other, no need to connect Internet (should use private docker registry in this case)*
@@ -60,6 +61,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ku
 
 
 ### Starting a Cluster
+
 #### Make *kubernetes* , *etcd* and *flanneld* binaries
 
 First clone the kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
@@ -74,6 +76,7 @@ Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `ku
 > We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
 
 #### Configure and start the kubernetes cluster
+
 An example cluster is listed as below:
 
 | IP Address|Role |      

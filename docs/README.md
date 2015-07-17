@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes Documentation: releases.k8s.io/HEAD
 
 * The [User's guide](user-guide/README.md) is for anyone who wants to run programs and

@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Images
 
 Each container in a pod has its own image.  Currently, the only type of image supported is a [Docker Image](https://docs.docker.com/userguide/dockerimages/).
@@ -252,6 +253,7 @@ You can use this in conjunction with a per-node `.dockerfile`.  The credentials
 will be merged.  This approach will work on Google Container Engine (GKE).
 
 ### Use Cases
+
 There are a number of solutions for configuring private registries.  Here are some
 common use cases and suggested solutions.
 

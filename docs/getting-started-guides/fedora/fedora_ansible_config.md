@@ -44,7 +44,7 @@ Configuring kubernetes on Fedora via Ansible offers a simple way to quickly crea
 - [Setting up the cluster](#setting-up-the-cluster)
 - [Testing and using your new cluster](#testing-and-using-your-new-cluster)
 
-##Prerequisites
+## Prerequisites
 
 1. Host able to run ansible and able to clone the following repo: [kubernetes-ansible](https://github.com/eparis/kubernetes-ansible)
 2. A Fedora 20+ or RHEL7 host to act as cluster master

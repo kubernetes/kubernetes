@@ -30,7 +30,9 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # How to Use it?
+
 Install Ceph on the Kubernetes host. For example, on Fedora 21
 
     # yum -y install ceph

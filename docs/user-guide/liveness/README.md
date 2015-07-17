@@ -30,7 +30,9 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Overview
+
 This example shows two types of pod [health checks](../production-pods.md#liveness-and-readiness-probes-aka-health-checks): HTTP checks and container execution checks.
 
 The [exec-liveness.yaml](exec-liveness.yaml) demonstrates the container execution check.
@@ -72,6 +74,7 @@ The Kubelet sends a HTTP request to the specified path and port to perform the h
 This [guide](../walkthrough/k8s201.md#health-checking) has more information on health checks.
 
 ## Get your hands dirty
+
 To show the health check is actually working, first create the pods:
 
 ```

@@ -48,6 +48,7 @@ The resource model aims to be:
 * precise, to avoid misunderstandings and promote pod portability.
 
 ## The resource model
+
 A Kubernetes _resource_ is something that can be requested by, allocated to, or consumed by a pod or container.  Examples include memory (RAM), CPU, disk-time, and network bandwidth.
 
 Once resources on a node have been allocated to one pod, they should not be allocated to another until that pod is removed or exits. This means that Kubernetes schedulers should ensure that the sum of the resources allocated (requested and granted) to its pods never exceeds the usable capacity of the node. Testing whether a pod will fit on a node is called _feasibility checking_. 
@@ -124,9 +125,11 @@ Where:
 
 
 ## Kubernetes-defined resource types
+
 The following resource types are predefined ("reserved") by Kubernetes in the `kubernetes.io` namespace, and so cannot be used for user-defined resources.  Note that the syntax of all resource types in the resource spec is deliberately similar, but some resource types (e.g., CPU) may receive significantly more support than simply tracking quantities in the schedulers and/or the Kubelet.
 
 ### Processor cycles
+
   * Name: `cpu` (or `kubernetes.io/cpu`)
   * Units: Kubernetes Compute Unit seconds/second (i.e., CPU cores normalized to a canonical "Kubernetes CPU")
   * Internal representation: milli-KCUs
@@ -141,6 +144,7 @@ Note that requesting 2 KCU won't guarantee that precisely 2 physical cores will 
 
 
 ### Memory
+
   * Name: `memory` (or `kubernetes.io/memory`)
   * Units: bytes
   * Compressible? no (at least initially)
@@ -152,6 +156,7 @@ rather than decimal ones: "64MiB" rather than "64MB".
 
 
 ## Resource metadata
+
 A resource type may have an associated read-only ResourceType structure, that contains metadata about the type.  For example:
 
 ```
@@ -222,16 +227,19 @@ and predicted
 ## Future resource types
 
 ### _[future] Network bandwidth_
+
   * Name: "network-bandwidth" (or `kubernetes.io/network-bandwidth`)
   * Units: bytes per second
   * Compressible? yes
 
 ### _[future] Network operations_
+
   * Name: "network-iops" (or `kubernetes.io/network-iops`)
   * Units: operations (messages) per second
   * Compressible? yes
 
 ### _[future] Storage space_
+
   * Name: "storage-space" (or `kubernetes.io/storage-space`)
   * Units: bytes
   * Compressible? no
@@ -239,6 +247,7 @@ and predicted
 The amount of secondary storage space available to a container.  The main target is local disk drives and SSDs, although this could also be used to qualify remotely-mounted volumes.   Specifying whether a resource is a raw disk, an SSD, a disk array, or a file system fronting any of these, is left for future work.
 
 ### _[future] Storage time_
+
   * Name: storage-time (or `kubernetes.io/storage-time`)
   * Units: seconds per second of disk time
   * Internal representation: milli-units
@@ -247,6 +256,7 @@ The amount of secondary storage space available to a container.  The main target
 This is the amount of time a container spends accessing disk, including actuator and transfer time.  A standard disk drive provides 1.0 diskTime seconds per second.
 
 ### _[future] Storage operations_
+
   * Name: "storage-iops" (or `kubernetes.io/storage-iops`)
   * Units: operations per second
   * Compressible? yes
