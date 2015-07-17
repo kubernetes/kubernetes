@@ -102,9 +102,9 @@ Check there are 2 nodes in the cluster:
 
 ```console
 core@kube-00 ~ $ kubectl get nodes
-NAME                LABELS                   STATUS
-kube-01             environment=production   Ready
-kube-02             environment=production   Ready
+NAME      LABELS                           STATUS
+kube-01   kubernetes.io/hostname=kube-01   Ready
+kube-02   kubernetes.io/hostname=kube-02   Ready
 ```
 
 ## Deploying the workload
@@ -112,16 +112,10 @@ kube-02             environment=production   Ready
 Let's follow the Guestbook example now:
 
 ```sh
-cd guestbook-example
-kubectl create -f examples/guestbook/redis-master-controller.yaml
-kubectl create -f examples/guestbook/redis-master-service.yaml
-kubectl create -f examples/guestbook/redis-slave-controller.yaml
-kubectl create -f examples/guestbook/redis-slave-service.yaml
-kubectl create -f examples/guestbook/frontend-controller.yaml
-kubectl create -f examples/guestbook/frontend-service.yaml
+kubectl create -f ~/guestbook-example
 ```
 
-You need to wait for the pods to get deployed, run the following and wait for `STATUS` to change from `Unknown`, through `Pending` to `Running`.
+You need to wait for the pods to get deployed, run the following and wait for `STATUS` to change from `Pending` to `Running`.
 
 ```sh
 kubectl get pods --watch
@@ -132,20 +126,20 @@ kubectl get pods --watch
 Eventually you should see:
 
 ```console
-NAME                 READY     STATUS    RESTARTS   AGE
-frontend-8anh8       1/1       Running   0          1m
-frontend-8pq5r       1/1       Running   0          1m
-frontend-v7tbq       1/1       Running   0          1m
-redis-master-u0my3   1/1       Running   0          1m
-redis-slave-4eznf    1/1       Running   0          1m
-redis-slave-hf40f    1/1       Running   0          1m
+NAME                READY     STATUS    RESTARTS   AGE
+frontend-0a9xi      1/1       Running   0          4m
+frontend-4wahe      1/1       Running   0          4m
+frontend-6l36j      1/1       Running   0          4m
+redis-master-talmr  1/1       Running   0          4m
+redis-slave-12zfd   1/1       Running   0          4m
+redis-slave-3nbce   1/1       Running   0          4m
 ```
 
 ## Scaling
 
-Two single-core nodes are certainly not enough for a production system of today, and, as you can see, there is one _unassigned_ pod. Let's scale the cluster by adding a couple of bigger nodes.
+Two single-core nodes are certainly not enough for a production system of today. Let's scale the cluster by adding a couple of bigger nodes.
 
-You will need to open another terminal window on your machine and go to the same working directory (e.g. `~/Workspace/weave-demos/coreos-azure`).
+You will need to open another terminal window on your machine and go to the same working directory (e.g. `~/Workspace/kubernetes/docs/getting-started-guides/coreos/azure/`).
 
 First, lets set the size of new VMs:
 
@@ -177,11 +171,11 @@ Back on `kube-00`:
 
 ```console
 core@kube-00 ~ $ kubectl get nodes
-NAME        LABELS                   STATUS
-kube-01     environment=production   Ready
-kube-02     environment=production   Ready
-kube-03     environment=production   Ready
-kube-04     environment=production   Ready
+NAME      LABELS                           STATUS
+kube-01   kubernetes.io/hostname=kube-01   Ready
+kube-02   kubernetes.io/hostname=kube-02   Ready
+kube-03   kubernetes.io/hostname=kube-03   Ready
+kube-04   kubernetes.io/hostname=kube-04   Ready
 ```
 
 You can see that two more nodes joined happily. Let's scale the number of Guestbook instances now.
@@ -190,18 +184,19 @@ First, double-check how many replication controllers there are:
 
 ```console
 core@kube-00 ~ $ kubectl get rc
-CONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS
+ONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS
 frontend       php-redis      kubernetes/example-guestbook-php-redis:v2   name=frontend       3
 redis-master   master         redis                                       name=redis-master   1
-redis-slave    slave          kubernetes/redis-slave:v2                   name=redis-slave    2
+redis-slave    worker         kubernetes/redis-slave:v2                   name=redis-slave    2
 ```
 
 As there are 4 nodes, let's scale proportionally:
 
 ```console
-core@kube-00 ~ $  kubectl scale --replicas=4 rc redis-slave
+core@kube-00 ~ $ kubectl scale --replicas=4 rc redis-slave
+>>>>>>> coreos/azure: Updates for 1.0
 scaled
-core@kube-00 ~ $  kubectl scale --replicas=4 rc frontend
+core@kube-00 ~ $ kubectl scale --replicas=4 rc frontend
 scaled
 ```
 
@@ -212,7 +207,7 @@ core@kube-00 ~ $ kubectl get rc
 CONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS
 frontend       php-redis      kubernetes/example-guestbook-php-redis:v2   name=frontend       4
 redis-master   master         redis                                       name=redis-master   1
-redis-slave    slave          kubernetes/redis-slave:v2                   name=redis-slave    4
+redis-slave    worker         kubernetes/redis-slave:v2                   name=redis-slave    4
 ```
 
 You now will have more instances of front-end Guestbook apps and Redis slaves; and, if you look up all pods labeled `name=frontend`, you should see one running on each node.
@@ -220,19 +215,35 @@ You now will have more instances of front-end Guestbook apps and Redis slaves; a
 ```console
 core@kube-00 ~/guestbook-example $ kubectl get pods -l name=frontend
 NAME             READY     STATUS    RESTARTS   AGE
-frontend-8anh8   1/1       Running   0          3m
-frontend-8pq5r   1/1       Running   0          3m
-frontend-oz8uo   1/1       Running   0          51s
-frontend-v7tbq   1/1       Running   0          3m
+frontend-0a9xi   1/1       Running   0          22m
+frontend-4wahe   1/1       Running   0          22m
+frontend-6l36j   1/1       Running   0          22m
+frontend-z9oxo   1/1       Running   0          41s
 ```
 
 ## Exposing the app to the outside world
 
-To makes sure the app is working, you probably want to load it in the browser. For accessing the Guestbook service from the outside world, an Azure endpoint needs to be created like shown on the picture below.
+There is no native Azure load-ballancer support in Kubernets 1.0, however here is how you can expose the Guestbook app to the Internet.
 
-![Creating an endpoint](external_access.png)
+```
+./expose_guestbook_app_port.sh ./output/kube_1c1496016083b4_ssh_conf
+Guestbook app is on port 31605, will map it to port 80 on kube-00
+info:    Executing command vm endpoint create
++ Getting virtual machines
++ Reading network configuration
++ Updating network configuration
+info:    vm endpoint create command OK
+info:    Executing command vm endpoint show
++ Getting virtual machines
+data:      Name                          : tcp-80-31605
+data:      Local port                    : 31605
+data:      Protcol                       : tcp
+data:      Virtual IP Address            : 137.117.156.164
+data:      Direct server return          : Disabled
+info:    vm endpoint show command OK
+```
 
-You then should be able to access it from anywhere via the Azure virtual IP for `kube-01`, i.e. `http://104.40.211.194:8000/` as per screenshot.
+You then should be able to access it from anywhere via the Azure virtual IP for `kube-00` displayed above, i.e. `http://137.117.156.164/` in my case.
 
 ## Next steps
 
