@@ -47,7 +47,7 @@ for a number of reasons:
   - User accounts are intended to be global. Names must be unique across all
     namespaces of a cluster, future user resource will not be namespaced).
     Service accounts are namespaced.
-  - Typically, a clusters User accounts might be synced from a corporate
+  - Typically, a cluster's User accounts might be synced from a corporate
     database, where new user account creation requires special privileges and
     is tied to complex business  processes.  Service account creation is intended
     to be more lightweight, allowing cluster users to create service accounts for
@@ -82,7 +82,7 @@ TokenController runs as part of controller-manager. It acts asynchronously. It:
 - observes serviceAccount creation and creates a corresponding Secret to allow API access.
 - observes serviceAccount deletion and deletes all corresponding ServiceAccountToken Secrets
 - observes secret addition, and ensures the referenced ServiceAccount exists, and adds a token to the secret if needed
-- observer secret deleteion and removes a reference from the corresponding ServiceAccount if needed
+- observes secret deleteion and removes a reference from the corresponding ServiceAccount if needed
 
 #### To create additional API tokens
 
