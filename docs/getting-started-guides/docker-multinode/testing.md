@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Testing your Kubernetes cluster.
 
 To validate that your node(s) have been added, run:

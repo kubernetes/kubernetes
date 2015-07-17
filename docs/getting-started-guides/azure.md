@@ -58,7 +58,9 @@ installed](https://docs.docker.com/installation/).  On Mac OS X you can use
 [boot2docker](http://boot2docker.io/).
 
 ## Setup
-###Starting a cluster
+
+### Starting a cluster
+
 The cluster setup scripts can setup Kubernetes for multiple targets. First modify `cluster/kube-env.sh` to specify azure:
 
     KUBERNETES_PROVIDER="azure"
@@ -83,6 +85,7 @@ The script above will start (by default) a single master VM along with 4 worker 
 can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 
 ### Adding the kubernetes command line tools to PATH
+
 The [kubectl](../../docs/user-guide/kubectl/kubectl.md) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
 You will use it to look at your new cluster and bring up example apps.
 
@@ -95,6 +98,7 @@ Add the appropriate binary folder to your ```PATH``` to access kubectl:
     export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
 
 ## Getting started with your cluster
+
 See [a simple nginx example](../user-guide/simple-nginx.md) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../examples/).

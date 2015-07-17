@@ -30,12 +30,14 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Nginx https service
 
 This example creates a basic nginx https service useful in verifying proof of concept, keys, secrets, and end-to-end https service creation in kubernetes.
 It uses an [nginx server block](http://wiki.nginx.org/ServerBlockExample) to serve the index page over both http and https.
 
 ### Generate certificates
+
 First generate a self signed rsa key and certificate that the server can use for TLS.
 
 ```shell

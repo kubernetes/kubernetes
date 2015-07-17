@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Elasticsearch for Kubernetes
 
 This directory contains the source for a Docker image that creates an instance

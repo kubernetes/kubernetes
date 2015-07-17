@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Admission control plugin: LimitRanger
 
 ## Background
@@ -164,6 +165,7 @@ It is expected we will want to define limits for particular pods or containers b
 To make a **LimitRangeItem** more restrictive, we will intend to add these additional restrictions at a future point in time.
 
 ## Example
+
 See the [example of Limit Range](../user-guide/limitrange/) for more information.
 
 

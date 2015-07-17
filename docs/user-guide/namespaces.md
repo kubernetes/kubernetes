@@ -74,6 +74,7 @@ The Namespace provides a unique scope for:
 Look [here](namespaces/) for an in depth example of namespaces.
 
 ### Viewing namespaces
+
 You can list the current namespaces in a cluster using:
 
 ```sh
@@ -187,6 +188,7 @@ kubectl delete namespaces <insert-some-namespace-name>
 This delete is asynchronous, so for a time you will see the namespace in the ```Terminating``` state.
 
 ## Namespaces and DNS
+
 When you create a [Service](services.md), it creates a corresponding [DNS entry](../admin/dns.md)1.
 This entry is of the form ```<service-name>.<namespace-name>.cluster.local```, which means
 that if a container just uses ```<service-name>``` it will resolve to the service which

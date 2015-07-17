@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Phabricator example
 
 This example shows how to build a simple multi-tier web application using Kubernetes and Docker.

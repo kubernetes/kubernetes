@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Kubernetes Namespaces
 
 Kubernetes _[namespaces](../namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.

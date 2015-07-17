@@ -30,7 +30,9 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Hunting flaky tests in Kubernetes
+
 Sometimes unit tests are flaky.  This means that due to (usually) race conditions, they will occasionally fail, even though most of the time they pass.
 
 We have a goal of 99.9% flake free tests.  This means that there is only one flake in one thousand runs of a test.

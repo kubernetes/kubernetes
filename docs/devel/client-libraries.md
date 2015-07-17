@@ -30,12 +30,15 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## kubernetes API client libraries
 
 ### Supported
+
    * [Go](../../pkg/client/)
 
 ### User Contributed
+
 *Note: Libraries provided by outside parties are supported by their authors, not the core Kubernetes team*
 
    * [Java (OSGI)](https://bitbucket.org/amdatulabs/amdatu-kubernetes)

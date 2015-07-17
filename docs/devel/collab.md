@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # On Collaborative Development
 
 Kubernetes is open source, but many of the people working on it do so as their day job.  In order to avoid forcing people to be "at work" effectively 24/7, we want to establish some semi-formal protocols around development.  Hopefully these rules make things go more smoothly.  If you find that this is not the case, please complain loudly.

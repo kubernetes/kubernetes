@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Administering Resource Quotas
 
 Kubernetes can limit both the number of objects created in a namespace, and the
@@ -49,7 +50,8 @@ Resource Quota is enforced in a particular namespace when there is a
 
 See [ResourceQuota design doc](../design/admission_control_resource_quota.md) for more information.
 
-##  Object Count Quota
+## Object Count Quota
+
 The number of objects of a given type can be restricted.  The following types
 are supported:
 
@@ -65,7 +67,8 @@ are supported:
 For example, `pods` quota counts and enforces a maximum on the number of `pods`
 created in a single namespace.
 
-##  Compute Resource Quota
+## Compute Resource Quota
+
 The total number of objects of a given type can be restricted.  The following types
 are supported:
 
@@ -83,6 +86,7 @@ Any resource that is not part of core Kubernetes must follow the resource naming
 This means the resource must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
 
 ## Viewing and Setting Quotas
+
 Kubectl supports creating, updating, and viewing quotas
 
 ```
@@ -123,6 +127,7 @@ services                3       5
 ```
 
 ## Quota and Cluster Capacity
+
 Resource Quota objects are independent of the Cluster Capacity.  They are
 expressed in absolute units.
 
@@ -136,6 +141,7 @@ writing a 'controller' which watches the quota usage and adjusts the quota
 hard limits of each namespace.
 
 ## Example
+
 See a [detailed example for how to use resource quota](../user-guide/resourcequota/). 
 
 

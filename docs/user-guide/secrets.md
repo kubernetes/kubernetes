@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Secrets
 
 Objects of type `secret` are intended to hold sensitive information, such as
@@ -158,7 +159,9 @@ whichever is convenient.
 See another example of creating a secret and a pod that consumes that secret in a volume [here](secrets/).
 
 ### Manually specifying an imagePullSecret
+
 Use of imagePullSecrets is desribed in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)
+
 ### Automatic use of Manually Created Secrets
 
 *This feature is planned but not implemented.  See [issue
@@ -170,7 +173,9 @@ Then, pods which use that service account will have
 The secrets will be mounted at **TBD**.
 
 ## Details
+
 ### Restrictions
+
 Secret volume sources are validated to ensure that the specified object
 reference actually points to an object of type `Secret`.  Therefore, a secret
 needs to be created before any pods that depend on it.
@@ -462,6 +467,7 @@ one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
 ```
 
 ### Use-case: Secret visible to one container in a pod
+
 <a name="use-case-two-containers"></a>
 
 Consider a program that needs to handle HTTP requests, do some complex business

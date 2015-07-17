@@ -73,6 +73,7 @@ steps that existing cluster setup scripts are making.
 ## Designing and Preparing
 
 ### Learning 
+
   1. You should be familiar with using Kubernetes already.  We suggest you set
     up a temporary cluster by following one of the other Getting Started Guides.
     This will help you become familiar with the CLI ([kubectl](../user-guide/kubectl/kubectl.md)) and concepts ([pods](../user-guide/pods.md), [services](../user-guide/services.md), etc.) first.
@@ -80,6 +81,7 @@ steps that existing cluster setup scripts are making.
     effect of completing one of the other Getting Started Guides.
 
 ### Cloud Provider
+
 Kubernetes has the concept of a Cloud Provider, which is a module which provides
 an interface for managing TCP Load Balancers, Nodes (Instances) and Networking Routes.
 The interface is defined in `pkg/cloudprovider/cloud.go`.  It is possible to
@@ -88,6 +90,7 @@ bare-metal), and not all parts of the interface need to be implemented, dependin
 on how flags are set on various components. 
 
 ### Nodes
+
 - You can use virtual or physical machines.
 - While you can build a cluster with 1 machine, in order to run all the examples and tests you
   need at least 4 nodes.
@@ -101,6 +104,7 @@ on how flags are set on various components.
   have identical configurations.
 
 ### Network
+
 Kubernetes has a distinctive [networking model](../admin/networking.md).
 
 Kubernetes allocates an IP address to each pod.  When creating a cluster, you
@@ -168,6 +172,7 @@ region of the world, etc.
     need to distinguish which resources each created.  Call this `CLUSTERNAME`.
 
 ### Software Binaries
+
 You will need binaries for:
   - etcd
   - A container runner, one of:
@@ -181,6 +186,7 @@ You will need binaries for:
     - kube-scheduler
 
 #### Downloading and Extracting Kubernetes Binaries
+
 A Kubernetes binary release includes all the Kubernetes binaries as well as the supported release of etcd.
 You can use a Kubernetes binary release (recommended) or build your Kubernetes binaries following the instructions in the
 [Developer Documentation](../devel/README.md).  Only using a binary release is covered in this guide.
@@ -191,6 +197,7 @@ Then, within the second set of unzipped files, locate `./kubernetes/server/bin`,
 all the necessary binaries.
 
 #### Selecting Images
+
 You will run docker, kubelet, and kube-proxy outside of a container, the same way you would run any system daemon, so
 you just need the bare binaries.  For etcd, kube-apiserver, kube-controller-manager, and kube-scheduler, 
 we recommend that you run these as containers, so you need an image to be built.
@@ -238,6 +245,7 @@ There are two main options for security:
 If following the HTTPS approach, you will need to prepare certs and credentials.
 
 #### Preparing Certs
+
 You need to prepare several certs:
 - The master needs a cert to act as an HTTPS server.
 - The kubelets optionally need certs to identify themselves as clients of the master, and when
@@ -262,6 +270,7 @@ You will end up with the following files (we will use these variables later on)
   - optional
 
 #### Preparing Credentials
+
 The admin user (and any users) need:
   - a token or a password to identify them. 
   - tokens are just long alphanumeric strings, e.g. 32 chars.  See
@@ -339,6 +348,7 @@ Started Guide.   After getting a cluster running, you can then copy the init.d s
 cluster, and then modify them for use on your custom cluster.
 
 ### Docker
+
 The minimum required Docker version will vary as the kubelet version changes.  The newest stable release is a good choice.  Kubelet will log a warning and refuse to start pods if the version is too old, so pick a version and try it.
 
 If you previously had Docker installed on a node without setting Kubernetes-specific
@@ -422,6 +432,7 @@ Arguments to consider:
     - `--api-servers=http://$MASTER_IP`
 
 ### Networking
+
 Each node needs to be allocated its own CIDR range for pod networking.
 Call this `NODE_X_POD_CIDR`. 
 
@@ -462,6 +473,7 @@ any masquerading at all.  Others, such as GCE, will not allow pod IPs to send
 traffic to the internet, but have no problem with them inside your GCE Project.
 
 ### Other 
+
 - Enable auto-upgrades for your OS package manager, if desired.
 - Configure log rotation for all node components (e.g. using [logrotate](http://linux.die.net/man/8/logrotate)).
 - Setup liveness-monitoring (e.g. using [monit](http://linux.die.net/man/1/monit)).
@@ -470,6 +482,7 @@ traffic to the internet, but have no problem with them inside your GCE Project.
     volumes.
 
 ### Using Configuration Management
+
 The previous steps all involved "conventional" system administration techniques for setting up
 machines.  You may want to use a Configuration Management system to automate the node configuration
 process.  There are examples of [Saltstack](../admin/salt.md), Ansible, Juju, and CoreOS Cloud Config in the
@@ -485,6 +498,7 @@ all configured and managed *by Kubernetes*:
   - they are kept running by Kubernetes rather than by init.
 
 ### etcd
+
 You will need to run one or more instances of etcd.  
   - Recommended approach: run one etcd instance, with its log written to a directory backed
     by durable storage (RAID, GCE PD)
@@ -613,6 +627,7 @@ node disk.
 Optionally, you may want to mount `/var/log` as well and redirect output there.
 
 #### Starting Apiserver
+
 Place the completed pod template into the kubelet config dir
 (whatever `--config=` argument of kubelet is set to, typically
 `/etc/kubernetes/manifests`).
@@ -688,6 +703,7 @@ Optionally, you may want to mount `/var/log` as well and redirect output there.
 Start as described for apiserver.
 
 ### Controller Manager
+
 To run the controller manager:
   - select the correct flags for your cluster
   - write a pod spec for the controller manager using the provided template
@@ -803,6 +819,7 @@ The nodes must be able to connect to each other using their private IP. Verify t
 pinging or SSH-ing from one node to another.
 
 ### Getting Help
+
 If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
 [google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
 

@@ -55,6 +55,7 @@ they vary from step-by-step instructions to general advice for setting up
 a kubernetes cluster from scratch. 
 
 ### Local-machine Solutions
+
 Local-machine solutions create a single cluster with one or more kubernetes nodes on a single
 physical machine.  Setup is completely automated and doesn't require a cloud provider account.
 But their size and availability is limited to that of a single machine.
@@ -66,10 +67,12 @@ The local-machine solutions are:
 
 
 ### Hosted Solutions
+
 [Google Container Engine](https://cloud.google.com/container-engine) offers managed Kubernetes
 clusters.
 
 ### Turn-key Cloud Solutions
+
 These solutions allow you to create Kubernetes clusters on range of Cloud IaaS providers with only a
 few commands, and have active community support.
 - [GCE](gce.md)
@@ -90,6 +93,7 @@ If you are interested in supporting Kubernetes on a new platform, check out our 
 writing a new solution](../../docs/devel/writing-a-getting-started-guide.md).
 
 #### Cloud
+
 These solutions are combinations of cloud provider and OS not covered by the above solutions.
 - [AWS + coreos](coreos.md)
 - [GCE + CoreOS](coreos.md)
@@ -98,6 +102,7 @@ These solutions are combinations of cloud provider and OS not covered by the abo
 - [Rackspace + CoreOS](rackspace.md)
 
 #### On-Premises VMs
+
 - [Vagrant](coreos.md) (uses CoreOS and flannel)
 - [CloudStack](cloudstack.md) (uses Ansible, CoreOS and flannel)
 - [Vmware](vsphere.md)  (uses Debian)
@@ -109,6 +114,7 @@ These solutions are combinations of cloud provider and OS not covered by the abo
 - [KVM](fedora/flannel_multi_node_cluster.md)  (uses Fedora and flannel)
 
 #### Bare Metal
+
 - [Offline](coreos/bare_metal_offline.md) (no internet required.  Uses CoreOS and Flannel)
 - [fedora/fedora_ansible_config.md](fedora/fedora_ansible_config.md)
 - [Fedora single node](fedora/fedora_manual_config.md) 
@@ -118,9 +124,11 @@ These solutions are combinations of cloud provider and OS not covered by the abo
 - [Docker Multi Node](docker-multinode.md)
 
 #### Integrations
+
 - [Kubernetes on Mesos](mesos.md) (Uses GCE)
 
 ## Table of Solutions
+
 Here are all the solutions mentioned above in table form.
 
 IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                              | Conforms | Support Level

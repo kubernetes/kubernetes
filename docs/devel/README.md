@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes Developer Guide
 
 The developer guide is for anyone wanting to either write code which directly accesses the

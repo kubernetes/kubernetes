@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Compute Resources
 
 ** Table of Contents**
@@ -150,6 +151,7 @@ then pod resource usage can be retrieved from the monitoring system.
 ## Troubleshooting
 
 ### My pods are pending with event message failedScheduling
+
 If the scheduler cannot find any node where a pod can fit, then the pod will remain unscheduled
 until a place can be found.    An event will be produced each time the scheduler fails to find a
 place for the pod, like this:
@@ -177,6 +179,7 @@ to limit the total amount of resources that can be consumed.  If used in conjunc
 with namespaces, it can prevent one team from hogging all the resources.
 
 ### My container is terminated 
+
 Your container may be terminated because it's resource-starved. To check if a container is being killed because it is hitting a resource limit, call `kubectl describe pod`
 on the pod you are interested in:
 

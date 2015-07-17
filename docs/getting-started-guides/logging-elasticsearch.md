@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Cluster Level Logging with Elasticsearch and Kibana
 
 On the Google Compute Engine (GCE) platform the default cluster level logging support targets

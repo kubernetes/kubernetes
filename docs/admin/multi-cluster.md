@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Considerations for running multiple Kubernetes clusters
 
 You may want to set up multiple kubernetes clusters, both to
@@ -65,6 +66,7 @@ Reasons to have multiple clusters include:
   - test clusters to canary new Kubernetes releases or other cluster software.
 
 ## Selecting the right number of clusters
+
 The selection of the number of kubernetes clusters may be a relatively static choice, only revisited occasionally.
 By contrast, the number of nodes in a cluster and the number of pods in a service may be change frequently according to
 load and growth.

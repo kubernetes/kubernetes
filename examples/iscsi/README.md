@@ -30,7 +30,9 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Step 1. Setting up iSCSI target and iSCSI initiator
+
 **Setup A.** On Fedora 21 nodes
 
 If you use Fedora 21 on Kubernetes node, then first install iSCSI initiator on the node:
@@ -46,7 +48,8 @@ I mostly followed these [instructions](http://www.server-world.info/en/note?os=F
 
 GCE does not provide preconfigured Fedora 21 image, so I set up the iSCSI target on a preconfigured Ubuntu 12.04 image, mostly following these [instructions](http://www.server-world.info/en/note?os=Ubuntu_12.04&p=iscsi). My Kubernetes cluster on GCE was running Debian 7 images, so I followed these [instructions](http://www.server-world.info/en/note?os=Debian_7.0&p=iscsi&f=2) to set up the iSCSI initiator.
 
-##Step 2. Creating the pod with iSCSI persistent storage
+## Step 2. Creating the pod with iSCSI persistent storage
+
 Once you have installed iSCSI initiator and new Kubernetes, you can create a pod based on my example *iscsi.json*. In the pod JSON, you need to provide *targetPortal* (the iSCSI target's **IP** address and *port* if not the default port 3260), target's *iqn*, *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean. 
 
 **Note:** If you have followed the instructions in the links above you

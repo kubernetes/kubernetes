@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Services and Firewalls
 
 Many cloud providers (e.g. Google Compute Engine) define firewalls that help keep prevent inadvertent
@@ -39,6 +40,7 @@ well as any provider specific details that may be necessary.
 
 
 ### Google Compute Engine
+
 When using a Service with `spec.type: LoadBalancer`, the firewall will be
 opened automatically.  When using `spec.type: NodePort`, however, the firewall
 is *not* opened by default.
@@ -77,6 +79,7 @@ the wilds of the internet.
 This will be fixed in an upcoming release of Kubernetes.
 
 ### Other cloud providers
+
 Coming soon.
 
 

@@ -51,9 +51,11 @@ Please install Docker 1.6.2 or wait for Docker 1.7.1.
 - [Testing your cluster](#testing-your-cluster)
 
 ## Prerequisites
+
 1. You need a machine with docker installed.
 
 ## Overview
+
 This guide will set up a 2-node kubernetes cluster, consisting of a _master_ node which hosts the API server and orchestrates work
 and a _worker_ node which receives work from the master.  You can repeat the process of adding worker nodes an arbitrary number of
 times to create larger clusters.
@@ -62,6 +64,7 @@ Here's a diagram of what the final result will look like:
 ![Kubernetes Single Node on Docker](k8s-docker.png)
 
 ### Bootstrap Docker
+
 This guide also uses a pattern of running two instances of the Docker daemon
    1) A _bootstrap_ Docker instance which is used to start system daemons like ```flanneld``` and ```etcd```
    2) A _main_ Docker instance which is used for the Kubernetes infrastructure and user's scheduled containers
@@ -71,6 +74,7 @@ all of the Docker containers created by Kubernetes.  To achieve this, it must ru
 it is still useful to use containers for deployment and management, so we create a simpler _bootstrap_ daemon to achieve this.
 
 ## Master Node
+
 The first step in the process is to initialize the master node.
 
 See [here](docker-multinode/master.md) for detailed instructions.

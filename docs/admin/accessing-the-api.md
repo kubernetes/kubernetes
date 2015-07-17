@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Configuring APIserver ports
 
 This document describes what ports the kubernetes apiserver
@@ -42,6 +43,7 @@ in [Accessing the cluster](../user-guide/accessing-the-cluster.md).
 
 
 ## Ports and IPs Served On
+
 The Kubernetes API is served by the Kubernetes APIServer process.  Typically,
 there is one of these running on a single kubernetes-master node.
 
@@ -93,6 +95,7 @@ variety of uses cases:
       setup time. Kubelets use cert-based auth, while kube-proxy uses token-based auth.
 
 ## Expected changes
+
    - Policy will limit the actions kubelets can do via the authed port.
    - Scheduler and Controller-manager will use the Secure Port too.  They
      will then be able to run on different machines than the apiserver.

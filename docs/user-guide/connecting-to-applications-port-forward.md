@@ -30,7 +30,8 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-#Connecting to applications: kubectl port-forward
+
+# Connecting to applications: kubectl port-forward
 
 kubectl port-forward forwards connections to a local port to a port on a pod. Its man page is available [here](kubectl/kubectl_port-forward.md). Compared to [kubectl proxy](accessing-the-cluster.md#using-kubectl-proxy), `kubectl port-forward` is more generic as it can forward TCP traffic while `kubectl proxy` can only forward HTTP traffic. This guide demonstrates how to use `kubectl port-forward` to connect to a Redis database, which may be useful for database debugging.
 
@@ -51,6 +52,7 @@ redis-master   2/2       Running   0          41s
 
 
 ## Connecting to the Redis master[a]
+
 The Redis master is listening on port 6397, to verify this,
 
 ```

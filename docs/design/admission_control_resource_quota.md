@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Admission control plugin: ResourceQuota
 
 ## Background
@@ -185,6 +186,7 @@ services                3       5
 ```
 
 ## More information 
+
 See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more information.
 
 
