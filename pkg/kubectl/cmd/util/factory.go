@@ -163,11 +163,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return kubectl.MakeLabels(t.Spec.Selector), nil
 			default:
-				kind, err := meta.NewAccessor().Kind(object)
+				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 				if err != nil {
 					return "", err
 				}
-				return "", fmt.Errorf("it is not possible to get a pod selector from %s", kind)
+				return "", fmt.Errorf("cannot extract pod selector from %s", kind)
 			}
 		},
 		PortsForObject: func(object runtime.Object) ([]string, error) {
@@ -178,11 +178,13 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *api.Pod:
 				return getPorts(t.Spec), nil
 			default:
-				kind, err := meta.NewAccessor().Kind(object)
+				// TODO: support extracting ports from service:
+				// https://github.com/GoogleCloudPlatform/kubernetes/issues/11392
+				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("it is not possible to get ports from %s", kind)
+				return nil, fmt.Errorf("cannot extract ports from %s", kind)
 			}
 		},
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
