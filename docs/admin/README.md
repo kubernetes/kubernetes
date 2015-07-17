@@ -85,9 +85,6 @@ project.](salt.md).
 
 ## Multi-tenant support
 
-* **Namespaces** ([namespaces.md](namespaces.md)): Namespaces help different
-  projects, teams, or customers to share a kubernetes cluster.
-
 * **Resource Quota** ([resource-quota.md](resource-quota.md)) 
 
 ## Security

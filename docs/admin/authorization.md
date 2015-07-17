@@ -37,9 +37,7 @@ In Kubernetes, authorization happens as a separate step from authentication.
 See the [authentication documentation](authentication.md) for an 
 overview of authentication.
 
-Authorization applies to all HTTP accesses on the main apiserver port. (The
-readonly port is not currently subject to authorization, but is planned to be
-removed soon.)
+Authorization applies to all HTTP accesses on the main (secure) apiserver port.
 
 The authorization check for any request compares attributes of the context of
 the request, (such as user, resource, and namespace) with access

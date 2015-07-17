@@ -59,7 +59,7 @@ By default the Kubernetes APIserver serves HTTP on 2 ports:
     - uses token-file or client-certificate based [authentication](authentication.md).
     - uses policy-based [authorization](authorization.md).
   3. Removed: ReadOnly Port
-    - For security reasons, this had to be removed. Use the service account feature instead.
+    - For security reasons, this had to be removed. Use the [service account](../user-guide/service-accounts.md) feature instead.
 
 ## Proxies and Firewall rules
 
@@ -80,26 +80,22 @@ variety of uses cases:
    1. Clients outside of a Kubernetes cluster, such as human running `kubectl`
       on desktop machine.  Currently, accesses the Localhost Port via a proxy (nginx)
       running on the `kubernetes-master` machine.  Proxy uses bearer token authentication.
-   2. Processes running in Containers on Kubernetes that need to do read from
-      the apiserver.  Currently, these can use a service account.
+   2. Processes running in Containers on Kubernetes that need to read from
+      the apiserver.  Currently, these can use a [service account](../user-guide/service-accounts.md).
    3. Scheduler and Controller-manager processes, which need to do read-write
-      API operations.  Currently, these have to run on the operations on the
-      apiserver.  Currently, these have to run on the same host as the
+      API operations. Currently, these have to run on the same host as the
       apiserver and use the Localhost Port.  In the future, these will be
       switched to using service accounts to avoid the need to be co-located.
    4. Kubelets, which need to do read-write API operations and are necessarily
       on different machines than the apiserver.  Kubelet uses the Secure Port
       to get their pods, to find the services that a pod can see, and to
       write events.  Credentials are distributed to kubelets at cluster
-      setup time.
+      setup time. Kubelets use cert-based auth, while kube-proxy uses token-based auth.
 
 ## Expected changes
    - Policy will limit the actions kubelets can do via the authed port.
-   - Kubelets will change from token-based authentication to cert-based-auth.
    - Scheduler and Controller-manager will use the Secure Port too.  They
      will then be able to run on different machines than the apiserver.
-   - A general mechanism will be provided for [giving credentials to
-     pods](https://github.com/GoogleCloudPlatform/kubernetes/issues/1907).
    - Clients, like kubectl, will all support token-based auth, and the
      Localhost will no longer be needed, and will not be the default.
      However, the localhost port may continue to be an option for

@@ -31,7 +31,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 # Cluster Troubleshooting
-Most of the time, if you encounter problems, it is your application that is having problems.  For application
+Most of the time, if you encounter problems, it is your application that is the root cause.  For application
 problems please see the [application troubleshooting guide](../user-guide/application-troubleshooting.md). You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
 
 ## Listing your cluster
@@ -46,7 +46,7 @@ And verify that all of the nodes you expect to see are present and that they are
 
 ## Looking at logs
 For now, digging deeper into the cluster requires logging into the relevant machines.  Here are the locations
-of the relevant log files.  (note that on systemd based systems, you may need to use ```journalctl``` instead)
+of the relevant log files.  (note that on systemd-based systems, you may need to use ```journalctl``` instead)
 
 ### Master
    * /var/log/kube-apiserver.log - API Server, responsible for serving the API
@@ -59,7 +59,7 @@ of the relevant log files.  (note that on systemd based systems, you may need to
 
 ## A general overview of cluster failure modes
 
-This is an incomplete list of things that could go wrong, and how to deal with them.
+This is an incomplete list of things that could go wrong, and how to adjust your cluster setup to mitigate the problems.
 
 Root causes:
   - VM(s) shutdown
@@ -102,18 +102,18 @@ Specific scenarios:
       - etc.
 
 Mitigations:
-- Action: Use IaaS providers automatic VM restarting feature for IaaS VMs
+- Action: Use IaaS provider's automatic VM restarting feature for IaaS VMs
   - Mitigates: Apiserver VM shutdown or apiserver crashing
   - Mitigates: Supporting services VM shutdown or crashes
 
 - Action use IaaS providers reliable storage (e.g GCE PD or AWS EBS volume) for VMs with apiserver+etcd
   - Mitigates: Apiserver backing storage lost
 
-- Action: Use [replicated APIserver](high-availability.md) feature
-  - Mitigates: Apiserver VM shutdown or apiserver crashing
-    - Will tolerate one or more simultaneous apiserver failures
+- Action: Use (experimental) [high-availability](high-availability.md) configuration
+  - Mitigates: Master VM shutdown or master components (scheduler, API server, controller-managing) crashing
+    - Will tolerate one or more simultaneous node or component failures
   - Mitigates: Apiserver backing storage (i.e., etcd's data directory) lost
-    - Each apiserver has independent storage.  Etcd will recover from loss of one member.  Risk of total data loss greatly reduced.
+    - Assuming you used clustered etcd.
 
 - Action: Snapshot apiserver PDs/EBS-volumes periodically
   - Mitigates: Apiserver backing storage lost
