@@ -30,6 +30,7 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # etcd
 
 [etcd](https://coreos.com/etcd/docs/2.0.12/) is a highly-available key value
