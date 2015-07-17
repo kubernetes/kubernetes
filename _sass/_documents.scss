@@ -1,12 +1,10 @@
-#bodywrapper {
-	float:right;
-	min-width: 600px;
-	overflow: hidden;
+.bodywrapper {
+    overflow: auto;
 }
-
 div #doccontent {
-	height: 94vh;
-	overflow: scroll;
+    padding-left: 30px;
+    margin-right: 30px;
+    height: 94vh;
 	padding-right: 10px;
 	h1 {
 		font-size: 45px;
