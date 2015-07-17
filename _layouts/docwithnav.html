@@ -1,0 +1,42 @@
+{% include dochead.html %}
+<div>
+	<table>
+		<tr>
+			<td>
+				<div id="wrapper">
+					{% include nav_v1_0.html %}
+				</div>
+			</td>
+			<td>
+				{% include documentation.html %}
+			</td>
+		</tr>
+	</table>
+</div>
+{% include footer.html %}
+<script type="text/javascript">
+	$(function() {
+	    var menu_ul = $('.menu > li > ul'),
+	           menu_a  = $('.menu > li > a');
+	    menu_ul.hide();
+	    menu_a.click(function(e) {
+	        e.preventDefault();
+	        if(!$(this).hasClass('active')) {
+	            menu_a.removeClass('active');
+	            menu_ul.filter(':visible').slideUp('normal');
+	            $(this).addClass('active').next().stop(true,true).slideDown('normal');
+	        } else {
+	            $(this).removeClass('active');
+	            $(this).next().stop(true,true).slideUp('normal');
+	        }
+	    });
+		window.addEventListener("popstate", function(e) {
+		        window.location.href = location.href
+		});
+	});
+    $('.menu a').each(function(){
+		var that = $(this);
+		that[ that.attr( 'href' ) === window.location.href ? 'addClass' : 'removeClass' ]( 'active' );
+    });
+</script>
+
