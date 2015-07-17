@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 # Considerations for running multiple Kubernetes clusters
 
 You may want to set up multiple kubernetes clusters, both to
-have clusters in different regions to be nearer to your users; and to tolerate failures and/or invasive maintenance.
+have clusters in different regions to be nearer to your users, and to tolerate failures and/or invasive maintenance.
 This document describes some of the issues to consider when making a decision about doing so.
 
 Note that at present,
@@ -54,8 +54,8 @@ We suggest that all the VMs in a Kubernetes cluster should be in the same availa
 
 It is okay to have multiple clusters per availability zone, though on balance we think fewer is better.
 Reasons to prefer fewer clusters are:
-  - improved bin packing of Pods in some cases with more nodes in one cluster.
-  - reduced operational overhead (though the advantage is diminished as ops tooling and processes matures).
+  - improved bin packing of Pods in some cases with more nodes in one cluster (less resource fragmentation)
+  - reduced operational overhead (though the advantage is diminished as ops tooling and processes matures)
   - reduced costs for per-cluster fixed resource costs, e.g. apiserver VMs (but small as a percentage
     of overall cluster cost for medium to large clusters).
 
@@ -82,13 +82,13 @@ you need `R + U` clusters.  If it is not (e.g you want to ensure low latency for
 cluster failure), then you need to have `R * U` clusters (`U` in each of `R` regions).  In any case, try to put each cluster in a different zone.
 
 Finally, if any of your clusters would need more than the maximum recommended number of nodes for a Kubernetes cluster, then
-you may need even more clusters.  Our [roadmap](../roadmap.md)
-calls for maximum 100 node clusters at v1.0 and maximum 1000 node clusters in the middle of 2015.
+you may need even more clusters.  Kubernetes v1.0 currently supports clusters up to 100 nodes in size, but we are targeting
+1000-node clusters by early 2016.
 
 ## Working with multiple clusters
 
 When you have multiple clusters, you would typically create services with the same config in each cluster and put each of those
-service instances behind a load balancer (AWS Elastic Load Balancer, GCE Forwarding Rule or HTTP Load Balancer), so that
+service instances behind a load balancer (AWS Elastic Load Balancer, GCE Forwarding Rule or HTTP Load Balancer) spanning all of them, so that
 failures of a single cluster are not visible to end users.
 
 
