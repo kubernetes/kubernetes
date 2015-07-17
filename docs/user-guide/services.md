@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Services in Kubernetes](#services-in-kubernetes)
   - [Overview](#overview)
   - [Defining a service](#defining-a-service)
