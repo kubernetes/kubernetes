@@ -62,7 +62,7 @@ Kubernetes documentation is organized into several categories.
     - in [docs/getting-started-guides](docs/getting-started-guides)
   - **User Documentation**
     - [User FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
-    - in [docs](docs/overview.md)
+    - in [docs](docs/user-guide/overview.md)
     - for people who want to run programs on kubernetes
     - describes current features of the system (with brief mentions of planned features)
   - **Developer Documentation**
@@ -71,7 +71,7 @@ Kubernetes documentation is organized into several categories.
     - covers development conventions
     - explains current architecture and project plans
   - **Service Documentation**
-    - in [docs/services.md](docs/services.md)
+    - in [docs/user-guide/services.md](docs/user-guide/services.md)
     - [Service FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ)
     - for people who are interested in how Services work
     - details of ```kube-proxy``` iptables
