@@ -8,7 +8,7 @@
 					var containertest = href.indexOf('#');
 					history.pushState({}, null, href);
 					if(containertest == -1){
-						$('#doccontent').animate({scrollTop: 0}, 1000).load(href + ' #doccontent > *');
+						$('#doccontent').animate({scrollTop: 0}, 500).load(href + ' #doccontent > *');
 					}
 		        return false; // don't actually follow the link
 		     	});
