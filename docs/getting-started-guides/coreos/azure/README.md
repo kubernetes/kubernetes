@@ -97,12 +97,12 @@ kube-02             environment=production   Ready
 Let's follow the Guestbook example now:
 ```
 cd guestbook-example
-kubectl create -f redis-master-controller.json
-kubectl create -f redis-master-service.json
-kubectl create -f redis-slave-controller.json
-kubectl create -f redis-slave-service.json
-kubectl create -f frontend-controller.json
-kubectl create -f frontend-service.json
+kubectl create -f examples/guestbook/redis-master-controller.yaml
+kubectl create -f examples/guestbook/redis-master-service.yaml
+kubectl create -f examples/guestbook/redis-slave-controller.yaml
+kubectl create -f examples/guestbook/redis-slave-service.yaml
+kubectl create -f examples/guestbook/frontend-controller.yaml
+kubectl create -f examples/guestbook/frontend-service.yaml
 ```
 
 You need to wait for the pods to get deployed, run the following and wait for `STATUS` to change from `Unknown`, through `Pending` to `Running`.

@@ -63,7 +63,7 @@ This pod specification has one container which runs a bash script when the conta
 namespace.
 
 ```
- $ kubectl create -f counter-pod.yaml
+ $ kubectl create -f examples/blog-logging/counter-pod.yaml
  pods/counter
 ```
 
@@ -114,7 +114,7 @@ pods/counter
 Now let’s restart the counter.
 
 ```
-$ kubectl create -f counter-pod.yaml
+$ kubectl create -f examples/blog-logging/counter-pod.yaml
 pods/counter
 ```
 Let’s wait for the container to restart and get the log lines again.

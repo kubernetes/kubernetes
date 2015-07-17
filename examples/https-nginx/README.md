@@ -40,7 +40,7 @@ You need a [running kubernetes cluster](../../docs/getting-started-guides/) for 
 $ kubectl create -f /tmp/secret.json
 secrets/nginxsecret
 
-$ kubectl create -f nginx-app.yaml
+$ kubectl create -f examples/https-nginx/nginx-app.yaml
 services/nginxsvc
 replicationcontrollers/my-nginx
 

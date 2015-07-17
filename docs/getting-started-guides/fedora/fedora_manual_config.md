@@ -146,7 +146,7 @@ done
 Now create a node object internally in your kubernetes cluster by running:
 
 ```
-$ kubectl create -f node.json
+$ kubectl create -f ./node.json
 
 $ kubectl get nodes
 NAME                LABELS              STATUS
@@ -205,7 +205,7 @@ fed-node          name=fed-node-label     Ready
 To delete _fed-node_ from your kubernetes cluster, one should run the following on fed-master (Please do not do it, it is just for information):
 
 ```
-$ kubectl delete -f node.json
+$ kubectl delete -f ./node.json
 ```
 
 *You should be finished!*

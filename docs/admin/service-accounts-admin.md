@@ -94,7 +94,7 @@ secret.json:
 	"type": "kubernetes.io/service-account-token"
 }
 
-$ kubectl create -f secret.json
+$ kubectl create -f ./secret.json
 $ kubectl describe secret mysecretname
 ```
 

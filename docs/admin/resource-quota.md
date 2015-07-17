@@ -93,7 +93,7 @@ $ cat <<EOF > quota.json
   }
 }
 EOF
-$ kubectl create -f quota.json
+$ kubectl create -f ./quota.json
 $ kubectl get quota
 NAME
 quota
