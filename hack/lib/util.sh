@@ -159,8 +159,9 @@ kube::util::gen-doc() {
         generated=$(echo "${generated}" | grep -v "^${skipprefix}" || :)
       fi
       # By now, the contents should be normalized and stripped of any
-      # auto-managed content.
-      if [[ "${original}" == "${generated}" ]]; then
+      # auto-managed content.  We also ignore whitespace here because of
+      # markdown strictness fixups later in the pipeline.
+      if diff -Bw <(echo "${original}") <(echo "${generated}") > /dev/null; then
         # actual contents same, overwrite generated with original.
         mv "${dest}/${file}" "${tmpdir}/${file}"
       fi
