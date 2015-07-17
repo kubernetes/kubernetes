@@ -47,20 +47,24 @@ We still have [a bunch of work](https://github.com/GoogleCloudPlatform/kubernete
   More details about the networking of rkt can be found in the [documentation](https://github.com/coreos/rkt/blob/master/Documentation/networking.md).
 
   To start the `rkt metadata service`, you can simply run:
+
   ```shell
   $ sudo rkt metadata-service
   ```
 
   If you want the service to be running as a systemd service, then:
+
   ```shell
   $ sudo systemd-run rkt metadata-service
   ```
+
   Alternatively, you can use the [rkt-metadata.service](https://github.com/coreos/rkt/blob/master/dist/init/systemd/rkt-metadata.service) and [rkt-metadata.socket](https://github.com/coreos/rkt/blob/master/dist/init/systemd/rkt-metadata.socket) to start the service.
 
 
 ### Local cluster
 
 To use rkt as the container runtime, you just need to set the environment variable `CONTAINER_RUNTIME`:
+
 ```shell
 $ export CONTAINER_RUNTIME=rkt
 $ hack/local-up-cluster.sh
@@ -69,6 +73,7 @@ $ hack/local-up-cluster.sh
 ### CoreOS cluster on Google Compute Engine (GCE)
 
 To use rkt as the container runtime for your CoreOS cluster on GCE, you need to specify the OS distribution, project, image:
+
 ```shell
 $ export KUBE_OS_DISTRIBUTION=coreos
 $ export KUBE_GCE_MINION_IMAGE=<image_id>
@@ -77,11 +82,13 @@ $ export KUBE_CONTAINER_RUNTIME=rkt
 ```
 
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
+
 ```shell
 $ export KUBE_RKT_VERSION=0.5.6
 ```
 
 Then you can launch the cluster by:
+
 ````shell
 $ kube-up.sh
 ```
@@ -91,6 +98,7 @@ Note that we are still working on making all containerized the master components
 ### CoreOS cluster on AWS
 
 To use rkt as the container runtime for your CoreOS cluster on AWS, you need to specify the provider and OS distribution:
+
 ```shell
 $ export KUBERNETES_PROVIDER=aws
 $ export KUBE_OS_DISTRIBUTION=coreos
@@ -98,16 +106,19 @@ $ export KUBE_CONTAINER_RUNTIME=rkt
 ```
 
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
+
 ```shell
 $ export KUBE_RKT_VERSION=0.5.6
 ```
 
 You can optionally choose the CoreOS channel  by setting `COREOS_CHANNEL`:
+
 ```shell
 $ export COREOS_CHANNEL=stable
 ```
 
 Then you can launch the cluster by:
+
 ````shell
 $ kube-up.sh
 ```

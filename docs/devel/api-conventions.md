@@ -196,12 +196,15 @@ References in the status of the referee to the referrer may be permitted, when t
 Discussed in [#2004](https://github.com/GoogleCloudPlatform/kubernetes/issues/2004) and elsewhere. There are no maps of subobjects in any API objects. Instead, the convention is to use a list of subobjects containing name fields.
 
 For example:
+
 ```yaml
 ports:
   - name: www
     containerPort: 80
 ```
+
 vs.
+
 ```yaml
 ports:
   www:
@@ -518,6 +521,7 @@ A ```Status``` kind will be returned by the API in two cases:
 The status object is encoded as JSON and provided as the body of the response.  The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning. When fields in the status object have the same meaning as generally defined HTTP headers and that header is returned with the response, the header should be considered as having higher priority.
 
 **Example:**
+
 ```
 $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1/namespaces/default/pods/grafana
 

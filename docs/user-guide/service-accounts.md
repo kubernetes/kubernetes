@@ -64,6 +64,7 @@ You can access the API using a proxy or with a client library, as described in
 
 Every namespace has a default service account resource called "default".
 You can list this and any other serviceAccount resources in the namespace with this command:
+
 ```
 kubectl get serviceAccounts
 $ NAME      SECRETS
@@ -71,6 +72,7 @@ default   1
 ```
 
 You can create additional serviceAccounts like this:
+
 ```
 $ cat > /tmp/serviceaccount.yaml <<EOF
 apiVersion: v1
@@ -83,6 +85,7 @@ serviceacccounts/build-robot
 ```
 
 If you get a complete dump of the service account object, like this:
+
 ```
 $ kubectl get serviceacccounts/build-robot -o yaml
 apiVersion: v1
@@ -97,6 +100,7 @@ metadata:
 secrets:
 - name: build-robot-token-bvbk5
 ```
+
 then you will see that a token has automatically been created and is referenced by the service account.
 
 In the future, you will be able to configure different access policies for each service account.
@@ -109,6 +113,7 @@ The service account has to exist at the time the pod is created, or it will be r
 You cannot update the service account of an already created pod.  
 
 You can clean up the service account from this example like this:
+
 ```
 $ kubectl delete serviceaccount/build-robot
 ```

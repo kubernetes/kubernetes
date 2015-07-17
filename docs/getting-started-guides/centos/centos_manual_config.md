@@ -50,6 +50,7 @@ The kubernetes package provides a few services: kube-apiserver, kube-scheduler, 
 **System Information:**
 
 Hosts:
+
 ```
 centos-master = 192.168.121.9
 centos-minion = 192.168.121.65

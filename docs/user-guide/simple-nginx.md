@@ -47,16 +47,19 @@ kubectl run my-nginx --image=nginx --replicas=2 --port=80
 ```
 
 Once the pods are created, you can list them to see what is up and running:
+
 ```bash
 kubectl get pods
 ```
 
 You can also see the replication controller that was created:
+
 ```bash
 kubectl get rc
 ```
 
 To stop the two replicated containers, stop the replication controller:
+
 ```bash
 kubectl stop rc my-nginx
 ```

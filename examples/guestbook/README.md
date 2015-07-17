@@ -130,6 +130,7 @@ NAME                                           READY     STATUS    RESTARTS   AG
 ...
 redis-master-dz33o                             1/1       Running   0          2h
 ```
+
 (Note that an initial `docker pull` to grab a container image may take a few minutes, depending on network conditions. A pod will be reported as `Pending` while its image is being downloaded.)
 
 #### Optional Interlude
@@ -221,6 +222,7 @@ Create the service by running:
 $ kubectl create -f examples/guestbook/redis-master-service.yaml
 services/redis-master
 ```
+
 Then check the list of services, which should include the redis-master:
 
 ```shell

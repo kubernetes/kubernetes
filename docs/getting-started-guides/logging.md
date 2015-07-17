@@ -56,6 +56,7 @@ This diagram shows four nodes created on a Google Compute Engine cluster with th
 [cluster DNS service](../admin/dns.md) runs on one of the nodes and a pod which provides monitoring support runs on another node.
 
 To help explain how cluster level logging works let’s start off with a synthetic log generator pod specification [counter-pod.yaml](../../examples/blog-logging/counter-pod.yaml):
+
 ```
  apiVersion: v1
  kind: Pod
@@ -69,6 +70,7 @@ To help explain how cluster level logging works let’s start off with a synthet
      args: [bash, -c, 
             'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
 ```
+
 This pod specification has one container which runs a bash script when the container is born. This script simply writes out the value of a counter and the date once per second and runs indefinitely. Let’s create the pod in the default
 namespace.
 
@@ -78,11 +80,13 @@ namespace.
 ```
 
 We can observe the running pod:
+
 ```
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 counter                                        1/1       Running   0          5m
 ```
+
 This step may take a few minutes to download the ubuntu:14.04 image during which the pod status will be shown as `Pending`. 
 
 One of the nodes is now running the counter pod:
@@ -127,6 +131,7 @@ Now let’s restart the counter.
 $ kubectl create -f examples/blog-logging/counter-pod.yaml
 pods/counter
 ```
+
 Let’s wait for the container to restart and get the log lines again.
 
 ```

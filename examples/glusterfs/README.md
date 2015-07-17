@@ -56,14 +56,17 @@ Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
       ]
 
 ```
+
 The "IP" field should be filled with the address of a node in the Glusterfs server cluster. In this example, it is fine to give any valid value (from 1 to 65535) to the "port" field. 
 
 Create the endpoints,
+
 ```shell
 $ kubectl create -f examples/glusterfs/glusterfs-endpoints.json
 ```
 
 You can verify that the endpoints are successfully created by running
+
 ```shell
 $ kubectl get endpoints
 NAME                ENDPOINTS
@@ -92,9 +95,11 @@ The parameters are explained as the followings.
 - **readOnly** is the boolean that sets the mountpoint readOnly or readWrite. 
 
 Create a pod that has a container using Glusterfs volume,
+
 ```shell
 $ kubectl create -f examples/glusterfs/glusterfs-pod.json
 ```
+
 You can verify that the pod is running:
 
 ```shell
@@ -107,6 +112,7 @@ $ kubectl get pods glusterfs -t '{{.status.hostIP}}{{"\n"}}'
 ```
 
 You may ssh to the host (the hostIP) and run 'mount' to see if the Glusterfs volume is mounted,
+
 ```shell
 $ mount | grep kube_vol
 10.240.106.152:kube_vol on /var/lib/kubelet/pods/f164a571-fa68-11e4-ad5c-42010af019b7/volumes/kubernetes.io~glusterfs/glusterfsvol type fuse.glusterfs (rw,relatime,user_id=0,group_id=0,default_permissions,allow_other,max_read=131072)

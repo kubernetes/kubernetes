@@ -116,11 +116,13 @@ To permit an action Policy with an unset namespace applies regardless of namespa
 
 Other implementations can be developed fairly easily.
 The APIserver calls the Authorizer interface:
+
 ```go
 type Authorizer interface {
   Authorize(a Attributes) error
 }
 ```
+
 to determine whether or not to allow each API action.
 
 An authorization plugin is a module that implements this interface.

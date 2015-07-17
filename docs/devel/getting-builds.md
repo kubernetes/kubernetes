@@ -45,6 +45,7 @@ usage:
 ```
 
 You can also use the gsutil tool to explore the Google Cloud Storage release bucket. Here are some examples:
+
 ```
 gsutil cat gs://kubernetes-release/ci/latest.txt          # output the latest ci version number
 gsutil cat gs://kubernetes-release/ci/latest-green.txt    # output the latest ci version number that passed gce e2e

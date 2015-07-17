@@ -75,6 +75,7 @@ Look [here](namespaces/) for an in depth example of namespaces.
 
 ### Viewing namespaces
 You can list the current namespaces in a cluster using:
+
 ```sh
 $> kubectl get namespaces
 NAME          LABELS    STATUS
@@ -140,6 +141,7 @@ Note that the name of your namespace must be a DNS compatible label.
 More information on the ```finalizers``` field can be found in the namespace [design doc](../design/namespaces.md#finalizers).
 
 Then run:
+
 ```
 kubectl create -f ./my-namespace.yaml
 ```
@@ -149,6 +151,7 @@ kubectl create -f ./my-namespace.yaml
 To temporarily set the namespace for a request, use the ```--namespace``` flag.
 
 For example:
+
 ```
 kubectl --namespace=<insert-namespace-name-here> run nginx --image=nginx
 kubectl --namespace=<insert-namespace-name-here> get pods
@@ -160,11 +163,13 @@ You can permanently save the namespace for all subsequent kubectl commands in th
 context.
 
 First get your current context:
+
 ```sh
 export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}')
 ```
 
 Then update the default namespace:
+
 ```sh
 kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
 ```

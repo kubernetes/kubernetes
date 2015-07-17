@@ -108,23 +108,31 @@ $ sudo docker ps
 CONTAINER ID   IMAGE                        COMMAND   CREATED   STATUS   PORTS                NAMES
 fd7bac9e2301   quay.io/coreos/etcd:v2.0.12  "/etcd"   5s ago    Up 3s    2379/tcp, 2380/...   etcd
 ```
+
 It's also a good idea to ensure your etcd instance is reachable by testing it
+
 ```bash
 curl -L http://${KUBERNETES_MASTER_IP}:4001/v2/keys/
 ```
+
 If connectivity is OK, you will see an output of the available keys in etcd (if any).
 
 ### Start Kubernetes-Mesos Services
 Update your PATH to more easily run the Kubernetes-Mesos binaries:
+
 ```bash
 $ export PATH="$(pwd)/_output/local/go/bin:$PATH"
 ```
+
 Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos_master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
 In order to let Kubernetes survive Mesos master changes, the ZooKeeper URL is recommended for production environments.
+
 ```bash
 $ export MESOS_MASTER=<host:port or zk:// url>
 ```
+
 Create a cloud config file `mesos-cloud.conf` in the current directory with the following contents:
+
 ```bash
 $ cat <<EOF >mesos-cloud.conf
 [mesos-cloud]
@@ -166,6 +174,7 @@ Disown your background jobs so that they'll stay running if you log out.
 ```bash
 $ disown -a
 ```
+
 #### Validate KM Services
 Add the appropriate binary folder to your ```PATH``` to access kubectl:
 
@@ -312,6 +321,7 @@ kubectl  exec busybox -- nslookup kubernetes
 ```
 
 If everything works fine, you will get this output:
+
 ```
 Server:    10.10.10.10
 Address 1: 10.10.10.10

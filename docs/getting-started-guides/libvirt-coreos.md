@@ -67,6 +67,7 @@ Getting started with libvirt CoreOS
 #### ¹ Depending on your distribution, libvirt access may be denied by default or may require a password at each access.
 
 You can test it with the following command:
+
 ```
 virsh -c qemu:///system pool-list
 ```
@@ -176,11 +177,13 @@ The IP to connect to the master is 192.168.10.1.
 The IPs to connect to the nodes are 192.168.10.2 and onwards.
 
 Connect to `kubernetes_master`:
+
 ```
 ssh core@192.168.10.1
 ```
 
 Connect to `kubernetes_minion-01`:
+
 ```
 ssh core@192.168.10.2
 ```
@@ -212,6 +215,7 @@ cluster/kube-push.sh
 ```
 
 Update the libvirt-CoreOS cluster with the locally built Kubernetes binaries produced by `make`:
+
 ```
 KUBE_PUSH=local cluster/kube-push.sh
 ```

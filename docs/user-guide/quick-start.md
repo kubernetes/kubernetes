@@ -58,6 +58,7 @@ my-nginx     my-nginx       nginx      run=my-nginx   2
 ```
 
 You can see that they are running by:
+
 ```bash
 $ kubectl get po
 NAME             READY     STATUS    RESTARTS   AGE

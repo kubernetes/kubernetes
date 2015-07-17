@@ -109,6 +109,7 @@ $ kubectl describe secret mysecretname
 ```
 
 #### To delete/invalidate a service account token
+
 ```
 kubectl delete secret mysecretname
 ```

@@ -38,10 +38,13 @@ This config bundle lives in `$HOME/.kube/config`, and is generated
 by `cluster/kube-up.sh`. Sample steps for sharing `kubeconfig` below.
 
 **1. Create a cluster**
+
 ```bash
 cluster/kube-up.sh
 ```
+
 **2. Copy `kubeconfig` to new host**
+
 ```bash
 scp $HOME/.kube/config user@remotehost:/path/to/.kube/config
 ```
@@ -49,14 +52,19 @@ scp $HOME/.kube/config user@remotehost:/path/to/.kube/config
 **3. On new host, make copied `config` available to `kubectl`**
 
 * Option A: copy to default location
+
 ```bash
 mv /path/to/.kube/config $HOME/.kube/config
 ```
+
 * Option B: copy to working directory (from which kubectl is run)
+
 ```bash
 mv /path/to/.kube/config $PWD
 ```
+
 * Option C: manually pass `kubeconfig` location to `.kubectl`
+
 ```bash
 # via environment variable
 export KUBECONFIG=/path/to/.kube/config
@@ -95,15 +103,18 @@ kubectl config set-credentials $USER_NICK
 # create context entry
 kubectl config set-context $CONTEXT_NAME --cluster=$CLUSTER_NICKNAME --user=$USER_NICK
 ```
+
 Notes:
 * The `--embed-certs` flag is needed to generate a standalone
 `kubeconfig`, that will work as-is on another host.
 * `--kubeconfig` is both the preferred file to load config from and the file to
 save config too. In the above commands the `--kubeconfig` file could be
 omitted if you first run
+
 ```bash
 export KUBECONFIG=/path/to/standalone/.kube/config
 ```
+
 * The ca_file, key_file, and cert_file referenced above are generated on the
 kube master at cluster turnup. They can be found on the master under
 `/srv/kubernetes`. Bearer token/basic auth are also generated on the kube master.
@@ -134,6 +145,7 @@ scp host2:/path/to/home2/.kube/config path/to/other/.kube/config
 
 export $KUBECONFIG=path/to/other/.kube/config
 ```
+
 Detailed examples and explanation of `kubeconfig` loading/merging rules can be found in [kubeconfig-file.md](kubeconfig-file.md).
 
 

@@ -130,6 +130,7 @@ ansible-playbook -i inventory ping.yml # This will look like it fails, that's ok
 **Push your ssh public key to every machine**
 
 Again, you can skip this step if your ansible machine has ssh access to the nodes you are going to use in the kubernetes cluster.
+
 ```
 ansible-playbook -i inventory keys.yml
 ```
@@ -161,6 +162,7 @@ Flannel is a cleaner mechanism to use, and is the recommended choice.
 - If you are using flannel, you should check the kubernetes-ansible repository above. 
 
 Currently, you essentially have to (1) update group_vars/all.yml, and then (2) run
+
 ```
 ansible-playbook -i inventory flannel.yml
 ```

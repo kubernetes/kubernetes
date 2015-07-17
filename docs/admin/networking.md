@@ -152,6 +152,7 @@ outbound internet access.  A linux bridge (called `cbr0`) is configured to exist
 on that subnet, and is passed to docker's `--bridge` flag.
 
 We start Docker with:
+
 ```
     DOCKER_OPTS="--bridge=cbr0 --iptables=false --ip-masq=false"
 ```

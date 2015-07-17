@@ -51,6 +51,7 @@ for ease of development and testing.  You'll create a local ```HostPath``` for t
 support local storage on the host at this time.  There is no guarantee your pod ends up on the correct node where the ```HostPath``` resides.
 
   
+
 ```
 
 // this will be nginx's webroot

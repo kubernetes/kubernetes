@@ -78,9 +78,11 @@ and you're trying to cut a release, don't hesitate to contact the GKE
 oncall.
 
 Before proceeding to the next step:
+
 ```
 export BRANCHPOINT=v0.20.2-322-g974377b
 ```
+
 Where `v0.20.2-322-g974377b` is the git hash you decided on. This will become
 our (retroactive) branch point.
 

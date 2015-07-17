@@ -33,6 +33,7 @@ Documentation for other releases can be found at
 # Install and configure kubectl
 
 ## Download the kubectl CLI tool
+
 ```bash
 ### Darwin
 wget https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/darwin/amd64/kubectl
@@ -42,12 +43,14 @@ wget https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux
 ```
 
 ### Copy kubectl to your path
+
 ```bash
 chmod +x kubectl
 mv kubectl /usr/local/bin/
 ```
 
 ### Create a secure tunnel for API communication
+
 ```bash
 ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
 ```

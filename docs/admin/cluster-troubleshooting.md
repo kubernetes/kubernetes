@@ -38,6 +38,7 @@ problems please see the [application troubleshooting guide](../user-guide/applic
 The first thing to debug in your cluster is if your nodes are all registered correctly.
 
 Run
+
 ```
 kubectl get nodes
 ```

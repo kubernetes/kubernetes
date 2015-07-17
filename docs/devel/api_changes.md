@@ -282,6 +282,7 @@ conversion functions when writing your conversion functions.
 Once all the necessary manually written conversions are added, you need to
 regenerate auto-generated ones. To regenerate them:
    - run
+
 ```
    $ hack/update-generated-conversions.sh
 ```

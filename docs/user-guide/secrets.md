@@ -90,6 +90,7 @@ information on how Service Accounts work.
 ### Creating a Secret Manually
 
 This is an example of a simple secret, in yaml format:
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -116,6 +117,7 @@ Once the secret is created, you can:
 ### Manually specifying a Secret to be Mounted on a Pod
 
 This is an example of a pod that mounts a secret in a volume:
+
 ```json
 {
  "apiVersion": "v1",
@@ -424,6 +426,7 @@ The pods:
 ```
 
 Both containers will have the following files present on their filesystems:
+
 ```
     /etc/secret-volume/username
     /etc/secret-volume/password
@@ -435,6 +438,7 @@ creating pods with different capabilities from a common pod config template.
 You could further simplify the base pod specification by using two service accounts:
 one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
 `test-user` with the `test-db-secret`.  Then, the pod spec can be shortened to, for example:
+
 ```json
 {
 "kind": "Pod",

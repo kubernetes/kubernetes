@@ -34,6 +34,7 @@ Documentation for other releases can be found at
 This example shows two types of pod [health checks](../production-pods.md#liveness-and-readiness-probes-aka-health-checks): HTTP checks and container execution checks.
 
 The [exec-liveness.yaml](exec-liveness.yaml) demonstrates the container execution check.
+
 ```
     livenessProbe:
       exec:
@@ -43,16 +44,20 @@ The [exec-liveness.yaml](exec-liveness.yaml) demonstrates the container executio
       initialDelaySeconds: 15
       timeoutSeconds: 1
 ```
+
 Kubelet executes the command `cat /tmp/health` in the container and reports failure if the command returns a non-zero exit code.
 
 Note that the container removes the `/tmp/health` file after 10 seconds,
+
 ```
 echo ok > /tmp/health; sleep 10; rm -rf /tmp/health; sleep 600
 ```
+
 so when Kubelet executes the health check 15 seconds (defined by initialDelaySeconds) after the container started, the check would fail.
 
 
 The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
+
 ```
     livenessProbe:
       httpGet:
@@ -61,18 +66,21 @@ The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
       initialDelaySeconds: 15
       timeoutSeconds: 1
 ```
+
 The Kubelet sends a HTTP request to the specified path and port to perform the health check. If you take a look at image/server.go, you will see the server starts to respond with an error code 500 after 10 seconds, so the check fails.
 
 This [guide](../walkthrough/k8s201.md#health-checking) has more information on health checks.
 
 ## Get your hands dirty
 To show the health check is actually working, first create the pods:
+
 ```
 # kubectl create -f docs/user-guide/liveness/exec-liveness.yaml
 # kubectl create -f docs/user-guide/liveness/http-liveness.yaml
 ```
 
 Check the status of the pods once they are created:
+
 ```
 # kubectl get pods
 NAME                                           READY     STATUS       RESTARTS   AGE
@@ -80,7 +88,9 @@ NAME                                           READY     STATUS       RESTARTS  
 liveness-exec                                  1/1       Running      0          13s
 liveness-http                                  1/1       Running      0          13s
 ```
+
 Check the status half a minute later, you will see the container restart count being incremented:
+
 ```
 # kubectl get pods
 mwielgus@mwielgusd:~/test/k2/kubernetes/examples/liveness$ kubectl get pods
@@ -89,6 +99,7 @@ NAME                                           READY     STATUS       RESTARTS  
 liveness-exec                                  1/1       Running      1          36s
 liveness-http                                  1/1       Running      1          36s
 ```
+
 At the bottom of the *kubectl describe* output there are messages indicating that the liveness probes have failed, and the containers have been killed and recreated.
 
 ```
