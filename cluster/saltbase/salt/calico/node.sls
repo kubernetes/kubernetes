@@ -32,7 +32,7 @@ calico-node:
 
 calico-ip-pool-reset:
   cmd.run:
-    - name: /home/vagrant/calicoctl pool remove 192.160.0.0/16
+    - name: /home/vagrant/calicoctl pool remove 192.168.0.0/16
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:

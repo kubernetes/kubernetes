@@ -1,15 +1,5 @@
 {% if grains.network_mode is defined and grains.network_mode == 'calico' %}
 
-/etc/kubernetes/manifests/calico-etcd.manifest:
-  file.managed:
-    - source: salt://calico/calico-etcd.manifest
-    - template: jinja
-    - user: root
-    - group: root
-    - mode: 644
-    - makedirs: true
-    - dir_mode: 755
-
 calicoctl:
   file.managed:
     - name: /home/vagrant/calicoctl
@@ -28,6 +18,21 @@ calico-node:
       - kmod: xt_set
       - service: docker
       - file: calicoctl
+      - cmd: etcd
+
+etcd:
+  cmd.run:
+    - name: >
+               docker run --name calico-etcd -d --restart=always -p 6666:6666
+               -v /varetcd:/var/etcd
+               gcr.io/google_containers/etcd:2.0.8
+               /usr/local/bin/etcd --name calico
+               --data-dir /var/etcd/calico-data
+               --advertise-client-urls http://{{grains.api_servers}}:6666
+               --listen-client-urls http://0.0.0.0:6666
+               --listen-peer-urls http://0.0.0.0:2380
+               --initial-advertise-peer-urls http://{{grains.api_servers}}:2380
+               --initial-cluster calico=http://{{grains.api_servers}}:2380
 
 ip6_tables:
   kmod.present
