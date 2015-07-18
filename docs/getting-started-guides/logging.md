@@ -38,7 +38,7 @@ A Kubernetes cluster will typically be humming along running many system and app
 Cluster level logging for Kubernetes allows us to collect logs which persist beyond the lifetime of the pod’s container images or the lifetime of the pod or even cluster. In this article we assume that a Kubernetes cluster has been created with cluster level logging support for sending logs to Google Cloud Logging. After a cluster has been created you will have a collection of system pods running in the `kube-system` namespace that support monitoring,
 logging and DNS resolution for names of Kubernetes services:
 
-```
+```console
 $ kubectl get pods --namespace=kube-system
 NAME                                           READY     REASON    RESTARTS   AGE
 fluentd-cloud-logging-kubernetes-minion-0f64   1/1       Running   0          32m
@@ -58,7 +58,7 @@ This diagram shows four nodes created on a Google Compute Engine cluster with th
 
 To help explain how cluster level logging works let’s start off with a synthetic log generator pod specification [counter-pod.yaml](../../examples/blog-logging/counter-pod.yaml):
 
-```
+```yaml
  apiVersion: v1
  kind: Pod
  metadata:
@@ -75,14 +75,14 @@ To help explain how cluster level logging works let’s start off with a synthet
 This pod specification has one container which runs a bash script when the container is born. This script simply writes out the value of a counter and the date once per second and runs indefinitely. Let’s create the pod in the default
 namespace.
 
-```
+```console
  $ kubectl create -f examples/blog-logging/counter-pod.yaml
  pods/counter
 ```
 
 We can observe the running pod:
 
-```
+```console
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 counter                                        1/1       Running   0          5m
@@ -96,7 +96,7 @@ One of the nodes is now running the counter pod:
 
 When the pod status changes to `Running` we can use the kubectl logs command to view the output of this counter pod.
 
-```
+```console
 $ kubectl logs counter
 0: Tue Jun  2 21:37:31 UTC 2015
 1: Tue Jun  2 21:37:32 UTC 2015
@@ -109,7 +109,7 @@ $ kubectl logs counter
 
 This command fetches the log text from the Docker log file for the image that is running in this container. We can connect to the running container and observe the running counter bash script.
 
-```
+```console
 $ kubectl exec -i counter bash
 ps aux
 USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
@@ -121,21 +121,21 @@ root       480  0.0  0.0  15572  2212 ?        R    00:05   0:00 ps aux
 
 What happens if for any reason the image in this pod is killed off and then restarted by Kubernetes? Will we still see the log lines from the previous invocation of the container followed by the log lines for the started container? Or will we lose the log lines from the original container’s execution and only see the log lines for the new container? Let’s find out. First let’s stop the currently running counter.
 
-```
+```console
 $ kubectl stop pod counter
 pods/counter
 ```
 
 Now let’s restart the counter.
 
-```
+```console
 $ kubectl create -f examples/blog-logging/counter-pod.yaml
 pods/counter
 ```
 
 Let’s wait for the container to restart and get the log lines again.
 
-```
+```console
 $ kubectl logs counter
 0: Tue Jun  2 21:51:40 UTC 2015
 1: Tue Jun  2 21:51:41 UTC 2015
@@ -154,7 +154,7 @@ When a Kubernetes cluster is created with logging to Google Cloud Logging enable
 
 This log collection pod has a specification which looks something like this [fluentd-gcp.yaml](../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml):
 
-```
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -193,7 +193,7 @@ Note the first container counted to 108 and then it was terminated. When the nex
 
  We could query the ingested logs from BigQuery using the SQL query which reports the counter log lines showing the newest lines first:
 
- ```
+ ```console
  SELECT metadata.timestamp, structPayload.log
  FROM [mylogs.kubernetes_counter_default_count_20150611] 
  ORDER BY metadata.timestamp DESC
@@ -206,14 +206,14 @@ Here is some sample output:
 We could also fetch the logs from Google Cloud Storage buckets to our desktop or laptop and then search them locally. The following command fetches logs for the counter pod running in a cluster which is itself in a Compute Engine project called `myproject`. Only logs for the date 2015-06-11 are fetched.
 
 
-```
+```console
 $ gsutil -m cp -r gs://myproject/kubernetes.counter_default_count/2015/06/11 .
 ```
 
 Now we can run queries over the ingested logs. The example below uses the [jq](http://stedolan.github.io/jq/) program to extract just the log lines.
 
-```
- $ cat 21\:00\:00_21\:59\:59_S0.json | jq '.structPayload.log'
+```console
+$ cat 21\:00\:00_21\:59\:59_S0.json | jq '.structPayload.log'
 "0: Thu Jun 11 21:39:38 UTC 2015\n"
 "1: Thu Jun 11 21:39:39 UTC 2015\n"
 "2: Thu Jun 11 21:39:40 UTC 2015\n"
