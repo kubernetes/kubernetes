@@ -65,7 +65,25 @@ func processFile(filename string) error {
 		return err
 	}
 
-	output := linkRE.ReplaceAllFunc(fileBytes, func(in []byte) (out []byte) {
+	output := rewriteLinks(fileBytes)
+	output = rewriteCodeBlocks(output)
+
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.WriteString("---\nlayout: docwithnav\n---\n")
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(output)
+	return err
+}
+
+func rewriteLinks(fileBytes []byte) []byte {
+	return linkRE.ReplaceAllFunc(fileBytes, func(in []byte) (out []byte) {
 		match := linkRE.FindSubmatch(in)
 
 		visibleText := string(match[1])
@@ -87,19 +105,42 @@ func processFile(filename string) error {
 		}
 		return []byte(fmt.Sprintf("[%s](%s)", visibleText, u.String()+altText))
 	})
+}
 
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
+// Allow more than 3 tick because people write this stuff.
+var ticticticRE = regexp.MustCompile("^`{3,}\\s*(.*)$")
+var notTicticticRE = regexp.MustCompile("^```(.*)```")
+var languageFixups = map[string]string{
+	"shell": "sh",
+}
+
+func rewriteCodeBlocks(fileBytes []byte) []byte {
+	lines := strings.Split(string(fileBytes), "\n")
+	inside := false
+	highlight := false
+	for i := range lines {
+		trimmed := []byte(strings.TrimLeft(lines[i], " "))
+		if !ticticticRE.Match(trimmed) || notTicticticRE.Match(trimmed) {
+			continue
+		}
+		if !inside {
+			out := ticticticRE.FindSubmatch(trimmed)
+			lang := strings.ToLower(string(out[1]))
+			// Can't syntax highlight unknown language.
+			if fixedLang := languageFixups[lang]; fixedLang != "" {
+				lang = fixedLang
+			}
+			if lang != "" {
+				lines[i] = fmt.Sprintf("{%% highlight %s %%}", lang)
+				highlight = true
+			}
+		} else if highlight {
+			lines[i] = `{% endhighlight %}`
+			highlight = false
+		}
+		inside = !inside
 	}
-
-	_, err = f.WriteString("---\nlayout: docwithnav\n---\n")
-	if err != nil {
-		return err
-	}
-
-	_, err = f.Write(output)
-	return err
+	return []byte(strings.Join(lines, "\n") + "\n")
 }
 
 func runGitUpdate(remote string) error {
