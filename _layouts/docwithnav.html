@@ -1,6 +1,7 @@
 {% include dochead.html %}
 <div>
 	<div id="wrapper">
+		<gcse:search></gcse:search>
 		{% include nav_v1.0.html %}
 	</div>
 	<div class="bodywrapper">
@@ -27,9 +28,5 @@
 		        window.location.href = location.href
 		});
 	});
-    $('.menu a').each(function(){
-		var that = $(this);
-		that[ that.attr( 'href' ) === window.location.href ? 'addClass' : 'removeClass' ]( 'active' );
-    });
 </script>
 {% include docfooter.html %}
