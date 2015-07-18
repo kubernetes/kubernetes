@@ -90,7 +90,7 @@ $ export KUBE_RKT_VERSION=0.5.6
 
 Then you can launch the cluster by:
 
-````shell
+```shell
 $ kube-up.sh
 ```
 
@@ -120,7 +120,7 @@ $ export COREOS_CHANNEL=stable
 
 Then you can launch the cluster by:
 
-````shell
+```shell
 $ kube-up.sh
 ```
 
