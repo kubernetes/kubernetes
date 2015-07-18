@@ -84,7 +84,7 @@ The [`command`](containers.md#containers-and-commands) overrides the Docker cont
 
 This pod can be created using the `create` command:
 
-```bash
+```console
 $ kubectl create -f ./hello-world.yaml
 pods/hello-world
 ```
@@ -95,13 +95,13 @@ pods/hello-world
 
 If you’re not sure you specified the resource correctly, you can ask `kubectl` to validate it for you:
 
-```bash
+```console
 $ kubectl create -f ./hello-world.yaml --validate
 ```
 
 Let’s say you specified `entrypoint` instead of `command`. You’d see output as follows:
 
-```
+```console
 I0709 06:33:05.600829   14160 schema.go:126] unknown field: entrypoint
 I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842
 pods/hello-world
@@ -143,7 +143,7 @@ You can see the pod you created (actually all of your cluster's pods) using the 
 
 If you’re quick, it will look as follows:
 
-```bash
+```console
 $ kubectl get pods
 NAME          READY     STATUS    RESTARTS   AGE
 hello-world   0/1       Pending   0          0s
@@ -153,7 +153,7 @@ Initially, a newly created pod is unscheduled -- no node has been selected to ru
 
 After the pod has been scheduled, the image may need to be pulled to the node on which it was scheduled, if it hadn’t be pulled already. After a few seconds, you should see the container running:
 
-```bash
+```console
 $ kubectl get pods
 NAME          READY     STATUS    RESTARTS   AGE
 hello-world   1/1       Running   0          5s
@@ -163,7 +163,7 @@ The `READY` column shows how many containers in the pod are running.
 
 Almost immediately after it starts running, this command will terminate. `kubectl` shows that the container is no longer running and displays the exit status:
 
-```bash
+```console
 $ kubectl get pods
 NAME          READY     STATUS       RESTARTS   AGE
 hello-world   0/1       ExitCode:0   0          15s
@@ -173,7 +173,7 @@ hello-world   0/1       ExitCode:0   0          15s
 
 You probably want to see the output of the command you ran. As with [`docker logs`](https://docs.docker.com/userguide/usingdocker/), `kubectl logs` will show you the output:
 
-```bash
+```console
 $ kubectl logs hello-world
 hello world
 ```
@@ -182,7 +182,7 @@ hello world
 
 When you’re done looking at the output, you should delete the pod:
 
-```bash
+```console
 $ kubectl delete pod hello-world
 pods/hello-world
 ```
@@ -191,7 +191,7 @@ As with `create`, `kubectl` prints the resource type and name of the resource de
 
 You can also use the resource/name format to specify the pod:
 
-```bash
+```console
 $ kubectl delete pods/hello-world
 pods/hello-world
 ```
