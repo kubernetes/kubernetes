@@ -2,9 +2,10 @@
     overflow: auto;
 }
 div #doccontent {
-    padding-left: 30px;
-    margin-right: 30px;
-    height: 94vh;
+	padding-left: 30px;
+	margin-right: 30px;
+	height: 94vh;
+	max-width: 900px;
 	padding-right: 10px;
 	h1 {
 		font-size: 45px;
