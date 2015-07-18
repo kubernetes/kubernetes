@@ -90,7 +90,7 @@ spec:
 
 Multiple resources can be created the same way as a single resource:
 
-```bash
+```console
 $ kubectl create -f ./nginx-app.yaml
 services/my-nginx-svc
 replicationcontrollers/my-nginx
@@ -100,13 +100,13 @@ The resources will be created in the order they appear in the file. Therefore, i
 
 `kubectl create` also accepts multiple `-f` arguments:
 
-```bash
+```console
 $ kubectl create -f ./nginx-svc.yaml -f ./nginx-rc.yaml
 ```
 
 And a directory can be specified rather than or in addition to individual files:
 
-```bash
+```console
 $ kubectl create -f ./nginx/
 ```
 
@@ -116,7 +116,7 @@ It is a recommended practice to put resources related to the same microservice o
 
 A URL can also be specified as a configuration source, which is handy for deploying directly from configuration files checked into github:
 
-```bash
+```console
 $ kubectl create -f https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/docs/user-guide/replication.yaml
 replicationcontrollers/nginx
 ```
@@ -125,7 +125,7 @@ replicationcontrollers/nginx
 
 Resource creation isn’t the only operation that `kubectl` can perform in bulk. It can also extract resource names from configuration files in order to perform other operations, in particular to delete the same resources you created:
 
-```bash
+```console
 $ kubectl delete -f ./nginx/
 replicationcontrollers/my-nginx
 services/my-nginx-svc
@@ -133,13 +133,13 @@ services/my-nginx-svc
 
 In the case of just two resources, it’s also easy to specify both on the command line using the resource/name syntax:
 
-```bash
+```console
 $ kubectl delete replicationcontrollers/my-nginx services/my-nginx-svc
 ```
 
 For larger numbers of resources, one can use labels to filter resources. The selector is specified using `-l`:
 
-```bash
+```console
 $ kubectl delete all -lapp=nginx
 replicationcontrollers/my-nginx
 services/my-nginx-svc
@@ -147,7 +147,7 @@ services/my-nginx-svc
 
 Because `kubectl` outputs resource names in the same syntax it accepts, it’s easy to chain operations using `$()` or `xargs`:
 
-```bash
+```console
 $ kubectl get $(kubectl create -f ./nginx/ | grep my-nginx)
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 my-nginx     nginx          nginx      app=nginx   2
@@ -187,7 +187,7 @@ and
 
 The labels allow us to slice and dice our resources along any dimension specified by a label:
 
-```bash
+```console
 $ kubectl create -f ./guestbook-fe.yaml -f ./redis-master.yaml -f ./redis-slave.yaml
 replicationcontrollers/guestbook-fe
 replicationcontrollers/guestbook-redis-master
@@ -240,8 +240,8 @@ The frontend service would span both sets of replicas by selecting the common su
 
 Sometimes existing pods and other resources need to be relabeled before creating new resources. This can be done with `kubectl label`. For example:
 
-```bash
-kubectl label pods -lapp=nginx tier=fe
+```console
+$ kubectl label pods -lapp=nginx tier=fe
 NAME                READY     STATUS    RESTARTS   AGE
 my-nginx-v4-9gw19   1/1       Running   0          14m
 NAME                READY     STATUS    RESTARTS   AGE
@@ -265,7 +265,7 @@ my-nginx-v4-wfof4   1/1       Running   0          16m       fe
 
 When load on your application grows or shrinks, it’s easy to scale with `kubectl`. For instance, to increase the number of nginx replicas from 2 to 3, do:
 
-```bash
+```console
 $ kubectl scale rc my-nginx --replicas=3
 scaled
 $ kubectl get pods -lapp=nginx
@@ -304,14 +304,14 @@ spec:
 
 To update to version 1.9.1, you can use [`kubectl rolling-update --image`](../../docs/design/simple-rolling-update.md):
 
-```bash
+```console
 $ kubectl rolling-update my-nginx --image=nginx:1.9.1
 Creating my-nginx-ccba8fbd8cc8160970f63f9a2696fc46
 ```
 
 In another window, you can see that `kubectl` added a `deployment` label to the pods, whose value is a hash of the configuration, to distinguish the new pods from the old:
 
-```bash
+```console
 $ kubectl get pods -lapp=nginx -Ldeployment
 NAME                                              READY     STATUS    RESTARTS   AGE       DEPLOYMENT
 my-nginx-1jgkf                                    1/1       Running   0          1h        2d1d7a8f682934a254002b56404b813e
@@ -324,7 +324,7 @@ my-nginx-q6all                                    1/1       Running   0         
 
 `kubectl rolling-update` reports progress as it progresses:
 
-```bash
+```console
 Updating my-nginx replicas: 4, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 1
 At end of loop: my-nginx replicas: 4, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 1
 At beginning of loop: my-nginx replicas: 3, my-nginx-ccba8fbd8cc8160970f63f9a2696fc46 replicas: 2
@@ -346,7 +346,7 @@ my-nginx
 
 If you encounter a problem, you can stop the rolling update midway and revert to the previous version using `--rollback`:
 
-```bash
+```console
 $ kubectl kubectl rolling-update my-nginx  --image=nginx:1.9.1 --rollback
 Found existing update in progress (my-nginx-ccba8fbd8cc8160970f63f9a2696fc46), resuming.
 Found desired replicas.Continuing update with existing controller my-nginx.
@@ -385,7 +385,7 @@ spec:
 
 and roll it out:
 
-```bash
+```console
 $ kubectl rolling-update my-nginx -f ./nginx-rc.yaml
 Creating my-nginx-v4
 At beginning of loop: my-nginx replicas: 4, my-nginx-v4 replicas: 1
@@ -413,7 +413,7 @@ You can also run the [update demo](update-demo/) to see a visual representation 
 
 Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](annotations.md) with a description of your object. That’s easiest to do with `kubectl patch`:
 
-```bash
+```console
 $ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
 my-nginx-v4
 $ kubectl get rc my-nginx-v4 -o yaml
@@ -429,7 +429,7 @@ The patch is specified using json.
 
 For more significant changes, you can `get` the resource, edit it, and then `replace` the resource with the updated version:
 
-```bash
+```console
 $ kubectl get rc my-nginx-v4 -o yaml > /tmp/nginx.yaml
 $ vi /tmp/nginx.yaml
 $ kubectl replace -f /tmp/nginx.yaml
@@ -443,7 +443,7 @@ The system ensures that you don’t clobber changes made by other users or compo
 
 In some cases, you may need to update resource fields that cannot be updated once initialized, or you may just want to make a recursive change immediately, such as to fix broken pods created by a replication controller. To change such fields, use `replace --force`, which deletes and re-creates the resource. In this case, you can simply modify your original configuration file:
 
-```bash
+```console
 $ kubectl replace -f ./nginx-rc.yaml --force
 replicationcontrollers/my-nginx-v4
 replicationcontrollers/my-nginx-v4
