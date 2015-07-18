@@ -102,7 +102,7 @@ spec:
 
 Change to the `<kubernetes>/examples/guestbook` directory if you're not already there. Create the redis master pod in your Kubernetes cluster by running:
 
-```shell
+```console
 $ kubectl create -f examples/guestbook/redis-master-controller.yaml
 replicationcontrollers/redis-master
 ```
@@ -110,7 +110,7 @@ replicationcontrollers/redis-master
 The `replicationcontrollers/redis-master` line is the expected response to this operation.
 You can see the replication controllers for your cluster by running:
 
-```shell
+```console
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
 redis-master                           master                  redis                                    name=redis-master            1
@@ -118,14 +118,14 @@ redis-master                           master                  redis            
 
 Then, you can list the pods in the cluster, to verify that the master is running:
 
-```shell
+```console
 $ kubectl get pods
 ```
 
 You'll see all pods in the cluster, including the redis master pod, and the status of each pod.
 The name of the redis master will look similar to that in the following list:
 
-```shell
+```console
 NAME                                           READY     STATUS    RESTARTS   AGE
 ...
 redis-master-dz33o                             1/1       Running   0          2h
@@ -137,7 +137,7 @@ redis-master-dz33o                             1/1       Running   0          2h
 
 You can get information about a pod, including the machine that it is running on, via `kubectl describe pods/<pod_name>`.  E.g., for the redis master, you should see something like the following (your pod name will be different):
 
-```shell
+```console
 $ kubectl describe pods/redis-master-dz33o
 ...
 Name:       redis-master-dz33o
@@ -163,7 +163,7 @@ The 'Node' is the name of the machine, e.g. `kubernetes-minion-krxw` in the exam
 
 If you want to view the container logs for a given pod, you can run:
 
-```shell
+```console
 $ kubectl logs <pod_name>
 ```
 
@@ -171,13 +171,13 @@ These logs will usually give you enough information to troubleshoot.
 
 However, if you should want to SSH to the listed host machine, you can inspect various logs there directly as well.  For example, with Google Compute Engine, using `gcloud`, you can SSH like this:
 
-```shell
+```console
 me@workstation$ gcloud compute ssh kubernetes-minion-krxw
 ```
 
 Then, you can look at the docker containers on the remote machine.  You should see something like this (the specifics of the IDs will be different):
 
-```shell
+```console
 me@kubernetes-minion-krxw:~$ sudo docker ps
 CONTAINER ID        IMAGE                                  COMMAND                CREATED              STATUS              PORTS                    NAMES
 ...
@@ -186,7 +186,7 @@ CONTAINER ID        IMAGE                                  COMMAND              
 
 If you want to see the logs for a given container, you can run:
 
-```shell
+```console
 $ docker logs <container_id>
 ```
 
@@ -218,14 +218,14 @@ spec:
 
 Create the service by running:
 
-```shell
+```console
 $ kubectl create -f examples/guestbook/redis-master-service.yaml
 services/redis-master
 ```
 
 Then check the list of services, which should include the redis-master:
 
-```shell
+```console
 $ kubectl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379
@@ -287,7 +287,7 @@ spec:
 
 and create the replication controller by running:
 
-```shell
+```console
 $ kubectl create -f examples/guestbook/redis-slave-controller.yaml
 replicationcontrollers/redis-slave
 
@@ -299,7 +299,7 @@ redis-slave                            slave                   kubernetes/redis-
 
 Once the replication controller is up, you can list the pods in the cluster, to verify that the master and slaves are running.  You should see a list that includes something like the following:
 
-```shell
+```console
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 ...
@@ -335,7 +335,7 @@ This time the selector for the service is `name=redis-slave`, because that ident
 
 Now that you have created the service specification, create it in your cluster by running:
 
-```shell
+```console
 $ kubectl create -f examples/guestbook/redis-slave-service.yaml
 services/redis-slave
 
@@ -379,14 +379,14 @@ spec:
 
 Using this file, you can turn up your frontend with:
 
-```shell
+```console
 $ kubectl create -f examples/guestbook/frontend-controller.yaml
 replicationcontrollers/frontend
 ```
 
 Then, list all your replication controllers:
 
-```shell
+```console
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                   SELECTOR                     REPLICAS
 frontend                               php-redis               kubernetes/example-guestbook-php-redis:v2  name=frontend                3
@@ -396,7 +396,7 @@ redis-slave                            slave                   kubernetes/redis-
 
 Once it's up (again, it may take up to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and frontends are all running.  You should see a list that includes something like the following:
 
-```shell
+```console
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 ...
@@ -488,14 +488,14 @@ To do this, uncomment the `type: LoadBalancer` line in the `frontend-service.yam
 
 Create the service like this:
 
-```shell
+```console
 $ kubectl create -f examples/guestbook/frontend-service.yaml
 services/frontend
 ```
 
 Then, list all your services again:
 
-```shell
+```console
 $ kubectl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT(S)
 frontend                name=frontend                             name=frontend                10.0.93.211         80/TCP
@@ -514,7 +514,7 @@ More generally, Kubernetes supports two ways of exposing a service onto an exter
 
 If the `LoadBalancer` specification is used, it can take a short period for an external IP to show up in `kubectl get services` output, but you should shortly see it listed as well, e.g. like this:
 
-```shell
+```console
 $ kubectl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT(S)
 frontend                name=frontend                             name=frontend                10.0.93.211         80/TCP
@@ -537,7 +537,7 @@ In Google Compute Engine, `kubectl` automatically creates forwarding rule for se
 
 You can list the forwarding rules like this.  The forwarding rule also indicates the external IP.
 
-```shell
+```console
 $ gcloud compute forwarding-rules list
 NAME                  REGION      IP_ADDRESS     IP_PROTOCOL TARGET
 frontend              us-central1 130.211.188.51 TCP         us-central1/targetPools/frontend
@@ -545,7 +545,7 @@ frontend              us-central1 130.211.188.51 TCP         us-central1/targetP
 
 In Google Compute Engine, you also may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion` (replace with your tags as appropriate):
 
-```shell
+```console
 $ gcloud compute firewall-rules create --allow=tcp:80 --target-tags=kubernetes-minion kubernetes-minion-80
 ```
 
@@ -558,14 +558,14 @@ For Google Compute Engine details about limiting traffic to specific sources, se
 
 If you are in a live kubernetes cluster, you can just kill the pods by stopping the replication controllers and deleting the services.  Using labels to select the resources to stop or delete is an easy way to do this in one command.
 
-```shell
+```console
 kubectl stop rc -l "name in (redis-master, redis-slave, frontend)"
 kubectl delete service -l "name in (redis-master, redis-slave, frontend)"
 ```
 
 To completely tear down a Kubernetes cluster, if you ran this from source, you can use:
 
-```shell
+```console
 $ <kubernetes>/cluster/kube-down.sh
 ```
 
