@@ -71,8 +71,8 @@ your Service?
 
 The first step in debugging a Pod is taking a look at it.  Check the current state of the Pod and recent events with the following command:
 
-```sh
-kubectl describe pods ${POD_NAME}
+```console
+$ kubectl describe pods ${POD_NAME}
 ```
 
 Look at the state of the containers in the pod.  Are they all ```Running```?  Have there been recent restarts?
@@ -107,28 +107,28 @@ Again, the information from ```kubectl describe ...``` should be informative.  T
 First, take a look at the logs of
 the current container:
 
-```sh
-kubectl logs ${POD_NAME} ${CONTAINER_NAME}
+```console
+$ kubectl logs ${POD_NAME} ${CONTAINER_NAME}
 ```
 
 If your container has previously crashed, you can access the previous container's crash log with:
 
-```sh
-kubectl logs --previous ${POD_NAME} ${CONTAINER_NAME}
+```console
+$ kubectl logs --previous ${POD_NAME} ${CONTAINER_NAME}
 ```
 
 Alternately, you can run commands inside that container with ```exec```:
 
-```sh
-kubectl exec ${POD_NAME} -c ${CONTAINER_NAME} -- ${CMD} ${ARG1} ${ARG2} ... ${ARGN}
+```console
+$ kubectl exec ${POD_NAME} -c ${CONTAINER_NAME} -- ${CMD} ${ARG1} ${ARG2} ... ${ARGN}
 ```
 
 Note that ```-c ${CONTAINER_NAME}``` is optional and can be omitted for Pods that only contain a single container.
 
 As an example, to look at the logs from a running Cassandra pod, you might run
 
-```sh
-kubectl exec cassandra -- cat /var/log/cassandra/system.log
+```console
+$ kubectl exec cassandra -- cat /var/log/cassandra/system.log
 ```
 
 
@@ -153,8 +153,8 @@ First, verify that there are endpoints for the service. For every Service object
 
 You can view this resource with:
 
-```
-kubectl get endpoints ${SERVICE_NAME}
+```console
+$ kubectl get endpoints ${SERVICE_NAME}
 ```
 
 Make sure that the endpoints match up with the number of containers that you expect to be a member of your service.
@@ -176,8 +176,8 @@ spec:
 
 You can use:
 
-```
-kubectl get pods --selector=name=nginx,type=frontend
+```console
+$ kubectl get pods --selector=name=nginx,type=frontend
 ```
 
 to list pods that match this selector.  Verify that the list matches the Pods that you expect to provide your Service.
