@@ -70,21 +70,21 @@ clear what is expected, this document will use the following conventions.
 
 If the command "COMMAND" is expected to run in a `Pod` and produce "OUTPUT":
 
-```sh
+```console
 pod$ COMMAND
 OUTPUT
 ```
 
 If the command "COMMAND" is expected to run on a `Node` and produce "OUTPUT":
 
-```sh
+```console
 node$ COMMAND
 OUTPUT
 ```
 
 If the command is "kubectl ARGS":
 
-```sh
+```console
 $ kubectl ARGS
 OUTPUT
 ```
@@ -95,7 +95,7 @@ For many steps here you will want to see what a `Pod` running in the cluster
 sees.  Kubernetes does not directly support interactive `Pod`s (yet), but you can
 approximate it:
 
-```sh
+```console
 $ cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
@@ -115,13 +115,13 @@ pods/busybox-sleep
 Now, when you need to run a command (even an interactive shell) in a `Pod`-like
 context, use:
 
-```sh
+```console
 $ kubectl exec busybox-sleep -- <COMMAND>
 ```
 
 or
 
-```sh
+```console
 $ kubectl exec -ti busybox-sleep sh
 / #
 ```
@@ -132,7 +132,7 @@ For the purposes of this walk-through, let's run some `Pod`s.  Since you're
 probably debugging your own `Service` you can substitute your own details, or you
 can follow along and get a second data point.
 
-```sh
+```console
 $ kubectl run hostnames --image=gcr.io/google_containers/serve_hostname \
                         --labels=app=hostnames \
                         --port=9376 \
@@ -168,7 +168,7 @@ spec:
 
 Confirm your `Pod`s are running:
 
-```sh
+```console
 $ kubectl get pods -l app=hostnames
 NAME              READY     STATUS    RESTARTS   AGE
 hostnames-0uton   1/1       Running   0          12s
@@ -186,21 +186,21 @@ So what would happen if I tried to access a non-existent `Service`?  Assuming yo
 have another `Pod` that consumes this `Service` by name you would get something
 like:
 
-```sh
+```console
 pod$ wget -qO- hostnames
 wget: bad address 'hostname'
 ```
 
 or:
 
-```sh
+```console
 pod$ echo $HOSTNAMES_SERVICE_HOST
 
 ```
 
 So the first thing to check is whether that `Service` actually exists:
 
-```sh
+```console
 $ kubectl get svc hostnames
 Error from server: service "hostnames" not found
 ```
@@ -208,7 +208,7 @@ Error from server: service "hostnames" not found
 So we have a culprit, let's create the `Service`.  As before, this is for the
 walk-through - you can use your own `Service`'s details here.
 
-```sh
+```console
 $ kubectl expose rc hostnames --port=80 --target-port=9376
 NAME        LABELS          SELECTOR        IP(S)     PORT(S)
 hostnames   app=hostnames   app=hostnames             80/TCP
@@ -216,7 +216,7 @@ hostnames   app=hostnames   app=hostnames             80/TCP
 
 And read it back, just to be sure:
 
-```sh
+```console
 $ kubectl get svc hostnames
 NAME        LABELS          SELECTOR        IP(S)        PORT(S)
 hostnames   app=hostnames   app=hostnames   10.0.1.175   80/TCP
@@ -245,7 +245,7 @@ Now you can confirm that the `Service` exists.
 
 From a `Pod` in the same `Namespace`:
 
-```sh
+```console
 pod$ nslookup hostnames
 Server:         10.0.0.10
 Address:        10.0.0.10#53
@@ -257,7 +257,7 @@ Address: 10.0.1.175
 If this fails, perhaps your `Pod` and `Service` are in different
 `Namespace`s, try a namespace-qualified name:
 
-```sh
+```console
 pod$ nslookup hostnames.default
 Server:         10.0.0.10
 Address:        10.0.0.10#53
@@ -269,7 +269,7 @@ Address: 10.0.1.175
 If this works, you'll need to ensure that `Pod`s and `Service`s run in the same
 `Namespace`.  If this still fails, try a fully-qualified name:
 
-```sh
+```console
 pod$ nslookup hostnames.default.svc.cluster.local
 Server:         10.0.0.10
 Address:        10.0.0.10#53
@@ -285,7 +285,7 @@ The "cluster.local" is your cluster domain.
 You can also try this from a `Node` in the cluster (note: 10.0.0.10 is my DNS
 `Service`):
 
-```sh
+```console
 node$ nslookup hostnames.default.svc.cluster.local 10.0.0.10
 Server:         10.0.0.10
 Address:        10.0.0.10#53
@@ -307,7 +307,7 @@ If the above still fails - DNS lookups are not working for your `Service` - we
 can take a step back and see what else is not working.  The Kubernetes master
 `Service` should always work:
 
-```sh
+```console
 pod$ nslookup kubernetes.default
 Server:    10.0.0.10
 Address 1: 10.0.0.10
@@ -325,7 +325,7 @@ debugging your own `Service`, debug DNS.
 The next thing to test is whether your `Service` works at all.  From a
 `Node` in your cluster, access the `Service`'s IP (from `kubectl get` above).
 
-```sh
+```console
 node$ curl 10.0.1.175:80
 hostnames-0uton
 
@@ -345,7 +345,7 @@ It might sound silly, but you should really double and triple check that your
 `Service` is correct and matches your `Pods`.  Read back your `Service` and
 verify it:
 
-```sh
+```console
 $ kubectl get service hostnames -o json
 {
     "kind": "Service",
@@ -398,7 +398,7 @@ actually being selected by the `Service`.
 
 Earlier we saw that the `Pod`s were running.  We can re-check that:
 
-```sh
+```console
 $ kubectl get pods -l app=hostnames
 NAME              READY     STATUS    RESTARTS   AGE
 hostnames-0uton   1/1       Running   0          1h
@@ -413,7 +413,7 @@ The `-l app=hostnames` argument is a label selector - just like our `Service`
 has.  Inside the Kubernetes system is a control loop which evaluates the
 selector of every `Service` and save the results into an `Endpoints` object.
 
-```sh
+```console
 $ kubectl get endpoints hostnames
 NAME        ENDPOINTS
 hostnames   10.244.0.5:9376,10.244.0.6:9376,10.244.0.7:9376
@@ -430,7 +430,7 @@ At this point, we know that your `Service` exists and has selected your `Pod`s.
 Let's check that the `Pod`s are actually working - we can bypass the `Service`
 mechanism and go straight to the `Pod`s.
 
-```sh
+```console
 pod$ wget -qO- 10.244.0.5:9376
 hostnames-0uton
 
@@ -458,7 +458,7 @@ suspect.  Let's confirm it, piece by piece.
 Confirm that `kube-proxy` is running on your `Node`s.  You should get something
 like the below:
 
-```sh
+```console
 node$ ps auxw | grep kube-proxy
 root  4194  0.4  0.1 101864 17696 ?    Sl Jul04  25:43 /usr/local/bin/kube-proxy --master=https://kubernetes-master --kubeconfig=/var/lib/kube-proxy/kubeconfig --v=2
 ```
@@ -469,7 +469,7 @@ depends on your `Node` OS.  On some OSes it is a file, such as
 /var/log/kube-proxy.log, while other OSes use `journalctl` to access logs.  You
 should see something like:
 
-```
+```console
 I0707 17:34:53.945651   30031 server.go:88] Running in resource-only container "/kube-proxy"
 I0707 17:34:53.945921   30031 proxier.go:121] Setting proxy IP to 10.240.115.247 and initializing iptables
 I0707 17:34:54.053023   30031 roundrobin.go:262] LoadBalancerRR: Setting endpoints for default/kubernetes: to [10.240.169.188:443]
@@ -499,7 +499,7 @@ One of the main responsibilities of `kube-proxy` is to write the `iptables`
 rules which implement `Service`s.  Let's check that those rules are getting
 written.
 
-```
+```console
 node$ iptables-save | grep hostnames
 -A KUBE-PORTALS-CONTAINER -d 10.0.1.175/32 -p tcp -m comment --comment "default/hostnames:default" -m tcp --dport 80 -j REDIRECT --to-ports 48577
 -A KUBE-PORTALS-HOST -d 10.0.1.175/32 -p tcp -m comment --comment "default/hostnames:default" -m tcp --dport 80 -j DNAT --to-destination 10.240.115.247:48577
@@ -514,7 +514,7 @@ then look at the logs again.
 
 Assuming you do see the above rules, try again to access your `Service` by IP:
 
-```sh
+```console
 node$ curl 10.0.1.175:80
 hostnames-0uton
 ```
@@ -524,14 +524,14 @@ If this fails, we can try accessing the proxy directly.  Look back at the
 using for your `Service`.  In the above examples it is "48577".  Now connect to
 that:
 
-```sh
+```console
 node$ curl localhost:48577
 hostnames-yp2kp
 ```
 
 If this still fails, look at the `kube-proxy` logs for specific lines like:
 
-```
+```console
 Setting endpoints for default/hostnames:default to [10.244.0.5:9376 10.244.0.6:9376 10.244.0.7:9376]
 ```
 
