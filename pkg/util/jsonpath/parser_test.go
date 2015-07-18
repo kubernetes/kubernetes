@@ -97,3 +97,32 @@ func TestParser(t *testing.T) {
 		}
 	}
 }
+
+type failParserTest struct {
+	name string
+	text string
+	err  string
+}
+
+func TestFailParser(t *testing.T) {
+	failParserTests := []failParserTest{
+		{"unclosed action", "{.hello", "unclosed action"},
+		{"unrecognized charactor", "{*}", "unrecognized charactor in action: U+002A '*'"},
+		{"invalid number", "{+12.3.0}", "cannot parse number +12.3.0"},
+		{"unterminated array", "{[1}", "unterminated array"},
+		{"invalid index", "{[::-1]}", "invalid array index ::-1"},
+		{"unterminated filter", "{[?(.price]}", "unterminated filter"},
+	}
+	for _, test := range failParserTests {
+		_, err := Parse(test.name, test.text)
+		var out string
+		if err == nil {
+			out = "nil"
+		} else {
+			out = err.Error()
+		}
+		if out != test.err {
+			t.Errorf("in %s, expect to get error %v, got %v", test.name, test.err, out)
+		}
+	}
+}

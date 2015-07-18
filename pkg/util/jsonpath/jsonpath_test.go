@@ -29,25 +29,6 @@ type jsonpathTest struct {
 	expect   string
 }
 
-type book struct {
-	Category string
-	Author   string
-	Title    string
-	Price    float32
-}
-
-type bicycle struct {
-	Color string
-	Price float32
-}
-
-type store struct {
-	Book    []book
-	Bicycle bicycle
-	Name    string
-	Labels  map[string]int
-}
-
 func testJSONPath(tests []jsonpathTest, t *testing.T) {
 	for _, test := range tests {
 		j := NewJSONPath(test.name)
@@ -67,8 +48,47 @@ func testJSONPath(tests []jsonpathTest, t *testing.T) {
 	}
 }
 
-// TestStoreData tests cases from original jsonpath webpage
-func TestStoreData(t *testing.T) {
+func testFailJSONPath(tests []jsonpathTest, t *testing.T) {
+	for _, test := range tests {
+		j := NewJSONPath(test.name)
+		err := j.Parse(test.template)
+		if err != nil {
+			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
+		}
+		buf := new(bytes.Buffer)
+		err = j.Execute(buf, test.input)
+		var out string
+		if err == nil {
+			out = "nil"
+		} else {
+			out = err.Error()
+		}
+		if out != test.expect {
+			t.Errorf("in %s, expect to get error %s, got %s", test.name, test.expect, out)
+		}
+	}
+}
+
+func TestStructInput(t *testing.T) {
+	type book struct {
+		Category string
+		Author   string
+		Title    string
+		Price    float32
+	}
+
+	type bicycle struct {
+		Color string
+		Price float32
+	}
+
+	type store struct {
+		Book    []book
+		Bicycle bicycle
+		Name    string
+		Labels  map[string]int
+	}
+
 	storeData := store{
 		Name: "jsonpath",
 		Book: []book{
@@ -104,9 +124,18 @@ func TestStoreData(t *testing.T) {
 			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
 	}
 	testJSONPath(storeTests, t)
+
+	failStoreTests := []jsonpathTest{
+		{"invalid identfier", "{hello}", storeData, "unrecongnized identifier hello"},
+		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
+		{"invalid array", "{.Labels[0]}", storeData, "<map[string]int Value> is not array or slice"},
+		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
+		{"redundent end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end"},
+	}
+	testFailJSONPath(failStoreTests, t)
 }
 
-func TestPoints(t *testing.T) {
+func TestJSONInput(t *testing.T) {
 	var pointsJSON = []byte(`[
 		{"id": "i1", "x":4, "y":-5},
 		{"id": "i2", "x":-2, "y":-5, "z":1},
@@ -121,7 +150,7 @@ func TestPoints(t *testing.T) {
 		t.Error(err)
 	}
 	pointsTests := []jsonpathTest{
-		{"exsits filter", "{[?(@.z)].id}", pointsData, "i2 i5"},
+		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5"},
 		{"bracket key", "{[0]['id']}", pointsData, "i1"},
 	}
 	testJSONPath(pointsTests, t)

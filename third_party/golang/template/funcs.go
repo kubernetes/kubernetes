@@ -1,7 +1,6 @@
-// Copyright 2011 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
+//This package is copied from Go library text/template.
+//The original private functions eq, ge, gt, le, lt, and ne
+//are exported as public functions.
 package template
 
 import (

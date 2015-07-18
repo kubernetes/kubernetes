@@ -139,7 +139,7 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 	case *IdentifierNode:
 		return j.evalIdentifier(value, node)
 	default:
-		return value, fmt.Errorf("unexpect Node %v", node)
+		return value, fmt.Errorf("unexpected Node %v", node)
 	}
 }
 
@@ -168,7 +168,7 @@ func (j *JSONPath) evalList(value []reflect.Value, node *ListNode) ([]reflect.Va
 	for _, node := range node.Nodes {
 		curValue, err = j.walk(curValue, node)
 		if err != nil {
-			return value, err
+			return curValue, err
 		}
 	}
 	return curValue, nil
@@ -183,17 +183,18 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 		j.beginRange += 1
 		results = input
 	case "end":
-		if j.endRange < j.inRange { //inside a loop, this loop end
+		if j.endRange < j.inRange { //inside a loop, break the current block
 			j.endRange += 1
-		} else { // the loop is about to end, pop value and continue the following execuation
-			if len(j.stack) > 0 {
-				j.cur, j.stack = j.stack[len(j.stack)-1], j.stack[:len(j.stack)-1]
-			} else {
-				return results, fmt.Errorf("not in range, nothing to end")
-			}
+			break
+		}
+		// the loop is about to end, pop value and continue the following execution
+		if len(j.stack) > 0 {
+			j.cur, j.stack = j.stack[len(j.stack)-1], j.stack[:len(j.stack)-1]
+		} else {
+			return results, fmt.Errorf("not in range, nothing to end")
 		}
 	default:
-		return input, fmt.Errorf("unrecongnize identifier %v", node.Name)
+		return input, fmt.Errorf("unrecongnized identifier %v", node.Name)
 	}
 	return results, nil
 }
@@ -337,24 +338,34 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 		for i := 0; i < value.Len(); i++ {
 			temp := []reflect.Value{value.Index(i)}
 			lefts, err := j.evalList(temp, node.Left)
-			if err != nil {
-				if node.Operator == "exists" {
-					lefts = []reflect.Value{{}}
-				} else {
-					return input, err
+
+			//case exists
+			if node.Operator == "exists" {
+				if len(lefts) > 0 {
+					results = append(results, value.Index(i))
 				}
+				continue
 			}
+
+			if err != nil {
+				return input, err
+			}
+
 			var left, right interface{}
-			if lefts[0].IsValid() {
-				left = lefts[0].Interface()
+			if len(lefts) != 1 {
+				return input, fmt.Errorf("can only compare one element at a time")
 			}
+			left = lefts[0].Interface()
+
 			rights, err := j.evalList(temp, node.Right)
 			if err != nil {
 				return input, err
 			}
-			if rights[0].IsValid() {
-				right = rights[0].Interface()
+			if len(rights) != 1 {
+				return input, fmt.Errorf("can only compare one element at a time")
 			}
+			right = rights[0].Interface()
+
 			pass := false
 			switch node.Operator {
 			case "<":
@@ -369,8 +380,6 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 				pass, err = template.LessEqual(left, right)
 			case ">=":
 				pass, err = template.GreaterEqual(left, right)
-			case "exists":
-				pass = lefts[0].IsValid()
 			default:
 				return results, fmt.Errorf("unrecognized filter operator %s", node.Operator)
 			}

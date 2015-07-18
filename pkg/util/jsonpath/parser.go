@@ -47,7 +47,11 @@ type Parser struct {
 // Parser is returned with the error
 func Parse(name, text string) (*Parser, error) {
 	p := NewParser(name)
-	return p, p.Parse(text)
+	err := p.Parse(text)
+	if err != nil {
+		p = nil
+	}
+	return p, err
 }
 
 func NewParser(name string) *Parser {
@@ -80,6 +84,7 @@ func (p *Parser) consumeText() string {
 // next returns the next rune in the input.
 func (p *Parser) next() rune {
 	if int(p.pos) >= len(p.input) {
+		p.width = 0
 		return eof
 	}
 	r, w := utf8.DecodeRuneInString(p.input[p.pos:])
@@ -174,7 +179,7 @@ func (p *Parser) parseRightDelim(cur *ListNode) error {
 	return p.parseText(cur)
 }
 
-// parseIdentifier scans build-in keywords like "range" "end"
+// parseIdentifier scans build-in keywords, like "range" "end"
 func (p *Parser) parseIdentifier(cur *ListNode) error {
 	var r rune
 	for {
@@ -233,7 +238,7 @@ Loop:
 	for {
 		switch p.next() {
 		case eof, '\n':
-			return fmt.Errorf("unterminated array string")
+			return fmt.Errorf("unterminated array")
 		case ']':
 			break Loop
 		}
