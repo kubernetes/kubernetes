@@ -75,12 +75,12 @@ spec:
         - containerPort: 80
 ```
 
-```bash
+```console
 $ kubectl create -f ./my-nginx-rc.yaml
 replicationcontrollers/my-nginx
 ```
 
-```bash
+```console
 $ kubectl get pods
 NAME             READY     REASON    RESTARTS   AGE
 my-nginx-gy1ij   1/1       Running   0          1m
@@ -89,7 +89,7 @@ my-nginx-yv5cn   1/1       Running   0          1m
 
 We can retrieve a lot more information about each of these pods using ```kubectl describe pod```. For example:
 
-```bash
+```console
 $ kubectl describe pod my-nginx-gy1ij
 Name:				my-nginx-gy1ij
 Image(s):			nginx
@@ -140,7 +140,7 @@ Lastly, you see a log of recent events related to your Pod. The system compresse
 
 A common scenario that you can detect using events is when you’ve created a Pod that won’t fit on any node. For example, the Pod might request more resources than are free on any node, or it might specify a label selector that doesn’t match any nodes. Let’s say we created the previous Replication Controller with 5 replicas (instead of 2) and requesting 600 millicores instead of 500, on a four-node cluster where each (virtual) machine has 1 CPU. In that case one of the Pods will not be able to schedule. (Note that because of the cluster addon pods such as fluentd, skydns, etc., that run on each node, if we requested 1000 millicores then none of the Pods would be able to schedule.) 
 
-```bash
+```console
 $ kubectl get pods
 NAME             READY     REASON    RESTARTS   AGE
 my-nginx-9unp9   0/1       Pending   0          8s
@@ -152,7 +152,7 @@ my-nginx-tc2j9   0/1       Running   0          8s
 
 To find out why the my-nginx-9unp9 pod is not running, we can use ```kubectl describe pod``` on the pending Pod and look at its events:
 
-```bash
+```console
 $ kubectl describe pod my-nginx-9unp9 
 Name:				my-nginx-9unp9
 Image(s):			nginx
@@ -249,7 +249,7 @@ status:
 
 Sometimes when debugging it can be useful to look at the status of a node -- for example, because you've noticed strange behavior of a Pod that’s running on the node, or to find out why a Pod won’t schedule onto the node. As with Pods, you can use ```kubectl describe node``` and ```kubectl get node -o yaml``` to retrieve detailed information about nodes. For example, here's what you'll see if a node is down (disconnected from the network, or kubelet dies and won't restart, etc.). Notice the events that show the node is NotReady, and also notice that the pods are no longer running (they are evicted after five minutes of NotReady status).
 
-```bash
+```console
 $ kubectl get nodes
 NAME                     LABELS                                          STATUS
 kubernetes-minion-861h   kubernetes.io/hostname=kubernetes-minion-861h   NotReady
