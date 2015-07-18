@@ -236,14 +236,13 @@ Members [2] {
 }
 
 2015-07-10 13:26:47.722  INFO 5 --- [           main] com.hazelcast.core.LifecycleService      : [10.244.77.3]:5701 [someGroup] [3.5] Address[10.244.77.3]:5701 is STARTED
-2015-07-10 13:26:47.723  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Started Application in 13.792 seconds (JVM running for 14.542)```
+2015-07-10 13:26:47.723  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Started Application in 13.792 seconds (JVM running for 14.542)
+```
 
 Now let's scale our cluster to 4 nodes:
 
 ```sh
-
 $ kubectl scale rc hazelcast --replicas=4
-
 ```
 
 Examine the status again by checking the logs and you should see the 4 members connected.
@@ -253,7 +252,6 @@ Examine the status again by checking the logs and you should see the 4 members c
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
 
 ```sh
-
 # create a service to track all hazelcast nodes
 kubectl create -f examples/hazelcast/hazelcast-service.yaml
 
@@ -265,7 +263,6 @@ kubectl scale rc hazelcast --replicas=2
 
 # scale up to 4 nodes
 kubectl scale rc hazelcast --replicas=4
-
 ```
 
 ### Hazelcast Discovery Source
