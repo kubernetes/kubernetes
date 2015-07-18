@@ -60,24 +60,25 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectResta
 	initialRestartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
 	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
 
-	// Wait for at most 48 * 5 = 240s = 4 minutes until restartCount is incremented
-	restarts := false
-	for i := 0; i < 48; i++ {
-		// Wait until restartCount is incremented.
-		time.Sleep(5 * time.Second)
+	// Wait for the restart state to be as desired.
+	restarts, deadline := false, time.Now().Add(2*time.Minute)
+	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = c.Pods(ns).Get(podDescr.Name)
 		expectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
 		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
-		By(fmt.Sprintf("Restart count of pod %s in namespace %s is now %d", podDescr.Name, ns, restartCount))
+		By(fmt.Sprintf("Restart count of pod %s/%s is now %d (%v elapsed)",
+			ns, podDescr.Name, restartCount, time.Since(start)))
 		if restartCount > initialRestartCount {
-			By(fmt.Sprintf("Restart count of pod %s in namespace %s increased from %d to %d during the test", podDescr.Name, ns, initialRestartCount, restartCount))
+			By(fmt.Sprintf("Restart count of pod %s/%s changed from %d to %d",
+				ns, podDescr.Name, initialRestartCount, restartCount))
 			restarts = true
 			break
 		}
 	}
 
 	if restarts != expectRestart {
-		Fail(fmt.Sprintf("pod %s in namespace %s - expected restarts: %v, found restarts: %v", podDescr.Name, ns, expectRestart, restarts))
+		Fail(fmt.Sprintf("pod %s/%s - expected restarts: %t, found restarts: %t",
+			ns, podDescr.Name, expectRestart, restarts))
 	}
 }
 
