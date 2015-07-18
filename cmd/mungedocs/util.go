@@ -23,13 +23,6 @@ import (
 	"strings"
 )
 
-var (
-	// Finds all preformatted block start/stops.
-	preformatRE    = regexp.MustCompile("^[\\s]*```.*")
-	notPreformatRE = regexp.MustCompile("^[\\s]*```.*```.*")
-	preformatEndRE = regexp.MustCompile(".*```.*")
-)
-
 // Splits a document up into a slice of lines.
 func splitLines(document []byte) []string {
 	lines := strings.Split(string(document), "\n")
@@ -141,6 +134,12 @@ type fileBlock struct {
 
 type fileBlocks []fileBlock
 
+var (
+	// Finds all preformatted block start/stops.
+	preformatRE    = regexp.MustCompile("^\\s*```")
+	notPreformatRE = regexp.MustCompile("^\\s*```.*```")
+)
+
 func splitByPreformatted(input []byte) fileBlocks {
 	f := fileBlocks{}
 
@@ -161,7 +160,7 @@ func splitByPreformatted(input []byte) fileBlocks {
 			cur = append(cur, line...)
 		} else {
 			cur = append(cur, line...)
-			if preformatEndRE.Match(line) {
+			if preformatRE.Match(line) {
 				if len(cur) > 0 {
 					f = append(f, fileBlock{true, cur})
 				}

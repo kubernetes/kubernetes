@@ -16,9 +16,7 @@ limitations under the License.
 
 package main
 
-import (
-	"bytes"
-)
+import "bytes"
 
 // Blocks of ``` need to have blank lines on both sides or they don't look
 // right in HTML.
