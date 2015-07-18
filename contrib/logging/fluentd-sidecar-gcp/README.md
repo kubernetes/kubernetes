@@ -15,12 +15,12 @@ In order to make this work, you have to add a few things to your pod config:
 4. The `FILES_TO_COLLECT` environment variable in the sidecar container, telling it which files to collect logs from. These paths should always be in the mounted volume.
 
 To try it out, make sure that your cluster was set up to log to Google Cloud Logging when it was created (i.e. you set `LOGGING_DESTINATION=gcp` or are running on Container Engine), then simply run
-```
+```console
 kubectl create -f logging-sidecar-pod.yaml
 ```
 
 You should see the logs show up in the log viewer of the Google Developer Console shortly after creating the pod. To clean up after yourself, simply run
-```
+```console
 kubectl delete -f logging-sidecar-pod.yaml
 ```
 
