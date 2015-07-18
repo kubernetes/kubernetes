@@ -40,9 +40,9 @@ can be code reviewed, producing a more robust, reliable and archival system.
 
 ### Running a container from a pod configuration file
 
-```bash
-cd kubernetes
-kubectl create -f ./pod.yaml
+```console
+$ cd kubernetes
+$ kubectl create -f ./pod.yaml
 ```
 
 Where pod.yaml contains something like:
@@ -64,14 +64,14 @@ spec:
 
 You can see your cluster's pods:
 
-```bash
-kubectl get pods
+```console
+$ kubectl get pods
 ```
 
 and delete the pod you just created:
 
-```bash
-kubectl delete pods nginx
+```console
+$ kubectl delete pods nginx
 ```
 
 ### Running a replicated set of containers from a configuration file
@@ -80,9 +80,9 @@ To run replicated containers, you need a [Replication Controller](replication-co
 A replication controller is responsible for ensuring that a specific number of pods exist in the
 cluster.
 
-```bash
-cd kubernetes
-kubectl create -f ./replication.yaml
+```console
+$ cd kubernetes
+$ kubectl create -f ./replication.yaml
 ```
 
 Where ```replication.yaml``` contains:
@@ -111,8 +111,8 @@ spec:
 
 To delete the replication controller (and the pods it created):
 
-```bash
-kubectl delete rc nginx
+```console
+$ kubectl delete rc nginx
 ```
 
 
