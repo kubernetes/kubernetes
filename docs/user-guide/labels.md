@@ -38,7 +38,7 @@ Labels are intended to be used to specify identifying attributes of objects that
 Labels can be used to organize and to select subsets of objects.  Labels can be attached to objects at creation time and subsequently added and modified at any time.
 Each object can have a set of key/value labels defined.  Each Key must be unique for a given object.
 
-```
+```json
 "labels": {
   "key1" : "value1",
   "key2" : "value2"
