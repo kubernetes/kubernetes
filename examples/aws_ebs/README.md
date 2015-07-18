@@ -52,7 +52,7 @@ You should now be able to query your web server:
 ```shell
   $ curl <Pod IP address>
   $ Hello World
-````
+```
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
