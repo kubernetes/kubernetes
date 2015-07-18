@@ -69,8 +69,8 @@ or someone else setup the cluster and provided you with credentials and a locati
 
 Check the location and credentials that kubectl knows about with this command:
 
-```
-kubectl config view
+```console
+$ kubectl config view
 ```
 
 Many of the [examples](../../examples/) provide an introduction to using
@@ -98,15 +98,15 @@ The following command runs kubectl in a mode where it acts as a reverse proxy.  
 locating the apiserver and authenticating.
 Run it like this:
 
-```
-kubectl proxy --port=8080 &
+```console
+$ kubectl proxy --port=8080 &
 ```
 
 See [kubectl proxy](kubectl/kubectl_proxy.md) for more details.
 
 Then you can explore the API with curl, wget, or a browser, like so:
 
-```
+```console
 $ curl http://localhost:8080/api/
 {
   "versions": [
@@ -120,7 +120,7 @@ $ curl http://localhost:8080/api/
 It is also possible to avoid using kubectl proxy by passing an authentication token
 directly to the apiserver, like this:
 
-```
+```console
 $ APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " ")
 $ TOKEN=$(kubectl config view | grep token | cut -f 2 -d ":" | tr -d " ")
 $ curl $APISERVER/api --header "Authorization: Bearer $TOKEN" --insecure
@@ -164,7 +164,7 @@ the `kubernetes` DNS name, which resolves to a Service IP which in turn
 will be routed to an apiserver.
 
 The recommended way to authenticate to the apiserver is with a
-[service account](service-accounts.md) credential.  By default, a pod
+[service account](service-accounts.md) credential.  By kube-system, a pod
 is associated with a service account, and a credential (token) for that
 service account is placed into the filesystem tree of each container in that pod,
 at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
@@ -219,24 +219,24 @@ You have several options for connecting to nodes, pods and services from outside
 
 ### Discovering builtin services
 
-Typically, there are several services which are started on a cluster by default. Get a list of these
+Typically, there are several services which are started on a cluster by kube-system. Get a list of these
 with the `kubectl cluster-info` command:
 
-```
+```console
 $ kubectl cluster-info
 
   Kubernetes master is running at https://104.197.5.247
-  elasticsearch-logging is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging
-  kibana-logging is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/kibana-logging
-  kube-dns is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/kube-dns
-  grafana is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/monitoring-grafana
-  heapster is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/monitoring-heapster
+  elasticsearch-logging is running at https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging
+  kibana-logging is running at https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/kibana-logging
+  kube-dns is running at https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/kube-dns
+  grafana is running at https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/monitoring-grafana
+  heapster is running at https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster
 ```
 
 This shows the proxy-verb URL for accessing each service.
 For example, this cluster has cluster-level logging enabled (using Elasticsearch), which can be reached
-at `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/` if suitable credentials are passed, or through a kubectl proxy at, for example:
-`http://localhost:8080/api/v1/proxy/namespaces/default/services/elasticsearch-logging/`.
+at `https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging/` if suitable credentials are passed, or through a kubectl proxy at, for example:
+`http://localhost:8080/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging/`.
 (See [above](#accessing-the-cluster-api) for how to pass credentials or use kubectl proxy.)
 
 #### Manually constructing apiserver proxy URLs
@@ -248,10 +248,10 @@ about namespaces? 'proxy' verb? -->
 
 ##### Examples
 
- * To access the Elasticsearch service endpoint `_search?q=user:kimchy`, you would use:   `http://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_search?q=user:kimchy`
- * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_cluster/health?pretty=true`
+ * To access the Elasticsearch service endpoint `_search?q=user:kimchy`, you would use:   `http://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy`
+ * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging/_cluster/health?pretty=true`
 
-  ```
+  ```json
   {
 	 "cluster_name" : "kubernetes_logging",
 	 "status" : "yellow",
