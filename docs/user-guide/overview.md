@@ -33,7 +33,9 @@ Documentation for other releases can be found at
 
 # Kubernetes Overview
 
-Kubernetes is an open-source system for managing containerized applications across multiple hosts in a cluster. It provides mechanisms for application deployment, scheduling, updating, maintenance, and scaling. A key feature of Kubernetes is that it actively manages the containers to ensure that the state of the cluster continually matches the user's intentions.
+Kubernetes is an open-source system for managing containerized applications across multiple hosts in a cluster. Kubernetes is intended to make deploying containerized/microservice-based applications easy but powerful.
+
+Kubernetes provides mechanisms for application deployment, scheduling, updating, maintenance, and scaling. A key feature of Kubernetes is that it actively manages the containers to ensure that the state of the cluster continually matches the user's intentions. An operations user should be able to launch a micro-service, letting the scheduler find the right placement. We also want to improve the tools and experience for how users can roll-out applications through patterns like canary deployments. 
 
 Kubernetes supports [Docker](http://www.docker.io) and [Rocket](https://coreos.com/blog/rocket/) containers, and other container image formats and container runtimes will be supported in the future.
 

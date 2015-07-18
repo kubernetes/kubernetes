@@ -35,9 +35,11 @@ Documentation for other releases can be found at
 
 ## Support
 
-At v1.0, Kubernetes supports clusters up to 100 nodes with 30 pods per node and 1-2 container per pod (as defined in the [1.0 roadmap](../../docs/roadmap.md#reliability-and-performance)).
+At v1.0, Kubernetes supports clusters up to 100 nodes with 30 pods per node and 1-2 containers per pod.
 
 ## Setup
+
+A cluster is a set of nodes (physical or virtual machines) running Kubernetes agents, managed by a "master" (the cluster-level control plane).
 
 Normally the number of nodes in a cluster is controlled by the the value `NUM_MINIONS` in the platform-specific `config-default.sh` file (for example, see [GCE's `config-default.sh`](../../cluster/gce/config-default.sh)).
 
