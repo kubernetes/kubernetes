@@ -156,7 +156,7 @@ If the scheduler cannot find any node where a pod can fit, then the pod will rem
 until a place can be found.    An event will be produced each time the scheduler fails to find a
 place for the pod, like this:
 
-```
+```console
 $ kubectl describe pods/frontend | grep -A 3 Events
 Events:
   FirstSeen				LastSeen			Count	From SubobjectPath	Reason			Message
@@ -183,7 +183,7 @@ with namespaces, it can prevent one team from hogging all the resources.
 Your container may be terminated because it's resource-starved. To check if a container is being killed because it is hitting a resource limit, call `kubectl describe pod`
 on the pod you are interested in:
 
-```
+```console
 [12:54:41] $ ./cluster/kubectl.sh describe pod simmemleak-hra99
 Name:               simmemleak-hra99
 Namespace:          default
@@ -223,7 +223,7 @@ Once [#10861](https://github.com/GoogleCloudPlatform/kubernetes/issues/10861) is
 
 Until then you can call `get pod` with the `-o template -t ...` option to fetch the status of previously terminated containers:
 
-```
+```console
 [13:59:01] $ ./cluster/kubectl.sh  get pod -o template -t '{{range.status.containerStatuses}}{{"Container Name: "}}{{.name}}{{"\r\nLastState: "}}{{.lastState}}{{end}}'  simmemleak-60xbc
 Container Name: simmemleak
 LastState: map[terminated:map[exitCode:137 reason:OOM Killed startedAt:2015-07-07T20:58:43Z finishedAt:2015-07-07T20:58:43Z containerID:docker://0e4095bba1feccdfe7ef9fb6ebffe972b4b14285d5acdec6f0d3ae8a22fad8b2]][13:59:03] clusterScaleDoc ~/go/src/github.com/GoogleCloudPlatform/kubernetes $ 
