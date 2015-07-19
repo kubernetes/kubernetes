@@ -69,6 +69,7 @@ using resources with kubectl can be found in (working_with_resources.md).*
       - [Success codes](#success-codes)
       - [Error codes](#error-codes)
   - [Response Status Kind](#response-status-kind)
+  - [Events](#events)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
