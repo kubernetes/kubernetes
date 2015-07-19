@@ -85,7 +85,7 @@ $ cd kubernetes
 $ kubectl create -f ./replication.yaml
 ```
 
-Where ```replication.yaml``` contains:
+Where `replication.yaml` contains:
 
 ```yaml
 apiVersion: v1

@@ -48,7 +48,7 @@ Use the [master.yaml](cloud-configs/master.yaml) and [node.yaml](cloud-configs/n
 
 ### AWS
 
-*Attention:* Replace ```<ami_image_id>``` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
+*Attention:* Replace `<ami_image_id>` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
 
 #### Provision the Master
 
@@ -94,7 +94,7 @@ aws ec2 run-instances \
 
 ### Google Compute Engine (GCE)
 
-*Attention:* Replace ```<gce_image_id>``` below for a [suitable version of CoreOS image for Google Compute Engine](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
+*Attention:* Replace `<gce_image_id>` below for a [suitable version of CoreOS image for Google Compute Engine](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
 
 #### Provision the Master
 

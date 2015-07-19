@@ -79,7 +79,7 @@ support all the features you expect.
 
 ## How do I turn on an admission control plug-in?
 
-The Kubernetes API server supports a flag, ```admission_control``` that takes a comma-delimited,
+The Kubernetes API server supports a flag, `admission_control` that takes a comma-delimited,
 ordered list of admission control choices to invoke prior to modifying objects in the cluster.
 
 ## What does each plug-in do?
@@ -102,16 +102,16 @@ commands in those containers, we strongly encourage enabling this plug-in.
 ### ServiceAccount
 
 This plug-in implements automation for [serviceAccounts](../user-guide/service-accounts.md).
-We strongly recommend using this plug-in if you intend to make use of Kubernetes ```ServiceAccount``` objects.
+We strongly recommend using this plug-in if you intend to make use of Kubernetes `ServiceAccount` objects.
 
 ### SecurityContextDeny
 
-This plug-in will deny any pod with a [SecurityContext](../user-guide/security-context.md) that defines options that were not available on the ```Container```.
+This plug-in will deny any pod with a [SecurityContext](../user-guide/security-context.md) that defines options that were not available on the `Container`.
 
 ### ResourceQuota
 
 This plug-in will observe the incoming request and ensure that it does not violate any of the constraints
-enumerated in the ```ResourceQuota``` object in a ```Namespace```.  If you are using ```ResourceQuota```
+enumerated in the `ResourceQuota` object in a `Namespace`.  If you are using `ResourceQuota`
 objects in your Kubernetes deployment, you MUST use this plug-in to enforce quota constraints.
 
 See the [resourceQuota design doc](../design/admission_control_resource_quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more details.
@@ -122,35 +122,35 @@ so that quota is not prematurely incremented only for the request to be rejected
 ### LimitRanger
 
 This plug-in will observe the incoming request and ensure that it does not violate any of the constraints
-enumerated in the ```LimitRange``` object in a ```Namespace```.  If you are using ```LimitRange``` objects in
+enumerated in the `LimitRange` object in a `Namespace`.  If you are using `LimitRange` objects in
 your Kubernetes deployment, you MUST use this plug-in to enforce those constraints. LimitRanger can also
 be used to apply default resource requests to Pods that don't specify any; currently, the default LimitRanger
-applies a 0.1 CPU requirement to all Pods in the ```default``` namespace.
+applies a 0.1 CPU requirement to all Pods in the `default` namespace.
 
 See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](../user-guide/limitrange/) for more details.
 
 ### NamespaceExists
 
-This plug-in will observe all incoming requests that attempt to create a resource in a Kubernetes ```Namespace```
-and reject the request if the ```Namespace``` was not previously created.  We strongly recommend running
+This plug-in will observe all incoming requests that attempt to create a resource in a Kubernetes `Namespace`
+and reject the request if the `Namespace` was not previously created.  We strongly recommend running
 this plug-in to ensure integrity of your data.
 
 ### NamespaceAutoProvision (deprecated)
 
-This plug-in will observe all incoming requests that attempt to create a resource in a Kubernetes ```Namespace```
-and create a new ```Namespace``` if one did not already exist previously.
+This plug-in will observe all incoming requests that attempt to create a resource in a Kubernetes `Namespace`
+and create a new `Namespace` if one did not already exist previously.
 
-We strongly recommend ```NamespaceExists``` over ```NamespaceAutoProvision```.
+We strongly recommend `NamespaceExists` over `NamespaceAutoProvision`.
 
 ### NamespaceLifecycle
 
-This plug-in enforces that a ```Namespace``` that is undergoing termination cannot have new objects created in it.
+This plug-in enforces that a `Namespace` that is undergoing termination cannot have new objects created in it.
 
-A ```Namespace``` deletion kicks off a sequence of operations that remove all objects (pods, services, etc.) in that
+A `Namespace` deletion kicks off a sequence of operations that remove all objects (pods, services, etc.) in that
 namespace.  In order to enforce integrity of that process, we strongly recommend running this plug-in.
 
-Once ```NamespaceAutoProvision``` is deprecated, we anticipate ```NamespaceLifecycle``` and ```NamespaceExists``` will
-be merged into a single plug-in that enforces the life-cycle of a ```Namespace``` in Kubernetes.
+Once `NamespaceAutoProvision` is deprecated, we anticipate `NamespaceLifecycle` and `NamespaceExists` will
+be merged into a single plug-in that enforces the life-cycle of a `Namespace` in Kubernetes.
 
 ## Is there a recommended set of plug-ins to use?
 

@@ -133,7 +133,7 @@ vagrant destroy
 
 Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubectl.sh` script.
 
-You may need to build the binaries first, you can do this with ```make```
+You may need to build the binaries first, you can do this with `make`
 
 ```sh
 $ ./cluster/kubectl.sh get nodes
@@ -374,7 +374,7 @@ export KUBERNETES_MINION_MEMORY=2048
 
 #### I ran vagrant suspend and nothing works!
 
-```vagrant suspend``` seems to mess up the network.  It's not supported at this time.
+`vagrant suspend` seems to mess up the network.  It's not supported at this time.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

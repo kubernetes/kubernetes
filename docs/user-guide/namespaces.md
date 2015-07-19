@@ -85,8 +85,8 @@ kube-system   <none>    Active
 ```
 
 Kubernetes starts with two initial namespaces:
-   * ```default``` The default namespace for objects with no other namespace
-   * ```kube-system``` The namespace for objects created by the Kubernetes system
+   * `default` The default namespace for objects with no other namespace
+   * `kube-system` The namespace for objects created by the Kubernetes system
 
 You can also get the summary of a specific namespace using:
 
@@ -121,14 +121,14 @@ a *Namespace*.
 See [Admission control: Limit Range](../design/admission_control_limit_range.md)
 
 A namespace can be in one of two phases:
-   * ```Active``` the namespace is in use
+   * `Active` the namespace is in use
    * ```Terminating`` the namespace is being deleted, and can not be used for new objects
 
 See the [design doc](../design/namespaces.md#phases) for more details.
 
 ### Creating a new namespace
 
-To create a new namespace, first create a new YAML file called ```my-namespace.yaml``` with the contents:
+To create a new namespace, first create a new YAML file called `my-namespace.yaml` with the contents:
 
 ```yaml
 apiVersion: v1
@@ -139,7 +139,7 @@ metadata:
 
 Note that the name of your namespace must be a DNS compatible label.
 
-More information on the ```finalizers``` field can be found in the namespace [design doc](../design/namespaces.md#finalizers).
+More information on the `finalizers` field can be found in the namespace [design doc](../design/namespaces.md#finalizers).
 
 Then run:
 
@@ -149,7 +149,7 @@ $ kubectl create -f ./my-namespace.yaml
 
 ### Setting the namespace for a request
 
-To temporarily set the namespace for a request, use the ```--namespace``` flag.
+To temporarily set the namespace for a request, use the `--namespace` flag.
 
 For example:
 
@@ -185,13 +185,13 @@ $ kubectl delete namespaces <insert-some-namespace-name>
 
 **WARNING, this deletes _everything_ under the namespace!**
 
-This delete is asynchronous, so for a time you will see the namespace in the ```Terminating``` state.
+This delete is asynchronous, so for a time you will see the namespace in the `Terminating` state.
 
 ## Namespaces and DNS
 
 When you create a [Service](services.md), it creates a corresponding [DNS entry](../admin/dns.md)1.
-This entry is of the form ```<service-name>.<namespace-name>.cluster.local```, which means
-that if a container just uses ```<service-name>``` it will resolve to the service which
+This entry is of the form `<service-name>.<namespace-name>.cluster.local`, which means
+that if a container just uses `<service-name>` it will resolve to the service which
 is local to a namespace.  This is useful for using the same configuration across
 multiple namespaces such as Development, Staging and Production.  If you want to reach
 across namespaces, you need to use the fully qualified domain name (FQDN).
