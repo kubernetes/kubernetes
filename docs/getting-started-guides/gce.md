@@ -138,13 +138,13 @@ potential issues with client/server version skew.
 
 Once `kubectl` is in your path, you can use it to look at your cluster. E.g., running:
 
-```shell
+```console
 $ kubectl get --all-namespaces services
 ```
 
 should show a set of [services](../user-guide/services.md) that look something like this:
 
-```shell
+```console
 NAMESPACE     NAME                  LABELS                                                                           SELECTOR                IP(S)       PORT(S)
 default       kubernetes            component=apiserver,provider=kubernetes                                          <none>                  10.0.0.1    443/TCP
 kube-system   kube-dns              k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS   k8s-app=kube-dns        10.0.0.10   53/UDP
@@ -159,7 +159,7 @@ kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernete
 Similarly, you can take a look at the set of [pods](../user-guide/pods.md) that were created during cluster startup.
 You can do this via the
 
-```shell
+```console
 $ kubectl get --all-namespaces pods
 ```
 
@@ -167,7 +167,7 @@ command.
 
 You'll see a list of pods that looks something like this (the name specifics will be different):
 
-```shell
+```console
 NAMESPACE     NAME                                           READY     STATUS    RESTARTS   AGE
 kube-system   fluentd-cloud-logging-kubernetes-minion-63uo   1/1       Running   0          14m
 kube-system   fluentd-cloud-logging-kubernetes-minion-c1n9   1/1       Running   0          14m
