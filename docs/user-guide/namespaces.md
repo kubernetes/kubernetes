@@ -77,8 +77,8 @@ Look [here](namespaces/) for an in depth example of namespaces.
 
 You can list the current namespaces in a cluster using:
 
-```sh
-$> kubectl get namespaces
+```console
+$ kubectl get namespaces
 NAME          LABELS    STATUS
 default       <none>    Active
 kube-system   <none>    Active
@@ -90,14 +90,14 @@ Kubernetes starts with two initial namespaces:
 
 You can also get the summary of a specific namespace using:
 
-```
-kubectl get namespaces <name>
+```console
+$ kubectl get namespaces <name>
 ```
 
 Or you can get detailed information with:
 
-```sh
-$> kubectl describe namespaces <name>
+```console
+$ kubectl describe namespaces <name>
 Name:	   default
 Labels:	   <none>
 Status:	   Active
@@ -143,8 +143,8 @@ More information on the ```finalizers``` field can be found in the namespace [de
 
 Then run:
 
-```
-kubectl create -f ./my-namespace.yaml
+```console
+$ kubectl create -f ./my-namespace.yaml
 ```
 
 ### Setting the namespace for a request
@@ -153,9 +153,9 @@ To temporarily set the namespace for a request, use the ```--namespace``` flag.
 
 For example:
 
-```
-kubectl --namespace=<insert-namespace-name-here> run nginx --image=nginx
-kubectl --namespace=<insert-namespace-name-here> get pods
+```console
+$ kubectl --namespace=<insert-namespace-name-here> run nginx --image=nginx
+$ kubectl --namespace=<insert-namespace-name-here> get pods
 ```
 
 ### Setting the namespace preference
@@ -165,22 +165,22 @@ context.
 
 First get your current context:
 
-```sh
-export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}')
+```console
+$ export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}')
 ```
 
 Then update the default namespace:
 
-```sh
-kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
+```console
+$ kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
 ```
 
 ### Deleting a namespace
 
 You can delete a namespace with
 
-```
-kubectl delete namespaces <insert-some-namespace-name>
+```console
+$ kubectl delete namespaces <insert-some-namespace-name>
 ```
 
 **WARNING, this deletes _everything_ under the namespace!**
