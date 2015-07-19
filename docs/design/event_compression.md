@@ -90,7 +90,7 @@ Each binary that generates events:
 
 Sample kubectl output
 
-```
+```console
 FIRSTSEEN                         LASTSEEN                          COUNT               NAME                                          KIND                SUBOBJECT                                REASON              SOURCE                                                  MESSAGE
 Thu, 12 Feb 2015 01:13:02 +0000   Thu, 12 Feb 2015 01:13:02 +0000   1                   kubernetes-minion-4.c.saad-dev-vms.internal   Minion                                                       starting            {kubelet kubernetes-minion-4.c.saad-dev-vms.internal}   Starting kubelet.
 Thu, 12 Feb 2015 01:13:09 +0000   Thu, 12 Feb 2015 01:13:09 +0000   1                   kubernetes-minion-1.c.saad-dev-vms.internal   Minion                                                       starting            {kubelet kubernetes-minion-1.c.saad-dev-vms.internal}   Starting kubelet.

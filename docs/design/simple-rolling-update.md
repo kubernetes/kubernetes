@@ -62,7 +62,7 @@ To facilitate recovery in the case of a crash of the updating process itself, we
 
 Recovery is achieved by issuing the same command again:
 
-```
+```sh
 kubectl rolling-update foo [foo-v2] --image=myimage:v2
 ```
 
