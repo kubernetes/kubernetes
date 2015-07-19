@@ -46,7 +46,7 @@ When you create a resource such as pod, and then retrieve the created
 resource, a number of the fields of the resource are added.
 You can see this at work in the following example:
 
-```
+```console
 $ cat > /tmp/original.yaml <<EOF
 apiVersion: v1
 kind: Pod
