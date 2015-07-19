@@ -143,7 +143,7 @@ No pods will be available before starting a container:
 
 We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
 
-```
+```json
 {
   "apiVersion": "v1",
   "kind": "Pod",
