@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -42,21 +43,13 @@ var (
 	remote    = flag.String("remote", "upstream", "The name of the remote repo from which to pull docs.")
 )
 
-func fixURL(u *url.URL) (modified bool) {
-	if u.Host != "" {
-		return
-	}
-
-	if strings.HasSuffix(u.Path, ".md") {
+func fixURL(u *url.URL) bool {
+	if u.Host != "" && strings.HasSuffix(u.Path, ".md") {
 		u.Path = u.Path[:len(u.Path)-3] + ".html"
-		modified = true
+		return true
 	}
 
-	if strings.HasSuffix(u.Path, "/") {
-		u.Path = u.Path + "README.html"
-		modified = true
-	}
-	return
+	return false
 }
 
 func processFile(filename string) error {
@@ -191,6 +184,34 @@ func copyFiles(remoteRepo, directory, branch string) error {
 	return tarCmd.Wait()
 }
 
+func copySingleFile(src, dst string) (err error) {
+	_, err = os.Stat(dst)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	_, err = io.Copy(out, in)
+	return
+}
+
 func main() {
 	flag.Parse()
 	if len(*branch) == 0 {
@@ -219,7 +240,17 @@ func main() {
 
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".md") {
 			fmt.Printf("Processing %s\n", path)
-			return processFile(path)
+			if err = processFile(path); err != nil {
+				return err
+			}
+
+			if strings.ToLower(info.Name()) == "readme.md" {
+				newpath := path[0:len(path)-len("readme.md")] + "index.md"
+				fmt.Printf("Copying %s to %s\n", path, newpath)
+				if err = copySingleFile(path, newpath); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	})
