@@ -71,7 +71,7 @@ This example will work in a custom namespace to demonstrate the concepts involve
 
 Let's create a new namespace called limit-example:
 
-```shell
+```console
 $ kubectl create -f docs/user-guide/limitrange/namespace.yaml
 namespaces/limit-example
 $ kubectl get namespaces
@@ -84,14 +84,14 @@ Step 2: Apply a limit to the namespace
 -----------------------------------------
 Let's create a simple limit in our namespace.
 
-```shell
+```console
 $ kubectl create -f docs/user-guide/limitrange/limits.yaml --namespace=limit-example
 limitranges/mylimits
 ```
 
 Let's describe the limits that we have imposed in our namespace.
 
-```shell
+```console
 $ kubectl describe limits mylimits --namespace=limit-example
 Name:   mylimits
 Type      Resource  Min  Max Default
@@ -123,7 +123,7 @@ of creation explaining why.
 Let's first spin up a replication controller that creates a single container pod to demonstrate
 how default values are applied to each pod.
 
-```shell
+```console
 $ kubectl run nginx --image=nginx --replicas=1 --namespace=limit-example
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 nginx        nginx          nginx      run=nginx   1
@@ -132,6 +132,9 @@ POD           IP           CONTAINER(S)   IMAGE(S)   HOST          LABELS      S
 nginx-ykj4j   10.246.1.3                             10.245.1.3/   run=nginx   Running   About a minute
                            nginx          nginx                                Running   54 seconds
 $ kubectl get pods nginx-ykj4j --namespace=limit-example -o yaml | grep resources -C 5
+```
+
+```yaml
   containers:
   - capabilities: {}
     image: nginx
@@ -149,17 +152,20 @@ Note that our nginx container has picked up the namespace default cpu and memory
 
 Let's create a pod that exceeds our allowed limits by having it have a container that requests 3 cpu cores.
 
-```shell
+```console
 $ kubectl create -f docs/user-guide/limitrange/invalid-pod.yaml --namespace=limit-example
 Error from server: Pod "invalid-pod" is forbidden: Maximum CPU usage per pod is 2, but requested 3
 ```
 
 Let's create a pod that falls within the allowed limit boundaries.
 
-```shell
+```console
 $ kubectl create -f docs/user-guide/limitrange/valid-pod.yaml --namespace=limit-example
 pods/valid-pod
 $ kubectl get pods valid-pod --namespace=limit-example -o yaml | grep -C 5 resources
+```
+
+```yaml
   containers:
   - capabilities: {}
     image: gcr.io/google_containers/serve_hostname
@@ -179,7 +185,7 @@ Step 4: Cleanup
 ----------------------------
 To remove the resources used by this example, you can just delete the limit-example namespace.
 
-```shell
+```console
 $ kubectl delete namespace limit-example
 namespaces/limit-example
 $ kubectl get namespaces
