@@ -128,7 +128,7 @@ The server is updated to be aware of **LimitRange** objects.
 
 The constraints are only enforced if the kube-apiserver is started as follows:
 
-```
+```console
 $ kube-apiserver -admission_control=LimitRanger
 ```
 
@@ -140,7 +140,7 @@ kubectl is modified to support the **LimitRange** resource.
 
 For example,
 
-```shell
+```console
 $ kubectl namespace myspace
 $ kubectl create -f docs/user-guide/limitrange/limits.yaml
 $ kubectl get limits

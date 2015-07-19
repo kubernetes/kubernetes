@@ -34,7 +34,7 @@ This directory contains diagrams for the clustering design doc.
 
 This depends on the `seqdiag` [utility](http://blockdiag.com/en/seqdiag/index.html).  Assuming you have a non-borked python install, this should be installable with
 
-```bash
+```sh
 pip install seqdiag
 ```
 
@@ -44,7 +44,7 @@ Just call `make` to regenerate the diagrams.
 
 If you are on a Mac or your pip install is messed up, you can easily build with docker.
 
-```
+```sh
 make docker
 ```
 

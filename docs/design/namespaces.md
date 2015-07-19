@@ -74,7 +74,7 @@ The Namespace provides a unique scope for:
 
 A *Namespace* defines a logically named group for multiple *Kind*s of resources.
 
-```
+```go
 type Namespace struct {
   TypeMeta   `json:",inline"`
   ObjectMeta `json:"metadata,omitempty"`
@@ -125,7 +125,7 @@ See [Admission control: Resource Quota](admission_control_resource_quota.md)
 
 Upon creation of a *Namespace*, the creator may provide a list of *Finalizer* objects.
 
-```
+```go
 type FinalizerName string
 
 // These are internal finalizers to Kubernetes, must be qualified name unless defined here
@@ -154,7 +154,7 @@ set by default.
 
 A *Namespace* may exist in the following phases.
 
-```
+```go
 type NamespacePhase string
 const(
   NamespaceActive NamespacePhase = "Active"
@@ -262,7 +262,7 @@ to take part in Namespace termination.
 
 OpenShift creates a Namespace in Kubernetes
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -287,7 +287,7 @@ own storage associated with the "development" namespace unknown to Kubernetes.
 
 User deletes the Namespace in Kubernetes, and Namespace now has following state:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -312,7 +312,7 @@ and begins to terminate all of the content in the namespace that it knows about.
 success, it executes a *finalize* action that modifies the *Namespace* by
 removing *kubernetes* from the list of finalizers:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -340,7 +340,7 @@ from the list of finalizers.
 
 This results in the following state:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
