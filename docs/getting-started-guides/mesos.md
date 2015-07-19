@@ -102,7 +102,16 @@ $ export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
 Start etcd and verify that it is running:
 
 ```bash
-$ sudo docker run -d --hostname $(uname -n) --name etcd -p 4001:4001 -p 7001:7001 quay.io/coreos/etcd:v2.0.12
+$ sudo docker run -d -p 4001:4001 -p 2380:2380 -p 2379:2379 \
+ --name etcd quay.io/coreos/etcd:v2.0.13 \
+ -name etcd0 \
+ -advertise-client-urls http://${KUBERNETES_MASTER_IP}:2379,http://${KUBERNETES_MASTER_IP}:4001 \
+ -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001 \
+ -initial-advertise-peer-urls http://${KUBERNETES_MASTER_IP}:2380 \
+ -listen-peer-urls http://0.0.0.0:2380 \
+ -initial-cluster-token etcd-cluster-1 \
+ -initial-cluster etcd0=http://${KUBERNETES_MASTER_IP}:2380 \
+ -initial-cluster-state new
 ```
 
 ```bash
