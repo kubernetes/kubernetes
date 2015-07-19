@@ -100,7 +100,7 @@ kubectl get nodes
 
 This should print:
 
-```
+```console
 NAME        LABELS    STATUS
 127.0.0.1   <none>    Ready
 ```
@@ -123,7 +123,7 @@ kubectl expose rc nginx --port=80
 
 This should print:
 
-```
+```console
 NAME      LABELS    SELECTOR              IP          PORT(S)
 nginx     <none>    run=nginx             <ip-addr>   80/TCP
 ```
