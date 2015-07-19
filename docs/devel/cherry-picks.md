@@ -40,7 +40,7 @@ Kubernetes projects.
 
 Any contributor can propose a cherry pick of any pull request, like so:
 
-```
+```sh
 hack/cherry_pick_pull.sh upstream/release-3.14 98765
 ```
 

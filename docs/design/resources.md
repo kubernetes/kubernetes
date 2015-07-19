@@ -89,7 +89,7 @@ Both users and a number of system components, such as schedulers, (horizontal) a
 
 Resource requirements for a container or pod should have the following form:
 
-```
+```yaml
 resourceRequirementSpec: [
   request:   [ cpu: 2.5, memory: "40Mi" ],
   limit:     [ cpu: 4.0, memory: "99Mi" ],
@@ -103,7 +103,7 @@ Where:
 
 Total capacity for a node should have a similar structure:
 
-```
+```yaml
 resourceCapacitySpec: [
   total:     [ cpu: 12,  memory: "128Gi" ]
 ]
@@ -159,15 +159,16 @@ rather than decimal ones: "64MiB" rather than "64MB".
 
 A resource type may have an associated read-only ResourceType structure, that contains metadata about the type.  For example:
 
-```
+```yaml
 resourceTypes: [
   "kubernetes.io/memory": [
     isCompressible: false, ... 
   ]
   "kubernetes.io/cpu": [
-    isCompressible: true, internalScaleExponent: 3, ...
+    isCompressible: true,
+    internalScaleExponent: 3, ...
   ]
-  "kubernetes.io/disk-space": [ ... }
+  "kubernetes.io/disk-space": [ ... ]
 ]
 ```
 
@@ -195,7 +196,7 @@ Because resource usage and related metrics change continuously, need to be track
 
 Singleton values for observed and predicted future usage will rapidly prove inadequate, so we will support the following structure for extended usage information: 
 
-```
+```yaml
 resourceStatus: [
   usage:     [ cpu: <CPU-info>, memory: <memory-info> ],
   maxusage:  [ cpu: <CPU-info>, memory: <memory-info> ],
@@ -205,7 +206,7 @@ resourceStatus: [
 
 where a `<CPU-info>` or `<memory-info>` structure looks like this:
 
-```
+```yaml
 {
     mean: <value>    # arithmetic mean
     max: <value>     # minimum value
@@ -218,7 +219,7 @@ where a `<CPU-info>` or `<memory-info>` structure looks like this:
       "99.9": <99.9th-percentile-value>,
       ...
     ]
- }
+}
 ```
 
 All parts of this structure are optional, although we strongly encourage including quantities for 50, 90, 95, 99, 99.5, and 99.9 percentiles.  _[In practice, it will be important to include additional info such as the length of the time window over which the averages are calculated, the confidence level, and information-quality metrics such as the number of dropped or discarded data points.]_
