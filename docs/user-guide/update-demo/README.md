@@ -55,7 +55,7 @@ This example demonstrates the usage of Kubernetes to perform a [rolling update](
 
 This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../../docs/getting-started-guides/):
 
-```bash
+```console
 $ cd kubernetes
 $ ./cluster/kube-up.sh
 ```
@@ -67,9 +67,8 @@ This can sometimes spew to the output so you could also run it in a different te
 Kubernetes repository. Otherwise you will get "404 page not found" errors as the paths will not match. You can find more information about `kubectl proxy`
 [here](../../../docs/user-guide/kubectl/kubectl_proxy.md).
 
-```
+```console
 $ kubectl proxy --www=examples/update-demo/local/ &
-+ kubectl proxy --www=examples/update-demo/local/
 I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 ```
 
@@ -79,7 +78,7 @@ Now visit the the [demo website](http://localhost:8001/static).  You won't see a
 
 Now we will turn up two replicas of an [image](../images.md).  They all serve on internal port 80.
 
-```bash
+```console
 $ kubectl create -f docs/user-guide/update-demo/nautilus-rc.yaml
 ```
 
@@ -89,7 +88,7 @@ After pulling the image from the Docker Hub to your worker nodes (which may take
 
 Now we will increase the number of replicas from two to four:
 
-```bash
+```console
 $ kubectl scale rc update-demo-nautilus --replicas=4
 ```
 
@@ -99,7 +98,7 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
-```bash
+```console
 $ kubectl rolling-update update-demo-nautilus --update-period=10s -f docs/user-guide/update-demo/kitten-rc.yaml
 ```
 
@@ -114,7 +113,7 @@ But if the replica count had been specified, the final replica count of the new 
 
 ### Step Five: Bring down the pods
 
-```bash
+```console
 $ kubectl stop rc update-demo-kitten
 ```
 
@@ -124,14 +123,14 @@ This first stops the replication controller by turning the target number of repl
 
 To turn down a Kubernetes cluster:
 
-```bash
+```console
 $ ./cluster/kube-down.sh
 ```
 
 Kill the proxy running in the background:
 After you are done running this demo make sure to kill it:
 
-```bash
+```console
 $ jobs
 [1]+  Running                 ./kubectl proxy --www=local/ &
 $ kill %1
@@ -142,7 +141,7 @@ $ kill %1
 
 If you want to build your own docker images, you can set `$DOCKER_HUB_USER` to your Docker user id and run the included shell script. It can take a few minutes to download/upload stuff.
 
-```bash
+```console
 $ export DOCKER_HUB_USER=my-docker-id
 $ ./examples/update-demo/build-images.sh
 ```
