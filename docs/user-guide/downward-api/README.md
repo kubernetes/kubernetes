@@ -50,7 +50,7 @@ containers to be injected with the name and namespace of the pod the container i
 Use the [`examples/downward-api/dapi-pod.yaml`](dapi-pod.yaml) file to create a Pod with a container that consumes the
 downward API.
 
-```shell
+```console
 $ kubectl create -f docs/user-guide/downward-api/dapi-pod.yaml
 ```
 
@@ -59,7 +59,7 @@ $ kubectl create -f docs/user-guide/downward-api/dapi-pod.yaml
 This pod runs the `env` command in a container that consumes the downward API.  You can grep
 through the pod logs to see that the pod was injected with the correct values:
 
-```shell
+```console
 $ kubectl logs dapi-test-pod | grep POD_
 2015-04-30T20:22:18.568024817Z POD_NAME=dapi-test-pod
 2015-04-30T20:22:18.568087688Z POD_NAMESPACE=default
