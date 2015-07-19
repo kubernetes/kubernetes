@@ -58,7 +58,7 @@ Ansible will take care of the rest of the configuration for you - configuring ne
 
 A Kubernetes cluster requires etcd, a master, and n nodes, so we will create a cluster with three hosts, for example:
 
-```
+```console
     fed1 (master,etcd) = 192.168.121.205
     fed2 (node) = 192.168.121.84
     fed3 (node) = 192.168.121.116
@@ -71,7 +71,7 @@ A Kubernetes cluster requires etcd, a master, and n nodes, so we will create a c
 
 **then we just clone down the kubernetes-ansible repository** 
 
-```
+```sh
    yum install -y ansible git
    git clone https://github.com/eparis/kubernetes-ansible.git
    cd kubernetes-ansible
@@ -83,7 +83,7 @@ Get the IP addresses from the master and nodes.  Add those to the `inventory` fi
 
 We will set the kube_ip_addr to '10.254.0.[1-3]', for now.  The reason we do this is explained later...  It might work for you as a default.
 
-```
+```console
 [masters]
 192.168.121.205
     
@@ -103,7 +103,7 @@ If you already are running on a machine which has passwordless ssh access to the
 
 edit: group_vars/all.yml
 
-```
+```yaml
 ansible_ssh_user: root
 ```
 
@@ -115,7 +115,7 @@ If you already have ssh access to every machine using ssh public keys you may sk
 
 The password file should contain the root password for every machine in the cluster.  It will be used in order to lay down your ssh public key. Make sure your machines sshd-config allows password logins from root.
 
-```
+```sh
 echo "password" > ~/rootpassword
 ```
 
@@ -123,7 +123,7 @@ echo "password" > ~/rootpassword
 
 After this is completed, ansible is now enabled to ssh into any of the machines you're configuring.
 
-```
+```sh
 ansible-playbook -i inventory ping.yml # This will look like it fails, that's ok
 ```
 
@@ -131,7 +131,7 @@ ansible-playbook -i inventory ping.yml # This will look like it fails, that's ok
 
 Again, you can skip this step if your ansible machine has ssh access to the nodes you are going to use in the kubernetes cluster.
 
-```
+```sh
 ansible-playbook -i inventory keys.yml
 ```
 
@@ -147,7 +147,7 @@ The IP address pool used to assign addresses to pods for each node is the `kube_
 
 For this example, as shown earlier, we can do something like this...
 
-```
+```console
 [minions]
 192.168.121.84  kube_ip_addr=10.254.0.1
 192.168.121.116 kube_ip_addr=10.254.0.2
@@ -163,7 +163,7 @@ Flannel is a cleaner mechanism to use, and is the recommended choice.
 
 Currently, you essentially have to (1) update group_vars/all.yml, and then (2) run
 
-```
+```sh
 ansible-playbook -i inventory flannel.yml
 ```
 
@@ -172,7 +172,7 @@ ansible-playbook -i inventory flannel.yml
 On EACH node, make sure NetworkManager is installed, and the service "NetworkManager" is running, then you can run 
 the network manager playbook...
 
-```
+```sh
 ansible-playbook -i inventory ./old-network-config/hack-network.yml
 ```
 
@@ -184,7 +184,7 @@ Each kubernetes service gets its own IP address.  These are not real IPs.  You n
 
 edit: group_vars/all.yml
 
-```
+```yaml
 kube_service_addresses: 10.254.0.0/16
 ```
 
@@ -192,7 +192,7 @@ kube_service_addresses: 10.254.0.0/16
 
 This will finally setup your whole kubernetes cluster for you.
 
-```
+```sh
 ansible-playbook -i inventory setup.yml
 ```
 
@@ -203,19 +203,19 @@ That's all there is to it.  It's really that easy.  At this point you should hav
 
 **Show services running on masters and nodes.**
 
-```
+```sh
 systemctl | grep -i kube
 ```
 
 **Show firewall rules on the masters and nodes.**
 
-```
+```sh
 iptables -nvL
 ```
 
 **Create the following apache.json file and deploy pod to node.**
 
-```
+```sh
 cat << EOF > apache.json
 {
   "kind": "Pod",
@@ -251,7 +251,7 @@ EOF
 
 **Check where the pod was created.**
 
-```
+```sh
 kubectl get pods
 ```
 
@@ -263,14 +263,14 @@ If you see 172 in the IP fields, networking was not setup correctly, and you may
 
 **Check Docker status on node.**
 
-```
+```sh
 docker ps
 docker images
 ```
 
 **After the pod is 'Running' Check web server access on the node.**
 
-```
+```sh
 curl http://localhost
 ```
 
