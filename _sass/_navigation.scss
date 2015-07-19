@@ -19,12 +19,13 @@ ul, ul ul {
 }
 .menu > li > a {
 	width: 100%;
-	height: 2em;
+	height: auto;
 	color:#505050;
-	line-height: 2em;
 	display: block;
 	position: center;
 	padding-right: .25em;
+	margin-top: 1em;
+	margin-bottom: 1em;
 }
 .menu ul li a {
 	width: 100%;
