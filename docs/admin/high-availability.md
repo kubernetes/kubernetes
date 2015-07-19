@@ -41,6 +41,19 @@ Documentation for other releases can be found at
   - [Overview](#overview)
   - [Initial set-up](#initial-set-up)
   - [Reliable nodes](#reliable-nodes)
+  - [Establishing a redundant, reliable data storage layer](#establishing-a-redundant-reliable-data-storage-layer)
+    - [Clustering etcd](#clustering-etcd)
+      - [Validating your cluster](#validating-your-cluster)
+    - [Even more reliable storage](#even-more-reliable-storage)
+  - [Replicated API Servers](#replicated-api-servers)
+    - [Installing configuration files](#installing-configuration-files)
+    - [Starting the API Server](#starting-the-api-server)
+    - [Load balancing](#load-balancing)
+  - [Master elected components](#master-elected-components)
+    - [Installing configuration files](#installing-configuration-files)
+    - [Running the podmaster](#running-the-podmaster)
+  - [Conclusion](#conclusion)
+  - [Vagrant up!](#vagrant-up)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
