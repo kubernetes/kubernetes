@@ -45,7 +45,7 @@ The **salt-minion** service runs on the kubernetes-master node and each kubernet
 
 Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file [(except on GCE)](#standalone-salt-configuration-on-gce).
 
-```
+```console
 [root@kubernetes-master] $ cat /etc/salt/minion.d/master.conf
 master: kubernetes-master
 ```
@@ -66,7 +66,7 @@ All remaining sections that refer to master/minion setups should be ignored for 
 
 Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from minions.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
 
-```
+```console
 [root@kubernetes-master] $ cat /etc/salt/master.d/auto-accept.conf
 open_mode: True
 auto_accept: True
@@ -78,7 +78,7 @@ Each minion in the salt cluster has an associated configuration that instructs t
 
 An example file is presented below using the Vagrant based environment.
 
-```
+```console
 [root@kubernetes-master] $ cat /etc/salt/minion.d/grains.conf
 grains:
   etcd_servers: $MASTER_IP
