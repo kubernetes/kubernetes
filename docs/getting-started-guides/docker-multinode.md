@@ -66,10 +66,10 @@ Here's a diagram of what the final result will look like:
 ### Bootstrap Docker
 
 This guide also uses a pattern of running two instances of the Docker daemon
-   1) A _bootstrap_ Docker instance which is used to start system daemons like ```flanneld``` and ```etcd```
+   1) A _bootstrap_ Docker instance which is used to start system daemons like `flanneld` and `etcd`
    2) A _main_ Docker instance which is used for the Kubernetes infrastructure and user's scheduled containers
 
-This pattern is necessary because the ```flannel``` daemon is responsible for setting up and managing the network that interconnects
+This pattern is necessary because the `flannel` daemon is responsible for setting up and managing the network that interconnects
 all of the Docker containers created by Kubernetes.  To achieve this, it must run outside of the _main_ Docker daemon.  However,
 it is still useful to use containers for deployment and management, so we create a simpler _bootstrap_ daemon to achieve this.
 

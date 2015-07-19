@@ -47,8 +47,8 @@ NAME           LABELS                                 STATUS
 127.0.0.1      kubernetes.io/hostname=127.0.0.1       Ready
 ```
 
-If the status of any node is ```Unknown``` or ```NotReady``` your cluster is broken, double check that all containers are running properly, and if all else fails, contact us on IRC at
-[```#google-containers```](http://webchat.freenode.net/?channels=google-containers) for advice.
+If the status of any node is `Unknown` or `NotReady` your cluster is broken, double check that all containers are running properly, and if all else fails, contact us on IRC at
+[`#google-containers`](http://webchat.freenode.net/?channels=google-containers) for advice.
 
 ### Run an application
 
@@ -56,7 +56,7 @@ If the status of any node is ```Unknown``` or ```NotReady``` your cluster is bro
 kubectl -s http://localhost:8080 run nginx --image=nginx --port=80
 ```
 
-now run ```docker ps``` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
+now run `docker ps` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
 
 ### Expose it as a service
 

@@ -99,21 +99,21 @@ describe easy installation for single-master clusters on a variety of platforms.
 
 On each master node, we are going to run a number of processes that implement the Kubernetes API.  The first step in making these reliable is
 to make sure that each automatically restarts when it fails.  To achieve this, we need to install a process watcher.  We choose to use
-the ```kubelet``` that we run on each of the worker nodes.  This is convenient, since we can use containers to distribute our binaries, we can
+the `kubelet` that we run on each of the worker nodes.  This is convenient, since we can use containers to distribute our binaries, we can
 establish resource limits, and introspect the resource usage of each daemon.  Of course, we also need something to monitor the kubelet
 itself (insert who watches the watcher jokes here).  For Debian systems, we choose monit, but there are a number of alternate
 choices. For example, on systemd-based systems (e.g. RHEL, CentOS), you can run 'systemctl enable kubelet'. 
 
-If you are extending from a standard Kubernetes installation, the ```kubelet``` binary should already be present on your system.  You can run
-```which kubelet``` to determine if the binary is in fact installed.  If it is not installed,
+If you are extending from a standard Kubernetes installation, the `kubelet` binary should already be present on your system.  You can run
+`which kubelet` to determine if the binary is in fact installed.  If it is not installed,
 you should install the [kubelet binary](https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubelet), the
 [kubelet init file](../../cluster/saltbase/salt/kubelet/initd) and [high-availability/default-kubelet](high-availability/default-kubelet)
 scripts.
 
-If you are using monit, you should also install the monit daemon (```apt-get install monit```) and the [high-availability/monit-kubelet](high-availability/monit-kubelet) and
+If you are using monit, you should also install the monit daemon (`apt-get install monit`) and the [high-availability/monit-kubelet](high-availability/monit-kubelet) and
 [high-availability/monit-docker](high-availability/monit-docker) configs.
 
-On systemd systems you ```systemctl enable kubelet``` and ```systemctl enable docker```.
+On systemd systems you `systemctl enable kubelet` and `systemctl enable docker`.
 
 
 ## Establishing a redundant, reliable data storage layer
@@ -140,14 +140,14 @@ First, hit the etcd discovery service to create a new token:
 curl https://discovery.etcd.io/new?size=3
 ```
 
-On each node, copy the [etcd.yaml](high-availability/etcd.yaml) file into ```/etc/kubernetes/manifests/etcd.yaml```
+On each node, copy the [etcd.yaml](high-availability/etcd.yaml) file into `/etc/kubernetes/manifests/etcd.yaml`
 
-The kubelet on each node actively monitors the contents of that directory, and it will create an instance of the ```etcd```
-server from the definition of the pod specified in ```etcd.yaml```.
+The kubelet on each node actively monitors the contents of that directory, and it will create an instance of the `etcd`
+server from the definition of the pod specified in `etcd.yaml`.
 
-Note that in ```etcd.yaml``` you should substitute the token URL you got above for ```${DISCOVERY_TOKEN}``` on all three machines,
-and you should substitute a different name (e.g. ```node-1```) for ${NODE_NAME} and the correct IP address
-for ```${NODE_IP}``` on each machine.
+Note that in `etcd.yaml` you should substitute the token URL you got above for `${DISCOVERY_TOKEN}` on all three machines,
+and you should substitute a different name (e.g. `node-1`) for ${NODE_NAME} and the correct IP address
+for `${NODE_IP}` on each machine.
 
 
 #### Validating your cluster
@@ -164,7 +164,7 @@ and
 etcdctl cluster-health
 ```
 
-You can also validate that this is working with ```etcdctl set foo bar``` on one node, and ```etcd get foo```
+You can also validate that this is working with `etcdctl set foo bar` on one node, and `etcd get foo`
 on a different node.
 
 ### Even more reliable storage
@@ -181,7 +181,7 @@ Alternatively, you can run a clustered file system like Gluster or Ceph.  Finall
 
 Regardless of how you choose to implement it, if you chose to use one of these options, you should make sure that your storage is mounted
 to each machine.  If your storage is shared between the three masters in your cluster, you should create a different directory on the storage
-for each node.  Throughout these instructions, we assume that this storage is mounted to your machine in ```/var/etcd/data```
+for each node.  Throughout these instructions, we assume that this storage is mounted to your machine in `/var/etcd/data`
 
 
 ## Replicated API Servers
@@ -196,7 +196,7 @@ First you need to create the initial log file, so that Docker mounts a file inst
 touch /var/log/kube-apiserver.log
 ```
 
-Next, you need to create a ```/srv/kubernetes/``` directory on each node.  This directory includes:
+Next, you need to create a `/srv/kubernetes/` directory on each node.  This directory includes:
    * basic_auth.csv  - basic auth user and password
    * ca.crt - Certificate Authority cert
    * known_tokens.csv - tokens that entities (e.g. the kubelet) can use to talk to the apiserver
@@ -209,9 +209,9 @@ The easiest way to create this directory, may be to copy it from the master node
 
 ### Starting the API Server
 
-Once these files exist, copy the [kube-apiserver.yaml](high-availability/kube-apiserver.yaml) into ```/etc/kubernetes/manifests/``` on each master node.
+Once these files exist, copy the [kube-apiserver.yaml](high-availability/kube-apiserver.yaml) into `/etc/kubernetes/manifests/` on each master node.
 
-The kubelet monitors this directory, and will automatically create an instance of the ```kube-apiserver``` container using the pod definition specified
+The kubelet monitors this directory, and will automatically create an instance of the `kube-apiserver` container using the pod definition specified
 in the file.
 
 ### Load balancing
@@ -224,9 +224,9 @@ Platform can be found [here](https://cloud.google.com/compute/docs/load-balancin
 Note, if you are using authentication, you may need to regenerate your certificate to include the IP address of the balancer,
 in addition to the IP addresses of the individual nodes.
 
-For pods that you deploy into the cluster, the ```kubernetes``` service/dns name should provide a load balanced endpoint for the master automatically.
+For pods that you deploy into the cluster, the `kubernetes` service/dns name should provide a load balanced endpoint for the master automatically.
 
-For external users of the API (e.g. the ```kubectl``` command line interface, continuous build pipelines, or other clients) you will want to configure
+For external users of the API (e.g. the `kubectl` command line interface, continuous build pipelines, or other clients) you will want to configure
 them to talk to the external load balancer's IP address.
 
 ## Master elected components
@@ -234,7 +234,7 @@ them to talk to the external load balancer's IP address.
 So far we have set up state storage, and we have set up the API server, but we haven't run anything that actually modifies
 cluster state, such as the controller manager and scheduler.  To achieve this reliably, we only want to have one actor modifying state at a time, but we want replicated
 instances of these actors, in case a machine dies.  To achieve this, we are going to use a lease-lock in etcd to perform
-master election.  On each of the three apiserver nodes, we run a small utility application named ```podmaster```. It's job is to implement a master
+master election.  On each of the three apiserver nodes, we run a small utility application named `podmaster`. It's job is to implement a master
 election protocol using etcd "compare and swap". If the apiserver node wins the election, it starts the master component it is managing (e.g. the scheduler), if it
 loses the election, it ensures that any master components running on the node (e.g. the scheduler) are stopped.
 
@@ -250,14 +250,14 @@ touch /var/log/kube-controller-manager.log
 ```
 
 Next, set up the descriptions of the scheduler and controller manager pods on each node.
-by copying [kube-scheduler.yaml](high-availability/kube-scheduler.yaml) and [kube-controller-manager.yaml](high-availability/kube-controller-manager.yaml) into the ```/srv/kubernetes/```
+by copying [kube-scheduler.yaml](high-availability/kube-scheduler.yaml) and [kube-controller-manager.yaml](high-availability/kube-controller-manager.yaml) into the `/srv/kubernetes/`
  directory.
 
 ### Running the podmaster
 
-Now that the configuration files are in place, copy the [podmaster.yaml](high-availability/podmaster.yaml) config file into ```/etc/kubernetes/manifests/```
+Now that the configuration files are in place, copy the [podmaster.yaml](high-availability/podmaster.yaml) config file into `/etc/kubernetes/manifests/`
 
-As before, the kubelet on the node monitors this directory, and will start an instance of the podmaster using the pod specification provided in ```podmaster.yaml```.
+As before, the kubelet on the node monitors this directory, and will start an instance of the podmaster using the pod specification provided in `podmaster.yaml`.
 
 Now you will have one instance of the scheduler process running on a single master node, and likewise one
 controller-manager process running on a single (possibly different) master node.  If either of these processes fail,
@@ -272,7 +272,7 @@ If you have an existing cluster, this is as simple as reconfiguring your kubelet
 restarting the kubelets on each node.
 
 If you are turning up a fresh cluster, you will need to install the kubelet and kube-proxy on each worker node, and
-set the ```--apiserver``` flag to your replicated endpoint.
+set the `--apiserver` flag to your replicated endpoint.
 
 ## Vagrant up!
 

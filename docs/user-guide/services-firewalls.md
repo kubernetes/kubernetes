@@ -47,7 +47,7 @@ is *not* opened by default.
 
 Google Compute Engine firewalls are documented [elsewhere](https://cloud.google.com/compute/docs/networking#firewalls_1).
 
-You can add a firewall with the ```gcloud``` command line tool:
+You can add a firewall with the `gcloud` command line tool:
 
 ```console
 $ gcloud compute firewall-rules create my-rule --allow=tcp:<port>

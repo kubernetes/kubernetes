@@ -174,7 +174,7 @@ Disk](http://cloud.google.com/compute/docs/disks) into your pod.  Unlike
 preserved and the volume is merely unmounted.  This means that a PD can be
 pre-populated with data, and that data can be "handed off" between pods.
 
-__Important: You must create a PD using ```gcloud``` or the GCE API or UI
+__Important: You must create a PD using `gcloud` or the GCE API or UI
 before you can use it__
 
 There are some restrictions when using a `gcePersistentDisk`:
@@ -230,7 +230,7 @@ volume are preserved and the volume is merely unmounted.  This means that an
 EBS volume can be pre-populated with data, and that data can be "handed off"
 between pods.
 
-__Important: You must create an EBS volume using ```aws ec2 create-volume``` or
+__Important: You must create an EBS volume using `aws ec2 create-volume` or
 the AWS API before you can use it__
 
 There are some restrictions when using an awsElasticBlockStore volume:

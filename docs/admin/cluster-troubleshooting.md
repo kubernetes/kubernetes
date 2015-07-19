@@ -48,12 +48,12 @@ Run
 kubectl get nodes
 ```
 
-And verify that all of the nodes you expect to see are present and that they are all in the ```Ready``` state.
+And verify that all of the nodes you expect to see are present and that they are all in the `Ready` state.
 
 ## Looking at logs
 
 For now, digging deeper into the cluster requires logging into the relevant machines.  Here are the locations
-of the relevant log files.  (note that on systemd-based systems, you may need to use ```journalctl``` instead)
+of the relevant log files.  (note that on systemd-based systems, you may need to use `journalctl` instead)
 
 ### Master
 
