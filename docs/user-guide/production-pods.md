@@ -107,7 +107,7 @@ data:
 
 As with other resources, this secret can be instantiated using `create` and can be viewed with `get`:
 
-```bash
+```console
 $ kubectl create -f ./secret.yaml
 secrets/mysecret
 $ kubectl get secrets
@@ -158,7 +158,7 @@ Secrets can also be used to pass [image registry credentials](images.md#using-a-
 First, create a `.dockercfg` file, such as running `docker login <registry.domain>`.
 Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
 
-```
+```console
 $ docker login
 Username: janedoe
 Password: ●●●●●●●●●●●
@@ -189,7 +189,7 @@ secrets/myregistrykey
 Now, you can create pods which reference that secret by adding an `imagePullSecrets`
 section to a pod definition.
 
-```
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -367,7 +367,7 @@ spec:
 
 The message is recorded along with the other state of the last (i.e., most recent) termination:
 
-```bash
+```console
 $ kubectl create -f ./pod.yaml
 pods/pod-w-message
 $ sleep 70
