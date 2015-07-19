@@ -93,7 +93,7 @@ account. To create additional API tokens for a service account, create a secret
 of type `ServiceAccountToken` with an annotation referencing the service
 account, and the controller will update it with a generated token:
 
-```
+```json
 secret.json:
 {
 	"kind": "Secret",
@@ -105,14 +105,16 @@ secret.json:
 	}
 	"type": "kubernetes.io/service-account-token"
 }
+```
 
-$ kubectl create -f ./secret.json
-$ kubectl describe secret mysecretname
+```sh
+kubectl create -f ./secret.json
+kubectl describe secret mysecretname
 ```
 
 #### To delete/invalidate a service account token
 
-```
+```sh
 kubectl delete secret mysecretname
 ```
 

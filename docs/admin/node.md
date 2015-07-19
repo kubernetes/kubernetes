@@ -209,7 +209,7 @@ node, but will not affect any existing pods on the node.  This is useful as a
 preparatory step before a node reboot, etc.  For example, to mark a node
 unschedulable, run this command:
 
-```
+```sh
 kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
 ```
 
@@ -228,7 +228,7 @@ processes not in containers.
 If you want to explicitly reserve resources for non-Pod processes, you can create a placeholder
 pod.  Use the following template:
 
-```
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:

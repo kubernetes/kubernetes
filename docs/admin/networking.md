@@ -155,7 +155,7 @@ on that subnet, and is passed to docker's `--bridge` flag.
 
 We start Docker with:
 
-```
+```sh
     DOCKER_OPTS="--bridge=cbr0 --iptables=false --ip-masq=false"
 ```
 
@@ -172,14 +172,14 @@ masquerade (aka SNAT - to make it seem as if packets came from the `Node`
 itself) traffic that is bound for IPs outside the GCE project network
 (10.0.0.0/8).
 
-```
+```sh
 iptables -t nat -A POSTROUTING ! -d 10.0.0.0/8 -o eth0 -j MASQUERADE
 ```
 
 Lastly we enable IP forwarding in the kernel (so the kernel will process
 packets for bridged containers):
 
-```
+```sh
 sysctl net.ipv4.ip_forward=1
 ```
 
