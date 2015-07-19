@@ -67,6 +67,25 @@ steps that existing cluster setup scripts are making.
     - [kubelet](#kubelet)
     - [kube-proxy](#kube-proxy)
     - [Networking](#networking)
+    - [Other](#other)
+    - [Using Configuration Management](#using-configuration-management)
+  - [Bootstrapping the Cluster](#bootstrapping-the-cluster)
+    - [etcd](#etcd)
+    - [Apiserver](#apiserver)
+      - [Apiserver pod template](#apiserver-pod-template)
+      - [Starting Apiserver](#starting-apiserver)
+    - [Scheduler](#scheduler)
+    - [Controller Manager](#controller-manager)
+    - [Logging](#logging)
+    - [Monitoring](#monitoring)
+    - [DNS](#dns)
+  - [Troubleshooting](#troubleshooting)
+    - [Running validate-cluster](#running-validate-cluster)
+    - [Inspect pods and services](#inspect-pods-and-services)
+    - [Try Examples](#try-examples)
+    - [Running the Conformance Test](#running-the-conformance-test)
+    - [Networking](#networking)
+    - [Getting Help](#getting-help)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -308,7 +327,7 @@ many distinct files to make:
 You can make the files by copying the `$HOME/.kube/config`, by following the code
 in `cluster/gce/configure-vm.sh` or by using the following template:
 
-```
+```yaml
 apiVersion: v1
 kind: Config
 users:
@@ -355,7 +374,7 @@ If you previously had Docker installed on a node without setting Kubernetes-spec
 options, you may have a Docker-created bridge and iptables rules.  You may want to remove these
 as follows before proceeding to configure Docker for Kubernetes.
 
-```
+```sh
 iptables -t nat -F 
 ifconfig docker0 down
 brctl delbr docker0
@@ -461,7 +480,11 @@ because of how this is used later.
 If you have turned off Docker's IP masquerading to allow pods to talk to each
 other, then you may need to do masquerading just for destination IPs outside
 the cluster network.  For example:
-```iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE \! -d ${CLUSTER_SUBNET}```
+
+```sh
+iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE \! -d ${CLUSTER_SUBNET}
+```
+
 This will rewrite the source address from
 the PodIP to the Node IP for traffic bound outside the cluster, and kernel
 [connection tracking](http://www.iptables.info/en/connection-state.html)
@@ -634,7 +657,7 @@ Place the completed pod template into the kubelet config dir
 
 Next, verify that kubelet has started a container for the apiserver:
 
-```
+```console
 $ sudo docker ps | grep apiserver:
 5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695
 
@@ -642,7 +665,7 @@ $ sudo docker ps | grep apiserver:
 
 Then try to connect to the apiserver:
 
-```
+```console
 
 $ echo $(curl -s http://localhost:8080/healthz)
 ok
