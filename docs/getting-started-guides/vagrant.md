@@ -117,8 +117,8 @@ The master node instantiates the Kubernetes master components as pods on the mac
 
 To view the service status and/or logs on the kubernetes-master:
 
-```sh
-vagrant ssh master
+```console
+[vagrant@kubernetes-master ~] $ vagrant ssh master
 [vagrant@kubernetes-master ~] $ sudo su
 
 [root@kubernetes-master ~] $ systemctl status kubelet
@@ -134,8 +134,8 @@ vagrant ssh master
 
 To view the services on any of the nodes:
 
-```sh
-vagrant ssh minion-1
+```console
+[vagrant@kubernetes-master ~] $ vagrant ssh minion-1
 [vagrant@kubernetes-master ~] $ sudo su
 
 [root@kubernetes-master ~] $ systemctl status kubelet
@@ -172,7 +172,7 @@ Once your Vagrant machines are up and provisioned, the first thing to do is to c
 
 You may need to build the binaries first, you can do this with ```make```
 
-```sh
+```console
 $ ./cluster/kubectl.sh get nodes
 
 NAME                LABELS
@@ -187,6 +187,9 @@ When using the vagrant provider in Kubernetes, the `cluster/kubectl.sh` script w
 
 ```sh
 cat ~/.kubernetes_vagrant_auth
+```
+
+```json
 { "User": "vagrant",
   "Password": "vagrant",
   "CAFile": "/home/k8s_user/.kubernetes.vagrant.ca.crt",
@@ -205,7 +208,7 @@ You should now be set to use the `cluster/kubectl.sh` script. For example try to
 
 Your cluster is running, you can list the nodes in your cluster:
 
-```sh
+```console
 $ ./cluster/kubectl.sh get nodes
 
 NAME                 LABELS
@@ -219,7 +222,7 @@ Now start running some containers!
 You can now use any of the `cluster/kube-*.sh` commands to interact with your VM machines.
 Before starting a container there will be no pods, services and replication controllers.
 
-```sh
+```console
 $ ./cluster/kubectl.sh get pods
 NAME        READY     STATUS    RESTARTS   AGE
 
@@ -232,13 +235,13 @@ CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR   REPLICAS
 
 Start a container running nginx with a replication controller and three replicas
 
-```sh
+```console
 $ ./cluster/kubectl.sh run my-nginx --image=nginx --replicas=3 --port=80
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
 
-```sh
+```console
 $ ./cluster/kubectl.sh get pods
 NAME             READY     STATUS    RESTARTS   AGE
 my-nginx-5kq0g   0/1       Pending   0          10s
@@ -248,7 +251,7 @@ my-nginx-xql4j   0/1       Pending   0          10s
 
 You need to wait for the provisioning to complete, you can monitor the nodes by doing:
 
-```sh
+```console
 $ vagrant ssh minion-1 -c 'sudo docker images'
 kubernetes-minion-1:
     REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
@@ -259,7 +262,7 @@ kubernetes-minion-1:
 
 Once the docker image for nginx has been downloaded, the container will start and you can list it:
 
-```sh
+```console
 $ vagrant ssh minion-1 -c 'sudo docker ps'
 kubernetes-minion-1:
     CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
@@ -271,7 +274,7 @@ kubernetes-minion-1:
 
 Going back to listing the pods, services and replicationcontrollers, you now have:
 
-```sh
+```console
 $ ./cluster/kubectl.sh get pods
 NAME             READY     STATUS    RESTARTS   AGE
 my-nginx-5kq0g   1/1       Running   0          1m
@@ -290,7 +293,7 @@ We did not start any services, hence there are none listed. But we see three rep
 Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
 You can already play with scaling the replicas with:
 
-```sh
+```console
 $ ./cluster/kubectl.sh scale rc my-nginx --replicas=2
 $ ./cluster/kubectl.sh get pods
 NAME             READY     STATUS    RESTARTS   AGE
@@ -325,6 +328,9 @@ After using kubectl.sh make sure that the correct credentials are set:
 
 ```sh
 cat ~/.kubernetes_vagrant_auth
+```
+
+```json
 {
   "User": "vagrant",
   "Password": "vagrant"
