@@ -66,15 +66,15 @@ You can access the API using a proxy or with a client library, as described in
 Every namespace has a default service account resource called "default".
 You can list this and any other serviceAccount resources in the namespace with this command:
 
-```
-kubectl get serviceAccounts
-$ NAME      SECRETS
+```console
+$ kubectl get serviceAccounts
+NAME      SECRETS
 default   1
 ```
 
 You can create additional serviceAccounts like this:
 
-```
+```console
 $ cat > /tmp/serviceaccount.yaml <<EOF
 apiVersion: v1
 kind: ServiceAccount
@@ -87,7 +87,7 @@ serviceacccounts/build-robot
 
 If you get a complete dump of the service account object, like this:
 
-```
+```console
 $ kubectl get serviceacccounts/build-robot -o yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -115,7 +115,7 @@ You cannot update the service account of an already created pod.
 
 You can clean up the service account from this example like this:
 
-```
+```console
 $ kubectl delete serviceaccount/build-robot
 ```
 
