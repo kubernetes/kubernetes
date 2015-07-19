@@ -44,7 +44,7 @@ The first thing to debug in your cluster is if your nodes are all registered cor
 
 Run
 
-```
+```sh
 kubectl get nodes
 ```
 

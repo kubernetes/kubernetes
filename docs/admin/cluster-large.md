@@ -68,14 +68,14 @@ To prevent memory leaks or other resource issues in [cluster addons](../../clust
 
 For example:
 
-```YAML
-      containers:
-        - image: gcr.io/google_containers/heapster:v0.15.0
-          name: heapster
-          resources:
-            limits:
-              cpu: 100m
-              memory: 200Mi
+```yaml
+containers:
+  - image: gcr.io/google_containers/heapster:v0.15.0
+    name: heapster
+    resources:
+      limits:
+        cpu: 100m
+        memory: 200Mi
 ```
 
 These limits, however, are based on data collected from addons running on 4-node clusters (see [#10335](https://github.com/GoogleCloudPlatform/kubernetes/issues/10335#issuecomment-117861225)). The addons consume a lot more resources when running on large deployment clusters (see [#5880](https://github.com/GoogleCloudPlatform/kubernetes/issues/5880#issuecomment-113984085)). So, if a large cluster is deployed without adjusting these values, the addons may continuously get killed because they keep hitting the limits.

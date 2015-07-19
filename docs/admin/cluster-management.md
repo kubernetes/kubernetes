@@ -62,7 +62,7 @@ KUBE_API_VERSIONS env var controls the API versions that are supported in the cl
 
 You can use the kube-version-change utility to convert config files between different API versions.
 
-```
+```console
 $ hack/build-go.sh cmd/kube-version-change
 $ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o myPod.v1.yaml
 ```
