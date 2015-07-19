@@ -67,7 +67,7 @@ across reboots and failures.
 
 Run:
 
-```
+```sh
 sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
 ```
 
@@ -114,7 +114,7 @@ The previous command should have printed a really long hash, copy this hash.
 
 Now get the subnet settings from flannel:
 
-```
+```sh
 sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from-above-here> cat /run/flannel/subnet.env
 ```
 
@@ -185,7 +185,7 @@ kubectl get nodes
 
 This should print:
 
-```
+```console
 NAME        LABELS                             STATUS
 127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
 ```

@@ -97,7 +97,7 @@ The previous command should have printed a really long hash, copy this hash.
 
 Now get the subnet settings from flannel:
 
-```
+```sh
 sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from-above-here> cat /run/flannel/subnet.env
 ```
 

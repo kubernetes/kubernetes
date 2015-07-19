@@ -41,7 +41,7 @@ kubectl get nodes
 
 That should show something like:
 
-```
+```console
 NAME           LABELS                                 STATUS
 10.240.99.26   kubernetes.io/hostname=10.240.99.26    Ready
 127.0.0.1      kubernetes.io/hostname=127.0.0.1       Ready
@@ -66,7 +66,7 @@ kubectl expose rc nginx --port=80
 
 This should print:
 
-```
+```console
 NAME      LABELS    SELECTOR              IP          PORT(S)
 nginx     <none>    run=nginx             <ip-addr>   80/TCP
 ```
