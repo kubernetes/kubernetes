@@ -140,7 +140,7 @@ The server is updated to be aware of **ResourceQuota** objects.
 
 The quota is only enforced if the kube-apiserver is started as follows:
 
-```
+```console
 $ kube-apiserver -admission_control=ResourceQuota
 ```
 
@@ -167,7 +167,7 @@ kubectl is modified to support the **ResourceQuota** resource.
 
 For example,
 
-```
+```console
 $ kubectl namespace myspace
 $ kubectl create -f docs/user-guide/resourcequota/quota.yaml
 $ kubectl get quota

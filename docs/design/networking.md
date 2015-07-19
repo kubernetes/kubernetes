@@ -131,7 +131,7 @@ differentiate it from `docker0`) is set up outside of Docker proper.
 
 Example of GCE's advanced routing rules:
 
-```
+```sh
 gcloud compute routes add "${MINION_NAMES[$i]}" \
   --project "${PROJECT}" \
   --destination-range "${MINION_IP_RANGES[$i]}" \
