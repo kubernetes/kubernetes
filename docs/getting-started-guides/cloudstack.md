@@ -35,10 +35,10 @@ Getting started on [CloudStack](http://cloudstack.apache.org)
 
 **Table of Contents**
 
-    - [Introduction](#introduction)
-    - [Prerequisites](#prerequisites)
-    - [Clone the playbook](#clone-the-playbook)
-    - [Create a Kubernetes cluster](#create-a-kubernetes-cluster)
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Clone the playbook](#clone-the-playbook)
+- [Create a Kubernetes cluster](#create-a-kubernetes-cluster)
 
 ### Introduction
 

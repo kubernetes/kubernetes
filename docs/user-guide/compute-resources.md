@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 
 # Compute Resources
 
-** Table of Contents**
+**Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
 - [Compute Resources](#compute-resources)

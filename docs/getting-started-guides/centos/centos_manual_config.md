@@ -35,8 +35,8 @@ Getting started on [CentOS](http://centos.org)
 
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-    - [Starting a cluster](#starting-a-cluster)
+- [Prerequisites](#prerequisites)
+- [Starting a cluster](#starting-a-cluster)
 
 ## Prerequisites
 
