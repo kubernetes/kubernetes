@@ -49,13 +49,13 @@ We still have [a bunch of work](https://github.com/GoogleCloudPlatform/kubernete
 
   To start the `rkt metadata service`, you can simply run:
 
-  ```shell
+  ```console
   $ sudo rkt metadata-service
   ```
 
   If you want the service to be running as a systemd service, then:
 
-  ```shell
+  ```console
   $ sudo systemd-run rkt metadata-service
   ```
 
@@ -66,7 +66,7 @@ We still have [a bunch of work](https://github.com/GoogleCloudPlatform/kubernete
 
 To use rkt as the container runtime, you just need to set the environment variable `CONTAINER_RUNTIME`:
 
-```shell
+```console
 $ export CONTAINER_RUNTIME=rkt
 $ hack/local-up-cluster.sh
 ```
@@ -75,7 +75,7 @@ $ hack/local-up-cluster.sh
 
 To use rkt as the container runtime for your CoreOS cluster on GCE, you need to specify the OS distribution, project, image:
 
-```shell
+```console
 $ export KUBE_OS_DISTRIBUTION=coreos
 $ export KUBE_GCE_MINION_IMAGE=<image_id>
 $ export KUBE_GCE_MINION_PROJECT=coreos-cloud
@@ -84,13 +84,13 @@ $ export KUBE_CONTAINER_RUNTIME=rkt
 
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
 
-```shell
+```console
 $ export KUBE_RKT_VERSION=0.5.6
 ```
 
 Then you can launch the cluster by:
 
-```shell
+```console
 $ kube-up.sh
 ```
 
@@ -100,7 +100,7 @@ Note that we are still working on making all containerized the master components
 
 To use rkt as the container runtime for your CoreOS cluster on AWS, you need to specify the provider and OS distribution:
 
-```shell
+```console
 $ export KUBERNETES_PROVIDER=aws
 $ export KUBE_OS_DISTRIBUTION=coreos
 $ export KUBE_CONTAINER_RUNTIME=rkt
@@ -108,19 +108,19 @@ $ export KUBE_CONTAINER_RUNTIME=rkt
 
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
 
-```shell
+```console
 $ export KUBE_RKT_VERSION=0.5.6
 ```
 
 You can optionally choose the CoreOS channel  by setting `COREOS_CHANNEL`:
 
-```shell
+```console
 $ export COREOS_CHANNEL=stable
 ```
 
 Then you can launch the cluster by:
 
-```shell
+```console
 $ kube-up.sh
 ```
 
