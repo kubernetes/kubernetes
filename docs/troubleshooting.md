@@ -62,7 +62,7 @@ Before you file an issue, please search existing issues to see if your issue is 
 
 ## IRC
 
-The Kubernetes team hangs out on IRC at [```#google-containers```](https://botbot.me/freenode/google-containers/) on freenode.  Feel free to come and ask any and all questions there.
+The Kubernetes team hangs out on IRC at [`#google-containers`](https://botbot.me/freenode/google-containers/) on freenode.  Feel free to come and ask any and all questions there.
 
 ## Mailing List
 

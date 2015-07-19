@@ -33,10 +33,10 @@ Documentation for other releases can be found at
 
 ## Installing a Kubernetes Master Node via Docker
 
-We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine is ```${MASTER_IP}```
+We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine is `${MASTER_IP}`
 
 There are two main phases to installing the master:
-   * [Setting up ```flanneld``` and ```etcd```](#setting-up-flanneld-and-etcd)
+   * [Setting up `flanneld` and `etcd`](#setting-up-flanneld-and-etcd)
    * [Starting the Kubernetes master components](#starting-the-kubernetes-master)
 
 
@@ -48,9 +48,9 @@ Please install Docker 1.6.2 or wait for Docker 1.7.1.
 
 ### Setup Docker-Bootstrap
 
-We're going to use ```flannel``` to set up networking between Docker daemons.  Flannel itself (and etcd on which it relies) will run inside of
+We're going to use `flannel` to set up networking between Docker daemons.  Flannel itself (and etcd on which it relies) will run inside of
 Docker containers themselves.  To achieve this, we need a separate "bootstrap" instance of the Docker daemon.  This daemon will be started with
-```--iptables=false``` so that it can only run containers with ```--net=host```.  That's sufficient to bootstrap our system.
+`--iptables=false` so that it can only run containers with `--net=host`.  That's sufficient to bootstrap our system.
 
 Run:
 
@@ -122,7 +122,7 @@ sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from
 
 You now need to edit the docker configuration to activate new flags.  Again, this is system specific.
 
-This may be in ```/etc/default/docker``` or ```/etc/systemd/service/docker.service``` or it may be elsewhere.
+This may be in `/etc/default/docker` or `/etc/systemd/service/docker.service` or it may be elsewhere.
 
 Regardless, you need to add the following to the docker command line:
 
@@ -132,14 +132,14 @@ Regardless, you need to add the following to the docker command line:
 
 #### Remove the existing Docker bridge
 
-Docker creates a bridge named ```docker0``` by default.  You need to remove this:
+Docker creates a bridge named `docker0` by default.  You need to remove this:
 
 ```sh
 sudo /sbin/ifconfig docker0 down
 sudo brctl delbr docker0
 ```
 
-You may need to install the ```bridge-utils``` package for the ```brctl``` binary.
+You may need to install the `bridge-utils` package for the `brctl` binary.
 
 #### Restart Docker
 
@@ -190,7 +190,7 @@ NAME        LABELS                             STATUS
 127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
 ```
 
-If the status of the node is ```NotReady``` or ```Unknown``` please check that all of the containers you created are successfully running.
+If the status of the node is `NotReady` or `Unknown` please check that all of the containers you created are successfully running.
 If all else fails, ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers).
 
 

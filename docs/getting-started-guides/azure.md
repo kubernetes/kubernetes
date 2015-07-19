@@ -89,7 +89,7 @@ can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 The [kubectl](../../docs/user-guide/kubectl/kubectl.md) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
 You will use it to look at your new cluster and bring up example apps.
 
-Add the appropriate binary folder to your ```PATH``` to access kubectl:
+Add the appropriate binary folder to your `PATH` to access kubectl:
 
     # OS X
     export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH

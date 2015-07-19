@@ -136,7 +136,7 @@ $ kube-apiserver -admission_control=LimitRanger
 
 kubectl is modified to support the **LimitRange** resource.
 
-```kubectl describe``` provides a human-readable output of limits.
+`kubectl describe` provides a human-readable output of limits.
 
 For example,
 

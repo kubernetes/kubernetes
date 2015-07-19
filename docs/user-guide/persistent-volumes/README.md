@@ -45,11 +45,11 @@ See [Persistent Storage design document](../../design/persistent-storage.md) for
 A Persistent Volume (PV) in Kubernetes represents a real piece of underlying storage capacity in the infrastructure.  Cluster administrators
 must first create storage (create their Google Compute Engine (GCE) disks, export their NFS shares, etc.) in order for Kubernetes to mount it.
 
-PVs are intended for "network volumes" like GCE Persistent Disks, NFS shares, and AWS ElasticBlockStore volumes.  ```HostPath``` was included
-for ease of development and testing.  You'll create a local ```HostPath``` for this example.
+PVs are intended for "network volumes" like GCE Persistent Disks, NFS shares, and AWS ElasticBlockStore volumes.  `HostPath` was included
+for ease of development and testing.  You'll create a local `HostPath` for this example.
 
-> IMPORTANT! For ```HostPath``` to work, you will need to run a single node cluster.  Kubernetes does not
-support local storage on the host at this time.  There is no guarantee your pod ends up on the correct node where the ```HostPath``` resides.
+> IMPORTANT! For `HostPath` to work, you will need to run a single node cluster.  Kubernetes does not
+support local storage on the host at this time.  There is no guarantee your pod ends up on the correct node where the `HostPath` resides.
 
   
 
@@ -124,7 +124,7 @@ I love Kubernetes storage!
 ```
 
 Hopefully this simple guide is enough to get you started with PersistentVolumes.  If you have any questions, join
-[```#google-containers```](https://botbot.me/freenode/google-containers/) on IRC and ask!
+[`#google-containers`](https://botbot.me/freenode/google-containers/) on IRC and ask!
 
 Enjoy!
 

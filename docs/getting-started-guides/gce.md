@@ -111,13 +111,13 @@ The next few steps will show you:
 
 ### Installing the kubernetes command line tools on your workstation
 
-The cluster startup script will leave you with a running cluster and a ```kubernetes``` directory on your workstation.
+The cluster startup script will leave you with a running cluster and a `kubernetes` directory on your workstation.
 The next step is to make sure the `kubectl` tool is in your path.
 
 The [kubectl](../user-guide/kubectl/kubectl.md) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
 You will use it to look at your new cluster and bring up example apps.
 
-Add the appropriate binary folder to your ```PATH``` to access kubectl:
+Add the appropriate binary folder to your `PATH` to access kubectl:
 
 ```bash
 # OS X
@@ -127,7 +127,7 @@ export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
 ```
 
-**Note**: gcloud also ships with ```kubectl```, which by default is added to your path.
+**Note**: gcloud also ships with `kubectl`, which by default is added to your path.
 However the gcloud bundled kubectl version may be older than the one downloaded by the
 get.k8s.io install script. We recommend you use the downloaded binary to avoid
 potential issues with client/server version skew.

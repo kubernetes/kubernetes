@@ -98,10 +98,10 @@ AWS CloudFormation or EC2 with user data (cloud-config).
 
 ### Command line administration tool: `kubectl`
 
-The cluster startup script will leave you with a ```kubernetes``` directory on your workstation.
+The cluster startup script will leave you with a `kubernetes` directory on your workstation.
 Alternately, you can download the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
 
-Next, add the appropriate binary folder to your ```PATH``` to access kubectl:
+Next, add the appropriate binary folder to your `PATH` to access kubectl:
 
 ```bash
 # OS X

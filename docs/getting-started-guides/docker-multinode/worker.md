@@ -37,10 +37,10 @@ Documentation for other releases can be found at
 
 These instructions are very similar to the master set-up above, but they are duplicated for clarity.
 You need to repeat these instructions for each node you want to join the cluster.
-We will assume that the IP address of this node is ```${NODE_IP}``` and you have the IP address of the master in ```${MASTER_IP}``` that you created in the [master instructions](master.md).
+We will assume that the IP address of this node is `${NODE_IP}` and you have the IP address of the master in `${MASTER_IP}` that you created in the [master instructions](master.md).
 
 For each worker node, there are three steps:
-   * [Set up ```flanneld``` on the worker node](#set-up-flanneld-on-the-worker-node)
+   * [Set up `flanneld` on the worker node](#set-up-flanneld-on-the-worker-node)
    * [Start kubernetes on the worker node](#start-kubernetes-on-the-worker-node)
    * [Add the worker to the cluster](#add-the-node-to-the-cluster)
 
@@ -106,7 +106,7 @@ sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from
 
 You now need to edit the docker configuration to activate new flags.  Again, this is system specific.
 
-This may be in ```/etc/default/docker``` or ```/etc/systemd/service/docker.service``` or it may be elsewhere.
+This may be in `/etc/default/docker` or `/etc/systemd/service/docker.service` or it may be elsewhere.
 
 Regardless, you need to add the following to the docker command line:
 
@@ -116,14 +116,14 @@ Regardless, you need to add the following to the docker command line:
 
 #### Remove the existing Docker bridge
 
-Docker creates a bridge named ```docker0``` by default.  You need to remove this:
+Docker creates a bridge named `docker0` by default.  You need to remove this:
 
 ```sh
 sudo /sbin/ifconfig docker0 down
 sudo brctl delbr docker0
 ```
 
-You may need to install the ```bridge-utils``` package for the ```brctl``` binary.
+You may need to install the `bridge-utils` package for the `brctl` binary.
 
 #### Restart Docker
 
@@ -143,7 +143,7 @@ systemctl start docker
 
 #### Run the kubelet
 
-Again this is similar to the above, but the ```--api_servers``` now points to the master we set up in the beginning.
+Again this is similar to the above, but the `--api_servers` now points to the master we set up in the beginning.
 
 ```sh
 sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=$(hostname -i)
@@ -151,7 +151,7 @@ sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.
 
 #### Run the service proxy
 
-The service proxy provides load-balancing between groups of containers defined by Kubernetes ```Services```
+The service proxy provides load-balancing between groups of containers defined by Kubernetes `Services`
 
 ```sh
 sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2

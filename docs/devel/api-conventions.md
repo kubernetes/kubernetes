@@ -69,6 +69,7 @@ using resources with kubectl can be found in (working_with_resources.md).*
       - [Success codes](#success-codes)
       - [Error codes](#error-codes)
   - [Response Status Kind](#response-status-kind)
+  - [Events](#events)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -497,7 +498,7 @@ The following HTTP status codes may be returned by the API.
 * `429 StatusTooManyRequests`
   * Indicates that the either the client rate limit has been exceeded or the server has received more requests then it can process.
   * Suggested client recovery behavior:
-    * Read the ```Retry-After``` HTTP header from the response, and wait at least that long before retrying.
+    * Read the `Retry-After` HTTP header from the response, and wait at least that long before retrying.
 * `500 StatusInternalServerError`
   * Indicates that the server can be reached and understood the request, but either an unexpected internal error occurred and the outcome of the call is unknown, or the server cannot complete the action in a reasonable time (this maybe due to temporary server load or a transient communication issue with another server).
   * Suggested client recovery behavior:
@@ -513,12 +514,12 @@ The following HTTP status codes may be returned by the API.
 
 ## Response Status Kind
 
-Kubernetes will always return the ```Status``` kind from any API endpoint when an error occurs.
+Kubernetes will always return the `Status` kind from any API endpoint when an error occurs.
 Clients SHOULD handle these types of objects when appropriate.
 
-A ```Status``` kind will be returned by the API in two cases:
+A `Status` kind will be returned by the API in two cases:
   * When an operation is not successful (i.e. when the server would return a non 2xx HTTP status code).
-  * When a HTTP ```DELETE``` call is successful.
+  * When a HTTP `DELETE` call is successful.
 
 The status object is encoded as JSON and provided as the body of the response.  The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning. When fields in the status object have the same meaning as generally defined HTTP headers and that header is returned with the response, the header should be considered as having higher priority.
 
@@ -554,17 +555,17 @@ $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https:/
 }
 ```
 
-```status``` field contains one of two possible values:
+`status` field contains one of two possible values:
 * `Success`
 * `Failure`
 
 `message` may contain human-readable description of the error
 
-```reason``` may contain a machine-readable description of why this operation is in the `Failure` status. If this value is empty there is no information available. The `reason` clarifies an HTTP status code but does not override it.
+`reason` may contain a machine-readable description of why this operation is in the `Failure` status. If this value is empty there is no information available. The `reason` clarifies an HTTP status code but does not override it.
 
-```details``` may contain extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.
+`details` may contain extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.
 
-Possible values for the ```reason``` and ```details``` fields:
+Possible values for the `reason` and `details` fields:
 * `BadRequest`
   * Indicates that the request itself was invalid, because the request doesn't make any sense, for example deleting a read-only object.
   * This is different than `status reason` `Invalid` above which indicates that the API call could possibly succeed, but the data was invalid.

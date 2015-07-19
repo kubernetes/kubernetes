@@ -61,7 +61,7 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
    2. [VMWare Fusion](https://www.vmware.com/products/fusion/) version 5 or greater as well as the appropriate [Vagrant VMWare Fusion provider](https://www.vagrantup.com/vmware)
    3. [VMWare Workstation](https://www.vmware.com/products/workstation/) version 9 or greater as well as the [Vagrant VMWare Workstation provider](https://www.vagrantup.com/vmware)
    4. [Parallels Desktop](https://www.parallels.com/products/desktop/) version 9 or greater as well as the [Vagrant Parallels provider](https://parallels.github.io/vagrant-parallels/)
-   5. libvirt with KVM and enable support of hardware virtualisation. [Vagrant-libvirt](https://github.com/pradels/vagrant-libvirt). For fedora provided official rpm, and possible to use ```yum install vagrant-libvirt```
+   5. libvirt with KVM and enable support of hardware virtualisation. [Vagrant-libvirt](https://github.com/pradels/vagrant-libvirt). For fedora provided official rpm, and possible to use `yum install vagrant-libvirt`
 
 ### Setup
 
@@ -170,7 +170,7 @@ vagrant destroy
 
 Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubectl.sh` script.
 
-You may need to build the binaries first, you can do this with ```make```
+You may need to build the binaries first, you can do this with `make`
 
 ```console
 $ ./cluster/kubectl.sh get nodes
@@ -375,7 +375,7 @@ export KUBERNETES_MINION_MEMORY=2048
 
 #### I ran vagrant suspend and nothing works!
 
-```vagrant suspend``` seems to mess up the network.  This is not supported at this time.
+`vagrant suspend` seems to mess up the network.  This is not supported at this time.
 
 #### I want vagrant to sync folders via nfs!
 
