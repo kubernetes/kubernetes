@@ -72,7 +72,7 @@ gpgcheck=0
 
 * Install kubernetes on all hosts - centos-{master,minion}.  This will also pull in etcd, docker, and cadvisor.
 
-```
+```sh
 yum -y install --enablerepo=virt7-testing kubernetes
 ```
 
@@ -82,27 +82,27 @@ If you do not get etcd-0.4.6-7 installed with virt7-testing repo,
 
 In the current virt7-testing repo, the etcd package is updated which causes service failure. To avoid this,
 
-```
+```sh
 yum erase etcd
 ```
 
 It will uninstall the current available etcd package
 
-```
+```sh
 yum install http://cbs.centos.org/kojifiles/packages/etcd/0.4.6/7.el7.centos/x86_64/etcd-0.4.6-7.el7.centos.x86_64.rpm
 yum -y install --enablerepo=virt7-testing kubernetes
 ```
 
 * Add master and node to /etc/hosts on all machines (not needed if hostnames already in DNS)
 
-```
+```sh
 echo "192.168.121.9	centos-master
 192.168.121.65	centos-minion" >> /etc/hosts
 ```
 
 * Edit /etc/kubernetes/config which will be the same on all hosts to contain:
 
-```
+```sh
 # Comma separated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://centos-master:4001"
 
@@ -118,7 +118,7 @@ KUBE_ALLOW_PRIV="--allow_privileged=false"
 
 * Disable the firewall on both the master and node, as docker does not play well with other firewall rule managers
 
-```
+```sh
 systemctl disable iptables-services firewalld
 systemctl stop iptables-services firewalld
 ```
@@ -127,7 +127,7 @@ systemctl stop iptables-services firewalld
 
 * Edit /etc/kubernetes/apiserver to appear as such:
 
-```       
+```sh
 # The address on the local server to listen to.
 KUBE_API_ADDRESS="--address=0.0.0.0"
 
@@ -149,7 +149,7 @@ KUBE_API_ARGS=""
 
 * Start the appropriate services on master:
 
-```
+```sh
 for SERVICES in etcd kube-apiserver kube-controller-manager kube-scheduler; do 
 	systemctl restart $SERVICES
 	systemctl enable $SERVICES
@@ -163,7 +163,7 @@ done
 
 * Edit /etc/kubernetes/kubelet to appear as such:
 
-```       
+```sh
 # The address for the info server to serve on
 KUBELET_ADDRESS="--address=0.0.0.0"
 
@@ -179,7 +179,7 @@ KUBELET_ARGS=""
 
 * Start the appropriate services on node (centos-minion).
 
-```
+```sh
 for SERVICES in kube-proxy kubelet docker; do 
     systemctl restart $SERVICES
     systemctl enable $SERVICES
@@ -191,8 +191,8 @@ done
 
 * Check to make sure the cluster can see the node (on centos-master)
 
-```
-kubectl get nodes
+```console
+$ kubectl get nodes
 NAME                   LABELS            STATUS
 centos-minion          <none>            Ready
 ```

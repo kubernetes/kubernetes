@@ -42,7 +42,7 @@ This example will work in a custom namespace to demonstrate the concepts involve
 
 Let's create a new namespace called quota-example:
 
-```shell
+```console
 $ kubectl create -f docs/user-guide/resourcequota/namespace.yaml
 $ kubectl get namespaces
 NAME            LABELS             STATUS
@@ -62,7 +62,7 @@ and API resources (pods, services, etc.) that a namespace may consume.
 
 Let's create a simple quota in our namespace:
 
-```shell
+```console
 $ kubectl create -f docs/user-guide/resourcequota/quota.yaml --namespace=quota-example
 ```
 
@@ -72,7 +72,7 @@ in the namespace until the quota usage has been calculated.  This should happen 
 You can describe your current quota usage to see what resources are being consumed in your
 namespace.
 
-```
+```console
 $ kubectl describe quota quota --namespace=quota-example
 Name:                   quota
 Namespace:              quota-example
@@ -97,7 +97,7 @@ cpu and memory by creating an nginx container.
 
 To demonstrate, lets create a replication controller that runs nginx:
 
-```shell
+```console
 $ kubectl run nginx --image=nginx --replicas=1 --namespace=quota-example
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 nginx        nginx          nginx      run=nginx   1
@@ -105,14 +105,14 @@ nginx        nginx          nginx      run=nginx   1
 
 Now let's look at the pods that were created.
 
-```shell
+```console
 $ kubectl get pods --namespace=quota-example
 NAME      READY     STATUS    RESTARTS   AGE
 ```
 
 What happened?  I have no pods!  Let's describe the replication controller to get a view of what is happening.
 
-```shell
+```console
 kubectl describe rc nginx --namespace=quota-example
 Name:   nginx
 Image(s): nginx
@@ -130,7 +130,7 @@ do not specify any memory usage.
 
 So let's set some default limits for the amount of cpu and memory a pod can consume:
 
-```shell
+```console
 $ kubectl create -f docs/user-guide/resourcequota/limits.yaml --namespace=quota-example
 limitranges/limits
 $ kubectl describe limits limits --namespace=quota-example
@@ -148,7 +148,7 @@ amount of cpu and memory per container will be applied as part of admission cont
 Now that we have applied default limits for our namespace, our replication controller should be able to
 create its pods.
 
-```shell
+```console
 $ kubectl get pods --namespace=quota-example
 NAME          READY     STATUS    RESTARTS   AGE
 nginx-t9cap   1/1       Running   0          49s
@@ -156,8 +156,8 @@ nginx-t9cap   1/1       Running   0          49s
 
 And if we print out our quota usage in the namespace:
 
-```shell
-kubectl describe quota quota --namespace=quota-example
+```console
+$ kubectl describe quota quota --namespace=quota-example
 Name:                   quota
 Namespace:              default
 Resource                Used            Hard
