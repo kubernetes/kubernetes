@@ -87,7 +87,7 @@ An example cluster is listed as below:
 
 First configure the cluster information in cluster/ubuntu/config-default.sh, below is a simple sample.
 
-```
+```sh
 export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 
 export roles="ai i i"
@@ -123,7 +123,7 @@ After all the above variable being set correctly. We can use below command in cl
 
 The scripts is automatically scp binaries and config files to all the machines and start the k8s service on them. The only thing you need to do is to type the sudo password when promoted. The current machine name is shown below like. So you will not type in the wrong password.
 
-```
+```console
 
 Deploying minion on machine 10.10.103.223
 
@@ -142,7 +142,7 @@ You can also use `kubectl` command to see if the newly created k8s is working co
 
 For example, use `$ kubectl get nodes` to see if all your nodes are in ready status. It may take some time for the nodes ready to use like below. 
 
-```
+```console
 
 NAME            LABELS                                 STATUS
 
@@ -164,7 +164,7 @@ After the previous parts, you will have a working k8s cluster, this part will te
 
 The configuration of dns is configured in cluster/ubuntu/config-default.sh.
 
-```
+```sh
 
 ENABLE_CLUSTER_DNS=true
 
@@ -182,7 +182,7 @@ The `DNS_REPLICAS` describes how many dns pod running in the cluster.
 
 After all the above variable have been set. Just type the below command
 
-```
+```console
 
 $ cd cluster/ubuntu
 
@@ -218,7 +218,7 @@ Please try:
 
 2. Check `/etc/default/etcd`, as we do not have much input validation, a right config should be like:
 
-	```
+	```sh
 	ETCD_OPTS="-name infra1 -initial-advertise-peer-urls <http://ip_of_this_node:2380> -listen-peer-urls <http://ip_of_this_node:2380> -initial-cluster-token etcd-cluster-1 -initial-cluster infra1=<http://ip_of_this_node:2380>,infra2=<http://ip_of_another_node:2380>,infra3=<http://ip_of_another_node:2380> -initial-cluster-state new"
 	```
 
