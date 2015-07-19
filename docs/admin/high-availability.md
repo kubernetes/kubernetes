@@ -141,13 +141,13 @@ for ```${NODE_IP}``` on each machine.
 
 Once you copy this into all three nodes, you should have a clustered etcd set up.  You can validate with
 
-```
+```sh
 etcdctl member list
 ```
 
 and
 
-```
+```sh
 etcdctl cluster-health
 ```
 
@@ -179,7 +179,7 @@ Once you have replicated etcd set up correctly, we will also install the apiserv
 
 First you need to create the initial log file, so that Docker mounts a file instead of a directory:
 
-```
+```sh
 touch /var/log/kube-apiserver.log
 ```
 
@@ -231,7 +231,7 @@ In the future, we expect to more tightly integrate this lease-locking into the s
 
 First, create empty log files on each node, so that Docker will mount the files not make new directories:
 
-```
+```sh
 touch /var/log/kube-scheduler.log
 touch /var/log/kube-controller-manager.log
 ```
