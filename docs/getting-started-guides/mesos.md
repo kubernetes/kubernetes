@@ -83,18 +83,18 @@ ssh jclouds@${ip_address_of_master_node}
 Build Kubernetes-Mesos.
 
 ```bash
-$ git clone https://github.com/GoogleCloudPlatform/kubernetes
-$ cd kubernetes
-$ export KUBERNETES_CONTRIB=mesos
-$ make
+git clone https://github.com/GoogleCloudPlatform/kubernetes
+cd kubernetes
+export KUBERNETES_CONTRIB=mesos
+make
 ```
 
 Set some environment variables.
 The internal IP address of the master may be obtained via `hostname -i`.
 
 ```bash
-$ export KUBERNETES_MASTER_IP=$(hostname -i)
-$ export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
+export KUBERNETES_MASTER_IP=$(hostname -i)
+export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
 ```
 
 ### Deploy etcd
@@ -102,10 +102,10 @@ $ export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
 Start etcd and verify that it is running:
 
 ```bash
-$ sudo docker run -d --hostname $(uname -n) --name etcd -p 4001:4001 -p 7001:7001 quay.io/coreos/etcd:v2.0.12
+sudo docker run -d --hostname $(uname -n) --name etcd -p 4001:4001 -p 7001:7001 quay.io/coreos/etcd:v2.0.12
 ```
 
-```bash
+```console
 $ sudo docker ps
 CONTAINER ID   IMAGE                        COMMAND   CREATED   STATUS   PORTS                NAMES
 fd7bac9e2301   quay.io/coreos/etcd:v2.0.12  "/etcd"   5s ago    Up 3s    2379/tcp, 2380/...   etcd
@@ -124,19 +124,19 @@ If connectivity is OK, you will see an output of the available keys in etcd (if 
 Update your PATH to more easily run the Kubernetes-Mesos binaries:
 
 ```bash
-$ export PATH="$(pwd)/_output/local/go/bin:$PATH"
+export PATH="$(pwd)/_output/local/go/bin:$PATH"
 ```
 
 Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos_master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
 In order to let Kubernetes survive Mesos master changes, the ZooKeeper URL is recommended for production environments.
 
 ```bash
-$ export MESOS_MASTER=<host:port or zk:// url>
+export MESOS_MASTER=<host:port or zk:// url>
 ```
 
 Create a cloud config file `mesos-cloud.conf` in the current directory with the following contents:
 
-```bash
+```console
 $ cat <<EOF >mesos-cloud.conf
 [mesos-cloud]
         mesos-master        = ${MESOS_MASTER}
@@ -145,7 +145,7 @@ EOF
 
 Now start the kubernetes-mesos API server, controller manager, and scheduler on the master node:
 
-```bash
+```console
 $ km apiserver \
   --address=${KUBERNETES_MASTER_IP} \
   --etcd-servers=http://${KUBERNETES_MASTER_IP}:4001 \
@@ -175,7 +175,7 @@ $ km scheduler \
 Disown your background jobs so that they'll stay running if you log out.
 
 ```bash
-$ disown -a
+disown -a
 ```
 
 #### Validate KM Services
@@ -188,12 +188,12 @@ export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
 
 Interact with the kubernetes-mesos framework via `kubectl`:
 
-```bash
+```console
 $ kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
 ```
 
-```bash
+```console
 # NOTE: your service IPs will likely differ
 $ kubectl get services
 NAME             LABELS                                    SELECTOR   IP(S)          PORT(S)
@@ -211,6 +211,9 @@ Write a JSON pod description to a local file:
 
 ```bash
 $ cat <<EOPOD >nginx.yaml
+```
+
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -226,7 +229,7 @@ EOPOD
 
 Send the pod description to Kubernetes using the `kubectl` CLI:
 
-```bash
+```console
 $ kubectl create -f ./nginx.yaml
 pods/nginx
 ```
@@ -234,7 +237,7 @@ pods/nginx
 Wait a minute or two while `dockerd` downloads the image layers from the internet.
 We can use the `kubectl` interface to monitor the status of our pod:
 
-```bash
+```console
 $ kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
 nginx     1/1       Running   0          14s
@@ -295,6 +298,9 @@ To check that the new DNS service in the cluster works, we start a busybox pod a
 
 ```bash
 cat <<EOF >busybox.yaml
+```
+
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -326,7 +332,7 @@ kubectl  exec busybox -- nslookup kubernetes
 
 If everything works fine, you will get this output:
 
-```
+```console
 Server:    10.10.10.10
 Address 1: 10.10.10.10
 
