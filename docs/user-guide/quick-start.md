@@ -53,7 +53,7 @@ Once your application is packaged into a container and pushed to an image regist
 
 For example, [nginx](http://wiki.nginx.org/Main) is a popular HTTP server, with a [pre-built container on Docker hub](https://registry.hub.docker.com/_/nginx/). The [`kubectl run`](kubectl/kubectl_run.md) command below will create two nginx replicas, listening on port 80.
 
-```bash
+```console
 $ kubectl run my-nginx --image=nginx --replicas=2 --port=80
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR       REPLICAS
 my-nginx     my-nginx       nginx      run=my-nginx   2
@@ -61,7 +61,7 @@ my-nginx     my-nginx       nginx      run=my-nginx   2
 
 You can see that they are running by:
 
-```bash
+```console
 $ kubectl get po
 NAME             READY     STATUS    RESTARTS   AGE
 my-nginx-l8n3i   1/1       Running   0          29m
@@ -74,7 +74,7 @@ Kubernetes will ensure that your application keeps running, by automatically res
 
 Through integration with some cloud providers (for example Google Compute Engine and AWS EC2), Kubernetes enables you to request that it provision a public IP address for your application. To do this run:
 
-```bash
+```console
 $ kubectl expose rc my-nginx --port=80 --type=LoadBalancer
 NAME       LABELS         SELECTOR       IP(S)     PORT(S)
 my-nginx   run=my-nginx   run=my-nginx             80/TCP
@@ -82,7 +82,7 @@ my-nginx   run=my-nginx   run=my-nginx             80/TCP
 
 To find the public IP address assigned to your application, execute:
 
-```bash
+```console
 $ kubectl get svc my-nginx -o json | grep \"ip\"
                    "ip": "130.111.122.213"
 ```
@@ -93,7 +93,7 @@ In order to access your nginx landing page, you also have to make sure that traf
 
 To kill the application and delete its containers and public IP address, do:
 
-```bash
+```console
 $ kubectl delete rc my-nginx
 replicationcontrollers/my-nginx
 $ kubectl delete svc my-nginx
