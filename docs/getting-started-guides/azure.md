@@ -105,7 +105,7 @@ For more complete applications, please look in the [examples directory](../../ex
 
 ## Tearing down the cluster
 
-```
+```sh
 cluster/kube-down.sh
 ```
 
