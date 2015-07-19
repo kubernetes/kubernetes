@@ -42,7 +42,7 @@ or if you build from source, kubectl should be either under _output/local/bin/<o
 
 Next, make sure the kubectl tool is in your path, assuming you download a release:
 
-```
+```bash
 # OS X
 export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 
@@ -64,12 +64,12 @@ The kubectl binary doesn't have to be installed to be executable, but the rest o
 
 The simplest way to install is to copy or move kubectl into a dir already in PATH (e.g. `/usr/local/bin`). For example:
 
-```bash
+```console
 # OS X
-sudo cp kubernetes/platforms/darwin/amd64/kubectl /usr/local/bin/kubectl
+$ sudo cp kubernetes/platforms/darwin/amd64/kubectl /usr/local/bin/kubectl
 # Linux
-sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
- ```
+$ sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
+```
 
 #### Configuring Kubectl
 
@@ -83,7 +83,7 @@ If your cluster was deployed by other means (e.g. a [getting started guide](../g
 
 Check that kubectl is properly configured by getting the cluster state:
 
-```sh
+```console
 $ kubectl cluster-info
 ```
 
