@@ -302,7 +302,7 @@ For example, the Service "redis-master" which exposes TCP port 6379 and has been
 allocated cluster IP address 10.0.0.11 produces the following environment
 variables:
 
-```
+```bash
 REDIS_MASTER_SERVICE_HOST=10.0.0.11
 REDIS_MASTER_SERVICE_PORT=6379
 REDIS_MASTER_PORT=tcp://10.0.0.11:6379
