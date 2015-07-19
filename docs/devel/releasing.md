@@ -65,7 +65,7 @@ to make sure they're solid around then as well. Once you find some greens, you
 can find the Git hash for a build by looking at the "Console Log", then look for
 `githash=`. You should see a line line:
 
-```
+```console
 + githash=v0.20.2-322-g974377b
 ```
 
@@ -80,7 +80,7 @@ oncall.
 
 Before proceeding to the next step:
 
-```
+```sh
 export BRANCHPOINT=v0.20.2-322-g974377b
 ```
 
@@ -230,11 +230,11 @@ present.
 We are using `pkg/version/base.go` as the source of versioning in absence of
 information from git. Here is a sample of that file's contents:
 
-```
-  var (
-      gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
-      gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
-  )
+```go
+var (
+    gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
+    gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
+)
 ```
 
 This means a build with `go install` or `go get` or a build from a tarball will
@@ -313,14 +313,14 @@ projects seem to live with that and it does not really become a large problem.
 As an example, Docker commit a327d9b91edf has a `v1.1.1-N-gXXX` label but it is
 not present in Docker `v1.2.0`:
 
-```
-  $ git describe a327d9b91edf
-  v1.1.1-822-ga327d9b91edf
+```console
+$ git describe a327d9b91edf
+v1.1.1-822-ga327d9b91edf
 
-  $ git log --oneline v1.2.0..a327d9b91edf
-  a327d9b91edf Fix data space reporting from Kb/Mb to KB/MB
+$ git log --oneline v1.2.0..a327d9b91edf
+a327d9b91edf Fix data space reporting from Kb/Mb to KB/MB
 
-  (Non-empty output here means the commit is not present on v1.2.0.)
+(Non-empty output here means the commit is not present on v1.2.0.)
 ```
 
 ## Release Notes

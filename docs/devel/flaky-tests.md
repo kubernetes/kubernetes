@@ -69,7 +69,7 @@ spec:
 
 Note that we omit the labels and the selector fields of the replication controller, because they will be populated from the labels field of the pod template by default.
 
-```
+```sh
 kubectl create -f ./controller.yaml
 ```
 

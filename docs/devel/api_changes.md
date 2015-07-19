@@ -284,8 +284,8 @@ Once all the necessary manually written conversions are added, you need to
 regenerate auto-generated ones. To regenerate them:
    - run
 
-```
-   $ hack/update-generated-conversions.sh
+```sh
+hack/update-generated-conversions.sh
 ```
 
 If running the above script is impossible due to compile errors, the easiest
@@ -359,8 +359,8 @@ an example to illustrate your change.
 
 Make sure you update the swagger API spec by running:
 
-```shell
-$ hack/update-swagger-spec.sh
+```sh
+hack/update-swagger-spec.sh
 ```
 
 The API spec changes should be in a commit separate from your other changes.
