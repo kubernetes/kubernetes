@@ -201,7 +201,7 @@ files and the secret values are base-64 decoded and stored inside these files.
 This is the result of commands
 executed inside the container from the example above:
 
-```
+```console
 $ ls /etc/foo/
 username
 password
@@ -433,7 +433,7 @@ The pods:
 
 Both containers will have the following files present on their filesystems:
 
-```
+```console
     /etc/secret-volume/username
     /etc/secret-volume/password
 ```
