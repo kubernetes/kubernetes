@@ -35,10 +35,10 @@ Getting started on Microsoft Azure
 
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-    - [Setup](#setup)
-    - [Getting started with your cluster](#getting-started-with-your-cluster)
-    - [Tearing down the cluster](#tearing-down-the-cluster)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Getting started with your cluster](#getting-started-with-your-cluster)
+- [Tearing down the cluster](#tearing-down-the-cluster)
 
 
 ## Prerequisites
