@@ -68,7 +68,7 @@ Getting started with libvirt CoreOS
 
 You can test it with the following command:
 
-```
+```sh
 virsh -c qemu:///system pool-list
 ```
 
@@ -76,7 +76,7 @@ If you have access error messages, please read https://libvirt.org/acl.html and 
 
 In short, if your libvirt has been compiled with Polkit support (ex: Arch, Fedora 21), you can create `/etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules` as follows to grant full access to libvirt to `$USER`
 
-```
+```sh
 sudo /bin/sh -c "cat - > /etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules" << EOF
 polkit.addRule(function(action, subject) {
         if (action.id == "org.libvirt.unix.manage" &&
@@ -91,11 +91,11 @@ EOF
 
 If your libvirt has not been compiled with Polkit (ex: Ubuntu 14.04.1 LTS), check the permissions on the libvirt unix socket:
 
-```
-ls -l /var/run/libvirt/libvirt-sock
+```console
+$ ls -l /var/run/libvirt/libvirt-sock
 srwxrwx--- 1 root libvirtd 0 févr. 12 16:03 /var/run/libvirt/libvirt-sock
 
-usermod -a -G libvirtd $USER
+$ usermod -a -G libvirtd $USER
 # $USER needs to logout/login to have the new group be taken into account
 ```
 
@@ -109,7 +109,7 @@ As we’re using the `qemu:///system` instance of libvirt, qemu will run with a 
 
 If your `$HOME` is world readable, everything is fine. If your $HOME is private, `cluster/kube-up.sh` will fail with an error message like:
 
-```
+```console
 error: Cannot access storage file '$HOME/.../kubernetes/cluster/libvirt-coreos/libvirt_storage_pool/kubernetes_master.img' (as uid:99, gid:78): Permission denied
 ```
 
@@ -122,7 +122,7 @@ In order to fix that issue, you have several possibilities:
 
 On Arch:
 
-```
+```sh
 setfacl -m g:kvm:--x ~
 ```
 
@@ -132,7 +132,7 @@ By default, the libvirt-coreos setup will create a single kubernetes master and 
 
 To start your local cluster, open a shell and run:
 
-```shell
+```sh
 cd kubernetes
 
 export KUBERNETES_PROVIDER=libvirt-coreos
@@ -150,8 +150,8 @@ The `KUBE_PUSH` environment variable may be set to specify which kubernetes bina
 
 You can check that your machines are there and running with:
 
-```
-virsh -c qemu:///system list
+```console
+$ virsh -c qemu:///system list
  Id    Name                           State
 ----------------------------------------------------
  15    kubernetes_master              running
@@ -162,7 +162,7 @@ virsh -c qemu:///system list
 
 You can check that the kubernetes cluster is working with:
 
-```
+```console
 $ kubectl get nodes
 NAME                LABELS              STATUS
 192.168.10.2        <none>              Ready
@@ -178,13 +178,13 @@ The IPs to connect to the nodes are 192.168.10.2 and onwards.
 
 Connect to `kubernetes_master`:
 
-```
+```sh
 ssh core@192.168.10.1
 ```
 
 Connect to `kubernetes_minion-01`:
 
-```
+```sh
 ssh core@192.168.10.2
 ```
 
@@ -192,37 +192,37 @@ ssh core@192.168.10.2
 
 All of the following commands assume you have set `KUBERNETES_PROVIDER` appropriately:
 
-```
+```sh
 export KUBERNETES_PROVIDER=libvirt-coreos
 ```
 
 Bring up a libvirt-CoreOS cluster of 5 nodes
 
-```
+```sh
 NUM_MINIONS=5 cluster/kube-up.sh
 ```
 
 Destroy the libvirt-CoreOS cluster
 
-```
+```sh
 cluster/kube-down.sh
 ```
 
 Update the libvirt-CoreOS cluster with a new Kubernetes release produced by `make release` or `make release-skip-tests`:
 
-```
+```sh
 cluster/kube-push.sh
 ```
 
 Update the libvirt-CoreOS cluster with the locally built Kubernetes binaries produced by `make`:
 
-```
+```sh
 KUBE_PUSH=local cluster/kube-push.sh
 ```
 
 Interact with the cluster
 
-```
+```sh
 kubectl ...
 ```
 
@@ -232,7 +232,7 @@ kubectl ...
 
 Build the release tarballs:
 
-```
+```sh
 make release
 ```
 
@@ -242,19 +242,19 @@ Install libvirt
 
 On Arch:
 
-```
+```sh
 pacman -S qemu libvirt
 ```
 
 On Ubuntu 14.04.1:
 
-```
+```sh
 aptitude install qemu-system-x86 libvirt-bin
 ```
 
 On Fedora 21:
 
-```
+```sh
 yum install qemu libvirt
 ```
 
@@ -264,13 +264,13 @@ Start the libvirt daemon
 
 On Arch:
 
-```
+```sh
 systemctl start libvirtd
 ```
 
 On Ubuntu 14.04.1:
 
-```
+```sh
 service libvirt-bin start
 ```
 
@@ -280,7 +280,7 @@ Fix libvirt access permission (Remember to adapt `$USER`)
 
 On Arch and Fedora 21:
 
-```
+```sh
 cat > /etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules <<EOF
 polkit.addRule(function(action, subject) {
         if (action.id == "org.libvirt.unix.manage" &&
@@ -295,7 +295,7 @@ EOF
 
 On Ubuntu:
 
-```
+```sh
 usermod -a -G libvirtd $USER
 ```
 
