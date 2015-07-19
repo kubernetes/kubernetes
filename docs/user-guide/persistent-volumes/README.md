@@ -53,17 +53,15 @@ support local storage on the host at this time.  There is no guarantee your pod 
 
   
 
-```
-
-// this will be nginx's webroot
+```console
+# This will be nginx's webroot
 $ mkdir /tmp/data01
 $ echo 'I love Kubernetes storage!' > /tmp/data01/index.html
-
 ```
 
 PVs are created by posting them to the API server.
 
-```
+```console
 $ kubectl create -f docs/user-guide/persistent-volumes/volumes/local-01.yaml
 NAME      LABELS       CAPACITY      ACCESSMODES   STATUS      CLAIM     REASON
 pv0001    type=local   10737418240   RWO           Available 
@@ -76,7 +74,7 @@ They just know they can rely on their claim to storage and can manage its lifecy
 
 Claims must be created in the same namespace as the pods that use them.
 
-```
+```console
 
 $ kubectl create -f docs/user-guide/persistent-volumes/claims/claim-01.yaml
 
@@ -101,7 +99,7 @@ pv0001    type=local   10737418240   RWO           Bound     default/myclaim-1
 
 Claims are used as volumes in pods.  Kubernetes uses the claim to look up its bound PV.  The PV is then exposed to the pod.
 
-```
+```console
 $ kubectl create -f docs/user-guide/persistent-volumes/simpletest/pod.yaml
 
 $ kubectl get pods
@@ -120,11 +118,9 @@ kubernetes        component=apiserver,provider=kubernetes   <none>              
 You should be able to query your service endpoint and see what content nginx is serving.  A "forbidden" error might mean you 
 need to disable SELinux (setenforce 0).
 
-```
-
-curl 10.0.0.241:3000
+```console
+$ curl 10.0.0.241:3000
 I love Kubernetes storage!
-
 ```
 
 Hopefully this simple guide is enough to get you started with PersistentVolumes.  If you have any questions, join
