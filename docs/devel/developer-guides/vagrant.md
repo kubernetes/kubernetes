@@ -86,8 +86,8 @@ vagrant ssh minion-3
 
 To view the service status and/or logs on the kubernetes-master:
 
-```sh
-vagrant ssh master
+```console
+$ vagrant ssh master
 [vagrant@kubernetes-master ~] $ sudo systemctl status kube-apiserver
 [vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-apiserver
 
@@ -100,8 +100,8 @@ vagrant ssh master
 
 To view the services on any of the nodes:
 
-```sh
-vagrant ssh minion-1
+```console
+$ vagrant ssh minion-1
 [vagrant@kubernetes-minion-1] $ sudo systemctl status docker
 [vagrant@kubernetes-minion-1] $ sudo journalctl -r -u docker
 [vagrant@kubernetes-minion-1] $ sudo systemctl status kubelet
@@ -135,7 +135,7 @@ Once your Vagrant machines are up and provisioned, the first thing to do is to c
 
 You may need to build the binaries first, you can do this with ```make```
 
-```sh
+```console
 $ ./cluster/kubectl.sh get nodes
 
 NAME                     LABELS                                          STATUS
@@ -182,8 +182,8 @@ Interact with the cluster
 
 When using the vagrant provider in Kubernetes, the `cluster/kubectl.sh` script will cache your credentials in a `~/.kubernetes_vagrant_auth` file so you will not be prompted for them in the future.
 
-```sh
-cat ~/.kubernetes_vagrant_auth
+```console
+$ cat ~/.kubernetes_vagrant_auth
 { "User": "vagrant",
   "Password": "vagrant"
   "CAFile": "/home/k8s_user/.kubernetes.vagrant.ca.crt",
@@ -202,7 +202,7 @@ You should now be set to use the `cluster/kubectl.sh` script. For example try to
 
 Your cluster is running, you can list the nodes in your cluster:
 
-```sh
+```console
 $ ./cluster/kubectl.sh get nodes
 
 NAME                     LABELS                                          STATUS
@@ -216,7 +216,7 @@ Now start running some containers!
 You can now use any of the cluster/kube-*.sh commands to interact with your VM machines.
 Before starting a container there will be no pods, services and replication controllers.
 
-```
+```console
 $ cluster/kubectl.sh get pods
 NAME  READY   STATUS    RESTARTS    AGE
 
@@ -229,7 +229,7 @@ CONTROLLER  CONTAINER(S)   IMAGE(S)    SELECTOR    REPLICAS
 
 Start a container running nginx with a replication controller and three replicas
 
-```
+```console
 $ cluster/kubectl.sh run my-nginx --image=nginx --replicas=3 --port=80
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR       REPLICAS
 my-nginx     my-nginx       nginx      run=my-nginx   3
@@ -237,7 +237,7 @@ my-nginx     my-nginx       nginx      run=my-nginx   3
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
 
-```
+```console
 $ cluster/kubectl.sh get pods
 NAME              READY     STATUS    RESTARTS   AGE
 my-nginx-389da    1/1       Waiting   0          33s
@@ -247,7 +247,7 @@ my-nginx-nyj3x    1/1       Waiting   0          33s
 
 You need to wait for the provisioning to complete, you can monitor the minions by doing:
 
-```sh
+```console
 $ sudo salt '*minion-1' cmd.run 'docker images'
 kubernetes-minion-1:
     REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
@@ -257,7 +257,7 @@ kubernetes-minion-1:
 
 Once the docker image for nginx has been downloaded, the container will start and you can list it:
 
-```sh
+```console
 $ sudo salt '*minion-1' cmd.run 'docker ps'
 kubernetes-minion-1:
     CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
@@ -267,7 +267,7 @@ kubernetes-minion-1:
 
 Going back to listing the pods, services and replicationcontrollers, you now have:
 
-```
+```console
 $ cluster/kubectl.sh get pods
 NAME              READY     STATUS    RESTARTS   AGE
 my-nginx-389da    1/1       Running   0          33s
@@ -286,7 +286,7 @@ We did not start any services, hence there are none listed. But we see three rep
 Check the [guestbook](../../../examples/guestbook/README.md) application to learn how to create a service.
 You can already play with scaling the replicas with:
 
-```sh
+```console
 $ ./cluster/kubectl.sh scale rc my-nginx --replicas=2
 $ ./cluster/kubectl.sh get pods
 NAME              READY     STATUS    RESTARTS   AGE
@@ -327,8 +327,8 @@ rm ~/.kubernetes_vagrant_auth
 
 After using kubectl.sh make sure that the correct credentials are set:
 
-```sh
-cat ~/.kubernetes_vagrant_auth
+```console
+$ cat ~/.kubernetes_vagrant_auth
 {
   "User": "vagrant",
   "Password": "vagrant"
