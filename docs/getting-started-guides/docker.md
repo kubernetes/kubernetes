@@ -105,7 +105,7 @@ NAME        LABELS    STATUS
 127.0.0.1   <none>    Ready
 ```
 
-If you are running different kubernetes clusters, you may need to specify ```-s http://localhost:8080``` to select the local cluster.
+If you are running different kubernetes clusters, you may need to specify `-s http://localhost:8080` to select the local cluster.
 
 ### Run an application
 
@@ -113,7 +113,7 @@ If you are running different kubernetes clusters, you may need to specify ```-s 
 kubectl -s http://localhost:8080 run-container nginx --image=nginx --port=80
 ```
 
-now run ```docker ps``` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
+now run `docker ps` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
 
 ### Expose it as a service
 
@@ -138,10 +138,10 @@ Note that you will need run this curl command on your boot2docker VM if you are 
 
 ### A note on turning down your cluster
 
-Many of these containers run under the management of the ```kubelet``` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
+Many of these containers run under the management of the `kubelet` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
 the cluster, you need to first kill the kubelet container, and then any other containers.
 
-You may use ```docker ps -a | awk '{print $1}' | xargs docker kill```, note this removes _all_ containers running under Docker, so use with caution.
+You may use `docker ps -a | awk '{print $1}' | xargs docker kill`, note this removes _all_ containers running under Docker, so use with caution.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

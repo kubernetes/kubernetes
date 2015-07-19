@@ -65,7 +65,7 @@ Kubernetes makes no guarantees at runtime that the underlying storage exists or 
 
 #### Describe available storage
 
-Cluster administrators use the API to manage *PersistentVolumes*.  A custom store ```NewPersistentVolumeOrderedIndex``` will index volumes by access modes and sort by storage capacity.  The ```PersistentVolumeClaimBinder``` watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
+Cluster administrators use the API to manage *PersistentVolumes*.  A custom store `NewPersistentVolumeOrderedIndex` will index volumes by access modes and sort by storage capacity.  The `PersistentVolumeClaimBinder` watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
 
 PVs are system objects and, thus, have no namespace.
 

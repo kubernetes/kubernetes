@@ -55,14 +55,14 @@ release.  It is likely long and many PRs aren't worth mentioning.  If any of the
 PRs were cherrypicked into patches on the last minor release, you should exclude
 them from the current release's notes.
 
-Open up ```candidate-notes.md``` in your favorite editor.
+Open up `candidate-notes.md` in your favorite editor.
 
 Remove, regroup, organize to your hearts content.
 
 
 ### 4) Update CHANGELOG.md
 
-With the final markdown all set, cut and paste it to the top of ```CHANGELOG.md```
+With the final markdown all set, cut and paste it to the top of `CHANGELOG.md`
 
 ### 5) Update the Release page
 

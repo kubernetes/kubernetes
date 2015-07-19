@@ -106,10 +106,10 @@ Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. 
 
 ### Installing godep
 
-There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
+There are many ways to build and host go binaries. Here is an easy way to get utilities like `godep` installed:
 
 1) Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
-source control system).  Use ```apt-get install mercurial``` or ```yum install mercurial``` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
+source control system).  Use `apt-get install mercurial` or `yum install mercurial` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
 directly from mercurial.
 
 2) Create a new GOPATH for your tools and install godep:
@@ -174,7 +174,7 @@ go get -u path/to/dependency
 godep update path/to/dependency
 ```
 
-5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by re-restoring: ```godep restore```
+5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by re-restoring: `godep restore`
 
 It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 

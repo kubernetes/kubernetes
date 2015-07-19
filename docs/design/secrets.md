@@ -297,7 +297,7 @@ storing it. Secrets contain multiple pieces of data that are presented as differ
 the secret volume (example: SSH key pair).
 
 In order to remove the burden from the end user in specifying every file that a secret consists of,
-it should be possible to mount all files provided by a secret with a single ```VolumeMount``` entry
+it should be possible to mount all files provided by a secret with a single `VolumeMount` entry
 in the container specification.
 
 ### Secret API Resource
@@ -349,7 +349,7 @@ finer points of secrets and resource allocation are fleshed out.
 
 ### Secret Volume Source
 
-A new `SecretSource` type of volume source will be added to the ```VolumeSource``` struct in the
+A new `SecretSource` type of volume source will be added to the `VolumeSource` struct in the
 API:
 
 ```go

@@ -163,7 +163,7 @@ this being the resource most closely running at the prescribed quota limits.
 
 kubectl is modified to support the **ResourceQuota** resource.
 
-```kubectl describe``` provides a human-readable output of quota.
+`kubectl describe` provides a human-readable output of quota.
 
 For example,
 

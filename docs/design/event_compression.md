@@ -38,41 +38,41 @@ This document captures the design of event compression.
 
 ## Background
 
-Kubernetes components can get into a state where they generate tons of events which are identical except for the timestamp. For example, when pulling a non-existing image, Kubelet will repeatedly generate ```image_not_existing``` and ```container_is_waiting``` events until upstream components correct the image. When this happens, the spam from the repeated events makes the entire event mechanism useless. It also appears to cause memory pressure in etcd (see [#3853](https://github.com/GoogleCloudPlatform/kubernetes/issues/3853)).
+Kubernetes components can get into a state where they generate tons of events which are identical except for the timestamp. For example, when pulling a non-existing image, Kubelet will repeatedly generate `image_not_existing` and `container_is_waiting` events until upstream components correct the image. When this happens, the spam from the repeated events makes the entire event mechanism useless. It also appears to cause memory pressure in etcd (see [#3853](https://github.com/GoogleCloudPlatform/kubernetes/issues/3853)).
 
 ## Proposal
 
-Each binary that generates events (for example, ```kubelet```) should keep track of previously generated events so that it can collapse recurring events into a single event instead of creating a new instance for each new event.
+Each binary that generates events (for example, `kubelet`) should keep track of previously generated events so that it can collapse recurring events into a single event instead of creating a new instance for each new event.
 
-Event compression should be best effort (not guaranteed). Meaning, in the worst case, ```n``` identical (minus timestamp) events may still result in ```n``` event entries.
+Event compression should be best effort (not guaranteed). Meaning, in the worst case, `n` identical (minus timestamp) events may still result in `n` event entries.
 
 ## Design
 
 Instead of a single Timestamp, each event object [contains](../../pkg/api/types.go#L1111) the following fields:
- * ```FirstTimestamp util.Time``` 
+ * `FirstTimestamp util.Time` 
    * The date/time of the first occurrence of the event.
- * ```LastTimestamp util.Time```
+ * `LastTimestamp util.Time`
    * The date/time of the most recent occurrence of the event.
    * On first occurrence, this is equal to the FirstTimestamp.
- * ```Count int```
+ * `Count int`
    * The number of occurrences of this event between FirstTimestamp and LastTimestamp
    * On first occurrence, this is 1.
 
 Each binary that generates events:
  * Maintains a historical record of previously generated events:
-   * Implemented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [```pkg/client/record/events_cache.go```](../../pkg/client/record/events_cache.go).
+   * Implemented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [`pkg/client/record/events_cache.go`](../../pkg/client/record/events_cache.go).
    * The key in the cache is generated from the event object minus timestamps/count/transient fields, specifically the following events fields are used to construct a unique key for an event:
-     * ```event.Source.Component```
-     * ```event.Source.Host```
-     * ```event.InvolvedObject.Kind```
-     * ```event.InvolvedObject.Namespace```
-     * ```event.InvolvedObject.Name```
-     * ```event.InvolvedObject.UID```
-     * ```event.InvolvedObject.APIVersion```
-     * ```event.Reason```
-     * ```event.Message```
+     * `event.Source.Component`
+     * `event.Source.Host`
+     * `event.InvolvedObject.Kind`
+     * `event.InvolvedObject.Namespace`
+     * `event.InvolvedObject.Name`
+     * `event.InvolvedObject.UID`
+     * `event.InvolvedObject.APIVersion`
+     * `event.Reason`
+     * `event.Message`
    * The LRU cache is capped at 4096 events. That means if a component (e.g. kubelet) runs for a long period of time and generates tons of unique events, the previously generated events cache will not grow unchecked in memory. Instead, after 4096 unique events are generated, the oldest events are evicted from the cache.
- * When an event is generated, the previously generated events cache is checked (see [```pkg/client/record/event.go```](../../pkg/client/record/event.go)).
+ * When an event is generated, the previously generated events cache is checked (see [`pkg/client/record/event.go`](../../pkg/client/record/event.go)).
    * If the key for the new event matches the key for a previously generated event (meaning all of the above fields match between the new event and some previously generated event), then the event is considered to be a duplicate and the existing event entry is updated in etcd:
      * The new PUT (update) event API is called to update the existing event entry in etcd with the new last seen timestamp and count.
      * The event is also updated in the previously generated events cache with an incremented count, updated last seen timestamp, name, and new resource version (all required to issue a future event update).
