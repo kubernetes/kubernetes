@@ -75,7 +75,7 @@ You need [go](https://golang.org/doc/install) at least 1.3+ in your path, please
 
 In a separate tab of your terminal, run the following (since one needs sudo access to start/stop kubernetes daemons, it is easier to run the entire script as root):
 
-```
+```sh
 cd kubernetes
 hack/local-up-cluster.sh
 ```
@@ -93,7 +93,7 @@ Your cluster is running, and you want to start running containers!
 
 You can now use any of the cluster/kubectl.sh commands to interact with your local setup.
 
-```
+```sh
 cluster/kubectl.sh get pods
 cluster/kubectl.sh get services
 cluster/kubectl.sh get replicationcontrollers
@@ -123,7 +123,7 @@ However you cannot view the nginx start page on localhost. To verify that nginx 
 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
 
-```
+```sh
 cluster/kubectl.sh create -f docs/user-guide/pod.yaml
 ```
 
@@ -149,7 +149,7 @@ You are running a single node setup.  This has the limitation of only supporting
 
 #### I changed Kubernetes code, how do I run it?
 
-```
+```sh
 cd kubernetes
 hack/build-go.sh
 hack/local-up-cluster.sh
