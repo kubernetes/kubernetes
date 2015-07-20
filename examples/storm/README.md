@@ -66,7 +66,7 @@ bootstrap and for state storage.
 Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a [pod](../../docs/user-guide/pods.md) running
 the ZooKeeper service.
 
-```shell
+```sh
 $ kubectl create -f examples/storm/zookeeper.json
 ```
 
@@ -74,7 +74,7 @@ Then, use the [`examples/storm/zookeeper-service.json`](zookeeper-service.json) 
 logical service endpoint that Storm can use to access the ZooKeeper
 pod.
 
-```shell
+```sh
 $ kubectl create -f examples/storm/zookeeper-service.json
 ```
 
@@ -83,7 +83,7 @@ before proceeding.
 
 ### Check to see if ZooKeeper is running
 
-```shell
+```sh
 $ kubectl get pods
 NAME        READY     STATUS    RESTARTS   AGE
 zookeeper   1/1       Running   0          43s
@@ -91,7 +91,7 @@ zookeeper   1/1       Running   0          43s
 
 ### Check to see if ZooKeeper is accessible
 
-```shell
+```sh
 $ kubectl get services
 NAME                LABELS                                    SELECTOR            IP(S)               PORT(S)
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
@@ -109,7 +109,7 @@ cluster. It depends on a functional ZooKeeper service.
 Use the [`examples/storm/storm-nimbus.json`](storm-nimbus.json) file to create a pod running
 the Nimbus service.
 
-```shell
+```sh
 $ kubectl create -f examples/storm/storm-nimbus.json
 ```
 
@@ -117,7 +117,7 @@ Then, use the [`examples/storm/storm-nimbus-service.json`](storm-nimbus-service.
 create a logical service endpoint that Storm workers can use to access
 the Nimbus pod.
 
-```shell
+```sh
 $ kubectl create -f examples/storm/storm-nimbus-service.json
 ```
 
@@ -125,7 +125,7 @@ Ensure that the Nimbus service is running and functional.
 
 ### Check to see if Nimbus is running and accessible
 
-```shell
+```sh
 $ kubectl get services
 NAME                LABELS                                    SELECTOR            IP(S)               PORT(S)
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
@@ -149,7 +149,7 @@ running.
 Use the [`examples/storm/storm-worker-controller.json`](storm-worker-controller.json) file to create a
 [replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
 
-```shell
+```sh
 $ kubectl create -f examples/storm/storm-worker-controller.json
 ```
 
@@ -158,7 +158,7 @@ $ kubectl create -f examples/storm/storm-worker-controller.json
 One way to check on the workers is to get information from the
 ZooKeeper service about how many clients it has.
 
-```shell
+```sh
 $  echo stat | nc 10.254.139.141 2181; echo
 Zookeeper version: 3.4.6--1, built on 10/23/2014 14:18 GMT
 Clients:
