@@ -148,7 +148,7 @@ with future high-availability support.
 
 There are [client libraries](../devel/client-libraries.md) for accessing the API
 from several languages.  The Kubernetes project-supported
-[Go](../../pkg/client/)
+[Go](http://releases.k8s.io/HEAD/pkg/client/)
 client library can use the same [kubeconfig file](kubeconfig-file.md)
 as the kubectl CLI does to locate and authenticate to the apiserver.  
 
