@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"bytes"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
@@ -55,6 +55,8 @@ var _ = Describe("Pod Disks", func() {
 
 		host0Name = nodes.Items[0].ObjectMeta.Name
 		host1Name = nodes.Items[1].ObjectMeta.Name
+
+		math_rand.Seed(time.Now().UTC().UnixNano())
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
@@ -64,8 +66,8 @@ var _ = Describe("Pod Disks", func() {
 		diskName, err := createPD()
 		expectNoError(err, "Error creating PD")
 
-		host0Pod := testPDPod(diskName, host0Name, false)
-		host1Pod := testPDPod(diskName, host1Name, false)
+		host0Pod := testPDPod(diskName, host0Name, false /* readOnly */, 1 /* numContainers */)
+		host1Pod := testPDPod(diskName, host1Name, false /* readOnly */, 1 /* numContainers */)
 
 		defer func() {
 			By("cleaning up PD-RW test environment")
@@ -87,7 +89,7 @@ var _ = Describe("Pod Disks", func() {
 		testFile := "/testpd/tracker"
 		testFileContents := fmt.Sprintf("%v", math_rand.Int())
 
-		expectNoError(writeFileOnPod(framework.Client, host0Pod.Name, testFile, testFileContents))
+		expectNoError(framework.WriteFileViaContainer(host0Pod.Name, "testpd" /* containerName */, testFile, testFileContents))
 		Logf("Wrote value: %v", testFileContents)
 
 		By("deleting host0Pod")
@@ -99,7 +101,7 @@ var _ = Describe("Pod Disks", func() {
 
 		expectNoError(framework.WaitForPodRunning(host1Pod.Name))
 
-		v, err := readFileOnPod(framework.Client, host1Pod.Name, testFile)
+		v, err := framework.ReadFileViaContainer(host1Pod.Name, "testpd", testFile)
 		expectNoError(err)
 		Logf("Read value: %v", v)
 
@@ -109,15 +111,7 @@ var _ = Describe("Pod Disks", func() {
 		expectNoError(podClient.Delete(host1Pod.Name, nil), "Failed to delete host1Pod")
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
-		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
-			if err = deletePD(diskName); err != nil {
-				Logf("Couldn't delete PD. Sleeping 5 seconds (%v)", err)
-				continue
-			}
-			Logf("Deleted PD %v", diskName)
-			break
-		}
-		expectNoError(err, "Error deleting PD")
+		deletePDWithRetry(diskName)
 
 		return
 	})
@@ -129,9 +123,9 @@ var _ = Describe("Pod Disks", func() {
 		diskName, err := createPD()
 		expectNoError(err, "Error creating PD")
 
-		rwPod := testPDPod(diskName, host0Name, false)
-		host0ROPod := testPDPod(diskName, host0Name, true)
-		host1ROPod := testPDPod(diskName, host1Name, true)
+		rwPod := testPDPod(diskName, host0Name, false /* readOnly */, 1 /* numContainers */)
+		host0ROPod := testPDPod(diskName, host0Name, true /* readOnly */, 1 /* numContainers */)
+		host1ROPod := testPDPod(diskName, host1Name, true /* readOnly */, 1 /* numContainers */)
 
 		defer func() {
 			By("cleaning up PD-RO test environment")
@@ -171,58 +165,89 @@ var _ = Describe("Pod Disks", func() {
 		expectNoError(podClient.Delete(host1ROPod.Name, nil), "Failed to delete host1ROPod")
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
-		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
-			if err = deletePD(diskName); err != nil {
-				Logf("Couldn't delete PD. Sleeping 5 seconds")
-				continue
-			}
-			Logf("Successfully deleted PD %q", diskName)
-			break
-		}
+		deletePDWithRetry(diskName)
+
 		expectNoError(err, "Error deleting PD")
+	})
+
+	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession", func() {
+		SkipUnlessProviderIs("gce", "gke", "aws")
+
+		By("creating PD")
+		diskName, err := createPD()
+		expectNoError(err, "Error creating PD")
+		numContainers := 4
+
+		host0Pod := testPDPod(diskName, host0Name, false /* readOnly */, numContainers)
+
+		defer func() {
+			By("cleaning up PD-RW test environment")
+			// Teardown pods, PD. Ignore errors.
+			// Teardown should do nothing unless test failed.
+			podClient.Delete(host0Pod.Name, nil)
+			detachPD(host0Name, diskName)
+			deletePD(diskName)
+		}()
+
+		fileAndContentToVerify := make(map[string]string)
+		for i := 0; i < 3; i++ {
+			Logf("PD Read/Writer Iteration #%v", i)
+			By("submitting host0Pod to kubernetes")
+			_, err = podClient.Create(host0Pod)
+			expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
+
+			expectNoError(framework.WaitForPodRunning(host0Pod.Name))
+
+			// randomly select a container and read/verify pd contents from it
+			containerName := fmt.Sprintf("testpd%v", math_rand.Intn(numContainers)+1)
+			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
+
+			// Randomly select a container to write a file to PD from
+			containerName = fmt.Sprintf("testpd%v", math_rand.Intn(numContainers)+1)
+			testFile := fmt.Sprintf("/testpd/tracker%v", i)
+			testFileContents := fmt.Sprintf("%v", math_rand.Int())
+			fileAndContentToVerify[testFile] = testFileContents
+			expectNoError(framework.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+			Logf("Wrote value: \"%v\" to PD %q from pod %q container %q", testFileContents, diskName, host0Pod.Name, containerName)
+
+			// Randomly select a container and read/verify pd contents from it
+			containerName = fmt.Sprintf("testpd%v", math_rand.Intn(numContainers)+1)
+			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
+
+			By("deleting host0Pod")
+			expectNoError(podClient.Delete(host0Pod.Name, nil), "Failed to delete host0Pod")
+		}
+
+		By(fmt.Sprintf("deleting PD %q", diskName))
+		deletePDWithRetry(diskName)
+
+		return
 	})
 })
 
-func kubectlExec(namespace string, podName string, args ...string) ([]byte, []byte, error) {
-	var stdout, stderr bytes.Buffer
-	cmdArgs := []string{"exec", fmt.Sprintf("--namespace=%v", namespace), podName}
-	cmdArgs = append(cmdArgs, args...)
-
-	cmd := kubectlCmd(cmdArgs...)
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
-	err := cmd.Run()
-	return stdout.Bytes(), stderr.Bytes(), err
-}
-
-// Write a file using kubectl exec echo <contents> > <path>
-// Because of the primitive technique we're using here, we only allow ASCII alphanumeric characters
-func writeFileOnPod(c *client.Client, podName string, path string, contents string) error {
-	By("writing a file in the container")
-	allowedCharacters := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	for _, c := range contents {
-		if !strings.ContainsRune(allowedCharacters, c) {
-			return fmt.Errorf("Unsupported character in string to write: %v", c)
+func deletePDWithRetry(diskName string) {
+	var err error
+	for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
+		if err = deletePD(diskName); err != nil {
+			Logf("Couldn't delete PD %q. Sleeping 5 seconds (%v)", diskName, err)
+			continue
 		}
+		Logf("Deleted PD %v", diskName)
+		break
 	}
-	command := fmt.Sprintf("echo '%s' > '%s'", contents, path)
-	stdout, stderr, err := kubectlExec(api.NamespaceDefault, podName, "--", "/bin/sh", "-c", command)
-	if err != nil {
-		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
-	}
-	return err
+	expectNoError(err, "Error deleting PD")
 }
 
-// Read a file using kubectl exec cat <path>
-func readFileOnPod(c *client.Client, podName string, path string) (string, error) {
-	By("reading a file in the container")
-
-	stdout, stderr, err := kubectlExec(api.NamespaceDefault, podName, "--", "cat", path)
-	if err != nil {
-		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+func verifyPDContentsViaContainer(f *Framework, podName, containerName string, fileAndContentToVerify map[string]string) {
+	for filePath, expectedContents := range fileAndContentToVerify {
+		v, err := f.ReadFileViaContainer(podName, containerName, filePath)
+		if err != nil {
+			Logf("Error reading file: %v", err)
+		}
+		expectNoError(err)
+		Logf("Read file %q with content: %v", filePath, v)
+		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(expectedContents)))
 	}
-	return string(stdout), err
 }
 
 func createPD() (string, error) {
@@ -284,7 +309,30 @@ func detachPD(hostName, pdName string) error {
 	}
 }
 
-func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
+func testPDPod(diskName, targetHost string, readOnly bool, numContainers int) *api.Pod {
+	containers := make([]api.Container, numContainers)
+	for i := range containers {
+		containers[i].Name = "testpd"
+		if numContainers > 1 {
+			containers[i].Name = fmt.Sprintf("testpd%v", i+1)
+		}
+
+		containers[i].Image = "gcr.io/google_containers/busybox"
+
+		containers[i].Command = []string{"sleep", "6000"}
+
+		containers[i].VolumeMounts = []api.VolumeMount{
+			{
+				Name:      "testpd",
+				MountPath: "/testpd",
+			},
+		}
+
+		containers[i].Resources.Limits = api.ResourceList{}
+		containers[i].Resources.Limits[api.ResourceCPU] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+
+	}
+
 	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
@@ -294,20 +342,8 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 			Name: "pd-test-" + string(util.NewUUID()),
 		},
 		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:    "testpd",
-					Image:   "gcr.io/google_containers/busybox",
-					Command: []string{"sleep", "600"},
-					VolumeMounts: []api.VolumeMount{
-						{
-							Name:      "testpd",
-							MountPath: "/testpd",
-						},
-					},
-				},
-			},
-			NodeName: targetHost,
+			Containers: containers,
+			NodeName:   targetHost,
 		},
 	}
 
