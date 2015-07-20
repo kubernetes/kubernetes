@@ -195,7 +195,6 @@ or:
 
 ```console
 u@pod$ echo $HOSTNAMES_SERVICE_HOST
-
 ```
 
 So the first thing to check is whether that `Service` actually exists:

@@ -45,7 +45,7 @@ into another one.
 
 The nfs server pod creates a privileged container, so if you are using a Salt based KUBERNETES_PROVIDER (**gce**, **vagrant**, **aws**), you have to enable the ability to create privileged containers by API.
 
-```shell
+```sh
 #At the root of Kubernetes source code
 $ vi cluster/saltbase/pillar/privilege.sls
 

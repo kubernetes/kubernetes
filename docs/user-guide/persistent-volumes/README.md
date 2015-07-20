@@ -75,7 +75,6 @@ They just know they can rely on their claim to storage and can manage its lifecy
 Claims must be created in the same namespace as the pods that use them.
 
 ```console
-
 $ kubectl create -f docs/user-guide/persistent-volumes/claims/claim-01.yaml
 
 $ kubectl get pvc

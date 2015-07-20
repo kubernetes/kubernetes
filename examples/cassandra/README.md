@@ -287,7 +287,6 @@ UN  10.244.3.3  51.28 KB   256     51.0%             dafe3154-1d67-42e1-ac1d-78e
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
 
 ```sh
-
 # create a service to track all cassandra nodes
 kubectl create -f examples/cassandra/cassandra-service.yaml
 
