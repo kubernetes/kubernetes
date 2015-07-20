@@ -57,45 +57,50 @@ They act as basic load balancers.
 
 Kubernetes documentation is organized into several categories.
 
-  - **Getting Started Guides**
-    - for people who want to create a kubernetes cluster
-    - in [docs/getting-started-guides](docs/getting-started-guides)
-  - **User Documentation**
+  - **Getting started guides**
+    - for people who want to create a Kubernetes cluster
+      - in [Creating a Kubernetes Cluster](docs/getting-started-guides/README.md)
+    - for people who want to port Kubernetes to a new environment
+      - in [Getting Started from Scratch](docs/getting-started-guides/scratch.md)
+  - **User documentation**
+    - for people who want to run programs on an existing Kubernetes cluster
+    - in the [Kubernetes User Guide: Managing Applications](docs/user-guide/README.md)
+    - the [Kubectl Command Line Interface](docs/user-guide/kubectl/kubectl.md) is a detailed reference on
+      the `kubectl` CLI
     - [User FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
-    - in [docs](docs/user-guide/overview.md)
-    - for people who want to run programs on kubernetes
-    - describes current features of the system (with brief mentions of planned features)
-  - **Developer Documentation**
-    - in [docs/devel](docs/devel)
-    - for people who want to contribute code to kubernetes
-    - covers development conventions
-    - explains current architecture and project plans
-  - **Service Documentation**
-    - in [docs/user-guide/services.md](docs/user-guide/services.md)
-    - [Service FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ)
-    - for people who are interested in how Services work
-    - details of ```kube-proxy``` iptables
-    - how to wire services to external internet
-  - **API documentation**
-    - in [the API doc](docs/api.md)
-    - and automatically generated API documentation served by the master
-  - **Design Documentation**
-    - in [docs/design](docs/design)
-    - for people who want to understand the design choices made
-    - describes tradeoffs, alternative designs
-    - descriptions of planned features that are too long for a github issue.
-  - **Walkthroughs and Examples**
-    - in [examples](/examples)
-    - Hands on introduction and example config files
+  - **Cluster administrator documentation**
+    - for people who want to create a Kubernetes cluster and administer it
+    - in the [Kubernetes Cluster Admin Guide](docs/admin/README.md)
+  - **Developer and API documentation**
+    - for people who want to write programs that access the Kubernetes API, write plugins
+      or extensions, or modify the core Kubernete code
+    - in the [Kubernetes Developer Guide](docs/devel/README.md)
+    - see also [notes on the API](docs/api.md)
+    - see also the [API object documentation](http://kubernetes.io/third_party/swagger-ui/), a
+      detailed description of all fields found in the core API objects 
+  - **Walkthroughs and examples**
+    - hands-on introduction and example config files
+    - in the [user guide](docs/user-guide/README.md#quick-walkthrough)
+    - in the [docs/examples directory](examples/)
+  - **Contributions from the Kubernetes community**
+    - in the [docs/contrib directory](contrib/)
+  - **Design documentation and design proposals**
+    - for people who want to understand the design of Kubernetes, and feature proposals
+    - design docs in the [Kubernetes Design Overview](docs/design/README.md) and the [docs/design directory](docs/design/)
+    - proposals in the [docs/proposals directory](docs/proposals/)
   - **Wiki/FAQ**
-    - in [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki)
-    - includes a number of [Kubernetes community-contributed recipes](/contrib/recipes)
+    - in the [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki)
+    - troubleshooting information in the [troubleshooting guide](docs/troubleshooting.md)
 
 ## Community, discussion and support
 
 If you have questions or want to start contributing please reach out.  We don't bite!
 
-The Kubernetes team is hanging out on IRC on the [#google-containers channel on freenode.net](http://webchat.freenode.net/?channels=google-containers). This client may be overloaded from time to time. If this happens you can use any [IRC client out there](http://en.wikipedia.org/wiki/Comparison_of_Internet_Relay_Chat_clients) to talk to us.
+You are always welcome to file a [Github issue](https://github.com/GoogleCloudPlatform/kubernetes/issues)
+if you have a problem or feature request, or would like
+feedback on an idea for something you want to implement in Kubernetes. 
+
+The Kubernetes team hangs out on IRC on the [#google-containers channel on freenode.net](http://webchat.freenode.net/?channels=google-containers). This client may be overloaded from time to time. If this happens you can use any [IRC client out there](http://en.wikipedia.org/wiki/Comparison_of_Internet_Relay_Chat_clients) to talk to us.
 
 We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers) for questions and discussion as well as the [kubernetes-announce mailing list](https://groups.google.com/forum/#!forum/kubernetes-announce) for important announcements (low-traffic, no chatter).
 
