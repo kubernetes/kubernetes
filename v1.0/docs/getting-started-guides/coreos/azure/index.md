@@ -229,6 +229,6 @@ By the way, with the scripts shown, you can deploy multiple clusters, if you lik
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/azure/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/azure/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

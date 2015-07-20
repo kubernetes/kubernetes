@@ -14,7 +14,7 @@ This document describes some of the issues to consider when making a decision ab
 
 Note that at present,
 Kubernetes does not offer a mechanism to aggregate multiple clusters into a single virtual cluster. However,
-we [plan to do this in the future](../proposals/federation.md).
+we [plan to do this in the future](../proposals/federation.html).
 
 ## Scope of a single cluster
 
@@ -70,6 +70,6 @@ failures of a single cluster are not visible to end users.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/multi-cluster.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/multi-cluster.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

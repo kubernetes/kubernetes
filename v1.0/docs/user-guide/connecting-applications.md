@@ -77,7 +77,7 @@ $ kubectl get pods -l app=nginx -o json | grep podIP
 
 You should be able to ssh into any node in your cluster and curl both ips. Note that the containers are *not* using port 80 on the node, nor are there any special NAT rules to route traffic to the pod. This means you can run multiple nginx pods on the same node all using the same containerPort and access them from any other pod or node in your cluster using ip. Like Docker, ports can still be published to the host node's interface(s), but the need for this is radically diminished because of the networking model.
 
-You can read more about [how we achieve this](../admin/networking.md#how-to-achieve-this) if you’re curious.
+You can read more about [how we achieve this](../admin/networking.html#how-to-achieve-this) if you’re curious.
 
 ## Creating a Service
 
@@ -131,11 +131,11 @@ NAME         ENDPOINTS
 nginxsvc     10.245.0.14:80,10.245.0.15:80
 {% endhighlight %}
 
-You should now be able to curl the nginx Service on `10.0.116.146:80` from any node in your cluster. Note that the Service ip is completely virtual, it never hits the wire, if you’re curious about how this works you can read more about the [service proxy](services.md#virtual-ips-and-service-proxies).
+You should now be able to curl the nginx Service on `10.0.116.146:80` from any node in your cluster. Note that the Service ip is completely virtual, it never hits the wire, if you’re curious about how this works you can read more about the [service proxy](services.html#virtual-ips-and-service-proxies).
 
 ## Accessing the Service
 
-Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](http://releases.k8s.io/v1.01/cluster/addons/dns/README.html).
+Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](http://releases.k8s.io/v1.0.1/cluster/addons/dns/README.md).
 
 ### Environment Variables
 
@@ -174,7 +174,7 @@ kube-dns   <none>       k8s-app=kube-dns     10.0.0.10   53/UDP
                                                          53/TCP
 {% endhighlight %}
 
-If it isn’t running, you can [enable it](http://releases.k8s.io/v1.01/cluster/addons/dns/README.html#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived ip (nginxsvc), and a dns server that has assigned a name to that ip (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
+If it isn’t running, you can [enable it](http://releases.k8s.io/v1.0.1/cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived ip (nginxsvc), and a dns server that has assigned a name to that ip (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
 
 {% highlight yaml %}
 $ cat curlpod.yaml
@@ -214,9 +214,9 @@ Address 1: 10.0.116.146
 Till now we have only accessed the nginx server from within the cluster. Before exposing the Service to the internet, you want to make sure the communication channel is secure. For this, you will need:
 * Self signed certificates for https (unless you already have an identitiy certificate)
 * An nginx server configured to use the cretificates
-* A [secret](secrets.md) that makes the certificates accessible to pods
+* A [secret](secrets.html) that makes the certificates accessible to pods
 
-You can acquire all these from the [nginx https example](../../examples/https-nginx/README.md), in short:
+You can acquire all these from the [nginx https example](../../examples/https-nginx/README.html), in short:
 
 {% highlight console %}
 $ make keys secret KEY=/tmp/nginx.key CERT=/tmp/nginx.crt SECRET=/tmp/secret.json
@@ -400,10 +400,10 @@ $ curl https://104.197.68.43 -k
 
 ## What's next?
 
-[Learn about more Kubernetes features that will help you run containers reliably in production.](production-pods.md)
+[Learn about more Kubernetes features that will help you run containers reliably in production.](production-pods.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-applications.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/connecting-applications.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

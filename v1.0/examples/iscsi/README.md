@@ -80,6 +80,6 @@ Run *docker inspect* and I found the Containers mounted the host directory into 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/iscsi/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/iscsi/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

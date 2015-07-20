@@ -93,13 +93,13 @@ to define *Hard* resource usage limits that a *Namespace* may consume.
 A limit range defines min/max constraints on the amount of resources a single entity can consume in
 a *Namespace*.
 
-See [Admission control: Limit Range](../design/admission_control_limit_range.md)
+See [Admission control: Limit Range](../design/admission_control_limit_range.html)
 
 A namespace can be in one of two phases:
    * `Active` the namespace is in use
    * ```Terminating`` the namespace is being deleted, and can not be used for new objects
 
-See the [design doc](../design/namespaces.md#phases) for more details.
+See the [design doc](../design/namespaces.html#phases) for more details.
 
 ### Creating a new namespace
 
@@ -114,7 +114,7 @@ metadata:
 
 Note that the name of your namespace must be a DNS compatible label.
 
-More information on the `finalizers` field can be found in the namespace [design doc](../design/namespaces.md#finalizers).
+More information on the `finalizers` field can be found in the namespace [design doc](../design/namespaces.html#finalizers).
 
 Then run:
 
@@ -164,7 +164,7 @@ This delete is asynchronous, so for a time you will see the namespace in the `Te
 
 ## Namespaces and DNS
 
-When you create a [Service](services.md), it creates a corresponding [DNS entry](../admin/dns.md)1.
+When you create a [Service](services.html), it creates a corresponding [DNS entry](../admin/dns.html)1.
 This entry is of the form `<service-name>.<namespace-name>.cluster.local`, which means
 that if a container just uses `<service-name>` it will resolve to the service which
 is local to a namespace.  This is useful for using the same configuration across
@@ -199,11 +199,11 @@ To interact with content associated with a Namespace:
 
 ## Design
 
-Details of the design of namespaces in Kubernetes, including a [detailed example](../design/namespaces.md#example-openshift-origin-managing-a-kubernetes-namespace)
-can be found in the [namespaces design doc](../design/namespaces.md)
+Details of the design of namespaces in Kubernetes, including a [detailed example](../design/namespaces.html#example-openshift-origin-managing-a-kubernetes-namespace)
+can be found in the [namespaces design doc](../design/namespaces.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

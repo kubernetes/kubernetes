@@ -8,7 +8,7 @@ layout: docwithnav
 
 ## Node selection example
 
-This example shows how to assign a [pod](../pods.md) to a specific [node](../../admin/node.md) or to one of a set of nodes using node labels and the nodeSelector field in a pod specification. Generally this is unnecessary, as the scheduler will take care of things for you, but you may want to do so in certain circumstances like to ensure that your pod ends up on a machine with an SSD attached to it.
+This example shows how to assign a [pod](../pods.html) to a specific [node](../../admin/node.html) or to one of a set of nodes using node labels and the nodeSelector field in a pod specification. Generally this is unnecessary, as the scheduler will take care of things for you, but you may want to do so in certain circumstances like to ensure that your pod ends up on a machine with an SSD attached to it.
 
 ### Step Zero: Prerequisites
 
@@ -20,9 +20,9 @@ Run `kubectl get nodes` to get the names of your cluster's nodes. Pick out the o
 
 Then, to add a label to the node you've chosen, run `kubectl label nodes <node-name> <label-key>=<label-value>`. For example, if my node name is 'kubernetes-foo-node-1.c.a-robinson.internal' and my desired label is 'disktype=ssd', then I can run `kubectl label nodes kubernetes-foo-node-1.c.a-robinson.internal disktype=ssd`.
 
-If this fails with an "invalid command" error, you're likely using an older version of kubectl that doesn't have the `label` command. In that case, see the [previous version](https://github.com/GoogleCloudPlatform/kubernetes/blob/a053dbc313572ed60d89dae9821ecab8bfd676dc/examples/node-selection/README.html) of this guide for instructions on how to manually set labels on a node.
+If this fails with an "invalid command" error, you're likely using an older version of kubectl that doesn't have the `label` command. In that case, see the [previous version](https://github.com/GoogleCloudPlatform/kubernetes/blob/a053dbc313572ed60d89dae9821ecab8bfd676dc/examples/node-selection/README.md) of this guide for instructions on how to manually set labels on a node.
 
-Also, note that label keys must be in the form of DNS labels (as described in the [identifiers doc](../../../docs/design/identifiers.md)), meaning that they are not allowed to contain any upper-case letters.
+Also, note that label keys must be in the form of DNS labels (as described in the [identifiers doc](../../../docs/design/identifiers.html)), meaning that they are not allowed to contain any upper-case letters.
 
 You can verify that it worked by re-running `kubectl get nodes` and checking that the node now has a label.
 
@@ -69,6 +69,6 @@ While this example only covered one node, you can attach labels to as many nodes
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/node-selection/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/node-selection/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

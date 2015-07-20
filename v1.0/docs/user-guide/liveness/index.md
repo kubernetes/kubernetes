@@ -8,7 +8,7 @@ layout: docwithnav
 
 ## Overview
 
-This example shows two types of pod [health checks](../production-pods.md#liveness-and-readiness-probes-aka-health-checks): HTTP checks and container execution checks.
+This example shows two types of pod [health checks](../production-pods.html#liveness-and-readiness-probes-aka-health-checks): HTTP checks and container execution checks.
 
 The [exec-liveness.yaml](exec-liveness.yaml) demonstrates the container execution check.
 
@@ -46,7 +46,7 @@ The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
 
 The Kubelet sends a HTTP request to the specified path and port to perform the health check. If you take a look at image/server.go, you will see the server starts to respond with an error code 500 after 10 seconds, so the check fails.
 
-This [guide](../walkthrough/k8s201.md#health-checking) has more information on health checks.
+This [guide](../walkthrough/k8s201.html#health-checking) has more information on health checks.
 
 ## Get your hands dirty
 
@@ -91,6 +91,6 @@ Sat, 27 Jun 2015 13:44:44 +0200    Sat, 27 Jun 2015 13:44:44 +0200    1    {kube
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/liveness/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/liveness/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

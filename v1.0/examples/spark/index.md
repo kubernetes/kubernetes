@@ -32,10 +32,10 @@ instructions for your platform.
 
 ## Step One: Start your Master service
 
-The Master [service](../../docs/user-guide/services.md) is the master (or head) service for a Spark
+The Master [service](../../docs/user-guide/services.html) is the master (or head) service for a Spark
 cluster.
 
-Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/user-guide/pods.md) running
+Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/user-guide/pods.html) running
 the Master service.
 
 {% highlight sh %}
@@ -95,7 +95,7 @@ program.
 The Spark workers need the Master service to be running.
 
 Use the [`examples/spark/spark-worker-controller.json`](spark-worker-controller.json) file to create a
-[replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
+[replication controller](../../docs/user-guide/replication-controller.html) that manages the worker pods.
 
 {% highlight sh %}
 $ kubectl create -f examples/spark/spark-worker-controller.json
@@ -193,6 +193,6 @@ Make sure the Master Pod is running (use: ```kubectl get pods```).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

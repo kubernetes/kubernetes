@@ -11,14 +11,14 @@ layout: docwithnav
 This directory contains the source for a Docker image that creates an instance
 of [Elasticsearch](https://www.elastic.co/products/elasticsearch) 1.5.2 which can 
 be used to automatically form clusters when used
-with [replication controllers](../../docs/user-guide/replication-controller.md). This will not work with the library Elasticsearch image
+with [replication controllers](../../docs/user-guide/replication-controller.html). This will not work with the library Elasticsearch image
 because multicast discovery will not find the other pod IPs needed to form a cluster. This
-image detects other Elasticsearch [pods](../../docs/user-guide/pods.md) running in a specified [namespace](../../docs/user-guide/namespaces.md) with a given
+image detects other Elasticsearch [pods](../../docs/user-guide/pods.html) running in a specified [namespace](../../docs/user-guide/namespaces.html) with a given
 label selector. The detected instances are used to form a list of peer hosts which
 are used as part of the unicast discovery mechansim for Elasticsearch. The detection
 of the peer nodes is done by a program which communicates with the Kubernetes API
 server to get a list of matching Elasticsearch pods. To enable authenticated
-communication this image needs a [secret](../../docs/user-guide/secrets.md) to be mounted at `/etc/apiserver-secret`
+communication this image needs a [secret](../../docs/user-guide/secrets.html) to be mounted at `/etc/apiserver-secret`
 with the basic authentication username and password.
 
 Here is an example replication controller specification that creates 4 instances of Elasticsearch which is in the file
@@ -133,7 +133,7 @@ replicationcontrollers/music-db
 
 {% endhighlight %}
 
-It's also useful to have a [service](../../docs/user-guide/services.md) with an load balancer for accessing the Elasticsearch
+It's also useful to have a [service](../../docs/user-guide/services.html) with an load balancer for accessing the Elasticsearch
 cluster which can be found in the file [music-service.yaml](music-service.yaml).
 
 {% highlight yaml %}
@@ -339,6 +339,6 @@ $ curl 104.197.12.157:9200/_nodes?pretty=true | grep name
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/elasticsearch/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/elasticsearch/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

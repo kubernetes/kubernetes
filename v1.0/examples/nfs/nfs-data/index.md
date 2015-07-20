@@ -16,6 +16,6 @@ Available in dockerhub as
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/nfs-data/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/nfs-data/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

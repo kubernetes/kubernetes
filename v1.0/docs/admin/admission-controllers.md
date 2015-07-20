@@ -76,12 +76,12 @@ commands in those containers, we strongly encourage enabling this plug-in.
 
 ### ServiceAccount
 
-This plug-in implements automation for [serviceAccounts](../user-guide/service-accounts.md).
+This plug-in implements automation for [serviceAccounts](../user-guide/service-accounts.html).
 We strongly recommend using this plug-in if you intend to make use of Kubernetes `ServiceAccount` objects.
 
 ### SecurityContextDeny
 
-This plug-in will deny any pod with a [SecurityContext](../user-guide/security-context.md) that defines options that were not available on the `Container`.
+This plug-in will deny any pod with a [SecurityContext](../user-guide/security-context.html) that defines options that were not available on the `Container`.
 
 ### ResourceQuota
 
@@ -89,7 +89,7 @@ This plug-in will observe the incoming request and ensure that it does not viola
 enumerated in the `ResourceQuota` object in a `Namespace`.  If you are using `ResourceQuota`
 objects in your Kubernetes deployment, you MUST use this plug-in to enforce quota constraints.
 
-See the [resourceQuota design doc](../design/admission_control_resource_quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more details.
+See the [resourceQuota design doc](../design/admission_control_resource_quota.html) and the [example of Resource Quota](../user-guide/resourcequota/) for more details.
 
 It is strongly encouraged that this plug-in is configured last in the sequence of admission control plug-ins.  This is
 so that quota is not prematurely incremented only for the request to be rejected later in admission control.
@@ -102,7 +102,7 @@ your Kubernetes deployment, you MUST use this plug-in to enforce those constrain
 be used to apply default resource requests to Pods that don't specify any; currently, the default LimitRanger
 applies a 0.1 CPU requirement to all Pods in the `default` namespace.
 
-See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](../user-guide/limitrange/) for more details.
+See the [limitRange design doc](../design/admission_control_limit_range.html) and the [example of Limit Range](../user-guide/limitrange/) for more details.
 
 ### NamespaceExists
 
@@ -139,6 +139,6 @@ For Kubernetes 1.0, we strongly recommend running the following set of admission
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/admission-controllers.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/admission-controllers.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

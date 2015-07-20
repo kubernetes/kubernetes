@@ -9,7 +9,7 @@ layout: docwithnav
 # Downward API example
 
 Following this example, you will create a pod with a containers that consumes the pod's name and
-namespace using the [downward API](../downward-api.md).
+namespace using the [downward API](../downward-api.html).
 
 ## Step Zero: Prerequisites
 
@@ -42,6 +42,6 @@ $ kubectl logs dapi-test-pod | grep POD_
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/downward-api/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/downward-api/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

@@ -528,10 +528,10 @@ Contact us on
 
 ## More information
 
-Visit [troubleshooting document](../troubleshooting.md) for more information. 
+Visit [troubleshooting document](../troubleshooting.html) for more information. 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/debugging-services.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/debugging-services.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

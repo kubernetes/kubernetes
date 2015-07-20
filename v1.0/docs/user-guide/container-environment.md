@@ -32,7 +32,7 @@ This document describes the environment for Kubelet managed containers on a Kube
 This cluster information makes it possible to build applications that are *cluster aware*.  
 Additionally, the Kubernetes container environment defines a series of hooks that are surfaced to optional hook handlers defined as part of individual containers.  Container hooks are somewhat analogous to operating system signals in a traditional process model.   However these hooks are designed to make it easier to build reliable, scalable cloud applications in the Kubernetes cluster.  Containers that participate in this cluster lifecycle become *cluster native*. 
 
-Another important part of the container environment is the file system that is available to the container.  In Kubernetes, the filesystem is a combination of an [image](images.md) and one or more [volumes](volumes.md).
+Another important part of the container environment is the file system that is available to the container.  In Kubernetes, the filesystem is a combination of an [image](images.html) and one or more [volumes](volumes.html).
 
 
 The following sections describe both the cluster information provided to containers, as well as the hooks and life-cycle that allows containers to interact with the management system.
@@ -58,7 +58,7 @@ FOO_SERVICE_HOST=<the host the service is running on>
 FOO_SERVICE_PORT=<the port the service is running on>
 {% endhighlight %}
 
-Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](http://releases.k8s.io/v1.01/cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
+Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](http://releases.k8s.io/v1.0.1/cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
 
 ## Container Hooks
 
@@ -97,7 +97,7 @@ Eventually, user specified reasons may be [added to the API](https://github.com/
 
 ### Hook Handler Execution
 
-When a management hook occurs, the management system calls into any registered hook handlers in the container for that hook.  These hook handler calls are synchronous in the context of the pod containing the container. Note:this means that hook handler execution blocks any further management of the pod.  If your hook handler blocks, no other management (including [health checks](production-pods.md#liveness-and-readiness-probes-aka-health-checks)) will occur until the hook handler completes.  Blocking hook handlers do *not* affect management of other Pods.  Typically we expect that users will make their hook handlers as lightweight as possible, but there are cases where long running commands make sense (e.g. saving state prior to container stop)
+When a management hook occurs, the management system calls into any registered hook handlers in the container for that hook.  These hook handler calls are synchronous in the context of the pod containing the container. Note:this means that hook handler execution blocks any further management of the pod.  If your hook handler blocks, no other management (including [health checks](production-pods.html#liveness-and-readiness-probes-aka-health-checks)) will occur until the hook handler completes.  Blocking hook handlers do *not* affect management of other Pods.  Typically we expect that users will make their hook handlers as lightweight as possible, but there are cases where long running commands make sense (e.g. saving state prior to container stop)
 
 For hooks which have parameters, these parameters are passed to the event handler as a set of key/value pairs.  The details of this parameter passing is handler implementation dependent (see below).
 
@@ -122,6 +122,6 @@ Hook handlers are the way that hooks are surfaced to containers.  Containers ca
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/container-environment.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/container-environment.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

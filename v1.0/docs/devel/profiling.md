@@ -50,6 +50,6 @@ To enable contention profiling you need to add line `rt.SetBlockProfileRate(1)` 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/profiling.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/profiling.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

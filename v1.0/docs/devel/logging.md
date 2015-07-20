@@ -34,6 +34,6 @@ As per the comments, the practical default level is V(2).  Developers and QE env
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/logging.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/logging.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

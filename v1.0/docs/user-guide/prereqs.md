@@ -8,7 +8,7 @@ layout: docwithnav
 
 # Kubernetes User Guide: Managing Applications: Prerequisites
 
-To deploy and manage applications on Kubernetes, you’ll use the Kubernetes command-line tool, [kubectl](kubectl/kubectl.md). It lets you inspect your cluster resources, create, delete, and update components, and much more. You will use it to look at your new cluster and bring up example apps. 
+To deploy and manage applications on Kubernetes, you’ll use the Kubernetes command-line tool, [kubectl](kubectl/kubectl.html). It lets you inspect your cluster resources, create, delete, and update components, and much more. You will use it to look at your new cluster and bring up example apps. 
 
 ## Install kubectl
 
@@ -27,7 +27,7 @@ export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
 
 ## Configure kubectl
 
-In order for kubectl to find and access the Kubernetes cluster, it needs a [kubeconfig file](kubeconfig-file.md), which is created automatically when creating a cluster using kube-up.sh (see the [getting started guides](../../docs/getting-started-guides/) for more about creating clusters). If you need access to a cluster you didn’t create, see the [Sharing Cluster Access document](sharing-clusters.md).
+In order for kubectl to find and access the Kubernetes cluster, it needs a [kubeconfig file](kubeconfig-file.html), which is created automatically when creating a cluster using kube-up.sh (see the [getting started guides](../../docs/getting-started-guides/) for more about creating clusters). If you need access to a cluster you didn’t create, see the [Sharing Cluster Access document](sharing-clusters.html).
 
 #### Installing Kubectl
 
@@ -52,7 +52,7 @@ If you used `./cluster/kube-up.sh` to deploy your Kubernetes cluster, kubectl sh
 
 By default, kubectl configuration lives at `~/.kube/config`.
 
-If your cluster was deployed by other means (e.g. a [getting started guide](../getting-started-guides/README.md)) your kubectl client will typically be configured during that process. If for some reason your kubectl client is not yet configured, check out [kubeconfig-file.md](kubeconfig-file.md).
+If your cluster was deployed by other means (e.g. a [getting started guide](../getting-started-guides/README.html)) your kubectl client will typically be configured during that process. If for some reason your kubectl client is not yet configured, check out [kubeconfig-file.md](kubeconfig-file.html).
 
 #### Making sure you're ready
 
@@ -66,10 +66,10 @@ If you see a url response, you are ready to go.
 
 ## What's next?
 
-[Learn how to launch and expose your application.](quick-start.md)
+[Learn how to launch and expose your application.](quick-start.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/prereqs.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/prereqs.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

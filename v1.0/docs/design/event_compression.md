@@ -23,7 +23,7 @@ Event compression should be best effort (not guaranteed). Meaning, in the worst 
 
 ## Design
 
-Instead of a single Timestamp, each event object [contains](http://releases.k8s.io/v1.01/pkg/api/types.go#L1111) the following fields:
+Instead of a single Timestamp, each event object [contains](http://releases.k8s.io/v1.0.1/pkg/api/types.go#L1111) the following fields:
  * `FirstTimestamp util.Time` 
    * The date/time of the first occurrence of the event.
  * `LastTimestamp util.Time`
@@ -47,7 +47,7 @@ Each binary that generates events:
      * `event.Reason`
      * `event.Message`
    * The LRU cache is capped at 4096 events. That means if a component (e.g. kubelet) runs for a long period of time and generates tons of unique events, the previously generated events cache will not grow unchecked in memory. Instead, after 4096 unique events are generated, the oldest events are evicted from the cache.
- * When an event is generated, the previously generated events cache is checked (see [`pkg/client/record/event.go`](http://releases.k8s.io/v1.01/pkg/client/record/event.go)).
+ * When an event is generated, the previously generated events cache is checked (see [`pkg/client/record/event.go`](http://releases.k8s.io/v1.0.1/pkg/client/record/event.go)).
    * If the key for the new event matches the key for a previously generated event (meaning all of the above fields match between the new event and some previously generated event), then the event is considered to be a duplicate and the existing event entry is updated in etcd:
      * The new PUT (update) event API is called to update the existing event entry in etcd with the new last seen timestamp and count.
      * The event is also updated in the previously generated events cache with an incremented count, updated last seen timestamp, name, and new resource version (all required to issue a future event update).
@@ -93,6 +93,6 @@ This demonstrates what would have been 20 separate entries (indicating schedulin
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/event_compression.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/event_compression.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

@@ -10,7 +10,7 @@ layout: docwithnav
 
 
 In Kubernetes, authorization happens as a separate step from authentication.
-See the [authentication documentation](authentication.md) for an 
+See the [authentication documentation](authentication.html) for an 
 overview of authentication.
 
 Authorization applies to all HTTP accesses on the main (secure) apiserver port.
@@ -88,7 +88,7 @@ To permit an action Policy with an unset namespace applies regardless of namespa
  3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`
  4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "ns": "projectCaribou"}`
 
-[Complete file example](http://releases.k8s.io/v1.01/pkg/auth/authorizer/abac/example_policy_file.jsonl)
+[Complete file example](http://releases.k8s.io/v1.0.1/pkg/auth/authorizer/abac/example_policy_file.jsonl)
 
 ## Plugin Development
 
@@ -114,6 +114,6 @@ caching and revocation of permissions.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/authorization.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/authorization.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

@@ -7,7 +7,7 @@ layout: docwithnav
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 Resource Quota
 ========================================
-This example demonstrates how [resource quota](../../admin/admission-controllers.md#resourcequota) and [limits](../../admin/admission-controllers.md#limitranger) can be applied to a Kubernetes namespace. See [ResourceQuota design doc](../../design/admission_control_resource_quota.md) for more information.
+This example demonstrates how [resource quota](../../admin/admission-controllers.html#resourcequota) and [limits](../../admin/admission-controllers.html#limitranger) can be applied to a Kubernetes namespace. See [ResourceQuota design doc](../../design/admission_control_resource_quota.html) for more information.
 
 This example assumes you have a functional Kubernetes setup.
 
@@ -160,6 +160,6 @@ meet your end goal.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/resourcequota/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/resourcequota/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

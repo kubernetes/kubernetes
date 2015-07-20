@@ -28,10 +28,10 @@ cd kubernetes
 make release
 {% endhighlight %}
 
-For more details on the release process see the [`build/` directory](http://releases.k8s.io/v1.01/build/)
+For more details on the release process see the [`build/` directory](http://releases.k8s.io/v1.0.1/build/)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/binary_release.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/binary_release.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

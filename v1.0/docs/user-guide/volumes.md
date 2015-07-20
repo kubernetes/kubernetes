@@ -15,7 +15,7 @@ container starts with a clean slate.  Second, when running containers together
 in a `Pod` it is often necessary to share files between those containers.  The
 Kubernetes `Volume` abstraction solves both of these problems.
 
-Familiarity with [pods](pods.md) is suggested.
+Familiarity with [pods](pods.html) is suggested.
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -344,12 +344,12 @@ non-volatile storage.
 __Important: You must create a secret in the Kubernetes API before you can use
 it__
 
-Secrets are described in more detail [here](secrets.md).
+Secrets are described in more detail [here](secrets.html).
 
 ### persistentVolumeClaim
 
 A `persistentVolumeClaim` volume is used to mount a
-[PersistentVolume](persistent-volumes.md) into a pod.  PersistentVolumes are a
+[PersistentVolume](persistent-volumes.html) into a pod.  PersistentVolumes are a
 way for users to "claim" durable storage (such as a GCE PersistentDisk or an
 iSCSI volume) without knowing the details of the particular cloud environment.
 
@@ -365,12 +365,12 @@ medium of the filesystem holding the kubelet root dir (typically
 pods.
 
 In the future, we expect that `emptyDir` and `hostPath` volumes will be able to
-request a certain amount of space using a [resource](compute-resources.md)
+request a certain amount of space using a [resource](compute-resources.html)
 specification, and to select the type of media to use, for clusters that have
 several media types.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/volumes.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/volumes.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

@@ -24,7 +24,7 @@ limitations under the License.
 
 # Rolling update example
 
-This example demonstrates the usage of Kubernetes to perform a [rolling update](../kubectl/kubectl_rolling-update.md) on a running group of [pods](../../../docs/user-guide/pods.md). See [here](../managing-deployments.md#updating-your-application-without-a-service-outage) to understand why you need a rolling update. Also check [rolling update design document](../../design/simple-rolling-update.md) for more information. 
+This example demonstrates the usage of Kubernetes to perform a [rolling update](../kubectl/kubectl_rolling-update.html) on a running group of [pods](../../../docs/user-guide/pods.html). See [here](../managing-deployments.html#updating-your-application-without-a-service-outage) to understand why you need a rolling update. Also check [rolling update design document](../../design/simple-rolling-update.html) for more information. 
 
 ### Step Zero: Prerequisites
 
@@ -40,7 +40,7 @@ $ ./cluster/kube-up.sh
 You can use bash job control to run this in the background (note that you must use the default port -- 8001 -- for the following demonstration to work properly).
 This can sometimes spew to the output so you could also run it in a different terminal. You have to run `kubectl proxy` in the root of the
 Kubernetes repository. Otherwise you will get "404 page not found" errors as the paths will not match. You can find more information about `kubectl proxy`
-[here](../../../docs/user-guide/kubectl/kubectl_proxy.md).
+[here](../../../docs/user-guide/kubectl/kubectl_proxy.html).
 
 {% highlight console %}
 $ kubectl proxy --www=examples/update-demo/local/ &
@@ -51,7 +51,7 @@ Now visit the the [demo website](http://localhost:8001/static).  You won't see a
 
 ### Step Two: Run the replication controller
 
-Now we will turn up two replicas of an [image](../images.md).  They all serve on internal port 80.
+Now we will turn up two replicas of an [image](../images.html).  They all serve on internal port 80.
 
 {% highlight console %}
 $ kubectl create -f docs/user-guide/update-demo/nautilus-rc.yaml
@@ -79,7 +79,7 @@ $ kubectl rolling-update update-demo-nautilus --update-period=10s -f docs/user-g
 
 The rolling-update command in kubectl will do 2 things:
 
-1. Create a new [replication controller](../../../docs/user-guide/replication-controller.md) with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
+1. Create a new [replication controller](../../../docs/user-guide/replication-controller.html) with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
 2. Scale the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinning up new ones to replace them.
 
 Watch the [demo website](http://localhost:8001/static/index.html), it will update one pod every 10 seconds until all of the pods have the new image.
@@ -132,6 +132,6 @@ Note that the images included here are public domain.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/update-demo/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/update-demo/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

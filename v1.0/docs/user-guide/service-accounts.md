@@ -11,7 +11,7 @@ layout: docwithnav
 A service account provides an identity for processes that run in a Pod.
 
 *This is a user introduction to Service Accounts.  See also the 
-[Cluster Admin Guide to Service Accounts](../admin/service-accounts-admin.md).*
+[Cluster Admin Guide to Service Accounts](../admin/service-accounts-admin.html).*
 
 *Note: This document describes how service accounts behave in a cluster set up
 as recommended by the Kubernetes project.  Your cluster administrator may have
@@ -31,10 +31,10 @@ When you create a pod, you do not need to specify a service account.  It is
 automatically assigned the `default` service account of the same namespace.  If
 you get the raw json or yaml for a pod you have created (e.g. `kubectl get
 pods/podname -o yaml`), you can see the `spec.serviceAccount` field has been
-[automatically set](working-with-resources.md#resources-are-automatically-modified).
+[automatically set](working-with-resources.html#resources-are-automatically-modified).
 
 You can access the API using a proxy or with a client library, as described in
-[Accessing the Cluster](accessing-the-cluster.md#accessing-the-api-from-a-pod).
+[Accessing the Cluster](accessing-the-cluster.html#accessing-the-api-from-a-pod).
 
 ## Using Multiple Service Accounts
 
@@ -105,6 +105,6 @@ TODO explain:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/service-accounts.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/service-accounts.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

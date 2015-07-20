@@ -36,7 +36,7 @@ layout: docwithnav
 
 This document describes how to build a high-availability (HA) Kubernetes cluster.  This is a fairly advanced topic.
 Users who merely want to experiment with Kubernetes are encouraged to use configurations that are simpler to set up such as
-the simple [Docker based single node cluster instructions](../../docs/getting-started-guides/docker.md),
+the simple [Docker based single node cluster instructions](../../docs/getting-started-guides/docker.html),
 or try [Google Container Engine](https://cloud.google.com/container-engine/) for hosted Kubernetes.
 
 Also, at this time high availability support for Kubernetes is not continuously tested in our end-to-end (e2e) testing.  We will
@@ -82,7 +82,7 @@ choices. For example, on systemd-based systems (e.g. RHEL, CentOS), you can run 
 If you are extending from a standard Kubernetes installation, the `kubelet` binary should already be present on your system.  You can run
 `which kubelet` to determine if the binary is in fact installed.  If it is not installed,
 you should install the [kubelet binary](https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubelet), the
-[kubelet init file](http://releases.k8s.io/v1.01/cluster/saltbase/salt/kubelet/initd) and [high-availability/default-kubelet](high-availability/default-kubelet)
+[kubelet init file](http://releases.k8s.io/v1.0.1/cluster/saltbase/salt/kubelet/initd) and [high-availability/default-kubelet](high-availability/default-kubelet)
 scripts.
 
 If you are using monit, you should also install the monit daemon (`apt-get install monit`) and the [high-availability/monit-kubelet](high-availability/monit-kubelet) and
@@ -106,7 +106,7 @@ size of the cluster from three to five nodes.  If that is still insufficient, yo
 ### Clustering etcd
 
 The full details of clustering etcd are beyond the scope of this document, lots of details are given on the
-[etcd clustering page](https://github.com/coreos/etcd/blob/master/Documentation/clustering.html).  This example walks through
+[etcd clustering page](https://github.com/coreos/etcd/blob/master/Documentation/clustering.md).  This example walks through
 a simple cluster set up, using etcd's built in discovery to build our cluster.
 
 First, hit the etcd discovery service to create a new token:
@@ -213,7 +213,7 @@ master election.  On each of the three apiserver nodes, we run a small utility a
 election protocol using etcd "compare and swap". If the apiserver node wins the election, it starts the master component it is managing (e.g. the scheduler), if it
 loses the election, it ensures that any master components running on the node (e.g. the scheduler) are stopped.
 
-In the future, we expect to more tightly integrate this lease-locking into the scheduler and controller-manager binaries directly, as described in the [high availability design proposal](../proposals/high-availability.md)
+In the future, we expect to more tightly integrate this lease-locking into the scheduler and controller-manager binaries directly, as described in the [high availability design proposal](../proposals/high-availability.html)
 
 ### Installing configuration files
 
@@ -257,6 +257,6 @@ It implements the major concepts (with a few minor reductions for simplicity), o
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/high-availability.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/high-availability.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

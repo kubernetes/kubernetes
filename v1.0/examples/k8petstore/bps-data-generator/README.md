@@ -24,6 +24,6 @@ then, cd to bigtop-bigpetstore/bigpetstore-transaction-queue, and run the docker
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/bps-data-generator/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/bps-data-generator/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

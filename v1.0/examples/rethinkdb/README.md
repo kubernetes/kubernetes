@@ -134,6 +134,6 @@ the generated pods which is using `nodeSelector` to force k8s to schedule contai
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/rethinkdb/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/rethinkdb/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

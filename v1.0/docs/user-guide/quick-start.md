@@ -19,14 +19,14 @@ layout: docwithnav
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-This guide will help you get oriented to Kubernetes and running your first containers on the cluster. If you are already familiar with the docker-cli, you can also checkout the docker-cli to kubectl migration guide [here](docker-cli-to-kubectl.md).
+This guide will help you get oriented to Kubernetes and running your first containers on the cluster. If you are already familiar with the docker-cli, you can also checkout the docker-cli to kubectl migration guide [here](docker-cli-to-kubectl.html).
 
 
 ## Launching a simple application
 
 Once your application is packaged into a container and pushed to an image registry, you’re ready to deploy it to Kubernetes.
 
-For example, [nginx](http://wiki.nginx.org/Main) is a popular HTTP server, with a [pre-built container on Docker hub](https://registry.hub.docker.com/_/nginx/). The [`kubectl run`](kubectl/kubectl_run.md) command below will create two nginx replicas, listening on port 80.
+For example, [nginx](http://wiki.nginx.org/Main) is a popular HTTP server, with a [pre-built container on Docker hub](https://registry.hub.docker.com/_/nginx/). The [`kubectl run`](kubectl/kubectl_run.html) command below will create two nginx replicas, listening on port 80.
 
 {% highlight console %}
 $ kubectl run my-nginx --image=nginx --replicas=2 --port=80
@@ -62,7 +62,7 @@ $ kubectl get svc my-nginx -o json | grep \"ip\"
                    "ip": "130.111.122.213"
 {% endhighlight %}
 
-In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a [firewall to allow traffic on port 80](services-firewalls.md).
+In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a [firewall to allow traffic on port 80](services-firewalls.html).
 
 ## Killing the application
 
@@ -77,10 +77,10 @@ services/my-nginx
 
 ## What's next?
 
-[Learn about how to configure common container parameters, such as commands and environment variables.](configuring-containers.md)
+[Learn about how to configure common container parameters, such as commands and environment variables.](configuring-containers.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/quick-start.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/quick-start.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

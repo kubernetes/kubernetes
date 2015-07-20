@@ -78,6 +78,6 @@ There is a specific `cluster/rackspace` directory with the scripts for the follo
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rackspace.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rackspace.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

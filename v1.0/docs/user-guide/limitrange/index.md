@@ -32,7 +32,7 @@ This example demonstrates how limits can be applied to a Kubernetes namespace to
 min/max resource limits per pod.  In addition, this example demonstrates how you can
 apply default resource limits to pods in the absence of an end-user specified value.
 
-See [LimitRange design doc](../../design/admission_control_limit_range.md) for more information. For a detailed description of the Kubernetes resource model, see [Resources](../../../docs/user-guide/compute-resources.md)
+See [LimitRange design doc](../../design/admission_control_limit_range.html) for more information. For a detailed description of the Kubernetes resource model, see [Resources](../../../docs/user-guide/compute-resources.html)
 
 Step 0: Prerequisites
 -----------------------------------------
@@ -177,6 +177,6 @@ amount of resource a pod consumes on a node.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/limitrange/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/limitrange/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

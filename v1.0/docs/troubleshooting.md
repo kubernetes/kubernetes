@@ -9,8 +9,8 @@ layout: docwithnav
 # Troubleshooting
 
 Sometimes things go wrong.  This guide is aimed at making them right.  It has two sections:
-   * [Troubleshooting your application](user-guide/application-troubleshooting.md) - Useful for users who are deploying code into Kubernetes and wondering why it is not working.
-   * [Troubleshooting your cluster](admin/cluster-troubleshooting.md) - Useful for cluster administrators and people whose Kubernetes cluster is unhappy.
+   * [Troubleshooting your application](user-guide/application-troubleshooting.html) - Useful for users who are deploying code into Kubernetes and wondering why it is not working.
+   * [Troubleshooting your cluster](admin/cluster-troubleshooting.html) - Useful for cluster administrators and people whose Kubernetes cluster is unhappy.
 
 # Getting help
 
@@ -45,6 +45,6 @@ The Kubernetes mailing list is google-containers@googlegroups.com
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/troubleshooting.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/troubleshooting.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

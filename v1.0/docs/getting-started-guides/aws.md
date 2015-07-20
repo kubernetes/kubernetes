@@ -38,16 +38,16 @@ export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 export KUBERNETES_PROVIDER=aws; curl -sS https://get.k8s.io | bash
 {% endhighlight %}
 
-NOTE: This script calls [cluster/kube-up.sh](http://releases.k8s.io/v1.01/cluster/kube-up.sh)
-which in turn calls [cluster/aws/util.sh](http://releases.k8s.io/v1.01/cluster/aws/util.sh)
-using [cluster/aws/config-default.sh](http://releases.k8s.io/v1.01/cluster/aws/config-default.sh).
+NOTE: This script calls [cluster/kube-up.sh](http://releases.k8s.io/v1.0.1/cluster/kube-up.sh)
+which in turn calls [cluster/aws/util.sh](http://releases.k8s.io/v1.0.1/cluster/aws/util.sh)
+using [cluster/aws/config-default.sh](http://releases.k8s.io/v1.0.1/cluster/aws/config-default.sh).
 
 This process takes about 5 to 10 minutes. Once the cluster is up, the IP addresses of your master and node(s) will be printed,
 as well as information about the default services running in the cluster (monitoring, logging, dns). User credentials and security
 tokens are written in `~/.kube/kubeconfig`, they will be necessary to use the CLI or the HTTP Basic Auth.
 
 By default, the script will provision a new VPC and a 4 node k8s cluster in us-west-2a (Oregon) with `t2.micro` instances running on Ubuntu.
-You can override the variables defined in [config-default.sh](http://releases.k8s.io/v1.01/cluster/aws/config-default.sh) to change this behavior as follows:
+You can override the variables defined in [config-default.sh](http://releases.k8s.io/v1.0.1/cluster/aws/config-default.sh) to change this behavior as follows:
 
 {% highlight bash %}
 export KUBE_AWS_ZONE=eu-west-1c
@@ -66,7 +66,7 @@ NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS
 
 ### Alternatives
 
-A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
+A contributed [example](aws-coreos.html) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
 AWS CloudFormation or EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
@@ -86,14 +86,14 @@ export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
 {% endhighlight %}
 
-An up-to-date documentation page for this tool is available here: [kubectl manual](../../docs/user-guide/kubectl/kubectl.md)
+An up-to-date documentation page for this tool is available here: [kubectl manual](../../docs/user-guide/kubectl/kubectl.html)
 
 By default, `kubectl` will use the `kubeconfig` file generated during the cluster startup for authenticating against the API.
-For more information, please read [kubeconfig files](../../docs/user-guide/kubeconfig-file.md)
+For more information, please read [kubeconfig files](../../docs/user-guide/kubeconfig-file.html)
 
 ### Examples
 
-See [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../../docs/user-guide/simple-nginx.html) to try out your new cluster.
 
 The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/)
 
@@ -115,6 +115,6 @@ and using a Kubernetes cluster.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

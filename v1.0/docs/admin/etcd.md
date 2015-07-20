@@ -20,7 +20,7 @@ internet at large), because access to etcd is equivilent to root in your
 cluster.
 
 Data Reliability: for reasonable safety, either etcd needs to be run as a
-[cluster](high-availability.md#clustering-etcd) (multiple machines each running
+[cluster](high-availability.html#clustering-etcd) (multiple machines each running
 etcd) or etcd's data directory should be located on durable storage (e.g., GCE's
 persistent disk). In either case, if high availability is required--as it might
 be in a production cluster--the data directory ought to be [backed up
@@ -30,14 +30,14 @@ to reduce downtime in case of corruption.
 ## Default configuration
 
 The default setup scripts use kubelet's file-based static pods feature to run etcd in a
-[pod](http://releases.k8s.io/v1.01/cluster/saltbase/salt/etcd/etcd.manifest). This manifest should only
+[pod](http://releases.k8s.io/v1.0.1/cluster/saltbase/salt/etcd/etcd.manifest). This manifest should only
 be run on master VMs. The default location that kubelet scans for manifests is
 `/etc/kubernetes/manifests/`.
 
 ## Kubernetes's usage of etcd
 
 By default, Kubernetes objects are stored under the `/registry` key in etcd.
-This path can be prefixed by using the [kube-apiserver](kube-apiserver.md) flag
+This path can be prefixed by using the [kube-apiserver](kube-apiserver.html) flag
 `--etcd-prefix="/foo"`.
 
 `etcd` is the only place that Kubernetes keeps state.
@@ -54,6 +54,6 @@ curl -fs -X PUT "http://${host}:${port}/v2/keys/_test"
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/etcd.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/etcd.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

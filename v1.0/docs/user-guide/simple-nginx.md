@@ -16,7 +16,7 @@ to Kubernetes and running your first containers on the cluster.
 
 From this point onwards, it is assumed that `kubectl` is on your path from one of the getting started guides.
 
-The [`kubectl run`](kubectl/kubectl_run.md) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](pods.md) listening on port 80. It will also create a [replication controller](replication-controller.md) named `my-nginx` to ensure that there are always two pods running.
+The [`kubectl run`](kubectl/kubectl_run.html) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](pods.html) listening on port 80. It will also create a [replication controller](replication-controller.html) named `my-nginx` to ensure that there are always two pods running.
 
 {% highlight bash %}
 kubectl run my-nginx --image=nginx --replicas=2 --port=80
@@ -42,7 +42,7 @@ kubectl stop rc my-nginx
 
 ### Exposing your pods to the internet.
 
-On some platforms (for example Google Compute Engine) the kubectl command can integrate with your cloud provider to add a [public IP address](services.md#external-services) for the pods,
+On some platforms (for example Google Compute Engine) the kubectl command can integrate with your cloud provider to add a [public IP address](services.html#external-services) for the pods,
 to do this run:
 
 {% highlight bash %}
@@ -59,11 +59,11 @@ In order to access your nginx landing page, you also have to make sure that traf
 
 ### Next: Configuration files
 
-Most people will eventually want to use declarative configuration files for creating/modifying their applications.  A [simplified introduction](simple-yaml.md)
+Most people will eventually want to use declarative configuration files for creating/modifying their applications.  A [simplified introduction](simple-yaml.html)
 is given in a different document.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/simple-nginx.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/simple-nginx.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

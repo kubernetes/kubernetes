@@ -145,6 +145,6 @@ See the [example of Limit Range](../user-guide/limitrange/) for more information
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

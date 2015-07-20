@@ -23,7 +23,7 @@ Resource Quota is enforced in a particular namespace when there is a
 `ResourceQuota` object in that namespace.  There should be at most one
 `ResourceQuota` object in a namespace.
 
-See [ResourceQuota design doc](../design/admission_control_resource_quota.md) for more information.
+See [ResourceQuota design doc](../design/admission_control_resource_quota.html) for more information.
 
 ## Object Count Quota
 
@@ -35,9 +35,9 @@ are supported:
 | pods | Total number of pods  |
 | services | Total number of services |
 | replicationcontrollers | Total number of replication controllers |
-| resourcequotas | Total number of [resource quotas](admission-controllers.md#resourcequota) |
+| resourcequotas | Total number of [resource quotas](admission-controllers.html#resourcequota) |
 | secrets | Total number of secrets |
-| persistentvolumeclaims | Total number of [persistent volume claims](../user-guide/persistent-volumes.md#persistentvolumeclaims) |
+| persistentvolumeclaims | Total number of [persistent volume claims](../user-guide/persistent-volumes.html#persistentvolumeclaims) |
 
 For example, `pods` quota counts and enforces a maximum on the number of `pods`
 created in a single namespace.
@@ -121,6 +121,6 @@ See a [detailed example for how to use resource quota](../user-guide/resourcequo
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/resource-quota.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/resource-quota.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

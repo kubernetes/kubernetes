@@ -28,11 +28,11 @@ If you are running a cluster in Google Container Engine (GKE), instead see the [
 
 This example assumes that you have a working cluster. See the [Getting Started Guides](../../docs/getting-started-guides/) for details about creating a cluster.
 
-**Tip:** View all the `kubectl` commands, including their options and descriptions in the [kudectl CLI reference](../../docs/user-guide/kubectl/kubectl.md).
+**Tip:** View all the `kubectl` commands, including their options and descriptions in the [kudectl CLI reference](../../docs/user-guide/kubectl/kubectl.html).
 
 ### Step One: Create the Redis master pod<a id="step-one"></a>
 
-Use the `examples/guestbook-go/redis-master-controller.json` file to create a [replication controller](../../docs/user-guide/replication-controller.md) and Redis master [pod](../../docs/user-guide/pods.md). The pod runs a Redis key-value server in a container. Using a replication controller is the preferred way to launch long-running pods, even for 1 replica, so that the pod benefits from the self-healing mechanism in Kubernetes (keeps the pods alive).
+Use the `examples/guestbook-go/redis-master-controller.json` file to create a [replication controller](../../docs/user-guide/replication-controller.html) and Redis master [pod](../../docs/user-guide/pods.html). The pod runs a Redis key-value server in a container. Using a replication controller is the preferred way to launch long-running pods, even for 1 replica, so that the pod benefits from the self-healing mechanism in Kubernetes (keeps the pods alive).
 
 1. Use the [redis-master-controller.json](redis-master-controller.json) file to create the Redis master replication controller in your Kubernetes cluster by running the `kubectl create -f` *`filename`* command:
 
@@ -77,7 +77,7 @@ Use the `examples/guestbook-go/redis-master-controller.json` file to create a [r
 
 ### Step Two: Create the Redis master service <a id="step-two"></a>
 
-A Kubernetes '[service](../../docs/user-guide/services.md)' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables or DNS. 
+A Kubernetes '[service](../../docs/user-guide/services.html)' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables or DNS. 
 
 Services find the containers to load balance based on pod labels. The pod that you created in Step One has the label `app=redis` and `role=master`. The selector field of the service determines which pods will receive the traffic sent to the service.
 
@@ -274,6 +274,6 @@ Tip: To turn down your Kubernetes cluster, follow the corresponding instructions
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook-go/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook-go/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

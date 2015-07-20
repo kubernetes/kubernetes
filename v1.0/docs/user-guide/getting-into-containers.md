@@ -10,7 +10,7 @@ Developers can use `kubectl exec` to run commands in a container. This guide dem
 
 ## Using kubectl exec to check the environment variables of a container
 
-Kubernetes exposes [services](services.md#environment-variables) through environment variables. It is convenient to check these environment variables using `kubectl exec`.
+Kubernetes exposes [services](services.html#environment-variables) through environment variables. It is convenient to check these environment variables using `kubectl exec`.
 
 
 We first create a pod and a service,
@@ -78,6 +78,6 @@ This gets you a terminal.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/getting-into-containers.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/getting-into-containers.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

@@ -10,7 +10,7 @@ layout: docwithnav
 
 # Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/v1.01/build/README.html).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/v1.0.1/build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -292,18 +292,18 @@ go run hack/e2e.go -v -ctl='delete pod foobar'
 ## Conformance testing
 
 End-to-end testing, as described above, is for [development
-distributions](writing-a-getting-started-guide.md).  A conformance test is used on
-a [versioned distro](writing-a-getting-started-guide.md).
+distributions](writing-a-getting-started-guide.html).  A conformance test is used on
+a [versioned distro](writing-a-getting-started-guide.html).
 
 The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not
 require support for up/push/down and other operations.  To run a conformance test, you need to know the
 IP of the master for your cluster and the authorization arguments to use.  The conformance test is
 intended to run against a cluster at a specific binary release of Kubernetes.
-See [conformance-test.sh](http://releases.k8s.io/v1.01/hack/conformance-test.sh).
+See [conformance-test.sh](http://releases.k8s.io/v1.0.1/hack/conformance-test.sh).
 
 ## Testing out flaky tests
 
-[Instructions here](flaky-tests.md)
+[Instructions here](flaky-tests.html)
 
 ## Regenerating the CLI documentation
 
@@ -313,6 +313,6 @@ hack/run-gendocs.sh
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/development.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/development.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

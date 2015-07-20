@@ -640,7 +640,7 @@ Reboot these servers to get the images PXEd and ready for running containers!
 
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-See [a simple nginx example](../../../docs/user-guide/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../../../docs/user-guide/simple-nginx.html) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../../examples/).
 
@@ -678,6 +678,6 @@ Kill all pods:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/bare_metal_offline.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/bare_metal_offline.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

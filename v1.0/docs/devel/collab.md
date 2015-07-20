@@ -49,6 +49,6 @@ Any maintainer or core contributor who wants to review a PR but does not have ti
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/collab.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/collab.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 
