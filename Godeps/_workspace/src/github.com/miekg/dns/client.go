@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const dnsTimeout time.Duration = 2 * 1e9
+const dnsTimeout time.Duration = 2 * time.Second
 const tcpIdleTimeout time.Duration = 8 * time.Second
 
 // A Conn represents a connection to a DNS server.
@@ -26,9 +26,9 @@ type Conn struct {
 type Client struct {
 	Net            string            // if "tcp" a TCP query will be initiated, otherwise an UDP one (default is "" for UDP)
 	UDPSize        uint16            // minimum receive buffer for UDP messages
-	DialTimeout    time.Duration     // net.DialTimeout (ns), defaults to 2 * 1e9
-	ReadTimeout    time.Duration     // net.Conn.SetReadTimeout value for connections (ns), defaults to 2 * 1e9
-	WriteTimeout   time.Duration     // net.Conn.SetWriteTimeout value for connections (ns), defaults to 2 * 1e9
+	DialTimeout    time.Duration     // net.DialTimeout, defaults to 2 seconds
+	ReadTimeout    time.Duration     // net.Conn.SetReadTimeout value for connections, defaults to 2 seconds
+	WriteTimeout   time.Duration     // net.Conn.SetWriteTimeout value for connections, defaults to 2 seconds
 	TsigSecret     map[string]string // secret(s) for Tsig map[<zonename>]<base64 secret>, zonename must be fully qualified
 	SingleInflight bool              // if true suppress multiple outstanding queries for the same Qname, Qtype and Qclass
 	group          singleflight
@@ -55,6 +55,13 @@ func Exchange(m *Msg, a string) (r *Msg, err error) {
 	defer co.Close()
 	co.SetReadDeadline(time.Now().Add(dnsTimeout))
 	co.SetWriteDeadline(time.Now().Add(dnsTimeout))
+
+	opt := m.IsEdns0()
+	// If EDNS0 is used use that for size.
+	if opt != nil && opt.UDPSize() >= MinMsgSize {
+		co.UDPSize = opt.UDPSize()
+	}
+
 	if err = co.WriteMsg(m); err != nil {
 		return nil, err
 	}
@@ -290,7 +297,7 @@ func Dial(network, address string) (conn *Conn, err error) {
 	return conn, nil
 }
 
-// Dialtimeout acts like Dial but takes a timeout.
+// DialTimeout acts like Dial but takes a timeout.
 func DialTimeout(network, address string, timeout time.Duration) (conn *Conn, err error) {
 	conn = new(Conn)
 	conn.Conn, err = net.DialTimeout(network, address, timeout)

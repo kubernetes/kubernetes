@@ -12,10 +12,9 @@ func TestDynamicUpdateParsing(t *testing.T) {
 			typ == "TSIG" || typ == "ISDN" || typ == "UNSPEC" || typ == "NULL" || typ == "ATMA" {
 			continue
 		}
-		r, e := NewRR(prefix + typ)
-		if e != nil {
-			t.Log("failure to parse: " + prefix + typ)
-			t.Fail()
+		r, err := NewRR(prefix + typ)
+		if err != nil {
+			t.Errorf("failure to parse: %s %s: %v", prefix, typ, err)
 		} else {
 			t.Logf("parsed: %s", r.String())
 		}
@@ -31,8 +30,7 @@ func TestDynamicUpdateUnpack(t *testing.T) {
 	msg := new(Msg)
 	err := msg.Unpack(buf)
 	if err != nil {
-		t.Log("failed to unpack: " + err.Error() + "\n" + msg.String())
-		t.Fail()
+		t.Errorf("failed to unpack: %v\n%s", err, msg.String())
 	}
 }
 
@@ -45,13 +43,11 @@ func TestDynamicUpdateZeroRdataUnpack(t *testing.T) {
 		rr.Rrtype = n
 		bytes, err := m.Pack()
 		if err != nil {
-			t.Logf("failed to pack %s: %v", s, err)
-			t.Fail()
+			t.Errorf("failed to pack %s: %v", s, err)
 			continue
 		}
 		if err := new(Msg).Unpack(bytes); err != nil {
-			t.Logf("failed to unpack %s: %v", s, err)
-			t.Fail()
+			t.Errorf("failed to unpack %s: %v", s, err)
 		}
 	}
 }
@@ -82,24 +78,7 @@ func TestRemoveRRset(t *testing.T) {
 		if err := tmp.Unpack(actual); err != nil {
 			t.Fatalf("Error unpacking actual msg: %v", err)
 		}
-		t.Logf("Expected msg:\n%s", expectstr)
-		t.Logf("Actual msg:\n%v", tmp)
-		t.Fail()
-	}
-
-	m.Ns = nil
-	m.RemoveRRset([]RR{rr, rr})
-	actual, err = m.Pack()
-	if err != nil {
-		t.Fatalf("Error packing actual msg: %v", err)
-	}
-	if !bytes.Equal(actual, expect) {
-		tmp := new(Msg)
-		if err := tmp.Unpack(actual); err != nil {
-			t.Fatalf("Error unpacking actual msg: %v", err)
-		}
-		t.Logf("Expected msg:\n%v", expectstr)
-		t.Logf("Actual msg:\n%v", tmp)
-		t.Fail()
+		t.Errorf("Expected msg:\n%s", expectstr)
+		t.Errorf("Actual msg:\n%v", tmp)
 	}
 }
