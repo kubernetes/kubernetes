@@ -37,6 +37,8 @@ Sometimes things go wrong.  This guide is aimed at making them right.  It has tw
    * [Troubleshooting your application](user-guide/application-troubleshooting.md) - Useful for users who are deploying code into Kubernetes and wondering why it is not working.
    * [Troubleshooting your cluster](admin/cluster-troubleshooting.md) - Useful for cluster administrators and people whose Kubernetes cluster is unhappy.
 
+You should also check the [known issues](user-guide/known-issues.md) for the release you're using.
+
 # Getting help
 
 If your problem isn't answered by any of the guides above, there are variety of ways for you to get help from the Kubernetes team.
