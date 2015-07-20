@@ -42,8 +42,8 @@ work like this:
   support for making this mandatory via ACLs is planned.
 - Users put [compute resource limits](../user-guide/compute-resources.md) on their pods.
 - The administrator creates a Resource Quota for each namespace.
-- If users exceed the limits specified in the Resource Quota in a namespace, they are blocked
-  from creating more pods in that namespace.  The POST of the pod will fail with HTTP status
+- If creating a pod would cause the namespace to exceed any of the limits specified in the
+  the Resource Quota for that namespace, then the request will fail with HTTP status
   code `403 FORBIDDEN`.
 - If quota is enabled in a namespace and the user does not specify limits on the pod for each
   of the resources for which quota is enabled, then the POST of the pod will fail with HTTP
@@ -56,7 +56,7 @@ Examples of policies that could be created using namespaces and quotas are:
 - Limit the "testing" namespace to using 1 core and 1GiB RAM.  Let the "production" namespace
   use any amount.
 
-In the case where the total capacity of the cell is less than the sum of the quotas of the namespaces,
+In the case where the total capacity of the cluster is less than the sum of the quotas of the namespaces,
 there may be contention for resources.  This is handled on a first-come-first-served basis.
 
 Neither contention nor changes to quota will affect already-running pods.
@@ -80,15 +80,9 @@ in a namespace can be limited.  The following compute resource types are support
 | ------------ | ----------- |
 | cpu | Total cpu limits of containers |
 | memory | Total memory limits of containers
-| `example.com/customresource` | Total of `resources.limits."example.com/customresource"` of containers |
 
 For example, `cpu` quota sums up the `resources.limits.cpu` fields of every
 container of every pod in the namespace, and enforces a maximum on that sum.
-
-Any resource that is not part of core Kubernetes must follow the resource naming convention prescribed by Kubernetes.
-
-This means the resource must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
-
 
 ## Object Count Quota
 
