@@ -56,6 +56,9 @@ func (c *FakeServiceAccounts) Delete(name string) error {
 }
 
 func (c *FakeServiceAccounts) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Lock.Lock()
+	defer c.Fake.Lock.Unlock()
+
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-serviceAccounts", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }

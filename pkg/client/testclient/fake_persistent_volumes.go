@@ -59,6 +59,9 @@ func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.Per
 }
 
 func (c *FakePersistentVolumes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Lock.Lock()
+	defer c.Fake.Lock.Unlock()
+
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-persistentVolumes", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }

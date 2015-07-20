@@ -56,6 +56,9 @@ func (c *FakeEvents) Get(id string) (*api.Event, error) {
 
 // Watch starts watching for events matching the given selectors.
 func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Lock.Lock()
+	defer c.Fake.Lock.Unlock()
+
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-events", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }
@@ -72,6 +75,9 @@ func (c *FakeEvents) Delete(name string) error {
 }
 
 func (c *FakeEvents) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
+	c.Fake.Lock.Lock()
+	defer c.Fake.Lock.Unlock()
+
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-field-selector"})
 	return fields.Everything()
 }

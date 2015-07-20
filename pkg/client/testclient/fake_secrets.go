@@ -56,6 +56,9 @@ func (c *FakeSecrets) Delete(name string) error {
 }
 
 func (c *FakeSecrets) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Lock.Lock()
+	defer c.Fake.Lock.Unlock()
+
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-secrets", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }
