@@ -54,7 +54,7 @@ particular, they may be self-merged by the release branch owner without fanfare,
 in the case the release branch owner knows the cherry pick was already
 requested - this should not be the norm, but it may happen.
 
-[Contributor License Agreements](../../CONTRIBUTING.md) is considered implicit
+[Contributor License Agreements](http://releases.k8s.io/HEAD/CONTRIBUTING.md) is considered implicit
 for all code within cherry-pick pull requests, ***unless there is a large
 conflict***.
 
