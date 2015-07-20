@@ -129,7 +129,7 @@ We should define a grains.conf key that captures more specifically what network 
 
 ## Further reading
 
-The [cluster/saltbase](../../cluster/saltbase/) tree has more details on the current SaltStack configuration.
+The [cluster/saltbase](http://releases.k8s.io/HEAD/cluster/saltbase/) tree has more details on the current SaltStack configuration.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

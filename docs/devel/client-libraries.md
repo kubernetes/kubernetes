@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 ### Supported
 
-   * [Go](../../pkg/client/)
+   * [Go](http://releases.k8s.io/HEAD/pkg/client/)
 
 ### User Contributed
 

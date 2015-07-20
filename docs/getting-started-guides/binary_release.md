@@ -53,7 +53,7 @@ cd kubernetes
 make release
 ```
 
-For more details on the release process see the [`build/` directory](../../build/)
+For more details on the release process see the [`build/` directory](http://releases.k8s.io/HEAD/build/)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
