@@ -30,6 +30,7 @@ import (
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/dns"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
@@ -143,6 +144,14 @@ func (s *ProxyServer) Run(_ []string) error {
 			}
 		}, 5*time.Second)
 	}
+
+	go func() {
+		// Note: Cannot restart SkyDNS without leaking goroutines
+		err := dns.ServeDNS(client)
+		if err != nil {
+			glog.Errorf("Starting DNS server failed: %v", err)
+		}
+	}()
 
 	// Just loop forever for now...
 	proxier.SyncLoop()
