@@ -71,11 +71,12 @@ steps that existing cluster setup scripts are making.
     - [Using Configuration Management](#using-configuration-management)
   - [Bootstrapping the Cluster](#bootstrapping-the-cluster)
     - [etcd](#etcd)
-    - [Apiserver](#apiserver)
+    - [Apiserver, Controller Manager, and Scheduler](#apiserver-controller-manager-and-scheduler)
       - [Apiserver pod template](#apiserver-pod-template)
-      - [Starting Apiserver](#starting-apiserver)
-    - [Scheduler](#scheduler)
-    - [Controller Manager](#controller-manager)
+        - [Cloud Providers](#cloud-providers)
+      - [Scheduler pod template](#scheduler-pod-template)
+      - [Controller Manager Template](#controller-manager-template)
+      - [Starting and Verifying Apiserver, Scheduler, and Controller Manager](#starting-and-verifying-apiserver-scheduler-and-controller-manager)
     - [Logging](#logging)
     - [Monitoring](#monitoring)
     - [DNS](#dns)
@@ -97,7 +98,8 @@ steps that existing cluster setup scripts are making.
     up a temporary cluster by following one of the other Getting Started Guides.
     This will help you become familiar with the CLI ([kubectl](../user-guide/kubectl/kubectl.md)) and concepts ([pods](../user-guide/pods.md), [services](../user-guide/services.md), etc.) first.
   1. You should have `kubectl` installed on your desktop.  This will happen as a side
-    effect of completing one of the other Getting Started Guides.
+    effect of completing one of the other Getting Started Guides.  If not, follow the instructions
+    [here](../user-guide/prereqs.md).
 
 ### Cloud Provider
 
@@ -537,38 +539,18 @@ To run an etcd instance:
 1. make any modifications needed
 1. start the pod by putting it into the kubelet manifest directory
 
-### Apiserver
+### Apiserver, Controller Manager, and Scheduler
 
-To run the apiserver:
-1. select the correct flags for your cluster
-1. write a pod spec for the apiserver using the provided template
-1. start the pod by putting it into the kubelet manifest directory
+The apiserver, controller manager, and scheduler will each run as a pod on the master node.
 
-Here are some apiserver flags you may need to set:
-  - `--cloud-provider=`
-  - `--cloud-config=` if cloud provider requires a config file (GCE, AWS). If so, need to put config file into apiserver image or mount through hostPath.
-  - `--address=${MASTER_IP}`.
-   - or `--bind-address=127.0.0.1` and `--address=127.0.0.1` if you want to run a proxy on the master node.
-  - `--cluster-name=$CLUSTER_NAME`
-  - `--service-cluster-ip-range=$SERVICE_CLUSTER_IP_RANGE`
-  - `--etcd-servers=http://127.0.0.1:4001`
-  - `--tls-cert-file=/srv/kubernetes/server.cert`
-  - `--tls-private-key-file=/srv/kubernetes/server.key`
-  - `--admission-control=$RECOMMENDED_LIST`
-    - See [admission controllers](../admin/admission-controllers.md) for recommended arguments.
-  - `--allow-privileged=true`, only if you trust your cluster user to run pods as root.
- 
-If you are following the firewall-only security approach, then use these arguments:
-  - `--token-auth-file=/dev/null`
-  - `--insecure-bind-address=$MASTER_IP`
-  - `--advertise-address=$MASTER_IP`
+For each of these components, the steps to start them running are similar:
 
-If you are using the HTTPS approach, then set:
-  - `--client-ca-file=/srv/kubernetes/ca.crt`
-  - `--token-auth-file=/srv/kubernetes/known_tokens.csv`
-  - `--basic-auth-file=/srv/kubernetes/basic_auth.csv`
-
-*TODO* document proxy-ssh setup.
+1. Start with a provided template for a pod.
+1. Set the `APISERVER_IMAGE`, `CNTRLMNGR_IMAGE`, and `SCHEDULER_IMAGE to the values chosen in [Selecting Images](#selecting-images).
+1. Determine which flags are needed for your cluster, using the advice below each template.
+1. Set the `APISERVER_FLAGS`, `CNTRLMNGR_FLAGS, and `SCHEDULER_FLAGS` to the space-separated list of flags for that component.
+1. Start the pod by putting the completed template into the kubelet manifest directory.
+1. Verify that the pod is started.
 
 #### Apiserver pod template
 
@@ -588,7 +570,7 @@ If you are using the HTTPS approach, then set:
         "command": [
           "/bin/sh",
           "-c",
-          "/usr/local/bin/kube-apiserver $ARGS"
+          "/usr/local/bin/kube-apiserver $APISERVER_FLAGS"
         ],
         "ports": [
           {
@@ -642,50 +624,66 @@ If you are using the HTTPS approach, then set:
 }
 ```
 
-The `/etc/ssl` mount allows the apiserver to find the SSL root certs so it can
-authenticate external services, such as a cloud provider.
+Here are some apiserver flags you may need to set:
 
-The `/srv/kubernetes` mount allows the apiserver to read certs and credentials stored on the
-node disk.
+- `--cloud-provider=` see [cloud providers](#cloud-providers)
+- `--cloud-config=` see [cloud providers](#cloud-providers)
+- `--address=${MASTER_IP}` *or* `--bind-address=127.0.0.1` and `--address=127.0.0.1` if you want to run a proxy on the master node.
+- `--cluster-name=$CLUSTER_NAME`
+- `--service-cluster-ip-range=$SERVICE_CLUSTER_IP_RANGE`
+- `--etcd-servers=http://127.0.0.1:4001`
+- `--tls-cert-file=/srv/kubernetes/server.cert`
+- `--tls-private-key-file=/srv/kubernetes/server.key`
+- `--admission-control=$RECOMMENDED_LIST`
+  - See [admission controllers](../admin/admission-controllers.md) for recommended arguments.
+- `--allow-privileged=true`, only if you trust your cluster user to run pods as root.
 
-Optionally, you may want to mount `/var/log` as well and redirect output there.
+If you are following the firewall-only security approach, then use these arguments:
 
-#### Starting Apiserver
+- `--token-auth-file=/dev/null`
+- `--insecure-bind-address=$MASTER_IP`
+- `--advertise-address=$MASTER_IP`
 
-Place the completed pod template into the kubelet config dir
-(whatever `--config=` argument of kubelet is set to, typically
-`/etc/kubernetes/manifests`).
+If you are using the HTTPS approach, then set:
+- `--client-ca-file=/srv/kubernetes/ca.crt`
+- `--token-auth-file=/srv/kubernetes/known_tokens.csv`
+- `--basic-auth-file=/srv/kubernetes/basic_auth.csv`
 
-Next, verify that kubelet has started a container for the apiserver:
+This pod mounts several node file system directories using the  `hostPath` volumes.  Their purposes are:
+- The `/etc/ssl` mount allows the apiserver to find the SSL root certs so it can
+  authenticate external services, such as a cloud provider.
+  - This is not required if you do not use a cloud provider (e.g. bare-metal).
+- The `/srv/kubernetes` mount allows the apiserver to read certs and credentials stored on the
+  node disk.  These could instead be stored on a persistend disk, such as a GCE PD, or baked into the image.
+- Optionally, you may want to mount `/var/log` as well and redirect output there (not shown in template).
+  - Do this if you prefer your logs to be accessible from the root filesystem with tools like journalctl.
 
-```console
-$ sudo docker ps | grep apiserver:
-5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695
-```
+*TODO* document proxy-ssh setup.
 
-Then try to connect to the apiserver:
+##### Cloud Providers
 
-```console
-$ echo $(curl -s http://localhost:8080/healthz)
-ok
-$ curl -s http://localhost:8080/api
-{
-  "versions": [
-    "v1beta3",
-    "v1"
-  ]
-}
-```
+Apiserver supports several cloud providers.
 
-If you have selected the `--register-node=true` option for kubelets, they will now being self-registering with the apiserver.
-You should soon be able to see all your nodes by running the `kubect get nodes` command.
-Otherwise, you will need to manually create node objects.
+- options for `--cloud-provider` flag are `aws`, `gce`, `mesos`, `openshift`, `ovirt`, `rackspace`, `vagrant`, or unset.
+- unset used for e.g. bare metal setups.
+- support for new IaaS is added by contributing code [here](../../pkg/cloudprovider/)
 
-### Scheduler
+Some cloud providers require a config file. If so, you need to put config file into apiserver image or mount through hostPath.
+
+- `--cloud-config=` set if cloud provider requires a config file.
+- Used by `aws`, `gce`, `mesos`, `openshift`, `ovirt` and `rackspace`.
+- You must put config file into apiserver image or mount through hostPath.
+- Cloud config file syntax is [Gcfg](https://code.google.com/p/gcfg/).
+- AWS format defined by type [AWSCloudConfig](../../pkg/cloudprovider/aws/aws.go)
+- There is a similar type in the corresponding file for other cloud providers.
+- GCE example: search for `gce.conf` in [this file](../../cluster/gce/configure-vm.sh)
+
+#### Scheduler pod template
 
 Complete this template for the scheduler pod:
 
 ```json
+
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -701,7 +699,7 @@ Complete this template for the scheduler pod:
         "command": [
           "/bin/sh",
           "-c",
-          "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080"
+          "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080 $SCHEDULER_FLAGS"
         ],
         "livenessProbe": {
           "httpGet": {
@@ -715,32 +713,19 @@ Complete this template for the scheduler pod:
     ]
   }
 }
+
 ```
+
+Typically, no additional flags are required for the scheduler.
 
 Optionally, you may want to mount `/var/log` as well and redirect output there.
 
-Start as described for apiserver.
-
-### Controller Manager
-
-To run the controller manager:
-  - select the correct flags for your cluster
-  - write a pod spec for the controller manager using the provided template
-  - start the controller manager pod
-
-Flags to consider using with controller manager.
- - `--cluster-name=$CLUSTER_NAME`
- - `--cluster-cidr=`
-   - *TODO*: explain this flag.
- - `--allocate-node-cidrs=`
-   - *TODO*: explain when you want controller to do this and when you wanna do it another way.
- - `--cloud-provider=` and `--cloud-config` as described in apiserver section.
- - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../user-guide/service-accounts.md) feature.
- - `--master=127.0.0.1:8080`
+#### Controller Manager Template
 
 Template for controller manager pod:
 
 ```json
+
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -756,7 +741,7 @@ Template for controller manager pod:
         "command": [
           "/bin/sh",
           "-c",
-          "/usr/local/bin/kube-controller-manager $ARGS"
+          "/usr/local/bin/kube-controller-manager $CNTRLMNGR_FLAGS"
         ],
         "volumeMounts": [
           {
@@ -796,8 +781,49 @@ Template for controller manager pod:
     ]
   }
 }
+
 ```
 
+Flags to consider using with controller manager:
+ - `--cluster-name=$CLUSTER_NAME`
+ - `--cluster-cidr=`
+   - *TODO*: explain this flag.
+ - `--allocate-node-cidrs=`
+   - *TODO*: explain when you want controller to do this and when you want to do it another way.
+ - `--cloud-provider=` and `--cloud-config` as described in apiserver section.
+ - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by the [service account](../user-guide/service-accounts.md) feature.
+ - `--master=127.0.0.1:8080`
+
+#### Starting and Verifying Apiserver, Scheduler, and Controller Manager
+
+Place each completed pod template into the kubelet config dir
+(whatever `--config=` argument of kubelet is set to, typically
+`/etc/kubernetes/manifests`).  The order does not matter: scheduler and
+controller manager will retry reaching the apiserver until it is up.
+
+Use `ps` or `docker ps` to verify that each process has started.  For example, verify that kubelet has started a container for the apiserver like this:
+
+```console
+$ sudo docker ps | grep apiserver:
+5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695
+```
+
+Then try to connect to the apiserver:
+
+```console
+$ echo $(curl -s http://localhost:8080/healthz)
+ok
+$ curl -s http://localhost:8080/api
+{
+  "versions": [
+    "v1"
+  ]
+}
+```
+
+If you have selected the `--register-node=true` option for kubelets, they will now begin self-registering with the apiserver.
+You should soon be able to see all your nodes by running the `kubect get nodes` command.
+Otherwise, you will need to manually create node objects.
 
 ### Logging
 
