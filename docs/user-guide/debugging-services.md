@@ -71,14 +71,14 @@ clear what is expected, this document will use the following conventions.
 If the command "COMMAND" is expected to run in a `Pod` and produce "OUTPUT":
 
 ```console
-pod$ COMMAND
+u@pod$ COMMAND
 OUTPUT
 ```
 
 If the command "COMMAND" is expected to run on a `Node` and produce "OUTPUT":
 
 ```console
-node$ COMMAND
+u@node$ COMMAND
 OUTPUT
 ```
 
@@ -187,14 +187,14 @@ have another `Pod` that consumes this `Service` by name you would get something
 like:
 
 ```console
-pod$ wget -qO- hostnames
+u@pod$ wget -qO- hostnames
 wget: bad address 'hostname'
 ```
 
 or:
 
 ```console
-pod$ echo $HOSTNAMES_SERVICE_HOST
+u@pod$ echo $HOSTNAMES_SERVICE_HOST
 
 ```
 
@@ -246,7 +246,7 @@ Now you can confirm that the `Service` exists.
 From a `Pod` in the same `Namespace`:
 
 ```console
-pod$ nslookup hostnames
+u@pod$ nslookup hostnames
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
@@ -258,7 +258,7 @@ If this fails, perhaps your `Pod` and `Service` are in different
 `Namespace`s, try a namespace-qualified name:
 
 ```console
-pod$ nslookup hostnames.default
+u@pod$ nslookup hostnames.default
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
@@ -270,7 +270,7 @@ If this works, you'll need to ensure that `Pod`s and `Service`s run in the same
 `Namespace`.  If this still fails, try a fully-qualified name:
 
 ```console
-pod$ nslookup hostnames.default.svc.cluster.local
+u@pod$ nslookup hostnames.default.svc.cluster.local
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
@@ -286,7 +286,7 @@ You can also try this from a `Node` in the cluster (note: 10.0.0.10 is my DNS
 `Service`):
 
 ```console
-node$ nslookup hostnames.default.svc.cluster.local 10.0.0.10
+u@node$ nslookup hostnames.default.svc.cluster.local 10.0.0.10
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
@@ -308,7 +308,7 @@ can take a step back and see what else is not working.  The Kubernetes master
 `Service` should always work:
 
 ```console
-pod$ nslookup kubernetes.default
+u@pod$ nslookup kubernetes.default
 Server:    10.0.0.10
 Address 1: 10.0.0.10
 
@@ -326,13 +326,13 @@ The next thing to test is whether your `Service` works at all.  From a
 `Node` in your cluster, access the `Service`'s IP (from `kubectl get` above).
 
 ```console
-node$ curl 10.0.1.175:80
+u@node$ curl 10.0.1.175:80
 hostnames-0uton
 
-node$ curl 10.0.1.175:80
+u@node$ curl 10.0.1.175:80
 hostnames-yp2kp
 
-node$ curl 10.0.1.175:80
+u@node$ curl 10.0.1.175:80
 hostnames-bvc05
 ```
 
@@ -431,13 +431,13 @@ Let's check that the `Pod`s are actually working - we can bypass the `Service`
 mechanism and go straight to the `Pod`s.
 
 ```console
-pod$ wget -qO- 10.244.0.5:9376
+u@pod$ wget -qO- 10.244.0.5:9376
 hostnames-0uton
 
 pod $ wget -qO- 10.244.0.6:9376
 hostnames-bvc05
 
-pod$ wget -qO- 10.244.0.7:9376
+u@pod$ wget -qO- 10.244.0.7:9376
 hostnames-yp2kp
 ```
 
@@ -459,7 +459,7 @@ Confirm that `kube-proxy` is running on your `Node`s.  You should get something
 like the below:
 
 ```console
-node$ ps auxw | grep kube-proxy
+u@node$ ps auxw | grep kube-proxy
 root  4194  0.4  0.1 101864 17696 ?    Sl Jul04  25:43 /usr/local/bin/kube-proxy --master=https://kubernetes-master --kubeconfig=/var/lib/kube-proxy/kubeconfig --v=2
 ```
 
@@ -500,7 +500,7 @@ rules which implement `Service`s.  Let's check that those rules are getting
 written.
 
 ```console
-node$ iptables-save | grep hostnames
+u@node$ iptables-save | grep hostnames
 -A KUBE-PORTALS-CONTAINER -d 10.0.1.175/32 -p tcp -m comment --comment "default/hostnames:default" -m tcp --dport 80 -j REDIRECT --to-ports 48577
 -A KUBE-PORTALS-HOST -d 10.0.1.175/32 -p tcp -m comment --comment "default/hostnames:default" -m tcp --dport 80 -j DNAT --to-destination 10.240.115.247:48577
 ```
@@ -515,7 +515,7 @@ then look at the logs again.
 Assuming you do see the above rules, try again to access your `Service` by IP:
 
 ```console
-node$ curl 10.0.1.175:80
+u@node$ curl 10.0.1.175:80
 hostnames-0uton
 ```
 
@@ -525,7 +525,7 @@ using for your `Service`.  In the above examples it is "48577".  Now connect to
 that:
 
 ```console
-node$ curl localhost:48577
+u@node$ curl localhost:48577
 hostnames-yp2kp
 ```
 
