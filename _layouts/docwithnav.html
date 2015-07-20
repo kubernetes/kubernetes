@@ -1,18 +1,18 @@
 {% include dochead.html %}
 <div>
+	<gcse:search></gcse:search>
+</div>
 	<div id="wrapper">
-		<gcse:search></gcse:search>
 		{% include nav_v1.0.html %}
 	</div>
 	<div class="bodywrapper">
 		{% include documentation.html %}
 	</div>
-</div>
 <script type="text/javascript">
 	$(function() {
 	    var menu_ul = $('.menu > li > ul'),
 	           menu_a  = $('.menu > li > a');
-	    menu_ul.hide();
+	    
 	    menu_a.click(function(e) {
 	        e.preventDefault();
 	        if(!$(this).hasClass('active')) {
