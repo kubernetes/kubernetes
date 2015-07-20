@@ -38,7 +38,7 @@ Documentation for other releases can be found at
 ### Synopsis
 
 
-The kubernetes network proxy runs on each node. This
+The Kubernetes network proxy runs on each node. This
 reflects services as defined in the Kubernetes API on each node and can do simple
 TCP,UDP stream forwarding or round robin TCP,UDP forwarding across a set of backends.
 Service cluster ips and ports are currently found through Docker-links-compatible

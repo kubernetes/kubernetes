@@ -37,7 +37,7 @@ It is sometimes useful for a container to have information about itself, but we
 want to be careful not to over-couple containers to Kubernetes. The downward
 API allows containers to consume information about themselves or the system and
 expose that information how they want it, without necessarily coupling to the
-kubernetes client or REST API.
+Kubernetes client or REST API.
 
 An example of this is a "legacy" app that is already written assuming
 that a particular environment variable will hold a unique identifier.  While it

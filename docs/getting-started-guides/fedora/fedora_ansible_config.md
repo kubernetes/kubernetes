@@ -30,10 +30,10 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-Configuring kubernetes on [Fedora](http://fedoraproject.org) via [Ansible](http://www.ansible.com/home)
+Configuring Kubernetes on [Fedora](http://fedoraproject.org) via [Ansible](http://www.ansible.com/home)
 -------------------------------------------------------------------------------------------------------
 
-Configuring kubernetes on Fedora via Ansible offers a simple way to quickly create a clustered environment with little effort.
+Configuring Kubernetes on Fedora via Ansible offers a simple way to quickly create a clustered environment with little effort.
 
 **Table of Contents**
 
@@ -73,7 +73,7 @@ If not
 yum install -y ansible git python-netaddr
 ```
 
-**Now clone down the kubernetes repository**
+**Now clone down the Kubernetes repository**
 
 ```sh
 git clone https://github.com/GoogleCloudPlatform/kubernetes.git
@@ -134,7 +134,7 @@ edit: ~/kubernetes/contrib/ansible/group_vars/all.yml
 
 **Configure the IP addresses used for services**
 
-Each kubernetes service gets its own IP address.  These are not real IPs.  You need only select a range of IPs which are not in use elsewhere in your environment.
+Each Kubernetes service gets its own IP address.  These are not real IPs.  You need only select a range of IPs which are not in use elsewhere in your environment.
 
 ```yaml
 kube_service_addresses: 10.254.0.0/16
@@ -167,7 +167,7 @@ dns_setup: true
 
 **Tell ansible to get to work!**
 
-This will finally setup your whole kubernetes cluster for you.
+This will finally setup your whole Kubernetes cluster for you.
 
 ```sh
 cd ~/kubernetes/contrib/ansible/
@@ -177,7 +177,7 @@ cd ~/kubernetes/contrib/ansible/
 
 ## Testing and using your new cluster
 
-That's all there is to it.  It's really that easy.  At this point you should have a functioning kubernetes cluster.
+That's all there is to it.  It's really that easy.  At this point you should have a functioning Kubernetes cluster.
 
 **Show kubernets nodes**
 

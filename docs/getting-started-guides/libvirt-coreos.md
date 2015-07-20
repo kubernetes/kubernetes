@@ -103,7 +103,7 @@ $ usermod -a -G libvirtd $USER
 
 #### ² Qemu will run with a specific user. It must have access to the VMs drives
 
-All the disk drive resources needed by the VM (CoreOS disk image, kubernetes binaries, cloud-init files, etc.) are put inside `./cluster/libvirt-coreos/libvirt_storage_pool`.
+All the disk drive resources needed by the VM (CoreOS disk image, Kubernetes binaries, cloud-init files, etc.) are put inside `./cluster/libvirt-coreos/libvirt_storage_pool`.
 
 As we’re using the `qemu:///system` instance of libvirt, qemu will run with a specific `user:group` distinct from your user. It is configured in `/etc/libvirt/qemu.conf`. That qemu user must have access to that libvirt storage pool.
 
@@ -128,7 +128,7 @@ setfacl -m g:kvm:--x ~
 
 ### Setup
 
-By default, the libvirt-coreos setup will create a single kubernetes master and 3 kubernetes nodes. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
+By default, the libvirt-coreos setup will create a single Kubernetes master and 3 Kubernetes nodes. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
 
 To start your local cluster, open a shell and run:
 
@@ -143,7 +143,7 @@ The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster 
 
 The `NUM_MINIONS` environment variable may be set to specify the number of nodes to start. If it is not set, the number of nodes defaults to 3.
 
-The `KUBE_PUSH` environment variable may be set to specify which kubernetes binaries must be deployed on the cluster. Its possible values are:
+The `KUBE_PUSH` environment variable may be set to specify which Kubernetes binaries must be deployed on the cluster. Its possible values are:
 
 * `release` (default if `KUBE_PUSH` is not set) will deploy the binaries of `_output/release-tars/kubernetes-server-….tar.gz`. This is built with `make release` or `make release-skip-tests`.
 * `local` will deploy the binaries of `_output/local/go/bin`. These are built with `make`.
@@ -160,7 +160,7 @@ $ virsh -c qemu:///system list
  18    kubernetes_minion-03           running
  ```
 
-You can check that the kubernetes cluster is working with:
+You can check that the Kubernetes cluster is working with:
 
 ```console
 $ kubectl get nodes

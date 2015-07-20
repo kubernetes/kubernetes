@@ -40,8 +40,8 @@ Documentation for other releases can be found at
   a Kubernetes cluster or administering it.
 
 * The [Developer guide](devel/README.md) is for anyone wanting to write
-  programs that access the kubernetes API, write plugins or extensions, or
-  modify the core code of kubernetes.
+  programs that access the Kubernetes API, write plugins or extensions, or
+  modify the core code of Kubernetes.
 
 * The [Kubectl Command Line Interface](user-guide/kubectl/kubectl.md) is a detailed reference on
   the `kubectl` CLI.
