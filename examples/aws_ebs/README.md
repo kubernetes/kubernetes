@@ -37,19 +37,19 @@ Create a volume in the same region as your node add your volume
 information in the pod description file aws-ebs-web.yaml then create
 the pod:
 
-```shell
+```sh
   $ kubectl create -f examples/aws_ebs/aws-ebs-web.yaml
 ```
 
 Add some data to the volume if is empty:
 
-```shell
+```sh
   $ echo  "Hello World" >& /var/lib/kubelet/plugins/kubernetes.io/aws-ebs/mounts/aws/{Region}/{Volume ID}/index.html
 ```
 
 You should now be able to query your web server:
 
-```shell
+```sh
   $ curl <Pod IP address>
   $ Hello World
 ```
