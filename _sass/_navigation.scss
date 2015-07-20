@@ -10,31 +10,37 @@ ul, ul ul {
 	float:left;
 	width: 250px;
 	height: 94vh;
-	margin: 10px;
 	overflow: scroll;
 }
 .menu {
 	width: auto;
 	height: auto;
+	margin: .75em;
+}
+.menu > li,
+.menu > li > a,
+.menu > li > ul > li,
+.menu > li > ul > li > ul > li {
+	margin-bottom: .75em;
 }
 .menu > li > a {
 	width: 100%;
-	height: 2em;
+	height: auto;
 	color:#505050;
-	line-height: 2em;
 	display: block;
 	position: center;
-	padding-right: .25em;
+}
+.menu ul li{
+	height: auto;
 }
 .menu ul li a {
 	width: 100%;
-	height: 2.25em;
-	line-height: 1em;
+	height: auto;
 	text-indent: .75em;
-	display: block;
 	position: center;
 }
 .menu ul li:last-child a {
+	
 }
 .menu > li > a:hover, .menu > li > a.active {
 	color: #428BCB;
@@ -43,39 +49,37 @@ ul, ul ul {
 	color: #428BCB;
 }
 .menu > li > a:before {
-	font-size: 36px;
-	height: 1em;
-	width: 1em;
 	position: absolute;
-	left: 0;
-	top: 50%;
-	margin: -.5em 0 0 0;
 }
-
 .menu > li > ul li a:before{
-	font-size: 8px;
 	position: absolute;
-	width: 1em;
-	height: 1em;
-	top: 0;
-	left: -2.7em;
 }
-
 .menu > li > ul li:hover a,
 .menu > li > ul li:hover a:before {
 	color:#428BCB;
 }
-
-.navContainer {
-	font-weight:bold;
-	margin-top:2px;
-	margin-left:0px;
-}
-
 .version {
 	font-style:italic;
 }
-
+.navContainer {
+	font-weight:bold;
+	margin-top:2px;
+	margin-left:.6em;
+}
+.navContainer2 {
+	font-weight:bold;
+	margin-top:2px;
+	margin-left:1.2em;
+}
 .navSubMenu {
-	margin-left:1em;
+    font-weight: normal;
+	margin-left:1.2em;
+}
+.navSubMenu2 {
+    font-weight: normal;
+	margin-left:1.8em;
+}
+.navSubMenu3 {
+    font-weight: normal;
+	margin-left:.6em;
 }
