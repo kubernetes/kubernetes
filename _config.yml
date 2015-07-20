@@ -19,10 +19,14 @@ google_analytics: "UA-36037335-10"
 
 # Build settings
 markdown: kramdown
-kramdown:
-    input: GFM
-    hard_wrap: false
-highlighter: pygments
+#kramdown:
+#    input: GFM
+#    hard_wrap: false
+#highlighter: pygments
+markdown: redcarpet
+redcarpet:
+    extensions: ["no_intra_emphasis", "tables", "autolink", "strikethrough", "with_toc_data", "lax_spacing", "space_after_headers" ]
+
 sass:
     style: :compressed
 

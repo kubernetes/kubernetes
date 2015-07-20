@@ -125,6 +125,10 @@ func rewriteCodeBlocks(fileBytes []byte) []byte {
 				lang = fixedLang
 			}
 			if lang != "" {
+				// The "redcarpet" markdown renderer will accept ```lang, but
+				// "kramdown" will not.  They both accept this, format, and we
+				// need a hook to fixup language codes anyway (until we have a
+				// munger in master).
 				lines[i] = fmt.Sprintf("{%% highlight %s %%}", lang)
 				highlight = true
 			}
