@@ -45,7 +45,7 @@ var (
 )
 
 func fixURL(u *url.URL) bool {
-	if u.Host != "" && strings.HasSuffix(u.Path, ".md") {
+	if u.Host == "" && strings.HasSuffix(u.Path, ".md") {
 		u.Path = u.Path[:len(u.Path)-3] + ".html"
 		return true
 	}
