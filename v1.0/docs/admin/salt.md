@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Using Salt to configure Kubernetes
 
 The Kubernetes cluster can be configured using Salt.
@@ -19,10 +20,11 @@ The **salt-minion** service runs on the kubernetes-master node and each kubernet
 
 Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file [(except on GCE)](#standalone-salt-configuration-on-gce).
 
-```
+{% highlight console %}
 [root@kubernetes-master] $ cat /etc/salt/minion.d/master.conf
 master: kubernetes-master
-```
+{% endhighlight %}
+
 The salt-master is contacted by each salt-minion and depending upon the machine information presented, the salt-master will provision the machine as either a kubernetes-master or kubernetes-minion with all the required capabilities needed to run Kubernetes.
 
 If you are running the Vagrant based environment, the **salt-api** service is running on the kubernetes-master.  It is configured to enable the vagrant user to introspect the salt cluster in order to find out about machines in the Vagrant environment via a REST API.
@@ -39,11 +41,11 @@ All remaining sections that refer to master/minion setups should be ignored for 
 
 Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from minions.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
 
-```
+{% highlight console %}
 [root@kubernetes-master] $ cat /etc/salt/master.d/auto-accept.conf
 open_mode: True
 auto_accept: True
-```
+{% endhighlight %}
 
 ## Salt minion configuration
 
@@ -51,14 +53,14 @@ Each minion in the salt cluster has an associated configuration that instructs t
 
 An example file is presented below using the Vagrant based environment.
 
-```
+{% highlight console %}
 [root@kubernetes-master] $ cat /etc/salt/minion.d/grains.conf
 grains:
   etcd_servers: $MASTER_IP
   cloud_provider: vagrant
   roles:
     - kubernetes-master
-```
+{% endhighlight %}
 
 Each hosting environment has a slightly different grains.conf file that is used to build conditional logic where required in the Salt files.
 
@@ -80,7 +82,7 @@ Key | Value
 
 These keys may be leveraged by the Salt sls files to branch behavior.
 
-In addition, a cluster may be running a Debian based operating system or Red Hat based operating system (Centos, Fedora, RHEL, etc.).  As a result, its important to sometimes distinguish behavior based on operating system using if branches like the following.
+In addition, a cluster may be running a Debian based operating system or Red Hat based operating system (Centos, Fedora, RHEL, etc.).  As a result, it's important to sometimes distinguish behavior based on operating system using if branches like the following.
 
 ```
 {% if grains['os_family'] == 'RedHat' %}
@@ -92,19 +94,20 @@ In addition, a cluster may be running a Debian based operating system or Red Hat
 
 ## Best Practices
 
-1.  When configuring default arguments for processes, its best to avoid the use of EnvironmentFiles (Systemd in Red Hat environments) or init.d files (Debian distributions) to hold default values that should be common across operating system environments.  This helps keep our Salt template files easy to understand for editors that may not be familiar with the particulars of each distribution.
+1.  When configuring default arguments for processes, it's best to avoid the use of EnvironmentFiles (Systemd in Red Hat environments) or init.d files (Debian distributions) to hold default values that should be common across operating system environments.  This helps keep our Salt template files easy to understand for editors who may not be familiar with the particulars of each distribution.
 
 ## Future enhancements (Networking)
 
-Per pod IP configuration is provider specific, so when making networking changes, its important to sand-box these as all providers may not use the same mechanisms (iptables, openvswitch, etc.)
+Per pod IP configuration is provider-specific, so when making networking changes, it's important to sandbox these as all providers may not use the same mechanisms (iptables, openvswitch, etc.)
 
 We should define a grains.conf key that captures more specifically what network configuration environment is being used to avoid future confusion across providers.
 
 ## Further reading
 
-The [cluster/saltbase](../../cluster/saltbase/README.html) tree has more details on the current SaltStack configuration.
+The [cluster/saltbase](http://releases.k8s.io/v1.01/cluster/saltbase/) tree has more details on the current SaltStack configuration.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/salt.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/salt.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

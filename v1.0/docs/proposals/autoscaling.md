@@ -5,7 +5,9 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Abstract
+
 Auto-scaling is a data-driven feature that allows users to increase or decrease capacity as needed by controlling the
 number of pods deployed within the system automatically.  
 
@@ -20,7 +22,7 @@ done automatically based on statistical analysis and thresholds.
 * Provide a concrete proposal for implementing auto-scaling pods within Kubernetes
 * Implementation proposal should be in line with current discussions in existing issues:
     * Scale verb - [1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629)
-    * Config conflicts - [Config](https://github.com/GoogleCloudPlatform/kubernetes/blob/c7cb991987193d4ca33544137a5cb7d0292cf7df/docs/config.md#automated-re-configuration-processes)
+    * Config conflicts - [Config](https://github.com/GoogleCloudPlatform/kubernetes/blob/c7cb991987193d4ca33544137a5cb7d0292cf7df/docs/config.html#automated-re-configuration-processes)
     * Rolling updates - [1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)
     * Multiple scalable types - [1624](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624)  
 
@@ -28,7 +30,7 @@ done automatically based on statistical analysis and thresholds.
 
 * This proposal is for horizontal scaling only.  Vertical scaling will be handled in [issue 2072](https://github.com/GoogleCloudPlatform/kubernetes/issues/2072)
 * `ReplicationControllers` will not know about the auto-scaler, they are the target of the auto-scaler.  The `ReplicationController` responsibilities are
-constrained to only ensuring that the desired number of pods are operational per the [Replication Controller Design](../user-guide/replication-controller.html#responsibilities-of-the-replication-controller)
+constrained to only ensuring that the desired number of pods are operational per the [Replication Controller Design](../user-guide/replication-controller.md#responsibilities-of-the-replication-controller)
 * Auto-scalers will be loosely coupled with data gathering components in order to allow a wide variety of input sources
 * Auto-scalable resources will support a scale verb ([1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629))
 such that the auto-scaler does not directly manipulate the underlying resource.
@@ -49,7 +51,7 @@ applications will expose one or more network endpoints for clients to connect to
 balanced or situated behind a proxy - the data from those proxies and load balancers can be used to estimate client to
 server traffic for applications. This is the primary, but not sole, source of data for making decisions.
 
-Within Kubernetes a [kube proxy](../user-guide/services.html#ips-and-vips)
+Within Kubernetes a [kube proxy](../user-guide/services.md#ips-and-vips)
 running on each node directs service requests to the underlying implementation.  
 
 While the proxy provides internal inter-pod connections, there will be L3 and L7 proxies and load balancers that manage
@@ -88,7 +90,7 @@ namespace just as a `ReplicationController` or `Service`.
 
 Since an auto-scaler is a durable object it is best represented as a resource.  
 
-```go
+{% highlight go %}
     //The auto scaler interface
     type AutoScalerInterface interface {
         //ScaleApplication adjusts a resource's replica count.  Calls scale endpoint.  
@@ -202,9 +204,10 @@ Since an auto-scaler is a durable object it is best represented as a resource.
      // AutoScaleIntentionType is a lexicon for intentions such as "cpu-utilization",
      // "max-rps-per-endpoint"
      type AutoScaleIntentionType string
-```
+{% endhighlight %}
 
 #### Boundary Definitions
+
 The `AutoScaleThreshold` definitions provide the boundaries for the auto-scaler.  By defining comparisons that form a range
 along with positive and negative increments you may define bi-directional scaling.  For example the upper bound may be
 specified as "when requests per second rise above 50 for 30 seconds scale the application up by 1" and a lower bound may
@@ -226,13 +229,14 @@ Of note: If the statistics gathering mechanisms can be initialized with a regist
 potentially piggyback on this registry.
 
 ### Multi-target Scaling Policy
+
 If multiple scalable targets satisfy the `TargetSelector` criteria the auto-scaler should be configurable as to which
 target(s) are scaled.  To begin with, if multiple targets are found the auto-scaler will scale the largest target up
 or down as appropriate.  In the future this may be more configurable.  
 
 ### Interactions with a deployment
 
-In a deployment it is likely that multiple replication controllers must be monitored.  For instance, in a [rolling deployment](../user-guide/replication-controller.html#rolling-updates)
+In a deployment it is likely that multiple replication controllers must be monitored.  For instance, in a [rolling deployment](../user-guide/replication-controller.md#rolling-updates)
 there will be multiple replication controllers, with one scaling up and another scaling down.  This means that an
 auto-scaler must be aware of the entire set of capacity that backs a service so it does not fight with the deployer.  `AutoScalerSpec.MonitorSelector`
 is what provides this ability.  By using a selector that spans the entire service the auto-scaler can monitor capacity
@@ -261,5 +265,6 @@ an auto-scaler to be able to grow capacity during a deployment than to shrink th
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/autoscaling.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/autoscaling.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

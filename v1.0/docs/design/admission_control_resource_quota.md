@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Admission control plugin: ResourceQuota
 
 ## Background
@@ -17,7 +18,7 @@ A new resource, **ResourceQuota**, is introduced to enumerate hard resource limi
 
 A new resource, **ResourceQuotaUsage**, is introduced to support atomic updates of a **ResourceQuota** status.
 
-```go
+{% highlight go %}
 // The following identify resource constants for Kubernetes object types
 const (
   // Pods, number
@@ -75,7 +76,7 @@ type ResourceQuotaList struct {
   Items []ResourceQuota `json:"items"`
 }
 
-```
+{% endhighlight %}
 
 ## AdmissionControl plugin: ResourceQuota
 
@@ -114,9 +115,9 @@ The server is updated to be aware of **ResourceQuota** objects.
 
 The quota is only enforced if the kube-apiserver is started as follows:
 
-```
+{% highlight console %}
 $ kube-apiserver -admission_control=ResourceQuota
-```
+{% endhighlight %}
 
 ## kube-controller-manager
 
@@ -137,11 +138,11 @@ this being the resource most closely running at the prescribed quota limits.
 
 kubectl is modified to support the **ResourceQuota** resource.
 
-```kubectl describe``` provides a human-readable output of quota.
+`kubectl describe` provides a human-readable output of quota.
 
 For example,
 
-```
+{% highlight console %}
 $ kubectl namespace myspace
 $ kubectl create -f docs/user-guide/resourcequota/quota.yaml
 $ kubectl get quota
@@ -157,9 +158,14 @@ pods                    5       10
 replicationcontrollers  5       20
 resourcequotas          1       1
 services                3       5
-```
+{% endhighlight %}
+
+## More information 
+
+See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more information.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

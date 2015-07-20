@@ -65,6 +65,8 @@ interface.
 
 ## Launch Kubernetes cluster
 
+Kubernetes releases can be downloaded from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
+
 You will need to have the Kubernetes tools compiled before launching the cluster
 
     make all WHAT=cmd/kubectl
@@ -116,7 +118,7 @@ No pods will be available before starting a container:
 
 We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
 
-```
+{% highlight json %}
 {
   "apiVersion": "v1",
   "kind": "Pod",
@@ -138,7 +140,7 @@ We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
     }]
   }
 }
-```
+{% endhighlight %}
 
 Create the pod with kubectl:
 
@@ -185,7 +187,7 @@ We can add node units like so:
 
 ## Launch the "k8petstore" example app
 
-The [k8petstore example](../../examples/k8petstore/README.html) is available as a
+The [k8petstore example](../../examples/k8petstore/) is available as a
 [juju action](https://jujucharms.com/docs/devel/actions).
 
     juju action do kubernetes-master/0
@@ -241,5 +243,6 @@ GCE               | TBD
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/juju.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/juju.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

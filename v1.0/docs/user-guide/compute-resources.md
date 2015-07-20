@@ -5,10 +5,12 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Compute Resources
 
-** Table of Contents**
+**Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Compute Resources](#compute-resources)
   - [Container and Pod Resource Limits](#container-and-pod-resource-limits)
   - [How Pods with Resource Limits are Scheduled](#how-pods-with-resource-limits-are-scheduled)
@@ -21,7 +23,7 @@ layout: docwithnav
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-When specifying a [pod](pods.html), you can optionally specify how much CPU and memory (RAM) each
+When specifying a [pod](pods.md), you can optionally specify how much CPU and memory (RAM) each
 container needs.  When containers have resource limits, the scheduler is able to make better
 decisions about which nodes to place pods on, and contention for resources can be handled in a
 consistent manner.
@@ -31,8 +33,8 @@ in units of cores.  Memory is specified in units of bytes.
 
 CPU and RAM are collectively referred to as *compute resources*, or just *resources*.  Compute
 resources are measureable quantities which can be requested, allocated, and consumed.  They are
-distinct from [API resources](working-with-resources.html).  API resources, such as pods and
-[services](services.html) are objects that can be written to and retrieved from the Kubernetes API
+distinct from [API resources](working-with-resources.md).  API resources, such as pods and
+[services](services.md) are objects that can be written to and retrieved from the Kubernetes API
 server.
 
 ## Container and Pod Resource Limits
@@ -53,7 +55,7 @@ The following pod has two containers.  Each has a limit of 0.5 core of cpu and 1
 (2<sup>20</sup> bytes) of memory.  The pod can be said to have a limit of 1 core and 256MiB of
 memory.
 
-```yaml
+{% highlight yaml %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -72,7 +74,7 @@ spec:
       limits:
         memory: "128Mi"
         cpu: "500m"
-```
+{% endhighlight %}
 
 ## How Pods with Resource Limits are Scheduled
 
@@ -96,7 +98,8 @@ runner (Docker or rkt).
 
 When using Docker:
 - The `spec.container[].resources.limits.cpu` is multiplied by 1024, converted to an integer, and
-  used as the value of the [`--cpu-shares`](%0A%20%20https://docs.docker.com/reference/run/README.html#runtime-constraints-on-resources) flag to the `docker run`
+  used as the value of the [`--cpu-shares`](
+  https://docs.docker.com/reference/run/#runtime-constraints-on-resources) flag to the `docker run`
   command.
 - The `spec.container[].resources.limits.memory` is converted to an integer, and used as the value
   of the [`--memory`](https://docs.docker.com/reference/run/#runtime-constraints-on-resources) flag
@@ -117,21 +120,23 @@ To determine if a container cannot be scheduled or is being killed due to resour
 
 The resource usage of a pod is reported as part of the Pod status.
 
-If [optional monitoring](../../cluster/addons/cluster-monitoring/README.html) is configured for your cluster,
+If [optional monitoring](http://releases.k8s.io/v1.01/cluster/addons/cluster-monitoring/README.html) is configured for your cluster,
 then pod resource usage can be retrieved from the monitoring system.
 
 ## Troubleshooting
 
 ### My pods are pending with event message failedScheduling
+
 If the scheduler cannot find any node where a pod can fit, then the pod will remain unscheduled
 until a place can be found.    An event will be produced each time the scheduler fails to find a
 place for the pod, like this:
-```
+
+{% highlight console %}
 $ kubectl describe pods/frontend | grep -A 3 Events
 Events:
   FirstSeen				LastSeen			Count	From SubobjectPath	Reason			Message
   Tue, 30 Jun 2015 09:01:41 -0700	Tue, 30 Jun 2015 09:39:27 -0700	128	{scheduler }            failedScheduling	Error scheduling: For each of these fitness predicates, pod frontend failed on at least one node: PodFitsResources.
-```
+{% endhighlight %}
 
 If a pod or pods are pending with this message, then there are several things to try:
 - Add more nodes to the cluster.
@@ -144,15 +149,16 @@ Here are some example command lines that extract just the necessary information:
 - `kubectl get nodes -o yaml | grep '\sname\|cpu\|memory'`
 - `kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, cap: .status.capacity}'`
 
-The [resource quota](../admin/resource-quota.html) feature can be configured
+The [resource quota](../admin/resource-quota.md) feature can be configured
 to limit the total amount of resources that can be consumed.  If used in conjunction
 with namespaces, it can prevent one team from hogging all the resources.
 
 ### My container is terminated 
+
 Your container may be terminated because it's resource-starved. To check if a container is being killed because it is hitting a resource limit, call `kubectl describe pod`
 on the pod you are interested in:
 
-```
+{% highlight console %}
 [12:54:41] $ ./cluster/kubectl.sh describe pod simmemleak-hra99
 Name:               simmemleak-hra99
 Namespace:          default
@@ -184,29 +190,31 @@ Events:
   Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  implicitly required container POD   created     Created with docker id 6a41280f516d
   Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  implicitly required container POD   started     Started with docker id 6a41280f516d
   Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  spec.containers{simmemleak}         created     Created with docker id 87348f12526a
-```
+{% endhighlight %}
 
 The `Restart Count:  5` indicates that the `simmemleak` container in this pod was terminated and restarted 5 times.
 
 Once [#10861](https://github.com/GoogleCloudPlatform/kubernetes/issues/10861) is resolved the reason for the termination of the last container will also be printed in this output.
 
 Until then you can call `get pod` with the `-o template -t ...` option to fetch the status of previously terminated containers:
-```
+
+{% highlight console %}
 [13:59:01] $ ./cluster/kubectl.sh  get pod -o template -t '{{range.status.containerStatuses}}{{"Container Name: "}}{{.name}}{{"\r\nLastState: "}}{{.lastState}}{{end}}'  simmemleak-60xbc
 Container Name: simmemleak
 LastState: map[terminated:map[exitCode:137 reason:OOM Killed startedAt:2015-07-07T20:58:43Z finishedAt:2015-07-07T20:58:43Z containerID:docker://0e4095bba1feccdfe7ef9fb6ebffe972b4b14285d5acdec6f0d3ae8a22fad8b2]][13:59:03] clusterScaleDoc ~/go/src/github.com/GoogleCloudPlatform/kubernetes $ 
-```
+{% endhighlight %}
+
 We can see that this container was terminated because `reason:OOM Killed`, where *OOM* stands for Out Of Memory.
 
 ## Planned Improvements
 
 The current system only allows resource quantities to be specified on a container.
 It is planned to improve accounting for resources which are shared by all containers in a pod,
-such as [EmptyDir volumes](volumes.html#emptydir).
+such as [EmptyDir volumes](volumes.md#emptydir).
 
 The current system only supports container limits for CPU and Memory.
 It is planned to add new resource types, including a node disk space
-resource, and a framework for adding custom [resource types](../design/resources.html#resource-types).
+resource, and a framework for adding custom [resource types](../design/resources.md#resource-types).
 
 The current system does not facilitate overcommitment of resources because resources reserved
 with container limits are assured.  It is planned to support multiple levels of [Quality of
@@ -220,5 +228,6 @@ across providers and platforms.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/compute-resources.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/compute-resources.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

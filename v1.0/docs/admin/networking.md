@@ -5,16 +5,18 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Networking in Kubernetes
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Networking in Kubernetes](#networking-in-kubernetes)
   - [Summary](#summary)
   - [Docker model](#docker-model)
   - [Kubernetes model](#kubernetes-model)
   - [How to achieve this](#how-to-achieve-this)
-    - [Google Compute Engine (GCE)](#google-compute-engine-(gce))
+    - [Google Compute Engine (GCE)](#google-compute-engine-gce)
     - [L2 networks and linux bridging](#l2-networks-and-linux-bridging)
     - [Flannel](#flannel)
     - [OpenVSwitch](#openvswitch)
@@ -27,10 +29,10 @@ layout: docwithnav
 Kubernetes approaches networking somewhat differently than Docker does by
 default.  There are 4 distinct networking problems to solve:
 1. Highly-coupled container-to-container communications: this is solved by
-   [pods](../user-guide/pods.html) and `localhost` communications.
+   [pods](../user-guide/pods.md) and `localhost` communications.
 2. Pod-to-Pod communications: this is the primary focus of this document.
-3. Pod-to-Service communications: this is covered by [services](../user-guide/services.html).
-4. External-to-Service communications: this is covered by [services](../user-guide/services.html).
+3. Pod-to-Service communications: this is covered by [services](../user-guide/services.md).
+4. External-to-Service communications: this is covered by [services](../user-guide/services.md).
 
 ## Summary
 
@@ -127,9 +129,10 @@ outbound internet access.  A linux bridge (called `cbr0`) is configured to exist
 on that subnet, and is passed to docker's `--bridge` flag.
 
 We start Docker with:
-```
+
+{% highlight sh %}
     DOCKER_OPTS="--bridge=cbr0 --iptables=false --ip-masq=false"
-```
+{% endhighlight %}
 
 This bridge is created by Kubelet (controlled by the `--configure-cbr0=true`
 flag) according to the `Node`'s `spec.podCIDR`.
@@ -144,16 +147,16 @@ masquerade (aka SNAT - to make it seem as if packets came from the `Node`
 itself) traffic that is bound for IPs outside the GCE project network
 (10.0.0.0/8).
 
-```
+{% highlight sh %}
 iptables -t nat -A POSTROUTING ! -d 10.0.0.0/8 -o eth0 -j MASQUERADE
-```
+{% endhighlight %}
 
 Lastly we enable IP forwarding in the kernel (so the kernel will process
 packets for bridged containers):
 
-```
+{% highlight sh %}
 sysctl net.ipv4.ip_forward=1
-```
+{% endhighlight %}
 
 The result of all this is that all `Pods` can reach each other and can egress
 traffic to the internet.
@@ -179,7 +182,7 @@ people have reported success with Flannel and Kubernetes.
 
 ### OpenVSwitch
 
-[OpenVSwitch](ovs-networking.html) is a somewhat more mature but also
+[OpenVSwitch](ovs-networking.md) is a somewhat more mature but also
 complicated way to build an overlay network.  This is endorsed by several of the
 "Big Shops" for networking.
 
@@ -197,9 +200,10 @@ IPs.
 
 The early design of the networking model and its rationale, and some future
 plans are described in more detail in the [networking design
-document](../design/networking.html).
+document](../design/networking.md).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/networking.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/networking.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

@@ -5,21 +5,23 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Scheduler Algorithm in Kubernetes
 
-For each unscheduled Pod, the Kubernetes scheduler tries to find a node across the cluster according to a set of rules. A general introduction to the Kubernetes scheduler can be found at [scheduler.md](scheduler.html). In this document, the algorithm of how to select a node for the Pod is explained. There are two steps before a destination node of a Pod is chosen. The first step is filtering all the nodes and the second is ranking the remaining nodes to find a best fit for the Pod.
+For each unscheduled Pod, the Kubernetes scheduler tries to find a node across the cluster according to a set of rules. A general introduction to the Kubernetes scheduler can be found at [scheduler.md](scheduler.md). In this document, the algorithm of how to select a node for the Pod is explained. There are two steps before a destination node of a Pod is chosen. The first step is filtering all the nodes and the second is ranking the remaining nodes to find a best fit for the Pod.
 
 ## Filtering the nodes
+
 The purpose of filtering the nodes is to filter out the nodes that do not meet certain requirements of the Pod. For example, if the free resource on a node (measured by the capacity minus the sum of the resource limits of all the Pods that already run on the node) is less than the Pod's required resource, the node should not be considered in the ranking phase so it is filtered out. Currently, there are several "predicates" implementing different filtering policies, including:
 
 - `NoDiskConflict`: Evaluate if a pod can fit due to the volumes it requests, and those that are already mounted.
 - `PodFitsResources`: Check if the free resource (CPU and Memory) meets the requirement of the Pod. The free resource is measured by the capacity minus the sum of limits of all Pods on the node.
 - `PodFitsPorts`: Check if any HostPort required by the Pod is already occupied on the node.
 - `PodFitsHost`: Filter out all nodes except the one specified in the PodSpec's NodeName field.
-- `PodSelectorMatches`: Check if the labels of the node match the labels specified in the Pod's `nodeSelector` field.
+- `PodSelectorMatches`: Check if the labels of the node match the labels specified in the Pod's `nodeSelector` field ([Here](../user-guide/node-selection/) is an example of how to use `nodeSelector` field).
 - `CheckNodeLabelPresence`: Check if all the specified labels exist on a node or not, regardless of the value. 
 
-The details of the above predicates can be found in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](../../plugin/pkg/scheduler/algorithm/predicates/predicates.go). All predicates mentioned above can be used in combination to perform a sophisticated filtering policy. Kubernetes uses some, but not all, of these predicates by default. You can see which ones are used by default in [plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](../../plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go).
+The details of the above predicates can be found in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](http://releases.k8s.io/v1.01/plugin/pkg/scheduler/algorithm/predicates/predicates.go). All predicates mentioned above can be used in combination to perform a sophisticated filtering policy. Kubernetes uses some, but not all, of these predicates by default. You can see which ones are used by default in [plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go).
 
 ## Ranking the nodes
 
@@ -37,9 +39,10 @@ Currently, Kubernetes scheduler provides some practical priority functions, incl
 - `CalculateSpreadPriority`: Spread Pods by minimizing the number of Pods belonging to the same service on the same node.
 - `CalculateAntiAffinityPriority`: Spread Pods by minimizing the number of Pods belonging to the same service on nodes with the same value for a particular label.
 
-The details of the above priority functions can be found in [plugin/pkg/scheduler/algorithm/priorities](../../plugin/pkg/scheduler/algorithm/priorities/README.html). Kubernetes uses some, but not all, of these priority functions by default. You can see which ones are used by default in [plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](../../plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go). Similar as predicates, you can combine the above priority functions and assign weight factors (positive number) to them as you want (check [scheduler.md](scheduler.html) for how to customize).
+The details of the above priority functions can be found in [plugin/pkg/scheduler/algorithm/priorities](http://releases.k8s.io/v1.01/plugin/pkg/scheduler/algorithm/priorities/). Kubernetes uses some, but not all, of these priority functions by default. You can see which ones are used by default in [plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go). Similar as predicates, you can combine the above priority functions and assign weight factors (positive number) to them as you want (check [scheduler.md](scheduler.md) for how to customize).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/scheduler_algorithm.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/scheduler_algorithm.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

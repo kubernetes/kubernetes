@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Namespaces
 
 ## Abstract
@@ -48,7 +49,7 @@ The Namespace provides a unique scope for:
 
 A *Namespace* defines a logically named group for multiple *Kind*s of resources.
 
-```
+{% highlight go %}
 type Namespace struct {
   TypeMeta   `json:",inline"`
   ObjectMeta `json:"metadata,omitempty"`
@@ -56,7 +57,7 @@ type Namespace struct {
   Spec NamespaceSpec `json:"spec,omitempty"`
   Status NamespaceStatus `json:"status,omitempty"`
 }
-```
+{% endhighlight %}
 
 A *Namespace* name is a DNS compatible label.
 
@@ -79,7 +80,7 @@ distinguish distinct entities, and reference particular entities across operatio
 
 A *Namespace* provides an authorization scope for accessing content associated with the *Namespace*.
 
-See [Authorization plugins](../admin/authorization.html)
+See [Authorization plugins](../admin/authorization.md)
 
 ### Limit Resource Consumption
 
@@ -88,18 +89,18 @@ A *Namespace* provides a scope to limit resource consumption.
 A *LimitRange* defines min/max constraints on the amount of resources a single entity can consume in
 a *Namespace*.
 
-See [Admission control: Limit Range](admission_control_limit_range.html)
+See [Admission control: Limit Range](admission_control_limit_range.md)
 
 A *ResourceQuota* tracks aggregate usage of resources in the *Namespace* and allows cluster operators
 to define *Hard* resource usage limits that a *Namespace* may consume.
 
-See [Admission control: Resource Quota](admission_control_resource_quota.html)
+See [Admission control: Resource Quota](admission_control_resource_quota.md)
 
 ### Finalizers
 
 Upon creation of a *Namespace*, the creator may provide a list of *Finalizer* objects.
 
-```
+{% highlight go %}
 type FinalizerName string
 
 // These are internal finalizers to Kubernetes, must be qualified name unless defined here
@@ -112,7 +113,7 @@ type NamespaceSpec struct {
   // Finalizers is an opaque list of values that must be empty to permanently remove object from storage
   Finalizers []FinalizerName
 }
-```
+{% endhighlight %}
 
 A *FinalizerName* is a qualified name.
 
@@ -128,7 +129,7 @@ set by default.
 
 A *Namespace* may exist in the following phases.
 
-```
+{% highlight go %}
 type NamespacePhase string
 const(
   NamespaceActive NamespacePhase = "Active"
@@ -139,7 +140,7 @@ type NamespaceStatus struct {
   ...
   Phase NamespacePhase 
 }
-```
+{% endhighlight %}
 
 A *Namespace* is in the **Active** phase if it does not have a *ObjectMeta.DeletionTimestamp*.
 
@@ -236,7 +237,7 @@ to take part in Namespace termination.
 
 OpenShift creates a Namespace in Kubernetes
 
-```
+{% highlight json %}
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -253,7 +254,7 @@ OpenShift creates a Namespace in Kubernetes
     "name": "development"
   },
 }
-```
+{% endhighlight %}
 
 OpenShift then goes and creates a set of resources (pods, services, etc) associated
 with the "development" namespace.  It also creates its own set of resources in its
@@ -261,7 +262,7 @@ own storage associated with the "development" namespace unknown to Kubernetes.
 
 User deletes the Namespace in Kubernetes, and Namespace now has following state:
 
-```
+{% highlight json %}
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -279,14 +280,14 @@ User deletes the Namespace in Kubernetes, and Namespace now has following state:
     "name": "development"
   },
 }
-```
+{% endhighlight %}
 
 The Kubernetes *namespace controller* observes the namespace has a *deletionTimestamp*
 and begins to terminate all of the content in the namespace that it knows about.  Upon
 success, it executes a *finalize* action that modifies the *Namespace* by
 removing *kubernetes* from the list of finalizers:
 
-```
+{% highlight json %}
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -304,7 +305,7 @@ removing *kubernetes* from the list of finalizers:
     "name": "development"
   },
 }
-```
+{% endhighlight %}
 
 OpenShift Origin has its own *namespace controller* that is observing cluster state, and
 it observes the same namespace had a *deletionTimestamp* assigned to it.  It too will go
@@ -314,7 +315,7 @@ from the list of finalizers.
 
 This results in the following state:
 
-```
+{% highlight json %}
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -332,7 +333,7 @@ This results in the following state:
     "name": "development"
   },
 }
-```
+{% endhighlight %}
 
 At this point, the Kubernetes *namespace controller* in its sync loop will see that the namespace
 has a deletion timestamp and that its list of finalizers is empty.  As a result, it knows all
@@ -343,5 +344,6 @@ At this point, all content associated with that Namespace, and the Namespace its
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/namespaces.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/namespaces.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

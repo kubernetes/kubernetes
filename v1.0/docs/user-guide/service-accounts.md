@@ -5,12 +5,13 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Service Accounts
 
 A service account provides an identity for processes that run in a Pod.
 
 *This is a user introduction to Service Accounts.  See also the 
-[Cluster Admin Guide to Service Accounts](../admin/service-accounts-admin.html).*
+[Cluster Admin Guide to Service Accounts](../admin/service-accounts-admin.md).*
 
 *Note: This document describes how service accounts behave in a cluster set up
 as recommended by the Kubernetes project.  Your cluster administrator may have
@@ -30,35 +31,38 @@ When you create a pod, you do not need to specify a service account.  It is
 automatically assigned the `default` service account of the same namespace.  If
 you get the raw json or yaml for a pod you have created (e.g. `kubectl get
 pods/podname -o yaml`), you can see the `spec.serviceAccount` field has been
-[automatically set](working-with-resources.html#resources-are-automatically-modified).
+[automatically set](working-with-resources.md#resources-are-automatically-modified).
 
 You can access the API using a proxy or with a client library, as described in
-[Accessing the Cluster](accessing-the-cluster.html#accessing-the-api-from-a-pod).
+[Accessing the Cluster](accessing-the-cluster.md#accessing-the-api-from-a-pod).
 
 ## Using Multiple Service Accounts
 
 Every namespace has a default service account resource called "default".
 You can list this and any other serviceAccount resources in the namespace with this command:
-```
-kubectl get serviceAccounts
-$ NAME      SECRETS
+
+{% highlight console %}
+$ kubectl get serviceAccounts
+NAME      SECRETS
 default   1
-```
+{% endhighlight %}
 
 You can create additional serviceAccounts like this:
-```
-$ cat > serviceaccount.yaml <<EOF
+
+{% highlight console %}
+$ cat > /tmp/serviceaccount.yaml <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: build-robot
 EOF
-$ kubectl create -f serviceaccount.json
+$ kubectl create -f /tmp/serviceaccount.json
 serviceacccounts/build-robot
-```
+{% endhighlight %}
 
 If you get a complete dump of the service account object, like this:
-```
+
+{% highlight console %}
 $ kubectl get serviceacccounts/build-robot -o yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -71,7 +75,8 @@ metadata:
   uid: 721ab723-13bc-11e5-aec2-42010af0021e
 secrets:
 - name: build-robot-token-bvbk5
-```
+{% endhighlight %}
+
 then you will see that a token has automatically been created and is referenced by the service account.
 
 In the future, you will be able to configure different access policies for each service account.
@@ -84,13 +89,15 @@ The service account has to exist at the time the pod is created, or it will be r
 You cannot update the service account of an already created pod.  
 
 You can clean up the service account from this example like this:
-```
+
+{% highlight console %}
 $ kubectl delete serviceaccount/build-robot
-```
+{% endhighlight %}
 
 <!-- TODO: describe how to create a pod with no Service Account. -->
 
 ## Adding Secrets to a service account.
+
 TODO: Test and explain how to use additional non-K8s secrets with an existing service account.
 
 TODO explain:
@@ -98,5 +105,6 @@ TODO explain:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/service-accounts.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/service-accounts.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

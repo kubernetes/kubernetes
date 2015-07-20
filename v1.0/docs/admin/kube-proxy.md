@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## kube-proxy
 
 
@@ -39,5 +40,6 @@ with the apiserver API to configure the proxy.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kube-proxy.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kube-proxy.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

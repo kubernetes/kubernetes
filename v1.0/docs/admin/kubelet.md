@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## kubelet
 
 
@@ -95,5 +96,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubelet.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kubelet.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

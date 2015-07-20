@@ -5,10 +5,12 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Clustering in Kubernetes
 
 
 ## Overview
+
 The term "clustering" refers to the process of having all members of the kubernetes cluster find and trust each other.  There are multiple different ways to achieve clustering with different security and usability profiles.  This document attempts to lay out the user experiences for clustering that Kubernetes aims to address.
 
 Once a cluster is established, the following is true:
@@ -68,5 +70,6 @@ This flow has the admin manually approving the kubelet signing requests.  This i
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/clustering.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/clustering.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

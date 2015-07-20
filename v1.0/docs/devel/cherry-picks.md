@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Overview
 
 This document explains cherry picks are managed on release branches within the
@@ -14,9 +15,9 @@ Kubernetes projects.
 
 Any contributor can propose a cherry pick of any pull request, like so:
 
-```
+{% highlight sh %}
 hack/cherry_pick_pull.sh upstream/release-3.14 98765
-```
+{% endhighlight %}
 
 This will walk you through the steps to propose an automated cherry pick of pull
  #98765 for remote branch `upstream/release-3.14`.
@@ -28,7 +29,7 @@ particular, they may be self-merged by the release branch owner without fanfare,
 in the case the release branch owner knows the cherry pick was already
 requested - this should not be the norm, but it may happen.
 
-[Contributor License Agreements](../../CONTRIBUTING.html) is considered implicit
+[Contributor License Agreements](http://releases.k8s.io/v1.01/CONTRIBUTING.html) is considered implicit
 for all code within cherry-pick pull requests, ***unless there is a large
 conflict***.
 
@@ -40,5 +41,6 @@ against a release is a GitHub query: For example,
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/cherry-picks.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/cherry-picks.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

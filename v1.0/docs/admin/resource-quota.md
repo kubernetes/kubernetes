@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Administering Resource Quotas
 
 Kubernetes can limit both the number of objects created in a namespace, and the
@@ -22,7 +23,10 @@ Resource Quota is enforced in a particular namespace when there is a
 `ResourceQuota` object in that namespace.  There should be at most one
 `ResourceQuota` object in a namespace.
 
-##  Object Count Quota
+See [ResourceQuota design doc](../design/admission_control_resource_quota.md) for more information.
+
+## Object Count Quota
+
 The number of objects of a given type can be restricted.  The following types
 are supported:
 
@@ -31,14 +35,15 @@ are supported:
 | pods | Total number of pods  |
 | services | Total number of services |
 | replicationcontrollers | Total number of replication controllers |
-| resourcequotas | Total number of resource quotas |
+| resourcequotas | Total number of [resource quotas](admission-controllers.md#resourcequota) |
 | secrets | Total number of secrets |
-| persistentvolumeclaims | Total number of persistent volume claims |
+| persistentvolumeclaims | Total number of [persistent volume claims](../user-guide/persistent-volumes.md#persistentvolumeclaims) |
 
 For example, `pods` quota counts and enforces a maximum on the number of `pods`
 created in a single namespace.
 
-##  Compute Resource Quota
+## Compute Resource Quota
+
 The total number of objects of a given type can be restricted.  The following types
 are supported:
 
@@ -56,8 +61,10 @@ Any resource that is not part of core Kubernetes must follow the resource naming
 This means the resource must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
 
 ## Viewing and Setting Quotas
+
 Kubectl supports creating, updating, and viewing quotas
-```
+
+{% highlight console %}
 $ kubectl namespace myspace
 $ cat <<EOF > quota.json
 {
@@ -78,7 +85,7 @@ $ cat <<EOF > quota.json
   }
 }
 EOF
-$ kubectl create -f quota.json
+$ kubectl create -f ./quota.json
 $ kubectl get quota
 NAME
 quota
@@ -92,9 +99,10 @@ pods                    5       10
 replicationcontrollers  5       20
 resourcequotas          1       1
 services                3       5
-```
+{% endhighlight %}
 
 ## Quota and Cluster Capacity
+
 Resource Quota objects are independent of the Cluster Capacity.  They are
 expressed in absolute units.
 
@@ -107,7 +115,12 @@ Such policies could be implemented using ResourceQuota as a building-block, by
 writing a 'controller' which watches the quota usage and adjusts the quota
 hard limits of each namespace.
 
+## Example
+
+See a [detailed example for how to use resource quota](../user-guide/resourcequota/). 
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/resource-quota.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/resource-quota.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

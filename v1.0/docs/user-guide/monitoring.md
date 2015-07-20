@@ -5,13 +5,14 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Resource Usage Monitoring in Kubernetes
 
-Understanding how an application behaves when deployed is crucial to scaling the application and providing a reliable service. In a Kubernetes cluster, application performance can be examined at many different levels: containers, [pods](pods.html), [services](services.html), and whole clusters. As part of Kubernetes we want to provide users with detailed resource usage information about their running applications at all these levels. This will give users deep insights into how their applications are performing and where possible application bottlenecks may be found. In comes [Heapster](https://github.com/GoogleCloudPlatform/heapster), a project meant to provide a base monitoring platform on Kubernetes.
+Understanding how an application behaves when deployed is crucial to scaling the application and providing a reliable service. In a Kubernetes cluster, application performance can be examined at many different levels: containers, [pods](pods.md), [services](services.md), and whole clusters. As part of Kubernetes we want to provide users with detailed resource usage information about their running applications at all these levels. This will give users deep insights into how their applications are performing and where possible application bottlenecks may be found. In comes [Heapster](https://github.com/GoogleCloudPlatform/heapster), a project meant to provide a base monitoring platform on Kubernetes.
 
 ### Overview
 
-Heapster is a cluster-wide aggregator of monitoring and event data. It currently supports Kubernetes natively and works on all Kubernetes setups. Heapster runs as a pod in the cluster, similar to how any Kubernetes application would run. The Heapster pod discovers all nodes in the cluster and queries usage information from the nodes’ [Kubelet](../../DESIGN.html#kubelet)s, the on-machine Kubernetes agent. The Kubelet itself fetches the data from [cAdvisor](https://github.com/google/cadvisor). Heapster groups the information by pod along with the relevant labels. This data is then pushed to a configurable backend for storage and visualization. Currently supported backends include [InfluxDB](http://influxdb.com/) (with [Grafana](http://grafana.org/) for visualization) and [Google Cloud Monitoring](https://cloud.google.com/monitoring/). The overall architecture of the service can be seen below:
+Heapster is a cluster-wide aggregator of monitoring and event data. It currently supports Kubernetes natively and works on all Kubernetes setups. Heapster runs as a pod in the cluster, similar to how any Kubernetes application would run. The Heapster pod discovers all nodes in the cluster and queries usage information from the nodes’ [Kubelet](../../DESIGN.md#kubelet)s, the on-machine Kubernetes agent. The Kubelet itself fetches the data from [cAdvisor](https://github.com/google/cadvisor). Heapster groups the information by pod along with the relevant labels. This data is then pushed to a configurable backend for storage and visualization. Currently supported backends include [InfluxDB](http://influxdb.com/) (with [Grafana](http://grafana.org/) for visualization) and [Google Cloud Monitoring](https://cloud.google.com/monitoring/). The overall architecture of the service can be seen below:
 
 ![overall monitoring architecture](monitoring-architecture.png)
 
@@ -30,11 +31,12 @@ On most Kubernetes clusters, cAdvisor exposes a simple UI for on-machine contain
 The Kubelet acts as a bridge between the Kubernetes master and the nodes. It manages the pods and containers running on a machine. Kubelet translates each pod into its constituent containers and fetches individual container usage statistics from cAdvisor. It then exposes the aggregated pod resource usage statistics via a REST API.
 
 ## Storage Backends
+
 ### InfluxDB and Grafana
 
-A Grafana setup with InfluxDB is a very popular combination for monitoring in the open source world. InfluxDB exposes an easy to use API to write and fetch time series data. Heapster is setup to use this storage backend by default on most kubernetes clusters. A detailed setup guide can be found [here](https://github.com/GoogleCloudPlatform/heapster/blob/master/docs/influxdb.md). InfluxDB and Grafana run in Pods. The pod exposes itself as a Kubernetes service which is how Heapster discovers it. 
+A Grafana setup with InfluxDB is a very popular combination for monitoring in the open source world. InfluxDB exposes an easy to use API to write and fetch time series data. Heapster is setup to use this storage backend by default on most kubernetes clusters. A detailed setup guide can be found [here](https://github.com/GoogleCloudPlatform/heapster/blob/master/docs/influxdb.html). InfluxDB and Grafana run in Pods. The pod exposes itself as a Kubernetes service which is how Heapster discovers it. 
 
-The Grafana container serves Grafana’s UI which provides an easy to configure dashboard interface. The default dashboard for Kubernetes contains an example dashboard that monitors resource usage of the cluster and the pods inside of it. This dashboard can easily be customized and expanded. Take a look at the storage schema for InfluxDB [here](https://github.com/GoogleCloudPlatform/heapster/blob/master/docs/storage-schema.md#metrics).
+The Grafana container serves Grafana’s UI which provides an easy to configure dashboard interface. The default dashboard for Kubernetes contains an example dashboard that monitors resource usage of the cluster and the pods inside of it. This dashboard can easily be customized and expanded. Take a look at the storage schema for InfluxDB [here](https://github.com/GoogleCloudPlatform/heapster/blob/master/docs/storage-schema.html#metrics).
 
 Here is a video showing how to monitor a kubernetes cluster using heapster, InfluxDB and Grafana:
 
@@ -57,6 +59,7 @@ Here is a snapshot of the a Google Cloud Monitoring dashboard showing cluster-wi
 ![Google Cloud Monitoring dashboard](gcm.png)
 
 ## Try it out!
+
 Now that you’ve learned a bit about Heapster, feel free to try it out on your own clusters! The [Heapster repository](https://github.com/GoogleCloudPlatform/heapster) is available on GitHub. It contains detailed instructions to setup Heapster and its storage backends. Heapster runs by default on most Kubernetes clusters, so you may already have it! Feedback is always welcome. Please let us know if you run into any issues. Heapster and Kubernetes developers hang out in the [#google-containers](http://webchat.freenode.net/?channels=google-containers) IRC channel on freenode.net. You can also reach us on the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers).
 
 ***
@@ -65,5 +68,6 @@ Now that you’ve learned a bit about Heapster, feel free to try it out on your 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/monitoring.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/monitoring.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

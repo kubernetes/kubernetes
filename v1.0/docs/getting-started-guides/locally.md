@@ -29,7 +29,7 @@ Getting started locally
 
 #### Linux
 
-Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](vagrant.html), or on a cloud provider like [Google Compute Engine](gce.html)
+Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](vagrant.md), or on a cloud provider like [Google Compute Engine](gce.md)
 
 #### Docker
 
@@ -50,10 +50,10 @@ You need [go](https://golang.org/doc/install) at least 1.3+ in your path, please
 
 In a separate tab of your terminal, run the following (since one needs sudo access to start/stop kubernetes daemons, it is easier to run the entire script as root):
 
-```
+{% highlight sh %}
 cd kubernetes
 hack/local-up-cluster.sh
-```
+{% endhighlight %}
 
 This will build and start a lightweight local cluster, consisting of a master
 and a single node. Type Control-C to shut it down.
@@ -68,7 +68,7 @@ Your cluster is running, and you want to start running containers!
 
 You can now use any of the cluster/kubectl.sh commands to interact with your local setup.
 
-```
+{% highlight sh %}
 cluster/kubectl.sh get pods
 cluster/kubectl.sh get services
 cluster/kubectl.sh get replicationcontrollers
@@ -87,20 +87,20 @@ cluster/kubectl.sh run my-nginx --image=nginx --replicas=2 --port=80
 cluster/kubectl.sh get pods
 cluster/kubectl.sh get services
 cluster/kubectl.sh get replicationcontrollers
-```
+{% endhighlight %}
 
 
 ### Running a user defined pod
 
-Note the difference between a [container](../user-guide/containers.html)
-and a [pod](../user-guide/pods.html). Since you only asked for the former, kubernetes will create a wrapper pod for you.
+Note the difference between a [container](../user-guide/containers.md)
+and a [pod](../user-guide/pods.md). Since you only asked for the former, kubernetes will create a wrapper pod for you.
 However you cannot view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
 
-```
+{% highlight sh %}
 cluster/kubectl.sh create -f docs/user-guide/pod.yaml
-```
+{% endhighlight %}
 
 Congratulations!
 
@@ -124,20 +124,22 @@ You are running a single node setup.  This has the limitation of only supporting
 
 #### I changed Kubernetes code, how do I run it?
 
-```
+{% highlight sh %}
 cd kubernetes
 hack/build-go.sh
 hack/local-up-cluster.sh
-```
+{% endhighlight %}
 
 #### kubectl claims to start a container but `get pods` and `docker ps` don't show it.
 
 One or more of the kubernetes daemons might've crashed. Tail the logs of each in /tmp.
 
 #### The pods fail to connect to the services by host names
-The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/issues/6667). You can start a manually. Related documents can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns#how-do-i-configure-it)
+
+The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/issues/6667). You can start a manually. Related documents can be found [here](../../cluster/addons/dns/#how-do-i-configure-it)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/locally.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/locally.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

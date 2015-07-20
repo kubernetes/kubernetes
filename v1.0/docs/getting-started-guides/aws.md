@@ -27,27 +27,29 @@ Getting started on AWS EC2
 3. You need an AWS [instance profile and role](http://docs.aws.amazon.com/IAM/latest/UserGuide/instance-profiles.html) with EC2 full access.
 
 ## Cluster turnup
+
 ### Supported procedure: `get-kube`
-```bash
+
+{% highlight bash %}
 #Using wget
 export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 
 #Using cURL
 export KUBERNETES_PROVIDER=aws; curl -sS https://get.k8s.io | bash
-```
+{% endhighlight %}
 
-NOTE: This script calls [cluster/kube-up.sh](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/kube-up.sh)
-which in turn calls [cluster/aws/util.sh](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/aws/util.sh)
-using [cluster/aws/config-default.sh](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/aws/config-default.sh).
+NOTE: This script calls [cluster/kube-up.sh](http://releases.k8s.io/v1.01/cluster/kube-up.sh)
+which in turn calls [cluster/aws/util.sh](http://releases.k8s.io/v1.01/cluster/aws/util.sh)
+using [cluster/aws/config-default.sh](http://releases.k8s.io/v1.01/cluster/aws/config-default.sh).
 
 This process takes about 5 to 10 minutes. Once the cluster is up, the IP addresses of your master and node(s) will be printed,
 as well as information about the default services running in the cluster (monitoring, logging, dns). User credentials and security
 tokens are written in `~/.kube/kubeconfig`, they will be necessary to use the CLI or the HTTP Basic Auth.
 
 By default, the script will provision a new VPC and a 4 node k8s cluster in us-west-2a (Oregon) with `t2.micro` instances running on Ubuntu.
-You can override the variables defined in [config-default.sh](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/aws/config-default.sh) to change this behavior as follows:
+You can override the variables defined in [config-default.sh](http://releases.k8s.io/v1.01/cluster/aws/config-default.sh) to change this behavior as follows:
 
-```bash
+{% highlight bash %}
 export KUBE_AWS_ZONE=eu-west-1c
 export NUM_MINIONS=2
 export MINION_SIZE=m3.medium
@@ -55,7 +57,7 @@ export AWS_S3_REGION=eu-west-1
 export AWS_S3_BUCKET=mycompany-kubernetes-artifacts
 export INSTANCE_PREFIX=k8s
 ...
-```
+{% endhighlight %}
 
 It will also try to create or reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".
 If these already exist, make sure you want them to be used here.
@@ -63,46 +65,56 @@ If these already exist, make sure you want them to be used here.
 NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS_SSH_KEY` key to point to your private key.
 
 ### Alternatives
-A contributed [example](aws-coreos.html) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
+
+A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
 AWS CloudFormation or EC2 with user data (cloud-config).
 
 ## Getting started with your cluster
-### Command line administration tool: `kubectl`
-Copy the appropriate `kubectl` binary to any location defined in your `PATH` environment variable, for example:
 
-```bash
+### Command line administration tool: `kubectl`
+
+The cluster startup script will leave you with a `kubernetes` directory on your workstation.
+Alternately, you can download the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
+
+Next, add the appropriate binary folder to your `PATH` to access kubectl:
+
+{% highlight bash %}
 # OS X
-sudo cp kubernetes/platforms/darwin/amd64/kubectl /usr/local/bin/kubectl
+export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 
 # Linux
-sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
-```
+export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
+{% endhighlight %}
 
-An up-to-date documentation page for this tool is available here: [kubectl manual](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
+An up-to-date documentation page for this tool is available here: [kubectl manual](../../docs/user-guide/kubectl/kubectl.md)
 
 By default, `kubectl` will use the `kubeconfig` file generated during the cluster startup for authenticating against the API.
-For more information, please read [kubeconfig files](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubeconfig-file.md)
+For more information, please read [kubeconfig files](../../docs/user-guide/kubeconfig-file.md)
 
 ### Examples
-See [a simple nginx example](../../docs/user-guide/simple-nginx.html) to try out your new cluster.
 
-The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/README.html)
+See [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../examples/README.html)
+The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/)
+
+For more complete applications, please look in the [examples directory](../../examples/)
 
 ## Tearing down the cluster
+
 Make sure the environment variables you used to provision your cluster are still exported, then call the following script inside the
 `kubernetes` directory:
 
-```bash
+{% highlight bash %}
 cluster/kube-down.sh
-```
+{% endhighlight %}
 
 ## Further reading
-Please see the [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs) for more details on administering
+
+Please see the [Kubernetes docs](../../docs/) for more details on administering
 and using a Kubernetes cluster.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # How to get faster PR reviews
 
 Most of what is written here is not at all specific to Kubernetes, but it bears
@@ -184,5 +185,6 @@ these things your PRs will flow much more easily.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/faster_reviews.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/faster_reviews.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

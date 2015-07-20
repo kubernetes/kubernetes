@@ -23,6 +23,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ku
 [Cloud team from Zhejiang University](https://github.com/ZJU-SEL) will maintain this work.
 
 ## Prerequisites
+
 *1 The nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge* 
 
 *2 All machines can communicate with each other, no need to connect Internet (should use private docker registry in this case)*
@@ -35,6 +36,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ku
 
 
 ### Starting a Cluster
+
 #### Make *kubernetes* , *etcd* and *flanneld* binaries
 
 First clone the kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
@@ -49,6 +51,7 @@ Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `ku
 > We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
 
 #### Configure and start the kubernetes cluster
+
 An example cluster is listed as below:
 
 | IP Address|Role |      
@@ -59,7 +62,7 @@ An example cluster is listed as below:
 
 First configure the cluster information in cluster/ubuntu/config-default.sh, below is a simple sample.
 
-```
+{% highlight sh %}
 export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 
 export roles="ai i i"
@@ -71,7 +74,7 @@ export SERVICE_CLUSTER_IP_RANGE=11.1.1.0/24
 export FLANNEL_NET=172.16.0.0/16
 
 
-```
+{% endhighlight %}
 
 The first variable `nodes` defines all your cluster nodes, MASTER node comes first and separated with blank space like `<user_1@ip_1> <user_2@ip_2> <user_3@ip_3> `
 
@@ -95,7 +98,7 @@ After all the above variable being set correctly. We can use below command in cl
 
 The scripts is automatically scp binaries and config files to all the machines and start the k8s service on them. The only thing you need to do is to type the sudo password when promoted. The current machine name is shown below like. So you will not type in the wrong password.
 
-```
+{% highlight console %}
 
 Deploying minion on machine 10.10.103.223
 
@@ -103,7 +106,7 @@ Deploying minion on machine 10.10.103.223
 
 [sudo] password to copy files and start minion: 
 
-```
+{% endhighlight %}
 
 If all things goes right, you will see the below message from console
 `Cluster validation succeeded` indicating the k8s is up.
@@ -114,7 +117,7 @@ You can also use `kubectl` command to see if the newly created k8s is working co
 
 For example, use `$ kubectl get nodes` to see if all your nodes are in ready status. It may take some time for the nodes ready to use like below. 
 
-```
+{% highlight console %}
 
 NAME            LABELS                                 STATUS
 
@@ -125,9 +128,9 @@ NAME            LABELS                                 STATUS
 10.10.103.250   kubernetes.io/hostname=10.10.103.250   Ready
 
 
-```
+{% endhighlight %}
 
-Also you can run kubernetes [guest-example](../../examples/guestbook/README.html) to build a redis backend cluster on the k8s．
+Also you can run kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
 
 
 #### Deploy addons
@@ -136,30 +139,31 @@ After the previous parts, you will have a working k8s cluster, this part will te
 
 The configuration of dns is configured in cluster/ubuntu/config-default.sh.
 
-```
+{% highlight sh %}
 
 ENABLE_CLUSTER_DNS=true
 
 DNS_SERVER_IP="192.168.3.10"
 
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 
 DNS_REPLICAS=1
 
-```
+{% endhighlight %}
+
 The `DNS_SERVER_IP` is defining the ip of dns server which must be in the service_cluster_ip_range.
 
 The `DNS_REPLICAS` describes how many dns pod running in the cluster.
 
 After all the above variable have been set. Just type the below command
 
-```
+{% highlight console %}
 
 $ cd cluster/ubuntu
 
 $ KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh
 
-```
+{% endhighlight %}
 
 After some time, you can use `$ kubectl get pods` to see the dns pod is running in the cluster. Done!
 
@@ -188,7 +192,8 @@ Please try:
 1. Check `/var/log/upstart/etcd.log` for suspicious etcd log 
 
 2. Check `/etc/default/etcd`, as we do not have much input validation, a right config should be like:
-	```
+
+	```sh
 	ETCD_OPTS="-name infra1 -initial-advertise-peer-urls <http://ip_of_this_node:2380> -listen-peer-urls <http://ip_of_this_node:2380> -initial-cluster-token etcd-cluster-1 -initial-cluster infra1=<http://ip_of_this_node:2380>,infra2=<http://ip_of_another_node:2380>,infra3=<http://ip_of_another_node:2380> -initial-cluster-state new"
 	```
 
@@ -200,5 +205,6 @@ Please try:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

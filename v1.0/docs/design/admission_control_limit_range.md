@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Admission control plugin: LimitRanger
 
 ## Background
@@ -16,7 +17,7 @@ This document proposes a system for enforcing min/max limits per resource as par
 A new resource, **LimitRange**, is introduced to enumerate min/max limits for a resource type scoped to a
 Kubernetes namespace.
 
-```go
+{% highlight go %}
 const (
   // Limit that applies to all pods in a namespace
   LimitTypePod string = "Pod"
@@ -59,7 +60,7 @@ type LimitRangeList struct {
   // Items is a list of LimitRange objects
   Items []LimitRange `json:"items"`
 }
-```
+{% endhighlight %}
 
 ## AdmissionControl plugin: LimitRanger
 
@@ -102,19 +103,19 @@ The server is updated to be aware of **LimitRange** objects.
 
 The constraints are only enforced if the kube-apiserver is started as follows:
 
-```
+{% highlight console %}
 $ kube-apiserver -admission_control=LimitRanger
-```
+{% endhighlight %}
 
 ## kubectl
 
 kubectl is modified to support the **LimitRange** resource.
 
-```kubectl describe``` provides a human-readable output of limits.
+`kubectl describe` provides a human-readable output of limits.
 
 For example,
 
-```shell
+{% highlight console %}
 $ kubectl namespace myspace
 $ kubectl create -f docs/user-guide/limitrange/limits.yaml
 $ kubectl get limits
@@ -128,7 +129,7 @@ Pod             memory          1Mi     1Gi     -
 Pod             cpu             250m    2       -
 Container       memory          1Mi     1Gi     1Mi
 Container       cpu             250m    250m    250m
-```
+{% endhighlight %}
 
 ## Future Enhancements: Define limits for a particular pod or container.
 
@@ -138,7 +139,12 @@ It is expected we will want to define limits for particular pods or containers b
 
 To make a **LimitRangeItem** more restrictive, we will intend to add these additional restrictions at a future point in time.
 
+## Example
+
+See the [example of Limit Range](../user-guide/limitrange/) for more information.
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

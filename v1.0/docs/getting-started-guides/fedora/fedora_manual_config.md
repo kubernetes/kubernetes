@@ -14,19 +14,21 @@ Getting started on [Fedora](http://fedoraproject.org)
 - [Instructions](#instructions)
 
 ## Prerequisites
+
 1. You need 2 or more machines with Fedora installed.
 
 ## Instructions
 
 This is a getting started guide for Fedora.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
-This guide will only get ONE node (previously minion) working.  Multiple nodes require a functional [networking configuration](../../admin/networking.html) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
+This guide will only get ONE node (previously minion) working.  Multiple nodes require a functional [networking configuration](../../admin/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
 
 The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes.  We will break the services up between the hosts.  The first host, fed-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_ (not needed if _etcd_ runs on a different host but this guide assumes that _etcd_ and kubernetes master run on the same host).  The remaining host, fed-node will be the node and run kubelet, proxy and docker.
 
 **System Information:**
 
 Hosts:
+
 ```
 fed-master = 192.168.121.9
 fed-node = 192.168.121.65
@@ -38,25 +40,26 @@ fed-node = 192.168.121.65
 * The [--enablerepo=update-testing](https://fedoraproject.org/wiki/QA:Updates_Testing) directive in the yum command below will ensure that the most recent Kubernetes version that is scheduled for pre-release will be installed. This should be a more recent version than the Fedora "stable" release for Kubernetes that you would get without adding the directive. 
 * If you want the very latest Kubernetes release [you can download and yum install the RPM directly from Fedora Koji](http://koji.fedoraproject.org/koji/packageinfo?packageID=19202) instead of using the yum install command below.
 
-```
+{% highlight sh %}
 yum -y install --enablerepo=updates-testing kubernetes
-```
+{% endhighlight %}
+
 * Install etcd and iptables
 
-```
+{% highlight sh %}
 yum -y install etcd iptables
-```
+{% endhighlight %}
 
 * Add master and node to /etc/hosts on all machines (not needed if hostnames already in DNS). Make sure that communication works between fed-master and fed-node by using a utility such as ping.
 
-```
+{% highlight sh %}
 echo "192.168.121.9	fed-master
 192.168.121.65	fed-node" >> /etc/hosts
-```
+{% endhighlight %}
 
 * Edit /etc/kubernetes/config which will be the same on all hosts (master and node) to contain:
 
-```
+{% highlight sh %}
 # Comma separated list of nodes in the etcd cluster
 KUBE_MASTER="--master=http://fed-master:8080"
 
@@ -68,20 +71,20 @@ KUBE_LOG_LEVEL="--v=0"
 
 # Should this cluster be allowed to run privileged docker containers
 KUBE_ALLOW_PRIV="--allow_privileged=false"
-```
+{% endhighlight %}
 
 * Disable the firewall on both the master and node, as docker does not play well with other firewall rule managers.  Please note that iptables-services does not exist on default fedora server install.
 
-```
+{% highlight sh %}
 systemctl disable iptables-services firewalld
 systemctl stop iptables-services firewalld
-```
+{% endhighlight %}
 
 **Configure the kubernetes services on the master.**
 
 * Edit /etc/kubernetes/apiserver to appear as such.  The service_cluster_ip_range IP addresses must be an unused block of addresses, not used anywhere else.  They do not need to be routed or assigned to anything.
 
-```
+{% highlight sh %}
 # The address on the local server to listen to.
 KUBE_API_ADDRESS="--address=0.0.0.0"
 
@@ -93,28 +96,29 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
 
 # Add your own!
 KUBE_API_ARGS=""
-```
+{% endhighlight %}
 
 * Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1, if not, you will get the error like "connection refused"
-```
+
+{% highlight sh %}
 ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
-```
+{% endhighlight %}
 
 * Start the appropriate services on master:
 
-```
+{% highlight sh %}
 for SERVICES in etcd kube-apiserver kube-controller-manager kube-scheduler; do
 	systemctl restart $SERVICES
 	systemctl enable $SERVICES
 	systemctl status $SERVICES
 done
-```
+{% endhighlight %}
 
 * Addition of nodes:
 
 * Create following node.json file on kubernetes master node:
 
-```json
+{% highlight json %}
 {
     "apiVersion": "v1",
     "kind": "Node",
@@ -126,18 +130,18 @@ done
         "externalID": "fed-node"
     }
 }
-```
+{% endhighlight %}
 
 Now create a node object internally in your kubernetes cluster by running:
 
-```
-$ kubectl create -f node.json
+{% highlight console %}
+$ kubectl create -f ./node.json
 
 $ kubectl get nodes
 NAME                LABELS              STATUS
 fed-node           name=fed-node-label     Unknown
 
-```
+{% endhighlight %}
 
 Please note that in the above, it only creates a representation for the node
 _fed-node_ internally. It does not provision the actual _fed-node_. Also, it
@@ -151,7 +155,7 @@ a kubernetes node (fed-node) below.
 
 * Edit /etc/kubernetes/kubelet to appear as such:
 
-```
+{% highlight sh %}
 ###
 # kubernetes kubelet (node) config
 
@@ -166,40 +170,42 @@ KUBELET_API_SERVER="--api_servers=http://fed-master:8080"
 
 # Add your own!
 #KUBELET_ARGS=""
-```
+{% endhighlight %}
 
 * Start the appropriate services on the node (fed-node).
 
-```
+{% highlight sh %}
 for SERVICES in kube-proxy kubelet docker; do 
     systemctl restart $SERVICES
     systemctl enable $SERVICES
     systemctl status $SERVICES 
 done
-```
+{% endhighlight %}
 
 * Check to make sure now the cluster can see the fed-node on fed-master, and its status changes to _Ready_.
 
-```
+{% highlight console %}
 kubectl get nodes
 NAME                LABELS              STATUS
 fed-node          name=fed-node-label     Ready
-```
+{% endhighlight %}
+
 * Deletion of nodes:
 
 To delete _fed-node_ from your kubernetes cluster, one should run the following on fed-master (Please do not do it, it is just for information):
 
-```
-$ kubectl delete -f node.json
-```
+{% highlight sh %}
+kubectl delete -f ./node.json
+{% endhighlight %}
 
 *You should be finished!*
 
 **The cluster should be running! Launch a test pod.**
 
-You should have a functional cluster, check out [101](../../../docs/user-guide/walkthrough/README.html)!
+You should have a functional cluster, check out [101](../../../docs/user-guide/walkthrough/README.md)!
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/fedora/fedora_manual_config.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/fedora/fedora_manual_config.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

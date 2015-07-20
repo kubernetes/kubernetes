@@ -46,29 +46,33 @@ The Namespace provides a unique scope for:
 
 ## Usage
 
+Look [here](namespaces/) for an in depth example of namespaces.
+
 ### Viewing namespaces
+
 You can list the current namespaces in a cluster using:
-```sh
-$> kubectl get namespaces
+
+{% highlight console %}
+$ kubectl get namespaces
 NAME          LABELS    STATUS
 default       <none>    Active
 kube-system   <none>    Active
-```
+{% endhighlight %}
 
 Kubernetes starts with two initial namespaces:
-   * ```default``` The default namespace for objects with no other namespace
-   * ```kube-system``` The namespace for objects created by the Kubernetes system
+   * `default` The default namespace for objects with no other namespace
+   * `kube-system` The namespace for objects created by the Kubernetes system
 
 You can also get the summary of a specific namespace using:
 
-```
-kubectl get namespaces <name>
-```
+{% highlight console %}
+$ kubectl get namespaces <name>
+{% endhighlight %}
 
 Or you can get detailed information with:
 
-```sh
-$> kubectl describe namespaces <name>
+{% highlight console %}
+$ kubectl describe namespaces <name>
 Name:	   default
 Labels:	   <none>
 Status:	   Active
@@ -79,7 +83,7 @@ Resource Limits
  Type		Resource	Min	Max	Default
  ----				--------	---	---	---
  Container			cpu			-	-	100m
-```
+{% endhighlight %}
 
 Note that these details show both resource quota (if present) as well as resource limit ranges.
 
@@ -89,43 +93,45 @@ to define *Hard* resource usage limits that a *Namespace* may consume.
 A limit range defines min/max constraints on the amount of resources a single entity can consume in
 a *Namespace*.
 
-See [Admission control: Limit Range](../design/admission_control_limit_range.html)
+See [Admission control: Limit Range](../design/admission_control_limit_range.md)
 
 A namespace can be in one of two phases:
-   * ```Active``` the namespace is in use
+   * `Active` the namespace is in use
    * ```Terminating`` the namespace is being deleted, and can not be used for new objects
 
-See the [design doc](../design/namespaces.html#phases) for more details.
+See the [design doc](../design/namespaces.md#phases) for more details.
 
 ### Creating a new namespace
 
-To create a new namespace, first create a new YAML file called ```my-namespace.yaml``` with the contents:
+To create a new namespace, first create a new YAML file called `my-namespace.yaml` with the contents:
 
-```yaml
+{% highlight yaml %}
 apiVersion: v1
 kind: Namespace
 metadata:
   name: <insert-namespace-name-here>
-```
+{% endhighlight %}
 
 Note that the name of your namespace must be a DNS compatible label.
 
-More information on the ```finalizers``` field can be found in the namespace [design doc](../design/namespaces.html#finalizers).
+More information on the `finalizers` field can be found in the namespace [design doc](../design/namespaces.md#finalizers).
 
 Then run:
-```
-kubectl create -f my-namespace.yaml
-```
+
+{% highlight console %}
+$ kubectl create -f ./my-namespace.yaml
+{% endhighlight %}
 
 ### Setting the namespace for a request
 
-To temporarily set the namespace for a request, use the ```--namespace``` flag.
+To temporarily set the namespace for a request, use the `--namespace` flag.
 
 For example:
-```
-kubectl --namespace=<insert-namespace-name-here> run nginx --image=nginx
-kubectl --namespace=<insert-namespace-name-here> get pods
-```
+
+{% highlight console %}
+$ kubectl --namespace=<insert-namespace-name-here> run nginx --image=nginx
+$ kubectl --namespace=<insert-namespace-name-here> get pods
+{% endhighlight %}
 
 ### Setting the namespace preference
 
@@ -133,31 +139,34 @@ You can permanently save the namespace for all subsequent kubectl commands in th
 context.
 
 First get your current context:
-```sh
-export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}')
-```
+
+{% highlight console %}
+$ export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}')
+{% endhighlight %}
 
 Then update the default namespace:
-```sh
-kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
-```
+
+{% highlight console %}
+$ kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
+{% endhighlight %}
 
 ### Deleting a namespace
 
 You can delete a namespace with
 
-```
-kubectl delete namespaces <insert-some-namespace-name>
-```
+{% highlight console %}
+$ kubectl delete namespaces <insert-some-namespace-name>
+{% endhighlight %}
 
 **WARNING, this deletes _everything_ under the namespace!**
 
-This delete is asynchronous, so for a time you will see the namespace in the ```Terminating``` state.
+This delete is asynchronous, so for a time you will see the namespace in the `Terminating` state.
 
 ## Namespaces and DNS
-When you create a [Service](services.html), it creates a corresponding [DNS entry](../admin/dns.html)1.
-This entry is of the form ```<service-name>.<namespace-name>.cluster.local```, which means
-that if a container just uses ```<service-name>``` it will resolve to the service which
+
+When you create a [Service](services.md), it creates a corresponding [DNS entry](../admin/dns.md)1.
+This entry is of the form `<service-name>.<namespace-name>.cluster.local`, which means
+that if a container just uses `<service-name>` it will resolve to the service which
 is local to a namespace.  This is useful for using the same configuration across
 multiple namespaces such as Development, Staging and Production.  If you want to reach
 across namespaces, you need to use the fully qualified domain name (FQDN).
@@ -190,10 +199,11 @@ To interact with content associated with a Namespace:
 
 ## Design
 
-Details of the design of namespaces in Kubernetes, including a [detailed example](../design/namespaces.html#example-openshift-origin-managing-a-kubernetes-namespace)
-can be found in the [namespaces design doc](../design/namespaces.html)
+Details of the design of namespaces in Kubernetes, including a [detailed example](../design/namespaces.md#example-openshift-origin-managing-a-kubernetes-namespace)
+can be found in the [namespaces design doc](../design/namespaces.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

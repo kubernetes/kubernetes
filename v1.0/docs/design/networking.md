@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Networking
 
 There are 4 distinct networking problems to solve:
@@ -105,14 +106,14 @@ differentiate it from `docker0`) is set up outside of Docker proper.
 
 Example of GCE's advanced routing rules:
 
-```
+{% highlight sh %}
 gcloud compute routes add "${MINION_NAMES[$i]}" \
   --project "${PROJECT}" \
   --destination-range "${MINION_IP_RANGES[$i]}" \
   --network "${NETWORK}" \
   --next-hop-instance "${MINION_NAMES[$i]}" \
   --next-hop-instance-zone "${ZONE}" &
-```
+{% endhighlight %}
 
 GCE itself does not know anything about these IPs, though.  This means that when
 a pod tries to egress beyond GCE's project the packets must be SNAT'ed
@@ -122,7 +123,7 @@ a pod tries to egress beyond GCE's project the packets must be SNAT'ed
 
 With the primary aim of providing IP-per-pod-model, other implementations exist
 to serve the purpose outside of GCE.
-  - [OpenVSwitch with GRE/VxLAN](../admin/ovs-networking.html)
+  - [OpenVSwitch with GRE/VxLAN](../admin/ovs-networking.md)
   - [Flannel](https://github.com/coreos/flannel#flannel)
   - [L2 networks](http://blog.oddbit.com/2014/08/11/four-ways-to-connect-a-docker/)
     ("With Linux Bridge devices" section)
@@ -133,7 +134,7 @@ to serve the purpose outside of GCE.
 
 ## Pod to service
 
-The [service](../user-guide/services.html) abstraction provides a way to group pods under a
+The [service](../user-guide/services.md) abstraction provides a way to group pods under a
 common access policy (e.g. load-balanced).  The implementation of this creates a
 virtual IP which clients can access and which is transparently proxied to the
 pods in a Service.  Each node runs a kube-proxy process which programs
@@ -184,5 +185,6 @@ IPv6 would be a nice option, also, but we can't depend on it yet. Docker support
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/networking.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/networking.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

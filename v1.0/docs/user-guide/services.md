@@ -5,10 +5,12 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Services in Kubernetes
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Services in Kubernetes](#services-in-kubernetes)
   - [Overview](#overview)
   - [Defining a service](#defining-a-service)
@@ -21,9 +23,9 @@ layout: docwithnav
     - [Environment variables](#environment-variables)
     - [DNS](#dns)
   - [Headless services](#headless-services)
-  - [<a name="external"></a>External services](#<a-name="external"></a>external-services)
-    - [Type = NodePort](#type-=-nodeport)
-    - [Type = LoadBalancer](#type-=-loadbalancer)
+  - [External services](#external-services)
+    - [Type = NodePort](#type--nodeport)
+    - [Type = LoadBalancer](#type--loadbalancer)
   - [Shortcomings](#shortcomings)
   - [Future work](#future-work)
   - [The gory details of virtual IPs](#the-gory-details-of-virtual-ips)
@@ -34,10 +36,10 @@ layout: docwithnav
 
 ## Overview
 
-Kubernetes [`Pods`](pods.html) are mortal. They are born and they die, and they
-are not resurrected.  [`ReplicationControllers`](replication-controller.html) in
+Kubernetes [`Pods`](pods.md) are mortal. They are born and they die, and they
+are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
 particular create and destroy `Pods` dynamically (e.g. when scaling up or down
-or when doing rolling updates).  While each `Pod` gets its own IP address, even
+or when doing [rolling updates](kubectl/kubectl_rolling-update.md)).  While each `Pod` gets its own IP address, even
 those IP addresses cannot be relied upon to be stable over time. This leads to
 a problem: if some set of `Pods` (let's call them backends) provides
 functionality to other `Pods` (let's call them frontends) inside the Kubernetes
@@ -49,7 +51,7 @@ Enter `Services`.
 A Kubernetes `Service` is an abstraction which defines a logical set of `Pods`
 and a policy by which to access them - sometimes called a micro-service.  The
 set of `Pods` targeted by a `Service` is (usually) determined by a [`Label
-Selector`](labels.html#label-selectors) (see below for why you might want a
+Selector`](labels.md#label-selectors) (see below for why you might want a
 `Service` without a selector).
 
 As an example, consider an image-processing backend which is running with 3
@@ -70,7 +72,7 @@ REST objects, a `Service` definition can be POSTed to the apiserver to create a
 new instance.  For example, suppose you have a set of `Pods` that each expose
 port 9376 and carry a label "app=MyApp".
 
-```json
+{% highlight json %}
 {
     "kind": "Service",
     "apiVersion": "v1",
@@ -90,7 +92,7 @@ port 9376 and carry a label "app=MyApp".
         ]
     }
 }
-```
+{% endhighlight %}
 
 This specification will create a new `Service` object named "my-service" which
 targets TCP port 9376 on any `Pod` with the "app=MyApp" label.  This `Service`
@@ -119,13 +121,13 @@ abstract other kinds of backends.  For example:
   * You want to have an external database cluster in production, but in test
     you use your own databases.
   * You want to point your service to a service in another
-    [`Namespace`](namespaces.html) or on another cluster.
+    [`Namespace`](namespaces.md) or on another cluster.
   * You are migrating your workload to Kubernetes and some of your backends run
     outside of Kubernetes.
 
 In any of these scenarios you can define a service without a selector:
 
-```json
+{% highlight json %}
 {
     "kind": "Service",
     "apiVersion": "v1",
@@ -142,12 +144,12 @@ In any of these scenarios you can define a service without a selector:
         ]
     }
 }
-```
+{% endhighlight %}
 
 Because this has no selector, the corresponding `Endpoints` object will not be
 created. You can manually map the service to your own specific endpoints:
 
-```json
+{% highlight json %}
 {
     "kind": "Endpoints",
     "apiVersion": "v1",
@@ -165,7 +167,7 @@ created. You can manually map the service to your own specific endpoints:
         }
     ]
 }
-```
+{% endhighlight %}
 
 Accessing a `Service` without a selector works the same as if it had selector.
 The traffic will be routed to endpoints defined by the user (`1.2.3.4:80` in
@@ -202,7 +204,7 @@ supports multiple port definitions on a `Service` object.  When using multiple
 ports you must give all of your ports names, so that endpoints can be
 disambiguated.  For example:
 
-```json
+{% highlight json %}
 {
     "kind": "Service",
     "apiVersion": "v1",
@@ -229,7 +231,7 @@ disambiguated.  For example:
         ]
     }
 }
-```
+{% endhighlight %}
 
 ## Choosing your own IP address
 
@@ -267,7 +269,7 @@ variables and DNS.
 When a `Pod` is run on a `Node`, the kubelet adds a set of environment variables
 for each active `Service`.  It supports both [Docker links
 compatible](https://docs.docker.com/userguide/dockerlinks/) variables (see
-[makeLinkVariables](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/pkg/kubelet/envvars/envvars.go#L49))
+[makeLinkVariables](http://releases.k8s.io/v1.01/pkg/kubelet/envvars/envvars.go#L49))
 and simpler `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` variables,
 where the Service name is upper-cased and dashes are converted to underscores.
 
@@ -275,7 +277,7 @@ For example, the Service "redis-master" which exposes TCP port 6379 and has been
 allocated cluster IP address 10.0.0.11 produces the following environment
 variables:
 
-```
+{% highlight bash %}
 REDIS_MASTER_SERVICE_HOST=10.0.0.11
 REDIS_MASTER_SERVICE_PORT=6379
 REDIS_MASTER_PORT=tcp://10.0.0.11:6379
@@ -283,7 +285,7 @@ REDIS_MASTER_PORT_6379_TCP=tcp://10.0.0.11:6379
 REDIS_MASTER_PORT_6379_TCP_PROTO=tcp
 REDIS_MASTER_PORT_6379_TCP_PORT=6379
 REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.0.11
-```
+{% endhighlight %}
 
 *This does imply an ordering requirement* - any `Service` that a `Pod` wants to
 access must be created before the `Pod` itself, or else the environment
@@ -292,7 +294,7 @@ variables will not be populated.  DNS does not have this restriction.
 ### DNS
 
 An optional (though strongly recommended) [cluster
-add-on](../../cluster/addons/README.html) is a DNS server.  The
+add-on](http://releases.k8s.io/v1.01/cluster/addons/README.html) is a DNS server.  The
 DNS server watches the Kubernetes API for new `Services` and creates a set of
 DNS records for each.  If DNS has been enabled throughout the cluster then all
 `Pods` should be able to do name resolution of `Services` automatically.
@@ -327,7 +329,7 @@ they desire, but leaves them freedom to do discovery in their own way.
 Applications can still use a self-registration pattern and adapters for other
 discovery systems could easily be built upon this API.
 
-##<a name="external"></a>External services
+## External services
 
 For some parts of your application (e.g. frontends) you may want to expose a
 Service onto an external (outside of your cluster, maybe public internet) IP
@@ -371,7 +373,7 @@ The actual creation of the load balancer happens asynchronously, and
 information about the provisioned balancer will be published in the `Service`'s
 `status.loadBalancer` field.  For example:
 
-```json
+{% highlight json %}
 {
     "kind": "Service",
     "apiVersion": "v1",
@@ -403,7 +405,7 @@ information about the provisioned balancer will be published in the `Service`'s
         }
     }
 }
-```
+{% endhighlight %}
 
 Traffic from the external load balancer will be directed at the backend `Pods`,
 though exactly how that works depends on the cloud provider.
@@ -501,5 +503,6 @@ of which `Pods` they are actually accessing.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/services.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/services.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

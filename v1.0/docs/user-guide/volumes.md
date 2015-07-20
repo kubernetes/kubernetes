@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Volumes
 
 On-disk files in a container are ephemeral, which presents some problems for
@@ -14,10 +15,11 @@ container starts with a clean slate.  Second, when running containers together
 in a `Pod` it is often necessary to share files between those containers.  The
 Kubernetes `Volume` abstraction solves both of these problems.
 
-Familiarity with [pods](pods.html) is suggested.
+Familiarity with [pods](pods.md) is suggested.
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Volumes](#volumes)
   - [Background](#background)
   - [Types of Volumes](#types-of-volumes)
@@ -147,7 +149,7 @@ Disk](http://cloud.google.com/compute/docs/disks) into your pod.  Unlike
 preserved and the volume is merely unmounted.  This means that a PD can be
 pre-populated with data, and that data can be "handed off" between pods.
 
-__Important: You must create a PD using ```gcloud``` or the GCE API or UI
+__Important: You must create a PD using `gcloud` or the GCE API or UI
 before you can use it__
 
 There are some restrictions when using a `gcePersistentDisk`:
@@ -168,13 +170,13 @@ the PD is read-only or the replica count is 0 or 1.
 
 Before you can use a GCE PD with a pod, you need to create it.
 
-```sh
+{% highlight sh %}
 gcloud compute disks create --size=500GB --zone=us-central1-a my-data-disk
-```
+{% endhighlight %}
 
 #### Example pod
 
-```yaml
+{% highlight yaml %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -192,7 +194,7 @@ spec:
     gcePersistentDisk:
       pdName: my-data-disk
       fsType: ext4
-```
+{% endhighlight %}
 
 ### awsElasticBlockStore
 
@@ -203,7 +205,7 @@ volume are preserved and the volume is merely unmounted.  This means that an
 EBS volume can be pre-populated with data, and that data can be "handed off"
 between pods.
 
-__Important: You must create an EBS volume using ```aws ec2 create-volume``` or
+__Important: You must create an EBS volume using `aws ec2 create-volume` or
 the AWS API before you can use it__
 
 There are some restrictions when using an awsElasticBlockStore volume:
@@ -216,16 +218,16 @@ There are some restrictions when using an awsElasticBlockStore volume:
 
 Before you can use a EBS volume with a pod, you need to create it.
 
-```sh
+{% highlight sh %}
 aws ec2 create-volume --availability-zone eu-west-1a --size 10 --volume-type gp2
-```
+{% endhighlight %}
 
 Make sure the zone matches the zone you brought up your cluster in.  (And also check that the size and EBS volume
 type are suitable for your use!)
 
 #### AWS EBS Example configuration
 
-```yaml
+{% highlight yaml %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -243,7 +245,7 @@ spec:
     awsElasticBlockStore:
       volumeID: aws://<availability-zone>/<volume-id>
       fsType: ext4
-```
+{% endhighlight %}
 
 (Note: the syntax of volumeID is currently awkward; #10181 fixes it)
 
@@ -259,7 +261,7 @@ writers simultaneously.
 __Important: You must have your own NFS server running with the share exported
 before you can use it__
 
-See the [NFS example](../../examples/nfs/README.html) for more details.
+See the [NFS example](../../examples/nfs/) for more details.
 
 For example, [this file](../../examples/nfs/nfs-web-pod.yaml) demonstrates how to
 specify the usage of an NFS volume within a pod.
@@ -287,7 +289,7 @@ and then serve it in parallel from as many pods as you need.  Unfortunately,
 iSCSI volumes can only be mounted by a single consumer in read-write mode - no
 simultaneous readers allowed.
 
-See the [iSCSI example](../../examples/iscsi/README.html) for more details.
+See the [iSCSI example](../../examples/iscsi/) for more details.
 
 ### glusterfs
 
@@ -302,7 +304,7 @@ simultaneously.
 __Important: You must have your own GlusterFS installation running before you
 can use it__
 
-See the [GlusterFS example](../../examples/glusterfs/README.html) for more details.
+See the [GlusterFS example](../../examples/glusterfs/) for more details.
 
 ### rbd
 
@@ -322,7 +324,7 @@ and then serve it in parallel from as many pods as you need.  Unfortunately,
 RBD volumes can only be mounted by a single consumer in read-write mode - no
 simultaneous readers allowed.
 
-See the [RBD example](../../examples/rbd/README.html) for more details.
+See the [RBD example](../../examples/rbd/) for more details.
 
 ### gitRepo
 
@@ -342,16 +344,16 @@ non-volatile storage.
 __Important: You must create a secret in the Kubernetes API before you can use
 it__
 
-Secrets are described in more detail [here](secrets.html).
+Secrets are described in more detail [here](secrets.md).
 
 ### persistentVolumeClaim
 
 A `persistentVolumeClaim` volume is used to mount a
-[PersistentVolume](persistent-volumes.html) into a pod.  PersistentVolumes are a
+[PersistentVolume](persistent-volumes.md) into a pod.  PersistentVolumes are a
 way for users to "claim" durable storage (such as a GCE PersistentDisk or an
 iSCSI volume) without knowing the details of the particular cloud environment.
 
-See the [PersistentVolumes example](persistent-volumes/README.html) for more
+See the [PersistentVolumes example](persistent-volumes/) for more
 details.
 
 ## Resources
@@ -363,11 +365,12 @@ medium of the filesystem holding the kubelet root dir (typically
 pods.
 
 In the future, we expect that `emptyDir` and `hostPath` volumes will be able to
-request a certain amount of space using a [resource](compute-resources.html)
+request a certain amount of space using a [resource](compute-resources.md)
 specification, and to select the type of media to use, for clusters that have
 several media types.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/volumes.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/volumes.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes API and Release Versioning
 
 Legend:
@@ -53,5 +54,6 @@ There is a separate question of how to track the capabilities of a kubelet to fa
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/versioning.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/versioning.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

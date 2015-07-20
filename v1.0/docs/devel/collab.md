@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # On Collaborative Development
 
 Kubernetes is open source, but many of the people working on it do so as their day job.  In order to avoid forcing people to be "at work" effectively 24/7, we want to establish some semi-formal protocols around development.  Hopefully these rules make things go more smoothly.  If you find that this is not the case, please complain loudly.
@@ -48,5 +49,6 @@ Any maintainer or core contributor who wants to review a PR but does not have ti
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/collab.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/collab.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
