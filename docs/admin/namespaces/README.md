@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/namespaces/README.md).
+[here](http://releases.k8s.io/release-1.0/docs/admin/namespaces/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -33,11 +33,11 @@ Documentation for other releases can be found at
 
 ## Kubernetes Namespaces
 
-Kubernetes _[namespaces](../namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
+Kubernetes _[namespaces](../../../docs/admin/namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
 
 It does this by providing the following:
 
-1. A scope for [Names](../identifiers.md).
+1. A scope for [Names](../../user-guide/identifiers.md).
 2. A mechanism to attach authorization and policy to a subsection of the cluster.
 
 Use of multiple namespaces is optional.
@@ -49,7 +49,7 @@ This example demonstrates how to use Kubernetes namespaces to subdivide your clu
 This example assumes the following:
 
 1. You have an [existing Kubernetes cluster](../../getting-started-guides/).
-2. You have a basic understanding of Kubernetes _[pods](../pods.md)_, _[services](../services.md)_, and _[replication controllers](../replication-controller.md)_.
+2. You have a basic understanding of Kubernetes _[pods](../../user-guide/pods.md)_, _[services](../../user-guide/services.md)_, and _[replication controllers](../../user-guide/replication-controller.md)_.
 
 ### Step One: Understand the default namespace
 
@@ -99,13 +99,13 @@ Use the file [`namespace-dev.json`](namespace-dev.json) which describes a develo
 Create the development namespace using kubectl.
 
 ```console
-$ kubectl create -f docs/user-guide/namespaces/namespace-dev.json
+$ kubectl create -f docs/admin/namespaces/namespace-dev.json
 ```
 
 And then lets create the production namespace using kubectl.
 
 ```console
-$ kubectl create -f docs/user-guide/namespaces/namespace-prod.json
+$ kubectl create -f docs/admin/namespaces/namespace-prod.json
 ```
 
 To be sure things are right, let's list all of the namespaces in our cluster.
@@ -279,5 +279,5 @@ authorization rules for each namespace.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/namespaces/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
