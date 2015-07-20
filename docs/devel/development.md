@@ -56,7 +56,7 @@ Below, we outline one of the more common git workflows that core developers use.
 
 ### Clone your fork
 
-The commands below require that you have $GOPATH set ([$GOPATH docs](https://golang.org/doc/code.html#GOPATH)). We highly recommend you put kubernetes' code into your GOPATH. Note: the commands below will not work if there is more than one directory in your `$GOPATH`.
+The commands below require that you have $GOPATH set ([$GOPATH docs](https://golang.org/doc/code.html#GOPATH)). We highly recommend you put Kubernetes' code into your GOPATH. Note: the commands below will not work if there is more than one directory in your `$GOPATH`.
 
 ```sh
 mkdir -p $GOPATH/src/github.com/GoogleCloudPlatform/
@@ -207,7 +207,7 @@ godep go test ./...
 If you only want to run unit tests in one package, you could run ``godep go test`` under the package directory. For example, the following commands will run all unit tests in package kubelet:
 
 ```console
-$ cd kubernetes # step into kubernetes' directory.
+$ cd kubernetes # step into the kubernetes directory.
 $ cd pkg/kubelet
 $ godep go test
 # some output from unit tests

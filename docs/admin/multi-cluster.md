@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 
 # Considerations for running multiple Kubernetes clusters
 
-You may want to set up multiple kubernetes clusters, both to
+You may want to set up multiple Kubernetes clusters, both to
 have clusters in different regions to be nearer to your users, and to tolerate failures and/or invasive maintenance.
 This document describes some of the issues to consider when making a decision about doing so.
 
@@ -67,7 +67,7 @@ Reasons to have multiple clusters include:
 
 ## Selecting the right number of clusters
 
-The selection of the number of kubernetes clusters may be a relatively static choice, only revisited occasionally.
+The selection of the number of Kubernetes clusters may be a relatively static choice, only revisited occasionally.
 By contrast, the number of nodes in a cluster and the number of pods in a service may be change frequently according to
 load and growth.
 

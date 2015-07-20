@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 
 # Configuring APIserver ports
 
-This document describes what ports the kubernetes apiserver
+This document describes what ports the Kubernetes apiserver
 may serve on and how to reach them.  The audience is
 cluster administrators who want to customize their cluster
 or understand the details.
@@ -44,7 +44,7 @@ in [Accessing the cluster](../user-guide/accessing-the-cluster.md).
 
 ## Ports and IPs Served On
 
-The Kubernetes API is served by the Kubernetes APIServer process.  Typically,
+The Kubernetes API is served by the Kubernetes apiserver process.  Typically,
 there is one of these running on a single kubernetes-master node.
 
 By default the Kubernetes APIserver serves HTTP on 2 ports:

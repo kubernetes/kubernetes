@@ -37,13 +37,13 @@ Kubernetes Deployment On Bare-metal Ubuntu Nodes
 - [Prerequisites](#prerequisites)
     - [Starting a Cluster](#starting-a-cluster)
         - [Make *kubernetes* , *etcd* and *flanneld* binaries](#make-kubernetes--etcd-and-flanneld-binaries)
-        - [Configure and start the kubernetes cluster](#configure-and-start-the-kubernetes-cluster)
+        - [Configure and start the Kubernetes cluster](#configure-and-start-the-kubernetes-cluster)
         - [Deploy addons](#deploy-addons)
         - [Trouble Shooting](#trouble-shooting)
 
 ## Introduction
 
-This document describes how to deploy kubernetes on ubuntu nodes, including 1 kubernetes master and 3 kubernetes nodes, and people uses this approach can scale to **any number of nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
+This document describes how to deploy Kubernetes on ubuntu nodes, including 1 Kubernetes master and 3 Kubernetes nodes, and people uses this approach can scale to **any number of nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
 
 [Cloud team from Zhejiang University](https://github.com/ZJU-SEL) will maintain this work.
 
@@ -64,7 +64,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ku
 
 #### Make *kubernetes* , *etcd* and *flanneld* binaries
 
-First clone the kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
+First clone the Kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
 then `$ cd kubernetes/cluster/ubuntu`.
 
 Then run `$ ./build.sh`, this will download all the needed binaries into `./binaries`.
@@ -75,7 +75,7 @@ Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `ku
 
 > We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
 
-#### Configure and start the kubernetes cluster
+#### Configure and start the Kubernetes cluster
 
 An example cluster is listed as below:
 
@@ -105,7 +105,7 @@ Then the `roles ` variable defines the role of above machine in the same order, 
 
 The `NUM_MINIONS` variable defines the total number of nodes.
 
-The `SERVICE_CLUSTER_IP_RANGE` variable defines the kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range according to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
+The `SERVICE_CLUSTER_IP_RANGE` variable defines the Kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range according to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
 
      10.0.0.0        -   10.255.255.255  (10/8 prefix)
 
@@ -148,7 +148,7 @@ NAME            LABELS                                 STATUS
 10.10.103.250   kubernetes.io/hostname=10.10.103.250   Ready
 ```
 
-Also you can run kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
+Also you can run Kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
 
 
 #### Deploy addons

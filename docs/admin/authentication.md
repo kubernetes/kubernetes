@@ -69,7 +69,7 @@ with a value of `Basic BASE64ENCODEDUSER:PASSWORD`.
 We plan for the Kubernetes API server to issue tokens
 after the user has been (re)authenticated by a *bedrock* authentication
 provider external to Kubernetes.  We plan to make it easy to develop modules
-that interface between kubernetes and a bedrock authentication provider (e.g.
+that interface between Kubernetes and a bedrock authentication provider (e.g.
 github.com, google.com, enterprise directory, kerberos, etc.)
 
 
