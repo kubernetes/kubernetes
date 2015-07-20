@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Import docs from a git branch and format them for gh-pages.
-// usage: go run _tools/release_docs/main.go --branch release-1.0 --output-dir v1.0
+// usage: go run _tools/release_docs/main.go _tools/release_docs/api-reference-process.go --branch release-1.0 --output-dir v1.0
 package main
 
 import (
@@ -38,9 +38,10 @@ var (
 	// Splits the link target into link target and alt-text.
 	altTextRE = regexp.MustCompile(`(.*)( ".*")`)
 
-	branch    = flag.String("branch", "", "The git branch from which to pull docs. (e.g. release-1.0, master).")
-	outputDir = flag.String("output-dir", "", "The directory in which to save results.")
-	remote    = flag.String("remote", "upstream", "The name of the remote repo from which to pull docs.")
+	branch       = flag.String("branch", "", "The git branch from which to pull docs. (e.g. release-1.0, master).")
+	outputDir    = flag.String("output-dir", "", "The directory in which to save results.")
+	remote       = flag.String("remote", "upstream", "The name of the remote repo from which to pull docs.")
+	apiReference = flag.Bool("apiReference", true, "Whether update api reference")
 )
 
 func fixURL(u *url.URL) bool {
@@ -252,11 +253,21 @@ func main() {
 				}
 			}
 		}
+
+		if *apiReference && !info.IsDir() && (info.Name() == "definitions.html" || info.Name() == "operations.html") {
+			fmt.Printf("Processing %s\n", path)
+			err := addHeader(path)
+			if err != nil {
+				return err
+			}
+			return fixHeadAlign(path)
+		}
 		return nil
+
 	})
 
 	if err != nil {
-		fmt.Printf("Error while processing markdown files: %v\n", err)
+		fmt.Printf("Error while processing markdown and html files: %v\n", err)
 		os.Exit(1)
 	}
 }
