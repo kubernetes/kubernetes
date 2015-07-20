@@ -20,15 +20,15 @@ layout: docwithnav
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-You previously read about how to quickly deploy a simple replicated application using [`kubectl run`](quick-start.md) and how to configure and launch single-run containers using pods (configuring-containers.md). Here, you’ll use the configuration-based approach to deploy a continuously running, replicated application.
+You previously read about how to quickly deploy a simple replicated application using [`kubectl run`](quick-start.html) and how to configure and launch single-run containers using pods (configuring-containers.md). Here, you’ll use the configuration-based approach to deploy a continuously running, replicated application.
 
 ## Launching a set of replicas using a configuration file
 
-Kubernetes creates and manages sets of replicated containers (actually, replicated [Pods](pods.md)) using [*Replication Controllers*](replication-controller.md). 
+Kubernetes creates and manages sets of replicated containers (actually, replicated [Pods](pods.html)) using [*Replication Controllers*](replication-controller.html). 
 
 A replication controller simply ensures that a specified number of pod "replicas" are running at any one time. If there are too many, it will kill some. If there are too few, it will start more. It’s analogous to Google Compute Engine’s [Instance Group Manager](https://cloud.google.com/compute/docs/instance-groups/manager/) or AWS’s [Auto-scaling Group](http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroup.html) (with no scaling policies).
 
-The replication controller created to run nginx by `kubctl run` in the [Quick start](quick-start.md) could be specified using YAML as follows:
+The replication controller created to run nginx by `kubctl run` in the [Quick start](quick-start.html) could be specified using YAML as follows:
 
 {% highlight yaml %}
 apiVersion: v1
@@ -83,7 +83,7 @@ my-nginx-buaiq   1/1       Running   0          51s
 
 ## Deleting replication controllers
 
-When you want to kill your application, delete your replication controller, as in the [Quick start](quick-start.md):
+When you want to kill your application, delete your replication controller, as in the [Quick start](quick-start.html):
 
 {% highlight console %}
 $ kubectl delete rc my-nginx
@@ -96,7 +96,7 @@ If you try to delete the pods before deleting the replication controller, it wil
 
 ## Labels
 
-Kubernetes uses user-defined key-value attributes called [*labels*](labels.md) to categorize and identify sets of resources, such as pods and replication controllers. The example above specified a single label in the pod template, with key `app` and value `nginx`. All pods created carry that label, which can be viewed using `-L`:
+Kubernetes uses user-defined key-value attributes called [*labels*](labels.html) to categorize and identify sets of resources, such as pods and replication controllers. The example above specified a single label in the pod template, with key `app` and value `nginx`. All pods created carry that label, which can be viewed using `-L`:
 
 {% highlight console %}
 $ kubectl get pods -L app
@@ -113,7 +113,7 @@ CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS   APP
 my-nginx     nginx          nginx      app=nginx   2          nginx
 {% endhighlight %}
 
-More importantly, the pod template’s labels are used to create a [`selector`](labels.md#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](kubectl/kubectl_get.md):
+More importantly, the pod template’s labels are used to create a [`selector`](labels.html#label-selectors) that will match pods carrying those labels. You can see this field by requesting it using the [Go template output format of `kubectl get`](kubectl/kubectl_get.html):
 
 {% highlight console %}
 $ kubectl get rc my-nginx -o template --template="{{.spec.selector}}"
@@ -124,10 +124,10 @@ You could also specify the `selector` explicitly, such as if you wanted to speci
 
 ## What's next?
 
-[Learn about exposing applications to users and clients, and connecting tiers of your application together.](connecting-applications.md)
+[Learn about exposing applications to users and clients, and connecting tiers of your application together.](connecting-applications.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/deploying-applications.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/deploying-applications.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

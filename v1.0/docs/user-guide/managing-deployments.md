@@ -8,7 +8,7 @@ layout: docwithnav
 
 # Kubernetes User Guide: Managing Applications: Managing deployments
 
-You’ve deployed your application and exposed it via a service. Now what? Kubernetes provides a number of tools to help you manage your application deployment, including scaling and updating. Among the features we’ll discuss in more depth are [configuration files](configuring-containers.md#configuration-in-kubernetes) and [labels](deploying-applications.md#labels).
+You’ve deployed your application and exposed it via a service. Now what? Kubernetes provides a number of tools to help you manage your application deployment, including scaling and updating. Among the features we’ll discuss in more depth are [configuration files](configuring-containers.html#configuration-in-kubernetes) and [labels](deploying-applications.html#labels).
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -254,7 +254,7 @@ my-nginx-o0ef1   1/1       Running   0          1h
 
 At some point, you’ll eventually need to update your deployed application, typically by specifying a new image or image tag, as in the canary deployment scenario above. `kubectl` supports several update operations, each of which is applicable to different scenarios.
 
-To update a service without an outage, `kubectl` supports what is called [“rolling update”](kubectl/kubectl_rolling-update.md), which updates one pod at a time, rather than taking down the entire service at the same time. See the [rolling update design document](../design/simple-rolling-update.md) and the [example of rolling update](update-demo/) for more information. 
+To update a service without an outage, `kubectl` supports what is called [“rolling update”](kubectl/kubectl_rolling-update.html), which updates one pod at a time, rather than taking down the entire service at the same time. See the [rolling update design document](../design/simple-rolling-update.html) and the [example of rolling update](update-demo/) for more information. 
 
 Let’s say you were running version 1.7.9 of nginx:
 
@@ -277,7 +277,7 @@ spec:
         - containerPort: 80
 {% endhighlight %}
 
-To update to version 1.9.1, you can use [`kubectl rolling-update --image`](../../docs/design/simple-rolling-update.md):
+To update to version 1.9.1, you can use [`kubectl rolling-update --image`](../../docs/design/simple-rolling-update.html):
 
 {% highlight console %}
 $ kubectl rolling-update my-nginx --image=nginx:1.9.1
@@ -386,7 +386,7 @@ You can also run the [update demo](update-demo/) to see a visual representation 
 
 ## In-place updates of resources
 
-Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](annotations.md) with a description of your object. That’s easiest to do with `kubectl patch`:
+Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](annotations.html) with a description of your object. That’s easiest to do with `kubectl patch`:
 
 {% highlight console %}
 $ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
@@ -426,11 +426,11 @@ replicationcontrollers/my-nginx-v4
 
 ## What's next?
 
-- [Learn about how to use `kubectl` for application introspection and debugging.](introspection-and-debugging.md)
-- [Tips and tricks when working with config](config-best-practices.md)
+- [Learn about how to use `kubectl` for application introspection and debugging.](introspection-and-debugging.html)
+- [Tips and tricks when working with config](config-best-practices.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/managing-deployments.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/managing-deployments.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

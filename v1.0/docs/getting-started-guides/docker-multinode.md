@@ -9,7 +9,7 @@ Running Multi-Node Kubernetes Using Docker
 ------------------------------------------
 
 _Note_:
-These instructions are somewhat significantly more advanced than the [single node](docker.md) instructions.  If you are
+These instructions are somewhat significantly more advanced than the [single node](docker.html) instructions.  If you are
 interested in just starting to explore Kubernetes, we recommend that you start there.
 
 _Note_:
@@ -52,22 +52,22 @@ it is still useful to use containers for deployment and management, so we create
 
 The first step in the process is to initialize the master node.
 
-See [here](docker-multinode/master.md) for detailed instructions.
+See [here](docker-multinode/master.html) for detailed instructions.
 
 ## Adding a worker node
 
 Once your master is up and running you can add one or more workers on different machines.
 
-See [here](docker-multinode/worker.md) for detailed instructions.
+See [here](docker-multinode/worker.html) for detailed instructions.
 
 ## Testing your cluster
 
-Once your cluster has been created you can [test it out](docker-multinode/testing.md)
+Once your cluster has been created you can [test it out](docker-multinode/testing.html)
 
 For more complete applications, please look in the [examples directory](../../examples/)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

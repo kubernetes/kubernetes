@@ -39,6 +39,6 @@ through the API as necessary.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kube-scheduler.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kube-scheduler.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

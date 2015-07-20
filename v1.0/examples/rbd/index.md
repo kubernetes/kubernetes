@@ -56,6 +56,6 @@ On the Kubernetes host, I got these in mount output
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/rbd/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/rbd/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

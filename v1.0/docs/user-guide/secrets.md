@@ -11,7 +11,7 @@ layout: docwithnav
 Objects of type `secret` are intended to hold sensitive information, such as
 passwords, OAuth tokens, and ssh keys.  Putting this information in a `secret`
 is safer and more flexible than putting it verbatim in a `pod` definition or in
-a docker image. See [Secrets design document](../design/secrets.md) for more information. 
+a docker image. See [Secrets design document](../design/secrets.html) for more information. 
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -43,7 +43,7 @@ a docker image. See [Secrets design document](../design/secrets.md) for more inf
 Creation of secrets can be manual (done by the user) or automatic (done by
 automation built into the cluster).
 
-A secret can be used with a pod in two ways: either as files in a [volume](volumes.md) mounted on one or more of
+A secret can be used with a pod in two ways: either as files in a [volume](volumes.html) mounted on one or more of
 its containers, or used by kubelet when pulling images for the pod.
 
 To use a secret, a pod needs to reference the secret.  This reference
@@ -61,7 +61,7 @@ The automatic creation and use of API credentials can be disabled or overridden
 if desired.  However, if all you need to do is securely access the apiserver,
 this is the recommended workflow.
 
-See the [Service Account](service-accounts.md) documentation for more
+See the [Service Account](service-accounts.html) documentation for more
 information on how Service Accounts work.
 
 ### Creating a Secret Manually
@@ -80,15 +80,15 @@ data:
 {% endhighlight %}
 
 The data field is a map.  Its keys must match
-[DNS_SUBDOMAIN](../design/identifiers.md), except that leading dots are also
+[DNS_SUBDOMAIN](../design/identifiers.html), except that leading dots are also
 allowed.  The values are arbitrary data, encoded using base64. The values of
 username and password in the example above, before base64 encoding,
 are `value-1` and `value-2`, respectively, with carriage return and newline characters at the end.
 
-Create the secret using [`kubectl create`](kubectl/kubectl_create.md).
+Create the secret using [`kubectl create`](kubectl/kubectl_create.html).
 
 Once the secret is created, you can:
-  - create pods that automatically use it via a [Service Account](service-accounts.md).
+  - create pods that automatically use it via a [Service Account](service-accounts.html).
   - modify your pod specification to use the secret
 
 ### Manually specifying a Secret to be Mounted on a Pod
@@ -135,14 +135,14 @@ See another example of creating a secret and a pod that consumes that secret in 
 
 ### Manually specifying an imagePullSecret
 
-Use of imagePullSecrets is desribed in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)
+Use of imagePullSecrets is desribed in the [images documentation](images.html#specifying-imagepullsecrets-on-a-pod)
 
 ### Automatic use of Manually Created Secrets
 
 *This feature is planned but not implemented.  See [issue
 9902](https://github.com/GoogleCloudPlatform/kubernetes/issues/9902).*
 
-You can reference manually created secrets from a [service account](service-accounts.md).
+You can reference manually created secrets from a [service account](service-accounts.html).
 Then, pods which use that service account will have
 `volumeMounts` and/or `imagePullSecrets` added to them.
 The secrets will be mounted at **TBD**.
@@ -210,9 +210,9 @@ change, even if the secret resource is modified.  To change the secret used,
 the original pod must be deleted, and a new pod (perhaps with an identical
 `PodSpec`) must be created.  Therefore, updating a secret follows the same
 workflow as deploying a new container image.  The `kubectl rolling-update`
-command can be used ([man page](kubectl/kubectl_rolling-update.md)).
+command can be used ([man page](kubectl/kubectl_rolling-update.html)).
 
-The [`resourceVersion`](../devel/api-conventions.md#concurrency-control-and-consistency)
+The [`resourceVersion`](../devel/api-conventions.html#concurrency-control-and-consistency)
 of the secret is not specified when it is referenced.
 Therefore, if a secret is updated at about the same time as pods are starting,
 then it is not defined which version of the secret will be used for the pod. It
@@ -506,6 +506,6 @@ Pod level](#use-case-two-containers).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/secrets.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/secrets.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

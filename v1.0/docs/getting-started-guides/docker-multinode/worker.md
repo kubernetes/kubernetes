@@ -12,7 +12,7 @@ layout: docwithnav
 
 These instructions are very similar to the master set-up above, but they are duplicated for clarity.
 You need to repeat these instructions for each node you want to join the cluster.
-We will assume that the IP address of this node is `${NODE_IP}` and you have the IP address of the master in `${MASTER_IP}` that you created in the [master instructions](master.md).
+We will assume that the IP address of this node is `${NODE_IP}` and you have the IP address of the master in `${MASTER_IP}` that you created in the [master instructions](master.html).
 
 For each worker node, there are three steps:
    * [Set up `flanneld` on the worker node](#set-up-flanneld-on-the-worker-node)
@@ -134,10 +134,10 @@ sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0
 
 ### Next steps
 
-Move on to [testing your cluster](testing.md) or [add another node](#adding-a-kubernetes-worker-node-via-docker)
+Move on to [testing your cluster](testing.html) or [add another node](#adding-a-kubernetes-worker-node-via-docker)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/worker.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/worker.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

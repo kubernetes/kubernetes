@@ -264,6 +264,6 @@ If you click on the tab called "Tasks", you should see an ever-growing list of t
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/celery-rabbitmq/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/celery-rabbitmq/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

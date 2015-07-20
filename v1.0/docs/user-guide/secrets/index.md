@@ -8,7 +8,7 @@ layout: docwithnav
 
 # Secrets example
 
-Following this example, you will create a [secret](../secrets.md) and a [pod](../pods.md) that consumes that secret in a [volume](../volumes.md). See [Secrets design document](../../design/secrets.md) for more information. 
+Following this example, you will create a [secret](../secrets.html) and a [pod](../pods.html) that consumes that secret in a [volume](../volumes.html). See [Secrets design document](../../design/secrets.html) for more information. 
 
 ## Step Zero: Prerequisites
 
@@ -67,6 +67,6 @@ $ kubectl logs secret-test-pod
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/secrets/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/secrets/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

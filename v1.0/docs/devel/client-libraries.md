@@ -10,7 +10,7 @@ layout: docwithnav
 
 ### Supported
 
-   * [Go](http://releases.k8s.io/v1.01/pkg/client/)
+   * [Go](http://releases.k8s.io/v1.0.1/pkg/client/)
 
 ### User Contributed
 
@@ -27,6 +27,6 @@ layout: docwithnav
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/client-libraries.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/client-libraries.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

@@ -35,10 +35,10 @@ instructions for your platform.
 
 ## Step One: Start your ZooKeeper service
 
-ZooKeeper is a distributed coordination [service](../../docs/user-guide/services.md) that Storm uses as a
+ZooKeeper is a distributed coordination [service](../../docs/user-guide/services.html) that Storm uses as a
 bootstrap and for state storage.
 
-Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a [pod](../../docs/user-guide/pods.md) running
+Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a [pod](../../docs/user-guide/pods.html) running
 the ZooKeeper service.
 
 {% highlight sh %}
@@ -122,7 +122,7 @@ The Storm workers need both the ZooKeeper and Nimbus services to be
 running.
 
 Use the [`examples/storm/storm-worker-controller.json`](storm-worker-controller.json) file to create a
-[replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
+[replication controller](../../docs/user-guide/replication-controller.html) that manages the worker pods.
 
 {% highlight sh %}
 $ kubectl create -f examples/storm/storm-worker-controller.json
@@ -177,6 +177,6 @@ Make sure the Nimbus Pod is running.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storm/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storm/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

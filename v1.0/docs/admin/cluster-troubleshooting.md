@@ -10,8 +10,8 @@ layout: docwithnav
 
 This doc is about cluster troubleshooting; we assume you have already ruled out your application as the root cause of the
 problem you are experiencing. See
-the [application troubleshooting guide](../user-guide/application-troubleshooting.md) for tips on application debugging.
-You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
+the [application troubleshooting guide](../user-guide/application-troubleshooting.html) for tips on application debugging.
+You may also visit [troubleshooting document](../troubleshooting.html) for more information. 
 
 ## Listing your cluster
 
@@ -93,7 +93,7 @@ Mitigations:
 - Action use IaaS providers reliable storage (e.g GCE PD or AWS EBS volume) for VMs with apiserver+etcd
   - Mitigates: Apiserver backing storage lost
 
-- Action: Use (experimental) [high-availability](high-availability.md) configuration
+- Action: Use (experimental) [high-availability](high-availability.html) configuration
   - Mitigates: Master VM shutdown or master components (scheduler, API server, controller-managing) crashing
     - Will tolerate one or more simultaneous node or component failures
   - Mitigates: Apiserver backing storage (i.e., etcd's data directory) lost
@@ -112,11 +112,11 @@ Mitigations:
   - Mitigates: Node shutdown
   - Mitigates: Kubelet software fault
 
-- Action: [Multiple independent clusters](multi-cluster.md) (and avoid making risky changes to all clusters at once)
+- Action: [Multiple independent clusters](multi-cluster.html) (and avoid making risky changes to all clusters at once)
   - Mitigates: Everything listed above.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-troubleshooting.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-troubleshooting.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

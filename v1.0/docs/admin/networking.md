@@ -29,10 +29,10 @@ layout: docwithnav
 Kubernetes approaches networking somewhat differently than Docker does by
 default.  There are 4 distinct networking problems to solve:
 1. Highly-coupled container-to-container communications: this is solved by
-   [pods](../user-guide/pods.md) and `localhost` communications.
+   [pods](../user-guide/pods.html) and `localhost` communications.
 2. Pod-to-Pod communications: this is the primary focus of this document.
-3. Pod-to-Service communications: this is covered by [services](../user-guide/services.md).
-4. External-to-Service communications: this is covered by [services](../user-guide/services.md).
+3. Pod-to-Service communications: this is covered by [services](../user-guide/services.html).
+4. External-to-Service communications: this is covered by [services](../user-guide/services.html).
 
 ## Summary
 
@@ -182,7 +182,7 @@ people have reported success with Flannel and Kubernetes.
 
 ### OpenVSwitch
 
-[OpenVSwitch](ovs-networking.md) is a somewhat more mature but also
+[OpenVSwitch](ovs-networking.html) is a somewhat more mature but also
 complicated way to build an overlay network.  This is endorsed by several of the
 "Big Shops" for networking.
 
@@ -200,10 +200,10 @@ IPs.
 
 The early design of the networking model and its rationale, and some future
 plans are described in more detail in the [networking design
-document](../design/networking.md).
+document](../design/networking.html).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/networking.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/networking.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

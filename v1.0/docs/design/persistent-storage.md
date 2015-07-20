@@ -213,6 +213,6 @@ Admins can script the recycling of released volumes.  Future dynamic provisioner
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/persistent-storage.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/persistent-storage.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

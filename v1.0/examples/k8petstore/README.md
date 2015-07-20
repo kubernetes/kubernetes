@@ -8,7 +8,7 @@ layout: docwithnav
 
 ## Welcome to k8PetStore
 
-This is a follow up to the [Guestbook Example](../guestbook/README.md)'s [Go implementation](../guestbook-go/).
+This is a follow up to the [Guestbook Example](../guestbook/README.html)'s [Go implementation](../guestbook-go/).
 
 - It leverages the same components (redis, Go REST API) as the guestbook application
 - It comes with visualizations for graphing whats happening in Redis transactions, along with commandline printouts of transaction throughput
@@ -102,7 +102,7 @@ So, to run this app in Kubernetes, simply run [The all in one k8petstore.sh shel
 
 Note that at the top of the script there are a few self explanatory parameters to set, among which the Public IPs parameter is where you can checkout the web ui (at $PUBLIC_IP:3000), which will show a plot and read outs of transaction throughput.
 
-In the mean time, because the public IP will be deprecated in Kubernetes v1, we provide other 2 scripts k8petstore-loadbalancer.sh and k8petstore-nodeport.sh. As the names suggest, they rely on LoadBalancer and NodePort respectively. More details can be found [here](../../docs/user-guide/services.md#external-services). 
+In the mean time, because the public IP will be deprecated in Kubernetes v1, we provide other 2 scripts k8petstore-loadbalancer.sh and k8petstore-nodeport.sh. As the names suggest, they rely on LoadBalancer and NodePort respectively. More details can be found [here](../../docs/user-guide/services.html#external-services). 
 
 ## Future
 
@@ -118,6 +118,6 @@ For questions about bigpetstore, and how the data is generated, ask on the apach
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

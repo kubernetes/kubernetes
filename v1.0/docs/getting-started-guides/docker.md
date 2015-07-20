@@ -43,7 +43,7 @@ docker run --net=host -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd
 docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
 {% endhighlight %}
 
-This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
+This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.html) that contains the other master components.
 
 ### Step Three: Run the service proxy
 
@@ -120,6 +120,6 @@ You may use `docker ps -a | awk '{print $1}' | xargs docker kill`, note this rem
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

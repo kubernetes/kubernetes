@@ -8,12 +8,12 @@ layout: docwithnav
 
 # How To Use Persistent Volumes
 
-The purpose of this guide is to help you become familiar with [Kubernetes Persistent Volumes](../persistent-volumes.md).  By the end of the guide, we'll have
+The purpose of this guide is to help you become familiar with [Kubernetes Persistent Volumes](../persistent-volumes.html).  By the end of the guide, we'll have
 nginx serving content from your persistent volume.
 
 This guide assumes knowledge of Kubernetes fundamentals and that you have a cluster up and running.
 
-See [Persistent Storage design document](../../design/persistent-storage.md) for more information. 
+See [Persistent Storage design document](../../design/persistent-storage.html) for more information. 
 
 ## Provisioning
 
@@ -105,6 +105,6 @@ Enjoy!
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/persistent-volumes/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/persistent-volumes/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

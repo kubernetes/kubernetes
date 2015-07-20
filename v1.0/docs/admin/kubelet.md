@@ -96,6 +96,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kubelet.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kubelet.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

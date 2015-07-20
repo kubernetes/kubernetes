@@ -29,17 +29,17 @@ In order for the kubectl usage examples to work, make sure you have an examples 
 
 ## Kubectl CLI
 
-The easiest way to interact with Kubernetes is via the [kubectl](../kubectl/kubectl.md) command-line interface.
+The easiest way to interact with Kubernetes is via the [kubectl](../kubectl/kubectl.html) command-line interface.
 
-For more info about kubectl, including its usage, commands, and parameters, see the [kubectl CLI reference](../kubectl/kubectl.md).
+For more info about kubectl, including its usage, commands, and parameters, see the [kubectl CLI reference](../kubectl/kubectl.html).
 
-If you haven't installed and configured kubectl, finish the [prerequisites](../prereqs.md) before continuing.
+If you haven't installed and configured kubectl, finish the [prerequisites](../prereqs.html) before continuing.
 
 ## Pods
 
 In Kubernetes, a group of one or more containers is called a _pod_. Containers in a pod are deployed together, and are started, stopped, and replicated as a group.
 
-See [pods](../../../docs/user-guide/pods.md) for more details.
+See [pods](../../../docs/user-guide/pods.html) for more details.
 
 
 #### Pod Definition
@@ -61,7 +61,7 @@ spec:
 
 A pod definition is a declaration of a _desired state_.  Desired state is a very important concept in the Kubernetes model.  Many things present a desired state to the system, and it is Kubernetes' responsibility to make sure that the current state matches the desired state.  For example, when you create a Pod, you declare that you want the containers in it to be running.  If the containers happen to not be running (e.g. program failure, ...), Kubernetes will continue to (re-)create them for you in order to drive them to the desired state. This process continues until the Pod is deleted.
 
-See the [design document](../../../DESIGN.md) for more details.
+See the [design document](../../../DESIGN.html) for more details.
 
 
 #### Pod Management
@@ -78,7 +78,7 @@ List all pods:
 $ kubectl get pods
 {% endhighlight %}
 
-On most providers, the pod IPs are not externally accessible. The easiest way to test that the pod is working is to create a busybox pod and exec commands on it remotely. See the [command execution documentation](../kubectl/kubectl_exec.md) for details.
+On most providers, the pod IPs are not externally accessible. The easiest way to test that the pod is working is to create a busybox pod and exec commands on it remotely. See the [command execution documentation](../kubectl/kubectl_exec.html) for details.
 
 Provided the pod IP is accessible, you should be able to access its http endpoint with curl on port 80:
 
@@ -147,7 +147,7 @@ Notes:
 - **EmptyDir**: Creates a new directory that will persist across container failures and restarts.
 - **HostPath**: Mounts an existing directory on the minion's file system (e.g. `/var/logs`).
 
-See [volumes](../../../docs/user-guide/volumes.md) for more details.
+See [volumes](../../../docs/user-guide/volumes.html) for more details.
 
 
 #### Multiple Containers
@@ -191,11 +191,11 @@ Finally, we have also introduced an environment variable to the `git-monitor` co
 
 ## What's Next?
 
-Continue on to [Kubernetes 201](k8s201.md) or
-for a complete application see the [guestbook example](../../../examples/guestbook/README.md)
+Continue on to [Kubernetes 201](k8s201.html) or
+for a complete application see the [guestbook example](../../../examples/guestbook/README.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/walkthrough/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/walkthrough/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

@@ -171,10 +171,10 @@ If all else fails, ask questions on IRC at [#google-containers](http://webchat.f
 
 ### Next steps
 
-Move on to [adding one or more workers](worker.md)
+Move on to [adding one or more workers](worker.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/master.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/master.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

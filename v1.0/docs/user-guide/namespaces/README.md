@@ -8,11 +8,11 @@ layout: docwithnav
 
 ## Kubernetes Namespaces
 
-Kubernetes _[namespaces](../namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
+Kubernetes _[namespaces](../namespaces.html)_ help different projects, teams, or customers to share a Kubernetes cluster.
 
 It does this by providing the following:
 
-1. A scope for [Names](../identifiers.md).
+1. A scope for [Names](../identifiers.html).
 2. A mechanism to attach authorization and policy to a subsection of the cluster.
 
 Use of multiple namespaces is optional.
@@ -24,7 +24,7 @@ This example demonstrates how to use Kubernetes namespaces to subdivide your clu
 This example assumes the following:
 
 1. You have an [existing Kubernetes cluster](../../getting-started-guides/).
-2. You have a basic understanding of Kubernetes _[pods](../pods.md)_, _[services](../services.md)_, and _[replication controllers](../replication-controller.md)_.
+2. You have a basic understanding of Kubernetes _[pods](../pods.html)_, _[services](../services.html)_, and _[replication controllers](../replication-controller.html)_.
 
 ### Step One: Understand the default namespace
 
@@ -254,6 +254,6 @@ authorization rules for each namespace.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

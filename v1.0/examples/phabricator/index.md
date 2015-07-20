@@ -14,7 +14,7 @@ The example combines a web frontend and an external service that provides MySQL 
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes [services](../../docs/user-guide/services.md) and that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/):
+This example assumes that you have a basic understanding of kubernetes [services](../../docs/user-guide/services.html) and that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/):
 
 {% highlight sh %}
 $ cd kubernetes
@@ -29,7 +29,7 @@ In the remaining part of this example we will assume that your instance is named
 
 ### Step Two: Turn up the phabricator
 
-To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](phabricator-controller.json) which describes a [replication controller](../../docs/user-guide/replication-controller.md) with a single [pod](../../docs/user-guide/pods.md) running an Apache server with Phabricator PHP source:
+To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](phabricator-controller.json) which describes a [replication controller](../../docs/user-guide/replication-controller.html) with a single [pod](../../docs/user-guide/pods.html) running an Apache server with Phabricator PHP source:
 
 {% highlight js %}
 {
@@ -166,7 +166,7 @@ $ kubectl create -f examples/phabricator/authenticator-controller.json
 
 ### Step Four: Turn up the phabricator service
 
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](../../docs/user-guide/services.md) before proceeding.
+A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](../../docs/user-guide/services.html) before proceeding.
 
 The pod that you created in Step One has the label `name=phabricator`. The selector field of the service determines which pods will receive the traffic sent to the service. Since we are setting up a service for an external application we also need to request external static IP address (otherwise it will be assigned dynamically):
 
@@ -232,6 +232,6 @@ $ cluster/kube-down.sh
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/phabricator/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/phabricator/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

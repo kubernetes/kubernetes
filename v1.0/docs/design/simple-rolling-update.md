@@ -8,7 +8,7 @@ layout: docwithnav
 
 ## Simple rolling update
 
-This is a lightweight design document for simple [rolling update](../user-guide/kubectl/kubectl_rolling-update.md) in `kubectl`. 
+This is a lightweight design document for simple [rolling update](../user-guide/kubectl/kubectl_rolling-update.html) in `kubectl`. 
 
 Complete execution flow can be found [here](#execution-details). See the [example of rolling update](../user-guide/update-demo/) for more information. 
 
@@ -108,6 +108,6 @@ then `foo-next` is synthesized using the pattern `<controller-name>-<hash-of-nex
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/simple-rolling-update.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/simple-rolling-update.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

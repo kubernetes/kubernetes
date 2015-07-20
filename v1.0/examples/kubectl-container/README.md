@@ -26,6 +26,6 @@ containers in your pod will find the proxy apparently serving on localhost.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/kubectl-container/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/kubectl-container/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

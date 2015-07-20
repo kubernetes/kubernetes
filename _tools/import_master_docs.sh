@@ -2,7 +2,7 @@
 # This is a hack to import from master and call it a versioned snapshot.
 
 OUTDIR=v1.0
-FAKE_TAG=v1.01
+FAKE_TAG=v1.0.1
 
 set -e
 

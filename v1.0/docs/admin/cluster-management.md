@@ -8,7 +8,9 @@ layout: docwithnav
 
 # Cluster Management
 
-This doc is in progress.
+## Creating and configuring a Cluster
+
+To install Kubernetes on a set of machines, consult one of the existing [Getting Started guides](../../docs/getting-started-guides/README.html) depending on your environment.
 
 ## Upgrading a cluster
 
@@ -48,7 +50,7 @@ If you need to reboot a node (such as for a kernel upgrade, libc upgrade, hardwa
 brief, then when the Kubelet restarts, it will attempt to restart the pods scheduled to it.  If the reboot takes longer,
 then the node controller will terminate the pods that are bound to the unavailable node.  If there is a corresponding
 replication controller, then a new copy of the pod will be started on a different node.  So, in the case where all
-pods are replicated, upgrades can be done without special coordination.
+pods are replicated, upgrades can be done without special coordination, assuming that not all nodes will go down at the same time.
 
 If you want more control over the upgrading process, you may use the following workflow:
   1. Mark the node to be rebooted as unschedulable:
@@ -57,17 +59,17 @@ If you want more control over the upgrading process, you may use the following w
   1. Get the pods off the machine, via any of the following strategies:
     1. wait for finite-duration pods to complete
     1. delete pods with `kubectl delete pods $PODNAME`
-    1. for pods with a replication controller, the pod will eventually be replaced by a new pod which will be scheduled to a new node. additionally, if the pod is part of a service, then clients will automatically be redirected to the new pod.
+    1. for pods with a replication controller, the pod will eventually be replaced by a new pod which will be scheduled to a new node. Additionally, if the pod is part of a service, then clients will automatically be redirected to the new pod.
     1. for pods with no replication controller, you need to bring up a new copy of the pod, and assuming it is not part of a service, redirect clients to it.
   1. Work on the node
   1. Make the node schedulable again:
     `kubectl replace nodes $NODENAME --patch='{"apiVersion": "v1", "spec": {"unschedulable": false}}'`.  
     If you deleted the node's VM instance and created a new one, then a new schedulable node resource will
     be created automatically when you create a new VM instance (if you're using a cloud provider that supports
-    node discovery; currently this is only Google Compute Engine, not including CoreOS on Google Compute Engine using kube-register). See [Node](node.md).
+    node discovery; currently this is only Google Compute Engine, not including CoreOS on Google Compute Engine using kube-register). See [Node](node.html).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-management.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-management.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

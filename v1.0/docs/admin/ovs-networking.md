@@ -23,6 +23,6 @@ Routing rules enable any 10.244.0.0/16 target to become reachable via the OVS br
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/ovs-networking.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/ovs-networking.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

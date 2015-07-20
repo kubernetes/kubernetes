@@ -22,7 +22,7 @@ CloudStack is a software to build public and private clouds based on hardware vi
 [CoreOS](http://coreos.com) templates for CloudStack are built [nightly](http://stable.release.core-os.net/amd64-usr/current/). CloudStack operators need to [register](http://docs.cloudstack.apache.org/projects/cloudstack-administration/en/latest/templates.html) this template in their cloud before proceeding with these Kubernetes deployment instructions.
 
 This guide uses an [Ansible playbook](https://github.com/runseb/ansible-kubernetes).
-This is a completely automated, a single playbook deploys Kubernetes based on the coreOS [instructions](coreos/coreos_multinode_cluster.md).
+This is a completely automated, a single playbook deploys Kubernetes based on the coreOS [instructions](coreos/coreos_multinode_cluster.html).
 
 
 This [Ansible](http://ansibleworks.com) playbook deploys Kubernetes on a CloudStack based Cloud using CoreOS images. The playbook, creates an ssh key pair, creates a security group and associated rules and finally starts coreOS instances configured via cloud-init.
@@ -92,6 +92,6 @@ SSH to it using the key that was created and using the _core_ user and you can l
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/cloudstack.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/cloudstack.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

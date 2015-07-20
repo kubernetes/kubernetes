@@ -12,7 +12,7 @@ Principles to follow when extending Kubernetes.
 
 ## API
 
-See also the [API conventions](../devel/api-conventions.md).
+See also the [API conventions](../devel/api-conventions.html).
 
 * All APIs should be declarative.
 * API objects should be complementary and composable, not opaque wrappers.
@@ -64,6 +64,6 @@ TODO
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/principles.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/principles.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

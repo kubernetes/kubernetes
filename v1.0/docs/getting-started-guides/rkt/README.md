@@ -20,7 +20,7 @@ We still have [a bunch of work](https://github.com/GoogleCloudPlatform/kubernete
   The minimum version required for now is [v0.5.6](https://github.com/coreos/rkt/releases/tag/v0.5.6).
 
 - Make sure the `rkt metadata service` is running because it is necessary for running pod in private network mode.
-  More details about the networking of rkt can be found in the [documentation](https://github.com/coreos/rkt/blob/master/Documentation/networking.html).
+  More details about the networking of rkt can be found in the [documentation](https://github.com/coreos/rkt/blob/master/Documentation/networking.md).
 
   To start the `rkt metadata service`, you can simply run:
 
@@ -104,12 +104,12 @@ scripts. The master node is always Ubuntu.
 
 ### Getting started with your cluster
 
-See [a simple nginx example](../../../docs/user-guide/simple-nginx.md) to try out your new cluster.
+See [a simple nginx example](../../../docs/user-guide/simple-nginx.html) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../../examples/).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rkt/README.html?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rkt/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 
