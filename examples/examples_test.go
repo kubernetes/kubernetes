@@ -247,7 +247,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"hazelcast-controller": &api.ReplicationController{},
 			"hazelcast-service":    &api.Service{},
 		},
-		"../docs/user-guide/namespaces": {
+		"../docs/admin/namespaces": {
 			"namespace-dev":  &api.Namespace{},
 			"namespace-prod": &api.Namespace{},
 		},
