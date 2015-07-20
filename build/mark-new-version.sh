@@ -105,7 +105,7 @@ for doc in "${mdfiles[@]}"; do
       "${doc}"
 
   # Replace /HEAD in html preview links with /NEW_VERSION.
-  $SED -ri -e "s|(${HTML_PREVIEW_PREFIX}/HEAD)|${HTML_PREVIEW_PREFIX}/${NEW_VERSION}|"
+  $SED -ri -e "s|(${HTML_PREVIEW_PREFIX}/HEAD)|${HTML_PREVIEW_PREFIX}/${NEW_VERSION}|" "${doc}"
 
   is_versioned_tag='<!-- TAG IS_VERSIONED -->'
   if ! grep -q "${is_versioned_tag}" "${doc}"; then
