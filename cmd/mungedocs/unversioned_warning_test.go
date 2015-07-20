@@ -26,15 +26,16 @@ func TestUnversionedWarning(t *testing.T) {
 	beginMark := beginMungeTag(unversionedWarningTag)
 	endMark := endMungeTag(unversionedWarningTag)
 
-	warningBlock := beginMark + "\n" + makeUnversionedWarning("filename.md") + "\n" + endMark + "\n"
+	warningString := makeUnversionedWarning("filename.md").String()
+	warningBlock := beginMark + "\n" + warningString + endMark + "\n"
 	var cases = []struct {
-		in  string
-		out string
+		in       string
+		expected string
 	}{
 		{"", warningBlock},
 		{
 			"Foo\nBar\n",
-			warningBlock + "Foo\nBar\n",
+			warningBlock + "\nFoo\nBar\n",
 		},
 		{
 			"Foo\n<!-- TAG IS_VERSIONED -->\nBar",
@@ -58,10 +59,12 @@ func TestUnversionedWarning(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
-		actual, err := updateUnversionedWarning("filename.md", []byte(c.in))
+		in := getMungeLines(c.in)
+		expected := getMungeLines(c.expected)
+		actual, err := updateUnversionedWarning("filename.md", in)
 		assert.NoError(t, err)
-		if string(actual) != c.out {
-			t.Errorf("case[%d]: expected %q got %q", i, c.out, string(actual))
+		if !expected.Equal(actual) {
+			t.Errorf("case[%d]: expected %v got %v", i, expected.String(), actual.String())
 		}
 	}
 }

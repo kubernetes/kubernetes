@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,21 +35,24 @@ func Test_updateMacroBlock(t *testing.T) {
 		{"", ""},
 		{"Lorem ipsum\ndolor sit amet\n",
 			"Lorem ipsum\ndolor sit amet\n"},
-		{"Lorem ipsum \n " + BEGIN + "\ndolor\n" + END + "\nsit amet\n",
-			"Lorem ipsum \n " + BEGIN + "\nfoo\n\n" + END + "\nsit amet\n"},
+		{"Lorem ipsum \n" + BEGIN + "\ndolor\n" + END + "\nsit amet\n",
+			"Lorem ipsum \n" + BEGIN + "\nfoo\n" + END + "\nsit amet\n"},
 	}
 	for _, c := range cases {
-		actual, err := updateMacroBlock(splitLines([]byte(c.in)), "TOKEN", "foo\n")
+		in := getMungeLines(c.in)
+		expected := getMungeLines(c.out)
+		actual, err := updateMacroBlock(in, token, getMungeLines("foo"))
 		assert.NoError(t, err)
-		if c.out != string(actual) {
-			t.Errorf("Expected '%v' but got '%v'", c.out, string(actual))
+		if !expected.Equal(actual) {
+			t.Errorf("Expected '%v' but got '%v'", expected.String(), expected.String())
 		}
 	}
 }
 
 func Test_updateMacroBlock_errors(t *testing.T) {
-	b := beginMungeTag("TOKEN")
-	e := endMungeTag("TOKEN")
+	token := "TOKEN"
+	b := beginMungeTag(token)
+	e := endMungeTag(token)
 
 	var cases = []struct {
 		in string
@@ -64,29 +67,31 @@ func Test_updateMacroBlock_errors(t *testing.T) {
 		{b + "\n" + b + "\n" + e + "\n" + e},
 	}
 	for _, c := range cases {
-		_, err := updateMacroBlock(splitLines([]byte(c.in)), "TOKEN", "foo")
+		in := getMungeLines(c.in)
+		_, err := updateMacroBlock(in, token, getMungeLines("foo"))
 		assert.Error(t, err)
 	}
 }
 
 func TestHasLine(t *testing.T) {
 	cases := []struct {
-		lines    []string
+		haystack string
 		needle   string
 		expected bool
 	}{
-		{[]string{"abc", "def", "ghi"}, "abc", true},
-		{[]string{"  abc", "def", "ghi"}, "abc", true},
-		{[]string{"abc  ", "def", "ghi"}, "abc", true},
-		{[]string{"\n abc", "def", "ghi"}, "abc", true},
-		{[]string{"abc \n", "def", "ghi"}, "abc", true},
-		{[]string{"abc", "def", "ghi"}, "def", true},
-		{[]string{"abc", "def", "ghi"}, "ghi", true},
-		{[]string{"abc", "def", "ghi"}, "xyz", false},
+		{"abc\ndef\nghi", "abc", true},
+		{"  abc\ndef\nghi", "abc", true},
+		{"abc  \ndef\nghi", "abc", true},
+		{"\n abc\ndef\nghi", "abc", true},
+		{"abc \n\ndef\nghi", "abc", true},
+		{"abc\ndef\nghi", "def", true},
+		{"abc\ndef\nghi", "ghi", true},
+		{"abc\ndef\nghi", "xyz", false},
 	}
 
 	for i, c := range cases {
-		if hasLine(c.lines, c.needle) != c.expected {
+		in := getMungeLines(c.haystack)
+		if hasLine(in, c.needle) != c.expected {
 			t.Errorf("case[%d]: %q, expected %t, got %t", i, c.needle, c.expected, !c.expected)
 		}
 	}
@@ -112,76 +117,53 @@ func TestHasMacroBlock(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		if hasMacroBlock(c.lines, token) != c.expected {
+		in := getMungeLines(strings.Join(c.lines, "\n"))
+		if hasMacroBlock(in, token) != c.expected {
 			t.Errorf("case[%d]: expected %t, got %t", i, c.expected, !c.expected)
 		}
 	}
 }
 
-func TestReplaceNonPreformatted(t *testing.T) {
+func TestAppendMacroBlock(t *testing.T) {
+	token := "<<<"
+	b := beginMungeTag(token)
+	e := endMungeTag(token)
 	cases := []struct {
-		in  string
-		out string
+		in       []string
+		expected []string
 	}{
-		{"aoeu", ""},
-		{"aoeu\n```\naoeu\n```\naoeu", "```\naoeu\n```\n"},
-		{"ao\neu\n```\naoeu\n\n\n", "```\naoeu\n\n\n"},
-		{"aoeu ```aoeu``` aoeu", ""},
+		{[]string{}, []string{b, e}},
+		{[]string{"bob"}, []string{"bob", "", b, e}},
+		{[]string{b, e}, []string{b, e, "", b, e}},
 	}
-
 	for i, c := range cases {
-		out := string(replaceNonPreformatted([]byte(c.in), func([]byte) []byte { return nil }))
-		if out != c.out {
-			t.Errorf("%v: got %q, wanted %q", i, out, c.out)
+		in := getMungeLines(strings.Join(c.in, "\n"))
+		expected := getMungeLines(strings.Join(c.expected, "\n"))
+		out := appendMacroBlock(in, token)
+		if !out.Equal(expected) {
+			t.Errorf("Case[%d]: expected '%q' but got '%q'", i, expected.String(), out.String())
 		}
 	}
 }
 
-func TestReplaceNonPreformattedNoChange(t *testing.T) {
+func TestPrependMacroBlock(t *testing.T) {
+	token := "<<<"
+	b := beginMungeTag(token)
+	e := endMungeTag(token)
 	cases := []struct {
-		in string
+		in       []string
+		expected []string
 	}{
-		{"aoeu"},
-		{"aoeu\n```\naoeu\n```\naoeu"},
-		{"aoeu\n\n```\n\naoeu\n\n```\n\naoeu"},
-		{"ao\neu\n```\naoeu\n\n\n"},
-		{"aoeu ```aoeu``` aoeu"},
-		{"aoeu\n```\naoeu\n```"},
-		{"aoeu\n```\naoeu\n```\n"},
-		{"aoeu\n```\naoeu\n```\n\n"},
+		{[]string{}, []string{b, e}},
+		{[]string{"bob"}, []string{b, e, "", "bob"}},
+		{[]string{b, e}, []string{b, e, "", b, e}},
 	}
-
 	for i, c := range cases {
-		out := string(replaceNonPreformatted([]byte(c.in), func(in []byte) []byte { return in }))
-		if out != c.in {
-			t.Errorf("%v: got %q, wanted %q", i, out, c.in)
-		}
-	}
-}
-
-func TestReplaceNonPreformattedCallOrder(t *testing.T) {
-	cases := []struct {
-		in     string
-		expect []string
-	}{
-		{"aoeu", []string{"aoeu"}},
-		{"aoeu\n```\naoeu\n```\naoeu", []string{"aoeu\n", "aoeu"}},
-		{"aoeu\n\n```\n\naoeu\n\n```\n\naoeu", []string{"aoeu\n\n", "\naoeu"}},
-		{"ao\neu\n```\naoeu\n\n\n", []string{"ao\neu\n"}},
-		{"aoeu ```aoeu``` aoeu", []string{"aoeu ```aoeu``` aoeu"}},
-		{"aoeu\n```\naoeu\n```", []string{"aoeu\n"}},
-		{"aoeu\n```\naoeu\n```\n", []string{"aoeu\n"}},
-		{"aoeu\n```\naoeu\n```\n\n", []string{"aoeu\n", "\n"}},
-	}
-
-	for i, c := range cases {
-		got := []string{}
-		replaceNonPreformatted([]byte(c.in), func(in []byte) []byte {
-			got = append(got, string(in))
-			return in
-		})
-		if e, a := c.expect, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: got %q, wanted %q", i, a, e)
+		in := getMungeLines(strings.Join(c.in, "\n"))
+		expected := getMungeLines(strings.Join(c.expected, "\n"))
+		out := prependMacroBlock(token, in)
+		if !out.Equal(expected) {
+			t.Errorf("Case[%d]: expected '%q' but got '%q'", i, expected.String(), out.String())
 		}
 	}
 }

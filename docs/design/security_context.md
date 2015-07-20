@@ -114,7 +114,7 @@ It is recommended that this design be implemented in two phases:
 2.  Implement a security context structure that is part of a service account. The
     default context provider can then be used to apply a security context based
     on the service account associated with the pod.
-    
+
 ### Security Context Provider
 
 The Kubelet will have an interface that points to a `SecurityContextProvider`. The `SecurityContextProvider` is invoked before creating and running a given container:

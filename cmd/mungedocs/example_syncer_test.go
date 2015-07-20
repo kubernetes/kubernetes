@@ -35,24 +35,27 @@ spec:
     - containerPort: 80
 `
 	var cases = []struct {
-		in  string
-		out string
+		in       string
+		expected string
 	}{
 		{"", ""},
 		{
-			"<!-- BEGIN MUNGE: EXAMPLE testdata/pod.yaml -->\n<!-- END MUNGE: EXAMPLE -->\n",
-			"<!-- BEGIN MUNGE: EXAMPLE testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](testdata/pod.yaml)\n<!-- END MUNGE: EXAMPLE -->\n",
+			"<!-- BEGIN MUNGE: EXAMPLE testdata/pod.yaml -->\n<!-- END MUNGE: EXAMPLE testdata/pod.yaml -->\n",
+			"<!-- BEGIN MUNGE: EXAMPLE testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](testdata/pod.yaml)\n<!-- END MUNGE: EXAMPLE testdata/pod.yaml -->\n",
 		},
 		{
-			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n<!-- END MUNGE: EXAMPLE -->\n",
-			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](../mungedocs/testdata/pod.yaml)\n<!-- END MUNGE: EXAMPLE -->\n",
+			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n<!-- END MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n",
+			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](../mungedocs/testdata/pod.yaml)\n<!-- END MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n",
 		},
 	}
+	repoRoot = ""
 	for _, c := range cases {
-		actual, err := syncExamples("mungedocs/filename.md", []byte(c.in))
+		in := getMungeLines(c.in)
+		expected := getMungeLines(c.expected)
+		actual, err := syncExamples("filename.md", in)
 		assert.NoError(t, err)
-		if c.out != string(actual) {
-			t.Errorf("Expected example \n'%v' but got \n'%v'", c.out, string(actual))
+		if !expected.Equal(actual) {
+			t.Errorf("Expected example \n'%q' but got \n'%q'", expected.String(), actual.String())
 		}
 	}
 }

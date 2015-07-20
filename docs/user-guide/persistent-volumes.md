@@ -75,7 +75,7 @@ Please see the [detailed walkthrough with working examples](persistent-volumes/)
 PVs are resources in the cluster.  PVC are requests for those resources and also act as claim checks to the resource.  The interaction between PVs and PVCs follows this lifecycle:
 
 ### Provisioning
-	
+
 A cluster administrator creates some number of PVs. They carry the details of the real storage that is available for use by cluster users.  They exist in the Kubernetes API and are available for consumption.
 
 ### Binding
