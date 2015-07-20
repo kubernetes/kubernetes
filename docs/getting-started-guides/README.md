@@ -41,7 +41,7 @@ crafting your own customized cluster.  We'll guide you in picking a solution tha
 
 If you just want to "kick the tires" on Kubernetes, we recommend the [local Docker-based](docker.md) solution.  
 
-The local Docker-based solution is one of several [Local cluster](#local-solutions) solutions
+The local Docker-based solution is one of several [Local cluster](#local-machine-solutions) solutions
 that are quick to setup, but are limited to running on one machine.
 
 When you are ready to scale-up to more machines and higher availability, a [Hosted](#hosted-solutions)
@@ -61,7 +61,7 @@ physical machine.  Setup is completely automated and doesn't require a cloud pro
 But their size and availability is limited to that of a single machine.
 
 The local-machine solutions are:
-  - [Local Docker-based](#local-solutions) (recommended starting point)
+  - [Local Docker-based](docker.md) (recommended starting point)
   - [Vagrant](vagrant.md) (works on any platform with Vagrant: Linux, MacOS, or Windows.)
   - [No-VM local cluster](locally.md) (Linux only)
 
@@ -73,7 +73,7 @@ clusters.
 
 ### Turn-key Cloud Solutions
 
-These solutions allow you to create Kubernetes clusters on range of Cloud IaaS providers with only a
+These solutions allow you to create Kubernetes clusters on a range of Cloud IaaS providers with only a
 few commands, and have active community support.
 - [GCE](gce.md)
 - [AWS](aws.md)
@@ -85,8 +85,8 @@ Kubernetes can run on a wide range of Cloud providers and bare-metal environment
 base operating systems.
 
 If you can find a guide below that matches your needs, use it.  It may be a little out of date, but
-it will be easier than starting from scratch.  If you do want to start from scratch, because you
-have special requirements, or just because you want to understand what is underneath a Kubernetes
+it will be easier than starting from scratch.  If you do want to start from scratch because you
+have special requirements or just because you want to understand what is underneath a Kubernetes
 cluster, try the [Getting Started from Scratch](scratch.md) guide.
 
 If you are interested in supporting Kubernetes on a new platform, check out our [advice for
