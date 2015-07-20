@@ -38,7 +38,7 @@ Getting started on Google Compute Engine
 - [Before you start](#before-you-start)
 - [Prerequisites](#prerequisites)
 - [Starting a cluster](#starting-a-cluster)
-- [Installing the kubernetes command line tools on your workstation](#installing-the-kubernetes-command-line-tools-on-your-workstation)
+- [Installing the Kubernetes command line tools on your workstation](#installing-the-kubernetes-command-line-tools-on-your-workstation)
 - [Getting started with your cluster](#getting-started-with-your-cluster)
     - [Inspect your cluster](#inspect-your-cluster)
     - [Run some examples](#run-some-examples)
@@ -109,7 +109,7 @@ The next few steps will show you:
 1. how to delete the cluster
 1. how to start clusters with non-default options (like larger clusters)
 
-### Installing the kubernetes command line tools on your workstation
+### Installing the Kubernetes command line tools on your workstation
 
 The cluster startup script will leave you with a running cluster and a `kubernetes` directory on your workstation.
 The next step is to make sure the `kubectl` tool is in your path.

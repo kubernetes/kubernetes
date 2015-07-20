@@ -67,11 +67,11 @@ The current cluster design is inspired by:
 
 - To build your own released version from source use `export KUBERNETES_PROVIDER=rackspace` and run the `bash hack/dev-build-and-up.sh`
 - Note: The get.k8s.io install method is not working yet for our scripts.
-  * To install the latest released version of kubernetes use `export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash`
+  * To install the latest released version of Kubernetes use `export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash`
 
 ## Build
 
-1. The kubernetes binaries will be built via the common build scripts in `build/`.
+1. The Kubernetes binaries will be built via the common build scripts in `build/`.
 2. If you've set the ENV `KUBERNETES_PROVIDER=rackspace`, the scripts will upload `kubernetes-server-linux-amd64.tar.gz` to Cloud Files.
 2. A cloud files container will be created via the `swiftly` CLI and a temp URL will be enabled on the object.
 3. The built `kubernetes-server-linux-amd64.tar.gz` will be uploaded to this container and the URL will be passed to master/nodes when booted.

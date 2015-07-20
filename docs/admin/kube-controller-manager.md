@@ -38,7 +38,7 @@ Documentation for other releases can be found at
 ### Synopsis
 
 
-The kubernetes controller manager is a daemon that embeds
+The Kubernetes controller manager is a daemon that embeds
 the core control loops shipped with Kubernetes. In applications of robotics and
 automation, a control loop is a non-terminating loop that regulates the state of
 the system. In Kubernetes, a controller is a control loop that watches the shared

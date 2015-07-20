@@ -37,7 +37,7 @@ This example shows how to assign a [pod](../pods.md) to a specific [node](../../
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes pods and that you have [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#documentation).
+This example assumes that you have a basic understanding of Kubernetes pods and that you have [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#documentation).
 
 ### Step One: Attach label to the node
 

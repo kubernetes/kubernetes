@@ -103,7 +103,7 @@ the required predependencies to get started with Juju, additionally it will
 launch a curses based configuration utility allowing you to select your cloud
 provider and enter the proper access credentials.
 
-Next it will deploy the kubernetes master, etcd, 2 nodes with flannel based
+Next it will deploy the Kubernetes master, etcd, 2 nodes with flannel based
 Software Defined Networking.
 
 
@@ -129,7 +129,7 @@ You can use `juju ssh` to access any of the units:
 
 ## Run some containers!
 
-`kubectl` is available on the kubernetes master node.  We'll ssh in to
+`kubectl` is available on the Kubernetes master node.  We'll ssh in to
 launch some containers, but one could use kubectl locally setting
 KUBERNETES_MASTER to point at the ip of `kubernetes-master/0`.
 

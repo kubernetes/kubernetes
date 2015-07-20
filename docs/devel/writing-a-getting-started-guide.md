@@ -66,7 +66,7 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
  - We may ask that you host binary assets or large amounts of code in our `contrib` directory or on your
    own repo.
  - Add or update a row in [The Matrix](../../docs/getting-started-guides/README.md).
- - State the binary version of kubernetes that you tested clearly in your Guide doc.
+ - State the binary version of Kubernetes that you tested clearly in your Guide doc.
  - Setup a cluster and run the [conformance test](development.md#conformance-testing) against it, and report the
    results in your PR.
  - Versioned distros should typically not modify or add code in `cluster/`.  That is just scripts for developer

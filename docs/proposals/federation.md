@@ -354,7 +354,7 @@ time.
 
 This is closely related to location affinity above, and also discussed
 there.  The basic idea is that some controller, logically outside of
-the basic kubernetes control plane of the clusters in question, needs
+the basic Kubernetes control plane of the clusters in question, needs
 to be able to:
 
 1. Receive "global" resource creation requests.

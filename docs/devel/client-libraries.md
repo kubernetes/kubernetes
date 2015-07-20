@@ -31,7 +31,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-## kubernetes API client libraries
+## Kubernetes API client libraries
 
 ### Supported
 
