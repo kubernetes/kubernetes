@@ -124,7 +124,7 @@ That's great for a simple static web server, but what about persistent storage?
 
 The container file system only lives as long as the container does. So if your app's state needs to survive relocation, reboots, and crashes, you'll need to configure some persistent storage.
 
-For this example, we'll be creating a Redis pod, with a named volume and volume mount that defines the path to mount the volume.
+For this example we'll be creating a Redis pod with a named volume and volume mount that defines the path to mount the volume.
 
 1. Define a volume:
 
@@ -134,7 +134,7 @@ For this example, we'll be creating a Redis pod, with a named volume and volume 
       emptyDir: {}
   ```
 
-1. Define a volume mount within a container definition:
+2. Define a volume mount within a container definition:
 
   ```yaml
     volumeMounts:
@@ -170,7 +170,7 @@ Notes:
 ##### Volume Types
 
 - **EmptyDir**: Creates a new directory that will persist across container failures and restarts.
-- **HostPath**: Mounts an existing directory on the minion's file system (e.g. `/var/logs`).
+- **HostPath**: Mounts an existing directory on the node's file system (e.g. `/var/logs`).
 
 See [volumes](../../../docs/user-guide/volumes.md) for more details.
 
