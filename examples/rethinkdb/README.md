@@ -48,13 +48,13 @@ Quick start
 Rethinkdb will discover peer using endpoints provided by kubernetes service,
 so first create a service so the following pod can query its endpoint
 
-```shell
+```sh
 $kubectl create -f examples/rethinkdb/driver-service.yaml
 ```
 
 check out:
 
-```shell
+```sh
 $kubectl get services
 NAME               LABELS        SELECTOR       IP(S)         PORT(S)
 [...]
@@ -65,7 +65,7 @@ rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
 
 start fist server in cluster
 
-```shell
+```sh
 $kubectl create -f examples/rethinkdb/rc.yaml
 ```
 
@@ -73,7 +73,7 @@ Actually, you can start servers as many as you want at one time, just modify the
 
 check out again:
 
-```shell
+```sh
 $kubectl get pods
 NAME                                                  READY     REASON    RESTARTS   AGE
 [...]
@@ -91,7 +91,7 @@ Scale
 You can scale up you cluster using `kubectl scale`, and new pod will join to exsits cluster automatically, for example
 
 
-```shell
+```sh
 $kubectl scale rc rethinkdb-rc --replicas=3
 scaled
 
@@ -108,14 +108,14 @@ Admin
 
 You need a separate pod (labeled as role:admin) to access Web Admin UI
 
-```shell
+```sh
 kubectl create -f examples/rethinkdb/admin-pod.yaml
 kubectl create -f examples/rethinkdb/admin-service.yaml
 ```
 
 find the service
 
-```shell
+```sh
 $kubectl get se
 NAME               LABELS        SELECTOR                  IP(S)            PORT(S)
 [...]
