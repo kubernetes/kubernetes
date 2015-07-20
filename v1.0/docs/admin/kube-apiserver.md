@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## kube-apiserver
 
 
@@ -79,5 +80,6 @@ cluster's shared state through which all other components interact.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kube-apiserver.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/kube-apiserver.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

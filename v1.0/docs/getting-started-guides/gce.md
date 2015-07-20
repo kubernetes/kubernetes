@@ -49,32 +49,33 @@ If you want to use custom binaries or pure open source Kubernetes, please contin
 You can install a client and start a cluster with either one of these commands (we list both in case only one is installed on your machine):
 
 
- ```bash
+{% highlight bash %}
  curl -sS https://get.k8s.io | bash
- ```
+{% endhighlight %}
 
 or
 
-```bash
+{% highlight bash %}
 wget -q -O - https://get.k8s.io | bash
-```
+{% endhighlight %}
 
 Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster.
 
-By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.html), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.html) services.
+By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.md), while `heapster` provides [monitoring](http://releases.k8s.io/v1.01/cluster/addons/cluster-monitoring/README.html) services.
 
 The script run by the commands above creates a cluster with the name/prefix "kubernetes". It defines one specific cluster config, so you can't run it more than once.
 
 Alternately, you can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
 
-```bash
+{% highlight bash %}
 cd kubernetes
 cluster/kube-up.sh
-```
+{% endhighlight %}
+
 If you want more than one cluster running in your project, want to use a different name, or want a different number of worker nodes, see the `<kubernetes>/cluster/gce/config-default.sh` file for more fine-grained configuration before you start up your cluster.
 
-If you run into trouble, please see the section on [troubleshooting](gce.html#troubleshooting), post to the
-[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at #google-containers on freenode.
+If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
+[google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
 
 The next few steps will show you:
 
@@ -85,23 +86,23 @@ The next few steps will show you:
 
 ### Installing the kubernetes command line tools on your workstation
 
-The cluster startup script will leave you with a running cluster and a ```kubernetes``` directory on your workstation.
+The cluster startup script will leave you with a running cluster and a `kubernetes` directory on your workstation.
 The next step is to make sure the `kubectl` tool is in your path.
 
-The [kubectl](../user-guide/kubectl/kubectl.html) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
+The [kubectl](../user-guide/kubectl/kubectl.md) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
 You will use it to look at your new cluster and bring up example apps.
 
-Add the appropriate binary folder to your ```PATH``` to access kubectl:
+Add the appropriate binary folder to your `PATH` to access kubectl:
 
-```bash
+{% highlight bash %}
 # OS X
 export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 
 # Linux
 export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
-```
+{% endhighlight %}
 
-**Note**: gcloud also ships with ```kubectl```, which by default is added to your path.
+**Note**: gcloud also ships with `kubectl`, which by default is added to your path.
 However the gcloud bundled kubectl version may be older than the one downloaded by the
 get.k8s.io install script. We recommend you use the downloaded binary to avoid
 potential issues with client/server version skew.
@@ -112,13 +113,13 @@ potential issues with client/server version skew.
 
 Once `kubectl` is in your path, you can use it to look at your cluster. E.g., running:
 
-```shell
+{% highlight console %}
 $ kubectl get --all-namespaces services
-```
+{% endhighlight %}
 
-should show a set of [services](../user-guide/services.html) that look something like this:
+should show a set of [services](../user-guide/services.md) that look something like this:
 
-```shell
+{% highlight console %}
 NAMESPACE     NAME                  LABELS                                                                           SELECTOR                IP(S)       PORT(S)
 default       kubernetes            component=apiserver,provider=kubernetes                                          <none>                  10.0.0.1    443/TCP
 kube-system   kube-dns              k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS   k8s-app=kube-dns        10.0.0.10   53/UDP
@@ -128,18 +129,20 @@ kube-system   monitoring-grafana    kubernetes.io/cluster-service=true,kubernete
 kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernetes.io/name=Heapster                   k8s-app=heapster        10.0.59.48     80/TCP
 kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
                                                                                                                                                             8086/TCP
-```
-Similarly, you can take a look at the set of [pods](../user-guide/pods.html) that were created during cluster startup.
+{% endhighlight %}
+
+Similarly, you can take a look at the set of [pods](../user-guide/pods.md) that were created during cluster startup.
 You can do this via the
 
-```shell
+{% highlight console %}
 $ kubectl get --all-namespaces pods
-```
+{% endhighlight %}
+
 command.
 
 You'll see a list of pods that looks something like this (the name specifics will be different):
 
-```shell
+{% highlight console %}
 NAMESPACE     NAME                                           READY     STATUS    RESTARTS   AGE
 kube-system   fluentd-cloud-logging-kubernetes-minion-63uo   1/1       Running   0          14m
 kube-system   fluentd-cloud-logging-kubernetes-minion-c1n9   1/1       Running   0          14m
@@ -149,23 +152,24 @@ kube-system   kube-dns-v5-7ztia                              3/3       Running  
 kube-system   kube-ui-v1-curt1                               1/1       Running   0          15m
 kube-system   monitoring-heapster-v5-ex4u3                   1/1       Running   1          15m
 kube-system   monitoring-influx-grafana-v1-piled             2/2       Running   0          15m
-```
+{% endhighlight %}
 
 Some of the pods may take a few seconds to start up (during this time they'll show `Pending`), but check that they all show as `Running` after a short period.
 
 #### Run some examples
 
-Then, see [a simple nginx example](../../docs/user-guide/simple-nginx.html) to try out your new cluster.
+Then, see [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../examples/README.html).  The [guestbook example](../../examples/guestbook/README.html) is a good "getting started" walkthrough.
+For more complete applications, please look in the [examples directory](../../examples/).  The [guestbook example](../../examples/guestbook/) is a good "getting started" walkthrough.
 
 ### Tearing down the cluster
+
 To remove/delete/teardown the cluster, use the `kube-down.sh` script.
 
-```bash
+{% highlight bash %}
 cd kubernetes
 cluster/kube-down.sh
-```
+{% endhighlight %}
 
 Likewise, the `kube-up.sh` in the same directory will bring it back up. You do not need to rerun the `curl` or `wget` command: everything needed to setup the Kubernetes cluster is now on your workstation.
 
@@ -220,5 +224,6 @@ field values:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/gce.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/gce.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

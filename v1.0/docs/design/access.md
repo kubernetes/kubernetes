@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # K8s Identity and Access Management Sketch
 
 This document suggests a direction for identity and access management in the Kubernetes system.
@@ -18,6 +19,7 @@ High level goals are:
    - Ease integration with existing enterprise and hosted scenarios.
 
 ### Actors
+
 Each of these can act as normal users or attackers.
    - External Users: People who are accessing applications running on K8s (e.g. a web site served by webserver running in a container on K8s), but who do not have K8s API access.
    - K8s Users : People who access the K8s API (e.g. create K8s API objects like Pods)
@@ -26,6 +28,7 @@ Each of these can act as normal users or attackers.
    - K8s Admin means K8s Cluster Admins and K8s Project Admins taken together.
 
 ### Threats
+
 Both intentional attacks and accidental use of privilege are concerns.
 
 For both cases it may be useful to think about these categories differently:
@@ -56,6 +59,7 @@ K8s Cluster assets:
 This document is primarily about protecting K8s User assets and K8s cluster assets from other K8s Users and K8s Project and Cluster Admins.
 
 ### Usage environments
+
 Cluster in Small organization:
    - K8s Admins may be the same people as K8s Users.
    - few K8s Admins.
@@ -87,6 +91,7 @@ Pods configs should be largely portable between Org-run and hosted configuration
 
 
 # Design
+
 Related discussion:
 - https://github.com/GoogleCloudPlatform/kubernetes/issues/442
 - https://github.com/GoogleCloudPlatform/kubernetes/issues/443
@@ -100,7 +105,9 @@ K8s distribution should include templates of config, and documentation, for simp
 Features in this doc are divided into "Initial Feature", and "Improvements".   Initial features would be candidates for version 1.00.
 
 ## Identity
-###userAccount
+
+### userAccount
+
 K8s will have a `userAccount` API object.
 - `userAccount` has a UID which is immutable.  This is used to associate users with objects and to record actions in audit logs.
 - `userAccount` has a name which is a string and human readable and unique among userAccounts.  It is used to refer to users in Policies, to ensure that the Policies are human readable.  It can be changed only when there are no Policy objects or other objects which refer to that name.  An email address is a suggested format for this field.
@@ -133,7 +140,8 @@ Enterprise Profile:
    - each service using the API has own `userAccount` too. (e.g. `scheduler`, `repcontroller`)
    - automated jobs to denormalize the ldap group info into the local system list of users into the K8s userAccount file.
 
-###Unix accounts
+### Unix accounts
+
 A `userAccount` is not a Unix user account.  The fact that a pod is started by a `userAccount` does not mean that the processes in that pod's containers run as a Unix user with a corresponding name or identity.
 
 Initially:
@@ -145,10 +153,11 @@ Improvements:
 - requires docker to integrate user namespace support, and deciding what getpwnam() does for these uids.
 - any features that help users avoid use of privileged containers (https://github.com/GoogleCloudPlatform/kubernetes/issues/391)
 
-###Namespaces
+### Namespaces
+
 K8s will have a have a `namespace` API object.  It is similar to a Google Compute Engine `project`.  It provides a namespace for objects created by a group of people co-operating together, preventing name collisions with non-cooperating groups.  It also serves as a reference point for authorization policies.
 
-Namespaces are described in [namespaces.md](namespaces.html).
+Namespaces are described in [namespaces.md](namespaces.md).
 
 In the Enterprise Profile:
    - a `userAccount` may have permission to access several `namespace`s.
@@ -158,7 +167,7 @@ In the Simple Profile:
 
 Namespaces versus userAccount vs Labels:
 - `userAccount`s are intended for audit logging (both name and UID should be logged), and to define who has access to `namespace`s.
-- `labels` (see [docs/user-guide/labels.md](../../docs/user-guide/labels.html)) should be used to distinguish pods, users, and other objects that cooperate towards a common goal but are different in some way, such as version, or responsibilities.
+- `labels` (see [docs/user-guide/labels.md](../../docs/user-guide/labels.md)) should be used to distinguish pods, users, and other objects that cooperate towards a common goal but are different in some way, such as version, or responsibilities.
 - `namespace`s prevent name collisions between uncoordinated groups of people, and provide a place to attach common policies for co-operating groups of people.
 
 
@@ -219,7 +228,7 @@ Policy objects may be applicable only to a single namespace or to all namespaces
 
 ## Accounting
 
-The API should have a `quota` concept (see https://github.com/GoogleCloudPlatform/kubernetes/issues/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources design doc](resources.html)).
+The API should have a `quota` concept (see https://github.com/GoogleCloudPlatform/kubernetes/issues/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources design doc](resources.md)).
 
 Initially:
 - a `quota` object is immutable.
@@ -256,5 +265,6 @@ Improvements:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/access.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/access.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

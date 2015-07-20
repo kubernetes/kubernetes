@@ -5,12 +5,15 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## kubernetes API client libraries
 
 ### Supported
-   * [Go](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/pkg/client)
+
+   * [Go](http://releases.k8s.io/v1.01/pkg/client/)
 
 ### User Contributed
+
 *Note: Libraries provided by outside parties are supported by their authors, not the core Kubernetes team*
 
    * [Java (OSGI)](https://bitbucket.org/amdatulabs/amdatu-kubernetes)
@@ -24,5 +27,6 @@ layout: docwithnav
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/client-libraries.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/client-libraries.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

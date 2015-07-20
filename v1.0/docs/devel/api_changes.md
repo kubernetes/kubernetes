@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # So you want to change the API?
 
 The Kubernetes API has two major components - the internal structures and
@@ -87,25 +88,25 @@ should talk to the Kubernetes team first.
 Let's consider some examples.  In a hypothetical API (assume we're at version
 v6), the `Frobber` struct looks something like this:
 
-```go
+{% highlight go %}
 // API v6.
 type Frobber struct {
 	Height int    `json:"height"`
 	Param  string `json:"param"`
 }
-```
+{% endhighlight %}
 
 You want to add a new `Width` field.  It is generally safe to add new fields
 without changing the API version, so you can simply change it to:
 
-```go
+{% highlight go %}
 // Still API v6.
 type Frobber struct {
 	Height int    `json:"height"`
 	Width  int    `json:"width"`
 	Param  string `json:"param"`
 }
-```
+{% endhighlight %}
 
 The onus is on you to define a sane default value for `Width` such that rule #1
 above is true - API calls and stored objects that used to work must continue to
@@ -115,7 +116,7 @@ For your next change you want to allow multiple `Param` values.  You can not
 simply change `Param string` to `Params []string` (without creating a whole new
 API version) - that fails rules #1 and #2.  You can instead do something like:
 
-```go
+{% highlight go %}
 // Still API v6, but kind of clumsy.
 type Frobber struct {
 	Height int           `json:"height"`
@@ -123,7 +124,7 @@ type Frobber struct {
 	Param  string        `json:"param"`  // the first param
 	ExtraParams []string `json:"params"` // additional params
 }
-```
+{% endhighlight %}
 
 Now you can satisfy the rules: API calls that provide the old style `Param`
 will still work, while servers that don't understand `ExtraParams` can ignore
@@ -133,14 +134,14 @@ Part of the reason for versioning APIs and for using internal structs that are
 distinct from any one version is to handle growth like this.  The internal
 representation can be implemented as:
 
-```go
+{% highlight go %}
 // Internal, soon to be v7beta1.
 type Frobber struct {
 	Height int
 	Width  int
 	Params []string
 }
-```
+{% endhighlight %}
 
 The code that converts to/from versioned APIs can decode this into the somewhat
 uglier (but compatible!) structures.  Eventually, a new API version, let's call
@@ -257,9 +258,10 @@ conversion functions when writing your conversion functions.
 Once all the necessary manually written conversions are added, you need to
 regenerate auto-generated ones. To regenerate them:
    - run
-```
-   $ hack/update-generated-conversions.sh
-```
+
+{% highlight sh %}
+hack/update-generated-conversions.sh
+{% endhighlight %}
 
 If running the above script is impossible due to compile errors, the easiest
 workaround is to comment out the code causing errors and let the script to
@@ -332,13 +334,14 @@ an example to illustrate your change.
 
 Make sure you update the swagger API spec by running:
 
-```shell
-$ hack/update-swagger-spec.sh
-```
+{% highlight sh %}
+hack/update-swagger-spec.sh
+{% endhighlight %}
 
 The API spec changes should be in a commit separate from your other changes.
 
 ## Incompatible API changes
+
 If your change is going to be backward incompatible or might be a breaking change for API
 consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
 the change gets in. If you are unsure, ask. Also make sure that the change gets documented in
@@ -350,5 +353,6 @@ TODO(smarterclayton): write this.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

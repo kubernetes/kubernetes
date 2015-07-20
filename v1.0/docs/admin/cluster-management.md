@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Cluster Management
 
 This doc is in progress.
@@ -36,10 +37,10 @@ KUBE_API_VERSIONS env var controls the API versions that are supported in the cl
 
 You can use the kube-version-change utility to convert config files between different API versions.
 
-```
+{% highlight console %}
 $ hack/build-go.sh cmd/kube-version-change
 $ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o myPod.v1.yaml
-```
+{% endhighlight %}
 
 ### Maintenance on a Node
 
@@ -63,9 +64,10 @@ If you want more control over the upgrading process, you may use the following w
     `kubectl replace nodes $NODENAME --patch='{"apiVersion": "v1", "spec": {"unschedulable": false}}'`.  
     If you deleted the node's VM instance and created a new one, then a new schedulable node resource will
     be created automatically when you create a new VM instance (if you're using a cloud provider that supports
-    node discovery; currently this is only Google Compute Engine, not including CoreOS on Google Compute Engine using kube-register). See [Node](node.html).
+    node discovery; currently this is only Google Compute Engine, not including CoreOS on Google Compute Engine using kube-register). See [Node](node.md).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-management.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-management.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

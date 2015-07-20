@@ -42,15 +42,16 @@ Getting started with libvirt CoreOS
 #### ¹ Depending on your distribution, libvirt access may be denied by default or may require a password at each access.
 
 You can test it with the following command:
-```
+
+{% highlight sh %}
 virsh -c qemu:///system pool-list
-```
+{% endhighlight %}
 
 If you have access error messages, please read https://libvirt.org/acl.html and https://libvirt.org/aclpolkit.html .
 
 In short, if your libvirt has been compiled with Polkit support (ex: Arch, Fedora 21), you can create `/etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules` as follows to grant full access to libvirt to `$USER`
 
-```
+{% highlight sh %}
 sudo /bin/sh -c "cat - > /etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules" << EOF
 polkit.addRule(function(action, subject) {
         if (action.id == "org.libvirt.unix.manage" &&
@@ -61,17 +62,17 @@ polkit.addRule(function(action, subject) {
         }
 });
 EOF
-```
+{% endhighlight %}
 
 If your libvirt has not been compiled with Polkit (ex: Ubuntu 14.04.1 LTS), check the permissions on the libvirt unix socket:
 
-```
-ls -l /var/run/libvirt/libvirt-sock
+{% highlight console %}
+$ ls -l /var/run/libvirt/libvirt-sock
 srwxrwx--- 1 root libvirtd 0 févr. 12 16:03 /var/run/libvirt/libvirt-sock
 
-usermod -a -G libvirtd $USER
+$ usermod -a -G libvirtd $USER
 # $USER needs to logout/login to have the new group be taken into account
-```
+{% endhighlight %}
 
 (Replace `$USER` with your login name)
 
@@ -83,9 +84,9 @@ As we’re using the `qemu:///system` instance of libvirt, qemu will run with a 
 
 If your `$HOME` is world readable, everything is fine. If your $HOME is private, `cluster/kube-up.sh` will fail with an error message like:
 
-```
+{% highlight console %}
 error: Cannot access storage file '$HOME/.../kubernetes/cluster/libvirt-coreos/libvirt_storage_pool/kubernetes_master.img' (as uid:99, gid:78): Permission denied
-```
+{% endhighlight %}
 
 In order to fix that issue, you have several possibilities:
 * set `POOL_PATH` inside `cluster/libvirt-coreos/config-default.sh` to a directory:
@@ -96,9 +97,9 @@ In order to fix that issue, you have several possibilities:
 
 On Arch:
 
-```
+{% highlight sh %}
 setfacl -m g:kvm:--x ~
-```
+{% endhighlight %}
 
 ### Setup
 
@@ -106,12 +107,12 @@ By default, the libvirt-coreos setup will create a single kubernetes master and 
 
 To start your local cluster, open a shell and run:
 
-```shell
+{% highlight sh %}
 cd kubernetes
 
 export KUBERNETES_PROVIDER=libvirt-coreos
 cluster/kube-up.sh
-```
+{% endhighlight %}
 
 The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
@@ -124,25 +125,25 @@ The `KUBE_PUSH` environment variable may be set to specify which kubernetes bina
 
 You can check that your machines are there and running with:
 
-```
-virsh -c qemu:///system list
+{% highlight console %}
+$ virsh -c qemu:///system list
  Id    Name                           State
 ----------------------------------------------------
  15    kubernetes_master              running
  16    kubernetes_minion-01           running
  17    kubernetes_minion-02           running
  18    kubernetes_minion-03           running
- ```
+{% endhighlight %}
 
 You can check that the kubernetes cluster is working with:
 
-```
+{% highlight console %}
 $ kubectl get nodes
 NAME                LABELS              STATUS
 192.168.10.2        <none>              Ready
 192.168.10.3        <none>              Ready
 192.168.10.4        <none>              Ready
-```
+{% endhighlight %}
 
 The VMs are running [CoreOS](https://coreos.com/).
 Your ssh keys have already been pushed to the VM. (It looks for ~/.ssh/id_*.pub)
@@ -151,51 +152,54 @@ The IP to connect to the master is 192.168.10.1.
 The IPs to connect to the nodes are 192.168.10.2 and onwards.
 
 Connect to `kubernetes_master`:
-```
+
+{% highlight sh %}
 ssh core@192.168.10.1
-```
+{% endhighlight %}
 
 Connect to `kubernetes_minion-01`:
-```
+
+{% highlight sh %}
 ssh core@192.168.10.2
-```
+{% endhighlight %}
 
 ### Interacting with your Kubernetes cluster with the `kube-*` scripts.
 
 All of the following commands assume you have set `KUBERNETES_PROVIDER` appropriately:
 
-```
+{% highlight sh %}
 export KUBERNETES_PROVIDER=libvirt-coreos
-```
+{% endhighlight %}
 
 Bring up a libvirt-CoreOS cluster of 5 nodes
 
-```
+{% highlight sh %}
 NUM_MINIONS=5 cluster/kube-up.sh
-```
+{% endhighlight %}
 
 Destroy the libvirt-CoreOS cluster
 
-```
+{% highlight sh %}
 cluster/kube-down.sh
-```
+{% endhighlight %}
 
 Update the libvirt-CoreOS cluster with a new Kubernetes release produced by `make release` or `make release-skip-tests`:
 
-```
+{% highlight sh %}
 cluster/kube-push.sh
-```
+{% endhighlight %}
 
 Update the libvirt-CoreOS cluster with the locally built Kubernetes binaries produced by `make`:
-```
+
+{% highlight sh %}
 KUBE_PUSH=local cluster/kube-push.sh
-```
+{% endhighlight %}
 
 Interact with the cluster
 
-```
+{% highlight sh %}
 kubectl ...
-```
+{% endhighlight %}
 
 ### Troubleshooting
 
@@ -203,9 +207,9 @@ kubectl ...
 
 Build the release tarballs:
 
-```
+{% highlight sh %}
 make release
-```
+{% endhighlight %}
 
 #### Can't find virsh in PATH, please fix and retry.
 
@@ -213,21 +217,21 @@ Install libvirt
 
 On Arch:
 
-```
+{% highlight sh %}
 pacman -S qemu libvirt
-```
+{% endhighlight %}
 
 On Ubuntu 14.04.1:
 
-```
+{% highlight sh %}
 aptitude install qemu-system-x86 libvirt-bin
-```
+{% endhighlight %}
 
 On Fedora 21:
 
-```
+{% highlight sh %}
 yum install qemu libvirt
-```
+{% endhighlight %}
 
 #### error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': No such file or directory
 
@@ -235,15 +239,15 @@ Start the libvirt daemon
 
 On Arch:
 
-```
+{% highlight sh %}
 systemctl start libvirtd
-```
+{% endhighlight %}
 
 On Ubuntu 14.04.1:
 
-```
+{% highlight sh %}
 service libvirt-bin start
-```
+{% endhighlight %}
 
 #### error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': Permission denied
 
@@ -251,7 +255,7 @@ Fix libvirt access permission (Remember to adapt `$USER`)
 
 On Arch and Fedora 21:
 
-```
+{% highlight sh %}
 cat > /etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules <<EOF
 polkit.addRule(function(action, subject) {
         if (action.id == "org.libvirt.unix.manage" &&
@@ -262,13 +266,13 @@ polkit.addRule(function(action, subject) {
         }
 });
 EOF
-```
+{% endhighlight %}
 
 On Ubuntu:
 
-```
+{% highlight sh %}
 usermod -a -G libvirtd $USER
-```
+{% endhighlight %}
 
 #### error: Out of memory initializing network (virsh net-create...)
 
@@ -276,5 +280,6 @@ Ensure libvirtd has been restarted since ebtables was installed.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/libvirt-coreos.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/libvirt-coreos.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Downward API
 
 It is sometimes useful for a container to have information about itself, but we
@@ -54,7 +55,7 @@ environment variable they want.
 This is an example of a pod that consumes its name and namespace via the
 downward API:
 
-```yaml
+{% highlight yaml %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -74,13 +75,14 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
   restartPolicy: Never
-```
+{% endhighlight %}
 
 Some more thorough examples:
-   * [environment variables](environment-guide/README.html)
-   * [downward API](downward-api/README.html)
+   * [environment variables](environment-guide/)
+   * [downward API](downward-api/)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/downward-api.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/downward-api.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

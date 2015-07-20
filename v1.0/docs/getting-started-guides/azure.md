@@ -10,10 +10,10 @@ Getting started on Microsoft Azure
 
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-    - [Setup](#setup)
-    - [Getting started with your cluster](#getting-started-with-your-cluster)
-    - [Tearing down the cluster](#tearing-down-the-cluster)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Getting started with your cluster](#getting-started-with-your-cluster)
+- [Tearing down the cluster](#tearing-down-the-cluster)
 
 
 ## Prerequisites
@@ -27,12 +27,15 @@ Getting started on Microsoft Azure
 **Prerequisites for your workstation**
 
 1. Be running a Linux or Mac OS X.
-2. Get or build a [binary release](binary_release.html)
+2. Get or build a [binary release](binary_release.md)
 3. If you want to build your own release, you need to have [Docker
 installed](https://docs.docker.com/installation/).  On Mac OS X you can use
 [boot2docker](http://boot2docker.io/).
 
 ## Setup
+
+### Starting a cluster
+
 The cluster setup scripts can setup Kubernetes for multiple targets. First modify `cluster/kube-env.sh` to specify azure:
 
     KUBERNETES_PROVIDER="azure"
@@ -48,24 +51,41 @@ You can create a virtual network:
 
 Now you're ready.
 
-You can then use the `cluster/kube-*.sh` scripts to manage your azure cluster, start with:
+You can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
 
+    cd kubernetes
     cluster/kube-up.sh
 
 The script above will start (by default) a single master VM along with 4 worker VMs.  You
 can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 
-## Getting started with your cluster
-See [a simple nginx example](../user-guide/simple-nginx.html) to try out your new cluster.
+### Adding the kubernetes command line tools to PATH
 
-For more complete applications, please look in the [examples directory](../../examples/README.html).
+The [kubectl](../../docs/user-guide/kubectl/kubectl.md) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
+You will use it to look at your new cluster and bring up example apps.
+
+Add the appropriate binary folder to your `PATH` to access kubectl:
+
+    # OS X
+    export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
+
+    # Linux
+    export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
+
+## Getting started with your cluster
+
+See [a simple nginx example](../user-guide/simple-nginx.md) to try out your new cluster.
+
+For more complete applications, please look in the [examples directory](../../examples/).
 
 ## Tearing down the cluster
-```
+
+{% highlight sh %}
 cluster/kube-down.sh
-```
+{% endhighlight %}
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/azure.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/azure.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

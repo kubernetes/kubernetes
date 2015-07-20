@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Containers with Kubernetes
 
 ## Containers and commands
@@ -97,5 +98,6 @@ The relationship between Docker's capabilities and [Linux capabilities](http://m
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/containers.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/containers.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

@@ -5,16 +5,20 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # kubeconfig files
+
 In order to easily switch between multiple clusters, a kubeconfig file was defined.  This file contains a series of authentication mechanisms and cluster connection information associated with nicknames.  It also introduces the concept of a tuple of authentication information (user) and cluster connection information called a context that is also associated with a nickname.
 
 Multiple kubeconfig files are allowed.  At runtime they are loaded and merged together along with override options specified from the command line (see rules below).
 
 ## Related discussion
+
 https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
 
 ## Example kubeconfig file
-```
+
+{% highlight yaml %}
 apiVersion: v1
 clusters:
 - cluster:
@@ -52,9 +56,10 @@ users:
   user:
     client-certificate: path/to/my/client/cert
     client-key: path/to/my/client/key
-```
+{% endhighlight %}
 
 ## Loading and merging rules
+
 The rules for loading and merging the kubeconfig files are straightforward, but there are a lot of them.  The final config is built in this order:
   1.  Get the kubeconfig  from disk.  This is done with the following hierarchy and merge rules:
 
@@ -89,20 +94,24 @@ The rules for loading and merging the kubeconfig files are straightforward, but 
   1.  For any information still missing, use default values and potentially prompt for authentication information
 
 ## Manipulation of kubeconfig via `kubectl config <subcommand>`
+
 In order to more easily manipulate kubeconfig files, there are a series of subcommands to `kubectl config` to help.
-See [kubectl/kubectl_config.md](kubectl/kubectl_config.html) for help.
+See [kubectl/kubectl_config.md](kubectl/kubectl_config.md) for help.
 
 ### Example
-```
-$kubectl config set-credentials myself --username=admin --password=secret
-$kubectl config set-cluster local-server --server=http://localhost:8080
-$kubectl config set-context default-context --cluster=local-server --user=myself
-$kubectl config use-context default-context
-$kubectl config set contexts.default-context.namespace the-right-prefix
-$kubectl config view
-```
+
+{% highlight console %}
+$ kubectl config set-credentials myself --username=admin --password=secret
+$ kubectl config set-cluster local-server --server=http://localhost:8080
+$ kubectl config set-context default-context --cluster=local-server --user=myself
+$ kubectl config use-context default-context
+$ kubectl config set contexts.default-context.namespace the-right-prefix
+$ kubectl config view
+{% endhighlight %}
+
 produces this output
-```
+
+{% highlight yaml %}
 clusters:
   local-server:
     server: http://localhost:8080
@@ -118,9 +127,11 @@ users:
     username: admin
     password: secret
 
-```
+{% endhighlight %}
+
 and a kubeconfig file that looks like this
-```
+
+{% highlight yaml %}
 apiVersion: v1
 clusters:
 - cluster:
@@ -140,22 +151,24 @@ users:
   user:
     username: admin
     password: secret
-```
+{% endhighlight %}
 
 #### Commands for the example file
-```
-$kubectl config set preferences.colors true
-$kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1
-$kubectl config set-cluster horse-cluster --server=https://horse.org:4443 --certificate-authority=path/to/my/cafile
-$kubectl config set-cluster pig-cluster --server=https://pig.org:443 --insecure-skip-tls-verify=true
-$kubectl config set-credentials blue-user --token=blue-token
-$kubectl config set-credentials green-user --client-certificate=path/to/my/client/cert --client-key=path/to/my/client/key
-$kubectl config set-context queen-anne-context --cluster=pig-cluster --user=black-user --namespace=saw-ns
-$kubectl config set-context federal-context --cluster=horse-cluster --user=green-user --namespace=chisel-ns
-$kubectl config use-context federal-context
-```
+
+{% highlight console %}
+$ kubectl config set preferences.colors true
+$ kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1
+$ kubectl config set-cluster horse-cluster --server=https://horse.org:4443 --certificate-authority=path/to/my/cafile
+$ kubectl config set-cluster pig-cluster --server=https://pig.org:443 --insecure-skip-tls-verify=true
+$ kubectl config set-credentials blue-user --token=blue-token
+$ kubectl config set-credentials green-user --client-certificate=path/to/my/client/cert --client-key=path/to/my/client/key
+$ kubectl config set-context queen-anne-context --cluster=pig-cluster --user=black-user --namespace=saw-ns
+$ kubectl config set-context federal-context --cluster=horse-cluster --user=green-user --namespace=chisel-ns
+$ kubectl config use-context federal-context
+{% endhighlight %}
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubeconfig-file.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubeconfig-file.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

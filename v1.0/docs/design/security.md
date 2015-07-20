@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Security in Kubernetes
 
 Kubernetes should define a reasonable set of security best practices that allows processes to be isolated from each other, from the cluster infrastructure, and which preserves important boundaries between those who manage the cluster, and those who use the cluster.
@@ -70,14 +71,14 @@ Automated process users fall into the following categories:
 A pod runs in a *security context* under a *service account* that is defined by an administrator or project administrator, and the *secrets* a pod has access to is limited by that *service account*.
 
 
-1. The API should authenticate and authorize user actions [authn and authz](access.html)
+1. The API should authenticate and authorize user actions [authn and authz](access.md)
 2. All infrastructure components (kubelets, kube-proxies, controllers, scheduler) should have an infrastructure user that they can authenticate with and be authorized to perform only the functions they require against the API.
 3. Most infrastructure components should use the API as a way of exchanging data and changing the system, and only the API should have access to the underlying data store (etcd)
-4. When containers run on the cluster and need to talk to other containers or the API server, they should be identified and authorized clearly as an autonomous process via a [service account](service_accounts.html)
+4. When containers run on the cluster and need to talk to other containers or the API server, they should be identified and authorized clearly as an autonomous process via a [service account](service_accounts.md)
    1.  If the user who started a long-lived process is removed from access to the cluster, the process should be able to continue without interruption
    2.  If the user who started processes are removed from the cluster, administrators may wish to terminate their processes in bulk
    3.  When containers run with a service account, the user that created / triggered the service account behavior must be associated with the container's action
-5. When container processes run on the cluster, they should run in a [security context](security_context.html) that isolates those processes via Linux user security, user namespaces, and permissions.
+5. When container processes run on the cluster, they should run in a [security context](security_context.md) that isolates those processes via Linux user security, user namespaces, and permissions.
    1.  Administrators should be able to configure the cluster to automatically confine all container processes as a non-root, randomly assigned UID
    2.  Administrators should be able to ensure that container processes within the same namespace are all assigned the same unix user UID
    3.  Administrators should be able to limit which developers and project administrators have access to higher privilege actions
@@ -86,7 +87,7 @@ A pod runs in a *security context* under a *service account* that is defined by 
    6.  Developers may need to ensure their images work within higher security requirements specified by administrators
    7.  When available, Linux kernel user namespaces can be used to ensure 5.2 and 5.4 are met.
    8.  When application developers want to share filesystem data via distributed filesystems, the Unix user ids on those filesystems must be consistent across different container processes
-6. Developers should be able to define [secrets](secrets.html) that are automatically added to the containers when pods are run
+6. Developers should be able to define [secrets](secrets.md) that are automatically added to the containers when pods are run
    1.  Secrets are files injected into the container whose values should not be displayed within a pod. Examples:
        1. An SSH private key for git cloning remote data
        2. A client certificate for accessing a remote system
@@ -100,11 +101,11 @@ A pod runs in a *security context* under a *service account* that is defined by 
 
 ### Related design discussion
 
-* [Authorization and authentication](access.html)
+* [Authorization and authentication](access.md)
 * [Secret distribution via files](https://github.com/GoogleCloudPlatform/kubernetes/pull/2030)
 * [Docker secrets](https://github.com/docker/docker/pull/6697)
 * [Docker vault](https://github.com/docker/docker/issues/10310)
-* [Service Accounts:](service_accounts.html)
+* [Service Accounts:](service_accounts.md)
 * [Secret volumes](https://github.com/GoogleCloudPlatform/kubernetes/pull/4126)
 
 ## Specific Design Points
@@ -125,5 +126,6 @@ The Kubernetes pod scheduler is responsible for reading data from the pod to fit
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/security.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/security.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

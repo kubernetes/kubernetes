@@ -16,7 +16,8 @@ using resources with kubectl can be found in (working_with_resources.md).*
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-  - [Types (Kinds)](#types-(kinds))
+
+  - [Types (Kinds)](#types-kinds)
     - [Resources](#resources)
     - [Objects](#objects)
       - [Metadata](#metadata)
@@ -43,10 +44,11 @@ using resources with kubectl can be found in (working_with_resources.md).*
       - [Success codes](#success-codes)
       - [Error codes](#error-codes)
   - [Response Status Kind](#response-status-kind)
+  - [Events](#events)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-The conventions of the [Kubernetes API](../api.html) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
+The conventions of the [Kubernetes API](../api.md) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
 
 The general style of the Kubernetes API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. Kubernetes also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields. Where relevant HTTP header fields exist, they should mirror the content of JSON fields, but the information should not be represented only in the HTTP header.
 
@@ -80,7 +82,7 @@ Kinds are grouped into three categories:
 
    Most objects defined in the system should have an endpoint that returns the full set of resources, as well as zero or more endpoints that return subsets of the full list. Some objects may be singletons (the current user, the system defaults) and may not have lists.
 
-   In addition, all lists that return objects with labels should support label filtering (see [docs/user-guide/labels.md](../user-guide/labels.html), and most lists should support filtering by fields.
+   In addition, all lists that return objects with labels should support label filtering (see [docs/user-guide/labels.md](../user-guide/labels.md), and most lists should support filtering by fields.
 
    Examples: PodLists, ServiceLists, NodeLists
 
@@ -113,17 +115,17 @@ These fields are required for proper decoding of the object. They may be populat
 
 Every object kind MUST have the following metadata in a nested object field called "metadata":
 
-* namespace: a namespace is a DNS compatible subdomain that objects are subdivided into. The default namespace is 'default'.  See [docs/admin/namespaces.md](../admin/namespaces.html) for more.
-* name: a string that uniquely identifies this object within the current namespace (see [docs/user-guide/identifiers.md](../user-guide/identifiers.html)). This value is used in the path when retrieving an individual object.
-* uid: a unique in time and space value (typically an RFC 4122 generated identifier, see [docs/user-guide/identifiers.md](../user-guide/identifiers.html)) used to distinguish between objects with the same name that have been deleted and recreated
+* namespace: a namespace is a DNS compatible subdomain that objects are subdivided into. The default namespace is 'default'.  See [docs/user-guide/namespaces.md](../user-guide/namespaces.md) for more.
+* name: a string that uniquely identifies this object within the current namespace (see [docs/user-guide/identifiers.md](../user-guide/identifiers.md)). This value is used in the path when retrieving an individual object.
+* uid: a unique in time and space value (typically an RFC 4122 generated identifier, see [docs/user-guide/identifiers.md](../user-guide/identifiers.md)) used to distinguish between objects with the same name that have been deleted and recreated
 
 Every object SHOULD have the following metadata in a nested object field called "metadata":
 
 * resourceVersion: a string that identifies the internal version of this object that can be used by clients to determine when objects have changed. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. (see [concurrency control](#concurrency-control-and-consistency), below, for more details)
 * creationTimestamp: a string representing an RFC 3339 date of the date and time an object was created
 * deletionTimestamp: a string representing an RFC 3339 date of the date and time after which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time.
-* labels: a map of string keys and values that can be used to organize and categorize objects (see [docs/user-guide/labels.md](../user-guide/labels.html))
-* annotations: a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object (see [docs/user-guide/annotations.md](../user-guide/annotations.html))
+* labels: a map of string keys and values that can be used to organize and categorize objects (see [docs/user-guide/labels.md](../user-guide/labels.md))
+* annotations: a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object (see [docs/user-guide/annotations.md](../user-guide/annotations.md))
 
 Labels are intended for organizational purposes by end users (select the pods that match this label query). Annotations enable third-party automation and tooling to decorate objects with additional metadata for their own use.
 
@@ -156,11 +158,11 @@ In order to preserve extensibility, in the future, we intend to explicitly conve
 
 Note that historical information status (e.g., last transition time, failure counts) is only provided at best effort, and is not guaranteed to not be lost.
 
-Status information that may be large (especially unbounded in size, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](../design/resources.html#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
+Status information that may be large (especially unbounded in size, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](../design/resources.md#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
 
 #### References to related objects
 
-References to loosely coupled sets of objects, such as [pods](../user-guide/pods.html) overseen by a [replication controller](../user-guide/replication-controller.html), are usually best referred to using a [label selector](../user-guide/labels.html). In order to ensure that GETs of individual objects remain bounded in time and space, these sets may be queried via separate API queries, but will not be expanded in the referring object's status.
+References to loosely coupled sets of objects, such as [pods](../user-guide/pods.md) overseen by a [replication controller](../user-guide/replication-controller.md), are usually best referred to using a [label selector](../user-guide/labels.md). In order to ensure that GETs of individual objects remain bounded in time and space, these sets may be queried via separate API queries, but will not be expanded in the referring object's status.
 
 References to specific objects, especially specific resource versions and/or specific fields of those objects, are specified using the `ObjectReference` type. Unlike partial URLs, the ObjectReference type facilitates flexible defaulting of fields from the referring object or other contextual information.
 
@@ -171,17 +173,20 @@ References in the status of the referee to the referrer may be permitted, when t
 Discussed in [#2004](https://github.com/GoogleCloudPlatform/kubernetes/issues/2004) and elsewhere. There are no maps of subobjects in any API objects. Instead, the convention is to use a list of subobjects containing name fields.
 
 For example:
-```yaml
+
+{% highlight yaml %}
 ports:
   - name: www
     containerPort: 80
-```
+{% endhighlight %}
+
 vs.
-```yaml
+
+{% highlight yaml %}
 ports:
   www:
     containerPort: 80
-```
+{% endhighlight %}
 
 This rule maintains the invariant that all JSON/YAML keys are fields in API objects. The only exceptions are pure maps in the API (currently, labels, selectors, and annotations), as opposed to sets of subobjects.
 
@@ -227,7 +232,7 @@ Kubernetes by convention exposes additional verbs as new root endpoints with sin
 
 These are verbs which change the fundamental type of data returned (watch returns a stream of JSON instead of a single JSON object). Support of additional verbs is not required for all object types.
 
-Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [docs/user-guide/accessing-the-cluster.md](../user-guide/accessing-the-cluster.html).
+Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [docs/user-guide/accessing-the-cluster.md](../user-guide/accessing-the-cluster.md).
 
 When resources wish to expose alternative actions that are closely coupled to a single resource, they should do so using new sub-resources. An example is allowing automated processes to update the "status" field of a Pod. The `/pods` endpoint only allows updates to "metadata" and "spec", since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted. Likewise, some actions like "stop" or "scale" are best represented as REST sub-resources that are POSTed to.  The POST action may require a simple kind to be provided if the action requires parameters, or function without a request body.
 
@@ -248,22 +253,22 @@ The API supports three different PATCH operations, determined by their correspon
 
 In the standard JSON merge patch, JSON objects are always merged but lists are always replaced. Often that isn't what we want. Let's say we start with the following Pod:
 
-```yaml
+{% highlight yaml %}
 spec:
   containers:
     - name: nginx
       image: nginx-1.0
-```
+{% endhighlight %}
 
 ...and we POST that to the server (as JSON). Then let's say we want to *add* a container to this Pod.
 
-```yaml
+{% highlight yaml %}
 PATCH /api/v1/namespaces/default/pods/pod-name
 spec:
   containers:
     - name: log-tailer
       image: log-tailer-1.0
-```
+{% endhighlight %}
 
 If we were to use standard Merge Patch, the entire container list would be replaced with the single log-tailer container. However, our intent is for the container lists to merge together based on the `name` field.
 
@@ -277,47 +282,47 @@ Strategic Merge Patch also supports special operations as listed below.
 
 To override the container list to be strictly replaced, regardless of the default:
 
-```yaml
+{% highlight yaml %}
 containers:
   - name: nginx
     image: nginx-1.0
   - $patch: replace   # any further $patch operations nested in this list will be ignored
-```
+{% endhighlight %}
 
 To delete an element of a list that should be merged:
 
-```yaml
+{% highlight yaml %}
 containers:
   - name: nginx
     image: nginx-1.0
   - $patch: delete
     name: log-tailer  # merge key and value goes here
-```
+{% endhighlight %}
 
 ### Map Operations
 
 To indicate that a map should not be merged and instead should be taken literally:
 
-```yaml
+{% highlight yaml %}
 $patch: replace  # recursive and applies to all fields of the map it's in
 containers:
 - name: nginx
   image: nginx-1.0
-```
+{% endhighlight %}
 
 To delete a field of a map:
 
-```yaml
+{% highlight yaml %}
 name: nginx
 image: nginx-1.0
 labels:
   live: null  # set the value of the map key to null
-```
+{% endhighlight %}
 
 
 ## Idempotency
 
-All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [docs/user-guide/identifiers.md](../user-guide/identifiers.html) for details.
+All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [docs/user-guide/identifiers.md](../user-guide/identifiers.md) for details.
 
 Names generated by the system may be requested using `metadata.generateName`. GenerateName indicates that the name should be made unique by the server prior to persisting it. A non-empty value for the field indicates the name will be made unique (and the name returned to the client will be different than the name passed). The value of this field will be combined with a unique suffix on the server if the Name field has not been provided. The provided value must be valid within the rules for Name, and may be truncated by the length of the suffix required to make the value unique on the server. If this field is specified, and Name is not present, the server will NOT return a 409 if the generated name exists - instead, it will either return 201 Created or 504 with Reason `ServerTimeout` indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).
 
@@ -427,6 +432,7 @@ The following HTTP status codes may be returned by the API.
   * Returned in response to HTTP OPTIONS requests.
 
 #### Error codes
+
 * `307 StatusTemporaryRedirect`
   * Indicates that the address for the requested resource has changed.
   * Suggested client recovery behavior
@@ -467,7 +473,7 @@ The following HTTP status codes may be returned by the API.
 * `429 StatusTooManyRequests`
   * Indicates that the either the client rate limit has been exceeded or the server has received more requests then it can process.
   * Suggested client recovery behavior:
-    * Read the ```Retry-After``` HTTP header from the response, and wait at least that long before retrying.
+    * Read the `Retry-After` HTTP header from the response, and wait at least that long before retrying.
 * `500 StatusInternalServerError`
   * Indicates that the server can be reached and understood the request, but either an unexpected internal error occurred and the outcome of the call is unknown, or the server cannot complete the action in a reasonable time (this maybe due to temporary server load or a transient communication issue with another server).
   * Suggested client recovery behavior:
@@ -483,17 +489,18 @@ The following HTTP status codes may be returned by the API.
 
 ## Response Status Kind
 
-Kubernetes will always return the ```Status``` kind from any API endpoint when an error occurs.
+Kubernetes will always return the `Status` kind from any API endpoint when an error occurs.
 Clients SHOULD handle these types of objects when appropriate.
 
-A ```Status``` kind will be returned by the API in two cases:
+A `Status` kind will be returned by the API in two cases:
   * When an operation is not successful (i.e. when the server would return a non 2xx HTTP status code).
-  * When a HTTP ```DELETE``` call is successful.
+  * When a HTTP `DELETE` call is successful.
 
 The status object is encoded as JSON and provided as the body of the response.  The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning. When fields in the status object have the same meaning as generally defined HTTP headers and that header is returned with the response, the header should be considered as having higher priority.
 
 **Example:**
-```
+
+{% highlight console %}
 $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1/namespaces/default/pods/grafana
 
 > GET /api/v1/namespaces/default/pods/grafana HTTP/1.1
@@ -521,19 +528,19 @@ $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https:/
   },
   "code": 404
 }
-```
+{% endhighlight %}
 
-```status``` field contains one of two possible values:
+`status` field contains one of two possible values:
 * `Success`
 * `Failure`
 
 `message` may contain human-readable description of the error
 
-```reason``` may contain a machine-readable description of why this operation is in the `Failure` status. If this value is empty there is no information available. The `reason` clarifies an HTTP status code but does not override it.
+`reason` may contain a machine-readable description of why this operation is in the `Failure` status. If this value is empty there is no information available. The `reason` clarifies an HTTP status code but does not override it.
 
-```details``` may contain extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.
+`details` may contain extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.
 
-Possible values for the ```reason``` and ```details``` fields:
+Possible values for the `reason` and `details` fields:
 * `BadRequest`
   * Indicates that the request itself was invalid, because the request doesn't make any sense, for example deleting a read-only object.
   * This is different than `status reason` `Invalid` above which indicates that the API call could possibly succeed, but the data was invalid.
@@ -618,5 +625,6 @@ TODO: Document events (refer to another doc for details)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api-conventions.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api-conventions.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

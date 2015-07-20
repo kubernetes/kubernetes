@@ -28,10 +28,12 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 
 
 ## Prerequisites
+
 1. Installed *CentOS 6* for PXE server
 2. At least two bare metal nodes to work with
 
 ## High Level Design
+
 1. Manage the tftp directory 
   * /tftpboot/(coreos)(centos)(RHEL)
   * /tftpboot/pxelinux.0/(MAC) -> linked to Linux image config file
@@ -42,6 +44,7 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 6. Installing the CoreOS slaves to become Kubernetes nodes.
 
 ## This Guides variables
+
 | Node Description              | MAC               | IP          |
 | :---------------------------- | :---------------: | :---------: |
 | CoreOS/etcd/Kubernetes Master | d0:00:67:13:0d:00 | 10.20.30.40 |
@@ -50,13 +53,14 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 
 
 ## Setup PXELINUX CentOS
+
 To setup CentOS PXELINUX environment there is a complete [guide here](http://docs.fedoraproject.org/en-US/Fedora/7/html/Installation_Guide/ap-pxe-server.html). This section is the abbreviated version.
 
 1. Install packages needed on CentOS
 
         sudo yum install tftp-server dhcp syslinux
 
-2. ```vi /etc/xinetd.d/tftp``` to enable tftp service and change disable to 'no'
+2. `vi /etc/xinetd.d/tftp` to enable tftp service and change disable to 'no'
         disable = no
 
 3. Copy over the syslinux images we will need.
@@ -79,7 +83,7 @@ To setup CentOS PXELINUX environment there is a complete [guide here](http://doc
         mkdir /tftpboot/pxelinux.cfg
         touch /tftpboot/pxelinux.cfg/default
 
-5. Edit the menu ```vi /tftpboot/pxelinux.cfg/default```
+5. Edit the menu `vi /tftpboot/pxelinux.cfg/default`
 
         default menu.c32
         prompt 0
@@ -96,10 +100,11 @@ To setup CentOS PXELINUX environment there is a complete [guide here](http://doc
 Now you should have a working PXELINUX setup to image CoreOS nodes. You can verify the services by using VirtualBox locally or with bare metal servers.
 
 ## Adding CoreOS to PXE
+
 This section describes how to setup the CoreOS images to live alongside a pre-existing PXELINUX environment. 
 
 1. Find or create the TFTP root directory that everything will be based off of.
-    * For this document we will assume ```/tftpboot/``` is our root directory.
+    * For this document we will assume `/tftpboot/` is our root directory.
 2. Once we know and have our tftp root directory we will create a new directory structure for our CoreOS images.
 3. Download the CoreOS PXE files provided by the CoreOS team.
 
@@ -113,7 +118,7 @@ This section describes how to setup the CoreOS images to live alongside a pre-ex
         gpg --verify coreos_production_pxe.vmlinuz.sig
         gpg --verify coreos_production_pxe_image.cpio.gz.sig
 
-4. Edit the menu ```vi /tftpboot/pxelinux.cfg/default``` again
+4. Edit the menu `vi /tftpboot/pxelinux.cfg/default` again
 
         default menu.c32
         prompt 0
@@ -143,9 +148,10 @@ This section describes how to setup the CoreOS images to live alongside a pre-ex
 This configuration file will now boot from local drive but have the option to PXE image CoreOS. 
 
 ## DHCP configuration 
+
 This section covers configuring the DHCP server to hand out our new images. In this case we are assuming that there are other servers that will boot alongside other images.
 
-1. Add the ```filename``` to the _host_ or _subnet_ sections.
+1. Add the `filename` to the _host_ or _subnet_ sections.
 
         filename "/tftpboot/pxelinux.0";
 
@@ -185,17 +191,18 @@ This section covers configuring the DHCP server to hand out our new images. In t
 We will be specifying the node configuration later in the guide.
 
 ## Kubernetes
-To deploy our configuration we need to create an ```etcd``` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here. 
+
+To deploy our configuration we need to create an `etcd` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here. 
 1. Is to template the cloud config file and programmatically create new static configs for different cluster setups.
 2. Have a service discovery protocol running in our stack to do auto discovery.
 
-This demo we just make a static single ```etcd``` server to host our Kubernetes and ```etcd``` master servers.
+This demo we just make a static single `etcd` server to host our Kubernetes and `etcd` master servers.
 
 Since we are OFFLINE here most of the helping processes in CoreOS and Kubernetes are then limited. To do our setup we will then have to download and serve up our binaries for Kubernetes in our local environment.
 
 An easy solution is to host a small web server on the DHCP/TFTP host for all our binaries to make them available to the local CoreOS PXE machines.
 
-To get this up and running we are going to setup a simple ```apache``` server to serve our binaries needed to bootstrap Kubernetes.
+To get this up and running we are going to setup a simple `apache` server to serve our binaries needed to bootstrap Kubernetes.
 
 This is on the PXE server from the previous section:
 
@@ -218,6 +225,7 @@ This sets up our binaries we need to run Kubernetes. This would need to be enhan
 Now for the good stuff!
 
 ## Cloud Configs
+
 The following config files are tailored for the OFFLINE version of a Kubernetes deployment.
 
 These are based on the work found here: [master.yml](cloud-configs/master.yaml), [node.yml](cloud-configs/node.yaml)
@@ -231,7 +239,8 @@ To make the setup work, you need to replace a few placeholders:
  - Add your own SSH public key(s) to the cloud config at the end
 
 ### master.yml
-On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-cloud-config-master.yml```.
+
+On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cloud-config-master.yml`.
 
 
     #cloud-config
@@ -451,7 +460,8 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
 
 
 ### node.yml
-On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-cloud-config-slave.yml```.
+
+On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cloud-config-slave.yml`.
 
     #cloud-config
     ---
@@ -585,7 +595,8 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
 
 
 ## New pxelinux.cfg file
-Create a pxelinux target file for a _slave_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-slave```
+
+Create a pxelinux target file for a _slave_ node: `vi /tftpboot/pxelinux.cfg/coreos-node-slave`
 
     default coreos
     prompt 1
@@ -598,7 +609,7 @@ Create a pxelinux target file for a _slave_ node: ```vi /tftpboot/pxelinux.cfg/c
       kernel images/coreos/coreos_production_pxe.vmlinuz
       append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-slave.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
 
-And one for the _master_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-master```
+And one for the _master_ node: `vi /tftpboot/pxelinux.cfg/coreos-node-master`
 
     default coreos
     prompt 1
@@ -612,6 +623,7 @@ And one for the _master_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-master``
       append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-master.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
 
 ## Specify the pxelinux targets
+
 Now that we have our new targets setup for master and slave we want to configure the specific hosts to those targets. We will do this by using the pxelinux mechanism of setting a specific MAC addresses to a specific pxelinux.cfg file.
 
 Refer to the MAC address table in the beginning of this guide. Documentation for more details can be found [here](http://www.syslinux.org/wiki/index.php/PXELINUX).
@@ -625,11 +637,12 @@ Refer to the MAC address table in the beginning of this guide. Documentation for
 Reboot these servers to get the images PXEd and ready for running containers!
 
 ## Creating test pod
+
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-See [a simple nginx example](../../../docs/user-guide/simple-nginx.html) to try out your new cluster.
+See [a simple nginx example](../../../docs/user-guide/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../../examples/README.html).
+For more complete applications, please look in the [examples directory](../../../examples/).
 
 ## Helping commands for debugging
 
@@ -665,5 +678,6 @@ Kill all pods:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/bare_metal_offline.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/bare_metal_offline.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

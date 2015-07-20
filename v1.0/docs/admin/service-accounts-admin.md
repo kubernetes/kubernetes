@@ -5,10 +5,11 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Cluster Admin Guide to Service Accounts
 
 *This is a Cluster Administrator guide to service accounts.  It assumes knowledge of
-the [User Guide to Service Accounts](../user-guide/service-accounts.html).*
+the [User Guide to Service Accounts](../user-guide/service-accounts.md).*
 
 *Support for authorization and user accounts is planned but incomplete.  Sometimes
 incomplete features are referred to in order to better describe service accounts.*
@@ -22,7 +23,7 @@ for a number of reasons:
   - User accounts are intended to be global. Names must be unique across all
     namespaces of a cluster, future user resource will not be namespaced).
     Service accounts are namespaced.
-  - Typically, a clusters User accounts might be synced from a corporate
+  - Typically, a cluster's User accounts might be synced from a corporate
     database, where new user account creation requires special privileges and
     is tied to complex business  processes.  Service account creation is intended
     to be more lightweight, allowing cluster users to create service accounts for
@@ -32,7 +33,7 @@ for a number of reasons:
     accounts for components of that system.  Because service accounts can be created
     ad-hoc and have namespaced names, such config is portable. 
 
-##  Service account automation
+## Service account automation
 
 Three separate components cooperate to implement the automation around service accounts:
   - A Service account admission controller
@@ -42,7 +43,7 @@ Three separate components cooperate to implement the automation around service a
 ### Service Account Admission Controller
 
 The modification of pods is implemented via a plugin
-called an [Admission Controller](admission-controllers.html). It is part of the apiserver.
+called an [Admission Controller](admission-controllers.md). It is part of the apiserver.
 It acts synchronously to modify pods as they are created or updated. When this plugin is active
 (and it is by default on most distributions), then it does the following when a pod is created or modified:
   1. If the pod does not have a `ServiceAccount` set, it sets the `ServiceAccount` to `default`.
@@ -53,11 +54,12 @@ It acts synchronously to modify pods as they are created or updated. When this p
   6. It adds a `volumeSource` to each container of the pod mounted at `/var/run/secrets/kubernetes.io/serviceaccount`.
 
 ### Token Controller
+
 TokenController runs as part of controller-manager. It acts asynchronously. It:
 - observes serviceAccount creation and creates a corresponding Secret to allow API access.
 - observes serviceAccount deletion and deletes all corresponding ServiceAccountToken Secrets
 - observes secret addition, and ensures the referenced ServiceAccount exists, and adds a token to the secret if needed
-- observer secret deleteion and removes a reference from the corresponding ServiceAccount if needed
+- observes secret deleteion and removes a reference from the corresponding ServiceAccount if needed
 
 #### To create additional API tokens
 
@@ -66,7 +68,7 @@ account. To create additional API tokens for a service account, create a secret
 of type `ServiceAccountToken` with an annotation referencing the service
 account, and the controller will update it with a generated token:
 
-```
+{% highlight json %}
 secret.json:
 {
 	"kind": "Secret",
@@ -78,17 +80,21 @@ secret.json:
 	}
 	"type": "kubernetes.io/service-account-token"
 }
+{% endhighlight %}
 
-$ kubectl create -f secret.json
-$ kubectl describe secret mysecretname
-```
+{% highlight sh %}
+kubectl create -f ./secret.json
+kubectl describe secret mysecretname
+{% endhighlight %}
 
 #### To delete/invalidate a service account token
-```
+
+{% highlight sh %}
 kubectl delete secret mysecretname
-```
+{% endhighlight %}
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/service-accounts-admin.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/service-accounts-admin.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

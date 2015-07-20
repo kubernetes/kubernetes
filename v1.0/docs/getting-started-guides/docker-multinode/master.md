@@ -5,11 +5,13 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Installing a Kubernetes Master Node via Docker
-We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine is ```${MASTER_IP}```
+
+We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine is `${MASTER_IP}`
 
 There are two main phases to installing the master:
-   * [Setting up ```flanneld``` and ```etcd```](#setting-up-flanneld-and-etcd)
+   * [Setting up `flanneld` and `etcd`](#setting-up-flanneld-and-etcd)
    * [Starting the Kubernetes master components](#starting-the-kubernetes-master)
 
 
@@ -20,14 +22,16 @@ There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 
 Please install Docker 1.6.2 or wait for Docker 1.7.1.
 
 ### Setup Docker-Bootstrap
-We're going to use ```flannel``` to set up networking between Docker daemons.  Flannel itself (and etcd on which it relies) will run inside of
+
+We're going to use `flannel` to set up networking between Docker daemons.  Flannel itself (and etcd on which it relies) will run inside of
 Docker containers themselves.  To achieve this, we need a separate "bootstrap" instance of the Docker daemon.  This daemon will be started with
-```--iptables=false``` so that it can only run containers with ```--net=host```.  That's sufficient to bootstrap our system.
+`--iptables=false` so that it can only run containers with `--net=host`.  That's sufficient to bootstrap our system.
 
 Run:
-```sh
+
+{% highlight sh %}
 sudo sh -c 'docker -d -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null &'
-```
+{% endhighlight %}
 
 _Important Note_:
 If you are running this on a long running system, rather than experimenting, you should run the bootstrap Docker instance under something like SysV init, upstart or systemd so that it is restarted
@@ -35,99 +39,113 @@ across reboots and failures.
 
 
 ### Startup etcd for flannel and the API server to use
+
 Run:
-```
+
+{% highlight sh %}
 sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
-```
+{% endhighlight %}
 
 Next, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:
 
-```sh
+{% highlight sh %}
 sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
-```
+{% endhighlight %}
 
 
 ### Set up Flannel on the master node
+
 Flannel is a network abstraction layer build by CoreOS, we will use it to provide simplified networking between our Pods of containers.
 
 Flannel re-configures the bridge that Docker uses for networking.  As a result we need to stop Docker, reconfigure its networking, and then restart Docker.
 
 #### Bring down Docker
+
 To re-configure Docker to use flannel, we need to take docker down, run flannel and then restart Docker.
 
 Turning down Docker is system dependent, it may be:
 
-```sh
+{% highlight sh %}
 sudo /etc/init.d/docker stop
-```
+{% endhighlight %}
 
 or
 
-```sh
+{% highlight sh %}
 sudo systemctl stop docker
-```
+{% endhighlight %}
 
 or it may be something else.
 
 #### Run flannel
 
 Now run flanneld itself:
-```sh
+
+{% highlight sh %}
 sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0
-```
+{% endhighlight %}
 
 The previous command should have printed a really long hash, copy this hash.
 
 Now get the subnet settings from flannel:
-```
+
+{% highlight sh %}
 sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from-above-here> cat /run/flannel/subnet.env
-```
+{% endhighlight %}
 
 #### Edit the docker configuration
+
 You now need to edit the docker configuration to activate new flags.  Again, this is system specific.
 
-This may be in ```/etc/default/docker``` or ```/etc/systemd/service/docker.service``` or it may be elsewhere.
+This may be in `/etc/default/docker` or `/etc/systemd/service/docker.service` or it may be elsewhere.
 
 Regardless, you need to add the following to the docker command line:
-```sh
+
+{% highlight sh %}
 --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}
-```
+{% endhighlight %}
 
 #### Remove the existing Docker bridge
-Docker creates a bridge named ```docker0``` by default.  You need to remove this:
 
-```sh
+Docker creates a bridge named `docker0` by default.  You need to remove this:
+
+{% highlight sh %}
 sudo /sbin/ifconfig docker0 down
 sudo brctl delbr docker0
-```
+{% endhighlight %}
 
-You may need to install the ```bridge-utils``` package for the ```brctl``` binary.
+You may need to install the `bridge-utils` package for the `brctl` binary.
 
 #### Restart Docker
+
 Again this is system dependent, it may be:
 
-```sh
+{% highlight sh %}
 sudo /etc/init.d/docker start
-```
+{% endhighlight %}
 
 it may be:
-```sh
+
+{% highlight sh %}
 systemctl start docker
-```
+{% endhighlight %}
 
 ## Starting the Kubernetes Master
+
 Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case, we will use the "main" instance of the Docker daemon for the Kubernetes components.
 
-```sh
+{% highlight sh %}
 sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
-```
+{% endhighlight %}
 
 ### Also run the service proxy
-```sh
+
+{% highlight sh %}
 sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
-```
+{% endhighlight %}
 
 ### Test it out
+
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
 Download the kubectl binary
@@ -136,24 +154,27 @@ Download the kubectl binary
 
 List the nodes
 
-```sh
+{% highlight sh %}
 kubectl get nodes
-```
+{% endhighlight %}
 
 This should print:
-```
+
+{% highlight console %}
 NAME        LABELS                             STATUS
 127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
-```
+{% endhighlight %}
 
-If the status of the node is ```NotReady``` or ```Unknown``` please check that all of the containers you created are successfully running.
-If all else fails, ask questions on IRC at #google-containers.
+If the status of the node is `NotReady` or `Unknown` please check that all of the containers you created are successfully running.
+If all else fails, ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers).
 
 
 ### Next steps
-Move on to [adding one or more workers](worker.html)
+
+Move on to [adding one or more workers](worker.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/master.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/master.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

@@ -5,7 +5,8 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-#Service Accounts
+
+# Service Accounts
 
 ## Motivation
 
@@ -25,18 +26,20 @@ They also may interact with services other than the Kubernetes API, such as:
   - accessing files in an NFS volume attached to the pod
 
 ## Design Overview
+
 A service account binds together several things:
   - a *name*, understood by users, and perhaps by peripheral systems, for an identity
-  - a *principal* that can be authenticated and [authorized](../admin/authorization.html)
-  - a [security context](security_context.html), which defines the Linux Capabilities, User IDs, Groups IDs, and other
+  - a *principal* that can be authenticated and [authorized](../admin/authorization.md)
+  - a [security context](security_context.md), which defines the Linux Capabilities, User IDs, Groups IDs, and other
     capabilities and controls on interaction with the file system and OS.
-  - a set of [secrets](secrets.html), which a container may use to
+  - a set of [secrets](secrets.md), which a container may use to
     access various networked resources.
 
 ## Design Discussion
 
 A new object Kind is added:
-```go
+
+{% highlight go %}
 type ServiceAccount struct {
     TypeMeta   `json:",inline" yaml:",inline"`
     ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
@@ -45,7 +48,7 @@ type ServiceAccount struct {
     securityContext ObjectReference // (reference to a securityContext object)
     secrets []ObjectReference // (references to secret objects
 }
-```
+{% endhighlight %}
 
 The name ServiceAccount is chosen because it is widely used already (e.g. by Kerberos and LDAP)
 to refer to this type of account.  Note that it has no relation to kubernetes Service objects.
@@ -111,6 +114,7 @@ are added to the map of tokens used by the authentication process in the apiserv
 might have some types that do not do anything on apiserver but just get pushed to the kubelet.)
 
 ### Pods
+
 The `PodSpec` is extended to have a `Pods.Spec.ServiceAccountUsername` field.  If this is unset, then a
 default value is chosen.  If it is set, then the corresponding value of `Pods.Spec.SecurityContext` is set by the
 Service Account Finalizer (see below).
@@ -118,6 +122,7 @@ Service Account Finalizer (see below).
 TBD: how policy limits which users can make pods with which service accounts.
 
 ### Authorization
+
 Kubernetes API Authorization Policies refer to users.  Pods created with a `Pods.Spec.ServiceAccountUsername` typically
 get a `Secret` which allows them to authenticate to the Kubernetes APIserver as a particular user.  So any
 policy that is desired can be applied to them.
@@ -171,5 +176,6 @@ to GET serviceAccounts to see what has been created.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/service_accounts.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/service_accounts.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

@@ -8,8 +8,8 @@ layout: docwithnav
 
 ## Abstract
 
-A proposal for the distribution of secrets (passwords, keys, etc) to the Kubelet and to
-containers inside Kubernetes using a custom volume type.
+A proposal for the distribution of [secrets](../user-guide/secrets.md) (passwords, keys, etc) to the Kubelet and to
+containers inside Kubernetes using a custom [volume](../user-guide/volumes.md#secrets) type. See the [secrets example](../user-guide/secrets/) for more information. 
 
 ## Motivation
 
@@ -78,7 +78,7 @@ service would also consume the secrets associated with the MySQL service.
 
 ### Use-Case: Secrets associated with service accounts
 
-[Service Accounts](service_accounts.html) are proposed as a
+[Service Accounts](service_accounts.md) are proposed as a
 mechanism to decouple capabilities and security contexts from individual human users.  A
 `ServiceAccount` contains references to some number of secrets.  A `Pod` can specify that it is
 associated with a `ServiceAccount`.  Secrets should have a `Type` field to allow the Kubelet and
@@ -248,7 +248,7 @@ memory overcommit on the node.
 
 #### Secret data on the node: isolation
 
-Every pod will have a [security context](security_context.html).
+Every pod will have a [security context](security_context.md).
 Secret data on the node should be isolated according to the security context of the container.  The
 Kubelet volume plugin API will be changed so that a volume plugin receives the security context of
 a volume along with the volume spec.  This will allow volume plugins to implement setting the
@@ -260,7 +260,7 @@ Several proposals / upstream patches are notable as background for this proposal
 
 1.  [Docker vault proposal](https://github.com/docker/docker/issues/10310)
 2.  [Specification for image/container standardization based on volumes](https://github.com/docker/docker/issues/9277)
-3.  [Kubernetes service account proposal](service_accounts.html)
+3.  [Kubernetes service account proposal](service_accounts.md)
 4.  [Secrets proposal for docker (1)](https://github.com/docker/docker/pull/6075)
 5.  [Secrets proposal for docker (2)](https://github.com/docker/docker/pull/6697)
 
@@ -272,14 +272,14 @@ storing it. Secrets contain multiple pieces of data that are presented as differ
 the secret volume (example: SSH key pair).
 
 In order to remove the burden from the end user in specifying every file that a secret consists of,
-it should be possible to mount all files provided by a secret with a single ```VolumeMount``` entry
+it should be possible to mount all files provided by a secret with a single `VolumeMount` entry
 in the container specification.
 
 ### Secret API Resource
 
 A new resource for secrets will be added to the API:
 
-```go
+{% highlight go %}
 type Secret struct {
     TypeMeta
     ObjectMeta
@@ -303,7 +303,7 @@ const (
 )
 
 const MaxSecretSize = 1 * 1024 * 1024
-```
+{% endhighlight %}
 
 A Secret can declare a type in order to provide type information to system components that work
 with secrets.  The default type is `opaque`, which represents arbitrary user-owned data.
@@ -324,10 +324,10 @@ finer points of secrets and resource allocation are fleshed out.
 
 ### Secret Volume Source
 
-A new `SecretSource` type of volume source will be added to the ```VolumeSource``` struct in the
+A new `SecretSource` type of volume source will be added to the `VolumeSource` struct in the
 API:
 
-```go
+{% highlight go %}
 type VolumeSource struct {
     // Other fields omitted
 
@@ -338,7 +338,7 @@ type VolumeSource struct {
 type SecretSource struct {
     Target ObjectReference
 }
-```
+{% endhighlight %}
 
 Secret volume sources are validated to ensure that the specified object reference actually points
 to an object of type `Secret`.
@@ -354,14 +354,14 @@ A new Kubelet volume plugin will be added to handle volumes with a secret source
 require access to the API server to retrieve secret data and therefore the volume `Host` interface
 will have to change to expose a client interface:
 
-```go
+{% highlight go %}
 type Host interface {
     // Other methods omitted
 
     // GetKubeClient returns a client interface
     GetKubeClient() client.Interface
 }
-```
+{% endhighlight %}
 
 The secret volume plugin will be responsible for:
 
@@ -399,7 +399,7 @@ suggested changes.  All of these examples are assumed to be created in a namespa
 
 To create a pod that uses an ssh key stored as a secret, we first need to create a secret:
 
-```json
+{% highlight json %}
 {
   "kind": "Secret",
   "apiVersion": "v1",
@@ -411,7 +411,7 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
     "id-rsa.pub": "dmFsdWUtMQ0K"
   }
 }
-```
+{% endhighlight %}
 
 **Note:** The serialized JSON and YAML values of secret data are encoded as
 base64 strings.  Newlines are not valid within these strings and must be
@@ -419,7 +419,7 @@ omitted.
 
 Now we can create a pod which references the secret with the ssh key and consumes it in a volume:
 
-```json
+{% highlight json %}
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -453,7 +453,7 @@ Now we can create a pod which references the secret with the ssh key and consume
     ]
   }
 }
-```
+{% endhighlight %}
 
 When the container's command runs, the pieces of the key will be available in:
 
@@ -470,7 +470,7 @@ credentials.
 
 The secrets:
 
-```json
+{% highlight json %}
 {
   "apiVersion": "v1",
   "kind": "List",
@@ -498,11 +498,11 @@ The secrets:
     }
   }]
 }
-```
+{% endhighlight %}
 
 The pods:
 
-```json
+{% highlight json %}
 {
   "apiVersion": "v1",
   "kind": "List",
@@ -574,7 +574,7 @@ The pods:
     }
   }]
 }
-```
+{% endhighlight %}
 
 The specs for the two pods differ only in the value of the object referred to by the secret volume
 source.  Both containers will have the following files present on their filesystems:
@@ -584,5 +584,6 @@ source.  Both containers will have the following files present on their filesyst
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/secrets.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/secrets.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

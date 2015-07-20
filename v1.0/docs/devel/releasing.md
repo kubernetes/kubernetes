@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Releasing Kubernetes
 
 This document explains how to cut a release, and the theory behind it. If you
@@ -39,9 +40,9 @@ to make sure they're solid around then as well. Once you find some greens, you
 can find the Git hash for a build by looking at the "Console Log", then look for
 `githash=`. You should see a line line:
 
-```
+{% highlight console %}
 + githash=v0.20.2-322-g974377b
-```
+{% endhighlight %}
 
 Because Jenkins builds frequently, if you're looking between jobs
 (e.g. `kubernetes-e2e-gke-ci` and `kubernetes-e2e-gce`), there may be no single
@@ -53,13 +54,16 @@ and you're trying to cut a release, don't hesitate to contact the GKE
 oncall.
 
 Before proceeding to the next step:
-```
+
+{% highlight sh %}
 export BRANCHPOINT=v0.20.2-322-g974377b
-```
+{% endhighlight %}
+
 Where `v0.20.2-322-g974377b` is the git hash you decided on. This will become
 our (retroactive) branch point.
 
 #### Branching, Tagging and Merging
+
 Do the following:
 
 1. `export VER=x.y` (e.g. `0.20` for v0.20)
@@ -90,7 +94,7 @@ In your git repo (you still have `${VER}` set from above right?):
 
 #### Writing Release Notes
 
-[This helpful guide](making-release-notes.html) describes how to write release
+[This helpful guide](making-release-notes.md) describes how to write release
 notes for a major/minor release. In the release template on GitHub, leave the
 last PR number that the tool finds for the `.0` release, so the next releaser
 doesn't have to hunt.
@@ -102,7 +106,7 @@ doesn't have to hunt.
 We cut `vX.Y.Z` releases from the `release-vX.Y` branch after all cherry picks
 to the branch have been resolved. You should ensure all outstanding cherry picks
 have been reviewed and merged and the branch validated on Jenkins (validation
-TBD). See the [Cherry Picks](cherry-picks.html) for more information on how to
+TBD). See the [Cherry Picks](cherry-picks.md) for more information on how to
 manage cherry picks prior to cutting the release.
 
 #### Tagging and Merging
@@ -201,12 +205,12 @@ present.
 We are using `pkg/version/base.go` as the source of versioning in absence of
 information from git. Here is a sample of that file's contents:
 
-```
-  var (
-      gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
-      gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
-  )
-```
+{% highlight go %}
+var (
+    gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
+    gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
+)
+{% endhighlight %}
 
 This means a build with `go install` or `go get` or a build from a tarball will
 yield binaries that will identify themselves as `v0.4-dev` and will not be able
@@ -284,15 +288,15 @@ projects seem to live with that and it does not really become a large problem.
 As an example, Docker commit a327d9b91edf has a `v1.1.1-N-gXXX` label but it is
 not present in Docker `v1.2.0`:
 
-```
-  $ git describe a327d9b91edf
-  v1.1.1-822-ga327d9b91edf
+{% highlight console %}
+$ git describe a327d9b91edf
+v1.1.1-822-ga327d9b91edf
 
-  $ git log --oneline v1.2.0..a327d9b91edf
-  a327d9b91edf Fix data space reporting from Kb/Mb to KB/MB
+$ git log --oneline v1.2.0..a327d9b91edf
+a327d9b91edf Fix data space reporting from Kb/Mb to KB/MB
 
-  (Non-empty output here means the commit is not present on v1.2.0.)
-```
+(Non-empty output here means the commit is not present on v1.2.0.)
+{% endhighlight %}
 
 ## Release Notes
 
@@ -310,5 +314,6 @@ it is just too cryptic/geeky/domain-specific that it isn't).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/releasing.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/releasing.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

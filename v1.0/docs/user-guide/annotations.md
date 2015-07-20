@@ -5,19 +5,21 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Annotations
 
-We have [labels](labels.html) for identifying metadata.
+We have [labels](labels.md) for identifying metadata.
 
 It is also useful to be able to attach arbitrary non-identifying metadata, for retrieval by API clients such as tools, libraries, etc. This information may be large, may be structured or unstructured, may include characters not permitted by labels, etc. Such information would not be used for object selection and therefore doesn't belong in labels.
 
 Like labels, annotations are key-value maps.
-```
+
+{% highlight json %}
 "annotations": {
   "key1" : "value1",
   "key2" : "value2"
 }
-```
+{% endhighlight %}
 
 Possible information that could be recorded in annotations:
 
@@ -33,5 +35,6 @@ Yes, this information could be stored in an external database or directory, but 
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/annotations.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/annotations.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Persistent Storage
 
 This document proposes a model for managing persistent, cluster-scoped storage for applications requiring long lived data.
@@ -13,7 +14,7 @@ This document proposes a model for managing persistent, cluster-scoped storage f
 
 Two new API kinds:
 
-A `PersistentVolume` (PV) is a storage resource provisioned by an administrator.  It is analogous to a node.
+A `PersistentVolume` (PV) is a storage resource provisioned by an administrator.  It is analogous to a node. See [Persistent Volume Guide](../user-guide/persistent-volumes/) for how to use it.
 
 A `PersistentVolumeClaim` (PVC) is a user's request for a persistent volume to use in a pod. It is analogous to a pod.  
 
@@ -39,7 +40,7 @@ Kubernetes makes no guarantees at runtime that the underlying storage exists or 
 
 #### Describe available storage
 
-Cluster administrators use the API to manage *PersistentVolumes*.  A custom store ```NewPersistentVolumeOrderedIndex``` will index volumes by access modes and sort by storage capacity.  The ```PersistentVolumeClaimBinder``` watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
+Cluster administrators use the API to manage *PersistentVolumes*.  A custom store `NewPersistentVolumeOrderedIndex` will index volumes by access modes and sort by storage capacity.  The `PersistentVolumeClaimBinder` watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
 
 PVs are system objects and, thus, have no namespace.
 
@@ -101,7 +102,7 @@ Events that communicate the state of a mounted volume are left to the volume plu
 
 An administrator provisions storage by posting PVs to the API.  Various way to automate this task can be scripted.  Dynamic provisioning is a future feature that can maintain levels of PVs.
 
-```
+{% highlight yaml %}
 POST:
 
 kind: PersistentVolume
@@ -114,16 +115,14 @@ spec:
   persistentDisk:
     pdName: "abc123"
     fsType: "ext4"
+{% endhighlight %}
 
---------------------------------------------------
-
-kubectl get pv
+{% highlight console %}
+$ kubectl get pv
 
 NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM              REASON
 pv0001              map[]               10737418240         RWO                 Pending    
-
-
-```
+{% endhighlight %}
 
 #### Users request storage
 
@@ -131,9 +130,9 @@ A user requests storage by posting a PVC to the API.  Their request contains the
 
 The user must be within a namespace to create PVCs.
 
-```
-
+{% highlight yaml %}
 POST: 
+
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -144,25 +143,22 @@ spec:
   resources:
     requests:
       storage: 3
+{% endhighlight %}
 
---------------------------------------------------
-
-kubectl get pvc
-
+{% highlight console %}
+$ kubectl get pvc
 
 NAME                LABELS              STATUS              VOLUME
 myclaim-1           map[]               pending                         
-
-```
+{% endhighlight %}
 
 
 #### Matching and binding
 
   The ```PersistentVolumeClaimBinder``` attempts to find an available volume that most closely matches the user's request.  If one exists, they are bound by putting a reference on the PV to the PVC.  Requests can go unfulfilled if a suitable match is not found.
 
-```
-
-kubectl get pv
+{% highlight console %}
+$ kubectl get pv
 
 NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM                                                        REASON
 pv0001              map[]               10737418240         RWO                 Bound               myclaim-1 / f4b3d283-c0ef-11e4-8be4-80e6500a981e
@@ -172,9 +168,7 @@ kubectl get pvc
 
 NAME                LABELS              STATUS              VOLUME
 myclaim-1           map[]               Bound               b16e91d6-c0ef-11e4-8be4-80e6500a981e
-
-
-```
+{% endhighlight %}
 
 #### Claim usage
 
@@ -182,7 +176,7 @@ The claim holder can use their claim as a volume.  The ```PersistentVolumeClaimV
 
 The claim holder owns the claim and its data for as long as the claim exists.  The pod using the claim can be deleted, but the claim remains in the user's namespace.  It can be used again and again by many pods.
 
-```
+{% highlight yaml %}
 POST: 
 
 kind: Pod
@@ -203,18 +197,15 @@ spec:
          accessMode: ReadWriteOnce
          claimRef:
            name: myclaim-1
-
-```
+{% endhighlight %}
 
 #### Releasing a claim and Recycling a volume
 
 When a claim holder is finished with their data, they can delete their claim.
 
-```
-
-kubectl delete pvc myclaim-1
-
-```
+{% highlight console %}
+$ kubectl delete pvc myclaim-1
+{% endhighlight %}
 
 The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim reference from the PV and change the PVs status to 'Released'.   
 
@@ -222,5 +213,6 @@ Admins can script the recycling of released volumes.  Future dynamic provisioner
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/persistent-storage.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/persistent-storage.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

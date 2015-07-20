@@ -5,6 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Services and Firewalls
 
 Many cloud providers (e.g. Google Compute Engine) define firewalls that help keep prevent inadvertent
@@ -14,17 +15,18 @@ well as any provider specific details that may be necessary.
 
 
 ### Google Compute Engine
+
 When using a Service with `spec.type: LoadBalancer`, the firewall will be
 opened automatically.  When using `spec.type: NodePort`, however, the firewall
 is *not* opened by default.
 
 Google Compute Engine firewalls are documented [elsewhere](https://cloud.google.com/compute/docs/networking#firewalls_1).
 
-You can add a firewall with the ```gcloud``` command line tool:
+You can add a firewall with the `gcloud` command line tool:
 
-```
-gcloud compute firewall-rules create my-rule --allow=tcp:<port>
-```
+{% highlight console %}
+$ gcloud compute firewall-rules create my-rule --allow=tcp:<port>
+{% endhighlight %}
 
 **Note**
 There is one important security note when using firewalls on Google Compute Engine:
@@ -52,9 +54,11 @@ the wilds of the internet.
 This will be fixed in an upcoming release of Kubernetes.
 
 ### Other cloud providers
+
 Coming soon.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/services-firewalls.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/services-firewalls.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

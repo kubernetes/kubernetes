@@ -37,5 +37,6 @@ These restrictions will be relaxed after v1.0 is released.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/pull-requests.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/pull-requests.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

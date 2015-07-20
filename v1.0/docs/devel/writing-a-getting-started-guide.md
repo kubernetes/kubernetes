@@ -7,6 +7,7 @@ layout: docwithnav
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
 # Writing a Getting Started Guide
+
 This page gives some advice for anyone planning to write or update a Getting Started Guide for Kubernetes.
 It also gives some guidelines which reviewers should follow when reviewing a pull request for a
 guide.
@@ -18,7 +19,7 @@ A guide refers to scripts, Configuration Management files, and/or binary assets 
 the combination of all these things needed to run on a particular type of infrastructure a
 **distro**.
 
-[The Matrix](../../docs/getting-started-guides/README.html) lists the distros.  If there is already a guide
+[The Matrix](../../docs/getting-started-guides/README.md) lists the distros.  If there is already a guide
 which is similar to the one you have planned, consider improving that one.
 
 
@@ -32,15 +33,16 @@ Distros fall into two categories:
 There are different guidelines for each.
 
 ## Versioned Distro Guidelines
+
 These guidelines say *what* to do.  See the Rationale section for *why*.
  - Send us a PR.
  - Put the instructions in `docs/getting-started-guides/...`. Scripts go there too.  This helps devs easily
    search for uses of flags by guides.
  - We may ask that you host binary assets or large amounts of code in our `contrib` directory or on your
    own repo.
- - Add or update a row in [The Matrix](../../docs/getting-started-guides/README.html).
+ - Add or update a row in [The Matrix](../../docs/getting-started-guides/README.md).
  - State the binary version of kubernetes that you tested clearly in your Guide doc.
- - Setup a cluster and run the [conformance test](development.html#conformance-testing) against it, and report the
+ - Setup a cluster and run the [conformance test](development.md#conformance-testing) against it, and report the
    results in your PR.
  - Versioned distros should typically not modify or add code in `cluster/`.  That is just scripts for developer
    distros.  
@@ -52,6 +54,7 @@ we still want to hear from you.  We suggest you write a blog post or a Gist, and
 Just file an issue or chat us on IRC and one of the committers will link to it from the wiki.
 
 ## Development Distro Guidelines
+
 These guidelines say *what* to do.  See the Rationale section for *why*.
   - the main reason to add a new development distro is to support a new IaaS provider (VM and
     network management).  This means implementing a new `pkg/cloudprovider/$IAAS_NAME`.  
@@ -68,6 +71,7 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
       refactoring and feature additions that affect code for their IaaS.
 
 ## Rationale 
+
  - We want people to create Kubernetes clusters with whatever IaaS, Node OS,
    configuration management tools, and so on, which they are familiar with.  The
    guidelines for **versioned distros** are designed for flexibility.
@@ -101,5 +105,6 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/writing-a-getting-started-guide.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/writing-a-getting-started-guide.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

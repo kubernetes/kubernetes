@@ -5,12 +5,15 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-#Kubernetes Cluster Federation   
-##(a.k.a. "Ubernetes")
+
+# Kubernetes Cluster Federation   
+
+## (a.k.a. "Ubernetes")
 
 ## Requirements Analysis and Product Proposal
 
 ## _by Quinton Hoole ([quinton@google.com](mailto:quinton@google.com))_  
+
 _Initial revision: 2015-03-05_  
 _Last updated: 2015-03-09_  
 This doc: [tinyurl.com/ubernetesv2](http://tinyurl.com/ubernetesv2)  
@@ -392,7 +395,7 @@ TBD: All very hand-wavey still, but some initial thoughts to get the conversatio
 
 ![image](federation-high-level-arch.png)
 
-##  Ubernetes API
+## Ubernetes API
 
 This looks a lot like the existing Kubernetes API but is explicitly multi-cluster.  
 
@@ -439,5 +442,6 @@ available redis database?
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/federation.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/federation.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+

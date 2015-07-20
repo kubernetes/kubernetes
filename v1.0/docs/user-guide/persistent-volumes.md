@@ -5,12 +5,14 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Persistent Volumes and Claims
 
-This document describes the current state of `PersistentVolumes` in Kubernetes.  Familiarity with [volumes](volumes.html) is suggested.
+This document describes the current state of `PersistentVolumes` in Kubernetes.  Familiarity with [volumes](volumes.md) is suggested.
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+
 - [Persistent Volumes and Claims](#persistent-volumes-and-claims)
   - [Introduction](#introduction)
   - [Lifecycle of a volume and claim](#lifecycle-of-a-volume-and-claim)
@@ -28,7 +30,7 @@ This document describes the current state of `PersistentVolumes` in Kubernetes. 
   - [PersistentVolumeClaims](#persistentvolumeclaims)
     - [Access Modes](#access-modes)
     - [Resources](#resources)
-  - [<a name="claims-as-volumes"></a> Claims As Volumes](#<a-name="claims-as-volumes"></a>-claims-as-volumes)
+  - [Claims As Volumes](#claims-as-volumes)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -40,7 +42,7 @@ A `PersistentVolume` (PV) is a piece of networked storage in the cluster that ha
 
 A `PersistentVolumeClaim` (PVC) is a request for storage by a user.  It is similar to a pod.  Pods consume node resources and PVCs consume PV resources.  Pods can request specific levels of resources (CPU and Memory).  Claims can request specific size and access modes (e.g, can be mounted once read/write or many times read-only).  
 
-Please see the [detailed walkthrough with working examples](persistent-volumes/README.html).
+Please see the [detailed walkthrough with working examples](persistent-volumes/).
 
 
 ## Lifecycle of a volume and claim
@@ -89,8 +91,7 @@ A `PersistentVolume's` reclaim policy tells the cluster what to do with the volu
 Each PV contains a spec and status, which is the specification and status of the volume.  
 
 
-```
-
+{% highlight yaml %}
   apiVersion: v1
   kind: PersistentVolume
   metadata:
@@ -104,12 +105,11 @@ Each PV contains a spec and status, which is the specification and status of the
     nfs:
       path: /tmp
       server: 172.17.0.2
-	
-```
+{% endhighlight %}
 
 ### Capacity
 
-Generally, a PV will have a specific storage capacity.  This is set using the PV's `capacity` attribute.  See the Kubernetes [Resource Model](../design/resources.html) to understand the units expected by `capacity`.
+Generally, a PV will have a specific storage capacity.  This is set using the PV's `capacity` attribute.  See the Kubernetes [Resource Model](../design/resources.md) to understand the units expected by `capacity`.
 
 Currently, storage size is the only resource that can be set or requested.  Future attributes may include IOPS, throughput, etc.
 
@@ -156,8 +156,7 @@ The CLI will show the name of the PVC bound to the PV.
 
 Each PVC contains a spec and status, which is the specification and status of the claim.
 
-```
-
+{% highlight yaml %}
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -168,8 +167,7 @@ spec:
   resources:
     requests:
       storage: 8Gi
-
-```
+{% endhighlight %}
 
 ### Access Modes
 
@@ -177,14 +175,13 @@ Claims use the same conventions as volumes when requesting storage with specific
 
 ### Resources
 
-Claims, like pods, can request specific quantities of a resource.  In this case, the request is for storage.  The same [resource model](../design/resources.html) applies to both volumes and claims.
+Claims, like pods, can request specific quantities of a resource.  In this case, the request is for storage.  The same [resource model](../design/resources.md) applies to both volumes and claims.
 
-## <a name="claims-as-volumes"></a> Claims As Volumes
+## Claims As Volumes
 
 Pods access storage by using the claim as a volume.  Claims must exist in the same namespace as the pod using the claim.  The cluster finds the claim in the pod's namespace and uses it to get the `PersistentVolume` backing the claim.  The volume is then mounted to the host and into the pod.
 
-```
-
+{% highlight yaml %}
 kind: Pod
 apiVersion: v1
 metadata:
@@ -200,10 +197,10 @@ spec:
     - name: mypd
       persistentVolumeClaim:
         claimName: myclaim
-
-```
+{% endhighlight %}
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/persistent-volumes.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/persistent-volumes.html?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
