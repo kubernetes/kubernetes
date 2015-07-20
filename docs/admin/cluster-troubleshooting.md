@@ -75,7 +75,7 @@ Root causes:
   - Network partition within cluster, or between cluster and users
   - Crashes in Kubernetes software 
   - Data loss or unavailability of persistent storage (e.g. GCE PD or AWS EBS volume)
-  - Operator error, e.g. misconfigured kubernetes software or application software
+  - Operator error, e.g. misconfigured Kubernetes software or application software
 
 Specific scenarios:
   - Apiserver VM shutdown or apiserver crashing
@@ -127,7 +127,7 @@ Mitigations:
 - Action: Snapshot apiserver PDs/EBS-volumes periodically
   - Mitigates: Apiserver backing storage lost
   - Mitigates: Some cases of operator error
-  - Mitigates: Some cases of kubernetes software fault
+  - Mitigates: Some cases of Kubernetes software fault
 
 - Action: use replication controller and services in front of pods
   - Mitigates: Node shutdown

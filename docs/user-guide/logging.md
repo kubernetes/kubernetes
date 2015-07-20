@@ -115,7 +115,7 @@ running in containers. The guide [Collecting log files within containers with Fl
 
 ## Known issues
 
-Kubernetes does log rotation for kubernetes components and docker containers. The command `kubectl logs` currently only read the latest logs, not all historical ones.
+Kubernetes does log rotation for Kubernetes components and docker containers. The command `kubectl logs` currently only read the latest logs, not all historical ones.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

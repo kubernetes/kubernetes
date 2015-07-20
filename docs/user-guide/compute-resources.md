@@ -103,7 +103,7 @@ spec:
 
 ## How Pods with Resource Limits are Scheduled
 
-When a pod is created, the kubernetes scheduler selects a node for the pod to
+When a pod is created, the Kubernetes scheduler selects a node for the pod to
 run on.  Each node has a maximum capacity for each of the resource types: the
 amount of CPU and memory it can provide for pods.  The scheduler ensures that,
 for each resource type (CPU and memory), the sum of the resource limits of the

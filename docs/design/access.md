@@ -200,7 +200,7 @@ Namespaces versus userAccount vs Labels:
 
 Goals for K8s authentication:
 - Include a built-in authentication system with no configuration required to use in single-user mode, and little configuration required to add several user accounts, and no https proxy required.
-- Allow for authentication to be handled by a system external to Kubernetes, to allow integration with existing to enterprise authorization systems.  The kubernetes namespace itself should avoid taking contributions of multiple authorization schemes.  Instead, a trusted proxy in front of the apiserver can be used to authenticate users.
+- Allow for authentication to be handled by a system external to Kubernetes, to allow integration with existing to enterprise authorization systems.  The Kubernetes namespace itself should avoid taking contributions of multiple authorization schemes.  Instead, a trusted proxy in front of the apiserver can be used to authenticate users.
   - For organizations whose security requirements only allow FIPS compliant implementations (e.g. apache) for authentication.
   - So the proxy can terminate SSL, and isolate the CA-signed certificate from less trusted, higher-touch APIserver.
   - For organizations that already have existing SaaS web services (e.g. storage, VMs) and want a common authentication portal.

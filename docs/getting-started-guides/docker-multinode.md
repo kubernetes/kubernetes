@@ -56,7 +56,7 @@ Please install Docker 1.6.2 or wait for Docker 1.7.1.
 
 ## Overview
 
-This guide will set up a 2-node kubernetes cluster, consisting of a _master_ node which hosts the API server and orchestrates work
+This guide will set up a 2-node Kubernetes cluster, consisting of a _master_ node which hosts the API server and orchestrates work
 and a _worker_ node which receives work from the master.  You can repeat the process of adding worker nodes an arbitrary number of
 times to create larger clusters.
 

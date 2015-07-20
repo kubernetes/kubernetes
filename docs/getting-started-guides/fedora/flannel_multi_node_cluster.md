@@ -43,7 +43,7 @@ Kubernetes multiple nodes cluster with flannel on Fedora
 
 ## Introduction
 
-This document describes how to deploy kubernetes on multiple hosts to set up a multi-node cluster and networking with flannel. Follow fedora [getting started guide](fedora_manual_config.md) to setup 1 master (fed-master) and 2 or more nodes. Make sure that all nodes have different names (fed-node1, fed-node2 and so on) and labels (fed-node1-label, fed-node2-label, and so on) to avoid any conflict. Also make sure that the kubernetes master host is running etcd, kube-controller-manager, kube-scheduler, and kube-apiserver services, and the nodes are running docker, kube-proxy and kubelet services. Now install flannel on kubernetes nodes. flannel on each node configures an overlay network that docker uses. flannel runs on each node to setup a unique class-C container network.
+This document describes how to deploy Kubernetes on multiple hosts to set up a multi-node cluster and networking with flannel. Follow fedora [getting started guide](fedora_manual_config.md) to setup 1 master (fed-master) and 2 or more nodes. Make sure that all nodes have different names (fed-node1, fed-node2 and so on) and labels (fed-node1-label, fed-node2-label, and so on) to avoid any conflict. Also make sure that the Kubernetes master host is running etcd, kube-controller-manager, kube-scheduler, and kube-apiserver services, and the nodes are running docker, kube-proxy and kubelet services. Now install flannel on Kubernetes nodes. flannel on each node configures an overlay network that docker uses. flannel runs on each node to setup a unique class-C container network.
 
 ## Prerequisites
 
@@ -51,7 +51,7 @@ This document describes how to deploy kubernetes on multiple hosts to set up a m
 
 ## Master Setup
 
-**Perform following commands on the kubernetes master**
+**Perform following commands on the Kubernetes master**
 
 * Configure flannel by creating a `flannel-config.json` in your current directory on fed-master. flannel provides udp and vxlan among other overlay networking backend options. In this guide, we choose kernel based vxlan backend. The contents of the json are:
 
@@ -82,7 +82,7 @@ etcdctl get /coreos.com/network/config
 
 ## Node Setup
 
-**Perform following commands on all kubernetes nodes**
+**Perform following commands on all Kubernetes nodes**
 
 * Edit the flannel configuration file /etc/sysconfig/flanneld as follows:
 
@@ -127,7 +127,7 @@ systemctl start docker
 
 ## **Test the cluster and flannel configuration**
 
-* Now check the interfaces on the nodes. Notice there is now a flannel.1 interface, and the ip addresses of docker0 and flannel.1 interfaces are in the same network. You will notice that docker0 is assigned a subnet (18.16.29.0/24 as shown below) on each kubernetes node out of the IP range configured above. A working output should look like this:
+* Now check the interfaces on the nodes. Notice there is now a flannel.1 interface, and the ip addresses of docker0 and flannel.1 interfaces are in the same network. You will notice that docker0 is assigned a subnet (18.16.29.0/24 as shown below) on each Kubernetes node out of the IP range configured above. A working output should look like this:
 
 ```console
 # ip -4 a|grep inet
@@ -172,7 +172,7 @@ FLANNEL_MTU=1450
 FLANNEL_IPMASQ=false
 ```
 
-* At this point, we have etcd running on the kubernetes master, and flannel / docker running on kubernetes nodes. Next steps are for testing cross-host container communication which will confirm that docker and flannel are configured properly.
+* At this point, we have etcd running on the Kubernetes master, and flannel / docker running on Kubernetes nodes. Next steps are for testing cross-host container communication which will confirm that docker and flannel are configured properly.
 
 * Issue the following commands on any 2 nodes:
 
@@ -211,7 +211,7 @@ PING 18.16.90.4 (18.16.90.4) 56(84) bytes of data.
 64 bytes from 18.16.90.4: icmp_seq=2 ttl=62 time=0.372 ms
 ```
 
-* Now kubernetes multi-node cluster is set up with overlay networking set up by flannel.
+* Now Kubernetes multi-node cluster is set up with overlay networking set up by flannel.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

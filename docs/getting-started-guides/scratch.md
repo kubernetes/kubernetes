@@ -136,7 +136,7 @@ accomplished in two ways:
   - Harder to setup from scratch.
   - Google Compute Engine ([GCE](gce.md)) and [AWS](aws.md) guides use this approach.
   - Need to make the Pod IPs routable by programming routers, switches, etc.
-  - Can be configured external to kubernetes, or can implement in the "Routes" interface of a Cloud Provider module.
+  - Can be configured external to Kubernetes, or can implement in the "Routes" interface of a Cloud Provider module.
   - Generally highest performance.
 - Create an Overlay network
   - Easier to setup
@@ -241,7 +241,7 @@ For etcd, you can:
 - Build your own image
   - You can do: `cd kubernetes/cluster/images/etcd; make`
 
-We recommend that you use the etcd version which is provided in the kubernetes binary distribution.   The kubernetes binaries in the release
+We recommend that you use the etcd version which is provided in the Kubernetes binary distribution.   The Kubernetes binaries in the release
 were tested extensively with this version of etcd and not with any other version.
 The recommended version number can also be found as the value of `ETCD_VERSION` in `kubernetes/cluster/images/etcd/Makefile`.
 
@@ -353,7 +353,7 @@ guide assume that there are kubeconfigs in `/var/lib/kube-proxy/kubeconfig` and
 
 ## Configuring and Installing Base Software on Nodes
 
-This section discusses how to configure machines to be kubernetes nodes. 
+This section discusses how to configure machines to be Kubernetes nodes. 
 
 You should run three daemons on every node:
   - docker or rkt
