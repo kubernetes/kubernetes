@@ -57,12 +57,13 @@ func buildTOC(markdown []byte) ([]byte, error) {
 	buffer.WriteString("\n")
 	scanner := bufio.NewScanner(bytes.NewReader(markdown))
 	inBlockQuotes := false
+	blockQuoteRegex, err := regexp.Compile("^```")
+	if err != nil {
+		return nil, err
+	}
 	for scanner.Scan() {
 		line := scanner.Text()
-		match, err := regexp.Match("^```", []byte(line))
-		if err != nil {
-			return nil, err
-		}
+		match := blockQuoteRegex.Match([]byte(line))
 		if match {
 			inBlockQuotes = !inBlockQuotes
 			continue
