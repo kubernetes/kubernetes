@@ -207,7 +207,7 @@ func (cgc *realContainerGC) removeOldestN(containers []containerGCInfo, toRemove
 		}
 		symlinkPath := dockertools.LogSymlink(cgc.containerLogsDir, containers[i].podNameWithNamespace, containers[i].containerName, containers[i].id)
 		err = os.Remove(symlinkPath)
-		if !os.IsNotExist(err) {
+		if err != nil && !os.IsNotExist(err) {
 			glog.Warningf("Failed to remove container %q log symlink %q: %v", containers[i].name, symlinkPath, err)
 		}
 	}
