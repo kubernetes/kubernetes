@@ -73,7 +73,7 @@ clusters.
 
 ### Turn-key Cloud Solutions
 
-These solutions allow you to create Kubernetes clusters on range of Cloud IaaS providers with only a
+These solutions allow you to create Kubernetes clusters on a range of Cloud IaaS providers with only a
 few commands, and have active community support.
 - [GCE](gce.md)
 - [AWS](aws.md)
@@ -85,8 +85,8 @@ Kubernetes can run on a wide range of Cloud providers and bare-metal environment
 base operating systems.
 
 If you can find a guide below that matches your needs, use it.  It may be a little out of date, but
-it will be easier than starting from scratch.  If you do want to start from scratch, because you
-have special requirements, or just because you want to understand what is underneath a Kubernetes
+it will be easier than starting from scratch.  If you do want to start from scratch because you
+have special requirements or just because you want to understand what is underneath a Kubernetes
 cluster, try the [Getting Started from Scratch](scratch.md) guide.
 
 If you are interested in supporting Kubernetes on a new platform, check out our [advice for
