@@ -22,20 +22,27 @@ and deleting pods, replication controllers, services, and minions.
 Most consumers should use the Config object to create a Client:
 
     import (
-    "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-    "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-    "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+      "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+      "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+      "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+      "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
     )
+
+    [...]
+
     config := &client.Config{
       Host:     "http://localhost:8080",
       Username: "test",
       Password: "password",
     }
-    client, err := client.New(&config)
+    client, err := client.New(config)
     if err != nil {
       // handle error
     }
-    client.Pods(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
+    pods, err := client.Pods(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
+    if err != nil {
+      // handle error
+    }
 
 More advanced consumers may wish to provide their own transport via a http.RoundTripper:
 
@@ -43,7 +50,7 @@ More advanced consumers may wish to provide their own transport via a http.Round
       Host:      "https://localhost:8080",
       Transport: oauthclient.Transport(),
     }
-    client, err := client.New(&config)
+    client, err := client.New(config)
 
 The RESTClient type implements the Kubernetes API conventions (see `docs/api-conventions.md`)
 for a given API path and is intended for use by consumers implementing their own Kubernetes
