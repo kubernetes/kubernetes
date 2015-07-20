@@ -89,38 +89,8 @@ if ! ($SED --version 2>&1 | grep -q GNU); then
   echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
 fi
 
-echo "+++ Versioning documentation and examples"
-
-# Update the docs to match this version.
-HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/\?https://github.com/GoogleCloudPlatform/kubernetes"
-
-md_dirs=(docs examples)
-md_files=()
-for dir in "${md_dirs[@]}"; do
-  mdfiles+=($( find "${dir}" -name "*.md" -type f ))
-done
-for doc in "${mdfiles[@]}"; do
-  $SED -ri \
-      -e '/<!-- BEGIN STRIP_FOR_RELEASE -->/,/<!-- END STRIP_FOR_RELEASE -->/d' \
-      -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|g" \
-      "${doc}"
-
-  # Replace /HEAD in html preview links with /NEW_VERSION.
-  $SED -ri -e "s|(${HTML_PREVIEW_PREFIX}/HEAD)|${HTML_PREVIEW_PREFIX}/${NEW_VERSION}|" "${doc}"
-
-  is_versioned_tag="<!-- BEGIN MUNGE: IS_VERSIONED -->
-  <!-- TAG IS_VERSIONED -->
-  <!-- END MUNGE: IS_VERSIONED -->"
-  if ! grep -q "${is_versioned_tag}" "${doc}"; then
-    echo -e "\n\n${is_versioned_tag}\n\n" >> "${doc}"
-  fi
-done
-
-# Update API descriptions to match this version.
-$SED -ri -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" pkg/api/v[0-9]*/types.go
-
-${KUBE_ROOT}/hack/run-gendocs.sh
-${KUBE_ROOT}/hack/update-swagger-spec.sh
+echo "+++ Running ./versionize-docs"
+${KUBE_ROOT}/build/versionize-docs.sh ${NEW_VERSION}
 git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 
 dochash=$(git log -n1 --format=%H)
