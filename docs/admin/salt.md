@@ -109,7 +109,7 @@ These keys may be leveraged by the Salt sls files to branch behavior.
 
 In addition, a cluster may be running a Debian based operating system or Red Hat based operating system (Centos, Fedora, RHEL, etc.).  As a result, it's important to sometimes distinguish behavior based on operating system using if branches like the following.
 
-```
+```jinja
 {% if grains['os_family'] == 'RedHat' %}
 // something specific to a RedHat environment (Centos, Fedora, RHEL) where you may use yum, systemd, etc.
 {% else %}

@@ -134,7 +134,7 @@ The external load balancer allows us to access the service from outside via an e
 
 Note that you may need to create a firewall rule to allow the traffic, assuming you are using Google Compute Engine:
 
-```
+```console
 $ gcloud compute firewall-rules create rethinkdb --allow=tcp:8080
 ```
 
