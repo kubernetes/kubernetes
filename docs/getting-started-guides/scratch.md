@@ -661,13 +661,11 @@ Next, verify that kubelet has started a container for the apiserver:
 ```console
 $ sudo docker ps | grep apiserver:
 5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695
-
 ```
 
 Then try to connect to the apiserver:
 
 ```console
-
 $ echo $(curl -s http://localhost:8080/healthz)
 ok
 $ curl -s http://localhost:8080/api
@@ -677,7 +675,6 @@ $ curl -s http://localhost:8080/api
     "v1"
   ]
 }
-
 ```
 
 If you have selected the `--register-node=true` option for kubelets, they will now being self-registering with the apiserver.
@@ -689,7 +686,6 @@ Otherwise, you will need to manually create node objects.
 Complete this template for the scheduler pod:
 
 ```json
-
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -719,7 +715,6 @@ Complete this template for the scheduler pod:
     ]
   }
 }
-
 ```
 
 Optionally, you may want to mount `/var/log` as well and redirect output there.
@@ -746,7 +741,6 @@ Flags to consider using with controller manager.
 Template for controller manager pod:
 
 ```json
-
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -802,7 +796,6 @@ Template for controller manager pod:
     ]
   }
 }
-
 ```
 
 

@@ -151,7 +151,6 @@ users:
   myself:
     username: admin
     password: secret
-
 ```
 
 and a kubeconfig file that looks like this

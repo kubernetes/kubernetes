@@ -63,7 +63,7 @@ cluster.
 Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/user-guide/pods.md) running
 the Master service.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-master.json
 ```
 
@@ -71,13 +71,13 @@ Then, use the [`examples/spark/spark-master-service.json`](spark-master-service.
 create a logical service endpoint that Spark workers can use to access
 the Master pod.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-master-service.json
 ```
 
 ### Check to see if Master is running and accessible
 
-```shell
+```sh
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 [...]
@@ -87,7 +87,7 @@ spark-master                                   1/1       Running   0          25
 
 Check logs to see the status of the master.
 
-```shell
+```sh
 $ kubectl logs spark-master
 
 starting org.apache.spark.deploy.master.Master, logging to /opt/spark-1.4.0-bin-hadoop2.6/sbin/../logs/spark--org.apache.spark.deploy.master.Master-1-spark-master.out
@@ -122,13 +122,13 @@ The Spark workers need the Master service to be running.
 Use the [`examples/spark/spark-worker-controller.json`](spark-worker-controller.json) file to create a
 [replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-worker-controller.json
 ```
 
 ### Check to see if the workers are running
 
-```shell
+```sh
 $ kubectl get pods
 NAME                                            READY     STATUS    RESTARTS   AGE
 [...]
@@ -148,7 +148,7 @@ $ kubectl logs spark-master
 
 Get the address and port of the Master service.
 
-```shell
+```sh
 $ kubectl get service spark-master
 NAME           LABELS              SELECTOR            IP(S)          PORT(S)
 spark-master   name=spark-master   name=spark-master   10.0.204.187   7077/TCP

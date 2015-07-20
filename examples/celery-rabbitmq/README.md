@@ -83,7 +83,7 @@ spec:
 
 To start the service, run:
 
-```shell
+```sh
 $ kubectl create -f examples/celery-rabbitmq/rabbitmq-service.yaml
 ```
 

@@ -117,7 +117,7 @@ Gather the public and private IPs for the master node:
 aws ec2 describe-instances --instance-id <instance-id>
 ```
 
-```
+```json
 {
     "Reservations": [
         {
@@ -131,7 +131,6 @@ aws ec2 describe-instances --instance-id <instance-id>
                     }, 
                     "PublicIpAddress": "54.68.97.117", 
                     "PrivateIpAddress": "172.31.9.9", 
-...
 ```
 
 #### Update the node.yaml cloud-config
@@ -222,7 +221,7 @@ Gather the public IP address for the worker node.
 aws ec2 describe-instances --filters 'Name=private-ip-address,Values=<host>'
 ```
 
-```
+```json
 {
     "Reservations": [
         {
@@ -235,7 +234,6 @@ aws ec2 describe-instances --filters 'Name=private-ip-address,Values=<host>'
                         "Name": "running"
                     }, 
                     "PublicIpAddress": "54.68.97.117", 
-...
 ```
 
 Visit the public IP address in your browser to view the running pod.

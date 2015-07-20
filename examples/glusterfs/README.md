@@ -63,13 +63,13 @@ The "IP" field should be filled with the address of a node in the Glusterfs serv
 
 Create the endpoints,
 
-```shell
+```sh
 $ kubectl create -f examples/glusterfs/glusterfs-endpoints.json
 ```
 
 You can verify that the endpoints are successfully created by running
 
-```shell
+```sh
 $ kubectl get endpoints
 NAME                ENDPOINTS
 glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
@@ -79,7 +79,7 @@ glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
 
 The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustrates a sample configuration.
 
-```js
+```json
 {
      "name": "glusterfsvol",
      "glusterfs": {
@@ -98,13 +98,13 @@ The parameters are explained as the followings.
 
 Create a pod that has a container using Glusterfs volume,
 
-```shell
+```sh
 $ kubectl create -f examples/glusterfs/glusterfs-pod.json
 ```
 
 You can verify that the pod is running:
 
-```shell
+```sh
 $ kubectl get pods
 NAME             READY     STATUS    RESTARTS   AGE
 glusterfs        1/1       Running   0          3m
@@ -115,7 +115,7 @@ $ kubectl get pods glusterfs -t '{{.status.hostIP}}{{"\n"}}'
 
 You may ssh to the host (the hostIP) and run 'mount' to see if the Glusterfs volume is mounted,
 
-```shell
+```sh
 $ mount | grep kube_vol
 10.240.106.152:kube_vol on /var/lib/kubelet/pods/f164a571-fa68-11e4-ad5c-42010af019b7/volumes/kubernetes.io~glusterfs/glusterfsvol type fuse.glusterfs (rw,relatime,user_id=0,group_id=0,default_permissions,allow_other,max_read=131072)
 ```
