@@ -49,8 +49,8 @@ Documentation for other releases can be found at
     - [DNS](#dns)
   - [Headless services](#headless-services)
   - [External services](#external-services)
-    - [Type NodePort](#type-nodeport)
-    - [Type LoadBalancer](#type-loadbalancer)
+    - [Type = NodePort](#type-nodeport)
+    - [Type = LoadBalancer](#type-loadbalancer)
   - [Shortcomings](#shortcomings)
   - [Future work](#future-work)
   - [The gory details of virtual IPs](#the-gory-details-of-virtual-ips)
@@ -375,7 +375,7 @@ accessed.  Valid values for this field are:
 Note that while `NodePort`s can be TCP or UDP, `LoadBalancer`s only support TCP
 as of Kubernetes 1.0.
 
-### Type NodePort
+### Type = NodePort
 
 If you set the `type` field to `"NodePort"`, the Kubernetes master will
 allocate a port from a flag-configured range (default: 30000-32767), and each
@@ -391,7 +391,7 @@ This gives developers the freedom to set up their own load balancers, to
 configure cloud environments that are not fully supported by Kubernetes, or
 even to just expose one or more nodes' IPs directly.
 
-### Type LoadBalancer
+### Type = LoadBalancer
 
 On cloud providers which support external load balancers, setting the `type`
 field to `"LoadBalancer"` will provision a load balancer for your `Service`.
