@@ -71,14 +71,14 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode 
 
 func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
 	if spec.VolumeSource.HostPath != nil {
-		return &hostPath{spec.VolumeSource.HostPath.Path}, nil
+		return &hostPathBuilder{&hostPath{spec.VolumeSource.HostPath.Path}}, nil
 	} else {
-		return &hostPath{spec.PersistentVolumeSource.HostPath.Path}, nil
+		return &hostPathBuilder{&hostPath{spec.PersistentVolumeSource.HostPath.Path}}, nil
 	}
 }
 
 func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID, _ mount.Interface) (volume.Cleaner, error) {
-	return &hostPath{""}, nil
+	return &hostPathCleaner{&hostPath{""}}, nil
 }
 
 func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
@@ -99,27 +99,39 @@ type hostPath struct {
 	path string
 }
 
-// SetUp does nothing.
-func (hp *hostPath) SetUp() error {
-	return nil
-}
-
-// SetUpAt does not make sense for host paths - probably programmer error.
-func (hp *hostPath) SetUpAt(dir string) error {
-	return fmt.Errorf("SetUpAt() does not make sense for host paths")
-}
-
 func (hp *hostPath) GetPath() string {
 	return hp.path
 }
 
+type hostPathBuilder struct {
+	*hostPath
+}
+
+var _ volume.Builder = &hostPathBuilder{}
+
+// SetUp does nothing.
+func (b *hostPathBuilder) SetUp() error {
+	return nil
+}
+
+// SetUpAt does not make sense for host paths - probably programmer error.
+func (b *hostPathBuilder) SetUpAt(dir string) error {
+	return fmt.Errorf("SetUpAt() does not make sense for host paths")
+}
+
+type hostPathCleaner struct {
+	*hostPath
+}
+
+var _ volume.Cleaner = &hostPathCleaner{}
+
 // TearDown does nothing.
-func (hp *hostPath) TearDown() error {
+func (c *hostPathCleaner) TearDown() error {
 	return nil
 }
 
 // TearDownAt does not make sense for host paths - probably programmer error.
-func (hp *hostPath) TearDownAt(dir string) error {
+func (c *hostPathCleaner) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }
 
