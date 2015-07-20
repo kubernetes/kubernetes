@@ -35,28 +35,9 @@ Documentation for other releases can be found at
 
 To deploy and manage applications on Kubernetes, you’ll use the Kubernetes command-line tool, [kubectl](kubectl/kubectl.md). It lets you inspect your cluster resources, create, delete, and update components, and much more. You will use it to look at your new cluster and bring up example apps. 
 
-## Install kubectl
+## Installing kubectl
 
-You can find it in the [release](https://github.com/GoogleCloudPlatform/kubernetes/releases) tar bundle, under platforms/<os>/<arch>;
-or if you build from source, kubectl should be either under _output/local/bin/<os>/<arch> or _output/dockerized/bin/<os>/<arch>.
-
-Next, make sure the kubectl tool is in your path, assuming you download a release:
-
-```bash
-# OS X
-export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
-
-# Linux
-export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
-```
-
-## Configure kubectl
-
-In order for kubectl to find and access the Kubernetes cluster, it needs a [kubeconfig file](kubeconfig-file.md), which is created automatically when creating a cluster using kube-up.sh (see the [getting started guides](../../docs/getting-started-guides/) for more about creating clusters). If you need access to a cluster you didn’t create, see the [Sharing Cluster Access document](sharing-clusters.md).
-
-#### Installing Kubectl
-
-If you downloaded a pre-compiled release, kubectl should be under `platforms/<os>/<arch>`.
+If you downloaded a pre-compiled [release](https://github.com/GoogleCloudPlatform/kubernetes/releases), kubectl should be under `platforms/<os>/<arch>` from the tar bundle.
 
 If you built from source, kubectl should be either under `_output/local/bin/<os>/<arch>` or `_output/dockerized/bin/<os>/<arch>`.
 
@@ -71,13 +52,26 @@ $ sudo cp kubernetes/platforms/darwin/amd64/kubectl /usr/local/bin/kubectl
 $ sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
 ```
 
-#### Configuring Kubectl
+You also need to ensure it's executable:
 
-If you used `./cluster/kube-up.sh` to deploy your Kubernetes cluster, kubectl should already be locally configured.
+```console
+$ sudo chmod +X /usr/local/bin/kubectl
+```
 
+If you prefer not to copy kubectl, you need to ensure the tool is in your path:
+
+```bash
+# OS X
+export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
+
+# Linux
+export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
+```
+
+## Configuring kubectl
+
+In order for kubectl to find and access the Kubernetes cluster, it needs a [kubeconfig file](kubeconfig-file.md), which is created automatically when creating a cluster using kube-up.sh (see the [getting started guides](../../docs/getting-started-guides/) for more about creating clusters). If you need access to a cluster you didn’t create, see the [Sharing Cluster Access document](sharing-clusters.md).
 By default, kubectl configuration lives at `~/.kube/config`.
-
-If your cluster was deployed by other means (e.g. a [getting started guide](../getting-started-guides/README.md)) your kubectl client will typically be configured during that process. If for some reason your kubectl client is not yet configured, check out [kubeconfig-file.md](kubeconfig-file.md).
 
 #### Making sure you're ready
 
