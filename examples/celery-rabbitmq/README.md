@@ -64,7 +64,7 @@ You should already have turned up a Kubernetes cluster. To get the most of this 
 
 The Celery task queue will need to communicate with the RabbitMQ broker. RabbitMQ will eventually appear on a separate pod, but since pods are ephemeral we need a service that can transparently route requests to RabbitMQ.
 
-Use the file [`examples/celery-rabbitmq/rabbitmq-service.yaml`](rabbitmq-service.yaml):
+<!-- BEGIN MUNGE: EXAMPLE rabbitmq-service.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -81,6 +81,9 @@ spec:
     component: rabbitmq
 ```
 
+[Download example](rabbitmq-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
+
 To start the service, run:
 
 ```sh
@@ -93,6 +96,8 @@ This service allows other pods to connect to the rabbitmq. To them, it will be s
 ## Step 2: Fire up RabbitMQ
 
 A RabbitMQ broker can be turned up using the file [`examples/celery-rabbitmq/rabbitmq-controller.yaml`](rabbitmq-controller.yaml):
+
+<!-- BEGIN MUNGE: EXAMPLE rabbitmq-controller.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -121,6 +126,9 @@ spec:
             cpu: 100m
 ```
 
+[Download example](rabbitmq-controller.yaml)
+<!-- END MUNGE: EXAMPLE -->
+
 Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.yaml` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
 
 Note that bringing up the pod includes pulling down a docker image, which may take a few moments. This applies to all other pods in this example.
@@ -129,6 +137,8 @@ Note that bringing up the pod includes pulling down a docker image, which may ta
 ## Step 3: Fire up Celery
 
 Bringing up the celery worker is done by running `$ kubectl create -f examples/celery-rabbitmq/celery-controller.yaml`, which contains this:
+
+<!-- BEGIN MUNGE: EXAMPLE celery-controller.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -156,6 +166,9 @@ spec:
           limits:
             cpu: 100m
 ```
+
+[Download example](celery-controller.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 There are several things to point out here...
 
@@ -207,6 +220,8 @@ Flower is a web-based tool for monitoring and administrating Celery clusters. By
 
 First, start the flower service with `$ kubectl create -f examples/celery-rabbitmq/flower-service.yaml`. The service is defined as below:
 
+<!-- BEGIN MUNGE: EXAMPLE flower-service.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -223,6 +238,9 @@ spec:
   type: LoadBalancer
 ```
 
+[Download example](flower-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
+
 It is marked as external (LoadBalanced). However on many platforms you will have to add an explicit firewall rule to open port 5555.
 On GCE this can be done with:
 
@@ -233,6 +251,8 @@ On GCE this can be done with:
 Please remember to delete the rule after you are done with the example (on GCE: `$ gcloud compute firewall-rules delete kubernetes-minion-5555`)
  
 To bring up the pods, run this command `$ kubectl create -f examples/celery-rabbitmq/flower-controller.yaml`. This controller is defined as so:
+
+<!-- BEGIN MUNGE: EXAMPLE flower-controller.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -258,6 +278,9 @@ spec:
           limits:
             cpu: 100m
 ```
+
+[Download example](flower-controller.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed through the service endpoint. This image uses the following command to start Flower:
 

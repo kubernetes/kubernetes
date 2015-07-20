@@ -83,6 +83,8 @@ Let's create two new namespaces to hold our work.
 
 Use the file [`namespace-dev.json`](namespace-dev.json) which describes a development namespace:
 
+<!-- BEGIN MUNGE: EXAMPLE namespace-dev.json -->
+
 ```json
 {
   "kind": "Namespace",
@@ -95,6 +97,9 @@ Use the file [`namespace-dev.json`](namespace-dev.json) which describes a develo
   }
 }
 ```
+
+[Download example](namespace-dev.json)
+<!-- END MUNGE: EXAMPLE -->
 
 Create the development namespace using kubectl.
 

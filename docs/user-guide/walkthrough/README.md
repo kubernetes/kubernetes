@@ -146,6 +146,8 @@ For this example we'll be creating a Redis pod with a named volume and volume mo
 
 Example Redis pod definition with a persistent storage volume ([pod-redis.yaml](pod-redis.yaml)):
 
+<!-- BEGIN MUNGE: EXAMPLE pod-redis.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -162,6 +164,9 @@ spec:
   - name: redis-persistent-storage
     emptyDir: {}
 ```
+
+[Download example](pod-redis.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Notes:
 - The volume mount name is a reference to a specific empty dir volume.

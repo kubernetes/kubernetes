@@ -52,43 +52,56 @@ This is a somewhat long tutorial.  If you want to jump straight to the "do it no
 In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
 In this simple case, we define a single container running Cassandra for our pod:
 
+<!-- BEGIN MUNGE: EXAMPLE cassandra-controller.yaml -->
+
 ```yaml
 apiVersion: v1
-kind: Pod
+kind: ReplicationController
 metadata:
   labels:
     name: cassandra
   name: cassandra
 spec:
-  containers:
-  - name: cassandra
-    image: gcr.io/google_containers/cassandra:v5
-    args:
-    - /run.sh
-    resources:
-      limits:
-        cpu: "0.5"
-    ports:
-    - name: cql
-      containerPort: 9042
-    - name: thrift
-      containerPort: 9160
-    volumeMounts:
-    - name: data
-      mountPath: /cassandra_data
-    env:
-    - name: MAX_HEAP_SIZE
-      value: 512M
-    - name: HEAP_NEWSIZE
-      value: 100M
-    - name: POD_NAMESPACE
-      valueFrom:
-        fieldRef:
-          fieldPath: metadata.namespace
-  volumes:
-    - name: data
-      emptyDir: {}
+  replicas: 1
+  selector:
+    name: cassandra
+  template:
+    metadata:
+      labels:
+        name: cassandra
+    spec:
+      containers:
+        - command:
+            - /run.sh
+          resources:
+            limits:
+              cpu: 0.1
+          env:
+            - name: MAX_HEAP_SIZE
+              value: 512M
+            - name: HEAP_NEWSIZE
+              value: 100M
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          image: gcr.io/google_containers/cassandra:v6
+          name: cassandra
+          ports:
+            - containerPort: 9042
+              name: cql
+            - containerPort: 9160
+              name: thrift
+          volumeMounts:
+            - mountPath: /cassandra_data
+              name: data
+      volumes:
+        - name: data
+          emptyDir: {}
 ```
+
+[Download example](cassandra-controller.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 There are a few things to note in this description.  First is that we are running the ```kubernetes/cassandra``` image.  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The ```KubernetesSeedProvider``` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
 
@@ -101,6 +114,8 @@ In theory could create a single Cassandra pod right now but since `KubernetesSee
 In Kubernetes a _[Service](../../docs/user-guide/services.md)_ describes a set of Pods that perform the same task.  For example, the set of Pods in a Cassandra cluster can be a Kubernetes Service, or even just the single Pod we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set of Pods.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
 
 Here is the service description:
+
+<!-- BEGIN MUNGE: EXAMPLE cassandra-service.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -115,6 +130,9 @@ spec:
   selector:
     name: cassandra
 ```
+
+[Download example](cassandra-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=cassandra```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
 
@@ -175,6 +193,8 @@ In Kubernetes a _[Replication Controller](../../docs/user-guide/replication-cont
 
 Replication controllers will "adopt" existing pods that match their selector query, so let's create a replication controller with a single replica to adopt our existing Cassandra pod.
 
+<!-- BEGIN MUNGE: EXAMPLE cassandra-controller.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -192,13 +212,11 @@ spec:
         name: cassandra
     spec:
       containers:
-        - name: cassandra
-          image: gcr.io/google_containers/cassandra:v5
-          command:
+        - command:
             - /run.sh
           resources:
             limits:
-              cpu: 0.5
+              cpu: 0.1
           env:
             - name: MAX_HEAP_SIZE
               value: 512M
@@ -208,6 +226,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          image: gcr.io/google_containers/cassandra:v6
+          name: cassandra
           ports:
             - containerPort: 9042
               name: cql
@@ -220,6 +240,9 @@ spec:
         - name: data
           emptyDir: {}
 ```
+
+[Download example](cassandra-controller.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Most of this replication controller definition is identical to the Cassandra pod definition above, it simply gives the resplication controller a recipe to use when it creates new Cassandra pods.  The other differentiating parts are the ```selector``` attribute which contains the controller's selector query, and the ```replicas``` attribute which specifies the desired number of replicas, in this case 1.
 

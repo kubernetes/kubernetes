@@ -75,7 +75,7 @@ To start the redis master, use the file `examples/guestbook/redis-master-control
 
 Although we have a single instance of our redis master, we are using a [replication controller](../../docs/user-guide/replication-controller.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the replication controller will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
 
-Here is `redis-master-controller.yaml`:
+<!-- BEGIN MUNGE: EXAMPLE redis-master-controller.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -99,6 +99,9 @@ spec:
         ports:
         - containerPort: 6379
 ```
+
+[Download example](redis-master-controller.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Change to the `<kubernetes>/examples/guestbook` directory if you're not already there. Create the redis master pod in your Kubernetes cluster by running:
 
@@ -200,6 +203,8 @@ The selector field of the service description determines which pods will receive
 
 The file `examples/guestbook/redis-master-service.yaml` defines the redis master service:
 
+<!-- BEGIN MUNGE: EXAMPLE redis-master-service.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -215,6 +220,9 @@ spec:
   selector:
     name: redis-master
 ```
+
+[Download example](redis-master-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Create the service by running:
 
@@ -262,6 +270,8 @@ In Kubernetes, a replication controller is responsible for managing multiple ins
 
 To create the replicated pod, use the file `examples/guestbook/redis-slave-controller.yaml`, which looks like this:
 
+<!-- BEGIN MUNGE: EXAMPLE redis-slave-controller.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -284,6 +294,9 @@ spec:
         ports:
         - containerPort: 6379
 ```
+
+[Download example](redis-slave-controller.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 and create the replication controller by running:
 
@@ -316,6 +329,8 @@ Just like the master, we want to have a service to proxy connections to the redi
 
 The service specification for the slaves is in `examples/guestbook/redis-slave-service.yaml`:
 
+<!-- BEGIN MUNGE: EXAMPLE redis-slave-service.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -330,6 +345,9 @@ spec:
   selector:
     name: redis-slave
 ```
+
+[Download example](redis-slave-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "label=value"` command.
 
@@ -354,6 +372,8 @@ Again we'll create a set of replicated frontend pods instantiated by a replicati
 
 The pod is described in the file `examples/guestbook/frontend-controller.yaml`:
 
+<!-- BEGIN MUNGE: EXAMPLE frontend-controller.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -376,6 +396,9 @@ spec:
         ports:
         - containerPort: 80
 ```
+
+[Download example](frontend-controller.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Using this file, you can turn up your frontend with:
 
@@ -457,6 +480,8 @@ Note the use of the `redis-master` and `redis-slave` host names-- we're finding 
 As with the other pods, we now want to create a service to group your frontend pods.
 The service is described in the file `frontend-service.yaml`:
 
+<!-- BEGIN MUNGE: EXAMPLE frontend-service.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -470,10 +495,13 @@ spec:
   # type: LoadBalancer
   ports:
     # the port that this service should serve on
-  - port: 80
+    - port: 80
   selector:
     name: frontend
 ```
+
+[Download example](frontend-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 #### Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)
 

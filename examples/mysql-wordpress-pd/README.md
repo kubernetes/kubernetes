@@ -95,6 +95,8 @@ Now that the persistent disks are defined, the Kubernetes pods can be launched. 
 First, **edit [`mysql.yaml`](mysql.yaml)**, the mysql pod definition, to use a database password that you specify.
 `mysql.yaml` looks like this:
 
+<!-- BEGIN MUNGE: EXAMPLE mysql.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -127,8 +129,10 @@ spec:
         # This GCE PD must already exist.
         pdName: mysql-disk
         fsType: ext4
-
 ```
+
+[Download example](mysql.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
 Once you've edited the file to set your database password, create the pod as follows, where `<kubernetes>` is the path to your Kubernetes installation:
@@ -164,6 +168,8 @@ So if we label our Kubernetes mysql service `mysql`, the wordpress pod will be a
 
 The [`mysql-service.yaml`](mysql-service.yaml) file looks like this:
 
+<!-- BEGIN MUNGE: EXAMPLE mysql-service.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -179,6 +185,9 @@ spec:
   selector: 
     name: mysql
 ```
+
+[Download example](mysql-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Start the service like this:
 
@@ -198,6 +207,8 @@ $ kubectl get services
 Once the mysql service is up, start the wordpress pod, specified in
 [`wordpress.yaml`](wordpress.yaml).  Before you start it, **edit `wordpress.yaml`** and **set the database password to be the same as you used in `mysql.yaml`**.
 Note that this config file also defines a volume, this one using the `wordpress-disk` persistent disk that you created.
+
+<!-- BEGIN MUNGE: EXAMPLE wordpress.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -230,6 +241,9 @@ spec:
         fsType: ext4
 ```
 
+[Download example](wordpress.yaml)
+<!-- END MUNGE: EXAMPLE -->
+
 Create the pod:
 
 ```sh
@@ -249,6 +263,8 @@ Once the wordpress pod is running, start its service, specified by [`wordpress-s
 
 The service config file looks like this:
 
+<!-- BEGIN MUNGE: EXAMPLE wordpress-service.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -265,6 +281,9 @@ spec:
     name: wordpress
   type: LoadBalancer
 ```
+
+[Download example](wordpress-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Note the `type: LoadBalancer` setting.  This will set up the wordpress service behind an external IP.
 Note also that we've set the service port to 80.  We'll return to that shortly.
