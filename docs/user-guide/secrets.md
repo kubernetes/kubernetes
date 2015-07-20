@@ -54,7 +54,7 @@ a docker image. See [Secrets design document](../design/secrets.md) for more inf
     - [Secret and Pod Lifetime interaction](#secret-and-pod-lifetime-interaction)
   - [Use cases](#use-cases)
     - [Use-Case: Pod with ssh keys](#use-case-pod-with-ssh-keys)
-    - [Use-Case: Pods with prod / test credentials](#use-case-pods-with-prod--test-credentials)
+    - [Use-Case: Pods with prod / test credentials](#use-case-pods-with-prod-test-credentials)
     - [Use-case: Secret visible to one container in a pod](#use-case-secret-visible-to-one-container-in-a-pod)
   - [Security Properties](#security-properties)
     - [Protections](#protections)

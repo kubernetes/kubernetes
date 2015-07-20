@@ -41,7 +41,7 @@ This document will hopefully help you to figure out what's going wrong.
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [My Service is not working - how to debug](#my-service-is-not-working---how-to-debug)
+- [My Service is not working - how to debug](#my-service-is-not-working-how-to-debug)
   - [Conventions](#conventions)
   - [Running commands in a Pod](#running-commands-in-a-pod)
   - [Setup](#setup)
