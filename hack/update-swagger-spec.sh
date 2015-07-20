@@ -39,13 +39,13 @@ trap cleanup EXIT SIGINT
 kube::log::status "Building apiserver"
 "${KUBE_ROOT}/hack/build-go.sh" cmd/kube-apiserver
 
-kube::etcd::start
-
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
+
+kube::etcd::start
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
