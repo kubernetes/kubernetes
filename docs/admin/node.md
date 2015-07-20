@@ -49,6 +49,7 @@ Documentation for other releases can be found at
     - [Self-Registration of Nodes](#self-registration-of-nodes)
       - [Manual Node Administration](#manual-node-administration)
     - [Node capacity](#node-capacity)
+  - [API Object](#api-object)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -256,6 +257,12 @@ spec:
 Set the `cpu` and `memory` values to the amount of resources you want to reserve.
 Place the file in the manifest directory (`--config=DIR` flag of kubelet).  Do this
 on each kubelet where you want to reserve resources.
+
+## API Object
+
+Node is a top-level resource in the kubernetes REST API. More details about the
+API object can be found at: [Node API
+object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_node).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

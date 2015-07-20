@@ -56,6 +56,7 @@ Documentation for other releases can be found at
   - [The gory details of virtual IPs](#the-gory-details-of-virtual-ips)
     - [Avoiding collisions](#avoiding-collisions)
     - [IPs and VIPs](#ips-and-vips)
+  - [API Object](#api-object)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -525,6 +526,12 @@ collision.  Clients can simply connect to an IP and port, without being aware
 of which `Pods` they are actually accessing.
 
 ![Services detailed diagram](services-detail.png)
+
+## API Object
+
+Service is a top-level resource in the kubernetes REST API. More details about the
+API object can be found at: [Service API
+object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_service).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
