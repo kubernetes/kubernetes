@@ -53,14 +53,14 @@ First, if you have not already done so:
 
 Authenticate with gcloud and set the gcloud default project name to point to the project you want to use for your Kubernetes cluster:
 
-```shell
+```sh
 gcloud auth login
 gcloud config set project <project-name>
 ```
 
 Next, start up a Kubernetes cluster:
 
-```shell
+```sh
 wget -q -O - https://get.k8s.io | bash
 ```
 
@@ -76,13 +76,13 @@ We will create two disks: one for the mysql pod, and one for the wordpress pod. 
 
 First create the mysql disk.
 
-```shell
+```sh
 gcloud compute disks create --size=20GB --zone=$ZONE mysql-disk
 ```
 
 Then create the wordpress disk.
 
-```shell
+```sh
 gcloud compute disks create --size=20GB --zone=$ZONE wordpress-disk
 ```
 
@@ -133,14 +133,14 @@ spec:
 Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
 Once you've edited the file to set your database password, create the pod as follows, where `<kubernetes>` is the path to your Kubernetes installation:
 
-```shell
+```sh
 $ kubectl create -f examples/mysql-wordpress-pd/mysql.yaml
 ```
 
 It may take a short period before the new pod reaches the `Running` state.
 List all pods to see the status of this new pod and the cluster node that it is running on:
 
-```shell
+```sh
 $ kubectl get pods
 ```
 
@@ -149,7 +149,7 @@ $ kubectl get pods
 
 You can take a look at the logs for a pod by using `kubectl.sh log`.  For example:
 
-```shell
+```sh
 $ kubectl logs mysql
 ```
 
@@ -182,13 +182,13 @@ spec:
 
 Start the service like this:
 
-```shell
+```sh
 $ kubectl create -f examples/mysql-wordpress-pd/mysql-service.yaml
 ```
 
 You can see what services are running via:
 
-```shell
+```sh
 $ kubectl get services
 ```
 
@@ -232,14 +232,14 @@ spec:
 
 Create the pod:
 
-```shell
+```sh
 $ kubectl create -f examples/mysql-wordpress-pd/wordpress.yaml
 ```
 
 And list the pods to check that the status of the new pod changes
 to `Running`.  As above, this might take a minute.
 
-```shell
+```sh
 $ kubectl get pods
 ```
 
@@ -271,13 +271,13 @@ Note also that we've set the service port to 80.  We'll return to that shortly.
 
 Start the service:
 
-```shell
+```sh
 $ kubectl create -f examples/mysql-wordpress-pd/wordpress-service.yaml
 ```
 
 and see it in the list of services:
 
-```shell
+```sh
 $ kubectl get services
 ```
 
@@ -289,7 +289,7 @@ $ kubectl get services/wpfrontend --template="{{range .status.loadBalancer.ingre
 
 or by listing the forwarding rules for your project:
 
-```shell
+```sh
 $ gcloud compute forwarding-rules list
 ```
 
@@ -299,7 +299,7 @@ Look for the rule called `wpfrontend`, which is what we named the wordpress serv
 
 To access your new installation, you first may need to open up port 80 (the port specified in the wordpress service config) in the firewall for your cluster. You can do this, e.g. via:
 
-```shell
+```sh
 $ gcloud compute firewall-rules create sample-http --allow tcp:80
 ```
 
@@ -320,7 +320,7 @@ Set up your WordPress blog and play around with it a bit.  Then, take down its p
 
 If you are just experimenting, you can take down and bring up only the pods:
 
-```shell
+```sh
 $ kubectl delete -f examples/mysql-wordpress-pd/wordpress.yaml
 $ kubectl delete -f examples/mysql-wordpress-pd/mysql.yaml
 ```
@@ -331,7 +331,7 @@ If you want to shut down the entire app installation, you can delete the service
 
 If you are ready to turn down your Kubernetes cluster altogether, run:
 
-```shell
+```sh
 $ cluster/kube-down.sh
 ```
 
