@@ -172,14 +172,16 @@ service anti-affinity (among other things). You can find the IP of your load bal
 by running:
 
 ```
-kubectl get service meteor --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
+kubectl get service meteor \
+--template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
 ```
 
 You will have to open up port 80 if it's not open yet in your
 environment. On Google Compute Engine, you may run the below command.
 
 ```
-gcloud compute firewall-rules create meteor-80 --allow=tcp:80 --target-tags kubernetes-minion
+gcloud compute firewall-rules create meteor-80 --allow=tcp:80 \
+--target-tags kubernetes-minion
 ```
 
 What is going on?

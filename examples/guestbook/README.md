@@ -546,7 +546,8 @@ frontend              us-central1 130.211.188.51 TCP         us-central1/targetP
 In Google Compute Engine, you also may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion` (replace with your tags as appropriate):
 
 ```console
-$ gcloud compute firewall-rules create --allow=tcp:80 --target-tags=kubernetes-minion kubernetes-minion-80
+$ gcloud compute firewall-rules create --allow=tcp:80 \
+--target-tags=kubernetes-minion kubernetes-minion-80
 ```
 
 For Google Compute Engine details about limiting traffic to specific sources, see the [Google Compute Engine firewall documentation][gce-firewall-docs].
