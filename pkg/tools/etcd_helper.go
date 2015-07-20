@@ -31,76 +31,26 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/glog"
-)
-
-var (
-	cacheHitCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "etcd_helper_cache_hit_count",
-			Help: "Counter of etcd helper cache hits.",
-		},
-	)
-	cacheMissCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "etcd_helper_cache_miss_count",
-			Help: "Counter of etcd helper cache miss.",
-		},
-	)
-	cacheEntryCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "etcd_helper_cache_entry_count",
-			Help: "Counter of etcd helper cache entries. This can be different from etcd_helper_cache_miss_count " +
-				"because two concurrent threads can miss the cache and generate the same entry twice.",
-		},
-	)
-	cacheGetLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
-			Name: "etcd_request_cache_get_latencies_summary",
-			Help: "Latency in microseconds of getting an object from etcd cache",
-		},
-	)
-	cacheAddLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
-			Name: "etcd_request_cache_add_latencies_summary",
-			Help: "Latency in microseconds of adding an object to etcd cache",
-		},
-	)
-	etcdRequestLatenciesSummary = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Name: "etcd_request_latencies_summary",
-			Help: "Etcd request latency summary in microseconds for each operation and object type.",
-		},
-		[]string{"operation", "type"},
-	)
 )
 
 const maxEtcdCacheEntries int = 50000
 
 func init() {
-	prometheus.MustRegister(cacheHitCounter)
-	prometheus.MustRegister(cacheMissCounter)
-	prometheus.MustRegister(cacheEntryCounter)
-	prometheus.MustRegister(cacheAddLatency)
-	prometheus.MustRegister(cacheGetLatency)
-	prometheus.MustRegister(etcdRequestLatenciesSummary)
+	metrics.Register()
 }
 
 func getTypeName(obj interface{}) string {
 	return reflect.TypeOf(obj).String()
 }
 
-func recordEtcdRequestLatency(verb, resource string, startTime time.Time) {
-	etcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(float64(time.Since(startTime) / time.Microsecond))
-}
-
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
 type EtcdHelper struct {
-	Client EtcdGetSet
+	Client EtcdClient
 	Codec  runtime.Codec
 	Copier runtime.ObjectCopier
 	// optional, no atomic operations can be performed without this interface
@@ -121,7 +71,7 @@ type EtcdHelper struct {
 // NewEtcdHelper creates a helper that works against objects that use the internal
 // Kubernetes API objects.
 // TODO: Refactor to take a runtiem.ObjectCopier
-func NewEtcdHelper(client EtcdGetSet, codec runtime.Codec, prefix string) EtcdHelper {
+func NewEtcdHelper(client EtcdClient, codec runtime.Codec, prefix string) EtcdHelper {
 	return EtcdHelper{
 		Client:     client,
 		Codec:      codec,
@@ -234,7 +184,7 @@ type etcdCache interface {
 func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 	startTime := time.Now()
 	defer func() {
-		cacheGetLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
+		metrics.ObserveGetCache(startTime)
 	}()
 	obj, found := h.cache.Get(index)
 	if found {
@@ -245,17 +195,17 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
 			return nil, false
 		}
-		cacheHitCounter.Inc()
+		metrics.ObserveCacheHit()
 		return objCopy.(runtime.Object), true
 	}
-	cacheMissCounter.Inc()
+	metrics.ObserveCacheMiss()
 	return nil, false
 }
 
 func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 	startTime := time.Now()
 	defer func() {
-		cacheAddLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
+		metrics.ObserveAddCache(startTime)
 	}()
 	objCopy, err := h.Copier.Copy(obj)
 	if err != nil {
@@ -264,7 +214,7 @@ func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 	}
 	isOverwrite := h.cache.Add(index, objCopy)
 	if !isOverwrite {
-		cacheEntryCounter.Inc()
+		metrics.ObserveNewEntry()
 	}
 }
 
@@ -281,7 +231,7 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 	startTime := time.Now()
 	trace.Step("About to list etcd node")
 	nodes, index, err := h.listEtcdNode(key)
-	recordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
+	metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 	trace.Step("Etcd node listed")
 	if err != nil {
 		return err
@@ -310,7 +260,7 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 	startTime := time.Now()
 	trace.Step("About to read etcd node")
 	response, err := h.Client.Get(key, false, false)
-	recordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
+	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	trace.Step("Etcd node read")
 	if err != nil {
 		if IsEtcdNotFound(err) {
@@ -348,7 +298,7 @@ func (h *EtcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFoun
 func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, node *etcd.Node, res *etcd.Response, err error) {
 	startTime := time.Now()
 	response, err := h.Client.Get(key, false, false)
-	recordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
+	metrics.RecordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
 
 	if err != nil && !IsEtcdNotFound(err) {
 		return "", nil, nil, err
@@ -404,7 +354,7 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 
 	startTime := time.Now()
 	response, err := h.Client.Create(key, string(data), ttl)
-	recordEtcdRequestLatency("create", getTypeName(obj), startTime)
+	metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	if err != nil {
 		return err
 	}
@@ -422,7 +372,7 @@ func (h *EtcdHelper) Delete(key string, recursive bool) error {
 	key = h.PrefixEtcdKey(key)
 	startTime := time.Now()
 	_, err := h.Client.Delete(key, recursive)
-	recordEtcdRequestLatency("delete", "UNKNOWN", startTime)
+	metrics.RecordEtcdRequestLatency("delete", "UNKNOWN", startTime)
 	return err
 }
 
@@ -435,7 +385,7 @@ func (h *EtcdHelper) DeleteObj(key string, out runtime.Object) error {
 
 	startTime := time.Now()
 	response, err := h.Client.Delete(key, false)
-	recordEtcdRequestLatency("delete", getTypeName(out), startTime)
+	metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
 	if !IsEtcdNotFound(err) {
 		// if the object that existed prior to the delete is returned by etcd, update out.
 		if err != nil || response.PrevNode != nil {
@@ -462,7 +412,7 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 			create = false
 			startTime := time.Now()
 			response, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
-			recordEtcdRequestLatency("compareAndSwap", getTypeName(obj), startTime)
+			metrics.RecordEtcdRequestLatency("compareAndSwap", getTypeName(obj), startTime)
 			if err != nil {
 				return err
 			}
@@ -472,7 +422,7 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 		// Create will fail if a key already exists.
 		startTime := time.Now()
 		response, err = h.Client.Create(key, string(data), ttl)
-		recordEtcdRequestLatency("create", getTypeName(obj), startTime)
+		metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	}
 
 	if err != nil {
@@ -589,7 +539,7 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		if index == 0 {
 			startTime := time.Now()
 			response, err := h.Client.Create(key, string(data), ttl)
-			recordEtcdRequestLatency("create", getTypeName(ptrToType), startTime)
+			metrics.RecordEtcdRequestLatency("create", getTypeName(ptrToType), startTime)
 			if IsEtcdNodeExist(err) {
 				continue
 			}
@@ -604,7 +554,7 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		startTime := time.Now()
 		// Swap origBody with data, if origBody is the latest etcd data.
 		response, err := h.Client.CompareAndSwap(key, string(data), ttl, origBody, index)
-		recordEtcdRequestLatency("compareAndSwap", getTypeName(ptrToType), startTime)
+		metrics.RecordEtcdRequestLatency("compareAndSwap", getTypeName(ptrToType), startTime)
 		if IsEtcdTestFailed(err) {
 			// Try again.
 			continue

@@ -186,7 +186,7 @@ func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding 
 
 // etcdWatch calls etcd's Watch function, and handles any errors. Meant to be called
 // as a goroutine.
-func (w *etcdWatcher) etcdWatch(client EtcdGetSet, key string, resourceVersion uint64) {
+func (w *etcdWatcher) etcdWatch(client EtcdClient, key string, resourceVersion uint64) {
 	defer util.HandleCrash()
 	defer close(w.etcdError)
 	if resourceVersion == 0 {
@@ -204,7 +204,7 @@ func (w *etcdWatcher) etcdWatch(client EtcdGetSet, key string, resourceVersion u
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
-func etcdGetInitialWatchState(client EtcdGetSet, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
+func etcdGetInitialWatchState(client EtcdClient, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
 	resp, err := client.Get(key, false, recursive)
 	if err != nil {
 		if !IsEtcdNotFound(err) {

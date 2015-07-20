@@ -37,7 +37,7 @@ type Master string
 func (Master) IsAnAPIObject() {}
 
 // NewEtcdMasterElector returns an implementation of election.MasterElector backed by etcd.
-func NewEtcdMasterElector(h tools.EtcdGetSet) MasterElector {
+func NewEtcdMasterElector(h tools.EtcdClient) MasterElector {
 	return &etcdMasterElector{etcd: h}
 }
 
@@ -45,7 +45,7 @@ type empty struct{}
 
 // internal implementation struct
 type etcdMasterElector struct {
-	etcd   tools.EtcdGetSet
+	etcd   tools.EtcdClient
 	done   chan empty
 	events chan watch.Event
 }

@@ -125,7 +125,7 @@ type KubernetesScheduler struct {
 	executorGroup     uint64
 	scheduleFunc      PodScheduleFunc
 	client            *client.Client
-	etcdClient        tools.EtcdGetSet
+	etcdClient        tools.EtcdClient
 	failoverTimeout   float64 // in seconds
 	reconcileInterval int64
 
@@ -158,7 +158,7 @@ type Config struct {
 	Executor          *mesos.ExecutorInfo
 	ScheduleFunc      PodScheduleFunc
 	Client            *client.Client
-	EtcdClient        tools.EtcdGetSet
+	EtcdClient        tools.EtcdClient
 	FailoverTimeout   float64
 	ReconcileInterval int64
 	ReconcileCooldown time.Duration
