@@ -4,8 +4,6 @@ readonly reset=$(tput sgr0)
 readonly   red=$(tput bold; tput setaf 1)
 readonly green=$(tput bold; tput setaf 2)
 
-KUBE_HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
-
 exit_code=0
 
 echo -ne "Checking that it builds... "
@@ -60,7 +58,7 @@ files_need_description=()
 # Check API schema definitions for field descriptions
 for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
   # Check for files with fields without description tags
-  descriptionless=$(hack/verify-description.sh "${file}")
+  descriptionless=$(hack/after-build/verify-description.sh "${file}")
   if [[ "$descriptionless" != "" ]]; then
     files_need_description+=("${file}")
   fi
@@ -80,7 +78,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for links in API descriptions... "
-if ! hack/verify-linkcheck.sh > /dev/null; then
+if ! hack/after-build/verify-linkcheck.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some links in pkg/api/.*types.go are outdated. They require a manual fix."
   exit_code=1
@@ -90,11 +88,11 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for docs that need updating... "
-if ! hack/verify-gendocs.sh > /dev/null; then
+if ! hack/after-build/verify-generated-docs.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some docs are out of sync between CLI and markdown."
   echo "To regenerate docs, run:"
-  echo "  hack/run-gendocs.sh"
+  echo "  hack/update-generated-docs.sh"
   exit_code=1
 else
   echo "${green}OK"
@@ -102,7 +100,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for conversions that need updating... "
-if ! hack/verify-generated-conversions.sh > /dev/null; then
+if ! hack/after-build/verify-generated-conversions.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some conversions functions need regeneration."
   echo "To regenerate conversions, run:"
@@ -114,7 +112,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for deep-copies that need updating... "
-if ! hack/verify-generated-deep-copies.sh > /dev/null; then
+if ! hack/after-build/verify-generated-deep-copies.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some deep-copy functions need regeneration."
   echo "To regenerate deep-copies, run:"
@@ -126,7 +124,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for swagger spec that need updating... "
-if ! hack/verify-swagger-spec.sh > /dev/null; then
+if ! hack/after-build/verify-swagger-spec.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Swagger spec needs to be updated."
   echo "To regenerate the spec, run:"

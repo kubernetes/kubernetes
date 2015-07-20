@@ -22,25 +22,9 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-linkcheck=$(kube::util::find-binary "linkcheck")
 
-if [[ ! -x "$linkcheck" ]]; then
-  {
-    echo "It looks as if you don't have a compiled linkcheck binary"
-    echo
-    echo "If you are running from a clone of the git repo, please run"
-    echo "'./hack/build-go.sh cmd/linkcheck'."
-  } >&2
-  exit 1
-fi
+"${KUBE_ROOT}/hack/build-go.sh" cmd/linkcheck
 
-TYPEROOT="${KUBE_ROOT}/pkg/api/"
-"${linkcheck}" "--root-dir=${TYPEROOT}" "--repo-root=${KUBE_ROOT}" "--file-suffix=types.go" "--prefix=http://releases.k8s.io/HEAD" && ret=0 || ret=$?
-if [[ $ret -eq 1 ]]; then
-  echo "links in ${TYPEROOT} is out of date."
-  exit 1
-fi
-if [[ $ret -gt 1 ]]; then
-  echo "Error running linkcheck"
-  exit 1
-fi
+"${KUBE_ROOT}/hack/after-build/verify-linkcheck.sh" "$@"
+
+# ex: ts=2 sw=2 et filetype=sh

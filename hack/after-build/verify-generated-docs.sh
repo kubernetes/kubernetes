@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -28,16 +28,6 @@ gendocs=$(kube::util::find-binary "gendocs")
 genman=$(kube::util::find-binary "genman")
 genbashcomp=$(kube::util::find-binary "genbashcomp")
 mungedocs=$(kube::util::find-binary "mungedocs")
-
-if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" || ! -x "$mungedocs" ]]; then
-  {
-    echo "It looks as if you don't have a compiled gendocs, genman, genbashcomp or mungedocs binary"
-    echo
-    echo "If you are running from a clone of the git repo, please run"
-    echo "'./hack/build-go.sh cmd/gendocs cmd/genman cmd/genbashcomp cmd/mungedocs'."
-  } >&2
-  exit 1
-fi
 
 DOCROOT="${KUBE_ROOT}/docs/"
 EXAMPLEROOT="${KUBE_ROOT}/examples/"
@@ -51,7 +41,7 @@ cp -a "${DOCROOT}" "${TMP_DOCROOT}"
 # links will be distorted. --verify means that it will not make changes.
 "${mungedocs}" "--verify=true" "--root-dir=${DOCROOT}" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
-  echo "${DOCROOT} is out of date. Please run hack/run-gendocs.sh"
+  echo "${DOCROOT} is out of date. Please run hack/update-generated-docs.sh"
   exit 1
 fi
 if [[ $ret -gt 1 ]]; then
@@ -61,7 +51,7 @@ fi
 
 "${mungedocs}" "--verify=true" "--root-dir=${EXAMPLEROOT}" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
-  echo "${EXAMPLEROOT} is out of date. Please run hack/run-gendocs.sh"
+  echo "${EXAMPLEROOT} is out of date. Please run hack/update-generated-docs.sh"
   exit 1
 fi
 if [[ $ret -gt 1 ]]; then
@@ -85,7 +75,7 @@ if [[ $ret -eq 0 ]]
 then
   echo "${DOCROOT} up to date."
 else
-  echo "${DOCROOT} is out of date. Please run hack/run-gendocs.sh"
+  echo "${DOCROOT} is out of date. Please run hack/update-generated-docs.sh"
   exit 1
 fi
 
@@ -99,7 +89,7 @@ if [ $ret -eq 0 ]
 then
 	echo "${COMPROOT} up to date."
 else
-	echo "${COMPROOT} is out of date. Please run hack/run-gendocs.sh"
+	echo "${COMPROOT} is out of date. Please run hack/update-generated-docs.sh"
 	echo "If you did not make a change to kubectl or its dependencies,"
 	echo "run 'make clean' and retry this command."
 	exit 1
