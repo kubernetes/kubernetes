@@ -38,7 +38,9 @@ func splitLines(document []byte) []string {
 //
 // Delimiters should occupy own line.
 // Returns copy of document with modifications.
-func updateMacroBlock(lines []string, beginMark, endMark, insertThis string) ([]byte, error) {
+func updateMacroBlock(lines []string, token, insertThis string) ([]byte, error) {
+	beginMark := beginMungeTag(token)
+	endMark := endMungeTag(token)
 	var buffer bytes.Buffer
 	betweenBeginAndEnd := false
 	for _, line := range lines {
@@ -85,15 +87,32 @@ func hasLine(lines []string, needle string) bool {
 	return false
 }
 
+// Add a macro block to the beginning of a set of lines
+func prependMacroBlock(token string, lines []string) []string {
+	beginMark := beginMungeTag(token)
+	endMark := endMungeTag(token)
+	return append([]string{beginMark, endMark}, lines...)
+}
+
+// Add a macro block to the end of a set of lines
+func appendMacroBlock(token string, lines []string) []string {
+	beginMark := beginMungeTag(token)
+	endMark := endMungeTag(token)
+	return append(lines, beginMark, endMark)
+}
+
 // Tests that a document, represented as a slice of lines, has a macro block.
-func hasMacroBlock(lines []string, begin string, end string) bool {
+func hasMacroBlock(lines []string, token string) bool {
+	beginMark := beginMungeTag(token)
+	endMark := endMungeTag(token)
+
 	foundBegin := false
 	for _, line := range lines {
 		trimmedLine := strings.Trim(line, " \n")
 		switch {
-		case !foundBegin && trimmedLine == begin:
+		case !foundBegin && trimmedLine == beginMark:
 			foundBegin = true
-		case foundBegin && trimmedLine == end:
+		case foundBegin && trimmedLine == endMark:
 			return true
 		}
 	}

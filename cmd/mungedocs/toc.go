@@ -39,7 +39,7 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 		return nil, err
 	}
 	lines := splitLines(markdown)
-	updatedMarkdown, err := updateMacroBlock(lines, beginMungeTag(tocMungeTag), endMungeTag(tocMungeTag), string(toc))
+	updatedMarkdown, err := updateMacroBlock(lines, tocMungeTag, string(toc))
 	if err != nil {
 		return nil, err
 	}

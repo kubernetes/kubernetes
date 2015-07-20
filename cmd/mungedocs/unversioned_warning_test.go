@@ -23,7 +23,10 @@ import (
 )
 
 func TestUnversionedWarning(t *testing.T) {
-	warningBlock := beginUnversionedWarning + "\n" + makeUnversionedWarning("filename.md") + "\n" + endUnversionedWarning + "\n"
+	beginMark := beginMungeTag(unversionedWarningTag)
+	endMark := endMungeTag(unversionedWarningTag)
+
+	warningBlock := beginMark + "\n" + makeUnversionedWarning("filename.md") + "\n" + endMark + "\n"
 	var cases = []struct {
 		in  string
 		out string
@@ -38,15 +41,15 @@ func TestUnversionedWarning(t *testing.T) {
 			"Foo\n<!-- TAG IS_VERSIONED -->\nBar",
 		},
 		{
-			beginUnversionedWarning + "\n" + endUnversionedWarning + "\n",
+			beginMark + "\n" + endMark + "\n",
 			warningBlock,
 		},
 		{
-			beginUnversionedWarning + "\n" + "something\n" + endUnversionedWarning + "\n",
+			beginMark + "\n" + "something\n" + endMark + "\n",
 			warningBlock,
 		},
 		{
-			"Foo\n" + beginUnversionedWarning + "\n" + endUnversionedWarning + "\nBar\n",
+			"Foo\n" + beginMark + "\n" + endMark + "\nBar\n",
 			"Foo\n" + warningBlock + "Bar\n",
 		},
 		{

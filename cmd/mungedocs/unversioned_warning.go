@@ -20,9 +20,6 @@ import "fmt"
 
 const unversionedWarningTag = "UNVERSIONED_WARNING"
 
-var beginUnversionedWarning = beginMungeTag(unversionedWarningTag)
-var endUnversionedWarning = endMungeTag(unversionedWarningTag)
-
 const unversionedWarningFmt = `
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
@@ -65,8 +62,8 @@ func updateUnversionedWarning(file string, markdown []byte) ([]byte, error) {
 		// No warnings on release branches
 		return markdown, nil
 	}
-	if !hasMacroBlock(lines, beginUnversionedWarning, endUnversionedWarning) {
-		lines = append([]string{beginUnversionedWarning, endUnversionedWarning}, lines...)
+	if !hasMacroBlock(lines, unversionedWarningTag) {
+		lines = prependMacroBlock(unversionedWarningTag, lines)
 	}
-	return updateMacroBlock(lines, beginUnversionedWarning, endUnversionedWarning, makeUnversionedWarning(file))
+	return updateMacroBlock(lines, unversionedWarningTag, makeUnversionedWarning(file))
 }

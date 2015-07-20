@@ -93,7 +93,7 @@ spec:
 ```
 
 [Download example](music-rc.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE music-rc.yaml -->
 
 The `CLUSTER_NAME` variable gives a name to the cluster and allows multiple separate clusters to
 exist in the same namespace.
@@ -120,7 +120,7 @@ data:
 ```
 
 [Download example](apiserver-secret.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE apiserver-secret.yaml -->
 
 Replace `NAMESPACE` with the actual namespace to be used and `TOKEN` with the basic64 encoded
 versions of the bearer token reported by `kubectl config view` e.g.
@@ -186,7 +186,7 @@ spec:
 ```
 
 [Download example](music-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE music-service.yaml -->
 
 Let's create the service with an external load balancer:
 
