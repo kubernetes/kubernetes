@@ -100,7 +100,6 @@ type ResourceQuotaList struct {
   // Items is a list of ResourceQuota objects
   Items []ResourceQuota `json:"items"`
 }
-
 ```
 
 ## AdmissionControl plugin: ResourceQuota

@@ -165,7 +165,6 @@ $ kubectl create -f ./node.json
 $ kubectl get nodes
 NAME                LABELS              STATUS
 fed-node           name=fed-node-label     Unknown
-
 ```
 
 Please note that in the above, it only creates a representation for the node

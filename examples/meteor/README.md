@@ -56,14 +56,14 @@ billing](https://developers.google.com/console/help/new/#billing).
 Authenticate with gcloud and set the gcloud default project name to
 point to the project you want to use for your Kubernetes cluster:
 
-```shell
+```sh
 gcloud auth login
 gcloud config set project <project-name>
 ```
 
 Next, start up a Kubernetes cluster:
 
-```shell
+```sh
 wget -q -O - https://get.k8s.io | bash
 ```
 
@@ -193,7 +193,7 @@ image is based on the Node.js official image. It then installs Meteor
 and copies in your apps' code. The last line specifies what happens
 when your app container is run.
 
-```
+```sh
 ENTRYPOINT MONGO_URL=mongodb://$MONGO_SERVICE_HOST:$MONGO_SERVICE_PORT /usr/local/bin/node main.js
 ```
 
@@ -216,7 +216,8 @@ As mentioned above, the mongo container uses a volume which is mapped
 to a persistent disk by Kubernetes. In [`mongo-pod.json`](mongo-pod.json) the container
 section specifies the volume:
 
-```
+```json
+{
         "volumeMounts": [
           {
             "name": "mongo-disk",
@@ -227,7 +228,8 @@ section specifies the volume:
 The name `mongo-disk` refers to the volume specified outside the
 container section:
 
-```
+```json
+{
     "volumes": [
       {
         "name": "mongo-disk",

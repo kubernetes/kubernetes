@@ -67,7 +67,6 @@ NAME                 ZONE          SIZE_GB TYPE   STATUS
 kubernetes-master-pd us-central1-b 20      pd-ssd READY
 Created [https://www.googleapis.com/compute/v1/projects/kubernetes-satnam/regions/us-central1/addresses/kubernetes-master-ip].
 +++ Logging using Fluentd to elasticsearch
-
 ```
 
 The node level Fluentd collector pods and the Elasticsearech pods used to ingest cluster logs and the pod for the Kibana
@@ -86,7 +85,6 @@ kibana-logging-v1-bhpo8                        1/1       Running   0          2h
 kube-dns-v3-7r1l9                              3/3       Running   0          2h
 monitoring-heapster-v4-yl332                   1/1       Running   1          2h
 monitoring-influx-grafana-v1-o79xf             2/2       Running   0          2h
-
 ```
 
 Here we see that for a four node cluster there is a `fluent-elasticsearch` pod running which gathers
@@ -137,7 +135,6 @@ KubeUI is running at https://146.148.94.154/api/v1/proxy/namespaces/kube-system/
 Grafana is running at https://146.148.94.154/api/v1/proxy/namespaces/kube-system/services/monitoring-grafana
 Heapster is running at https://146.148.94.154/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster
 InfluxDB is running at https://146.148.94.154/api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb
-
 ```
 
 Before accessing the logs ingested into Elasticsearch using a browser and the service proxy URL we need to find out
@@ -204,7 +201,6 @@ $ curl --header "Authorization: Bearer JsUe2Z3cXqa17UQqQ8qWGGf4nOSLwSnp" --insec
   },
   "tagline" : "You Know, for Search"
 }
-
 ```
 
 Note that you need the trailing slash at the end of the service proxy URL. Here is an example of a search:
