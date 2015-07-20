@@ -60,6 +60,9 @@ func (c *FakeNodes) UpdateStatus(minion *api.Node) (*api.Node, error) {
 }
 
 func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Lock.Lock()
+	defer c.Fake.Lock.Unlock()
+
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-nodes", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }

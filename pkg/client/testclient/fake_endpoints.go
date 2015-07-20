@@ -51,6 +51,9 @@ func (c *FakeEndpoints) Delete(name string) error {
 }
 
 func (c *FakeEndpoints) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Lock.Lock()
+	defer c.Fake.Lock.Unlock()
+
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-endpoints", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }

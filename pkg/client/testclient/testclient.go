@@ -17,6 +17,8 @@ limitations under the License.
 package testclient
 
 import (
+	"sync"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -55,11 +57,16 @@ type Fake struct {
 	// and return a response. It can implement scenario specific behavior. The type
 	// of object returned must match the expected type from the caller (even if nil).
 	ReactFn ReactionFunc
+
+	Lock sync.Mutex
 }
 
 // Invokes records the provided FakeAction and then invokes the ReactFn (if provided).
 // obj is expected to be of the same type a normal call would return.
 func (c *Fake) Invokes(action FakeAction, obj runtime.Object) (runtime.Object, error) {
+	c.Lock.Lock()
+	defer c.Lock.Unlock()
+
 	c.Actions = append(c.Actions, action)
 	if c.ReactFn != nil {
 		return c.ReactFn(action)
@@ -124,12 +131,18 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 }
 
 func (c *Fake) ServerVersion() (*version.Info, error) {
+	c.Lock.Lock()
+	defer c.Lock.Unlock()
+
 	c.Actions = append(c.Actions, FakeAction{Action: "get-version", Value: nil})
 	versionInfo := version.Get()
 	return &versionInfo, nil
 }
 
 func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
+	c.Lock.Lock()
+	defer c.Lock.Unlock()
+
 	c.Actions = append(c.Actions, FakeAction{Action: "get-apiversions", Value: nil})
 	return &api.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
 }

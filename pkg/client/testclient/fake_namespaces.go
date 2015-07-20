@@ -55,6 +55,9 @@ func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error
 }
 
 func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Lock.Lock()
+	defer c.Fake.Lock.Unlock()
+
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-namespaces", Value: resourceVersion})
 	return c.Fake.Watch, nil
 }
