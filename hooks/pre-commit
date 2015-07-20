@@ -41,31 +41,13 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for files that need boilerplate... "
-files_need_boilerplate=()
-boiler="${KUBE_HOOKS_DIR}/boilerplate.py"
-# Check for go files without the required boilerplate.
-if [[ ${#files[@]} -gt 0 ]]; then
-  files_need_boilerplate+=($("${boiler}" "go" "${files[@]}"))
-fi
-
-# Check for sh files without the required boilerplate.
-files=($(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v -e "third_party" -e "Godeps"))
-if [[ ${#files[@]} -gt 0 ]]; then
-  files_need_boilerplate+=($("${boiler}" "sh" "${files[@]}"))
-fi
-
-# Check for py files without the required boilerplate.
-files=($(git diff --cached --name-only --diff-filter ACM | grep "\.py" | grep -v -e "third_party" -e "Godeps"))
-if [[ ${#files} -gt 0 ]]; then
-  files_need_boilerplate+=($("${boiler}" "py" "${files[@]}"))
-fi
-
-if [[ "${#files_need_boilerplate[@]}" -ne 0 ]]; then
+out=($(hack/verify-boilerplate.sh))
+if [[ $? -ne 0 ]]; then
   echo "${red}ERROR!"
   echo "Some files are missing the required boilerplate header"
   echo "from hooks/boilerplate.txt:"
-  for file in "${files_need_boilerplate[@]}"; do
-    echo "  ${file}"
+  for f in "${out[@]}"; do
+    echo "  ${f}"
   done
   exit_code=1
 else
