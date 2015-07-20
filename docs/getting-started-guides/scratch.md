@@ -256,7 +256,7 @@ There are two main options for security:
 - Access the apiserver using HTTP.
   - Use a firewall for security.
   - This is easier to setup.
-- Access the apiserver using HTTPS  
+- Access the apiserver using HTTPS
   - Use https with certs, and credentials for user.
   - This is the recommended approach.
   - Configuring certs can be tricky.
@@ -389,7 +389,7 @@ so that kube-proxy can manage iptables instead of docker.
     - if you have setup PodIPs to be routable, then you want this false, otherwise, docker will
       rewrite the PodIP source-address to a NodeIP.
     - some environments (e.g. GCE) still need you to masquerade out-bound traffic when it leaves the cloud environment. This is very environment specific.
-    - if you are using an overlay network, consult those instructions.  
+    - if you are using an overlay network, consult those instructions.
   - `--mtu=`
     - may be required when using Flannel, because of the extra packet size due to udp encapsulation
   - `--insecure-registry $CLUSTER_SUBNET` 
@@ -429,13 +429,13 @@ Arguments to consider:
     - `--kubeconfig=/var/lib/kubelet/kubeconfig`
   - Otherwise, if taking the firewall-based security approach
     - `--api-servers=http://$MASTER_IP`
-  - `--config=/etc/kubernetes/manifests` -%}
+  - `--config=/etc/kubernetes/manifests`
   - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Addons](#starting-addons).)
   - `--cluster-domain=` to the dns domain prefix to use for cluster DNS addresses.
   - `--docker-root=`
   - `--root-dir=`
   - `--configure-cbr0=` (described above)
-  - `--register-node` (described in [Node](../admin/node.md) documentation.
+  - `--register-node` (described in [Node](../admin/node.md) documentation.)
 
 ### kube-proxy
 
@@ -522,7 +522,7 @@ all configured and managed *by Kubernetes*:
 
 ### etcd
 
-You will need to run one or more instances of etcd.  
+You will need to run one or more instances of etcd.
   - Recommended approach: run one etcd instance, with its log written to a directory backed
     by durable storage (RAID, GCE PD)
   - Alternative: run 3 or 5 etcd instances.
@@ -546,13 +546,13 @@ To run the apiserver:
 Here are some apiserver flags you may need to set:
   - `--cloud-provider=`
   - `--cloud-config=` if cloud provider requires a config file (GCE, AWS). If so, need to put config file into apiserver image or mount through hostPath.
-  - `--address=${MASTER_IP}`.  
+  - `--address=${MASTER_IP}`.
    - or `--bind-address=127.0.0.1` and `--address=127.0.0.1` if you want to run a proxy on the master node.
   - `--cluster-name=$CLUSTER_NAME`
   - `--service-cluster-ip-range=$SERVICE_CLUSTER_IP_RANGE`
   - `--etcd-servers=http://127.0.0.1:4001`
-  - `--tls-cert-file=/srv/kubernetes/server.cert` -%}
-  - `--tls-private-key-file=/srv/kubernetes/server.key` -%}
+  - `--tls-cert-file=/srv/kubernetes/server.cert`
+  - `--tls-private-key-file=/srv/kubernetes/server.key`
   - `--admission-control=$RECOMMENDED_LIST`
     - See [admission controllers](../admin/admission-controllers.md) for recommended arguments.
   - `--allow-privileged=true`, only if you trust your cluster user to run pods as root.
@@ -739,7 +739,7 @@ Flags to consider using with controller manager.
  - `--allocate-node-cidrs=`
    - *TODO*: explain when you want controller to do this and when you wanna do it another way.
  - `--cloud-provider=` and `--cloud-config` as described in apiserver section.
- - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../user-guide/service-accounts.md) feature.  
+ - `--service-account-private-key-file=/srv/kubernetes/server.key`, used by [service account](../user-guide/service-accounts.md) feature.
  - `--master=127.0.0.1:8080`
 
 Template for controller manager pod:
