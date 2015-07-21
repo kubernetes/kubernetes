@@ -31,7 +31,7 @@ In the remaining part of this example we will assume that your instance is named
 
 To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](phabricator-controller.json) which describes a [replication controller](../../docs/user-guide/replication-controller.html) with a single [pod](../../docs/user-guide/pods.html) running an Apache server with Phabricator PHP source:
 
-{% highlight js %}
+{% highlight json %}
 {
   "kind": "ReplicationController",
   "apiVersion": "v1",
@@ -123,7 +123,7 @@ gcloud sql instances patch phabricator-db --authorized-networks 130.211.141.151
 
 To automate this process and make sure that a proper host is authorized even if pod is rescheduled to a new machine we need a separate pod that periodically lists pods and authorizes hosts. Use the file [`examples/phabricator/authenticator-controller.json`](authenticator-controller.json):
 
-{% highlight js %}
+{% highlight json %}
 {
   "kind": "ReplicationController",
   "apiVersion": "v1",
@@ -179,7 +179,7 @@ phabricator  us-central1 107.178.210.6  RESERVED
 
 Use the file [`examples/phabricator/phabricator-service.json`](phabricator-service.json):
 
-{% highlight js %}
+{% highlight json %}
 {
   "kind": "Service",
   "apiVersion": "v1",

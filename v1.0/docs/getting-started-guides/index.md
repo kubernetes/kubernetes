@@ -9,17 +9,17 @@ layout: docwithnav
 # Creating a Kubernetes Cluster
 
 Kubernetes can run on a range of platforms, from your laptop, to VMs on a cloud provider, to rack of
-bare metal servers.  The effort required to setup a cluster varies from running a single command to
+bare metal servers.  The effort required to set up a cluster varies from running a single command to
 crafting your own customized cluster.  We'll guide you in picking a solution that fits for your needs.
 
 ## Picking the Right Solution
 
 If you just want to "kick the tires" on Kubernetes, we recommend the [local Docker-based](docker.html) solution.  
 
-The local Docker-based solution is one of several [Local cluster](#local-solutions) solutions
-that are quick to setup, but are limited to running on one machine.
+The local Docker-based solution is one of several [Local cluster](#local-machine-solutions) solutions
+that are quick to set up, but are limited to running on one machine.
 
-When you are ready to scale-up to more machines and higher availability, a [Hosted](#hosted-solutions)
+When you are ready to scale up to more machines and higher availability, a [Hosted](#hosted-solutions)
 solution is the easiest to create and maintain.
 
 [Turn-key cloud solutions](#turn-key-cloud-solutions) require only a few commands to create
@@ -27,16 +27,16 @@ and cover a wider range of cloud providers.
 
 [Custom solutions](#custom-solutions) require more effort to setup but cover and even 
 they vary from step-by-step instructions to general advice for setting up
-a kubernetes cluster from scratch. 
+a Kubernetes cluster from scratch. 
 
 ### Local-machine Solutions
 
-Local-machine solutions create a single cluster with one or more kubernetes nodes on a single
+Local-machine solutions create a single cluster with one or more Kubernetes nodes on a single
 physical machine.  Setup is completely automated and doesn't require a cloud provider account.
 But their size and availability is limited to that of a single machine.
 
 The local-machine solutions are:
-  - [Local Docker-based](#local-solutions) (recommended starting point)
+  - [Local Docker-based](docker.html) (recommended starting point)
   - [Vagrant](vagrant.html) (works on any platform with Vagrant: Linux, MacOS, or Windows.)
   - [No-VM local cluster](locally.html) (Linux only)
 
@@ -48,7 +48,7 @@ clusters.
 
 ### Turn-key Cloud Solutions
 
-These solutions allow you to create Kubernetes clusters on range of Cloud IaaS providers with only a
+These solutions allow you to create Kubernetes clusters on a range of Cloud IaaS providers with only a
 few commands, and have active community support.
 - [GCE](gce.html)
 - [AWS](aws.html)
@@ -60,8 +60,8 @@ Kubernetes can run on a wide range of Cloud providers and bare-metal environment
 base operating systems.
 
 If you can find a guide below that matches your needs, use it.  It may be a little out of date, but
-it will be easier than starting from scratch.  If you do want to start from scratch, because you
-have special requirements, or just because you want to understand what is underneath a Kubernetes
+it will be easier than starting from scratch.  If you do want to start from scratch because you
+have special requirements or just because you want to understand what is underneath a Kubernetes
 cluster, try the [Getting Started from Scratch](scratch.html) guide.
 
 If you are interested in supporting Kubernetes on a new platform, check out our [advice for
@@ -133,6 +133,7 @@ Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.html)  
 AWS                  | Saltstack    | Ubuntu | OVS         | [docs](aws.html)                                    |          | Community (@justinsb)
 Vmware               | CoreOS       | CoreOS | flannel     | [docs](coreos.html)                                 |          | Community (@kelseyhightower)
 Azure                | Saltstack    | Ubuntu | OpenVPN     | [docs](azure.html)                                  |          | Community
+Bare-metal           | custom       | Ubuntu | calico      | [docs](ubuntu-calico.html)                          |          | Community (@djosborne)
 Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.html)                                 |          | Community (@resouer @WIZARD-CXY)
 Local                |              |        | _none_      | [docs](locally.html)                                |          | Community (@preillyme)
 libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.html)                         |          | Community (@lhuard1A)
@@ -146,7 +147,7 @@ any                  | any          | any    | any         | [docs](scratch.html
 Definition of columns:
   - **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.
   - **OS** is the base operating system of the nodes.
-  - **Config. Mgmt** is the configuration management system that helps install and maintain kubernetes software on the
+  - **Config. Mgmt** is the configuration management system that helps install and maintain Kubernetes software on the
     nodes.
   - **Networking** is what implements the [networking model](../../docs/admin/networking.html).  Those with networking type
     _none_ may not support more than one node, or may support multiple VM nodes only in the same physical node.
@@ -156,9 +157,9 @@ Definition of columns:
     - **Project**:  Kubernetes Committers regularly use this configuration, so it usually works with the latest release
       of Kubernetes.
     - **Commercial**: A commercial offering with its own support arrangements.
-    - **Community**: Actively supported by community contributions. May not work with more recent releases of kubernetes.
-    - **Inactive**: No active maintainer.  Not recommended for first-time K8s users, and may be deleted soon.
-  - **Notes** is relevant information such as version k8s used.
+    - **Community**: Actively supported by community contributions. May not work with more recent releases of Kubernetes.
+    - **Inactive**: No active maintainer.  Not recommended for first-time Kubernetes users, and may be deleted soon.
+  - **Notes** is relevant information such as the version of Kubernetes used.
 
 <!-- reference style links below here -->
 <!-- GCE conformance test result -->

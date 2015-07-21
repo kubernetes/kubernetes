@@ -70,7 +70,7 @@ Key | Value
 ------------- | -------------
 `api_servers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
 `cbr-cidr` | (Optional) The minion IP address range used for the docker container bridge.
-`cloud` | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*, *aws*, *vagrant*
+`cloud` | (Optional) Which IaaS platform is used to host Kubernetes, *gce*, *azure*, *aws*, *vagrant*
 `etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role, or 127.0.0.1 on GCE.
 `hostnamef` | (Optional) The full host name of the machine, i.e. uname -n
 `node_ip` | (Optional) The IP address to use to address this node
@@ -78,19 +78,19 @@ Key | Value
 `network_mode` | (Optional) Networking model to use among nodes: *openvswitch*
 `networkInterfaceName` | (Optional) Networking interface to use to bind addresses, default value *eth0*
 `publicAddressOverride` | (Optional) The IP address the kube-apiserver should use to bind against for external read-only access
-`roles` | (Required) 1. `kubernetes-master` means this machine is the master in the kubernetes cluster.  2. `kubernetes-pool` means this machine is a kubernetes-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
+`roles` | (Required) 1. `kubernetes-master` means this machine is the master in the Kubernetes cluster.  2. `kubernetes-pool` means this machine is a kubernetes-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
 
 These keys may be leveraged by the Salt sls files to branch behavior.
 
 In addition, a cluster may be running a Debian based operating system or Red Hat based operating system (Centos, Fedora, RHEL, etc.).  As a result, it's important to sometimes distinguish behavior based on operating system using if branches like the following.
 
-```
+{% highlight jinja %}
 {% if grains['os_family'] == 'RedHat' %}
 // something specific to a RedHat environment (Centos, Fedora, RHEL) where you may use yum, systemd, etc.
 {% else %}
 // something specific to Debian environment (apt-get, initd)
 {% endif %}
-```
+{% endhighlight %}
 
 ## Best Practices
 

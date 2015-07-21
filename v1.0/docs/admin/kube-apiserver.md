@@ -13,7 +13,7 @@ layout: docwithnav
 ### Synopsis
 
 
-The kubernetes API server validates and configures data
+The Kubernetes API server validates and configures data
 for the api objects which include pods, services, replicationcontrollers, and
 others. The API Server services REST operations and provides the frontend to the
 cluster's shared state through which all other components interact.
@@ -55,7 +55,7 @@ cluster's shared state through which all other components interact.
       --kubelet_port=0: Kubelet port
       --kubelet_timeout=0: Timeout for kubelet operations
       --long-running-request-regexp="(/|^)((watch|proxy)(/|$)|(logs|portforward|exec)/?$)": A regular expression matching long running requests which should be excluded from maximum inflight request handling.
-      --master-service-namespace="": The namespace from which the kubernetes master services should be injected into pods
+      --master-service-namespace="": The namespace from which the Kubernetes master services should be injected into pods
       --max-requests-inflight=400: The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.
       --min-request-timeout=1800: An optional field indicating the minimum number of seconds a handler must keep a request open before timing it out. Currently only honored by the watch request handler, which picks a randomized value above this number as the connection timeout, to spread out load.
       --old-etcd-prefix="": The previous prefix for all resource paths in etcd, if any.

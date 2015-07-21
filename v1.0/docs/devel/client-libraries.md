@@ -6,7 +6,7 @@ layout: docwithnav
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-## kubernetes API client libraries
+## Kubernetes API client libraries
 
 ### Supported
 

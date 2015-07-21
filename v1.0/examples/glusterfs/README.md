@@ -54,7 +54,7 @@ glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
 
 The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustrates a sample configuration.
 
-{% highlight js %}
+{% highlight json %}
 {
      "name": "glusterfsvol",
      "glusterfs": {

@@ -59,7 +59,7 @@ You can download and install the latest Kubernetes release from [this page](http
 The script above will start (by default) a single master VM along with 4 worker VMs.  You
 can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 
-### Adding the kubernetes command line tools to PATH
+### Adding the Kubernetes command line tools to PATH
 
 The [kubectl](../../docs/user-guide/kubectl/kubectl.html) tool controls the Kubernetes cluster manager.  It lets you inspect your cluster resources, create, delete, and update components, and much more.
 You will use it to look at your new cluster and bring up example apps.

@@ -9,7 +9,7 @@ layout: docwithnav
 # Kubernetes Developer Guide
 
 The developer guide is for anyone wanting to either write code which directly accesses the
-kubernetes API, or to contribute directly to the kubernetes project.
+Kubernetes API, or to contribute directly to the Kubernetes project.
 It assumes some familiarity with concepts in the [User Guide](../user-guide/README.html) and the [Cluster Admin
 Guide](../admin/README.html).
 

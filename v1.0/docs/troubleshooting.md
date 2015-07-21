@@ -12,9 +12,11 @@ Sometimes things go wrong.  This guide is aimed at making them right.  It has tw
    * [Troubleshooting your application](user-guide/application-troubleshooting.html) - Useful for users who are deploying code into Kubernetes and wondering why it is not working.
    * [Troubleshooting your cluster](admin/cluster-troubleshooting.html) - Useful for cluster administrators and people whose Kubernetes cluster is unhappy.
 
+You should also check the [known issues](user-guide/known-issues.html) for the release you're using.
+
 # Getting help
 
-If your problem isn't answered by any of guides above, there are variety of ways for you to get help from the Kubernetes team.
+If your problem isn't answered by any of the guides above, there are variety of ways for you to get help from the Kubernetes team.
 
 ## Questions
 
@@ -41,7 +43,7 @@ The Kubernetes team hangs out on IRC at [`#google-containers`](https://botbot.me
 
 ## Mailing List
 
-The Kubernetes mailing list is google-containers@googlegroups.com
+The Kubernetes mailing list is [google-containers@googlegroups.com](https://groups.google.com/forum/#!forum/google-containers)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

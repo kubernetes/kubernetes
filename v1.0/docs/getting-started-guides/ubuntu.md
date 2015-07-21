@@ -12,13 +12,13 @@ Kubernetes Deployment On Bare-metal Ubuntu Nodes
 - [Prerequisites](#prerequisites)
     - [Starting a Cluster](#starting-a-cluster)
         - [Make *kubernetes* , *etcd* and *flanneld* binaries](#make-kubernetes--etcd-and-flanneld-binaries)
-        - [Configure and start the kubernetes cluster](#configure-and-start-the-kubernetes-cluster)
+        - [Configure and start the Kubernetes cluster](#configure-and-start-the-kubernetes-cluster)
         - [Deploy addons](#deploy-addons)
         - [Trouble Shooting](#trouble-shooting)
 
 ## Introduction
 
-This document describes how to deploy kubernetes on ubuntu nodes, including 1 kubernetes master and 3 kubernetes nodes, and people uses this approach can scale to **any number of nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
+This document describes how to deploy Kubernetes on ubuntu nodes, including 1 Kubernetes master and 3 Kubernetes nodes, and people uses this approach can scale to **any number of nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
 
 [Cloud team from Zhejiang University](https://github.com/ZJU-SEL) will maintain this work.
 
@@ -39,7 +39,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ku
 
 #### Make *kubernetes* , *etcd* and *flanneld* binaries
 
-First clone the kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
+First clone the Kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
 then `$ cd kubernetes/cluster/ubuntu`.
 
 Then run `$ ./build.sh`, this will download all the needed binaries into `./binaries`.
@@ -50,7 +50,7 @@ Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `ku
 
 > We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
 
-#### Configure and start the kubernetes cluster
+#### Configure and start the Kubernetes cluster
 
 An example cluster is listed as below:
 
@@ -72,8 +72,6 @@ export NUM_MINIONS=${NUM_MINIONS:-3}
 export SERVICE_CLUSTER_IP_RANGE=11.1.1.0/24
 
 export FLANNEL_NET=172.16.0.0/16
-
-
 {% endhighlight %}
 
 The first variable `nodes` defines all your cluster nodes, MASTER node comes first and separated with blank space like `<user_1@ip_1> <user_2@ip_2> <user_3@ip_3> `
@@ -82,7 +80,7 @@ Then the `roles ` variable defines the role of above machine in the same order, 
 
 The `NUM_MINIONS` variable defines the total number of nodes.
 
-The `SERVICE_CLUSTER_IP_RANGE` variable defines the kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range according to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
+The `SERVICE_CLUSTER_IP_RANGE` variable defines the Kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range according to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
 
      10.0.0.0        -   10.255.255.255  (10/8 prefix)
 
@@ -99,13 +97,11 @@ After all the above variable being set correctly. We can use below command in cl
 The scripts is automatically scp binaries and config files to all the machines and start the k8s service on them. The only thing you need to do is to type the sudo password when promoted. The current machine name is shown below like. So you will not type in the wrong password.
 
 {% highlight console %}
-
 Deploying minion on machine 10.10.103.223
 
 ...
 
 [sudo] password to copy files and start minion: 
-
 {% endhighlight %}
 
 If all things goes right, you will see the below message from console
@@ -118,7 +114,6 @@ You can also use `kubectl` command to see if the newly created k8s is working co
 For example, use `$ kubectl get nodes` to see if all your nodes are in ready status. It may take some time for the nodes ready to use like below. 
 
 {% highlight console %}
-
 NAME            LABELS                                 STATUS
 
 10.10.103.162   kubernetes.io/hostname=10.10.103.162   Ready
@@ -126,11 +121,9 @@ NAME            LABELS                                 STATUS
 10.10.103.223   kubernetes.io/hostname=10.10.103.223   Ready
 
 10.10.103.250   kubernetes.io/hostname=10.10.103.250   Ready
-
-
 {% endhighlight %}
 
-Also you can run kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
+Also you can run Kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
 
 
 #### Deploy addons
@@ -140,7 +133,6 @@ After the previous parts, you will have a working k8s cluster, this part will te
 The configuration of dns is configured in cluster/ubuntu/config-default.sh.
 
 {% highlight sh %}
-
 ENABLE_CLUSTER_DNS=true
 
 DNS_SERVER_IP="192.168.3.10"
@@ -148,7 +140,6 @@ DNS_SERVER_IP="192.168.3.10"
 DNS_DOMAIN="cluster.local"
 
 DNS_REPLICAS=1
-
 {% endhighlight %}
 
 The `DNS_SERVER_IP` is defining the ip of dns server which must be in the service_cluster_ip_range.
@@ -158,11 +149,9 @@ The `DNS_REPLICAS` describes how many dns pod running in the cluster.
 After all the above variable have been set. Just type the below command
 
 {% highlight console %}
-
 $ cd cluster/ubuntu
 
 $ KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh
-
 {% endhighlight %}
 
 After some time, you can use `$ kubectl get pods` to see the dns pod is running in the cluster. Done!

@@ -30,14 +30,14 @@ While Kubernetes today is not primarily a multi-tenant system, the long term evo
 
 We define "user" as a unique identity accessing the Kubernetes API server, which may be a human or an automated process.  Human users fall into the following categories:
 
-1. k8s admin - administers a kubernetes cluster and has access to the underlying components of the system
+1. k8s admin - administers a Kubernetes cluster and has access to the underlying components of the system
 2. k8s project administrator - administrates the security of a small subset of the cluster
-3. k8s developer - launches pods on a kubernetes cluster and consumes cluster resources
+3. k8s developer - launches pods on a Kubernetes cluster and consumes cluster resources
 
 Automated process users fall into the following categories:
 
 1. k8s container user - a user that processes running inside a container (on the cluster) can use to access other cluster resources independent of the human users attached to a project
-2. k8s infrastructure user - the user that kubernetes infrastructure components use to perform cluster functions with clearly defined roles
+2. k8s infrastructure user - the user that Kubernetes infrastructure components use to perform cluster functions with clearly defined roles
 
 
 ### Description of roles

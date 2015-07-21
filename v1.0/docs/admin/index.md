@@ -11,74 +11,36 @@ layout: docwithnav
 The cluster admin guide is for anyone creating or administering a Kubernetes cluster.
 It assumes some familiarity with concepts in the [User Guide](../user-guide/README.html).
 
-## Planning a cluster
+## Admin Guide Table of Contents
 
-There are many different examples of how to setup a kubernetes cluster.  Many of them are listed in this
-[matrix](../getting-started-guides/README.html).  We call each of the combinations in this matrix a *distro*.
+[Introduction](introduction.html)
 
-Before choosing a particular guide, here are some things to consider:
- - Are you just looking to try out Kubernetes on your laptop, or build a high-availability many-node cluster? Both
-   models are supported, but some distros are better for one case or the other.
- - Will you be using a hosted Kubernetes cluster, such as [GKE](https://cloud.google.com/container-engine), or setting
-   one up yourself?
- - Will your cluster be on-premises, or in the cloud (IaaS)?  Kubernetes does not directly support hybrid clusters.  We
-   recommend setting up multiple clusters rather than spanning distant locations.
- - Will you be running Kubernetes on "bare metal" or virtual machines?  Kubernetes supports both, via different distros.
- - Do you just want to run a cluster, or do you expect to do active development of kubernetes project code?  If the
-   latter, it is better to pick a distro actively used by other developers.  Some distros only use binary releases, but
-   offer is a greater variety of choices.
- - Not all distros are maintained as actively.  Prefer ones which are listed as tested on a more recent version of
-   Kubernetes.
- - If you are configuring kubernetes on-premises, you will need to consider what [networking
-   model](networking.html) fits best.
- - If you are designing for very high-availability, you may want [clusters in multiple zones](multi-cluster.html).
- - You may want to familiarize yourself with the various
-   [components](cluster-components.html) needed to run a cluster.
-
-## Setting up a cluster
-
-Pick one of the Getting Started Guides from the [matrix](../getting-started-guides/README.html) and follow it.
-If none of the Getting Started Guides fits, you may want to pull ideas from several of the guides.
-
-One option for custom networking is *OpenVSwitch GRE/VxLAN networking* ([ovs-networking.md](ovs-networking.html)), which
-uses OpenVSwitch to set up networking between pods across
-  Kubernetes nodes.
-
-If you are modifying an existing guide which uses Salt, this document explains [how Salt is used in the Kubernetes
-project](salt.html).
-
-## Managing a cluster, including upgrades
-
-[Managing a cluster](cluster-management.html).
-
-## Managing nodes
-
-[Managing nodes](node.html).
-
-## Optional Cluster Services
-
-* **DNS Integration with SkyDNS** ([dns.md](dns.html)):
-  Resolving a DNS name directly to a Kubernetes service.
-
-* **Logging** with [Kibana](../user-guide/logging.html)
-
-## Multi-tenant support
-
-* **Resource Quota** ([resource-quota.md](resource-quota.html)) 
-
-## Security
-
-* **Kubernetes Container Environment** ([docs/user-guide/container-environment.md](../user-guide/container-environment.html)):
-  Describes the environment for Kubelet managed containers on a Kubernetes
-  node.
-
-* **Securing access to the API Server** [accessing the api](accessing-the-api.html)
-
-* **Authentication**  [authentication](authentication.html)
-
-* **Authorization** [authorization](authorization.html)
-
-* **Admission Controllers** [admission_controllers](admission-controllers.html)
+1. [Components of a cluster](cluster-components.html)
+  1. [Cluster Management](cluster-management.html)
+  1. Administrating Master Components
+    1. [The kube-apiserver binary](kube-apiserver.html)
+      1. [Authorization](authorization.html)
+      1. [Authentication](authentication.html)
+      1. [Accessing the api](accessing-the-api.html)
+      1. [Admission Controllers](admission-controllers.html)
+      1. [Administrating Service Accounts](service-accounts-admin.html)
+      1. [Resource Quotas](resource-quota.html)
+    1. [The kube-scheduler binary](kube-scheduler.html)
+    1. [The kube-controller-manager binary](kube-controller-manager.html)
+  1. [Administrating Kubernetes Nodes](node.html)
+    1. [The kubelet binary](kubelet.html)
+    1. [The kube-proxy binary](kube-proxy.html)
+  1. Administrating Addons
+    1. [DNS](dns.html)
+  1. [Networking](networking.html)
+    1. [OVS Networking](ovs-networking.html)
+  1. Example Configurations
+    1. [Multiple Clusters](multi-cluster.html)
+    1. [High Availability Clusters](high-availability.html)
+    1. [Large Clusters](cluster-large.html)
+    1. [Getting started from scratch](../getting-started-guides/scratch.html)
+      1. [Kubernetes's use of salt](salt.html)
+  1. [Troubleshooting](cluster-troubleshooting.html)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

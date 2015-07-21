@@ -170,7 +170,6 @@ or:
 
 {% highlight console %}
 u@pod$ echo $HOSTNAMES_SERVICE_HOST
-
 {% endhighlight %}
 
 So the first thing to check is whether that `Service` actually exists:

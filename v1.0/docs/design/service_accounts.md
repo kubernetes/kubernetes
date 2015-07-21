@@ -51,7 +51,7 @@ type ServiceAccount struct {
 {% endhighlight %}
 
 The name ServiceAccount is chosen because it is widely used already (e.g. by Kerberos and LDAP)
-to refer to this type of account.  Note that it has no relation to kubernetes Service objects.
+to refer to this type of account.  Note that it has no relation to Kubernetes Service objects.
 
 The ServiceAccount object does not include any information that could not be defined separately:
   - username can be defined however users are defined.
@@ -65,12 +65,12 @@ These features are explained later.
 
 ### Names
 
-From the standpoint of the Kubernetes API, a `user` is any principal which can authenticate to kubernetes API.
+From the standpoint of the Kubernetes API, a `user` is any principal which can authenticate to Kubernetes API.
 This includes a human running `kubectl` on her desktop and a container in a Pod on a Node making API calls.
 
-There is already a notion of a username in kubernetes, which is populated into a request context after authentication.
+There is already a notion of a username in Kubernetes, which is populated into a request context after authentication.
 However, there is no API object representing a user.  While this may evolve, it is expected that in mature installations,
-the canonical storage of user identifiers will be handled by a system external to kubernetes.
+the canonical storage of user identifiers will be handled by a system external to Kubernetes.
 
 Kubernetes does not dictate how to divide up the space of user identifier strings.  User names can be
 simple Unix-style short usernames, (e.g. `alice`), or may be qualified to allow for federated identity (
@@ -79,7 +79,7 @@ accounts (e.g. `alice@example.com` vs `build-service-account-a3b7f0@foo-namespac
 but Kubernetes does not require this.
 
 Kubernetes also does not require that there be a distinction between human and Pod users.  It will be possible
-to setup a cluster where Alice the human talks to the kubernetes API as username `alice` and starts pods that
+to setup a cluster where Alice the human talks to the Kubernetes API as username `alice` and starts pods that
 also talk to the API as user `alice` and write files to NFS as user `alice`.  But, this is not recommended.
 
 Instead, it is recommended that Pods and Humans have distinct identities, and reference implementations will
@@ -128,7 +128,7 @@ get a `Secret` which allows them to authenticate to the Kubernetes APIserver as 
 policy that is desired can be applied to them.
 
 A higher level workflow is needed to coordinate creation of serviceAccounts, secrets and relevant policy objects.
-Users are free to extend kubernetes to put this business logic wherever is convenient for them, though the
+Users are free to extend Kubernetes to put this business logic wherever is convenient for them, though the
 Service Account Finalizer is one place where this can happen (see below).
 
 ### Kubelet

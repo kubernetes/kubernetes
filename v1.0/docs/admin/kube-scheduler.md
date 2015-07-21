@@ -13,7 +13,7 @@ layout: docwithnav
 ### Synopsis
 
 
-The kubernetes scheduler is a policy-rich, topology-aware,
+The Kubernetes scheduler is a policy-rich, topology-aware,
 workload-specific function that significantly impacts availability, performance,
 and capacity. The scheduler needs to take into account individual and collective
 resource requirements, quality of service requirements, hardware/software/policy
