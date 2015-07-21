@@ -3,16 +3,15 @@
 }
 
 div #doccontent {
-	  position: absolute;
-	  top:134px;
-	  left:250px;
-	  right:0px;
-	  bottom:0px;
+    position: absolute;
+    top:134px;
+    left:250px;
+    right:0px;
+    bottom:0px;
     font-family: "Roboto";
     padding-left: 30px;
-    margin-right: 30px;
+    padding-right: 30px;
     max-width: 900px;
-    padding-right: 10px;
     overflow: auto;
 
     h1 {
