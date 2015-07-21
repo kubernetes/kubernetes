@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/expansion.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Variable expansion in pod command, args, and env
 
 ## Abstract
@@ -61,7 +94,7 @@ script that sets up the environment and runs the command.  This has a number of 
 
 1.  Solutions that require a shell are unfriendly to images that do not contain a shell
 2.  Wrapper scripts make it harder to use images as base images
-3.  Wrapper scripts increase coupling to kubernetes
+3.  Wrapper scripts increase coupling to Kubernetes
 
 Users should be able to do the 80% case of variable expansion in command without writing a wrapper
 script or adding a shell invocation to their containers' commands.
@@ -385,4 +418,7 @@ spec:
   restartPolicy: Never
 ```
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/expansion.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

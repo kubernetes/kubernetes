@@ -6,13 +6,13 @@
 
 Now start a local redis instance 
 
-```
+```sh
 redis-server
 ```
 
 And run the app 
 
-```
+```sh
 export GOPATH=~/Development/k8hacking/k8petstore/web-server/
 cd $GOPATH/src/main/
 ## Now, you're in the local dir to run the app.  Go get its depenedencies.

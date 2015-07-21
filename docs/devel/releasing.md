@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/devel/releasing.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Releasing Kubernetes
 
 This document explains how to cut a release, and the theory behind it. If you
@@ -21,7 +54,7 @@ You should progress in this strict order.
 #### Selecting Release Components
 
 When cutting a major/minor release, your first job is to find the branch
-point. We cut `vX.Y.0` releases directly from `master`, which is also the the
+point. We cut `vX.Y.0` releases directly from `master`, which is also the
 branch that we have most continuous validation on. Go first to [the main GCE
 Jenkins end-to-end job](http://go/k8s-test/job/kubernetes-e2e-gce) and next to [the
 Critical Builds page](http://go/k8s-test/view/Critical%20Builds) and hopefully find a
@@ -32,7 +65,7 @@ to make sure they're solid around then as well. Once you find some greens, you
 can find the Git hash for a build by looking at the "Console Log", then look for
 `githash=`. You should see a line line:
 
-```
+```console
 + githash=v0.20.2-322-g974377b
 ```
 
@@ -42,17 +75,20 @@ Because Jenkins builds frequently, if you're looking between jobs
 `kubernetes-e2e-gce` build (but please check that it corresponds to a temporally
 similar build that's green on `kubernetes-e2e-gke-ci`). Lastly, if you're having
 trouble understanding why the GKE continuous integration clusters are failing
-and you're trying to cut a release, don't hesistate to contact the GKE
+and you're trying to cut a release, don't hesitate to contact the GKE
 oncall.
 
 Before proceeding to the next step:
-```
+
+```sh
 export BRANCHPOINT=v0.20.2-322-g974377b
 ```
+
 Where `v0.20.2-322-g974377b` is the git hash you decided on. This will become
 our (retroactive) branch point.
 
 #### Branching, Tagging and Merging
+
 Do the following:
 
 1. `export VER=x.y` (e.g. `0.20` for v0.20)
@@ -100,10 +136,13 @@ manage cherry picks prior to cutting the release.
 
 #### Tagging and Merging
 
-Do the following (you still have `${VER}` set and you're still working on the
-`release-${VER}` branch, right?):
-
+1. `export VER=x.y` (e.g. `0.20` for v0.20)
 1. `export PATCH=Z` where `Z` is the patch level of `vX.Y.Z`
+1. cd to the base of the repo
+1. `git fetch upstream && git checkout -b upstream/release-${VER}`
+1. Make sure you don't have any files you care about littering your repo (they
+   better be checked in or outside the repo, or the next step will delete them).
+1. `make clean && git reset --hard HEAD && git clean -xdf`
 1. `make` (TBD: you really shouldn't have to do this, but the swagger output step requires it right now)
 1. `./build/mark-new-version.sh v${VER}.${PATCH}` to mark the new release and get further
    instructions. This creates a series of commits on the branch you're working
@@ -112,7 +151,9 @@ Do the following (you still have `${VER}` set and you're still working on the
    version commit.
 1. Follow the instructions given to you by that script. They are canon for the
    remainder of the Git process. If you don't understand something in that
-   process, please ask!
+   process, please ask! When proposing PRs, you can pre-fill the body with
+   `hack/cherry_pick_list.sh upstream/release-${VER}` to inform people of what
+   is already on the branch.
 
 **TODO**: how to fix tags, etc., if the release is changed.
 
@@ -129,10 +170,10 @@ In your git repo (you still have `${VER}` and `${PATCH}` set from above right?):
 
 #### Writing Release Notes
 
-Release notes for a patch release are relatives fast: `git log release-${VER}`
-(If you followed the procedure in the first section, all the cherry-picks will
-have the pull request number in the commit log). Unless there's some reason not
-to, just include all the PRs back to the last release.
+Run `hack/cherry_pick_list.sh ${VER}.${PATCH}~1` to get the release notes for
+the patch release you just created. Feel free to prune anything internal, like
+you would for a major release, but typically for patch releases we tend to
+include everything in the release notes.
 
 ## Origin of the Sources
 
@@ -189,11 +230,11 @@ present.
 We are using `pkg/version/base.go` as the source of versioning in absence of
 information from git. Here is a sample of that file's contents:
 
-```
-  var (
-      gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
-      gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
-  )
+```go
+var (
+    gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
+    gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
+)
 ```
 
 This means a build with `go install` or `go get` or a build from a tarball will
@@ -272,14 +313,14 @@ projects seem to live with that and it does not really become a large problem.
 As an example, Docker commit a327d9b91edf has a `v1.1.1-N-gXXX` label but it is
 not present in Docker `v1.2.0`:
 
-```
-  $ git describe a327d9b91edf
-  v1.1.1-822-ga327d9b91edf
+```console
+$ git describe a327d9b91edf
+v1.1.1-822-ga327d9b91edf
 
-  $ git log --oneline v1.2.0..a327d9b91edf
-  a327d9b91edf Fix data space reporting from Kb/Mb to KB/MB
+$ git log --oneline v1.2.0..a327d9b91edf
+a327d9b91edf Fix data space reporting from Kb/Mb to KB/MB
 
-  (Non-empty output here means the commit is not present on v1.2.0.)
+(Non-empty output here means the commit is not present on v1.2.0.)
 ```
 
 ## Release Notes
@@ -297,4 +338,6 @@ by plain mortals (in a perfect world PR/issue's title would be enough but often
 it is just too cryptic/geeky/domain-specific that it isn't).
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/releasing.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

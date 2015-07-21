@@ -17,9 +17,6 @@ spec:
       containers:
       - image: endocode/flower
         name: flower
-        ports:
-        - containerPort: 5555
-          hostPort: 5555
         resources:
           limits:
             cpu: 100m
