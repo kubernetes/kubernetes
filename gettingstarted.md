@@ -66,7 +66,7 @@ releases:
 techdetails:
     api:
         label: API Documentation
-        url: http://kubernetes.io/third_party/swagger-ui/
+        url: /v1.0/docs/api-reference/operations.html
     kubecfg:
         label: Kubectl Command Tool
         url: /v1.0/docs/user-guide/kubectl/kubectl.html
