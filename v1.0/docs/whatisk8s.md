@@ -4,21 +4,21 @@ layout: docwithnav
 
 # What is Kubernetes?
 
-Kubernetes is an open source container cluster orchestration platform that was started by Google in 2014.
+The Kubernetes project was started by Google in 2014. 
 
-Use Kubernetes to manage your containerized applications across multiple hosts through automated deployment, container life-cycle maintenance, and application scaling.
+Kubernetes is an open-source platform for automating deployment, scaling, and operations of application containers. It schedules containers across clusters of hosts.
 
-With Kuberenets, you are able to quickly and efficiently respond to customer demand: 
+With Kubernetes, you are able to quickly and efficiently respond to customer demand: 
 
  - Scale your applications on the fly
  - Seamlessly roll out new features
- - Maintain optimal hardware use (only use the resouces you need)
+ - Optimize use of your hardware by using only the resources you need
 
 
 #### Kubernetes is:
 
 * **lean**: lightweight, simple, accessible
-* **portable**: public, private, hybrid, multi cloud
+* **portable**: public, private, hybrid, multi-cloud
 * **extensible**: modular, pluggable, hookable, composable
 * **self-healing**: auto-placement, auto-restart, auto-replication
 
