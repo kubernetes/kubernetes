@@ -92,7 +92,7 @@ my-nginx-6isf4   1/1       Running   0          2h        e2e-test-beeps-minion-
 my-nginx-t26zt   1/1       Running   0          2h        e2e-test-beeps-minion-93ly
 ```
 
-Check your pods ips:
+Check your pods' IPs:
 
 ```console
 $ kubectl get pods -l app=nginx -o json | grep podIP
@@ -100,13 +100,13 @@ $ kubectl get pods -l app=nginx -o json | grep podIP
                 "podIP": "10.245.0.14",
 ```
 
-You should be able to ssh into any node in your cluster and curl both ips. Note that the containers are *not* using port 80 on the node, nor are there any special NAT rules to route traffic to the pod. This means you can run multiple nginx pods on the same node all using the same containerPort and access them from any other pod or node in your cluster using ip. Like Docker, ports can still be published to the host node's interface(s), but the need for this is radically diminished because of the networking model.
+You should be able to ssh into any node in your cluster and curl both IPs. Note that the containers are *not* using port 80 on the node, nor are there any special NAT rules to route traffic to the pod. This means you can run multiple nginx pods on the same node all using the same containerPort and access them from any other pod or node in your cluster using IP. Like Docker, ports can still be published to the host node's interface(s), but the need for this is radically diminished because of the networking model.
 
 You can read more about [how we achieve this](../admin/networking.md#how-to-achieve-this) if you’re curious.
 
 ## Creating a Service
 
-So we have pods running nginx in a flat, cluster wide, address space. In theory, you could talk to these pods directly, but what happens when a node dies? The pods die with it, and the replication controller will create new ones, with different ips. This is the problem a Service solves.
+So we have pods running nginx in a flat, cluster wide, address space. In theory, you could talk to these pods directly, but what happens when a node dies? The pods die with it, and the replication controller will create new ones, with different IPs. This is the problem a Service solves.
 
 A Kubernetes Service is an abstraction which defines a logical set of Pods running somewhere in your cluster, that all provide the same functionality. When created, each Service is assigned a unique IP address (also called clusterIP). This address is tied to the lifespan of the Service, and will not change while the Service is alive. Pods can be configured to talk to the Service, and know that communication to the Service will be automatically load-balanced out to some pod that is a member of the Service.
 
@@ -137,7 +137,7 @@ NAME         LABELS        SELECTOR    IP(S)          PORT(S)
 nginxsvc     app=nginx     app=nginx   10.0.116.146   80/TCP
 ```
 
-As mentioned previously, a Service is backed by a group of pods. These pods are exposed through `endpoints`. The Service's selector will be evaluated continuously and the results will be POSTed to an Endpoints object also named `nginxsvc`. When a pod dies, it is automatically removed from the endpoints, and new pods matching the Service’s selector will automatically get added to the endpoints. Check the endpoints, and note that the ips are the same as the pods created in the first step:
+As mentioned previously, a Service is backed by a group of pods. These pods are exposed through `endpoints`. The Service's selector will be evaluated continuously and the results will be POSTed to an Endpoints object also named `nginxsvc`. When a pod dies, it is automatically removed from the endpoints, and new pods matching the Service’s selector will automatically get added to the endpoints. Check the endpoints, and note that the IPs are the same as the pods created in the first step:
 
 ```console
 $ kubectl describe svc nginxsvc
@@ -157,7 +157,7 @@ NAME         ENDPOINTS
 nginxsvc     10.245.0.14:80,10.245.0.15:80
 ```
 
-You should now be able to curl the nginx Service on `10.0.116.146:80` from any node in your cluster. Note that the Service ip is completely virtual, it never hits the wire, if you’re curious about how this works you can read more about the [service proxy](services.md#virtual-ips-and-service-proxies).
+You should now be able to curl the nginx Service on `10.0.116.146:80` from any node in your cluster. Note that the Service IP is completely virtual, it never hits the wire, if you’re curious about how this works you can read more about the [service proxy](services.md#virtual-ips-and-service-proxies).
 
 ## Accessing the Service
 
@@ -200,7 +200,7 @@ kube-dns   <none>       k8s-app=kube-dns     10.0.0.10   53/UDP
                                                          53/TCP
 ```
 
-If it isn’t running, you can [enable it](http://releases.k8s.io/HEAD/cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived ip (nginxsvc), and a dns server that has assigned a name to that ip (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
+If it isn’t running, you can [enable it](http://releases.k8s.io/HEAD/cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived IP (nginxsvc), and a dns server that has assigned a name to that IP (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
 
 ```yaml
 $ cat curlpod.yaml
@@ -326,7 +326,7 @@ node $ curl -k https://10.1.0.80
 <h1>Welcome to nginx!</h1>
 ```
 
-Note how we supplied the -k parameter to curl in the last step, this is because we don't know anything about the pods running nginx at certificate generation time,
+Note how we supplied the `-k` parameter to curl in the last step, this is because we don't know anything about the pods running nginx at certificate generation time,
 so we have to tell curl to ignore the CName mismatch. By creating a Service we linked the CName used in the certificate with the actual DNS name used by pods during Service lookup.
 Lets test this from a pod (the same secret is being reused for simplicity, the pod only needs nginx.crt to access the Service):
 
@@ -372,7 +372,7 @@ $ kubectl exec curlpod -- curl https://nginxsvc --cacert /etc/nginx/ssl/nginx.cr
 
 ## Exposing the Service
 
-For some parts of your applications you may want to expose a Service onto an external IP address. Kubernetes supports two ways of doing this: NodePorts and LoadBalancers. The Service created in the last section already used `NodePort`, so your nginx https replica is ready to serve traffic on the internet if your node has a public ip.
+For some parts of your applications you may want to expose a Service onto an external IP address. Kubernetes supports two ways of doing this: NodePorts and LoadBalancers. The Service created in the last section already used `NodePort`, so your nginx https replica is ready to serve traffic on the internet if your node has a public IP.
 
 ```console
 $ kubeclt get svc nginxsvc -o json | grep -i nodeport -C 5

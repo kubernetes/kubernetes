@@ -77,7 +77,7 @@ NAME         LABELS          SELECTOR        IP(S)     PORT(S)
 nginx-http   run=nginx-app   run=nginx-app             80/TCP
 ```
 
-With kubectl, we create a [replication controller](replication-controller.md) which will make sure that N pods are running nginx (where in is the number of replicas stated in the spec, which defaults to 1). We also create a [service](services.md) with a selector that matches the replication controller's selector. See the [quick-start.md](quick-start.md) guide for more information.
+With kubectl, we create a [replication controller](replication-controller.md) which will make sure that N pods are running nginx (where N is the number of replicas stated in the spec, which defaults to 1). We also create a [service](services.md) with a selector that matches the replication controller's selector. See the [Quick start](quick-start.md) for more information.
 
 #### docker ps
 
@@ -163,7 +163,7 @@ $ kubectl logs -f nginx-app-zibvs
 10.240.63.110 - - [14/Jul/2015:01:09:02 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.26.0" "-"
 ```
 
-Now's a good time to mention slight difference between pods and containers; by default pods will not terminate if their process's exit. Instead it will restart the process. This is similar to the docker run option `--restart=always` with one major difference. In docker, the output for each invocation of the process is concatenated but for Kubernetes, each invokation is separate. To see the output from a prevoius run in Kubernetes, do this:
+Now's a good time to mention slight difference between pods and containers; by default pods will not terminate if their processes exit. Instead it will restart the process. This is similar to the docker run option `--restart=always` with one major difference. In docker, the output for each invocation of the process is concatenated but for Kubernetes, each invokation is separate. To see the output from a prevoius run in Kubernetes, do this:
 
 ```console
 $ kubectl logs --previous nginx-app-zibvs
@@ -209,7 +209,7 @@ Notice that we don't delete the pod directly. With kubectl we want to delete the
 
 #### docker login
 
-There is no direct analog of 'docker login' in kubectl. If you are interested in using Kubernetes with a private registry, see [Using a Private Registry](images.md#using-a-private-registry).
+There is no direct analog of `docker login` in kubectl. If you are interested in using Kubernetes with a private registry, see [Using a Private Registry](images.md#using-a-private-registry).
 
 #### docker version
 

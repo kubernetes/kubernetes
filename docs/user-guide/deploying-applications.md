@@ -45,11 +45,11 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-You previously read about how to quickly deploy a simple replicated application using [`kubectl run`](quick-start.md) and how to configure and launch single-run containers using pods (configuring-containers.md). Here, you’ll use the configuration-based approach to deploy a continuously running, replicated application.
+You previously read about how to quickly deploy a simple replicated application using [`kubectl run`](quick-start.md) and how to configure and launch single-run containers using pods ([Configuring containers](configuring-containers.md)). Here you’ll use the configuration-based approach to deploy a continuously running, replicated application.
 
 ## Launching a set of replicas using a configuration file
 
-Kubernetes creates and manages sets of replicated containers (actually, replicated [Pods](pods.md)) using [*Replication Controllers*](replication-controller.md). 
+Kubernetes creates and manages sets of replicated containers (actually, replicated [Pods](pods.md)) using [*Replication Controllers*](replication-controller.md).
 
 A replication controller simply ensures that a specified number of pod "replicas" are running at any one time. If there are too many, it will kill some. If there are too few, it will start more. It’s analogous to Google Compute Engine’s [Instance Group Manager](https://cloud.google.com/compute/docs/instance-groups/manager/) or AWS’s [Auto-scaling Group](http://docs.aws.amazon.com/AutoScaling/latest/DeveloperGuide/AutoScalingGroup.html) (with no scaling policies).
 
@@ -86,7 +86,7 @@ $ kubectl create -f ./nginx-rc.yaml
 replicationcontrollers/my-nginx
 ```
 
-Unlike in the case where you directly create pods, a replication controller replaces pods that are deleted or terminated for any reason, such as in the case of node failure. For this reason, we recommend that you use a replication controller for a continuously running application even if your application requires only a single pod, in which case you can omit `replicas` and it will default to a single replica. 
+Unlike in the case where you directly create pods, a replication controller replaces pods that are deleted or terminated for any reason, such as in the case of node failure. For this reason, we recommend that you use a replication controller for a continuously running application even if your application requires only a single pod, in which case you can omit `replicas` and it will default to a single replica.
 
 ## Viewing replication controller status
 
