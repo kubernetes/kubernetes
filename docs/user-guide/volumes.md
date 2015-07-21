@@ -337,7 +337,7 @@ An `rbd` volume allows a [Rados Block
 Device](http://ceph.com/docs/master/rbd/rbd/) volume to be mounted into your
 pod.  Unlike `emptyDir`, which is erased when a Pod is removed, the contents of
 an `rbd` volume are preserved and the volume is merely unmounted.  This
-means that a glusterfs volume can be pre-populated with data, and that data can
+means that a RBD volume can be pre-populated with data, and that data can
 be "handed off" between pods.
 
 __Important: You must have your own Ceph installation running before you
