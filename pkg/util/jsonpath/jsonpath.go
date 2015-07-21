@@ -145,18 +145,18 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 
 // evalInt evaluates IntNode
 func (j *JSONPath) evalInt(input []reflect.Value, node *IntNode) ([]reflect.Value, error) {
-	result := []reflect.Value{}
-	for range input {
-		result = append(result, reflect.ValueOf(node.Value))
+	result := make([]reflect.Value, len(input))
+	for i := range input {
+		result[i] = reflect.ValueOf(node.Value)
 	}
 	return result, nil
 }
 
 // evalFloat evaluates FloatNode
 func (j *JSONPath) evalFloat(input []reflect.Value, node *FloatNode) ([]reflect.Value, error) {
-	result := []reflect.Value{}
-	for range input {
-		result = append(result, reflect.ValueOf(node.Value))
+	result := make([]reflect.Value, len(input))
+	for i := range input {
+		result[i] = reflect.ValueOf(node.Value)
 	}
 	return result, nil
 }
