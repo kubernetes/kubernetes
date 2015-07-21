@@ -297,7 +297,7 @@ function create-salt-master-auth() {
       mkdir -p /srv/kubernetes
       (umask 077;
         echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
-        echo "${MASTER_CERT}" | base64 -d > /srv/kubernetes/server.cert;
+        echo "${MASTER_CERT}" | base64 -d > /srv/kubernetes/server.crt;
         echo "${MASTER_KEY}" | base64 -d > /srv/kubernetes/server.key;
         # Kubecfg cert/key are optional and included for backwards compatibility.
         # TODO(roberthbailey): Remove these two lines once GKE no longer requires
