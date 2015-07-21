@@ -1,4 +1,4 @@
-# Kubernetes Documentation: releases.k8s.io/v1.0.1
+# Kubernetes Documentation: releases.k8s.io/v1.0.0
 
 
 ## Where to start

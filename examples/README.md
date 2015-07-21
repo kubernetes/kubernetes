@@ -1,4 +1,4 @@
-# Kubernetes Examples: releases.k8s.io/v1.0.1
+# Kubernetes Examples: releases.k8s.io/v1.0.0
 
 
 ##
