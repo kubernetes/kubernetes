@@ -16,7 +16,7 @@ We will assume that the IP address of this node is `${NODE_IP}` and you have the
 
 For each worker node, there are three steps:
    * [Set up `flanneld` on the worker node](#set-up-flanneld-on-the-worker-node)
-   * [Start kubernetes on the worker node](#start-kubernetes-on-the-worker-node)
+   * [Start Kubernetes on the worker node](#start-kubernetes-on-the-worker-node)
    * [Add the worker to the cluster](#add-the-node-to-the-cluster)
 
 ### Set up Flanneld on the worker node

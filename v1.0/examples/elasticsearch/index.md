@@ -86,7 +86,6 @@ metadata:
   namespace: NAMESPACE
 data:
   token: "TOKEN"
-
 {% endhighlight %}
 
 Replace `NAMESPACE` with the actual namespace to be used and `TOKEN` with the basic64 encoded
@@ -101,7 +100,6 @@ $ kubectl config view
  ...   
 $ echo yGlDcMvSZPX4PyP0Q5bHgAYgi1iyEHv2 | base64
 eUdsRGNNdlNaUFg0UHlQMFE1YkhnQVlnaTFpeUVIdjIK=
-
 {% endhighlight %}
 
 resulting in the file:
@@ -114,7 +112,6 @@ metadata:
   namespace: mytunes
 data:
   token: "eUdsRGNNdlNaUFg0UHlQMFE1YkhnQVlnaTFpeUVIdjIK="
-
 {% endhighlight %}
 
 which can be used to create the secret in your namespace:
@@ -122,7 +119,6 @@ which can be used to create the secret in your namespace:
 {% highlight console %}
 kubectl create -f examples/elasticsearch/apiserver-secret.yaml --namespace=mytunes
 secrets/apiserver-secret
-
 {% endhighlight %}
 
 Now you are ready to create the replication controller which will then create the pods:
@@ -130,7 +126,6 @@ Now you are ready to create the replication controller which will then create th
 {% highlight console %}
 $ kubectl create -f examples/elasticsearch/music-rc.yaml --namespace=mytunes
 replicationcontrollers/music-db
-
 {% endhighlight %}
 
 It's also useful to have a [service](../../docs/user-guide/services.html) with an load balancer for accessing the Elasticsearch
@@ -159,7 +154,6 @@ Let's create the service with an external load balancer:
 {% highlight console %}
 $ kubectl create -f examples/elasticsearch/music-service.yaml --namespace=mytunes
 services/music-server
-
 {% endhighlight %}
 
 Let's see what we've got:
@@ -276,7 +270,6 @@ music-db-u1ru3   1/1       Running   0          38s
 music-db-wnss2   1/1       Running   0          1m
 music-db-x7j2w   1/1       Running   0          1m
 music-db-zjqyv   1/1       Running   0          1m
-
 {% endhighlight %}
 
 Let's check to make sure that these 10 nodes are part of the same Elasticsearch cluster:
@@ -334,7 +327,6 @@ $ curl 104.197.12.157:9200/_nodes?pretty=true | grep name
           "name" : "mytunes-db"
         "vm_name" : "OpenJDK 64-Bit Server VM",
           "name" : "eth0",
-
 {% endhighlight %}
 
 

@@ -10,8 +10,8 @@ API Conventions
 
 Updated: 4/16/2015
 
-*This document is oriented at users who want a deeper understanding of the kubernetes
-API structure, and developers wanting to extend the kubernetes API.  An introduction to
+*This document is oriented at users who want a deeper understanding of the Kubernetes
+API structure, and developers wanting to extend the Kubernetes API.  An introduction to
 using resources with kubectl can be found in (working_with_resources.md).*
 
 **Table of Contents**

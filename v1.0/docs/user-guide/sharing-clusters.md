@@ -8,7 +8,7 @@ layout: docwithnav
 
 # Sharing Cluster Access
 
-Client access to a running kubernetes cluster can be shared by copying
+Client access to a running Kubernetes cluster can be shared by copying
 the `kubectl` client config bundle ([.kubeconfig](kubeconfig-file.html)).
 This config bundle lives in `$HOME/.kube/config`, and is generated
 by `cluster/kube-up.sh`. Sample steps for sharing `kubeconfig` below.

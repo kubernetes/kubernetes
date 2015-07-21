@@ -233,7 +233,7 @@ These are based on the work found here: [master.yml](cloud-configs/master.yaml),
 To make the setup work, you need to replace a few placeholders:
 
  - Replace `<PXE_SERVER_IP>` with your PXE server ip address (e.g. 10.20.30.242)
- - Replace `<MASTER_SERVER_IP>` with the kubernetes master ip address (e.g. 10.20.30.40)
+ - Replace `<MASTER_SERVER_IP>` with the Kubernetes master ip address (e.g. 10.20.30.40)
  - If you run a private docker registry, replace `rdocker.example.com` with your docker registry dns name.
  - If you use a proxy, replace `rproxy.example.com` with your proxy server (and port)
  - Add your own SSH public key(s) to the cloud config at the end

@@ -56,7 +56,7 @@ Goals of this design:
     the kubelet implement some reserved behaviors based on the types of secrets the service account
     consumes:
     1.  Use credentials for a docker registry to pull the pod's docker image
-    2.  Present kubernetes auth token to the pod or transparently decorate traffic between the pod
+    2.  Present Kubernetes auth token to the pod or transparently decorate traffic between the pod
         and master service
 4.  As a user, I want to be able to indicate that a secret expires and for that secret's value to
     be rotated once it expires, so that the system can help me follow good practices
@@ -87,7 +87,7 @@ other system components to take action based on the secret's type.
 #### Example: service account consumes auth token secret
 
 As an example, the service account proposal discusses service accounts consuming secrets which
-contain kubernetes auth tokens.  When a Kubelet starts a pod associated with a service account
+contain Kubernetes auth tokens.  When a Kubelet starts a pod associated with a service account
 which consumes this type of secret, the Kubelet may take a number of actions:
 
 1.  Expose the secret in a `.kubernetes_auth` file in a well-known location in the container's

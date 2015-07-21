@@ -21,9 +21,9 @@ You need two machines with CentOS installed on them.
 
 This is a getting started guide for CentOS.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
-This guide will only get ONE node working.  Multiple nodes requires a functional [networking configuration](../../admin/networking.html) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
+This guide will only get ONE node working.  Multiple nodes requires a functional [networking configuration](../../admin/networking.html) done outside of kubernetes.  Although the additional Kubernetes configuration requirements should be obvious.
 
-The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, centos-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_.  The remaining host, centos-minion will be the node and run kubelet, proxy, cadvisor and docker.
+The Kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, centos-master, will be the Kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_.  The remaining host, centos-minion will be the node and run kubelet, proxy, cadvisor and docker.
 
 **System Information:**
 
@@ -45,7 +45,7 @@ baseurl=http://cbs.centos.org/repos/virt7-testing/x86_64/os/
 gpgcheck=0
 ```
 
-* Install kubernetes on all hosts - centos-{master,minion}.  This will also pull in etcd, docker, and cadvisor.
+* Install Kubernetes on all hosts - centos-{master,minion}.  This will also pull in etcd, docker, and cadvisor.
 
 {% highlight sh %}
 yum -y install --enablerepo=virt7-testing kubernetes
@@ -98,7 +98,7 @@ systemctl disable iptables-services firewalld
 systemctl stop iptables-services firewalld
 {% endhighlight %}
 
-**Configure the kubernetes services on the master.**
+**Configure the Kubernetes services on the master.**
 
 * Edit /etc/kubernetes/apiserver to appear as such:
 
@@ -132,7 +132,7 @@ for SERVICES in etcd kube-apiserver kube-controller-manager kube-scheduler; do
 done
 {% endhighlight %}
 
-**Configure the kubernetes services on the node.**
+**Configure the Kubernetes services on the node.**
 
 ***We need to configure the kubelet and start the kubelet and proxy***
 

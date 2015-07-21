@@ -8,7 +8,7 @@ layout: docwithnav
 
 # Services and Firewalls
 
-Many cloud providers (e.g. Google Compute Engine) define firewalls that help keep prevent inadvertent
+Many cloud providers (e.g. Google Compute Engine) define firewalls that help prevent inadvertent
 exposure to the internet.  When exposing a service to the external world, you may need to open up
 one or more ports in these firewalls to serve traffic.  This document describes this process, as
 well as any provider specific details that may be necessary.

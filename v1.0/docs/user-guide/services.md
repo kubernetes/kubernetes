@@ -24,13 +24,14 @@ layout: docwithnav
     - [DNS](#dns)
   - [Headless services](#headless-services)
   - [External services](#external-services)
-    - [Type = NodePort](#type--nodeport)
-    - [Type = LoadBalancer](#type--loadbalancer)
+    - [Type NodePort](#type-nodeport)
+    - [Type LoadBalancer](#type-loadbalancer)
   - [Shortcomings](#shortcomings)
   - [Future work](#future-work)
   - [The gory details of virtual IPs](#the-gory-details-of-virtual-ips)
     - [Avoiding collisions](#avoiding-collisions)
     - [IPs and VIPs](#ips-and-vips)
+  - [API Object](#api-object)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -349,7 +350,7 @@ accessed.  Valid values for this field are:
 Note that while `NodePort`s can be TCP or UDP, `LoadBalancer`s only support TCP
 as of Kubernetes 1.0.
 
-### Type = NodePort
+### Type NodePort
 
 If you set the `type` field to `"NodePort"`, the Kubernetes master will
 allocate a port from a flag-configured range (default: 30000-32767), and each
@@ -365,7 +366,7 @@ This gives developers the freedom to set up their own load balancers, to
 configure cloud environments that are not fully supported by Kubernetes, or
 even to just expose one or more nodes' IPs directly.
 
-### Type = LoadBalancer
+### Type LoadBalancer
 
 On cloud providers which support external load balancers, setting the `type`
 field to `"LoadBalancer"` will provision a load balancer for your `Service`.
@@ -500,6 +501,12 @@ collision.  Clients can simply connect to an IP and port, without being aware
 of which `Pods` they are actually accessing.
 
 ![Services detailed diagram](services-detail.png)
+
+## API Object
+
+Service is a top-level resource in the kubernetes REST API. More details about the
+API object can be found at: [Service API
+object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_service).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

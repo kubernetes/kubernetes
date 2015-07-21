@@ -22,6 +22,7 @@ layout: docwithnav
     - [Scaling](#scaling)
     - [Rolling updates](#rolling-updates)
     - [Multiple release tracks](#multiple-release-tracks)
+  - [API Object](#api-object)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -91,6 +92,12 @@ Rolling update is implemented in the client tool
 In addition to running multiple releases of an application while a rolling update is in progress, it's common to run multiple releases for an extended period of time, or even continuously, using multiple release tracks. The tracks would be differentiated by labels.
 
 For instance, a service might target all pods with `tier in (frontend), environment in (prod)`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a replication controller with `replicas` set to 9 for the bulk of the replicas, with labels `tier=frontend, environment=prod, track=stable`, and another replication controller with `replicas` set to 1 for the canary, with labels `tier=frontend, environment=prod, track=canary`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the replication controllers separately to test things out, monitor the results, etc.
+
+## API Object
+
+Replication controller is a top-level resource in the kubernetes REST API. More details about the
+API object can be found at: [ReplicationController API
+object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_replicationcontroller).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

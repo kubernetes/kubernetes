@@ -5,7 +5,7 @@ layout: docwithnav
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-Running kubernetes locally via Docker
+Running Kubernetes locally via Docker
 -------------------------------------
 
 **Table of Contents**
@@ -22,7 +22,7 @@ Running kubernetes locally via Docker
 
 ### Overview
 
-The following instructions show you how to set up a simple, single node kubernetes cluster using Docker.
+The following instructions show you how to set up a simple, single node Kubernetes cluster using Docker.
 
 Here's a diagram of what the final result will look like:
 ![Kubernetes Single Node on Docker](k8s-singlenode-docker.png)
@@ -55,7 +55,7 @@ docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2
 
 ### Test it out
 
-At this point you should have a running kubernetes cluster.  You can test this by downloading the kubectl 
+At this point you should have a running Kubernetes cluster.  You can test this by downloading the kubectl 
 binary
 ([OS X](https://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/darwin/amd64/kubectl))
 ([linux](https://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/linux/amd64/kubectl))
@@ -80,7 +80,7 @@ NAME        LABELS    STATUS
 127.0.0.1   <none>    Ready
 {% endhighlight %}
 
-If you are running different kubernetes clusters, you may need to specify `-s http://localhost:8080` to select the local cluster.
+If you are running different Kubernetes clusters, you may need to specify `-s http://localhost:8080` to select the local cluster.
 
 ### Run an application
 

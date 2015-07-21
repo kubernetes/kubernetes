@@ -24,6 +24,7 @@ layout: docwithnav
     - [Self-Registration of Nodes](#self-registration-of-nodes)
       - [Manual Node Administration](#manual-node-administration)
     - [Node capacity](#node-capacity)
+  - [API Object](#api-object)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -99,7 +100,7 @@ number of pods that can be scheduled onto the node.
 
 ### Node Info
 
-General information about the node, for instance kernel version, kubernetes version
+General information about the node, for instance kernel version, Kubernetes version
 (kubelet version, kube-proxy version), docker version (if used), OS name.
 The information is gathered by Kubelet from the node.
 
@@ -205,7 +206,7 @@ Normally, nodes register themselves and report their capacity when creating the 
 you are doing [manual node administration](#manual-node-administration), then you need to set node
 capacity when adding a node.
 
-The kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It
+The Kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It
 checks that the sum of the limits of containers on the node is no greater than than the node capacity.  It
 includes all containers started by kubelet, but not containers started directly by docker, nor
 processes not in containers.  
@@ -231,6 +232,12 @@ spec:
 Set the `cpu` and `memory` values to the amount of resources you want to reserve.
 Place the file in the manifest directory (`--config=DIR` flag of kubelet).  Do this
 on each kubelet where you want to reserve resources.
+
+## API Object
+
+Node is a top-level resource in the kubernetes REST API. More details about the
+API object can be found at: [Node API
+object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_node).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

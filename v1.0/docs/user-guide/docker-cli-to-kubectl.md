@@ -8,7 +8,7 @@ layout: docwithnav
 
 # kubectl for docker users
 
-In this doc, we introduce the kubernetes command line to for interacting with the api to docker-cli users. The tool, kubectl, is designed to be familiar to docker-cli users but there are a few necessary differences. Each section of this doc highlights a docker subcommand explains the kubectl equivalent.
+In this doc, we introduce the Kubernetes command line to for interacting with the api to docker-cli users. The tool, kubectl, is designed to be familiar to docker-cli users but there are a few necessary differences. Each section of this doc highlights a docker subcommand explains the kubectl equivalent.
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -138,7 +138,7 @@ $ kubectl logs -f nginx-app-zibvs
 10.240.63.110 - - [14/Jul/2015:01:09:02 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.26.0" "-"
 {% endhighlight %}
 
-Now's a good time to mention slight difference between pods and containers; by default pods will not terminate if their process's exit. Instead it will restart the process. This is similar to the docker run option `--restart=always` with one major difference. In docker, the output for each invocation of the process is concatenated but for Kubernetes, each invokation is separate. To see the output from a prevoius run in kubernetes, do this:
+Now's a good time to mention slight difference between pods and containers; by default pods will not terminate if their process's exit. Instead it will restart the process. This is similar to the docker run option `--restart=always` with one major difference. In docker, the output for each invocation of the process is concatenated but for Kubernetes, each invokation is separate. To see the output from a prevoius run in Kubernetes, do this:
 
 {% highlight console %}
 $ kubectl logs --previous nginx-app-zibvs

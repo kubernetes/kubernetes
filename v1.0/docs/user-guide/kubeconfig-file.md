@@ -126,7 +126,6 @@ users:
   myself:
     username: admin
     password: secret
-
 {% endhighlight %}
 
 and a kubeconfig file that looks like this

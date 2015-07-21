@@ -8,13 +8,13 @@ layout: docwithnav
 
 # High Availability of Scheduling and Controller Components in Kubernetes
 
-This document serves as a proposal for high availability of the scheduler and controller components in kubernetes.  This proposal is intended to provide a simple High Availability api for kubernetes components with the potential to extend to services running on kubernetes.  Those services would be subject to their own constraints.
+This document serves as a proposal for high availability of the scheduler and controller components in Kubernetes.  This proposal is intended to provide a simple High Availability api for Kubernetes components with the potential to extend to services running on Kubernetes.  Those services would be subject to their own constraints.
 
 ## Design Options
 
 For complete reference see [this](https://www.ibm.com/developerworks/community/blogs/RohitShetty/entry/high_availability_cold_warm_hot?lang=en)
 
-1. Hot Standby: In this scenario, data and state are shared between the two components such that an immediate failure in one component causes the standby daemon to take over exactly where the failed component had left off.  This would be an ideal solution for kubernetes, however it poses a series of challenges in the case of controllers where component-state is cached locally and not persisted in a transactional way to a storage facility.  This would also introduce additional load on the apiserver, which is not desirable.  As a result, we are **NOT** planning on this approach at this time.
+1. Hot Standby: In this scenario, data and state are shared between the two components such that an immediate failure in one component causes the standby daemon to take over exactly where the failed component had left off.  This would be an ideal solution for Kubernetes, however it poses a series of challenges in the case of controllers where component-state is cached locally and not persisted in a transactional way to a storage facility.  This would also introduce additional load on the apiserver, which is not desirable.  As a result, we are **NOT** planning on this approach at this time.
 
 2. **Warm Standby**: In this scenario there is only one active component acting as the master and additional components running but not providing service or responding to requests.  Data and state are not shared between the active and standby components.  When a failure occurs, the standby component that becomes the master must determine the current state of the system before resuming functionality.  This is the approach that this proposal will leverage.
 

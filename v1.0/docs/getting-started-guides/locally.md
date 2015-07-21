@@ -35,7 +35,7 @@ Not running Linux? Consider running Linux in a local virtual machine with [Vagra
 
 At least [Docker](https://docs.docker.com/installation/#installation)
 1.3+. Ensure the Docker daemon is running and can be contacted (try `docker
-ps`).  Some of the kubernetes components need to run as root, which normally
+ps`).  Some of the Kubernetes components need to run as root, which normally
 works fine with docker.
 
 #### etcd
@@ -48,7 +48,7 @@ You need [go](https://golang.org/doc/install) at least 1.3+ in your path, please
 
 ### Starting the cluster
 
-In a separate tab of your terminal, run the following (since one needs sudo access to start/stop kubernetes daemons, it is easier to run the entire script as root):
+In a separate tab of your terminal, run the following (since one needs sudo access to start/stop Kubernetes daemons, it is easier to run the entire script as root):
 
 {% highlight sh %}
 cd kubernetes
@@ -83,7 +83,7 @@ cluster/kubectl.sh run my-nginx --image=nginx --replicas=2 --port=80
   exit
 ## end wait
 
-## introspect kubernetes!
+## introspect Kubernetes!
 cluster/kubectl.sh get pods
 cluster/kubectl.sh get services
 cluster/kubectl.sh get replicationcontrollers
@@ -93,7 +93,7 @@ cluster/kubectl.sh get replicationcontrollers
 ### Running a user defined pod
 
 Note the difference between a [container](../user-guide/containers.html)
-and a [pod](../user-guide/pods.html). Since you only asked for the former, kubernetes will create a wrapper pod for you.
+and a [pod](../user-guide/pods.html). Since you only asked for the former, Kubernetes will create a wrapper pod for you.
 However you cannot view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
@@ -132,7 +132,7 @@ hack/local-up-cluster.sh
 
 #### kubectl claims to start a container but `get pods` and `docker ps` don't show it.
 
-One or more of the kubernetes daemons might've crashed. Tail the logs of each in /tmp.
+One or more of the KUbernetes daemons might've crashed. Tail the logs of each in /tmp.
 
 #### The pods fail to connect to the services by host names
 

@@ -168,9 +168,9 @@ image is based on the Node.js official image. It then installs Meteor
 and copies in your apps' code. The last line specifies what happens
 when your app container is run.
 
-```
+{% highlight sh %}
 ENTRYPOINT MONGO_URL=mongodb://$MONGO_SERVICE_HOST:$MONGO_SERVICE_PORT /usr/local/bin/node main.js
-```
+{% endhighlight %}
 
 Here we can see the MongoDB host and port information being passed
 into the Meteor app. The `MONGO_SERVICE...` environment variables are
@@ -191,18 +191,20 @@ As mentioned above, the mongo container uses a volume which is mapped
 to a persistent disk by Kubernetes. In [`mongo-pod.json`](mongo-pod.json) the container
 section specifies the volume:
 
-```
+{% highlight json %}
+{
         "volumeMounts": [
           {
             "name": "mongo-disk",
             "mountPath": "/data/db"
           }
-```
+{% endhighlight %}
 
 The name `mongo-disk` refers to the volume specified outside the
 container section:
 
-```
+{% highlight json %}
+{
     "volumes": [
       {
         "name": "mongo-disk",
@@ -212,7 +214,7 @@ container section:
         }
       }
     ],
-```
+{% endhighlight %}
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

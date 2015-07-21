@@ -21,7 +21,7 @@ Currently, you can look at:
 
 Example from command line (the DNS lookup looks better from a web browser):
 
-```
+{% highlight console %}
 $ kubectl create -f examples/explorer/pod.json
 $ kubectl proxy &
 Starting to serve on localhost:8001
@@ -133,7 +133,7 @@ Error: &lt;*&gt;lookup elasticsearch-logging: no such host
 </nil></nil></nil></nil></nil></nil></pre>
 
 </body></html>
-```
+{% endhighlight %}
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

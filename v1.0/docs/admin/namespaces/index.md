@@ -8,11 +8,11 @@ layout: docwithnav
 
 ## Kubernetes Namespaces
 
-Kubernetes _[namespaces](../namespaces.html)_ help different projects, teams, or customers to share a Kubernetes cluster.
+Kubernetes _[namespaces](../../../docs/admin/namespaces.html)_ help different projects, teams, or customers to share a Kubernetes cluster.
 
 It does this by providing the following:
 
-1. A scope for [Names](../identifiers.html).
+1. A scope for [Names](../../user-guide/identifiers.html).
 2. A mechanism to attach authorization and policy to a subsection of the cluster.
 
 Use of multiple namespaces is optional.
@@ -24,7 +24,7 @@ This example demonstrates how to use Kubernetes namespaces to subdivide your clu
 This example assumes the following:
 
 1. You have an [existing Kubernetes cluster](../../getting-started-guides/).
-2. You have a basic understanding of Kubernetes _[pods](../pods.html)_, _[services](../services.html)_, and _[replication controllers](../replication-controller.html)_.
+2. You have a basic understanding of Kubernetes _[pods](../../user-guide/pods.html)_, _[services](../../user-guide/services.html)_, and _[replication controllers](../../user-guide/replication-controller.html)_.
 
 ### Step One: Understand the default namespace
 
@@ -74,13 +74,13 @@ Use the file [`namespace-dev.json`](namespace-dev.json) which describes a develo
 Create the development namespace using kubectl.
 
 {% highlight console %}
-$ kubectl create -f docs/user-guide/namespaces/namespace-dev.json
+$ kubectl create -f docs/admin/namespaces/namespace-dev.json
 {% endhighlight %}
 
 And then lets create the production namespace using kubectl.
 
 {% highlight console %}
-$ kubectl create -f docs/user-guide/namespaces/namespace-prod.json
+$ kubectl create -f docs/admin/namespaces/namespace-prod.json
 {% endhighlight %}
 
 To be sure things are right, let's list all of the namespaces in our cluster.
@@ -254,6 +254,6 @@ authorization rules for each namespace.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/namespaces/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
 

@@ -34,13 +34,13 @@ The Kubelet acts as a bridge between the Kubernetes master and the nodes. It man
 
 ### InfluxDB and Grafana
 
-A Grafana setup with InfluxDB is a very popular combination for monitoring in the open source world. InfluxDB exposes an easy to use API to write and fetch time series data. Heapster is setup to use this storage backend by default on most kubernetes clusters. A detailed setup guide can be found [here](https://github.com/GoogleCloudPlatform/heapster/blob/master/docs/influxdb.md). InfluxDB and Grafana run in Pods. The pod exposes itself as a Kubernetes service which is how Heapster discovers it. 
+A Grafana setup with InfluxDB is a very popular combination for monitoring in the open source world. InfluxDB exposes an easy to use API to write and fetch time series data. Heapster is setup to use this storage backend by default on most Kubernetes clusters. A detailed setup guide can be found [here](https://github.com/GoogleCloudPlatform/heapster/blob/master/docs/influxdb.md). InfluxDB and Grafana run in Pods. The pod exposes itself as a Kubernetes service which is how Heapster discovers it. 
 
 The Grafana container serves Grafana’s UI which provides an easy to configure dashboard interface. The default dashboard for Kubernetes contains an example dashboard that monitors resource usage of the cluster and the pods inside of it. This dashboard can easily be customized and expanded. Take a look at the storage schema for InfluxDB [here](https://github.com/GoogleCloudPlatform/heapster/blob/master/docs/storage-schema.md#metrics).
 
-Here is a video showing how to monitor a kubernetes cluster using heapster, InfluxDB and Grafana:
+Here is a video showing how to monitor a Kubernetes cluster using heapster, InfluxDB and Grafana:
 
-[![How to monitor a kubernetes cluster using heapster, InfluxDB and Grafana](http://img.youtube.com/vi/SZgqjMrxo3g/0.jpg)](http://www.youtube.com/watch?v=SZgqjMrxo3g)
+[![How to monitor a Kubernetes cluster using heapster, InfluxDB and Grafana](http://img.youtube.com/vi/SZgqjMrxo3g/0.jpg)](http://www.youtube.com/watch?v=SZgqjMrxo3g)
 
 Here is a snapshot of the default Kubernetes Grafana dashboard that shows the CPU and Memory usage of the entire cluster, individual pods and containers:
 
