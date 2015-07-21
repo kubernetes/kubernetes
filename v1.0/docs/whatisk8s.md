@@ -24,7 +24,7 @@ With Kubernetes, you are able to quickly and efficiently respond to customer dem
 
 Kubernetes builds upon a [decade and a half of experience that Google has with running production workloads at scale](https://research.google.com/pubs/pub43438.html), combined with best-of-breed ideas and practices from the community.
 
-Ready to [Get Started](getting-started-guides/README.md)?
+Ready to [Get Started](getting-started-guides/README.html)?
 
 #### Why containers?
 
