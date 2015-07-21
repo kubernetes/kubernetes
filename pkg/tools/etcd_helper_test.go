@@ -846,13 +846,13 @@ func TestPrefixEtcdKey(t *testing.T) {
 
 	// Verify prefix is added
 	keyBefore := baseKey
-	keyAfter := helper.PrefixEtcdKey(keyBefore)
+	keyAfter := helper.prefixEtcdKey(keyBefore)
 
 	assert.Equal(t, keyAfter, path.Join(prefix, baseKey), "Prefix incorrectly added by EtcdHelper")
 
 	// Verify prefix is not added
 	keyBefore = path.Join(prefix, baseKey)
-	keyAfter = helper.PrefixEtcdKey(keyBefore)
+	keyAfter = helper.prefixEtcdKey(keyBefore)
 
 	assert.Equal(t, keyBefore, keyAfter, "Prefix incorrectly added by EtcdHelper")
 }
