@@ -1,8 +1,40 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/secrets.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 
 ## Abstract
 
-A proposal for the distribution of secrets (passwords, keys, etc) to the Kubelet and to
-containers inside Kubernetes using a custom volume type.
+A proposal for the distribution of [secrets](../user-guide/secrets.md) (passwords, keys, etc) to the Kubelet and to
+containers inside Kubernetes using a custom [volume](../user-guide/volumes.md#secrets) type. See the [secrets example](../user-guide/secrets/) for more information. 
 
 ## Motivation
 
@@ -49,7 +81,7 @@ Goals of this design:
     the kubelet implement some reserved behaviors based on the types of secrets the service account
     consumes:
     1.  Use credentials for a docker registry to pull the pod's docker image
-    2.  Present kubernetes auth token to the pod or transparently decorate traffic between the pod
+    2.  Present Kubernetes auth token to the pod or transparently decorate traffic between the pod
         and master service
 4.  As a user, I want to be able to indicate that a secret expires and for that secret's value to
     be rotated once it expires, so that the system can help me follow good practices
@@ -80,7 +112,7 @@ other system components to take action based on the secret's type.
 #### Example: service account consumes auth token secret
 
 As an example, the service account proposal discusses service accounts consuming secrets which
-contain kubernetes auth tokens.  When a Kubelet starts a pod associated with a service account
+contain Kubernetes auth tokens.  When a Kubelet starts a pod associated with a service account
 which consumes this type of secret, the Kubelet may take a number of actions:
 
 1.  Expose the secret in a `.kubernetes_auth` file in a well-known location in the container's
@@ -247,7 +279,7 @@ Kubelet volume plugin API will be changed so that a volume plugin receives the s
 a volume along with the volume spec.  This will allow volume plugins to implement setting the
 security context of volumes they manage.
 
-## Community work:
+## Community work
 
 Several proposals / upstream patches are notable as background for this proposal:
 
@@ -265,7 +297,7 @@ storing it. Secrets contain multiple pieces of data that are presented as differ
 the secret volume (example: SSH key pair).
 
 In order to remove the burden from the end user in specifying every file that a secret consists of,
-it should be possible to mount all files provided by a secret with a single ```VolumeMount``` entry
+it should be possible to mount all files provided by a secret with a single `VolumeMount` entry
 in the container specification.
 
 ### Secret API Resource
@@ -317,7 +349,7 @@ finer points of secrets and resource allocation are fleshed out.
 
 ### Secret Volume Source
 
-A new `SecretSource` type of volume source will be added to the ```VolumeSource``` struct in the
+A new `SecretSource` type of volume source will be added to the `VolumeSource` struct in the
 API:
 
 ```go
@@ -576,4 +608,6 @@ source.  Both containers will have the following files present on their filesyst
     /etc/secret-volume/password
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/secrets.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

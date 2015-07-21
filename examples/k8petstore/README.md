@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/examples/k8petstore/README.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Welcome to k8PetStore
 
 This is a follow up to the [Guestbook Example](../guestbook/README.md)'s [Go implementation](../guestbook-go/).
@@ -94,7 +127,7 @@ So, to run this app in Kubernetes, simply run [The all in one k8petstore.sh shel
 
 Note that at the top of the script there are a few self explanatory parameters to set, among which the Public IPs parameter is where you can checkout the web ui (at $PUBLIC_IP:3000), which will show a plot and read outs of transaction throughput.
 
-In the mean time, because the public IP will be deprecated in Kubernetes v1, we provide other 2 scripts k8petstore-loadbalancer.sh and k8petstore-nodeport.sh. As the names suggest, they rely on LoadBalancer and NodePort respectively. More details can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#external-services). 
+In the mean time, because the public IP will be deprecated in Kubernetes v1, we provide other 2 scripts k8petstore-loadbalancer.sh and k8petstore-nodeport.sh. As the names suggest, they rely on LoadBalancer and NodePort respectively. More details can be found [here](../../docs/user-guide/services.md#external-services). 
 
 ## Future
 
@@ -109,4 +142,6 @@ For questions on running this app, you can ask on the google containers group (f
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

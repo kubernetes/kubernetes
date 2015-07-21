@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/devel/api_changes.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # So you want to change the API?
 
 The Kubernetes API has two major components - the internal structures and
@@ -177,7 +210,7 @@ need to add cases to `pkg/api/<version>/defaults.go`.  Of course, since you
 have added code, you have to add a test: `pkg/api/<version>/defaults_test.go`.
 
 Do use pointers to scalars when you need to distinguish between an unset value
-and an an automatic zero value.  For example,
+and an automatic zero value.  For example,
 `PodSpec.TerminationGracePeriodSeconds` is defined as `*int64` the go type
 definition.  A zero value means 0 seconds, and a nil value asks the system to
 pick a default.
@@ -250,8 +283,9 @@ conversion functions when writing your conversion functions.
 Once all the necessary manually written conversions are added, you need to
 regenerate auto-generated ones. To regenerate them:
    - run
-```
-   $ hack/update-generated-conversions.sh
+
+```sh
+hack/update-generated-conversions.sh
 ```
 
 If running the above script is impossible due to compile errors, the easiest
@@ -325,13 +359,14 @@ an example to illustrate your change.
 
 Make sure you update the swagger API spec by running:
 
-```shell
-$ hack/update-swagger-spec.sh
+```sh
+hack/update-swagger-spec.sh
 ```
 
 The API spec changes should be in a commit separate from your other changes.
 
 ## Incompatible API changes
+
 If your change is going to be backward incompatible or might be a breaking change for API
 consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
 the change gets in. If you are unsure, ask. Also make sure that the change gets documented in
@@ -342,4 +377,6 @@ the change gets in. If you are unsure, ask. Also make sure that the change gets 
 TODO(smarterclayton): write this.
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
