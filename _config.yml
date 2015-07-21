@@ -43,6 +43,10 @@ nav:
    url: /gettingstarted
    slug: gettingstarted
    external: false
+ - label: Documentation
+   url: /v1.0
+   slug: v1.0
+   external: false
  - label: Community
    url: /community
    slug: community
