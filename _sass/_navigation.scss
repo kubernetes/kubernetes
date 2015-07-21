@@ -7,10 +7,14 @@ ul, ul ul {
 	list-style: none;
 }
 #wrapper {
+	position: absolute;
+	top: 134px;
+	left: 0px;
 	float:left;
 	width: 250px;
-	height: 94vh;
+	height: 85vh;
 	overflow: scroll;
+	padding-bottom: 20px;
 }
 .menu {
 	width: auto;
@@ -22,6 +26,10 @@ ul, ul ul {
 .menu > li > ul > li,
 .menu > li > ul > li > ul > li {
 	margin-bottom: .75em;
+}
+/* default second level menu state (keep menus hidden until clicked) - see :active class */
+.menu > li > ul {
+	display: none;
 }
 .menu > li > a {
 	width: 100%;
@@ -42,7 +50,7 @@ ul, ul ul {
 .menu ul li:last-child a {
 	
 }
-.menu > li > a:hover, .menu > li > a.active {
+.menu > li > a:hover, .menu > li > a.active, .menu > li > ul > li > a.active {
 	color: #428BCB;
 }
 .menu > li > a.active {

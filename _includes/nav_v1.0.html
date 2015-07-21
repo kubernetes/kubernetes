@@ -3,7 +3,7 @@
 		<a href="{{ site.url }}/v1.0/index.html" class="nav-link">Version 1.0</a>
 	</li>
 	<li class="navContainer">
-		<a href="{{ site.url }}/v1.0/docs/README.html" class="nav-link">What is Kubernetes?</a>
+		<a href="{{ site.url }}/v1.0/docs/whatisk8s.html" class="nav-link">What is Kubernetes?</a>
 	</li><!-- 
 					GETTING STARTED
 					 -->
@@ -20,7 +20,7 @@ USERS GUIDE
 	-->
 	<li class="navContainer">User's Guide
 	</li>
-	<li class="navSubMenu">
+	<li class="navSubMenu haschild">
 		<a href="#" class="nav-link">Overview and Concepts</a>
 		<ul class="navSubMenu">
 			<li>
@@ -65,7 +65,7 @@ APPLICATION ADMINISTRATION
 	<li class="navSubMenu2">
 		<a href="{{ site.url }}/v1.0/docs/user-guide/README.html" class="nav-link">Application Admin Guide</a>
 	</li>
-	<li class="navSubMenu2"><a href="#">Quick Walkthrough (Basics Tutorials)</a>
+	<li class="navSubMenu2 haschild"><a href="#">Quick Walkthrough (Basics Tutorials)</a>
 		<ul>
 			<li class="navSubMenu">
 				<a href="{{ site.url }}/v1.0/docs/user-guide/walkthrough/README.html" class="nav-link">Kubernetes 101</a>
@@ -75,7 +75,7 @@ APPLICATION ADMINISTRATION
 			</li>
 		</ul>
 	</li>
-	<li class="navSubMenu2"><a href="#">Detailed Walkthrough</a>
+	<li class="navSubMenu2 haschild"><a href="#">Detailed Walkthrough</a>
 		<ul>
 			<li class="navSubMenu">
 				<a href="{{ site.url }}/v1.0/docs/user-guide/quick-start.html" class="nav-link">Quick Start: Launching Applications</a>
@@ -128,12 +128,9 @@ CLUSTER ADMINISTRATION
 	<li class="navSubMenu2">
 		<a href="{{ site.url }}/v1.0/docs/admin/index.html" class="nav-link">Administering Clusters</a>
 	</li>
-	<li class="navSubMenu2">
+	<li class="navSubMenu2 haschild">
 		<a href="{{ site.url }}/v1.0/docs/design/README.html" class="nav-link">Planning and Designing</a>
 		<ul class="navSubMenu">
-			<li>
-				<a href="#" class="nav-link">Scheduler</a>
-			</li>
 			<li>
 				<a href="{{ site.url }}/v1.0/docs/design/security.html" class="nav-link">Security</a>
 			</li>
@@ -157,15 +154,9 @@ CLUSTER ADMINISTRATION
 			</li>
 		</ul>
 	</li>
-	<li class="navSubMenu2">
+	<li class="navSubMenu2 haschild">
 		<a href="{{ site.url }}/v1.0/docs/admin/cluster-management.html" class="nav-link">Managing Clusters and Nodes</a>
 		<ul class="navSubMenu">
-			<li>
-				<a href="#" class="nav-link">Creating Clusters and Nodes</a>
-			</li>
-			<li>
-				<a href="#" class="nav-link">Configuring Clusters</a>
-			</li>
 			<li>
 				<a href="https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ#how-do-i-change-the-size-of-my-cluster" class="nav-link">Changing Cluster Size</a>
 			</li>
@@ -173,25 +164,10 @@ CLUSTER ADMINISTRATION
 				<a href="{{ site.url }}/v1.0/docs/admin/resource-quota.html" class="nav-link">Setting Resource Quotas</a>
 			</li>
 			<li>
-				<a href="#" class="nav-link">Setting Limits</a>
-			</li>
-			<li>
-				<a href="#" class="nav-link">Sharing Clusters</a>
-			</li>
-			<li>
 				<a href="{{ site.url }}/v1.0/docs/getting-started-guides/logging.html" class="nav-link">Logging</a>
 			</li>
 			<li>
 				<a href="{{ site.url }}/v1.0/docs/admin/networking.html" class="nav-link">Networking</a>
-			</li>
-			<li>
-				<a href="#" class="nav-link">Viewing Clusters</a>
-			</li>
-			<li>
-				<a href="#" class="nav-link">Upgrading Clusters</a>
-			</li>
-			<li>
-				<a href="#" class="nav-link">Tearing Down Clusters</a>
 			</li>
 		</ul>
 	</li>
@@ -200,9 +176,6 @@ CLUSTER ADMINISTRATION
 	</li>
 	<li class="navSubMenu2">
 				<a href="{{ site.url }}/v1.0/docs/admin/salt.html" class="nav-link">Configuration Management: SaltStack</a>
-	</li>
-	<li class="navSubMenu2">
-		<a href="#" class="nav-link">Container Image Registry</a>
 	</li><!-- 
 				SOLUTIONS
 			 -->
@@ -218,7 +191,7 @@ CLUSTER ADMINISTRATION
 				 -->
 	<li class="navContainer">Tutorials
 	</li>
-	<li class="navSubMenu">
+	<li class="navSubMenu haschild">
 		<a href="#" class="nav-link">Kubernetes Basics</a>
 		<ul class="navSubMenu3">
 			<li>
@@ -229,7 +202,7 @@ CLUSTER ADMINISTRATION
 			</li>
 		</ul>
 	</li>
-	<li class="navSubMenu">
+	<li class="navSubMenu haschild">
 		<a href="#" class="nav-link">Deploying Clusters</a>
 		<ul class="navSubMenu3">
 			<li>
@@ -261,7 +234,7 @@ CLUSTER ADMINISTRATION
 	<li class="navSubMenu">
 		<a href="{{ site.url }}/v1.0/examples/mysql-wordpress-pd/README.html" class="nav-link">Persistent Images</a>
 	</li>
-	<li class="navSubMenu">
+	<li class="navSubMenu haschild">
 		<a href="#" class="nav-link">Multi-tier Applications</a>
 		<ul class="navSubMenu3">
 			<li>
@@ -279,7 +252,7 @@ CLUSTER ADMINISTRATION
 				 -->
 	<li class="navContainer">Examples
 	</li>
-	<li class="navSubMenu">
+	<li class="navSubMenu haschild">
 		<a href="#" class="nav-link">Setup and Configuration</a>
 		<ul class="navSubMenu3">
 			<li>
@@ -294,9 +267,10 @@ CLUSTER ADMINISTRATION
 			<li>
 				<a href="{{ site.url }}/v1.0/docs/user-guide/node-selection/README.html" class="nav-link">Assigning Pods to Nodes</a>
 			</li>
-			<li>
+			<!-- not a usefull topic
+				<li>
 				<a href="{{ site.url }}/v1.0/examples/kubectl-container/README.html" class="nav-link">Packaging kubectl into a Pod</a>
-			</li>
+			</li> -->
 			<li>Resource Control:
 			</li>
 			<li class="navSubMenu3">
@@ -343,7 +317,7 @@ CLUSTER ADMINISTRATION
 			<li class="navSubMenu3">
 				<a href="{{ site.url }}/v1.0/examples/nfs/README.html" class="nav-link">NFS Volumes</a>
 			</li>
-			<!--><li class="navSubMenu3">
+			<!--<li class="navSubMenu3">
 				<a href="#" class="nav-link">MongoDB Volumes</a>
 				-->
 			</li>
@@ -361,27 +335,16 @@ CLUSTER ADMINISTRATION
 		</ul>
 	</li>
 	<li class="navSubMenu">
-		<a href="#" class="nav-link">Upgrading Pods and Clusters</a>
-<ul class="navSubMenu3">
-	<li>
 		<a href="{{ site.url }}/v1.0/docs/user-guide/update-demo/README.html" class="nav-link">Updating Live Pods</a>
-	</li>
-	<li>
-		<a href="#" class="nav-link">Upgrading Clusters</a>
-	</li>
-</ul>
 </li>
 	<!-- 
 				API REFERENCE
 				 -->
 	<li class="navContainer">API Reference
 	</li>
-	<li class="navSubMenu">
+	<li class="navSubMenu haschild">
 		<a href="{{ site.url }}/v1.0/docs/api.html" class="nav-link">API Basics</a>
 <ul class="navSubMenu3">
-	<li>
-		<a href="{{ site.url }}/v1.0/docs/devel/client-libraries.html" class="nav-link">Client Libraries</a>
-	</li>
 	<li>
 		<a href="{{ site.url }}/v1.0/docs/admin/authorization.html" class="nav-link">API Authorization</a>
 	</li>
@@ -390,9 +353,6 @@ CLUSTER ADMINISTRATION
 	</li>
 	<li>
 		<a href="{{ site.url }}/v1.0/docs/user-guide/working-with-resources.html" class="nav-link">Working with Resources</a>
-	</li>
-	<li>
-		<a href="{{ site.url }}/v1.0/docs/devel/api-conventions.html" class="nav-link">API Conventions</a>
 	</li>
 </ul>
 	</li>
@@ -403,7 +363,7 @@ CLUSTER ADMINISTRATION
 				 -->
 	<li class="navContainer">CLI Reference
 	</li>
-	<li class="navSubMenu">
+	<li class="navSubMenu haschild">
 		<a href="{{ site.url }}/v1.0/docs/user-guide/kubectl/kubectl.html" class="nav-link">kubectl</a>
 <ul class="navSubMenu3">
 	<li>
@@ -492,12 +452,14 @@ CLUSTER ADMINISTRATION
 	</li>
 </ul>
 	</li>
-	<li class="navContainer"><a href="{{ site.url }}/v1.0/docs/troubleshooting.html" class="nav-link">Troubleshooting</a>
+	<li class="navContainer haschild"><a href="{{ site.url }}/v1.0/docs/troubleshooting.html" class="nav-link">Troubleshooting and Support</a>
 		<ul class="navSubMenu3">
-			<li>
+			<li>Troubleshooting
+			</li>
+			<li class="navSubMenu3">
 				<a href="{{ site.url }}/v1.0/docs/user-guide/application-troubleshooting.html" class="nav-link">Applications</a>
 			</li>
-			<li>
+			<li class="navSubMenu3">
 				<a href="{{ site.url }}/v1.0/docs/admin/cluster-troubleshooting.html" class="nav-link">Clusters</a>
 			</li>
 			<li>Wiki FAQ
@@ -519,34 +481,15 @@ CLUSTER ADMINISTRATION
 		</ul>
 	</li>
 	<!-- 
-				SUPPORT
-				 -->
-	<li class="navContainer">
-		<a href="#" class="nav-link">Support</a>
-<ul class="navSubMenu">
-	<li>
-		<a href="#" class="nav-link">Getting Help</a>
-	</li>
-	<li>
-		<a href="#" class="nav-link">Esculating Security Issues</a>
-	</li>
-	<li>
-		<a href="http://kubernetes.io/community/" class="nav-link">Community</a>
-	</li>
-	<li>
-		<a href="http://releases.k8s.io/v1.0.1/contrib/recipes">Community Contriubted Solutions</a>
-	</li>
-	<li>
-		<a href="https://github.com/GoogleCloudPlatform/kubernetes/wiki/Media" class="nav-link">Presentation and Videos</a>
-	</li>
-</ul>
-	</li>
-	<!-- 
-				RELEASE NOTES
+		RELEASE NOTES
 				 -->
 	<li>
 		<a href="https://github.com/GoogleCloudPlatform/kubernetes/releases" class="navContainer nav-link">Release Notes</a>
 	</li>
+	<!-- nothing here yet
+		<li class="navContainer">
+		<a href="{{ site.url }}/v1.0/docs/glossary.html" class="nav-link">Glossary</a>
+	</li> -->
 <!--
 		<hr>
 		<ul>

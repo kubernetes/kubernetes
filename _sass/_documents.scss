@@ -1,12 +1,17 @@
 .bodywrapper {
-    overflow: auto;
+    height: 85vh;
 }
 div #doccontent {
+	position: absolute;
+	top:134px;
+	left:250px;
+	right:0px;
+	bottom:0px;
     padding-left: 30px;
     margin-right: 30px;
-    height: 94vh;
     max-width: 900px;
     padding-right: 10px;
+    overflow: auto;
 
     h1 {
         font-size: 45px;
@@ -113,6 +118,10 @@ div #doccontent {
         margin-top: 10px;
         margin-bottom: 10px;
     }
+	
+	p > code {
+	  white-space: nowrap;
+	}
 
     img {
         max-width: 100%;
