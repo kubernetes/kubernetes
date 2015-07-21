@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,6 +106,74 @@ func TestHasMacroBlock(t *testing.T) {
 	for i, c := range cases {
 		if hasMacroBlock(c.lines, c.begin, c.end) != c.expected {
 			t.Errorf("case[%d]: %q,%q, expected %t, got %t", i, c.begin, c.end, c.expected, !c.expected)
+		}
+	}
+}
+
+func TestReplaceNonPreformatted(t *testing.T) {
+	cases := []struct {
+		in  string
+		out string
+	}{
+		{"aoeu", ""},
+		{"aoeu\n```\naoeu\n```\naoeu", "```\naoeu\n```\n"},
+		{"ao\neu\n```\naoeu\n\n\n", "```\naoeu\n\n\n"},
+		{"aoeu ```aoeu``` aoeu", ""},
+	}
+
+	for i, c := range cases {
+		out := string(replaceNonPreformatted([]byte(c.in), func([]byte) []byte { return nil }))
+		if out != c.out {
+			t.Errorf("%v: got %q, wanted %q", i, out, c.out)
+		}
+	}
+}
+
+func TestReplaceNonPreformattedNoChange(t *testing.T) {
+	cases := []struct {
+		in string
+	}{
+		{"aoeu"},
+		{"aoeu\n```\naoeu\n```\naoeu"},
+		{"aoeu\n\n```\n\naoeu\n\n```\n\naoeu"},
+		{"ao\neu\n```\naoeu\n\n\n"},
+		{"aoeu ```aoeu``` aoeu"},
+		{"aoeu\n```\naoeu\n```"},
+		{"aoeu\n```\naoeu\n```\n"},
+		{"aoeu\n```\naoeu\n```\n\n"},
+	}
+
+	for i, c := range cases {
+		out := string(replaceNonPreformatted([]byte(c.in), func(in []byte) []byte { return in }))
+		if out != c.in {
+			t.Errorf("%v: got %q, wanted %q", i, out, c.in)
+		}
+	}
+}
+
+func TestReplaceNonPreformattedCallOrder(t *testing.T) {
+	cases := []struct {
+		in     string
+		expect []string
+	}{
+		{"aoeu", []string{"aoeu"}},
+		{"aoeu\n```\naoeu\n```\naoeu", []string{"aoeu\n", "aoeu"}},
+		{"aoeu\n\n```\n\naoeu\n\n```\n\naoeu", []string{"aoeu\n\n", "\naoeu"}},
+		{"ao\neu\n```\naoeu\n\n\n", []string{"ao\neu\n"}},
+		{"aoeu ```aoeu``` aoeu", []string{"aoeu ```aoeu``` aoeu"}},
+		{"aoeu\n```\naoeu\n```", []string{"aoeu\n"}},
+		{"aoeu\n```\naoeu\n```\n", []string{"aoeu\n"}},
+		{"aoeu\n```\naoeu\n```\n\n", []string{"aoeu\n", "\n"}},
+	}
+
+	for i, c := range cases {
+		got := []string{}
+		replaceNonPreformatted([]byte(c.in), func(in []byte) []byte {
+			got = append(got, string(in))
+			return in
+		})
+		if e, a := c.expect, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: got %q, wanted %q", i, a, e)
 		}
 	}
 }

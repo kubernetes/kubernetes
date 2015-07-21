@@ -551,12 +551,6 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 	})
 }
 
-// waitForPodSuccess returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-// The default namespace is used to identify pods.
-func waitForPodSuccess(c *client.Client, podName string, contName string) error {
-	return waitForPodSuccessInNamespace(c, podName, contName, api.NamespaceDefault)
-}
-
 // waitForRCPodOnNode returns the pod from the given replication controller (decribed by rcName) which is scheduled on the given node.
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, error) {
@@ -790,6 +784,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+waitLoop:
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1", "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
@@ -802,20 +797,20 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
 				Logf("%s is created but not running", podID)
-				continue
+				continue waitLoop
 			}
 
 			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
-				continue
+				continue waitLoop
 			}
 
 			// Call the generic validator function here.
 			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
 			if err := validator(c, podID); err != nil {
 				Logf("%s is running right image but validator function failed: %v", podID, err)
-				continue
+				continue waitLoop
 			}
 
 			Logf("%s is verified up and running", podID)
@@ -1224,7 +1219,7 @@ func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 // restart and node unhealthy events. Note that listing events like this will mess
 // with latency metrics, beware of calling it during a test.
 func getNodeEvents(c *client.Client, nodeName string) []api.Event {
-	events, err := c.Events(api.NamespaceDefault).List(
+	events, err := c.Events(api.NamespaceSystem).List(
 		labels.Everything(),
 		fields.Set{
 			"involvedObject.kind":      "Node",
@@ -1258,11 +1253,12 @@ func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
 	podStore := newPodStore(c, ns, label, fields.Everything())
 	defer podStore.Stop()
+waitLoop:
 	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
 		pods := podStore.List()
 		for _, p := range pods {
 			if p.Status.Phase != api.PodRunning {
-				continue
+				continue waitLoop
 			}
 		}
 		running = true

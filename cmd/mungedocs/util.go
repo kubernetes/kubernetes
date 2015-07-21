@@ -19,6 +19,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -97,4 +98,86 @@ func hasMacroBlock(lines []string, begin string, end string) bool {
 		}
 	}
 	return false
+}
+
+// Returns the canonical begin-tag for a given description.  This does not
+// include the trailing newline.
+func beginMungeTag(desc string) string {
+	return fmt.Sprintf("<!-- BEGIN MUNGE: %s -->", desc)
+}
+
+// Returns the canonical end-tag for a given description.  This does not
+// include the trailing newline.
+func endMungeTag(desc string) string {
+	return fmt.Sprintf("<!-- END MUNGE: %s -->", desc)
+}
+
+// Calls 'replace' for all sections of the document not in ``` / ``` blocks. So
+// that you don't have false positives inside those blocks.
+func replaceNonPreformatted(input []byte, replace func([]byte) []byte) []byte {
+	f := splitByPreformatted(input)
+	output := []byte(nil)
+	for _, block := range f {
+		if block.preformatted {
+			output = append(output, block.data...)
+		} else {
+			output = append(output, replace(block.data)...)
+		}
+	}
+	return output
+}
+
+type fileBlock struct {
+	preformatted bool
+	data         []byte
+}
+
+type fileBlocks []fileBlock
+
+var (
+	// Finds all preformatted block start/stops.
+	preformatRE    = regexp.MustCompile("^\\s*```")
+	notPreformatRE = regexp.MustCompile("^\\s*```.*```")
+)
+
+func splitByPreformatted(input []byte) fileBlocks {
+	f := fileBlocks{}
+
+	cur := []byte(nil)
+	preformatted := false
+	// SplitAfter keeps the newline, so you don't have to worry about
+	// omitting it on the last line or anything. Also, the documentation
+	// claims it's unicode safe.
+	for _, line := range bytes.SplitAfter(input, []byte("\n")) {
+		if !preformatted {
+			if preformatRE.Match(line) && !notPreformatRE.Match(line) {
+				if len(cur) > 0 {
+					f = append(f, fileBlock{false, cur})
+				}
+				cur = []byte{}
+				preformatted = true
+			}
+			cur = append(cur, line...)
+		} else {
+			cur = append(cur, line...)
+			if preformatRE.Match(line) {
+				if len(cur) > 0 {
+					f = append(f, fileBlock{true, cur})
+				}
+				cur = []byte{}
+				preformatted = false
+			}
+		}
+	}
+	if len(cur) > 0 {
+		f = append(f, fileBlock{preformatted, cur})
+	}
+	return f
+}
+
+// As above, but further uses exp to parse the non-preformatted sections.
+func replaceNonPreformattedRegexp(input []byte, exp *regexp.Regexp, replace func([]byte) []byte) []byte {
+	return replaceNonPreformatted(input, func(in []byte) []byte {
+		return exp.ReplaceAllFunc(in, replace)
+	})
 }

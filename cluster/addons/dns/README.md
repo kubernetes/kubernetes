@@ -74,7 +74,7 @@ Supported environments offer the following config flags, which are used at
 cluster turn-up to create the SkyDNS pods and configure the kubelets.  For
 example, see `cluster/gce/config-default.sh`.
 
-```shell
+```sh
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="cluster.local"

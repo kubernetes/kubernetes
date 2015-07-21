@@ -36,7 +36,7 @@ const (
 
 JSON and YAML formats are accepted.`
 	create_example = `// Create a pod using the data in pod.json.
-$ kubectl create -f pod.json
+$ kubectl create -f ./pod.json
 
 // Create a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl create -f -`
@@ -127,7 +127,7 @@ func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 cluster.  If you want to expose this service to the external internet, you may
 need to set up firewall rules for the service port(s) (%s) to serve traffic.
 
-See http://releases.k8s.io/HEAD/docs/services-firewalls.md for more details.
+See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
 `,
 				makePortsString(obj.Spec.Ports, true))
 			out.Write([]byte(msg))

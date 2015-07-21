@@ -20,13 +20,16 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+const tocMungeTag = "GENERATED_TOC"
 
 // inserts/updates a table of contents in markdown file.
 //
 // First, builds a ToC.
-// Then, finds <!-- BEGIN GENERATED TOC --> and <!-- END GENERATED TOC -->, and replaces anything between those with
+// Then, finds the magic macro block tags and replaces anything between those with
 // the ToC, thereby updating any previously inserted ToC.
 //
 // TODO(erictune): put this in own package with tests
@@ -36,7 +39,7 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 		return nil, err
 	}
 	lines := splitLines(markdown)
-	updatedMarkdown, err := updateMacroBlock(lines, "<!-- BEGIN GENERATED TOC -->", "<!-- END GENERATED TOC -->", string(toc))
+	updatedMarkdown, err := updateMacroBlock(lines, beginMungeTag(tocMungeTag), endMungeTag(tocMungeTag), string(toc))
 	if err != nil {
 		return nil, err
 	}
@@ -51,18 +54,35 @@ func updateTOC(filePath string, markdown []byte) ([]byte, error) {
 // builds the ToC.
 func buildTOC(markdown []byte) ([]byte, error) {
 	var buffer bytes.Buffer
+	buffer.WriteString("\n")
 	scanner := bufio.NewScanner(bytes.NewReader(markdown))
+	inBlockQuotes := false
 	for scanner.Scan() {
 		line := scanner.Text()
+		match, err := regexp.Match("^```", []byte(line))
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			inBlockQuotes = !inBlockQuotes
+			continue
+		}
+		if inBlockQuotes {
+			continue
+		}
 		noSharps := strings.TrimLeft(line, "#")
 		numSharps := len(line) - len(noSharps)
 		heading := strings.Trim(noSharps, " \n")
 		if numSharps > 0 {
 			indent := strings.Repeat("  ", numSharps-1)
 			bookmark := strings.Replace(strings.ToLower(heading), " ", "-", -1)
+			// remove symbols (except for -) in bookmarks
+			r := regexp.MustCompile("[^A-Za-z0-9-]")
+			bookmark = r.ReplaceAllString(bookmark, "")
 			tocLine := fmt.Sprintf("%s- [%s](#%s)\n", indent, heading, bookmark)
 			buffer.WriteString(tocLine)
 		}
+
 	}
 	if err := scanner.Err(); err != nil {
 		return []byte{}, err

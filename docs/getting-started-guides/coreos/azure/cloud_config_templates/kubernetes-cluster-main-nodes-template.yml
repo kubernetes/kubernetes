@@ -17,7 +17,7 @@ write_files:
     owner: root
     content: |
       #!/bin/sh -xe
-      minion_id="${1}"
+      node_id="${1}"
       master_url="${2}"
       env_label="${3}"
       until healthcheck=$(curl --fail --silent "${master_url}/healthz")
@@ -31,7 +31,7 @@ write_files:
         "metadata": {
           "name": "%s",
           "labels": { "environment": "%s" }
-        }' "${minion_id}" "${env_label}" \
+        }' "${node_id}" "${env_label}" \
         | /opt/bin/kubectl create -s "${master_url}" -f -
 
   - path: /etc/kubernetes/manifests/fluentd.manifest
