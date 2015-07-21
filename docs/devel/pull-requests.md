@@ -1,3 +1,7 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Pull Request Process
 ====================
 
@@ -26,6 +30,9 @@ These PRs require:
 
 Once those requirements are met, they will be labeled [ok-to-merge](https://github.com/GoogleCloudPlatform/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Aopen+is%3Apr+label%3Aok-to-merge) and can be merged.
 
-These restrictions will be relaxed after v1.0 is released.
+These restrictions will be relaxed after v1.0 is released.<!-- TAG IS_VERSIONED -->
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/pull-requests.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

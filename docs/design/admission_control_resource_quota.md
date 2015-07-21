@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Admission control plugin: ResourceQuota
 
 ## Background
@@ -67,7 +72,6 @@ type ResourceQuotaList struct {
   // Items is a list of ResourceQuota objects
   Items []ResourceQuota `json:"items"`
 }
-
 ```
 
 ## AdmissionControl plugin: ResourceQuota
@@ -107,7 +111,7 @@ The server is updated to be aware of **ResourceQuota** objects.
 
 The quota is only enforced if the kube-apiserver is started as follows:
 
-```
+```console
 $ kube-apiserver -admission_control=ResourceQuota
 ```
 
@@ -130,13 +134,13 @@ this being the resource most closely running at the prescribed quota limits.
 
 kubectl is modified to support the **ResourceQuota** resource.
 
-```kubectl describe``` provides a human-readable output of quota.
+`kubectl describe` provides a human-readable output of quota.
 
 For example,
 
-```
+```console
 $ kubectl namespace myspace
-$ kubectl create -f examples/resourcequota/resource-quota.json
+$ kubectl create -f docs/user-guide/resourcequota/quota.yaml
 $ kubectl get quota
 NAME
 quota
@@ -152,5 +156,11 @@ resourcequotas          1       1
 services                3       5
 ```
 
+## More information 
 
+See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more information.<!-- TAG IS_VERSIONED -->
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

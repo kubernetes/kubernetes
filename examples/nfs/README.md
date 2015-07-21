@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Example of NFS volume
 
 See [nfs-web-pod.yaml](nfs-web-pod.yaml) for a quick example, how to use NFS volume
@@ -8,10 +13,11 @@ in a pod.
 The example below shows how to export a NFS share from a pod and import it
 into another one.
 
-###Prerequisites
+### Prerequisites
+
 The nfs server pod creates a privileged container, so if you are using a Salt based KUBERNETES_PROVIDER (**gce**, **vagrant**, **aws**), you have to enable the ability to create privileged containers by API.
 
-```shell
+```sh
 #At the root of Kubernetes source code
 $ vi cluster/saltbase/pillar/privilege.sls
 
@@ -47,7 +53,9 @@ Define the pod:
 Now the pod serves `index.html` from the NFS server:
 
     $ curl http://<the container IP address>/
-    Hello World!
+    Hello World!<!-- TAG IS_VERSIONED -->
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

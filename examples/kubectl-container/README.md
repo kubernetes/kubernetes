@@ -1,3 +1,7 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 This directory contains a Dockerfile and Makefile for packaging up kubectl into
 a container.
 
@@ -15,7 +19,9 @@ this configuration.
 
 A possible reason why you would want to do this is to use ```kubectl proxy``` as
 a drop-in replacement for the old no-auth KUBERNETES_RO service. The other
-containers in your pod will find the proxy apparently serving on localhost.
+containers in your pod will find the proxy apparently serving on localhost.<!-- TAG IS_VERSIONED -->
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/kubectl-container/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

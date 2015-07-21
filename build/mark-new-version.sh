@@ -92,12 +92,25 @@ fi
 echo "+++ Versioning documentation and examples"
 
 # Update the docs to match this version.
-DOCS_TO_EDIT=(docs/README.md examples/README.md)
-for DOC in "${DOCS_TO_EDIT[@]}"; do
+HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes"
+md_dirs=(docs examples)
+md_files=()
+for dir in "${md_dirs[@]}"; do
+  mdfiles+=($( find "${dir}" -name "*.md" -type f ))
+done
+for doc in "${mdfiles[@]}"; do
   $SED -ri \
       -e '/<!-- BEGIN STRIP_FOR_RELEASE -->/,/<!-- END STRIP_FOR_RELEASE -->/d' \
       -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" \
-      "${DOC}"
+      "${doc}"
+
+  # Replace /HEAD in html preview links with /NEW_VERSION.
+  $SED -ri -e "s|(${HTML_PREVIEW_PREFIX}/HEAD)|${HTML_PREVIEW_PREFIX}/${NEW_VERSION}|" "${doc}"
+
+  is_versioned_tag='<!-- TAG IS_VERSIONED -->'
+  if ! grep -q "${is_versioned_tag}" "${doc}"; then
+    echo "${is_versioned_tag}" >> "${doc}"
+  fi
 done
 
 # Update API descriptions to match this version.

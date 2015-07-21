@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ### explorer
 
 Explorer is a little container for examining the runtime environment kubernetes produces for your pods.
@@ -12,8 +17,9 @@ Currently, you can look at:
 `pod.json` is supplied as an example. You can control the port it serves on with the -port flag.
 
 Example from command line (the DNS lookup looks better from a web browser):
-```
-$ kubectl create -f pod.json
+
+```console
+$ kubectl create -f examples/explorer/pod.json
 $ kubectl proxy &
 Starting to serve on localhost:8001
 
@@ -124,7 +130,9 @@ Error: &lt;*&gt;lookup elasticsearch-logging: no such host
 </nil></nil></nil></nil></nil></nil></pre>
 
 </body></html>
-```
+```<!-- TAG IS_VERSIONED -->
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/explorer/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

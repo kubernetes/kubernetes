@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # How to get faster PR reviews
 
 Most of what is written here is not at all specific to Kubernetes, but it bears
@@ -173,8 +178,9 @@ explanation.
 Obviously, none of these points are hard rules.  There is no document that can
 take the place of common sense and good taste.  Use your best judgment, but put
 a bit of thought into how your work can be made easier to review.  If you do
-these things your PRs will flow much more easily.
+these things your PRs will flow much more easily.<!-- TAG IS_VERSIONED -->
 
 
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/faster_reviews.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

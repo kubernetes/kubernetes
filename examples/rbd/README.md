@@ -1,4 +1,10 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # How to Use it?
+
 Install Ceph on the Kubernetes host. For example, on Fedora 21
 
     # yum -y install ceph
@@ -43,6 +49,9 @@ On the Kubernetes host, I got these in mount output
 	/dev/rbd0 on /var/lib/kubelet/pods/ec2166b4-de07-11e4-aaf5-d4bed9b39058/volumes/kubernetes.io~rbd/rbdpd type ext4 (ro,relatime,stripe=4096,data=ordered)
 ```
 
- If you ssh to that machine, you can run `docker ps` to see the actual pod and `docker inspect` to see the volumes used by the container.
+ If you ssh to that machine, you can run `docker ps` to see the actual pod and `docker inspect` to see the volumes used by the container.<!-- TAG IS_VERSIONED -->
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/rbd/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -142,7 +142,7 @@ function install_components {
 
             ### precaution to make sure etcd is writable, flush iptables.
              iptables -F
-        ### minions: these will each run their own api server.
+        ### nodes: these will each run their own api server.
     else
         ### Make sure etcd running, flannel needs it.
         test_etcd

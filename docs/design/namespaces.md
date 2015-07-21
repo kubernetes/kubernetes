@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Namespaces
 
 ## Abstract
@@ -41,7 +46,7 @@ The Namespace provides a unique scope for:
 
 A *Namespace* defines a logically named group for multiple *Kind*s of resources.
 
-```
+```go
 type Namespace struct {
   TypeMeta   `json:",inline"`
   ObjectMeta `json:"metadata,omitempty"`
@@ -72,7 +77,7 @@ distinguish distinct entities, and reference particular entities across operatio
 
 A *Namespace* provides an authorization scope for accessing content associated with the *Namespace*.
 
-See [Authorization plugins](../authorization.md)
+See [Authorization plugins](../admin/authorization.md)
 
 ### Limit Resource Consumption
 
@@ -92,7 +97,7 @@ See [Admission control: Resource Quota](admission_control_resource_quota.md)
 
 Upon creation of a *Namespace*, the creator may provide a list of *Finalizer* objects.
 
-```
+```go
 type FinalizerName string
 
 // These are internal finalizers to Kubernetes, must be qualified name unless defined here
@@ -121,7 +126,7 @@ set by default.
 
 A *Namespace* may exist in the following phases.
 
-```
+```go
 type NamespacePhase string
 const(
   NamespaceActive NamespacePhase = "Active"
@@ -229,7 +234,7 @@ to take part in Namespace termination.
 
 OpenShift creates a Namespace in Kubernetes
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -254,7 +259,7 @@ own storage associated with the "development" namespace unknown to Kubernetes.
 
 User deletes the Namespace in Kubernetes, and Namespace now has following state:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -279,7 +284,7 @@ and begins to terminate all of the content in the namespace that it knows about.
 success, it executes a *finalize* action that modifies the *Namespace* by
 removing *kubernetes* from the list of finalizers:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -307,7 +312,7 @@ from the list of finalizers.
 
 This results in the following state:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -332,6 +337,9 @@ has a deletion timestamp and that its list of finalizers is empty.  As a result,
 content associated from that namespace has been purged.  It performs a final DELETE action 
 to remove that Namespace from the storage.
 
-At this point, all content associated with that Namespace, and the Namespace itself are gone.
+At this point, all content associated with that Namespace, and the Namespace itself are gone.<!-- TAG IS_VERSIONED -->
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/namespaces.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

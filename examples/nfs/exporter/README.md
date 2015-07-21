@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # NFS-exporter container
 
 Inspired by https://github.com/cpuguy83/docker-nfs-server. Rewritten for
@@ -7,7 +12,9 @@ Serves NFS4 exports, defined on command line. At least one export must be define
 
 Usage::
 
-    docker run -d --name nfs --privileged jsafrane/nfsexporter /path/to/share /path/to/share2 ...
+    docker run -d --name nfs --privileged jsafrane/nfsexporter /path/to/share /path/to/share2 ...<!-- TAG IS_VERSIONED -->
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/exporter/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

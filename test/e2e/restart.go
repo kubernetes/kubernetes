@@ -64,7 +64,7 @@ var _ = Describe("Restart", func() {
 		SkipUnlessProviderIs("gce", "gke")
 		skipped = false
 
-		ps = newPodStore(c, api.NamespaceDefault, labels.Everything(), fields.Everything())
+		ps = newPodStore(c, api.NamespaceSystem, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
@@ -89,7 +89,7 @@ var _ = Describe("Restart", func() {
 		for i, p := range pods {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
-		ns := api.NamespaceDefault
+		ns := api.NamespaceSystem
 		if !checkPodsRunningReady(c, ns, podNamesBefore, podReadyBeforeTimeout) {
 			Failf("At least one pod wasn't running and ready at test start.")
 		}

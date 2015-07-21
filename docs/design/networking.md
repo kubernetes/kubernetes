@@ -1,6 +1,12 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Networking
 
 There are 4 distinct networking problems to solve:
+
 1. Highly-coupled container-to-container communications
 2. Pod-to-Pod communications
 3. Pod-to-Service communications
@@ -97,7 +103,7 @@ differentiate it from `docker0`) is set up outside of Docker proper.
 
 Example of GCE's advanced routing rules:
 
-```
+```sh
 gcloud compute routes add "${MINION_NAMES[$i]}" \
   --project "${PROJECT}" \
   --destination-range "${MINION_IP_RANGES[$i]}" \
@@ -114,7 +120,7 @@ a pod tries to egress beyond GCE's project the packets must be SNAT'ed
 
 With the primary aim of providing IP-per-pod-model, other implementations exist
 to serve the purpose outside of GCE.
-  - [OpenVSwitch with GRE/VxLAN](../ovs-networking.md)
+  - [OpenVSwitch with GRE/VxLAN](../admin/ovs-networking.md)
   - [Flannel](https://github.com/coreos/flannel#flannel)
   - [L2 networks](http://blog.oddbit.com/2014/08/11/four-ways-to-connect-a-docker/)
     ("With Linux Bridge devices" section)
@@ -125,9 +131,9 @@ to serve the purpose outside of GCE.
 
 ## Pod to service
 
-The [service](../services.md) abstraction provides a way to group pods under a
+The [service](../user-guide/services.md) abstraction provides a way to group pods under a
 common access policy (e.g. load-balanced).  The implementation of this creates a
-virtual IP which clients can access and which is transparantly proxied to the
+virtual IP which clients can access and which is transparently proxied to the
 pods in a Service.  Each node runs a kube-proxy process which programs
 `iptables` rules to trap access to service IPs and redirect them to the correct
 backends.  This provides a highly-available load-balancing solution with low
@@ -172,7 +178,9 @@ External IP assignment would also simplify DNS support (see below).
 
 ### IPv6
 
-IPv6 would be a nice option, also, but we can't depend on it yet. Docker support is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974), [Docker issue #6923](https://github.com/dotcloud/docker/issues/6923), [Docker issue #6975](https://github.com/dotcloud/docker/issues/6975). Additionally, direct ipv6 assignment to instances doesn't appear to be supported by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull requests from people running Kubernetes on bare metal, though. :-)
+IPv6 would be a nice option, also, but we can't depend on it yet. Docker support is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974), [Docker issue #6923](https://github.com/dotcloud/docker/issues/6923), [Docker issue #6975](https://github.com/dotcloud/docker/issues/6975). Additionally, direct ipv6 assignment to instances doesn't appear to be supported by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull requests from people running Kubernetes on bare metal, though. :-)<!-- TAG IS_VERSIONED -->
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/networking.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

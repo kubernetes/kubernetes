@@ -6,7 +6,7 @@ The exec healthz server is a sidecar container meant to serve as a liveness-exec
 
 ### Run the healthz server directly on localhost:
 
-```shell
+```sh
 $ make server
 $ ./exechealthz -cmd "ls /tmp/test"
 $ curl http://localhost:8080/healthz
@@ -20,7 +20,7 @@ ok
 ### Run the healthz server in a docker container:
 
 The [docker daemon](https://docs.docker.com/userguide/) needs to be running on your host.
-```shell
+```sh
 $ make container PREFIX=mycontainer/test
 $ docker run -itP -p 8080:8080 mycontainer/test:0.0 -cmd "ls /tmp/test"
 $ curl http://localhost:8080/healthz
@@ -67,7 +67,7 @@ Create a pod.json that looks like:
 ```
 
 And run the pod on your cluster using kubectl:
-```shell
+```sh
 $ kubectl create -f pod.json
 pods/simple
 $ kubectl get pods -o wide
@@ -76,7 +76,7 @@ simple   0/1       Pending   0          3s   node
 ```
 
 SSH into the node (note that the recommended way to access a server in a container is through a [service](../../docs/services.md), the example that follows is just to illustrate how the kubelet performs an http liveness probe):
-```shell
+```sh
 node$ kubectl get pods simple -o json | grep podIP
 "podIP": "10.1.0.2",
 

@@ -1,3 +1,7 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Getting started with Juju
 -------------------------
 
@@ -58,6 +62,8 @@ interface.
 
 ## Launch Kubernetes cluster
 
+Kubernetes releases can be downloaded from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
+
 You will need to have the Kubernetes tools compiled before launching the cluster
 
     make all WHAT=cmd/kubectl
@@ -69,7 +75,7 @@ the required predependencies to get started with Juju, additionally it will
 launch a curses based configuration utility allowing you to select your cloud
 provider and enter the proper access credentials.
 
-Next it will deploy the kubernetes master, etcd, 2 minions with flannel based
+Next it will deploy the Kubernetes master, etcd, 2 nodes with flannel based
 Software Defined Networking.
 
 
@@ -95,7 +101,7 @@ You can use `juju ssh` to access any of the units:
 
 ## Run some containers!
 
-`kubectl` is available on the kubernetes master node.  We'll ssh in to
+`kubectl` is available on the Kubernetes master node.  We'll ssh in to
 launch some containers, but one could use kubectl locally setting
 KUBERNETES_MASTER to point at the ip of `kubernetes-master/0`.
 
@@ -109,7 +115,7 @@ No pods will be available before starting a container:
 
 We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
 
-```
+```json
 {
   "apiVersion": "v1",
   "kind": "Pod",
@@ -143,7 +149,7 @@ Get info on the pod:
     kubectl get pods
 
 
-To test the hello app, we need to locate which minion is hosting
+To test the hello app, we need to locate which node is hosting
 the container. Better tooling for using juju to introspect container
 is in the works but we can use `juju run` and `juju status` to find
 our hello app.
@@ -172,7 +178,7 @@ Finally delete the pod:
 
 ## Scale out cluster
 
-We can add minion units like so:
+We can add node units like so:
 
     juju add-unit docker # creates unit docker/2, kubernetes/2, docker-flannel/2
 
@@ -183,7 +189,7 @@ The [k8petstore example](../../examples/k8petstore/) is available as a
 
     juju action do kubernetes-master/0
 
-Note: this example includes curl statements to exercise the app, which automatically generates "petstore" transactions written to redis, and allows you to visualize the throughput in your browswer.
+Note: this example includes curl statements to exercise the app, which automatically generates "petstore" transactions written to redis, and allows you to visualize the throughput in your browser.
 
 ## Tear down cluster
 
@@ -199,7 +205,7 @@ Kubernetes Bundle on Github
 
  - [Bundle Repository](https://github.com/whitmo/bundle-kubernetes)
    * [Kubernetes master charm](https://github.com/whitmo/charm-kubernetes-master)
-   * [Kubernetes mininion charm](https://github.com/whitmo/charm-kubernetes)
+   * [Kubernetes node charm](https://github.com/whitmo/charm-kubernetes)
  - [Bundle Documentation](http://whitmo.github.io/bundle-kubernetes)
  - [More about Juju](https://juju.ubuntu.com)
 
@@ -230,7 +236,9 @@ Joyent            | [Pass](http://reports.vapour.ws/charm-test-details/charm-bun
 Azure             | TBD
 Digital Ocean     | TBD
 MAAS (bare metal) | TBD
-GCE               | TBD
+GCE               | TBD<!-- TAG IS_VERSIONED -->
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/juju.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

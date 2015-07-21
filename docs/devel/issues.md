@@ -1,3 +1,7 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 GitHub Issues for the Kubernetes Project
 ========================================
 
@@ -16,7 +20,9 @@ Definitions
 * P3 - default priority for lower importance bugs that we still want to track and plan to fix at some point
 * design - priority/design is for issues that are used to track design discussions
 * support - priority/support is used for issues tracking user support requests
-* untriaged - anything without a priority/X label will be considered untriaged
+* untriaged - anything without a priority/X label will be considered untriaged<!-- TAG IS_VERSIONED -->
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/issues.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -17,6 +17,8 @@ limitations under the License.
 package controllermanager
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -150,6 +152,20 @@ func (s *CMServer) Run(_ []string) error {
 	}
 	pvRecycler.Run()
 
+	var rootCA []byte
+
+	if s.RootCAFile != "" {
+		rootCA, err = ioutil.ReadFile(s.RootCAFile)
+		if err != nil {
+			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
+		}
+		if _, err := util.CertsFromPEM(rootCA); err != nil {
+			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
+		}
+	} else {
+		rootCA = kubeconfig.CAData
+	}
+
 	if len(s.ServiceAccountKeyFile) > 0 {
 		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
 		if err != nil {
@@ -159,7 +175,7 @@ func (s *CMServer) Run(_ []string) error {
 				kubeClient,
 				serviceaccount.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
-					RootCA:         kubeconfig.CAData,
+					RootCA:         rootCA,
 				},
 			).Run()
 		}
