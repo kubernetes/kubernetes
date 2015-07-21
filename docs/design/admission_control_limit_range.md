@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Admission control plugin: LimitRanger
 
 ## Background
@@ -95,7 +100,7 @@ The server is updated to be aware of **LimitRange** objects.
 
 The constraints are only enforced if the kube-apiserver is started as follows:
 
-```
+```console
 $ kube-apiserver -admission_control=LimitRanger
 ```
 
@@ -103,13 +108,13 @@ $ kube-apiserver -admission_control=LimitRanger
 
 kubectl is modified to support the **LimitRange** resource.
 
-```kubectl describe``` provides a human-readable output of limits.
+`kubectl describe` provides a human-readable output of limits.
 
 For example,
 
-```shell
+```console
 $ kubectl namespace myspace
-$ kubectl create -f examples/limitrange/limit-range.json
+$ kubectl create -f docs/user-guide/limitrange/limits.yaml
 $ kubectl get limits
 NAME
 limits
@@ -131,5 +136,14 @@ It is expected we will want to define limits for particular pods or containers b
 
 To make a **LimitRangeItem** more restrictive, we will intend to add these additional restrictions at a future point in time.
 
+## Example
 
+See the [example of Limit Range](../user-guide/limitrange/) for more information.
+
+
+<!-- TAG IS_VERSIONED -->
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

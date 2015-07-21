@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Identifiers and Names in Kubernetes
 
 A summarization of the goals and recommendations for identifiers in Kubernetes.  Described in [GitHub issue #199](https://github.com/GoogleCloudPlatform/kubernetes/issues/199).
@@ -92,4 +97,9 @@ objectives.
       1. This may correspond to Docker's container ID.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/identifiers.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

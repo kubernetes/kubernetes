@@ -1,12 +1,16 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 Getting started on [CloudStack](http://cloudstack.apache.org)
 ------------------------------------------------------------
 
 **Table of Contents**
 
-    - [Introduction](#introduction)
-    - [Prerequisites](#prerequisites)
-    - [Clone the playbook](#clone-the-playbook)
-    - [Create a Kubernetes cluster](#create-a-kubernetes-cluster)
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Clone the playbook](#clone-the-playbook)
+- [Create a Kubernetes cluster](#create-a-kubernetes-cluster)
 
 ### Introduction
 
@@ -20,13 +24,13 @@ This is a completely automated, a single playbook deploys Kubernetes based on th
 
 This [Ansible](http://ansibleworks.com) playbook deploys Kubernetes on a CloudStack based Cloud using CoreOS images. The playbook, creates an ssh key pair, creates a security group and associated rules and finally starts coreOS instances configured via cloud-init.
 
-###Prerequisites
+### Prerequisites
 
     $ sudo apt-get install -y python-pip
     $ sudo pip install ansible
     $ sudo pip install cs
 
-[_cs_](http://github.com/exoscale/cs) is a python module for the CloudStack API.
+[_cs_](https://github.com/exoscale/cs) is a python module for the CloudStack API.
 
 Set your CloudStack endpoint, API keys and HTTP method used.
 
@@ -42,14 +46,14 @@ Or create a `~/.cloudstack.ini` file:
 
 We need to use the http POST method to pass the _large_ userdata to the coreOS instances.
 
-###Clone the playbook
+### Clone the playbook
 
     $ git clone --recursive https://github.com/runseb/ansible-kubernetes.git
     $ cd ansible-kubernetes
 
 The [ansible-cloudstack](https://github.com/resmo/ansible-cloudstack) module is setup in this repository as a submodule, hence the `--recursive`.
 
-###Create a Kubernetes cluster
+### Create a Kubernetes cluster
 
 You simply need to run the playbook.
 
@@ -84,11 +88,9 @@ SSH to it using the key that was created and using the _core_ user and you can l
     e9af8293...	<node #2 IP>   role=node
 
 
+<!-- TAG IS_VERSIONED -->
 
 
-
-
-
-
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/cloudstack.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

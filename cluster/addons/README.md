@@ -21,7 +21,7 @@ manifests on the master server. But still, users are discouraged to do it
 on their own - they should rather wait for a new release of
 Kubernetes that will also contain new versions of add-ons.
 
-Each add-on must specify the following label: ````kubernetes.io/cluster-service: true````.
+Each add-on must specify the following label: ```kubernetes.io/cluster-service: true```.
 Yaml files that do not define this label will be ignored.
 
 The naming convention for Replication Controllers is

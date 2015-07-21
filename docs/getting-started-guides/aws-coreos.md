@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Getting started on Amazon EC2 with CoreOS
 
 The example below creates an elastic Kubernetes cluster with a custom number of worker nodes and a master.
@@ -10,13 +15,13 @@ no security tokens, no basic auth). For demonstration purposes only.
 * Cluster bootstrapping using [cloud-config](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/)
 * Cross container networking with [flannel](https://github.com/coreos/flannel#flannel)
 * Auto worker registration with [kube-register](https://github.com/kelseyhightower/kube-register#kube-register)
-* Kubernetes v0.17.0 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.17.0)
+* Kubernetes v0.19.3 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.19.3)
 
 ## Prerequisites
 
 * [aws CLI](http://aws.amazon.com/cli)
 * [CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/)
-* [kubectl CLI](aws/kubectl.md)
+* [kubectl CLI](aws/kubectl.md) ([installation](aws.md#command-line-administration-tool-kubectl))
 
 ## Starting a Cluster
 
@@ -84,7 +89,7 @@ Gather the public and private IPs for the master node:
 aws ec2 describe-instances --instance-id <instance-id>
 ```
 
-```
+```json
 {
     "Reservations": [
         {
@@ -98,7 +103,6 @@ aws ec2 describe-instances --instance-id <instance-id>
                     }, 
                     "PublicIpAddress": "54.68.97.117", 
                     "PrivateIpAddress": "172.31.9.9", 
-...
 ```
 
 #### Update the node.yaml cloud-config
@@ -172,7 +176,7 @@ Create a pod manifest: `pod.json`
 ### Create the pod using the kubectl command line tool
 
 ```bash
-kubectl create -f pod.json
+kubectl create -f ./pod.json
 ```
 
 ### Testing
@@ -189,7 +193,7 @@ Gather the public IP address for the worker node.
 aws ec2 describe-instances --filters 'Name=private-ip-address,Values=<host>'
 ```
 
-```
+```json
 {
     "Reservations": [
         {
@@ -202,7 +206,6 @@ aws ec2 describe-instances --filters 'Name=private-ip-address,Values=<host>'
                         "Name": "running"
                     }, 
                     "PublicIpAddress": "54.68.97.117", 
-...
 ```
 
 Visit the public IP address in your browser to view the running pod.
@@ -214,4 +217,9 @@ kubectl delete pods hello
 ```
 
 
+<!-- TAG IS_VERSIONED -->
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws-coreos.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

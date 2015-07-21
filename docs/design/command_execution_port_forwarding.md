@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Container Command Execution & Port Forwarding in Kubernetes
 
 ## Abstract
@@ -55,12 +60,14 @@ won't be able to work with this mechanism, unless adapters can be written.
 ## Process Flow
 
 ### Remote Command Execution Flow
+
 1. The client connects to the Kubernetes Master to initiate a remote command execution
 request
 2. The Master proxies the request to the Kubelet where the container lives
 3. The Kubelet executes nsenter + the requested command and streams stdin/stdout/stderr back and forth between the client and the container
 
 ### Port Forwarding Flow
+
 1. The client connects to the Kubernetes Master to initiate a remote command execution
 request
 2. The Master proxies the request to the Kubelet where the container lives
@@ -143,4 +150,10 @@ access.
 
 Additional work is required to ensure that multiple command execution or port forwarding connections from different clients are not able to see each other's data. This can most likely be achieved via SELinux labeling and unique process contexts.
 
+
+<!-- TAG IS_VERSIONED -->
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/command_execution_port_forwarding.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

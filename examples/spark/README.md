@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Spark example
 
 Following this example, you will create a functional [Apache
@@ -19,32 +24,32 @@ The Docker images are heavily based on https://github.com/mattf/docker-spark
 This example assumes you have a Kubernetes cluster installed and
 running, and that you have installed the ```kubectl``` command line
 tool somewhere in your path. Please see the [getting
-started](../../docs/getting-started-guides) for installation
+started](../../docs/getting-started-guides/) for installation
 instructions for your platform.
 
 ## Step One: Start your Master service
 
-The Master [service](../../docs/services.md) is the master (or head) service for a Spark
+The Master [service](../../docs/user-guide/services.md) is the master (or head) service for a Spark
 cluster.
 
-Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/pods.md) running
+Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a [pod](../../docs/user-guide/pods.md) running
 the Master service.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-master.json
 ```
 
-Then, use the [`examples/spark/spark-master-service.json`](spar-master-service.json) file to
+Then, use the [`examples/spark/spark-master-service.json`](spark-master-service.json) file to
 create a logical service endpoint that Spark workers can use to access
 the Master pod.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-master-service.json
 ```
 
 ### Check to see if Master is running and accessible
 
-```shell
+```sh
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 [...]
@@ -54,7 +59,7 @@ spark-master                                   1/1       Running   0          25
 
 Check logs to see the status of the master.
 
-```shell
+```sh
 $ kubectl logs spark-master
 
 starting org.apache.spark.deploy.master.Master, logging to /opt/spark-1.4.0-bin-hadoop2.6/sbin/../logs/spark--org.apache.spark.deploy.master.Master-1-spark-master.out
@@ -87,15 +92,15 @@ program.
 The Spark workers need the Master service to be running.
 
 Use the [`examples/spark/spark-worker-controller.json`](spark-worker-controller.json) file to create a
-[replication controller](../../docs/replication-controller.md) that manages the worker pods.
+[replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
 
-```shell
+```sh
 $ kubectl create -f examples/spark/spark-worker-controller.json
 ```
 
 ### Check to see if the workers are running
 
-```shell
+```sh
 $ kubectl get pods
 NAME                                            READY     STATUS    RESTARTS   AGE
 [...]
@@ -110,11 +115,12 @@ $ kubectl logs spark-master
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.1.15:44839 with 1 cores, 2.6 GB RAM
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.0.19:60970 with 1 cores, 2.6 GB RAM
 ```
+
 ## Step Three: Do something with the cluster
 
 Get the address and port of the Master service.
 
-```shell
+```sh
 $ kubectl get service spark-master
 NAME           LABELS              SELECTOR            IP(S)          PORT(S)
 spark-master   name=spark-master   name=spark-master   10.0.204.187   7077/TCP
@@ -164,6 +170,7 @@ SparkContext available as sc, HiveContext available as sqlContext.
 >>> sc.parallelize(range(1000)).map(lambda x:socket.gethostname()).distinct().collect()
 ['spark-worker-controller-u40r2', 'spark-worker-controller-hifwi', 'spark-worker-controller-vpgyg']
 ```
+
 ## Result
 
 You now have services, replication controllers, and pods for the Spark master and Spark workers.
@@ -181,4 +188,10 @@ Make sure the Master Pod is running (use: ```kubectl get pods```).
 
 ```kubectl create -f spark-worker-controller.json```
 
+
+<!-- TAG IS_VERSIONED -->
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

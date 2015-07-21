@@ -1,9 +1,16 @@
-#Kubernetes Cluster Federation   
-##(a.k.a. "Ubernetes")
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
+# Kubernetes Cluster Federation   
+
+## (a.k.a. "Ubernetes")
 
 ## Requirements Analysis and Product Proposal
 
 ## _by Quinton Hoole ([quinton@google.com](mailto:quinton@google.com))_  
+
 _Initial revision: 2015-03-05_  
 _Last updated: 2015-03-09_  
 This doc: [tinyurl.com/ubernetesv2](http://tinyurl.com/ubernetesv2)  
@@ -319,7 +326,7 @@ time.
 
 This is closely related to location affinity above, and also discussed
 there.  The basic idea is that some controller, logically outside of
-the basic kubernetes control plane of the clusters in question, needs
+the basic Kubernetes control plane of the clusters in question, needs
 to be able to:
 
 1. Receive "global" resource creation requests.
@@ -385,7 +392,7 @@ TBD: All very hand-wavey still, but some initial thoughts to get the conversatio
 
 ![image](federation-high-level-arch.png)
 
-##  Ubernetes API
+## Ubernetes API
 
 This looks a lot like the existing Kubernetes API but is explicitly multi-cluster.  
 
@@ -431,4 +438,9 @@ their primary zookeeper replica? And now how do I do a shared, highly
 available redis database?
 
 
+<!-- TAG IS_VERSIONED -->
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/federation.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

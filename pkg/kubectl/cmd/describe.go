@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
@@ -40,7 +40,12 @@ given resource or group of resources.
 $ kubectl describe RESOURCE NAME_PREFIX
 
 will first check for an exact match on RESOURCE and NAME_PREFIX. If no such resource
-exists, it will output details for every resource that has a name prefixed with NAME_PREFIX`
+exists, it will output details for every resource that has a name prefixed with NAME_PREFIX
+
+Possible resources include pods (po), replicationcontrollers (rc), services
+(svc), nodes (no), events (ev), componentstatuses (cs), limitRanges (limits),
+persistentVolumes (pv), persistentVolumeClaims (pvc), resourceQuotas (quota)
+or secrets.`
 	describe_example = `// Describe a node
 $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
@@ -78,6 +83,11 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return err
 	}
 
+	if len(args) == 0 {
+		fmt.Fprint(out, "You must specify the type of resource to describe. ", valid_resources)
+		return cmdutil.UsageError(cmd, "Required resource not specified.")
+	}
+
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
@@ -101,7 +111,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	}
 	infos, err := r.Infos()
 	if err != nil {
-		if errors.IsNotFound(err) && len(args) == 2 {
+		if apierrors.IsNotFound(err) && len(args) == 2 {
 			return DescribeMatchingResources(mapper, typer, describer, f, cmdNamespace, args[0], args[1], out)
 		}
 		return err

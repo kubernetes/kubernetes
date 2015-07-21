@@ -1,3 +1,8 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # On Collaborative Development
 
 Kubernetes is open source, but many of the people working on it do so as their day job.  In order to avoid forcing people to be "at work" effectively 24/7, we want to establish some semi-formal protocols around development.  Hopefully these rules make things go more smoothly.  If you find that this is not the case, please complain loudly.
@@ -40,4 +45,9 @@ PRs that are incorrectly judged to be merge-able, may be reverted and subject to
 Any maintainer or core contributor who wants to review a PR but does not have time immediately may put a hold on a PR simply by saying so on the PR discussion and offering an ETA measured in single-digit days at most.  Any PR that has a hold shall not be merged until the person who requested the hold acks the review, withdraws their hold, or is overruled by a preponderance of maintainers.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/collab.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
