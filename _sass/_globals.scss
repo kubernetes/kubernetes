@@ -68,8 +68,9 @@ $turquoise: map-get($colors,"turquoise");
 $white    : map-get($colors,"white");
 
 // Fonts
-$fontsMuli      : 'Muli', sans-serif;
-$fontsMontserrat: 'Montserrat', sans-serif;
+$fontsMontserrat: 'Roboto', sans-serif;
+$fontsRoboto: 'Roboto', sans-serif;
+$fontsMuli: 'Roboto', sans-serif;
 
 // Mixins
 

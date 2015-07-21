@@ -1,7 +1,9 @@
 .bodywrapper {
     overflow: auto;
 }
+
 div #doccontent {
+    font-family: "Roboto";
     padding-left: 30px;
     margin-right: 30px;
     height: 94vh;
@@ -10,7 +12,6 @@ div #doccontent {
 
     h1 {
         font-size: 45px;
-        font-family: $fontsMontserrat;
         font-weight: 700;
         line-height: normal;
         letter-spacing: 0em;
@@ -20,7 +21,6 @@ div #doccontent {
 
     h2 {
         font-size: 35px;
-        font-family: $fontsMontserrat;
         font-weight: 700;
         line-height: normal;
         letter-spacing: 0em;
@@ -30,7 +30,6 @@ div #doccontent {
 
     h3 {
         font-size: 28px;
-        font-family: $fontsMontserrat;
         font-weight: 700;
         text-align: left;
         line-height: 40px;
@@ -39,7 +38,6 @@ div #doccontent {
 
     h4 {
         font-size: 24px;
-        font-family: $fontsMuli;
         text-align: left;
         line-height: 32px;
         letter-spacing: 0em;
@@ -52,7 +50,6 @@ div #doccontent {
 
     li {
         color: $gray;
-        font-family: $fontsMuli;
         font-size: 16px;
         line-height: 25px;
         letter-spacing: 0em;
@@ -60,7 +57,6 @@ div #doccontent {
 
     table {
         color: $gray;
-        font-family: $fontsMuli;
         font-size: 16px;
         line-height: 25px;
         letter-spacing: 0em;
