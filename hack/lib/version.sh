@@ -99,25 +99,57 @@ kube::version::load_version_vars() {
   source "${version_file}"
 }
 
+# Create -X keyDELvalue string, where DEL is delimiter of key and value
+# to provide -X option for both golang <= 1.5 and higher.
+# Implicit delimiter is " " (space)
+kube::version::ldflags::new_pair() {
+  local key=${1-}
+  local value=${2-}
+  local delimiter=${3-}
+
+  [[ -n ${key} ]] || {
+    return ""
+  }
+
+  [[ -n ${value} ]] || {
+    return ""
+  }
+
+  # Set implicit delimiter if not set
+  if [[ -z "${delimiter}" ]]; then
+    delimiter=" "
+  fi
+
+  echo "-X ${key}${delimiter}${value}"
+}
+
 # Prints the value that needs to be passed to the -ldflags parameter of go build
 # in order to set the Kubernetes based on the git tree status.
 kube::version::ldflags() {
   kube::version::get_version_vars
 
+  GO_VERSION=($(go version))
+
+  if [[ -n $(echo "${GO_VERSION[2]}" | grep -E 'go1.2|go1.3|go1.4') ]]; then
+    DELIM=" "
+  else
+    DELIM="="
+  fi
+
   local -a ldflags=()
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${KUBE_GIT_COMMIT}")
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${KUBE_GIT_TREE_STATE}")
+    ldflags+=($(kube::version::ldflags::new_pair "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${KUBE_GIT_COMMIT}" "${DELIM}"))
+    ldflags+=($(kube::version::ldflags::new_pair "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${KUBE_GIT_TREE_STATE}" "${DELIM}"))
   fi
 
   if [[ -n ${KUBE_GIT_VERSION-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${KUBE_GIT_VERSION}")
+    ldflags+=($(kube::version::ldflags::new_pair "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${KUBE_GIT_VERSION}" "${DELIM}"))
   fi
 
   if [[ -n ${KUBE_GIT_MAJOR-} && -n ${KUBE_GIT_MINOR-} ]]; then
     ldflags+=(
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMajor" "${KUBE_GIT_MAJOR}"
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMinor" "${KUBE_GIT_MINOR}"
+      $(kube::version::ldflags::new_pair "${KUBE_GO_PACKAGE}/pkg/version.gitMajor" "${KUBE_GIT_MAJOR}" "${DELIM}")
+      $(kube::version::ldflags::new_pair "${KUBE_GO_PACKAGE}/pkg/version.gitMinor" "${KUBE_GIT_MINOR}" "${DELIM}")
     )
   fi
 
