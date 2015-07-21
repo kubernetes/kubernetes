@@ -85,7 +85,8 @@ Step 2: Apply a limit to the namespace
 Let's create a simple limit in our namespace.
 
 ```console
-$ kubectl create -f docs/user-guide/limitrange/limits.yaml --namespace=limit-example
+$ kubectl create -f docs/user-guide/limitrange/limits.yaml \
+--namespace=limit-example
 limitranges/mylimits
 ```
 
@@ -131,7 +132,8 @@ $ kubectl get pods --namespace=limit-example
 POD           IP           CONTAINER(S)   IMAGE(S)   HOST          LABELS      STATUS    CREATED          MESSAGE
 nginx-ykj4j   10.246.1.3                             10.245.1.3/   run=nginx   Running   About a minute
                            nginx          nginx                                Running   54 seconds
-$ kubectl get pods nginx-ykj4j --namespace=limit-example -o yaml | grep resources -C 5
+$ kubectl get pods nginx-ykj4j --namespace=limit-example -o yaml \
+| grep resources -C 5
 ```
 
 ```yaml
@@ -153,16 +155,19 @@ Note that our nginx container has picked up the namespace default cpu and memory
 Let's create a pod that exceeds our allowed limits by having it have a container that requests 3 cpu cores.
 
 ```console
-$ kubectl create -f docs/user-guide/limitrange/invalid-pod.yaml --namespace=limit-example
+$ kubectl create -f docs/user-guide/limitrange/invalid-pod.yaml \
+--namespace=limit-example
 Error from server: Pod "invalid-pod" is forbidden: Maximum CPU usage per pod is 2, but requested 3
 ```
 
 Let's create a pod that falls within the allowed limit boundaries.
 
 ```console
-$ kubectl create -f docs/user-guide/limitrange/valid-pod.yaml --namespace=limit-example
+$ kubectl create -f docs/user-guide/limitrange/valid-pod.yaml \
+--namespace=limit-example
 pods/valid-pod
-$ kubectl get pods valid-pod --namespace=limit-example -o yaml | grep -C 5 resources
+$ kubectl get pods valid-pod --namespace=limit-example -o yaml \
+| grep -C 5 resources
 ```
 
 ```yaml

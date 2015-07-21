@@ -128,7 +128,8 @@ See [kubectl/kubectl_config.md](kubectl/kubectl_config.md) for help.
 ```console
 $ kubectl config set-credentials myself --username=admin --password=secret
 $ kubectl config set-cluster local-server --server=http://localhost:8080
-$ kubectl config set-context default-context --cluster=local-server --user=myself
+$ kubectl config set-context default-context --cluster=local-server \
+--user=myself
 $ kubectl config use-context default-context
 $ kubectl config set contexts.default-context.namespace the-right-prefix
 $ kubectl config view
@@ -181,13 +182,20 @@ users:
 
 ```console
 $ kubectl config set preferences.colors true
-$ kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1
-$ kubectl config set-cluster horse-cluster --server=https://horse.org:4443 --certificate-authority=path/to/my/cafile
-$ kubectl config set-cluster pig-cluster --server=https://pig.org:443 --insecure-skip-tls-verify=true
+$ kubectl config set-cluster cow-cluster --server=http://cow.org:8080 \
+--api-version=v1
+$ kubectl config set-cluster horse-cluster --server=https://horse.org:4443 \
+--certificate-authority=path/to/my/cafile
+$ kubectl config set-cluster pig-cluster --server=https://pig.org:443 \
+--insecure-skip-tls-verify=true
 $ kubectl config set-credentials blue-user --token=blue-token
-$ kubectl config set-credentials green-user --client-certificate=path/to/my/client/cert --client-key=path/to/my/client/key
-$ kubectl config set-context queen-anne-context --cluster=pig-cluster --user=black-user --namespace=saw-ns
-$ kubectl config set-context federal-context --cluster=horse-cluster --user=green-user --namespace=chisel-ns
+$ kubectl config set-credentials green-user \
+--client-certificate=path/to/my/client/cert \
+--client-key=path/to/my/client/key
+$ kubectl config set-context queen-anne-context --cluster=pig-cluster \
+--user=black-user --namespace=saw-ns
+$ kubectl config set-context federal-context --cluster=horse-cluster \
+--user=green-user --namespace=chisel-ns
 $ kubectl config use-context federal-context
 ```
 

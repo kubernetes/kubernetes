@@ -159,8 +159,10 @@ users:
 The next step is to define a context for the kubectl client to work in each namespace. The value of "cluster" and "user" fields are copied from the current context.
 
 ```console
-$ kubectl config set-context dev --namespace=development --cluster=lithe-cocoa-92103_kubernetes --user=lithe-cocoa-92103_kubernetes
-$ kubectl config set-context prod --namespace=production --cluster=lithe-cocoa-92103_kubernetes --user=lithe-cocoa-92103_kubernetes
+$ kubectl config set-context dev --namespace=development \
+--cluster=lithe-cocoa-92103_kubernetes --user=lithe-cocoa-92103_kubernetes
+$ kubectl config set-context prod --namespace=production \
+--cluster=lithe-cocoa-92103_kubernetes --user=lithe-cocoa-92103_kubernetes
 ```
 
 The above commands provided two request contexts you can alternate against depending on what namespace you

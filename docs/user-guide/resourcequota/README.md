@@ -63,7 +63,8 @@ and API resources (pods, services, etc.) that a namespace may consume.
 Let's create a simple quota in our namespace:
 
 ```console
-$ kubectl create -f docs/user-guide/resourcequota/quota.yaml --namespace=quota-example
+$ kubectl create -f docs/user-guide/resourcequota/quota.yaml \
+--namespace=quota-example
 ```
 
 Once your quota is applied to a namespace, the system will restrict any creation of content
@@ -131,7 +132,8 @@ do not specify any memory usage.
 So let's set some default limits for the amount of cpu and memory a pod can consume:
 
 ```console
-$ kubectl create -f docs/user-guide/resourcequota/limits.yaml --namespace=quota-example
+$ kubectl create -f docs/user-guide/resourcequota/limits.yaml \
+--namespace=quota-example
 limitranges/limits
 $ kubectl describe limits limits --namespace=quota-example
 Name:           limits

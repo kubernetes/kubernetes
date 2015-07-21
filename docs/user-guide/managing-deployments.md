@@ -188,7 +188,8 @@ and
 The labels allow us to slice and dice our resources along any dimension specified by a label:
 
 ```console
-$ kubectl create -f ./guestbook-fe.yaml -f ./redis-master.yaml -f ./redis-slave.yaml
+$ kubectl create -f ./guestbook-fe.yaml -f ./redis-master.yaml \
+-f ./redis-slave.yaml
 replicationcontrollers/guestbook-fe
 replicationcontrollers/guestbook-redis-master
 replicationcontrollers/guestbook-redis-slave
@@ -414,7 +415,8 @@ You can also run the [update demo](update-demo/) to see a visual representation 
 Sometimes it’s necessary to make narrow, non-disruptive updates to resources you’ve created. For instance, you might want to add an [annotation](annotations.md) with a description of your object. That’s easiest to do with `kubectl patch`:
 
 ```console
-$ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
+$ kubectl patch rc my-nginx-v4 -p \
+'{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
 my-nginx-v4
 $ kubectl get rc my-nginx-v4 -o yaml
 apiVersion: v1
