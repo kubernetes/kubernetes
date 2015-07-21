@@ -29,7 +29,7 @@ steps:
 
 hostedservices:
   - label: Google Container Engine
-    url: https://cloud.google.com/container-engine/
+    url: https://cloud.google.com/container-engine/docs/
 
 installguides:
   - label: Google Compute Engine
