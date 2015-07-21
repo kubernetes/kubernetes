@@ -24,7 +24,7 @@ steps:
     text: Releases of Kubernetes
     slug: releases
   - title: Technical Details
-    text: "Interested in taking a peek inside Kubernetes? You should start by reading the <a href=\"https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/README.md\" onclick=\"trackOutboundLink('https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/README.md'); return false;\">design overview</a> which introduces core Kubernetes concepts and components. After that, you probably want to take a look at the API documentation and learn about the kubecfg command line tool."
+    text: "Interested in taking a peek inside Kubernetes? You should start by reading the <a href=\"v1.0/docs/design/README.html\" onclick=\"trackOutboundLink('v1.0/docs/design/README.html'); return false;\">design overview</a> which introduces core Kubernetes concepts and components. After that, you probably want to take a look at the API documentation and learn about the kubecfg command line tool."
     slug: techdetails
 
 hostedservices:
@@ -33,31 +33,31 @@ hostedservices:
 
 installguides:
   - label: Google Compute Engine
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/gce.md
+    url: v1.0/docs/getting-started-guides/gce.html
   - label: Vagrant
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/vagrant.md
+    url: v1.0/docs/getting-started-guides/vagrant.html
   - label: Fedora (Ansible)
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/fedora/fedora_ansible_config.md
+    url: v1.0/docs/getting-started-guides/fedora/fedora_ansible_config.html
   - label: Fedora (Manual)
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/fedora/fedora_manual_config.md
+    url: v1.0/docs/getting-started-guides/fedora/fedora_manual_config.html
   - label: Local
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/locally.md
+    url: v1.0/docs/getting-started-guides/locally.html
   - label: Microsoft Azure
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/azure.md
+    url: v1.0/docs/getting-started-guides/azure.html
   - label: Rackspace
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/rackspace.md
+    url: v1.0/docs/getting-started-guides/rackspace.html
   - label: CoreOS
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos.md
+    url: v1.0/docs/getting-started-guides/coreos.html
   - label: vSphere
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/vsphere.md
+    url: v1.0/docs/getting-started-guides/vsphere.html
   - label: Amazon Web Services
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/aws.md
+    url: v1.0/docs/getting-started-guides/aws.html
   - label: Mesos
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/mesos.md
+    url: v1.0/docs/getting-started-guides/mesos.html
 
 firstapp:
     label: Run Now
-    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md
+    url: v1.0/examples/guestbook/README.html
 
 releases:
     label: Releases
@@ -69,5 +69,5 @@ techdetails:
         url: http://kubernetes.io/third_party/swagger-ui/
     kubecfg:
         label: Kubectl Command Tool
-        url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/user-guide/kubectl/kubectl.md
+        url: v1.0/docs/user-guide/kubectl/kubectl.html
 ---
