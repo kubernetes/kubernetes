@@ -1,0 +1,250 @@
+.swagger-section #header a#logo {
+  font-size: 1.5em;
+  font-weight: bold;
+  text-decoration: none;
+  background: transparent url(../images/logo.png) no-repeat left center;
+  padding: 20px 0 20px 40px;
+}
+#text-head {
+  font-size: 80px;
+  font-family: 'Roboto', sans-serif;
+  color: #ffffff;
+  float: right;
+  margin-right: 20%;
+}
+.navbar-fixed-top .navbar-nav {
+  height: auto;
+}
+.navbar-fixed-top .navbar-brand {
+  height: auto;
+}
+.navbar-header {
+  height: auto;
+}
+.navbar-inverse {
+  background-color: #000;
+  border-color: #000;
+}
+#navbar-brand {
+  margin-left: 20%;
+}
+.navtext {
+  font-size: 10px;
+}
+.h1,
+h1 {
+  font-size: 60px;
+}
+.navbar-default .navbar-header .navbar-brand {
+  color: #a2dfee;
+}
+/* tag titles */
+.swagger-section .swagger-ui-wrap ul#resources li.resource div.heading h2 a {
+  color: #393939;
+  font-family: 'Arvo', serif;
+  font-size: 1.5em;
+}
+.swagger-section .swagger-ui-wrap ul#resources li.resource div.heading h2 a:hover {
+  color: black;
+}
+.swagger-section .swagger-ui-wrap ul#resources li.resource div.heading h2 {
+  color: #525252;
+  padding-left: 0px;
+  display: block;
+  clear: none;
+  float: left;
+  font-family: 'Arvo', serif;
+  font-weight: bold;
+}
+.navbar-default .navbar-collapse,
+.navbar-default .navbar-form {
+  border-color: #0A0A0A;
+}
+.container1 {
+  width: 1500px;
+  margin: auto;
+  margin-top: 0;
+  background-image: url('../images/shield.png');
+  background-repeat: no-repeat;
+  background-position: -40px -20px;
+  margin-bottom: 210px;
+}
+.container-inner {
+  width: 1200px;
+  margin: auto;
+  background-color: rgba(223, 227, 228, 0.75);
+  padding-bottom: 40px;
+  padding-top: 40px;
+  border-radius: 15px;
+}
+.header-content {
+  padding: 0;
+  width: 1000px;
+}
+.title1 {
+  font-size: 80px;
+  font-family: 'Vollkorn', serif;
+  color: #404040;
+  text-align: center;
+  padding-top: 40px;
+  padding-bottom: 100px;
+}
+#icon {
+  margin-top: -18px;
+}
+.subtext {
+  font-size: 25px;
+  font-style: italic;
+  color: #08b;
+  text-align: right;
+  padding-right: 250px;
+}
+.bg-primary {
+  background-color: #00468b;
+}
+.navbar-default .nav > li > a,
+.navbar-default .nav > li > a:focus {
+  color: #08b;
+}
+.navbar-default .nav > li > a,
+.navbar-default .nav > li > a:hover {
+  color: #08b;
+}
+.navbar-default .nav > li > a,
+.navbar-default .nav > li > a:focus:hover {
+  color: #08b;
+}
+.text-faded {
+  font-size: 25px;
+  font-family: 'Vollkorn', serif;
+}
+.section-heading {
+  font-family: 'Vollkorn', serif;
+  font-size: 45px;
+  padding-bottom: 10px;
+}
+hr {
+  border-color: #00468b;
+  padding-bottom: 10px;
+}
+.description {
+  margin-top: 20px;
+  padding-bottom: 200px;
+}
+.description li {
+  font-family: 'Vollkorn', serif;
+  font-size: 25px;
+  color: #525252;
+  margin-left: 28%;
+  padding-top: 5px;
+}
+.gap {
+  margin-top: 200px;
+}
+.troubleshootingtext {
+  color: rgba(255, 255, 255, 0.7);
+  padding-left: 30%;
+}
+.troubleshootingtext li {
+  list-style-type: circle;
+  font-size: 25px;
+  padding-bottom: 5px;
+}
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+}
+.block.response_body.json:hover {
+  cursor: pointer;
+}
+.backdrop {
+  color: blue;
+}
+#myModal {
+  height: 100%;
+}
+.modal-backdrop {
+  bottom: 0;
+  position: fixed;
+}
+.curl {
+  padding: 10px;
+  font-family: "Anonymous Pro", "Menlo", "Consolas", "Bitstream Vera Sans Mono", "Courier New", monospace;
+  font-size: 0.9em;
+  max-height: 400px;
+  margin-top: 5px;
+  overflow-y: auto;
+  background-color: #fcf6db;
+  border: 1px solid #e5e0c6;
+  border-radius: 4px;
+}
+.curl_title {
+  font-size: 1.1em;
+  margin: 0;
+  padding: 15px 0 5px;
+  font-family: 'Open Sans', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+  line-height: 1.1;
+}
+.footer {
+  display: none;
+}
+.swagger-section .swagger-ui-wrap h2 {
+  padding: 0;
+}
+h2 {
+  margin: 0;
+  margin-bottom: 5px;
+}
+.markdown p {
+  font-size: 15px;
+  font-family: 'Arvo', serif;
+}
+.swagger-section .swagger-ui-wrap .code {
+  font-size: 15px;
+  font-family: 'Arvo', serif;
+}
+.swagger-section .swagger-ui-wrap b {
+  font-family: 'Arvo', serif;
+}
+#signin:hover {
+  cursor: pointer;
+}
+.dropdown-menu {
+  padding: 15px;
+}
+.navbar-right .dropdown-menu {
+  left: 0;
+  right: auto;
+}
+#signinbutton {
+  width: 100%;
+  height: 32px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #08b;
+}
+.navbar-default .nav > li .details {
+  color: #000000;
+  text-transform: none;
+  font-size: 15px;
+  font-weight: normal;
+  font-family: 'Open Sans', sans-serif;
+  font-style: italic;
+  line-height: 20px;
+  top: -2px;
+}
+.navbar-default .nav > li .details:hover {
+  color: black;
+}
+#signout {
+  width: 100%;
+  height: 32px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #08b;
+}
