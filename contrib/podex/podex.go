@@ -29,13 +29,13 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"crypto/tls"
 	"os"
 	"strconv"
 	"strings"
@@ -250,9 +250,9 @@ type imageMetadata struct {
 func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error) {
 	var scheme string
 	if *flInsecureRegistry {
-    	scheme = "http"
+		scheme = "http"
 	} else {
-    	scheme = "https"
+		scheme = "https"
 	}
 	if *flInsecureSkipVerify {
 
@@ -268,13 +268,13 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 	}
 
 	tr := &http.Transport{
-        TLSClientConfig: &tls.Config{
-        	InsecureSkipVerify: *flInsecureSkipVerify,
-        },
-    }
-    client := &http.Client{
-    	Transport: tr,
-    }
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: *flInsecureSkipVerify,
+		},
+	}
+	client := &http.Client{
+		Transport: tr,
+	}
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s://%s/v1/repositories/%s/%s/images", scheme, host, namespace, repo), nil)
 	if err != nil {
