@@ -17,13 +17,13 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"math/rand"
 	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	utilrand "github.com/GoogleCloudPlatform/kubernetes/pkg/util/rand"
 )
 
 type testGenerator struct {
@@ -372,7 +372,7 @@ func TestTokenCreation(t *testing.T) {
 	for k, tc := range testcases {
 
 		// Re-seed to reset name generation
-		rand.Seed(1)
+		utilrand.Seed(1)
 
 		generator := &testGenerator{Token: "ABC"}
 

@@ -26,8 +26,8 @@ import (
 var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
 var numLetters = len(letters)
 var rng = struct {
+	sync.Mutex
 	rand *rand.Rand
-	lock sync.Mutex
 }{
 	rand: rand.New(rand.NewSource(time.Now().UTC().UnixNano())),
 }
@@ -39,10 +39,18 @@ func String(n int) string {
 		panic("out-of-bounds value")
 	}
 	b := make([]rune, n)
-	rng.lock.Lock()
-	defer rng.lock.Unlock()
+	rng.Lock()
+	defer rng.Unlock()
 	for i := range b {
 		b[i] = letters[rng.rand.Intn(numLetters)]
 	}
 	return string(b)
+}
+
+// Seed seeds the rng with the provided seed.
+func Seed(seed int64) {
+	rng.Lock()
+	defer rng.Unlock()
+
+	rng.rand = rand.New(rand.NewSource(seed))
 }
