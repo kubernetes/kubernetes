@@ -18,8 +18,7 @@ package api
 
 import (
 	"fmt"
-
-	utilrand "github.com/GoogleCloudPlatform/kubernetes/pkg/util/rand"
+	"math/rand"
 )
 
 // NameGenerator generates names for objects. Some backends may have more information
@@ -60,5 +59,16 @@ func (simpleNameGenerator) GenerateName(base string) string {
 	if len(base) > maxGeneratedNameLength {
 		base = base[:maxGeneratedNameLength]
 	}
-	return fmt.Sprintf("%s%s", base, utilrand.String(randomLength))
+	value := randSeq(randomLength)
+	return fmt.Sprintf("%s%s", base, value)
+}
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+
+func randSeq(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
