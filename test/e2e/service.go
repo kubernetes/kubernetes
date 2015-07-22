@@ -457,8 +457,20 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected len(Status.LoadBalancer.Ingresss) for NodePort service: %v", service)
 		}
 		ingress2 := service.Status.LoadBalancer.Ingress[0]
-		// TODO: This is a problem on AWS; we can't just always be changing the LB
-		Expect(ingress1).To(Equal(ingress2))
+
+		// TODO: Fix the issue here: https://github.com/GoogleCloudPlatform/kubernetes/issues/11002
+		if providerIs("aws") {
+			// TODO: Make this less of a hack (or fix the underlying bug)
+			time.Sleep(time.Second * 120)
+			service, err = waitForLoadBalancerIngress(c, serviceName, ns)
+			Expect(err).NotTo(HaveOccurred())
+
+			// We don't want the ingress point to change, but we should verify that the new ingress point still works
+			ingress2 = service.Status.LoadBalancer.Ingress[0]
+			Expect(ingress1).NotTo(Equal(ingress2))
+		} else {
+			Expect(ingress1).To(Equal(ingress2))
+		}
 
 		By("hitting the pod through the service's updated NodePort")
 		testReachable(ip, nodePort2)
