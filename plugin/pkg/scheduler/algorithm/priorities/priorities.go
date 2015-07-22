@@ -212,8 +212,8 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
 	capacityMemory := node.Status.Capacity.Memory().Value()
 
-	cpuFraction := fractionOfCapacity(totalMilliCPU, capacityMilliCPU, node.Name)
-	memoryFraction := fractionOfCapacity(totalMemory, capacityMemory, node.Name)
+	cpuFraction := fractionOfCapacity(totalMilliCPU, capacityMilliCPU)
+	memoryFraction := fractionOfCapacity(totalMemory, capacityMemory)
 	if cpuFraction >= 1 || memoryFraction >= 1 {
 		// if requested >= capacity, the corresponding host should never be preferrred.
 		score = 0
@@ -239,7 +239,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	}
 }
 
-func fractionOfCapacity(requested, capacity int64, node string) float64 {
+func fractionOfCapacity(requested, capacity int64) float64 {
 	if capacity == 0 {
 		return 1
 	}
