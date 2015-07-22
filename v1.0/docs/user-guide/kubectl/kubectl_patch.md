@@ -18,27 +18,34 @@ Update field(s) of a resource using strategic merge patch
 JSON and YAML formats are accepted.
 
 ```
+{% raw %}
 kubectl patch RESOURCE NAME -p PATCH
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 
 // Partially update a node using strategic merge patch
 kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
   -h, --help=false: help for patch
   -p, --patch="": The patch to be applied to the resource JSON file.
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -63,6 +70,7 @@ kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

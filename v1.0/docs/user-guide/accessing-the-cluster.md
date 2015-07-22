@@ -45,7 +45,9 @@ or someone else setup the cluster and provided you with credentials and a locati
 Check the location and credentials that kubectl knows about with this command:
 
 {% highlight console %}
+{% raw %}
 $ kubectl config view
+{% endraw %}
 {% endhighlight %}
 
 Many of the [examples](../../examples/) provide an introduction to using
@@ -74,7 +76,9 @@ locating the apiserver and authenticating.
 Run it like this:
 
 {% highlight console %}
+{% raw %}
 $ kubectl proxy --port=8080 &
+{% endraw %}
 {% endhighlight %}
 
 See [kubectl proxy](kubectl/kubectl_proxy.html) for more details.
@@ -82,12 +86,14 @@ See [kubectl proxy](kubectl/kubectl_proxy.html) for more details.
 Then you can explore the API with curl, wget, or a browser, like so:
 
 {% highlight console %}
+{% raw %}
 $ curl http://localhost:8080/api/
 {
   "versions": [
     "v1"
   ]
 }
+{% endraw %}
 {% endhighlight %}
 
 #### Without kubectl proxy
@@ -96,6 +102,7 @@ It is also possible to avoid using kubectl proxy by passing an authentication to
 directly to the apiserver, like this:
 
 {% highlight console %}
+{% raw %}
 $ APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " ")
 $ TOKEN=$(kubectl config view | grep token | cut -f 2 -d ":" | tr -d " ")
 $ curl $APISERVER/api --header "Authorization: Bearer $TOKEN" --insecure
@@ -104,6 +111,7 @@ $ curl $APISERVER/api --header "Authorization: Bearer $TOKEN" --insecure
     "v1"
   ]
 }
+{% endraw %}
 {% endhighlight %}
 
 The above example uses the `--insecure` flag.  This leaves it subject to MITM
@@ -198,6 +206,7 @@ Typically, there are several services which are started on a cluster by kube-sys
 with the `kubectl cluster-info` command:
 
 {% highlight console %}
+{% raw %}
 $ kubectl cluster-info
 
   Kubernetes master is running at https://104.197.5.247
@@ -206,6 +215,7 @@ $ kubectl cluster-info
   kube-dns is running at https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/kube-dns
   grafana is running at https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/monitoring-grafana
   heapster is running at https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster
+{% endraw %}
 {% endhighlight %}
 
 This shows the proxy-verb URL for accessing each service.
@@ -227,6 +237,7 @@ about namespaces? 'proxy' verb? -->
  * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/elasticsearch-logging/_cluster/health?pretty=true`
 
 {% highlight json %}
+{% raw %}
   {
 	 "cluster_name" : "kubernetes_logging",
 	 "status" : "yellow",
@@ -239,6 +250,7 @@ about namespaces? 'proxy' verb? -->
 	 "initializing_shards" : 0,
 	 "unassigned_shards" : 5
   }
+{% endraw %}
 {% endhighlight %}
 
 #### Using web browsers to access services running on the cluster

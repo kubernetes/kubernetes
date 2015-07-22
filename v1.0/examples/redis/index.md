@@ -30,7 +30,9 @@ Here is the config for the initial master and sentinel pod: [redis-master.yaml](
 Create this master as follows:
 
 {% highlight sh %}
+{% raw %}
 kubectl create -f examples/redis/redis-master.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Turning up a sentinel service
@@ -44,7 +46,9 @@ Here is the definition of the sentinel service: [redis-sentinel-service.yaml](re
 Create this service:
 
 {% highlight sh %}
+{% raw %}
 kubectl create -f examples/redis/redis-sentinel-service.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Turning up replicated redis servers
@@ -60,7 +64,9 @@ The bulk of this controller config is actually identical to the redis-master pod
 Create this controller:
 
 {% highlight sh %}
+{% raw %}
 kubectl create -f examples/redis/redis-controller.yaml
+{% endraw %}
 {% endhighlight %}
 
 We'll do the same thing for the sentinel.  Here is the controller config: [redis-sentinel-controller.yaml](redis-sentinel-controller.yaml)
@@ -68,7 +74,9 @@ We'll do the same thing for the sentinel.  Here is the controller config: [redis
 We create it as follows:
 
 {% highlight sh %}
+{% raw %}
 kubectl create -f examples/redis/redis-sentinel-controller.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Scale our replicated pods
@@ -76,11 +84,15 @@ kubectl create -f examples/redis/redis-sentinel-controller.yaml
 Initially creating those pods didn't actually do anything, since we only asked for one sentinel and one redis server, and they already existed, nothing changed.  Now we will add more replicas:
 
 {% highlight sh %}
+{% raw %}
 kubectl scale rc redis --replicas=3
+{% endraw %}
 {% endhighlight %}
 
 {% highlight sh %}
+{% raw %}
 kubectl scale rc redis-sentinel --replicas=3
+{% endraw %}
 {% endhighlight %}
 
 This will create two additional replicas of the redis server and two additional replicas of the redis sentinel.
@@ -94,7 +106,9 @@ The final step in the cluster turn up is to delete the original redis-master pod
 Delete the master as follows:
 
 {% highlight sh %}
+{% raw %}
 kubectl delete pods redis-master
+{% endraw %}
 {% endhighlight %}
 
 Now let's take a close look at what happens after this pod is deleted.  There are three things that happen:
@@ -112,6 +126,7 @@ At this point we now have a reliable, scalable Redis installation.  By scaling t
 For those of you who are impatient, here is the summary of commands we ran in this tutorial:
 
 ```
+{% raw %}
 # Create a bootstrap master
 kubectl create -f examples/redis/redis-master.yaml
 
@@ -130,6 +145,7 @@ kubectl scale rc redis-sentinel --replicas=3
 
 # Delete the original master pod
 kubectl delete pods redis-master
+{% endraw %}
 ```
 
 

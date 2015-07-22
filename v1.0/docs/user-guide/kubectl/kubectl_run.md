@@ -17,12 +17,15 @@ Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s).
 
 ```
+{% raw %}
 kubectl run NAME --image=image [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json]
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Starts a single instance of nginx.
 $ kubectl run nginx --image=nginx
 
@@ -34,11 +37,13 @@ $ kubectl run nginx --image=nginx --dry-run
 
 // Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
 $ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --dry-run=false: If true, only print the object that would be sent, without sending it.
       --generator="run/v1": The name of the API generator to use.  Default is 'run-controller/v1'.
   -h, --help=false: help for run
@@ -52,11 +57,13 @@ $ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { .
       --port=-1: The port that this container exposes.
   -r, --replicas=1: Number of replicas to create for this container. Default is 1.
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -81,6 +88,7 @@ $ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { .
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

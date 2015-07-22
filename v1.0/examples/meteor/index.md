@@ -32,14 +32,18 @@ Authenticate with gcloud and set the gcloud default project name to
 point to the project you want to use for your Kubernetes cluster:
 
 {% highlight sh %}
+{% raw %}
 gcloud auth login
 gcloud config set project <project-name>
+{% endraw %}
 {% endhighlight %}
 
 Next, start up a Kubernetes cluster:
 
 {% highlight sh %}
+{% raw %}
 wget -q -O - https://get.k8s.io | bash
+{% endraw %}
 {% endhighlight %}
 
 Please see the [Google Compute Engine getting started
@@ -59,8 +63,10 @@ files to your existing Meteor project `Dockerfile` and
 `ROOT_URL` with the actual hostname of your app.
 
 ```
+{% raw %}
 FROM chees/meteor-kubernetes
 ENV ROOT_URL http://myawesomeapp.com
+{% endraw %}
 ```
 
 The `.dockerignore` file should contain the below lines. This tells
@@ -68,8 +74,10 @@ Docker to ignore the files on those directories when it's building
 your container.
 
 ```
+{% raw %}
 .meteor/local
 packages/*/.build*
+{% endraw %}
 ```
 
 You can see an example meteor project already set up at:
@@ -83,7 +91,9 @@ Now you can build your container by running this in
 your Meteor project directory:
 
 ```
+{% raw %}
 docker build -t my-meteor .
+{% endraw %}
 ```
 
 Pushing to a registry
@@ -94,8 +104,10 @@ your username and push to the Hub with the below commands. Replace
 `<username>` with your Hub username.
 
 ```
+{% raw %}
 docker tag my-meteor <username>/my-meteor
 docker push <username>/my-meteor
+{% endraw %}
 ```
 
 For [Google Container
@@ -104,8 +116,10 @@ your app image with your project ID, and push to GCR. Replace
 `<project>` with your project ID.
 
 ```
+{% raw %}
 docker tag my-meteor gcr.io/<project>/my-meteor
 gcloud docker push gcr.io/<project>/my-meteor
+{% endraw %}
 ```
 
 Running
@@ -122,21 +136,27 @@ options. We're going to use Google Compute Engine persistent
 disks. Create the MongoDB disk by running:
 
 ```
+{% raw %}
 gcloud compute disks create --size=200GB mongo-disk
+{% endraw %}
 ```
 
 Now you can start Mongo using that disk:
 
 ```
+{% raw %}
 kubectl create -f examples/meteor/mongo-pod.json
 kubectl create -f examples/meteor/mongo-service.json
+{% endraw %}
 ```
 
 Wait until Mongo is started completely and then start up your Meteor app:
 
 ```
+{% raw %}
 kubectl create -f examples/meteor/meteor-service.json
 kubectl create -f examples/meteor/meteor-controller.json
+{% endraw %}
 ```
 
 Note that [`meteor-service.json`](meteor-service.json) creates a load balancer, so
@@ -147,14 +167,18 @@ service anti-affinity (among other things). You can find the IP of your load bal
 by running:
 
 ```
+{% raw %}
 kubectl get service meteor --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
+{% endraw %}
 ```
 
 You will have to open up port 80 if it's not open yet in your
 environment. On Google Compute Engine, you may run the below command.
 
 ```
+{% raw %}
 gcloud compute firewall-rules create meteor-80 --allow=tcp:80 --target-tags kubernetes-minion
+{% endraw %}
 ```
 
 What is going on?
@@ -169,7 +193,9 @@ and copies in your apps' code. The last line specifies what happens
 when your app container is run.
 
 {% highlight sh %}
+{% raw %}
 ENTRYPOINT MONGO_URL=mongodb://$MONGO_SERVICE_HOST:$MONGO_SERVICE_PORT /usr/local/bin/node main.js
+{% endraw %}
 {% endhighlight %}
 
 Here we can see the MongoDB host and port information being passed
@@ -192,18 +218,21 @@ to a persistent disk by Kubernetes. In [`mongo-pod.json`](mongo-pod.json) the co
 section specifies the volume:
 
 {% highlight json %}
+{% raw %}
 {
         "volumeMounts": [
           {
             "name": "mongo-disk",
             "mountPath": "/data/db"
           }
+{% endraw %}
 {% endhighlight %}
 
 The name `mongo-disk` refers to the volume specified outside the
 container section:
 
 {% highlight json %}
+{% raw %}
 {
     "volumes": [
       {
@@ -214,6 +243,7 @@ container section:
         }
       }
     ],
+{% endraw %}
 {% endhighlight %}
 
 

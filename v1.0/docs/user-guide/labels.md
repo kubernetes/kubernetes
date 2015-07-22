@@ -14,10 +14,12 @@ Labels can be used to organize and to select subsets of objects.  Labels can be 
 Each object can have a set of key/value labels defined.  Each Key must be unique for a given object.
 
 {% highlight json %}
+{% raw %}
 "labels": {
   "key1" : "value1",
   "key2" : "value2"
 }
+{% endraw %}
 {% endhighlight %}
 
 We'll eventually index and reverse-index labels for efficient queries and watches, use them to sort and group in UIs and CLIs, etc. We don't want to pollute labels with non-identifying, especially large and/or structured, data. Non-identifying information should be recorded using [annotations](annotations.html).
@@ -64,8 +66,10 @@ _Equality-_ or _inequality-based_ requirements allow filtering by label keys and
 Three kinds of operators are admitted `=`,`==`,`!=`. The first two represent _equality_ and are simply synonyms. While the latter represents _inequality_. For example:
 
 ```
+{% raw %}
 environment = production
 tier != frontend
+{% endraw %}
 ```
 
 The former selects all resources with key equal to `environment` and value equal to `production`.
@@ -78,9 +82,11 @@ One could filter for resources in `production` but not `frontend` using the comm
 _Set-based_ label requirements allow filtering keys according to a set of values. Matching objects must have all of the specified labels (i.e. all keys and at least one of the values specified for each key). Three kind of operators are supported: `in`,`notin` and exists (only the key identifier). For example:
 
 ```
+{% raw %}
 environment in (production, qa)
 tier notin (frontend, backend)
 partition
+{% endraw %}
 ```
 
 The first example selects all resources with key equal to `environment` and value equal to `production` or `qa`.

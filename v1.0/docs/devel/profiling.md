@@ -19,9 +19,11 @@ Go comes with inbuilt 'net/http/pprof' profiling library and profiling web servi
 TL;DR: Add lines:
 
 {% highlight go %}
+{% raw %}
 m.mux.HandleFunc("/debug/pprof/", pprof.Index)
 m.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 m.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+{% endraw %}
 {% endhighlight %}
 
 to the init(c *Config) method in 'pkg/master/master.go' and import 'net/http/pprof' package.
@@ -33,13 +35,17 @@ In most use cases to use profiler service it's enough to do 'import _ net/http/p
 Even when running profiler I found not really straightforward to use 'go tool pprof' with it. The problem is that at least for dev purposes certificates generated for APIserver are not signed by anyone trusted and because secureServer serves only secure traffic it isn't straightforward to connect to the service. The best workaround I found is by creating an ssh tunnel from the kubernetes_master open unsecured port to some external server, and use this server as a proxy. To save everyone looking for correct ssh flags, it is done by running:
 
 {% highlight sh %}
+{% raw %}
 ssh kubernetes_master -L<local_port>:localhost:8080
+{% endraw %}
 {% endhighlight %}
 
 or analogous one for you Cloud provider. Afterwards you can e.g. run
 
 {% highlight sh %}
+{% raw %}
 go tool pprof http://localhost:<local_port>/debug/pprof/profile
+{% endraw %}
 {% endhighlight %}
 
 to get 30 sec. CPU profile.

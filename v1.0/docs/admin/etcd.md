@@ -49,7 +49,9 @@ test key. On your master VM (or somewhere with firewalls configured such that
 you can talk to your cluster's etcd), try:
 
 {% highlight sh %}
+{% raw %}
 curl -fs -X PUT "http://${host}:${port}/v2/keys/_test"
+{% endraw %}
 {% endhighlight %}
 
 

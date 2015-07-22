@@ -16,8 +16,10 @@ You have seen the [basics](accessing-the-cluster.html) about `kubectl proxy` and
 kube-ui is deployed as a cluster add-on. To find its apiserver proxy URL,
 
 {% highlight console %}
+{% raw %}
 $ kubectl cluster-info | grep "KubeUI"
 KubeUI is running at https://173.255.119.104/api/v1/proxy/namespaces/kube-system/services/kube-ui
+{% endraw %}
 {% endhighlight %}
 
 if this command does not find the URL, try the steps [here](ui.html#accessing-the-ui).
@@ -28,8 +30,10 @@ if this command does not find the URL, try the steps [here](ui.html#accessing-th
 The above proxy URL is an access to the kube-ui service provided by the apiserver. To access it, you still need to authenticate to the apiserver. `kubectl proxy` can handle the authentication.
 
 {% highlight console %}
+{% raw %}
 $ kubectl proxy --port=8001
 Starting to serve on localhost:8001
+{% endraw %}
 {% endhighlight %}
 
 Now you can access the kube-ui service on your local workstation at [http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kube-ui](http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/kube-ui)

@@ -16,13 +16,17 @@ by `cluster/kube-up.sh`. Sample steps for sharing `kubeconfig` below.
 **1. Create a cluster**
 
 {% highlight console %}
+{% raw %}
 $ cluster/kube-up.sh
+{% endraw %}
 {% endhighlight %}
 
 **2. Copy `kubeconfig` to new host**
 
 {% highlight console %}
+{% raw %}
 $ scp $HOME/.kube/config user@remotehost:/path/to/.kube/config
+{% endraw %}
 {% endhighlight %}
 
 **3. On new host, make copied `config` available to `kubectl`**
@@ -30,23 +34,29 @@ $ scp $HOME/.kube/config user@remotehost:/path/to/.kube/config
 * Option A: copy to default location
 
 {% highlight console %}
+{% raw %}
 $ mv /path/to/.kube/config $HOME/.kube/config
+{% endraw %}
 {% endhighlight %}
 
 * Option B: copy to working directory (from which kubectl is run)
 
 {% highlight console %}
+{% raw %}
 $ mv /path/to/.kube/config $PWD
+{% endraw %}
 {% endhighlight %}
 
 * Option C: manually pass `kubeconfig` location to `.kubectl`
 
 {% highlight console %}
+{% raw %}
 # via environment variable
 $ export KUBECONFIG=/path/to/.kube/config
 
 # via commandline flag
 $ kubectl ... --kubeconfig=/path/to/.kube/config
+{% endraw %}
 {% endhighlight %}
 
 ## Manually Generating `kubeconfig`
@@ -55,6 +65,7 @@ $ kubectl ... --kubeconfig=/path/to/.kube/config
 using (any desired subset of) the following commands.
 
 {% highlight console %}
+{% raw %}
 # create kubeconfig entry
 $ kubectl config set-cluster $CLUSTER_NICK \
     --server=https://1.1.1.1 \
@@ -78,6 +89,7 @@ $ kubectl config set-credentials $USER_NICK \
 
 # create context entry
 $ kubectl config set-context $CONTEXT_NAME --cluster=$CLUSTER_NICKNAME --user=$USER_NICK
+{% endraw %}
 {% endhighlight %}
 
 Notes:
@@ -88,7 +100,9 @@ save config too. In the above commands the `--kubeconfig` file could be
 omitted if you first run
 
 {% highlight console %}
+{% raw %}
 $ export KUBECONFIG=/path/to/standalone/.kube/config
+{% endraw %}
 {% endhighlight %}
 
 * The ca_file, key_file, and cert_file referenced above are generated on the
@@ -111,6 +125,7 @@ If you create clusters A, B on host1, and clusters C, D on host2, you can
 make all four clusters available on both hosts by running
 
 {% highlight console %}
+{% raw %}
 # on host2, copy host1's default kubeconfig, and merge it from env
 $ scp host1:/path/to/home1/.kube/config path/to/other/.kube/config
 
@@ -120,6 +135,7 @@ $ export $KUBECONFIG=path/to/other/.kube/config
 $ scp host2:/path/to/home2/.kube/config path/to/other/.kube/config
 
 $ export $KUBECONFIG=path/to/other/.kube/config
+{% endraw %}
 {% endhighlight %}
 
 Detailed examples and explanation of `kubeconfig` loading/merging rules can be found in [kubeconfig-file.md](kubeconfig-file.html).

@@ -52,24 +52,30 @@ Upgrades on open source Google Compute Engine (GCE) clusters are controlled by t
 Its usage is as follows:
 
 {% highlight console %}
+{% raw %}
 cluster/gce/upgrade.sh [-M|-N|-P] -l | <release or continuous integration version> | [latest_stable|latest_release|latest_ci]
   Upgrades master and nodes by default
   -M:  Upgrade master only
   -N:  Upgrade nodes only
   -P:  Node upgrade prerequisites only (create a new instance template)
   -l:  Use local(dev) binaries
+{% endraw %}
 {% endhighlight %}
 
 For example, to upgrade just your master to a specific version (v1.0.2):
 
 {% highlight console %}
+{% raw %}
 cluster/gce/upgrade.sh -M v1.0.2
+{% endraw %}
 {% endhighlight %}
 
 Alternatively, to upgrade your entire cluster to the latest stable release:
 
 {% highlight console %}
+{% raw %}
 cluster/gce/upgrade.sh latest_stable
+{% endraw %}
 {% endhighlight %}
 
 ### Other platforms
@@ -90,7 +96,9 @@ If you want more control over the upgrading process, you may use the following w
 Mark the node to be rebooted as unschedulable:
 
 {% highlight console %}
+{% raw %}
 kubectl replace nodes $NODENAME --patch='{"apiVersion": "v1", "spec": {"unschedulable": true}}'
+{% endraw %}
 {% endhighlight %}
 
 This keeps new pods from landing on the node while you are trying to get them off.
@@ -100,7 +108,9 @@ Get the pods off the machine, via any of the following strategies:
    * Delete pods with:
 
 {% highlight console %}
+{% raw %}
 kubectl delete pods $PODNAME
+{% endraw %}
 {% endhighlight %}
 
 For pods with a replication controller, the pod will eventually be replaced by a new pod which will be scheduled to a new node. Additionally, if the pod is part of a service, then clients will automatically be redirected to the new pod.
@@ -112,7 +122,9 @@ Perform maintainence work on the node.
 Make the node schedulable again:
 
 {% highlight console %}
+{% raw %}
 kubectl replace nodes $NODENAME --patch='{"apiVersion": "v1", "spec": {"unschedulable": false}}'
+{% endraw %}
 {% endhighlight %}
 
 If you deleted the node's VM instance and created a new one, then a new schedulable node resource will
@@ -154,8 +166,10 @@ for changes to this variable to take effect.
 You can use the `kube-version-change` utility to convert config files between different API versions.
 
 {% highlight console %}
+{% raw %}
 $ hack/build-go.sh cmd/kube-version-change
 $ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o myPod.v1.yaml
+{% endraw %}
 {% endhighlight %}
 
 

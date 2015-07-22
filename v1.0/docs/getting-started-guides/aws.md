@@ -31,11 +31,13 @@ Getting started on AWS EC2
 ### Supported procedure: `get-kube`
 
 {% highlight bash %}
+{% raw %}
 #Using wget
 export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 
 #Using cURL
 export KUBERNETES_PROVIDER=aws; curl -sS https://get.k8s.io | bash
+{% endraw %}
 {% endhighlight %}
 
 NOTE: This script calls [cluster/kube-up.sh](http://releases.k8s.io/v1.0.1/cluster/kube-up.sh)
@@ -50,6 +52,7 @@ By default, the script will provision a new VPC and a 4 node k8s cluster in us-w
 You can override the variables defined in [config-default.sh](http://releases.k8s.io/v1.0.1/cluster/aws/config-default.sh) to change this behavior as follows:
 
 {% highlight bash %}
+{% raw %}
 export KUBE_AWS_ZONE=eu-west-1c
 export NUM_MINIONS=2
 export MINION_SIZE=m3.medium
@@ -57,6 +60,7 @@ export AWS_S3_REGION=eu-west-1
 export AWS_S3_BUCKET=mycompany-kubernetes-artifacts
 export INSTANCE_PREFIX=k8s
 ...
+{% endraw %}
 {% endhighlight %}
 
 It will also try to create or reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".
@@ -79,11 +83,13 @@ Alternately, you can download the latest Kubernetes release from [this page](htt
 Next, add the appropriate binary folder to your `PATH` to access kubectl:
 
 {% highlight bash %}
+{% raw %}
 # OS X
 export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 
 # Linux
 export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
+{% endraw %}
 {% endhighlight %}
 
 An up-to-date documentation page for this tool is available here: [kubectl manual](../../docs/user-guide/kubectl/kubectl.html)
@@ -105,7 +111,9 @@ Make sure the environment variables you used to provision your cluster are still
 `kubernetes` directory:
 
 {% highlight bash %}
+{% raw %}
 cluster/kube-down.sh
+{% endraw %}
 {% endhighlight %}
 
 ## Further reading

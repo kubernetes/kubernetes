@@ -16,12 +16,15 @@ Forward one or more local ports to a pod.
 Forward one or more local ports to a pod.
 
 ```
+{% raw %}
 kubectl port-forward -p POD_NAME [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 
 // listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
 $ kubectl port-forward -p mypod 5000 6000
@@ -34,18 +37,22 @@ $ kubectl port-forward -p mypod :5000
 
 // listens on a random port locally, forwarding to 5000 in the pod
 $ kubectl port-forward -p mypod 0:5000
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
   -h, --help=false: help for port-forward
   -p, --pod="": Pod name
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -70,6 +77,7 @@ $ kubectl port-forward -p mypod 0:5000
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

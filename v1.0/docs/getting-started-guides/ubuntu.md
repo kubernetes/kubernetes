@@ -63,6 +63,7 @@ An example cluster is listed as below:
 First configure the cluster information in cluster/ubuntu/config-default.sh, below is a simple sample.
 
 {% highlight sh %}
+{% raw %}
 export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 
 export roles="ai i i"
@@ -72,6 +73,7 @@ export NUM_MINIONS=${NUM_MINIONS:-3}
 export SERVICE_CLUSTER_IP_RANGE=11.1.1.0/24
 
 export FLANNEL_NET=172.16.0.0/16
+{% endraw %}
 {% endhighlight %}
 
 The first variable `nodes` defines all your cluster nodes, MASTER node comes first and separated with blank space like `<user_1@ip_1> <user_2@ip_2> <user_3@ip_3> `
@@ -97,11 +99,13 @@ After all the above variable being set correctly. We can use below command in cl
 The scripts is automatically scp binaries and config files to all the machines and start the k8s service on them. The only thing you need to do is to type the sudo password when promoted. The current machine name is shown below like. So you will not type in the wrong password.
 
 {% highlight console %}
+{% raw %}
 Deploying minion on machine 10.10.103.223
 
 ...
 
 [sudo] password to copy files and start minion: 
+{% endraw %}
 {% endhighlight %}
 
 If all things goes right, you will see the below message from console
@@ -114,6 +118,7 @@ You can also use `kubectl` command to see if the newly created k8s is working co
 For example, use `$ kubectl get nodes` to see if all your nodes are in ready status. It may take some time for the nodes ready to use like below. 
 
 {% highlight console %}
+{% raw %}
 NAME            LABELS                                 STATUS
 
 10.10.103.162   kubernetes.io/hostname=10.10.103.162   Ready
@@ -121,6 +126,7 @@ NAME            LABELS                                 STATUS
 10.10.103.223   kubernetes.io/hostname=10.10.103.223   Ready
 
 10.10.103.250   kubernetes.io/hostname=10.10.103.250   Ready
+{% endraw %}
 {% endhighlight %}
 
 Also you can run Kubernetes [guest-example](../../examples/guestbook/) to build a redis backend cluster on the k8s．
@@ -133,6 +139,7 @@ After the previous parts, you will have a working k8s cluster, this part will te
 The configuration of dns is configured in cluster/ubuntu/config-default.sh.
 
 {% highlight sh %}
+{% raw %}
 ENABLE_CLUSTER_DNS=true
 
 DNS_SERVER_IP="192.168.3.10"
@@ -140,6 +147,7 @@ DNS_SERVER_IP="192.168.3.10"
 DNS_DOMAIN="cluster.local"
 
 DNS_REPLICAS=1
+{% endraw %}
 {% endhighlight %}
 
 The `DNS_SERVER_IP` is defining the ip of dns server which must be in the service_cluster_ip_range.
@@ -149,9 +157,11 @@ The `DNS_REPLICAS` describes how many dns pod running in the cluster.
 After all the above variable have been set. Just type the below command
 
 {% highlight console %}
+{% raw %}
 $ cd cluster/ubuntu
 
 $ KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh
+{% endraw %}
 {% endhighlight %}
 
 After some time, you can use `$ kubectl get pods` to see the dns pod is running in the cluster. Done!

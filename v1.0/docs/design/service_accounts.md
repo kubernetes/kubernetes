@@ -40,6 +40,7 @@ A service account binds together several things:
 A new object Kind is added:
 
 {% highlight go %}
+{% raw %}
 type ServiceAccount struct {
     TypeMeta   `json:",inline" yaml:",inline"`
     ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
@@ -48,6 +49,7 @@ type ServiceAccount struct {
     securityContext ObjectReference // (reference to a securityContext object)
     secrets []ObjectReference // (references to secret objects
 }
+{% endraw %}
 {% endhighlight %}
 
 The name ServiceAccount is chosen because it is widely used already (e.g. by Kerberos and LDAP)

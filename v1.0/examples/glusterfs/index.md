@@ -21,6 +21,7 @@ Set up Glusterfs server cluster; install Glusterfs client package on the Kuberne
 Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
 
 ```
+{% raw %}
       "addresses": [
         {
           "IP": "10.240.106.152"
@@ -32,6 +33,7 @@ Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
         }
       ]
 
+{% endraw %}
 ```
 
 The "IP" field should be filled with the address of a node in the Glusterfs server cluster. In this example, it is fine to give any valid value (from 1 to 65535) to the "port" field. 
@@ -39,15 +41,19 @@ The "IP" field should be filled with the address of a node in the Glusterfs serv
 Create the endpoints,
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/glusterfs/glusterfs-endpoints.json
+{% endraw %}
 {% endhighlight %}
 
 You can verify that the endpoints are successfully created by running
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get endpoints
 NAME                ENDPOINTS
 glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
+{% endraw %}
 {% endhighlight %}
 
 ### Create a POD
@@ -55,6 +61,7 @@ glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
 The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustrates a sample configuration.
 
 {% highlight json %}
+{% raw %}
 {
      "name": "glusterfsvol",
      "glusterfs": {
@@ -63,6 +70,7 @@ The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustra
         "readOnly": true
     }
 }
+{% endraw %}
 {% endhighlight %}
 
 The parameters are explained as the followings. 
@@ -74,25 +82,31 @@ The parameters are explained as the followings.
 Create a pod that has a container using Glusterfs volume,
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/glusterfs/glusterfs-pod.json
+{% endraw %}
 {% endhighlight %}
 
 You can verify that the pod is running:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get pods
 NAME             READY     STATUS    RESTARTS   AGE
 glusterfs        1/1       Running   0          3m
 
 $ kubectl get pods glusterfs -t '{{.status.hostIP}}{{"\n"}}'
 10.240.169.172
+{% endraw %}
 {% endhighlight %}
 
 You may ssh to the host (the hostIP) and run 'mount' to see if the Glusterfs volume is mounted,
 
 {% highlight sh %}
+{% raw %}
 $ mount | grep kube_vol
 10.240.106.152:kube_vol on /var/lib/kubelet/pods/f164a571-fa68-11e4-ad5c-42010af019b7/volumes/kubernetes.io~glusterfs/glusterfsvol type fuse.glusterfs (rw,relatime,user_id=0,group_id=0,default_permissions,allow_other,max_read=131072)
+{% endraw %}
 {% endhighlight %}
 
 You may also run `docker ps` on the host to see the actual container.

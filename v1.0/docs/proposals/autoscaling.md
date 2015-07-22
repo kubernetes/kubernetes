@@ -91,6 +91,7 @@ namespace just as a `ReplicationController` or `Service`.
 Since an auto-scaler is a durable object it is best represented as a resource.  
 
 {% highlight go %}
+{% raw %}
     //The auto scaler interface
     type AutoScalerInterface interface {
         //ScaleApplication adjusts a resource's replica count.  Calls scale endpoint.  
@@ -204,6 +205,7 @@ Since an auto-scaler is a durable object it is best represented as a resource.
      // AutoScaleIntentionType is a lexicon for intentions such as "cpu-utilization",
      // "max-rps-per-endpoint"
      type AutoScaleIntentionType string
+{% endraw %}
 {% endhighlight %}
 
 #### Boundary Definitions

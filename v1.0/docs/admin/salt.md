@@ -21,8 +21,10 @@ The **salt-minion** service runs on the kubernetes-master node and each kubernet
 Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file [(except on GCE)](#standalone-salt-configuration-on-gce).
 
 {% highlight console %}
+{% raw %}
 [root@kubernetes-master] $ cat /etc/salt/minion.d/master.conf
 master: kubernetes-master
+{% endraw %}
 {% endhighlight %}
 
 The salt-master is contacted by each salt-minion and depending upon the machine information presented, the salt-master will provision the machine as either a kubernetes-master or kubernetes-minion with all the required capabilities needed to run Kubernetes.
@@ -42,9 +44,11 @@ All remaining sections that refer to master/minion setups should be ignored for 
 Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from minions.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
 
 {% highlight console %}
+{% raw %}
 [root@kubernetes-master] $ cat /etc/salt/master.d/auto-accept.conf
 open_mode: True
 auto_accept: True
+{% endraw %}
 {% endhighlight %}
 
 ## Salt minion configuration
@@ -54,12 +58,14 @@ Each minion in the salt cluster has an associated configuration that instructs t
 An example file is presented below using the Vagrant based environment.
 
 {% highlight console %}
+{% raw %}
 [root@kubernetes-master] $ cat /etc/salt/minion.d/grains.conf
 grains:
   etcd_servers: $MASTER_IP
   cloud_provider: vagrant
   roles:
     - kubernetes-master
+{% endraw %}
 {% endhighlight %}
 
 Each hosting environment has a slightly different grains.conf file that is used to build conditional logic where required in the Salt files.
@@ -85,11 +91,13 @@ These keys may be leveraged by the Salt sls files to branch behavior.
 In addition, a cluster may be running a Debian based operating system or Red Hat based operating system (Centos, Fedora, RHEL, etc.).  As a result, it's important to sometimes distinguish behavior based on operating system using if branches like the following.
 
 {% highlight jinja %}
+{% raw %}
 {% if grains['os_family'] == 'RedHat' %}
 // something specific to a RedHat environment (Centos, Fedora, RHEL) where you may use yum, systemd, etc.
 {% else %}
 // something specific to Debian environment (apt-get, initd)
 {% endif %}
+{% endraw %}
 {% endhighlight %}
 
 ## Best Practices

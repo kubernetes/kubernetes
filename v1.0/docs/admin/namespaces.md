@@ -53,10 +53,12 @@ Look [here](namespaces/) for an in depth example of namespaces.
 You can list the current namespaces in a cluster using:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get namespaces
 NAME          LABELS    STATUS
 default       <none>    Active
 kube-system   <none>    Active
+{% endraw %}
 {% endhighlight %}
 
 Kubernetes starts with two initial namespaces:
@@ -66,12 +68,15 @@ Kubernetes starts with two initial namespaces:
 You can also get the summary of a specific namespace using:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get namespaces <name>
+{% endraw %}
 {% endhighlight %}
 
 Or you can get detailed information with:
 
 {% highlight console %}
+{% raw %}
 $ kubectl describe namespaces <name>
 Name:	   default
 Labels:	   <none>
@@ -83,6 +88,7 @@ Resource Limits
  Type		Resource	Min	Max	Default
  ----				--------	---	---	---
  Container			cpu			-	-	100m
+{% endraw %}
 {% endhighlight %}
 
 Note that these details show both resource quota (if present) as well as resource limit ranges.
@@ -106,10 +112,12 @@ See the [design doc](../design/namespaces.html#phases) for more details.
 To create a new namespace, first create a new YAML file called `my-namespace.yaml` with the contents:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Namespace
 metadata:
   name: <insert-namespace-name-here>
+{% endraw %}
 {% endhighlight %}
 
 Note that the name of your namespace must be a DNS compatible label.
@@ -119,7 +127,9 @@ More information on the `finalizers` field can be found in the namespace [design
 Then run:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f ./my-namespace.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Working in namespaces
@@ -132,7 +142,9 @@ and [Setting the namespace preference](../../docs/user-guide/namespaces.html#set
 You can delete a namespace with
 
 {% highlight console %}
+{% raw %}
 $ kubectl delete namespaces <insert-some-namespace-name>
+{% endraw %}
 {% endhighlight %}
 
 **WARNING, this deletes _everything_ under the namespace!**

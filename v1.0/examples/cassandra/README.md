@@ -28,6 +28,7 @@ In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-gu
 In this simple case, we define a single container running Cassandra for our pod:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -63,6 +64,7 @@ spec:
   volumes:
     - name: data
       emptyDir: {}
+{% endraw %}
 {% endhighlight %}
 
 There are a few things to note in this description.  First is that we are running the ```kubernetes/cassandra``` image.  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The ```KubernetesSeedProvider``` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
@@ -78,6 +80,7 @@ In Kubernetes a _[Service](../../docs/user-guide/services.html)_ describes a set
 Here is the service description:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Service
 metadata:
@@ -89,6 +92,7 @@ spec:
     - port: 9042
   selector:
     name: cassandra
+{% endraw %}
 {% endhighlight %}
 
 The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=cassandra```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
@@ -96,26 +100,33 @@ The important thing to note here is the ```selector```. It is a query over label
 Create this service as follows:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/cassandra/cassandra-service.yaml
+{% endraw %}
 {% endhighlight %}
 
 Now, as the service is running, we can create the first Cassandra pod using the mentioned specification.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/cassandra/cassandra.yaml
+{% endraw %}
 {% endhighlight %}
 
 After a few moments, you should be able to see the pod running, plus its single container:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get pods cassandra
 NAME        READY     STATUS    RESTARTS   AGE
 cassandra   1/1       Running   0          55s
+{% endraw %}
 {% endhighlight %}
 
 You can also query the service endpoints to check if the pod has been correctly selected.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get endpoints cassandra -o yaml
 apiVersion: v1
 kind: Endpoints
@@ -140,6 +151,7 @@ subsets:
   ports:
   - port: 9042
     protocol: TCP
+{% endraw %}
 {% endhighlight %}
 
 ### Adding replicated nodes
@@ -151,6 +163,7 @@ In Kubernetes a _[Replication Controller](../../docs/user-guide/replication-cont
 Replication controllers will "adopt" existing pods that match their selector query, so let's create a replication controller with a single replica to adopt our existing Cassandra pod.
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -194,6 +207,7 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
+{% endraw %}
 {% endhighlight %}
 
 Most of this replication controller definition is identical to the Cassandra pod definition above, it simply gives the resplication controller a recipe to use when it creates new Cassandra pods.  The other differentiating parts are the ```selector``` attribute which contains the controller's selector query, and the ```replicas``` attribute which specifies the desired number of replicas, in this case 1.
@@ -201,7 +215,9 @@ Most of this replication controller definition is identical to the Cassandra pod
 Create this controller:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/cassandra/cassandra-controller.yaml
+{% endraw %}
 {% endhighlight %}
 
 Now this is actually not that interesting, since we haven't actually done anything new.  Now it will get interesting.
@@ -209,16 +225,20 @@ Now this is actually not that interesting, since we haven't actually done anythi
 Let's scale our cluster to 2:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl scale rc cassandra --replicas=2
+{% endraw %}
 {% endhighlight %}
 
 Now if you list the pods in your cluster, and filter to the label ```name=cassandra```, you should see two cassandra pods:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get pods -l="name=cassandra"
 NAME              READY     STATUS    RESTARTS   AGE
 cassandra         1/1       Running   0          3m
 cassandra-af6h5   1/1       Running   0          28s
+{% endraw %}
 {% endhighlight %}
 
 Notice that one of the pods has the human readable name ```cassandra``` that you specified in your config before, and one has a random string, since it was named by the replication controller.
@@ -226,6 +246,7 @@ Notice that one of the pods has the human readable name ```cassandra``` that you
 To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster.  To do this, use the ```kubectl exec``` command to run ```nodetool``` in one of your Cassandra pods.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl exec -ti cassandra -- nodetool status
 Datacenter: datacenter1
 =======================
@@ -234,17 +255,21 @@ Status=Up/Down
 --  Address     Load       Tokens  Owns (effective)  Host ID                               Rack
 UN  10.244.0.5  74.09 KB   256     100.0%            86feda0f-f070-4a5b-bda1-2eeb0ad08b77  rack1
 UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
+{% endraw %}
 {% endhighlight %}
 
 Now let's scale our cluster to 4 nodes:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl scale rc cassandra --replicas=4
+{% endraw %}
 {% endhighlight %}
 
 In a few moments, you can examine the status again:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl exec -ti cassandra -- nodetool status
 Datacenter: datacenter1
 =======================
@@ -255,6 +280,7 @@ UN  10.244.2.3  57.61 KB   256     49.1%             9d560d8e-dafb-4a88-8e2f-f55
 UN  10.244.1.7  41.1 KB    256     50.2%             68b8cc9c-2b76-44a4-b033-31402a77b839  rack1
 UN  10.244.0.5  74.09 KB   256     49.7%             86feda0f-f070-4a5b-bda1-2eeb0ad08b77  rack1
 UN  10.244.3.3  51.28 KB   256     51.0%             dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
+{% endraw %}
 {% endhighlight %}
 
 ### tl; dr;
@@ -262,6 +288,7 @@ UN  10.244.3.3  51.28 KB   256     51.0%             dafe3154-1d67-42e1-ac1d-78e
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
 
 {% highlight sh %}
+{% raw %}
 # create a service to track all cassandra nodes
 kubectl create -f examples/cassandra/cassandra-service.yaml
 
@@ -279,6 +306,7 @@ kubectl exec -ti cassandra -- nodetool status
 
 # scale up to 4 nodes
 kubectl scale rc cassandra --replicas=4
+{% endraw %}
 {% endhighlight %}
 
 ### Seed Provider Source

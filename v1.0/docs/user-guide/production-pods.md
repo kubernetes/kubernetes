@@ -33,6 +33,7 @@ The container file system only lives as long as the container does, so when a co
 For example, [Redis](http://redis.io/) is a key-value cache and store, which we use in the [guestbook](../../examples/guestbook/) and other examples. We can add a volume to it to store persistent data as follows:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -57,6 +58,7 @@ spec:
         volumeMounts:
         - mountPath: /redis-master-data
           name: data   # must match the name of the volume, above
+{% endraw %}
 {% endhighlight %}
 
 `emptyDir` volumes live for the lifespan of the [pod](pods.html), which is longer than the lifespan of any one container, so if the container fails and is restarted, our storage will live on.
@@ -70,6 +72,7 @@ Many applications need credentials, such as passwords, OAuth tokens, and TLS key
 Kubernetes provides a mechanism, called [*secrets*](secrets.html), that facilitates delivery of sensitive credentials to applications. A `Secret` is a simple resource containing a map of data. For instance, a simple secret with a username and password might look as follows:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -78,22 +81,26 @@ type: Opaque
 data:
   password: dmFsdWUtMg0K
   username: dmFsdWUtMQ0K
+{% endraw %}
 {% endhighlight %}
 
 As with other resources, this secret can be instantiated using `create` and can be viewed with `get`:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f ./secret.yaml
 secrets/mysecret
 $ kubectl get secrets
 NAME                  TYPE                                  DATA
 default-token-v9pyz   kubernetes.io/service-account-token   2
 mysecret              Opaque                                2
+{% endraw %}
 {% endhighlight %}
 
 To use the secret, you need to reference it in a pod or pod template. The `secret` volume source enables you to mount it as an in-memory directory into your containers.
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -122,6 +129,7 @@ spec:
           name: data   # must match the name of the volume, above
         - mountPath: /var/run/secrets/super
           name: supersecret
+{% endraw %}
 {% endhighlight %}
 
 For more details, see the [secrets document](secrets.html), [example](secrets/) and [design doc](../../docs/design/secrets.html).
@@ -134,6 +142,7 @@ First, create a `.dockercfg` file, such as running `docker login <registry.domai
 Then put the resulting `.dockercfg` file into a [secret resource](secrets.html).  For example:
 
 {% highlight console %}
+{% raw %}
 $ docker login
 Username: janedoe
 Password: ●●●●●●●●●●●
@@ -159,12 +168,14 @@ EOF
 
 $ kubectl create -f ./image-pull-secret.yaml
 secrets/myregistrykey
+{% endraw %}
 {% endhighlight %}
 
 Now, you can create pods which reference that secret by adding an `imagePullSecrets`
 section to a pod definition.
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -175,6 +186,7 @@ spec:
       image: janedoe/awesomeapp:v1
   imagePullSecrets:
     - name: myregistrykey
+{% endraw %}
 {% endhighlight %}
 
 ## Helper containers
@@ -184,6 +196,7 @@ spec:
 Such containers typically need to communicate with one another, often through the file system. This can be achieved by mounting the same volume into both containers. An example of this pattern would be a web server with a [program that polls a git repository](http://releases.k8s.io/v1.0.1/contrib/git-sync/) for new updates:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -214,6 +227,7 @@ spec:
         volumeMounts:
         - mountPath: /data
           name: www-data
+{% endraw %}
 {% endhighlight %}
 
 More examples can be found in our [blog article](http://blog.kubernetes.io/2015/06/the-distributed-system-toolkit-patterns.html) and [presentation slides](http://www.slideshare.net/Docker/slideshare-burns).
@@ -225,6 +239,7 @@ Kubernetes’s scheduler will place applications only where they have adequate C
 If no resource requirements are specified, a nominal amount of resources is assumed. (This default is applied via a [LimitRange](limitrange/) for the default [Namespace](namespaces.html). It can be viewed with `kubectl describe limitrange limits`.) You may explicitly specify the amount of resources required as follows:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -247,6 +262,7 @@ spec:
             cpu: 500m
             # memory units are bytes
             memory: 64Mi
+{% endraw %}
 {% endhighlight %}
 
 The container will die due to OOM (out of memory) if it exceeds its specified limit, so specifying a value a little higher than expected generally improves reliability.
@@ -260,6 +276,7 @@ Many applications running for long periods of time eventually transition to brok
 A common way to probe an application is using HTTP, which can be specified as follows:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -283,6 +300,7 @@ spec:
             port: 80
           initialDelaySeconds: 30
           timeoutSeconds: 1
+{% endraw %}
 {% endhighlight %}
 
 Other times, applications are only temporarily unable to serve, and will recover on their own. Typically in such cases you’d prefer not to kill the application, but don’t want to send it requests, either, since the application won’t respond correctly or at all. A common such scenario is loading large data or configuration files during application startup. Kubernetes provides *readiness probes* to detect and mitigate such situations. Readiness probes are configured similarly to liveness probes, just using the `readinessProbe` field. A pod with containers reporting that they are not ready will not receive traffic through Kubernetes [services](connecting-applications.html).
@@ -298,6 +316,7 @@ Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*
 The specification of a pre-stop hook is similar to that of probes, but without the timing-related parameters. For example:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -319,6 +338,7 @@ spec:
             exec:
               # SIGTERM triggers a quick exit; gracefully terminate instead
               command: ["/usr/sbin/nginx","-s","quit"]
+{% endraw %}
 {% endhighlight %}
 
 ## Termination message
@@ -328,6 +348,7 @@ In order to achieve a reasonably high level of availability, especially for acti
 Here is a toy example:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -338,11 +359,13 @@ spec:
     image: "ubuntu:14.04"
     command: ["/bin/sh","-c"]
     args: ["sleep 60 && /bin/echo Sleep expired > /dev/termination-log"]
+{% endraw %}
 {% endhighlight %}
 
 The message is recorded along with the other state of the last (i.e., most recent) termination:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f ./pod.yaml
 pods/pod-w-message
 $ sleep 70
@@ -350,6 +373,7 @@ $ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatus
 Sleep expired
 $ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatuses}}{{.lastState.terminated.exitCode}}{{end}}"
 0
+{% endraw %}
 {% endhighlight %}
 
 ## What's next?

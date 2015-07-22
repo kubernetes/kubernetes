@@ -20,12 +20,15 @@ If --overwrite is true, then existing labels can be overwritten, otherwise attem
 If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
 ```
+{% raw %}
 kubectl label [--overwrite] RESOURCE NAME KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Update pod 'foo' with the label 'unhealthy' and the value 'true'.
 $ kubectl label pods foo unhealthy=true
 
@@ -41,11 +44,13 @@ $ kubectl label pods foo status=unhealthy --resource-version=1
 // Update pod 'foo' by removing a label named 'bar' if it exists.
 // Does not require the --overwrite flag.
 $ kubectl label pods foo bar-
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --all=false: select all resources in the namespace of the specified resource types
   -h, --help=false: help for label
       --no-headers=false: When using the default output, don't print headers.
@@ -55,11 +60,13 @@ $ kubectl label pods foo bar-
       --resource-version="": If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.
   -l, --selector="": Selector (label query) to filter on
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -84,6 +91,7 @@ $ kubectl label pods foo bar-
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

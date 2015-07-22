@@ -17,28 +17,35 @@ Sets a context entry in kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values for those fields.
 
 ```
+{% raw %}
 kubectl config set-context NAME [--cluster=cluster_nickname] [--user=user_nickname] [--namespace=namespace]
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Set the user field on the gce context entry without touching other values
 $ kubectl config set-context gce --user=cluster-admin
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --cluster=: cluster for the context entry in kubeconfig
   -h, --help=false: help for set-context
       --namespace=: namespace for the context entry in kubeconfig
       --user=: user for the context entry in kubeconfig
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -60,6 +67,7 @@ $ kubectl config set-context gce --user=cluster-admin
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO
