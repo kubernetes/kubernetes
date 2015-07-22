@@ -40,14 +40,13 @@ Legend:
 
 ## Release Timeline
 
-### Minor version timeline
+### Minor version scheme and timeline
 
-* Kube 1.0.0
-* Kube 1.0.x: We create a 1.0-patch branch and backport critical bugs and security issues to it. Patch releases occur as needed.
-* Kube 1.1-alpha1: Cut from HEAD, smoke tested and released two weeks after Kube 1.0's release. Roughly every two weeks a new alpha is released from HEAD. The timeline is flexible; for example, if there is a critical bugfix, a new alpha can be released ahead of schedule. (This applies to the beta and rc releases as well.)
-* Kube 1.1-beta1: When HEAD is feature complete, we create a 1.1-snapshot branch and release it as a beta. (The 1.1-snapshot branch may be created earlier if something that definitely won't be in 1.1 needs to be merged to HEAD.) This should occur 6-8 weeks after Kube 1.0. Development continues at HEAD and only fixes are backported to 1.1-snapshot.
-* Kube 1.1-rc1: Released from 1.1-snapshot when it is considered stable and ready for testing. Most users should be able to upgrade to this version in production.
-* Kube 1.1: Final release. Should occur between 3 and 4 months after 1.0.
+* Kube 1.0.0, 1.0.1 -- DONE!
+* Kube 1.0.X (X>1): Standard operating procedure. We patch the release-1.0 branch as needed and increment the patch number.
+* Kube 1.1alpha.X: Released roughly every two weeks by cutting from HEAD. No cherrypick releases. If there is a critical bugfix, a new release from HEAD can be created ahead of schedule. (This applies to the beta releases as well.)
+* Kube 1.1beta.X: When HEAD is feature-complete, we go into code freeze 2 weeks prior to the desired 1.1.0 date and only merge PRs essential to 1.1. Releases continue to be cut from HEAD until we're essentially done.
+* Kube 1.1.0: Final release. Should occur between 3 and 4 months after 1.0.
 
 ### Major version timeline
 
