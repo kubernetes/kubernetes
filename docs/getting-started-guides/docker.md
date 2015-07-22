@@ -128,6 +128,11 @@ NAME      LABELS    SELECTOR              IP          PORT(S)
 nginx     <none>    run=nginx             <ip-addr>   80/TCP
 ```
 
+If ip-addr is blank run the following command to obtain it. Know issue #10836
+```sh
+kubectl get svc nginx
+```
+
 Hit the webserver:
 
 ```sh
