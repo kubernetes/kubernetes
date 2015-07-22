@@ -25,8 +25,8 @@ Kubernetes builds upon a [decade and a half of experience at Google running prod
 ### Kubernetes can run anywhere!
 However, initial development was done on GCE and so our instructions and scripts are built around that.  If you make it work on other infrastructure please let us know and contribute instructions/code.
 
-### Kubernetes is in pre-production beta!
-While the concepts and architecture in Kubernetes represent years of experience designing and building large scale cluster manager at Google, the Kubernetes project is still under heavy development.  Expect bugs, design and API changes as we bring it to a stable, production product over the coming year.
+### Kubernetes is ready for Production!
+With the [1.0.1 release](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v1.0.1) Kubernetes is ready to serve your production workloads.
 
 
 ## Concepts
