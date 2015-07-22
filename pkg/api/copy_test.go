@@ -43,7 +43,7 @@ func TestDeepCopyApiObjects(t *testing.T) {
 				}
 
 				if !reflect.DeepEqual(item, itemCopy) {
-					t.Errorf("expected %#v\ngot %#v", item, itemCopy)
+					t.Errorf("\nexpected %#v\ngot      %#v", item, itemCopy)
 				}
 			}
 		}
