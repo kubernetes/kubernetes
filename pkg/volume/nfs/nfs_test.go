@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/network_volume"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -62,7 +63,11 @@ func TestGetAccessModes(t *testing.T) {
 
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins([]volume.VolumePlugin{&nfsPlugin{newRecyclerFunc: newMockRecycler}}, volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins([]volume.VolumePlugin{
+		&nfsPlugin{
+			NetworkVolumePlugin: &network_volume.NetworkVolumePlugin{
+				PluginName: nfsPluginName},
+			newRecyclerFunc: newMockRecycler}}, volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
 	spec := &volume.Spec{PersistentVolumeSource: api.PersistentVolumeSource{NFS: &api.NFSVolumeSource{Path: "/foo"}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
@@ -141,7 +146,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if builder.(*nfs).readOnly {
+	if builder.(*nfs).Mounter.(*nfsNetworkVolumeMounter).readOnly {
 		t.Errorf("The volume source should not be read-only and it is.")
 	}
 	if len(fake.Log) != 1 {

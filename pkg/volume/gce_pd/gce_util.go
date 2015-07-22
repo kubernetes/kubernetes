@@ -52,10 +52,10 @@ type GCEDiskUtil struct{}
 
 // Attaches a disk specified by a volume.GCEPersistentDisk to the current kubelet.
 // Mounts the disk to it's global path.
-func (diskUtil *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
-	glog.V(5).Infof("AttachAndMountDisk(pd, %q) where pd is %#v\r\n", globalPDPath, pd)
+func (util *GCEDiskUtil) AttachAndMountDisk(mounter *gceNetworkVolumeMounter) error {
+	glog.V(5).Infof("AttachAndMountDisk(mounter) where mounter is %#v\r\n", mounter)
 	// Terminate any in progress verify detach go routines, this will block until the goroutine is ready to exit because the channel is unbuffered
-	detachCleanupManager.Send(pd.pdName, true)
+	detachCleanupManager.Send(mounter.pdName, true)
 	sdBefore, err := filepath.Glob(diskSDPattern)
 	if err != nil {
 		glog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
@@ -67,20 +67,20 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDP
 		return err
 	}
 
-	if err := gce.(*gce_cloud.GCECloud).AttachDisk(pd.pdName, pd.readOnly); err != nil {
+	if err := gce.(*gce_cloud.GCECloud).AttachDisk(mounter.pdName, mounter.readOnly); err != nil {
 		return err
 	}
 
-	devicePath, err := verifyAttached(pd, sdBeforeSet, gce)
+	devicePath, err := verifyAttached(mounter, sdBeforeSet, gce)
 	if err != nil {
 		return err
 	}
 
 	// Only mount the PD globally once.
-	mountpoint, err := pd.mounter.IsMountPoint(globalPDPath)
+	mountpoint, err := mounter.IsMountPoint(mounter.globalPDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+			if err := os.MkdirAll(mounter.globalPDPath, 0750); err != nil {
 				return err
 			}
 			mountpoint = false
@@ -89,13 +89,13 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDP
 		}
 	}
 	options := []string{}
-	if pd.readOnly {
+	if mounter.readOnly {
 		options = append(options, "ro")
 	}
 	if !mountpoint {
-		err = pd.diskMounter.Mount(devicePath, globalPDPath, pd.fsType, options)
+		err = mounter.diskMounter.Mount(devicePath, mounter.globalPDPath, mounter.fsType, options)
 		if err != nil {
-			os.Remove(globalPDPath)
+			os.Remove(mounter.globalPDPath)
 			return err
 		}
 	}
@@ -103,18 +103,17 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDP
 }
 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk) error {
+func (util *GCEDiskUtil) DetachDisk(mounter *gceNetworkVolumeMounter) error {
 	// Unmount the global PD mount, which should be the only one.
-	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
-	glog.V(5).Infof("DetachDisk(pd) where pd is %#v and the globalPDPath is %q\r\n", pd, globalPDPath)
+	glog.V(5).Infof("DetachDisk(mounter) where mounter is %#v and the globalPDPath is %q\r\n", mounter, mounter.globalPDPath)
 
 	// Terminate any in progress verify detach go routines, this will block until the goroutine is ready to exit because the channel is unbuffered
 	detachCleanupManager.Send(pd.pdName, true)
 
-	if err := pd.mounter.Unmount(globalPDPath); err != nil {
+	if err := mounter.Unmount(mounter.globalPDPath); err != nil {
 		return err
 	}
-	if err := os.Remove(globalPDPath); err != nil {
+	if err := os.Remove(mounter.globalPDPath); err != nil {
 		return err
 	}
 	// Detach the disk
@@ -122,7 +121,7 @@ func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk) error {
 	if err != nil {
 		return err
 	}
-	if err := gce.(*gce_cloud.GCECloud).DetachDisk(pd.pdName); err != nil {
+	if err := gce.(*gce_cloud.GCECloud).DetachDisk(mounter.pdName); err != nil {
 		return err
 	}
 
@@ -132,8 +131,8 @@ func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk) error {
 }
 
 // Verifys the disk device to be created has been succesffully attached, and retries if it fails.
-func verifyAttached(pd *gcePersistentDisk, sdBeforeSet util.StringSet, gce cloudprovider.Interface) (string, error) {
-	devicePaths := getDiskByIdPaths(pd)
+func verifyAttached(mounter *gceNetworkVolumeMounter, sdBeforeSet util.StringSet, gce cloudprovider.Interface) (string, error) {
+	devicePaths := getDiskByIdPaths(mounter)
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		for numChecks := 0; numChecks < maxChecks; numChecks++ {
 			if err := udevadmChangeToNewDrives(sdBeforeSet); err != nil {
@@ -146,45 +145,45 @@ func verifyAttached(pd *gcePersistentDisk, sdBeforeSet util.StringSet, gce cloud
 					return "", err
 				} else if pathExists {
 					// A device path has succesfully been created for the PD
-					glog.V(5).Infof("Succesfully attached GCE PD %q.", pd.pdName)
+					glog.V(5).Infof("Succesfully attached GCE PD %q.", mounter.pdName)
 					return path, nil
 				}
 			}
 
 			// Sleep then check again
-			glog.V(5).Infof("Waiting for GCE PD %q to attach.", pd.pdName)
+			glog.V(5).Infof("Waiting for GCE PD %q to attach.", mounter.pdName)
 			time.Sleep(checkSleepDuration)
 		}
 
 		// Try attaching the disk again
-		glog.Warningf("Timed out waiting for GCE PD %q to attach. Retrying attach.", pd.pdName)
-		if err := gce.(*gce_cloud.GCECloud).AttachDisk(pd.pdName, pd.readOnly); err != nil {
+		glog.Warningf("Timed out waiting for GCE PD %q to attach. Retrying attach.", mounter.pdName)
+		if err := gce.(*gce_cloud.GCECloud).AttachDisk(mounter.pdName, mounter.readOnly); err != nil {
 			return "", err
 		}
 	}
 
-	return "", fmt.Errorf("Could not attach GCE PD %q. Timeout waiting for mount paths to be created.", pd.pdName)
+	return "", fmt.Errorf("Could not attach GCE PD %q. Timeout waiting for mount paths to be created.", mounter.pdName)
 }
 
 // Veify the specified persistent disk device has been succesfully detached, and retries if it fails.
 // This function is intended to be called asynchronously as a go routine.
-func verifyDetached(pd *gcePersistentDisk, gce cloudprovider.Interface) {
+func verifyDetached(mounter *gceNetworkVolumeMounter, gce cloudprovider.Interface) {
 	defer util.HandleCrash()
 
 	// Setting bufferSize to 0 so that when senders send, they are blocked until we recieve. This avoids the need to have a separate exit check.
-	ch, err := detachCleanupManager.Start(pd.pdName, 0 /* bufferSize */)
+	ch, err := detachCleanupManager.Start(mounter.pdName, 0 /* bufferSize */)
 	if err != nil {
-		glog.Errorf("Error adding %q to detachCleanupManager: %v", pd.pdName, err)
+		glog.Errorf("Error adding %q to detachCleanupManager: %v", mounter.pdName, err)
 		return
 	}
-	defer detachCleanupManager.Close(pd.pdName)
+	defer detachCleanupManager.Close(mounter.pdName)
 
 	devicePaths := getDiskByIdPaths(pd)
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		for numChecks := 0; numChecks < maxChecks; numChecks++ {
 			select {
 			case <-ch:
-				glog.Warningf("Terminating GCE PD %q detach verification. Another attach/detach call was made for this PD.", pd.pdName)
+				glog.Warningf("Terminating GCE PD %q detach verification. Another attach/detach call was made for this PD.", mounter.pdName)
 				return
 			default:
 				allPathsRemoved := true
@@ -202,37 +201,37 @@ func verifyDetached(pd *gcePersistentDisk, gce cloudprovider.Interface) {
 				}
 				if allPathsRemoved {
 					// All paths to the PD have been succefully removed
-					glog.V(5).Infof("Succesfully detached GCE PD %q.", pd.pdName)
+					glog.V(5).Infof("Succesfully detached GCE PD %q.", mounter.pdName)
 					return
 				}
 
 				// Sleep then check again
-				glog.V(5).Infof("Waiting for GCE PD %q to detach.", pd.pdName)
+				glog.V(5).Infof("Waiting for GCE PD %q to detach.", mounter.pdName)
 				time.Sleep(checkSleepDuration)
 			}
 		}
 
 		// Try detaching disk again
-		glog.Warningf("Timed out waiting for GCE PD %q to detach. Retrying detach.", pd.pdName)
-		if err := gce.(*gce_cloud.GCECloud).DetachDisk(pd.pdName); err != nil {
-			glog.Errorf("Error on retry detach PD %q: %v", pd.pdName, err)
+		glog.Warningf("Timed out waiting for GCE PD %q to detach. Retrying detach.", mounter.pdName)
+		if err := gce.(*gce_cloud.GCECloud).DetachDisk(mounter.pdName); err != nil {
+			glog.Errorf("Error on retry detach PD %q: %v", mounter.pdName, err)
 			return
 		}
 	}
 
-	glog.Errorf("Could not detach GCE PD %q. One or more mount paths was not removed.", pd.pdName)
+	glog.Errorf("Could not detach GCE PD %q. One or more mount paths was not removed.", mounter.pdName)
 }
 
 // Returns list of all /dev/disk/by-id/* paths for given PD.
-func getDiskByIdPaths(pd *gcePersistentDisk) []string {
+func getDiskByIdPaths(mounter *gceNetworkVolumeMounter) []string {
 	devicePaths := []string{
-		path.Join(diskByIdPath, diskGooglePrefix+pd.pdName),
-		path.Join(diskByIdPath, diskScsiGooglePrefix+pd.pdName),
+		path.Join(diskByIdPath, diskGooglePrefix+mounter.pdName),
+		path.Join(diskByIdPath, diskScsiGooglePrefix+mounter.pdName),
 	}
 
-	if pd.partition != "" {
+	if mounter.partition != "" {
 		for i, path := range devicePaths {
-			devicePaths[i] = path + diskPartitionSuffix + pd.partition
+			devicePaths[i] = path + diskPartitionSuffix + mounter.partition
 		}
 	}
 
