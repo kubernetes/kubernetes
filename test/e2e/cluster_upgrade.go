@@ -526,13 +526,12 @@ func migTemplate() (string, error) {
 	if wait.Poll(poll, singleCallTimeout, func() (bool, error) {
 		// TODO(mbforbes): make this hit the compute API directly instead of
 		// shelling out to gcloud.
-		o, err := exec.Command("gcloud", "preview", "managed-instance-groups",
+		o, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
+			"describe", testContext.CloudConfig.NodeInstanceGroup,
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
-			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
-			"describe",
-			testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
+			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone)).CombinedOutput()
 		if err != nil {
-			errLast = fmt.Errorf("gcloud preview managed-instance-groups describe call failed with err: %v", err)
+			errLast = fmt.Errorf("gcloud compute instance-groups managed describe call failed with err: %v", err)
 			return false, nil
 		}
 		output := string(o)

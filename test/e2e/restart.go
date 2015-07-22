@@ -232,13 +232,13 @@ func restartNodes(provider string, nt time.Duration) error {
 //   done
 //
 //   # Step 2: Start the recreate.
-//   output=$(gcloud preview managed-instance-groups --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
+//   output=$(gcloud compute instance-groups managed --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
 //   op=${output##*:}
 //
 //   # Step 3: Wait until it's complete.
 //   status=""
 //   while [[ "${status}" != "DONE" ]]; do
-// 	  output=$(gcloud preview managed-instance-groups --zone="${ZONE}" get-operation ${op} | grep status)
+// 	  output=$(gcloud compute instance-groups managed --zone="${ZONE}" get-operation ${op} | grep status)
 // 	  status=${output##*:}
 //   done
 func migRollingUpdateSelf(nt time.Duration) error {
