@@ -52,7 +52,7 @@ Documentation for other releases can be found at
 
 In addition to the imperative-style commands, such as `kubectl run` and `kubectl expose`, described [elsewhere](quick-start.md), Kubernetes supports declarative configuration. Often times, configuration files are preferable to imperative commands, since they can be checked into version control and changes to the files can be code reviewed, which is especially important for more complex configurations, producing a more robust, reliable and archival system.
 
-In the declarative style, all configuration is stored in YAML or JSON configuration files, using Kubernetes's API resource schemas as the configuration schemas. `kubectl` can create, update, delete, and get API resources. The `apiVersion` (currently “v1”), resource `kind`, and resource `name` are used by `kubectl` to construct the appropriate API path to invoke for the specified operation. 
+In the declarative style, all configuration is stored in YAML or JSON configuration files using Kubernetes's API resource schemas as the configuration schemas. `kubectl` can create, update, delete, and get API resources. The `apiVersion` (currently “v1”), resource `kind`, and resource `name` are used by `kubectl` to construct the appropriate API path to invoke for the specified operation.
 
 ## Launching a container using a configuration file
 
@@ -154,7 +154,7 @@ hello-world   0/1       Pending   0          0s
 
 Initially, a newly created pod is unscheduled -- no node has been selected to run it. Scheduling happens after creation, but is fast, so you normally shouldn’t see pods in an unscheduled state unless there’s a problem.
 
-After the pod has been scheduled, the image may need to be pulled to the node on which it was scheduled, if it hadn’t be pulled already. After a few seconds, you should see the container running:
+After the pod has been scheduled, the image may need to be pulled to the node on which it was scheduled, if it hadn’t been pulled already. After a few seconds, you should see the container running:
 
 ```console
 $ kubectl get pods
