@@ -89,23 +89,27 @@ Let's consider some examples.  In a hypothetical API (assume we're at version
 v6), the `Frobber` struct looks something like this:
 
 {% highlight go %}
+{% raw %}
 // API v6.
 type Frobber struct {
 	Height int    `json:"height"`
 	Param  string `json:"param"`
 }
+{% endraw %}
 {% endhighlight %}
 
 You want to add a new `Width` field.  It is generally safe to add new fields
 without changing the API version, so you can simply change it to:
 
 {% highlight go %}
+{% raw %}
 // Still API v6.
 type Frobber struct {
 	Height int    `json:"height"`
 	Width  int    `json:"width"`
 	Param  string `json:"param"`
 }
+{% endraw %}
 {% endhighlight %}
 
 The onus is on you to define a sane default value for `Width` such that rule #1
@@ -117,6 +121,7 @@ simply change `Param string` to `Params []string` (without creating a whole new
 API version) - that fails rules #1 and #2.  You can instead do something like:
 
 {% highlight go %}
+{% raw %}
 // Still API v6, but kind of clumsy.
 type Frobber struct {
 	Height int           `json:"height"`
@@ -124,6 +129,7 @@ type Frobber struct {
 	Param  string        `json:"param"`  // the first param
 	ExtraParams []string `json:"params"` // additional params
 }
+{% endraw %}
 {% endhighlight %}
 
 Now you can satisfy the rules: API calls that provide the old style `Param`
@@ -135,12 +141,14 @@ distinct from any one version is to handle growth like this.  The internal
 representation can be implemented as:
 
 {% highlight go %}
+{% raw %}
 // Internal, soon to be v7beta1.
 type Frobber struct {
 	Height int
 	Width  int
 	Params []string
 }
+{% endraw %}
 {% endhighlight %}
 
 The code that converts to/from versioned APIs can decode this into the somewhat
@@ -260,7 +268,9 @@ regenerate auto-generated ones. To regenerate them:
    - run
 
 {% highlight sh %}
+{% raw %}
 hack/update-generated-conversions.sh
+{% endraw %}
 {% endhighlight %}
 
 If running the above script is impossible due to compile errors, the easiest
@@ -335,7 +345,9 @@ an example to illustrate your change.
 Make sure you update the swagger API spec by running:
 
 {% highlight sh %}
+{% raw %}
 hack/update-swagger-spec.sh
+{% endraw %}
 {% endhighlight %}
 
 The API spec changes should be in a commit separate from your other changes.

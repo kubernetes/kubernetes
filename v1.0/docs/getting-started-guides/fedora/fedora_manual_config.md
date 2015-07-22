@@ -30,8 +30,10 @@ The Kubernetes package provides a few services: kube-apiserver, kube-scheduler, 
 Hosts:
 
 ```
+{% raw %}
 fed-master = 192.168.121.9
 fed-node = 192.168.121.65
+{% endraw %}
 ```
 
 **Prepare the hosts:**
@@ -41,25 +43,32 @@ fed-node = 192.168.121.65
 * If you want the very latest Kubernetes release [you can download and yum install the RPM directly from Fedora Koji](http://koji.fedoraproject.org/koji/packageinfo?packageID=19202) instead of using the yum install command below.
 
 {% highlight sh %}
+{% raw %}
 yum -y install --enablerepo=updates-testing kubernetes
+{% endraw %}
 {% endhighlight %}
 
 * Install etcd and iptables
 
 {% highlight sh %}
+{% raw %}
 yum -y install etcd iptables
+{% endraw %}
 {% endhighlight %}
 
 * Add master and node to /etc/hosts on all machines (not needed if hostnames already in DNS). Make sure that communication works between fed-master and fed-node by using a utility such as ping.
 
 {% highlight sh %}
+{% raw %}
 echo "192.168.121.9	fed-master
 192.168.121.65	fed-node" >> /etc/hosts
+{% endraw %}
 {% endhighlight %}
 
 * Edit /etc/kubernetes/config which will be the same on all hosts (master and node) to contain:
 
 {% highlight sh %}
+{% raw %}
 # Comma separated list of nodes in the etcd cluster
 KUBE_MASTER="--master=http://fed-master:8080"
 
@@ -71,13 +80,16 @@ KUBE_LOG_LEVEL="--v=0"
 
 # Should this cluster be allowed to run privileged docker containers
 KUBE_ALLOW_PRIV="--allow_privileged=false"
+{% endraw %}
 {% endhighlight %}
 
 * Disable the firewall on both the master and node, as docker does not play well with other firewall rule managers.  Please note that iptables-services does not exist on default fedora server install.
 
 {% highlight sh %}
+{% raw %}
 systemctl disable iptables-services firewalld
 systemctl stop iptables-services firewalld
+{% endraw %}
 {% endhighlight %}
 
 **Configure the Kubernetes services on the master.**
@@ -85,6 +97,7 @@ systemctl stop iptables-services firewalld
 * Edit /etc/kubernetes/apiserver to appear as such.  The service_cluster_ip_range IP addresses must be an unused block of addresses, not used anywhere else.  They do not need to be routed or assigned to anything.
 
 {% highlight sh %}
+{% raw %}
 # The address on the local server to listen to.
 KUBE_API_ADDRESS="--address=0.0.0.0"
 
@@ -96,22 +109,27 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
 
 # Add your own!
 KUBE_API_ARGS=""
+{% endraw %}
 {% endhighlight %}
 
 * Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1, if not, you will get the error like "connection refused"
 
 {% highlight sh %}
+{% raw %}
 ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
+{% endraw %}
 {% endhighlight %}
 
 * Start the appropriate services on master:
 
 {% highlight sh %}
+{% raw %}
 for SERVICES in etcd kube-apiserver kube-controller-manager kube-scheduler; do
 	systemctl restart $SERVICES
 	systemctl enable $SERVICES
 	systemctl status $SERVICES
 done
+{% endraw %}
 {% endhighlight %}
 
 * Addition of nodes:
@@ -119,6 +137,7 @@ done
 * Create following node.json file on Kubernetes master node:
 
 {% highlight json %}
+{% raw %}
 {
     "apiVersion": "v1",
     "kind": "Node",
@@ -130,16 +149,19 @@ done
         "externalID": "fed-node"
     }
 }
+{% endraw %}
 {% endhighlight %}
 
 Now create a node object internally in your Kubernetes cluster by running:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f ./node.json
 
 $ kubectl get nodes
 NAME                LABELS              STATUS
 fed-node           name=fed-node-label     Unknown
+{% endraw %}
 {% endhighlight %}
 
 Please note that in the above, it only creates a representation for the node
@@ -155,6 +177,7 @@ a Kubernetes node (fed-node) below.
 * Edit /etc/kubernetes/kubelet to appear as such:
 
 {% highlight sh %}
+{% raw %}
 ###
 # Kubernetes kubelet (node) config
 
@@ -169,24 +192,29 @@ KUBELET_API_SERVER="--api_servers=http://fed-master:8080"
 
 # Add your own!
 #KUBELET_ARGS=""
+{% endraw %}
 {% endhighlight %}
 
 * Start the appropriate services on the node (fed-node).
 
 {% highlight sh %}
+{% raw %}
 for SERVICES in kube-proxy kubelet docker; do 
     systemctl restart $SERVICES
     systemctl enable $SERVICES
     systemctl status $SERVICES 
 done
+{% endraw %}
 {% endhighlight %}
 
 * Check to make sure now the cluster can see the fed-node on fed-master, and its status changes to _Ready_.
 
 {% highlight console %}
+{% raw %}
 kubectl get nodes
 NAME                LABELS              STATUS
 fed-node          name=fed-node-label     Ready
+{% endraw %}
 {% endhighlight %}
 
 * Deletion of nodes:
@@ -194,7 +222,9 @@ fed-node          name=fed-node-label     Ready
 To delete _fed-node_ from your Kubernetes cluster, one should run the following on fed-master (Please do not do it, it is just for information):
 
 {% highlight sh %}
+{% raw %}
 kubectl delete -f ./node.json
+{% endraw %}
 {% endhighlight %}
 
 *You should be finished!*

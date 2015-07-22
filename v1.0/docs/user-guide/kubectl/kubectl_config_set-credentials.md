@@ -29,12 +29,15 @@ Specifying a name that already exists will merge new fields on top of existing v
 
 
 ```
+{% raw %}
 kubectl config set-credentials NAME [--client-certificate=path/to/certfile] [--client-key=path/to/keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password]
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Set only the "client-key" field on the "cluster-admin"
 // entry, without touching other values:
 $ kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
@@ -44,11 +47,13 @@ $ kubectl config set-credentials cluster-admin --username=admin --password=uXFGw
 
 // Embed client certificate data in the "cluster-admin" entry
 $ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --client-certificate=: path to client-certificate for the user entry in kubeconfig
       --client-key=: path to client-key for the user entry in kubeconfig
       --embed-certs=false: embed client cert/key for the user entry in kubeconfig
@@ -56,11 +61,13 @@ $ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admi
       --password=: password for the user entry in kubeconfig
       --token=: token for the user entry in kubeconfig
       --username=: username for the user entry in kubeconfig
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -80,6 +87,7 @@ $ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admi
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

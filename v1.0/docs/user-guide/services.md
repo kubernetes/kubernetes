@@ -74,6 +74,7 @@ new instance.  For example, suppose you have a set of `Pods` that each expose
 port 9376 and carry a label "app=MyApp".
 
 {% highlight json %}
+{% raw %}
 {
     "kind": "Service",
     "apiVersion": "v1",
@@ -93,6 +94,7 @@ port 9376 and carry a label "app=MyApp".
         ]
     }
 }
+{% endraw %}
 {% endhighlight %}
 
 This specification will create a new `Service` object named "my-service" which
@@ -129,6 +131,7 @@ abstract other kinds of backends.  For example:
 In any of these scenarios you can define a service without a selector:
 
 {% highlight json %}
+{% raw %}
 {
     "kind": "Service",
     "apiVersion": "v1",
@@ -145,12 +148,14 @@ In any of these scenarios you can define a service without a selector:
         ]
     }
 }
+{% endraw %}
 {% endhighlight %}
 
 Because this has no selector, the corresponding `Endpoints` object will not be
 created. You can manually map the service to your own specific endpoints:
 
 {% highlight json %}
+{% raw %}
 {
     "kind": "Endpoints",
     "apiVersion": "v1",
@@ -168,6 +173,7 @@ created. You can manually map the service to your own specific endpoints:
         }
     ]
 }
+{% endraw %}
 {% endhighlight %}
 
 Accessing a `Service` without a selector works the same as if it had selector.
@@ -206,6 +212,7 @@ ports you must give all of your ports names, so that endpoints can be
 disambiguated.  For example:
 
 {% highlight json %}
+{% raw %}
 {
     "kind": "Service",
     "apiVersion": "v1",
@@ -232,6 +239,7 @@ disambiguated.  For example:
         ]
     }
 }
+{% endraw %}
 {% endhighlight %}
 
 ## Choosing your own IP address
@@ -279,6 +287,7 @@ allocated cluster IP address 10.0.0.11 produces the following environment
 variables:
 
 {% highlight bash %}
+{% raw %}
 REDIS_MASTER_SERVICE_HOST=10.0.0.11
 REDIS_MASTER_SERVICE_PORT=6379
 REDIS_MASTER_PORT=tcp://10.0.0.11:6379
@@ -286,6 +295,7 @@ REDIS_MASTER_PORT_6379_TCP=tcp://10.0.0.11:6379
 REDIS_MASTER_PORT_6379_TCP_PROTO=tcp
 REDIS_MASTER_PORT_6379_TCP_PORT=6379
 REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.0.11
+{% endraw %}
 {% endhighlight %}
 
 *This does imply an ordering requirement* - any `Service` that a `Pod` wants to
@@ -375,6 +385,7 @@ information about the provisioned balancer will be published in the `Service`'s
 `status.loadBalancer` field.  For example:
 
 {% highlight json %}
+{% raw %}
 {
     "kind": "Service",
     "apiVersion": "v1",
@@ -406,6 +417,7 @@ information about the provisioned balancer will be published in the `Service`'s
         }
     }
 }
+{% endraw %}
 {% endhighlight %}
 
 Traffic from the external load balancer will be directed at the backend `Pods`,

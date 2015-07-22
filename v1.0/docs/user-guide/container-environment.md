@@ -54,8 +54,10 @@ Currently the list of all services that are running at the time when the contain
 For a service named **foo** that maps to a container port named **bar**, the following variables are defined:
 
 {% highlight sh %}
+{% raw %}
 FOO_SERVICE_HOST=<the host the service is running on>
 FOO_SERVICE_PORT=<the port the service is running on>
+{% endraw %}
 {% endhighlight %}
 
 Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](http://releases.k8s.io/v1.0.1/cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.

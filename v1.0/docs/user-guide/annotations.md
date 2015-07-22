@@ -15,10 +15,12 @@ It is also useful to be able to attach arbitrary non-identifying metadata, for r
 Like labels, annotations are key-value maps.
 
 {% highlight json %}
+{% raw %}
 "annotations": {
   "key1" : "value1",
   "key2" : "value2"
 }
+{% endraw %}
 {% endhighlight %}
 
 Possible information that could be recorded in annotations:

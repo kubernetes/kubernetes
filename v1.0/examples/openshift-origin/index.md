@@ -27,26 +27,32 @@ If you are using a Salt based KUBERNETES_PROVIDER (**gce**, **vagrant**, **aws**
 ability to create privileged containers via the API.
 
 {% highlight sh %}
+{% raw %}
 $ cd kubernetes
 $ vi cluster/saltbase/pillar/privilege.sls
 
 # If true, allow privileged containers to be created by API
 allow_privileged: true
+{% endraw %}
 {% endhighlight %}
 
 Now spin up a cluster using your preferred KUBERNETES_PROVIDER
 
 {% highlight sh %}
+{% raw %}
 $ export KUBERNETES_PROVIDER=gce
 $ cluster/kube-up.sh
+{% endraw %}
 {% endhighlight %}
 
 Next, let's setup some variables, and create a local folder that will hold generated configuration files.
 
 {% highlight sh %}
+{% raw %}
 $ export OPENSHIFT_EXAMPLE=$(pwd)/examples/openshift-origin
 $ export OPENSHIFT_CONFIG=${OPENSHIFT_EXAMPLE}/config
 $ mkdir ${OPENSHIFT_CONFIG}
+{% endraw %}
 {% endhighlight %}
 
 ### Step 1: Export your Kubernetes configuration file for use by OpenShift pod
@@ -54,7 +60,9 @@ $ mkdir ${OPENSHIFT_CONFIG}
 OpenShift Origin uses a configuration file to know how to access your Kubernetes cluster with administrative authority.
 
 ```
+{% raw %}
 $ cluster/kubectl.sh config view --output=yaml --flatten=true --minify=true > ${OPENSHIFT_CONFIG}/kubeconfig
+{% endraw %}
 ```
 
 The output from this command will contain a single file that has all the required information needed to connect to your
@@ -70,7 +78,9 @@ Kubernetes cluster.
 
 
 {% highlight sh %}
+{% raw %}
 $ cluster/kubectl.sh create -f $OPENSHIFT_EXAMPLE/openshift-service.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Step 3: Generate configuration file for your OpenShift master pod
@@ -83,8 +93,10 @@ build default certificates.
 Grab the public IP address of the service we previously created.
 
 {% highlight sh %}
+{% raw %}
 $ export PUBLIC_IP=$(cluster/kubectl.sh get services openshift --template="{{ index .status.loadBalancer.ingress 0 \"ip\" }}")
 $ echo $PUBLIC_IP
+{% endraw %}
 {% endhighlight %}
 
 Ensure you have a valid PUBLIC_IP address before continuing in the example.
@@ -92,7 +104,9 @@ Ensure you have a valid PUBLIC_IP address before continuing in the example.
 We now need to run a command on your host to generate a proper OpenShift configuration.  To do this, we will volume mount the configuration directory that holds your Kubernetes kubeconfig file from the prior step.
 
 {% highlight sh %}
+{% raw %}
 docker run --privileged -v ${OPENSHIFT_CONFIG}:/config openshift/origin start master --write-config=/config --kubeconfig='/config/kubeconfig' --master='https://localhost:8443' --public-master='https://${PUBLIC_IP}:8443'
+{% endraw %}
 {% endhighlight %}
 
 You should now see a number of certificates minted in your configuration directory, as well as a master-config.yaml file that tells the OpenShift master how to execute.  In the next step, we will bundle this into a Kubernetes Secret that our OpenShift master pod will consume.
@@ -106,19 +120,25 @@ OpenShift includes an experimental command to make this easier.
 First, update the ownership for the files previously generated:
 
 ```
+{% raw %}
 $ sudo -E chown -R ${USER} ${OPENSHIFT_CONFIG}
+{% endraw %}
 ```
 
 Then run the following command to collapse them into a Kubernetes secret.
 
 {% highlight sh %}
+{% raw %}
 docker run -i -t --privileged -e="OPENSHIFTCONFIG=/config/admin.kubeconfig" -v ${OPENSHIFT_CONFIG}:/config openshift/origin ex bundle-secret openshift-config -f /config &> ${OPENSHIFT_EXAMPLE}/secret.json
+{% endraw %}
 {% endhighlight %}
 
 Now, lets create the secret in your Kubernetes cluster.
 
 {% highlight sh %}
+{% raw %}
 $ cluster/kubectl.sh create -f ${OPENSHIFT_EXAMPLE}/secret.json
+{% endraw %}
 {% endhighlight %}
 
 **NOTE: This secret is secret and should not be shared with untrusted parties.**
@@ -131,23 +151,29 @@ We will deploy a pod that runs the OpenShift master.  The OpenShift master will 
 system to manage Kubernetes specific resources.  For the sake of simplicity, the OpenShift master will run with an embedded etcd to hold OpenShift specific content.  This demonstration will evolve in the future to show how to run etcd in a pod so that content is not destroyed if the OpenShift master fails.
 
 {% highlight sh %}
+{% raw %}
 $  cluster/kubectl.sh create -f ${OPENSHIFT_EXAMPLE}/openshift-controller.yaml
+{% endraw %}
 {% endhighlight %}
 
 You should now get a pod provisioned whose name begins with openshift.
 
 {% highlight sh %}
+{% raw %}
 $ cluster/kubectl.sh get pods | grep openshift
 $ cluster/kubectl.sh log openshift-t7147 origin
 Running: cluster/../cluster/gce/../../cluster/../_output/dockerized/bin/linux/amd64/kubectl logs openshift-t7t47 origin
 2015-04-30T15:26:00.454146869Z I0430 15:26:00.454005       1 start_master.go:296] Starting an OpenShift master, reachable at 0.0.0.0:8443 (etcd: [https://10.0.27.2:4001])
 2015-04-30T15:26:00.454231211Z I0430 15:26:00.454223       1 start_master.go:297] OpenShift master public address is https://104.197.73.241:8443
+{% endraw %}
 {% endhighlight %}
 
 Depending upon your cloud provider, you may need to open up an external firewall rule for tcp:8443.  For GCE, you can run the following:
 
 {% highlight sh %}
+{% raw %}
 gcloud compute --project "your-project" firewall-rules create "origin" --allow tcp:8443 --network "your-network" --source-ranges "0.0.0.0/0"
+{% endraw %}
 {% endhighlight %}
 
 Consult your cloud provider's documentation for more information.
@@ -157,9 +183,11 @@ Open a browser and visit the OpenShift master public address reported in your lo
 You can use the CLI commands by running the following:
 
 {% highlight sh %}
+{% raw %}
 $ docker run --privileged --entrypoint="/usr/bin/bash" -it -e="OPENSHIFTCONFIG=/config/admin.kubeconfig" -v ${OPENSHIFT_CONFIG}:/config openshift/origin
 $ osc config use-context public-default
 $ osc --help
+{% endraw %}
 {% endhighlight %}
 
 

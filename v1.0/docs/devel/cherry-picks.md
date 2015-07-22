@@ -16,7 +16,9 @@ Kubernetes projects.
 Any contributor can propose a cherry pick of any pull request, like so:
 
 {% highlight sh %}
+{% raw %}
 hack/cherry_pick_pull.sh upstream/release-3.14 98765
+{% endraw %}
 {% endhighlight %}
 
 This will walk you through the steps to propose an automated cherry pick of pull

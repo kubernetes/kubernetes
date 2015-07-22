@@ -47,12 +47,14 @@ This example will work in a custom namespace to demonstrate the concepts involve
 Let's create a new namespace called limit-example:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/limitrange/namespace.yaml
 namespaces/limit-example
 $ kubectl get namespaces
 NAME            LABELS             STATUS
 default         <none>             Active
 limit-example   <none>             Active
+{% endraw %}
 {% endhighlight %}
 
 Step 2: Apply a limit to the namespace
@@ -60,13 +62,16 @@ Step 2: Apply a limit to the namespace
 Let's create a simple limit in our namespace.
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/limitrange/limits.yaml --namespace=limit-example
 limitranges/mylimits
+{% endraw %}
 {% endhighlight %}
 
 Let's describe the limits that we have imposed in our namespace.
 
 {% highlight console %}
+{% raw %}
 $ kubectl describe limits mylimits --namespace=limit-example
 Name:   mylimits
 Type      Resource  Min  Max Default
@@ -75,6 +80,7 @@ Pod       memory    6Mi  1Gi -
 Pod       cpu       250m   2 -
 Container memory    6Mi  1Gi 100Mi
 Container cpu       250m   2 250m
+{% endraw %}
 {% endhighlight %}
 
 In this scenario, we have said the following:
@@ -99,6 +105,7 @@ Let's first spin up a replication controller that creates a single container pod
 how default values are applied to each pod.
 
 {% highlight console %}
+{% raw %}
 $ kubectl run nginx --image=nginx --replicas=1 --namespace=limit-example
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 nginx        nginx          nginx      run=nginx   1
@@ -107,9 +114,11 @@ POD           IP           CONTAINER(S)   IMAGE(S)   HOST          LABELS      S
 nginx-ykj4j   10.246.1.3                             10.245.1.3/   run=nginx   Running   About a minute
                            nginx          nginx                                Running   54 seconds
 $ kubectl get pods nginx-ykj4j --namespace=limit-example -o yaml | grep resources -C 5
+{% endraw %}
 {% endhighlight %}
 
 {% highlight yaml %}
+{% raw %}
   containers:
   - capabilities: {}
     image: nginx
@@ -121,6 +130,7 @@ $ kubectl get pods nginx-ykj4j --namespace=limit-example -o yaml | grep resource
         memory: 100Mi
     terminationMessagePath: /dev/termination-log
     volumeMounts:
+{% endraw %}
 {% endhighlight %}
 
 Note that our nginx container has picked up the namespace default cpu and memory resource limits.
@@ -128,19 +138,24 @@ Note that our nginx container has picked up the namespace default cpu and memory
 Let's create a pod that exceeds our allowed limits by having it have a container that requests 3 cpu cores.
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/limitrange/invalid-pod.yaml --namespace=limit-example
 Error from server: Pod "invalid-pod" is forbidden: Maximum CPU usage per pod is 2, but requested 3
+{% endraw %}
 {% endhighlight %}
 
 Let's create a pod that falls within the allowed limit boundaries.
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/limitrange/valid-pod.yaml --namespace=limit-example
 pods/valid-pod
 $ kubectl get pods valid-pod --namespace=limit-example -o yaml | grep -C 5 resources
+{% endraw %}
 {% endhighlight %}
 
 {% highlight yaml %}
+{% raw %}
   containers:
   - capabilities: {}
     image: gcr.io/google_containers/serve_hostname
@@ -152,6 +167,7 @@ $ kubectl get pods valid-pod --namespace=limit-example -o yaml | grep -C 5 resou
         memory: 512Mi
     securityContext:
       capabilities: {}
+{% endraw %}
 {% endhighlight %}
 
 Note that this pod specifies explicit resource limits so it did not pick up the namespace default values.
@@ -161,11 +177,13 @@ Step 4: Cleanup
 To remove the resources used by this example, you can just delete the limit-example namespace.
 
 {% highlight console %}
+{% raw %}
 $ kubectl delete namespace limit-example
 namespaces/limit-example
 $ kubectl get namespaces
 NAME      LABELS    STATUS
 default   <none>    Active
+{% endraw %}
 {% endhighlight %}
 
 Summary

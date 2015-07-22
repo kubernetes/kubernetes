@@ -38,7 +38,9 @@ To facilitate recovery in the case of a crash of the updating process itself, we
 Recovery is achieved by issuing the same command again:
 
 {% highlight sh %}
+{% raw %}
 kubectl rolling-update foo [foo-v2] --image=myimage:v2
+{% endraw %}
 {% endhighlight %}
 
 Whenever the rolling update command executes, the kubectl client looks for replication controllers called `foo` and `foo-next`, if they exist, an attempt is

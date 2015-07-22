@@ -25,12 +25,15 @@ submits an update to a resource right when you submit a delete, their update
 will be lost along with the rest of the resource.
 
 ```
+{% raw %}
 kubectl delete ([-f FILENAME] | (RESOURCE [(NAME | -l label | --all)]
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Delete a pod using the type and name specified in pod.json.
 $ kubectl delete -f ./pod.json
 
@@ -45,11 +48,13 @@ $ kubectl delete pod 1234-56-7890-234234-456456
 
 // Delete all pods
 $ kubectl delete pods --all
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --all=false: [-all] to select all the specified resources.
       --cascade=true: If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.
   -f, --filename=[]: Filename, directory, or URL to a file containing the resource to delete.
@@ -58,11 +63,13 @@ $ kubectl delete pods --all
       --ignore-not-found=false: Treat "resource not found" as a successful delete.
   -l, --selector="": Selector (label query) to filter on.
       --timeout=0: The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -87,6 +94,7 @@ $ kubectl delete pods --all
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

@@ -50,6 +50,7 @@ The Namespace provides a unique scope for:
 A *Namespace* defines a logically named group for multiple *Kind*s of resources.
 
 {% highlight go %}
+{% raw %}
 type Namespace struct {
   TypeMeta   `json:",inline"`
   ObjectMeta `json:"metadata,omitempty"`
@@ -57,6 +58,7 @@ type Namespace struct {
   Spec NamespaceSpec `json:"spec,omitempty"`
   Status NamespaceStatus `json:"status,omitempty"`
 }
+{% endraw %}
 {% endhighlight %}
 
 A *Namespace* name is a DNS compatible label.
@@ -101,6 +103,7 @@ See [Admission control: Resource Quota](admission_control_resource_quota.html)
 Upon creation of a *Namespace*, the creator may provide a list of *Finalizer* objects.
 
 {% highlight go %}
+{% raw %}
 type FinalizerName string
 
 // These are internal finalizers to Kubernetes, must be qualified name unless defined here
@@ -113,6 +116,7 @@ type NamespaceSpec struct {
   // Finalizers is an opaque list of values that must be empty to permanently remove object from storage
   Finalizers []FinalizerName
 }
+{% endraw %}
 {% endhighlight %}
 
 A *FinalizerName* is a qualified name.
@@ -130,6 +134,7 @@ set by default.
 A *Namespace* may exist in the following phases.
 
 {% highlight go %}
+{% raw %}
 type NamespacePhase string
 const(
   NamespaceActive NamespacePhase = "Active"
@@ -140,6 +145,7 @@ type NamespaceStatus struct {
   ...
   Phase NamespacePhase 
 }
+{% endraw %}
 {% endhighlight %}
 
 A *Namespace* is in the **Active** phase if it does not have a *ObjectMeta.DeletionTimestamp*.
@@ -238,6 +244,7 @@ to take part in Namespace termination.
 OpenShift creates a Namespace in Kubernetes
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -254,6 +261,7 @@ OpenShift creates a Namespace in Kubernetes
     "name": "development"
   },
 }
+{% endraw %}
 {% endhighlight %}
 
 OpenShift then goes and creates a set of resources (pods, services, etc) associated
@@ -263,6 +271,7 @@ own storage associated with the "development" namespace unknown to Kubernetes.
 User deletes the Namespace in Kubernetes, and Namespace now has following state:
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -280,6 +289,7 @@ User deletes the Namespace in Kubernetes, and Namespace now has following state:
     "name": "development"
   },
 }
+{% endraw %}
 {% endhighlight %}
 
 The Kubernetes *namespace controller* observes the namespace has a *deletionTimestamp*
@@ -288,6 +298,7 @@ success, it executes a *finalize* action that modifies the *Namespace* by
 removing *kubernetes* from the list of finalizers:
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -305,6 +316,7 @@ removing *kubernetes* from the list of finalizers:
     "name": "development"
   },
 }
+{% endraw %}
 {% endhighlight %}
 
 OpenShift Origin has its own *namespace controller* that is observing cluster state, and
@@ -316,6 +328,7 @@ from the list of finalizers.
 This results in the following state:
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -333,6 +346,7 @@ This results in the following state:
     "name": "development"
   },
 }
+{% endraw %}
 {% endhighlight %}
 
 At this point, the Kubernetes *namespace controller* in its sync loop will see that the namespace

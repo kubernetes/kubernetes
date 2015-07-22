@@ -25,6 +25,7 @@ Here is an example replication controller specification that creates 4 instances
 [music-rc.yaml](music-rc.yaml).
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -64,6 +65,7 @@ spec:
       - name: apiserver-secret
         secret:
           secretName: apiserver-secret
+{% endraw %}
 {% endhighlight %}
 
 The `CLUSTER_NAME` variable gives a name to the cluster and allows multiple separate clusters to
@@ -79,6 +81,7 @@ Before creating pods with the replication controller a secret containing the bea
 should be set up. A template is provided in the file [apiserver-secret.yaml](apiserver-secret.yaml):
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -86,12 +89,14 @@ metadata:
   namespace: NAMESPACE
 data:
   token: "TOKEN"
+{% endraw %}
 {% endhighlight %}
 
 Replace `NAMESPACE` with the actual namespace to be used and `TOKEN` with the basic64 encoded
 versions of the bearer token reported by `kubectl config view` e.g.
 
 {% highlight console %}
+{% raw %}
 $ kubectl config view
 ...
 - name: kubernetes-logging_kubernetes-basic-auth
@@ -100,11 +105,13 @@ $ kubectl config view
  ...   
 $ echo yGlDcMvSZPX4PyP0Q5bHgAYgi1iyEHv2 | base64
 eUdsRGNNdlNaUFg0UHlQMFE1YkhnQVlnaTFpeUVIdjIK=
+{% endraw %}
 {% endhighlight %}
 
 resulting in the file:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -112,26 +119,32 @@ metadata:
   namespace: mytunes
 data:
   token: "eUdsRGNNdlNaUFg0UHlQMFE1YkhnQVlnaTFpeUVIdjIK="
+{% endraw %}
 {% endhighlight %}
 
 which can be used to create the secret in your namespace:
 
 {% highlight console %}
+{% raw %}
 kubectl create -f examples/elasticsearch/apiserver-secret.yaml --namespace=mytunes
 secrets/apiserver-secret
+{% endraw %}
 {% endhighlight %}
 
 Now you are ready to create the replication controller which will then create the pods:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f examples/elasticsearch/music-rc.yaml --namespace=mytunes
 replicationcontrollers/music-db
+{% endraw %}
 {% endhighlight %}
 
 It's also useful to have a [service](../../docs/user-guide/services.html) with an load balancer for accessing the Elasticsearch
 cluster which can be found in the file [music-service.yaml](music-service.yaml).
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Service
 metadata:
@@ -147,18 +160,22 @@ spec:
     port: 9200
     targetPort: es
   type: LoadBalancer
+{% endraw %}
 {% endhighlight %}
 
 Let's create the service with an external load balancer:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f examples/elasticsearch/music-service.yaml --namespace=mytunes
 services/music-server
+{% endraw %}
 {% endhighlight %}
 
 Let's see what we've got:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods,rc,services,secrets --namespace=mytunes
 
 NAME             READY     STATUS    RESTARTS   AGE
@@ -173,11 +190,13 @@ music-server   name=music-db   name=music-db   10.0.45.177      9200/TCP
                                                104.197.12.157
 NAME                  TYPE                                      DATA
 apiserver-secret      Opaque                                    1
+{% endraw %}
 {% endhighlight %}
 
 This shows 4 instances of Elasticsearch running. After making sure that port 9200 is accessible for this cluster (e.g. using a firewall rule for Google Compute Engine) we can make queries via the service which will be fielded by the matching Elasticsearch pods.
 
 {% highlight console %}
+{% raw %}
 $ curl 104.197.12.157:9200
 {
   "status" : 200,
@@ -206,11 +225,13 @@ $ curl 104.197.12.157:9200
   },
   "tagline" : "You Know, for Search"
 }
+{% endraw %}
 {% endhighlight %}
 
 We can query the nodes to confirm that an Elasticsearch cluster has been formed.
 
 {% highlight console %}
+{% raw %}
 $ curl 104.197.12.157:9200/_nodes?pretty=true
 {
   "cluster_name" : "mytunes-db",
@@ -251,11 +272,13 @@ $ curl 104.197.12.157:9200/_nodes?pretty=true
               "unicast" : {
                 "hosts" : [ "10.244.2.48", "10.244.0.24", "10.244.3.31", "10.244.1.37" ]
 ...
+{% endraw %}
 {% endhighlight %}
 
 Let's ramp up the number of Elasticsearch nodes from 4 to 10:
 
 {% highlight console %}
+{% raw %}
 $ kubectl scale --replicas=10 replicationcontrollers music-db --namespace=mytunes
 scaled
 $ kubectl get pods --namespace=mytunes
@@ -270,11 +293,13 @@ music-db-u1ru3   1/1       Running   0          38s
 music-db-wnss2   1/1       Running   0          1m
 music-db-x7j2w   1/1       Running   0          1m
 music-db-zjqyv   1/1       Running   0          1m
+{% endraw %}
 {% endhighlight %}
 
 Let's check to make sure that these 10 nodes are part of the same Elasticsearch cluster:
 
 {% highlight console %}
+{% raw %}
 $ curl 104.197.12.157:9200/_nodes?pretty=true | grep name
 "cluster_name" : "mytunes-db",
       "name" : "Killraven",
@@ -327,6 +352,7 @@ $ curl 104.197.12.157:9200/_nodes?pretty=true | grep name
           "name" : "mytunes-db"
         "vm_name" : "OpenJDK 64-Bit Server VM",
           "name" : "eth0",
+{% endraw %}
 {% endhighlight %}
 
 

@@ -96,9 +96,11 @@ Other implementations can be developed fairly easily.
 The APIserver calls the Authorizer interface:
 
 {% highlight go %}
+{% raw %}
 type Authorizer interface {
   Authorize(a Attributes) error
 }
+{% endraw %}
 {% endhighlight %}
 
 to determine whether or not to allow each API action.

@@ -19,6 +19,7 @@ this pod specification [counter-pod.yaml](../../examples/blog-logging/counter-po
 output every second. (You can find different pod specifications [here](logging-demo/).)
 
 {% highlight yaml %}
+{% raw %}
  apiVersion: v1
  kind: Pod
  metadata:
@@ -29,18 +30,22 @@ output every second. (You can find different pod specifications [here](logging-d
      image: ubuntu:14.04
      args: [bash, -c, 
             'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
+{% endraw %}
 {% endhighlight %}
 
 we can run the pod:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f ./counter-pod.yaml
 pods/counter
+{% endraw %}
 {% endhighlight %}
 
 and then fetch the logs:
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs counter
 0: Tue Jun  2 21:37:31 UTC 2015
 1: Tue Jun  2 21:37:32 UTC 2015
@@ -49,12 +54,14 @@ $ kubectl logs counter
 4: Tue Jun  2 21:37:35 UTC 2015
 5: Tue Jun  2 21:37:36 UTC 2015
 ...
+{% endraw %}
 {% endhighlight %}
 
 If a pod has more than one container then you need to specify which container's log files should
 be fetched e.g.
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs kube-dns-v3-7r1l9 etcd
 2015/06/23 00:43:10 etcdserver: start to snapshot (applied: 30003, lastsnap: 20002)
 2015/06/23 00:43:10 etcdserver: compacted log at index 30003
@@ -70,6 +77,7 @@ $ kubectl logs kube-dns-v3-7r1l9 etcd
 2015/06/23 04:51:03 etcdserver: compacted log at index 60006
 2015/06/23 04:51:03 etcdserver: saved snapshot at index 60006
 ...
+{% endraw %}
 {% endhighlight %}
 
 ## Cluster level logging to Google Cloud Logging

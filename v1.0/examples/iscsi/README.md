@@ -34,48 +34,60 @@ Make sure you have the correct device name then run the following as
 root to format it:
 
 {% highlight console %}
+{% raw %}
 mkfs.ext4 /dev/<name of device>
+{% endraw %}
 {% endhighlight %}
 
 Once your pod is created, run it on the Kubernetes master:
 
 {% highlight console %}
+{% raw %}
 kubectl create -f ./your_new_pod.json
+{% endraw %}
 {% endhighlight %}
 
 Here is my command and output:
 
 {% highlight console %}
+{% raw %}
 # kubectl create -f examples/iscsi/iscsi.json
 # kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
 iscsipd   2/2       RUNNING   0           2m
+{% endraw %}
 {% endhighlight %}
 
 On the Kubernetes node, I got these in mount output
 
 {% highlight console %}
+{% raw %}
 # mount |grep kub
 /dev/sdb on /var/lib/kubelet/plugins/kubernetes.io/iscsi/iscsi/10.240.205.13:3260-iqn-iqn.2014-12.world.server:storage.target1-lun-0 type ext4 (ro,relatime,data=ordered)
 /dev/sdb on /var/lib/kubelet/pods/e36158ce-f8d8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-ro type ext4 (ro,relatime,data=ordered)
 /dev/sdc on /var/lib/kubelet/plugins/kubernetes.io/iscsi/iscsi/10.240.205.13:3260-iqn-iqn.2014-12.world.server:storage.target1-lun-1 type xfs (rw,relatime,attr2,inode64,noquota)
 /dev/sdc on /var/lib/kubelet/pods/e36158ce-f8d8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-rw type xfs (rw,relatime,attr2,inode64,noquota)
+{% endraw %}
 {% endhighlight %}
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod.
 
 {% highlight console %}
+{% raw %}
 # docker ps
 CONTAINER ID        IMAGE                                                COMMAND                CREATED             STATUS              PORTS               NAMES
 cc051196e7af        kubernetes/pause:latest                              "/pause"               About an hour ago   Up About an hour                        k8s_iscsipd-rw.ff2d2e9f_iscsipd_default_e36158ce-f8d8-11e4-9ae7-42010af01964_26f3a457                                               
 8aa981443cf4        kubernetes/pause:latest                              "/pause"               About an hour ago   Up About an hour                        k8s_iscsipd-ro.d7752e8f_iscsipd_default_e36158ce-f8d8-11e4-9ae7-42010af01964_4939633d    
+{% endraw %}
 {% endhighlight %}
 
 Run *docker inspect* and I found the Containers mounted the host directory into the their */mnt/iscsipd* directory.
 
 {% highlight console  %}
+{% raw %}
 # docker inspect --format '{{index .Volumes "/mnt/iscsipd"}}' cc051196e7af
 /var/lib/kubelet/pods/75e0af2b-f8e8-11e4-9ae7-42010af01964/volumes/kubernetes.io~iscsi/iscsipd-rw
+{% endraw %}
 {% endhighlight %}
 
 

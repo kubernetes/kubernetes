@@ -18,12 +18,15 @@ Replace a resource by filename or stdin.
 JSON and YAML formats are accepted.
 
 ```
+{% raw %}
 kubectl replace -f FILENAME
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Replace a pod using the data in pod.json.
 $ kubectl replace -f ./pod.json
 
@@ -32,22 +35,26 @@ $ cat pod.json | kubectl replace -f -
 
 // Force replace, delete and then re-create the resource
 kubectl replace --force -f ./pod.json
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --cascade=false: Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.
   -f, --filename=[]: Filename, directory, or URL to file to use to replace the resource.
       --force=false: Delete and re-create the specified resource
       --grace-period=-1: Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
   -h, --help=false: help for replace
       --timeout=0: Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -72,6 +79,7 @@ kubectl replace --force -f ./pod.json
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

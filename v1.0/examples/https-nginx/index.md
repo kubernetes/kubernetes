@@ -16,7 +16,9 @@ It uses an [nginx server block](http://wiki.nginx.org/ServerBlockExample) to ser
 First generate a self signed rsa key and certificate that the server can use for TLS.
 
 {% highlight sh %}
+{% raw %}
 $ make keys secret KEY=/tmp/nginx.key CERT=/tmp/nginx.crt SECRET=/tmp/secret.json
+{% endraw %}
 {% endhighlight %}
 
 ### Create a https nginx application running in a kubernetes cluster
@@ -24,6 +26,7 @@ $ make keys secret KEY=/tmp/nginx.key CERT=/tmp/nginx.crt SECRET=/tmp/secret.jso
 You need a [running kubernetes cluster](../../docs/getting-started-guides/) for this to work.
 
 ```
+{% raw %}
 $ kubectl create -f /tmp/secret.json
 secrets/nginxsecret
 
@@ -64,6 +67,7 @@ $ curl https://nodeip:30744 -k
 ...
 <title>Welcome to nginx!</title>
 ...
+{% endraw %}
 ```
 
 For more information on how to run this in a kubernetes cluster, please see the [user-guide](../../docs/user-guide/connecting-applications.html).

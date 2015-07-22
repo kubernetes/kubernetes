@@ -29,12 +29,15 @@ persistentVolumes (pv), persistentVolumeClaims (pvc), resourceQuotas (quota)
 or secrets.
 
 ```
+{% raw %}
 kubectl describe (RESOURCE NAME_PREFIX | RESOURCE/NAME)
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Describe a node
 $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
@@ -47,18 +50,22 @@ $ kubectl describe po -l name=myLabel
 // Describe all pods managed by the 'frontend' replication controller (rc-created pods
 // get the name of the rc as a prefix in the pod the name).
 $ kubectl describe pods frontend
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
   -h, --help=false: help for describe
   -l, --selector="": Selector (label query) to filter on
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -83,6 +90,7 @@ $ kubectl describe pods frontend
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

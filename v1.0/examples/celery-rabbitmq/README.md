@@ -42,6 +42,7 @@ The Celery task queue will need to communicate with the RabbitMQ broker. RabbitM
 Use the file [`examples/celery-rabbitmq/rabbitmq-service.yaml`](rabbitmq-service.yaml):
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Service
 metadata:
@@ -54,12 +55,15 @@ spec:
   selector:
     app: taskQueue
     component: rabbitmq
+{% endraw %}
 {% endhighlight %}
 
 To start the service, run:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/celery-rabbitmq/rabbitmq-service.yaml
+{% endraw %}
 {% endhighlight %}
 
 This service allows other pods to connect to the rabbitmq. To them, it will be seen as available on port 5672, although the service is routing the traffic to the container (also via port 5672).
@@ -70,6 +74,7 @@ This service allows other pods to connect to the rabbitmq. To them, it will be s
 A RabbitMQ broker can be turned up using the file [`examples/celery-rabbitmq/rabbitmq-controller.yaml`](rabbitmq-controller.yaml):
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -94,6 +99,7 @@ spec:
         resources:
           limits:
             cpu: 100m
+{% endraw %}
 {% endhighlight %}
 
 Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.yaml` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
@@ -106,6 +112,7 @@ Note that bringing up the pod includes pulling down a docker image, which may ta
 Bringing up the celery worker is done by running `$ kubectl create -f examples/celery-rabbitmq/celery-controller.yaml`, which contains this:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -130,6 +137,7 @@ spec:
         resources:
           limits:
             cpu: 100m
+{% endraw %}
 {% endhighlight %}
 
 There are several things to point out here...
@@ -137,6 +145,7 @@ There are several things to point out here...
 Like the RabbitMQ controller, this controller ensures that there is always a pod is running a Celery worker instance. The celery-app-add Docker image is an extension of the standard Celery image. This is the Dockerfile:
 
 ```
+{% raw %}
 FROM library/celery
 
 ADD celery_conf.py /data/celery_conf.py
@@ -146,6 +155,7 @@ ADD run.sh /usr/local/bin/run.sh
 ENV C_FORCE_ROOT 1
 
 CMD ["/bin/bash", "/usr/local/bin/run.sh"]
+{% endraw %}
 ```
 
 The celery\_conf.py contains the definition of a simple Celery task that adds two numbers. This last line starts the Celery worker.
@@ -155,6 +165,7 @@ The celery\_conf.py contains the definition of a simple Celery task that adds tw
 The celery\_conf.py file contains the following:
 
 {% highlight python %}
+{% raw %}
 import os
 
 from celery import Celery
@@ -167,6 +178,7 @@ app = Celery('tasks', broker='amqp://guest@%s//' % broker_service_host, backend=
 @app.task
 def add(x, y):
     return x + y
+{% endraw %}
 {% endhighlight %}
 
 Assuming you're already familiar with how Celery works, everything here should be familiar, except perhaps the part `os.environ.get('RABBITMQ_SERVICE_SERVICE_HOST')`. This environment variable contains the IP address of the RabbitMQ service we created in step 1. Kubernetes automatically provides this environment variable to all containers which have the same app label as that defined in the RabbitMQ service (in this case "taskQueue"). In the Python code above, this has the effect of automatically filling in the broker address when the pod is started.
@@ -183,6 +195,7 @@ Flower is a web-based tool for monitoring and administrating Celery clusters. By
 First, start the flower service with `$ kubectl create -f examples/celery-rabbitmq/flower-service.yaml`. The service is defined as below:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Service
 metadata:
@@ -196,13 +209,16 @@ spec:
     app: taskQueue
     component: flower
   type: LoadBalancer
+{% endraw %}
 {% endhighlight %}
 
 It is marked as external (LoadBalanced). However on many platforms you will have to add an explicit firewall rule to open port 5555.
 On GCE this can be done with:
 
 ```
+{% raw %}
  $ gcloud compute firewall-rules create --allow=tcp:5555 --target-tags=kubernetes-minion kubernetes-minion-5555
+{% endraw %}
 ```
 
 Please remember to delete the rule after you are done with the example (on GCE: `$ gcloud compute firewall-rules delete kubernetes-minion-5555`)
@@ -210,6 +226,7 @@ Please remember to delete the rule after you are done with the example (on GCE: 
 To bring up the pods, run this command `$ kubectl create -f examples/celery-rabbitmq/flower-controller.yaml`. This controller is defined as so:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -232,12 +249,15 @@ spec:
         resources:
           limits:
             cpu: 100m
+{% endraw %}
 {% endhighlight %}
 
 This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed through the service endpoint. This image uses the following command to start Flower:
 
 {% highlight sh %}
+{% raw %}
 flower --broker=amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST:localhost}:5672//
+{% endraw %}
 {% endhighlight %}
 
 Again, it uses the Kubernetes-provided environment variable to obtain the address of the RabbitMQ service.
@@ -245,18 +265,22 @@ Again, it uses the Kubernetes-provided environment variable to obtain the addres
 Once all pods are up and running, running `kubectl get pods` will display something like this:
 
 ```
+{% raw %}
 NAME                                           READY     REASON       RESTARTS   AGE
 celery-controller-wqkz1                        1/1       Running      0          8m
 flower-controller-7bglc                        1/1       Running      0          7m
 rabbitmq-controller-5eb2l                      1/1       Running      0          13m
+{% endraw %}
 ```
 
 `kubectl get service flower-service` will help you to get the external IP addresses of the flower service.
 
 ```
+{% raw %}
 NAME             LABELS        SELECTOR                         IP(S)            PORT(S)
 flower-service   name=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
                                                                 162.222.181.180
+{% endraw %}
 ```
 
 Point your internet browser to the appropriate flower-service address, port 5555 (in our case http://162.222.181.180:5555).

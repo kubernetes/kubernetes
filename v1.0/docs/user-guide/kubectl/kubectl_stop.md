@@ -19,12 +19,15 @@ Attempts to shut down and delete a resource that supports graceful termination.
 If the resource is scalable it will be scaled to 0 before deletion.
 
 ```
+{% raw %}
 kubectl stop (-f FILENAME | RESOURCE (NAME | -l label | --all))
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Shut down foo.
 $ kubectl stop replicationcontroller foo
 
@@ -36,11 +39,13 @@ $ kubectl stop -f service.json
 
 // Shut down all resources in the path/to/resources directory
 $ kubectl stop -f path/to/resources
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --all=false: [-all] to select all the specified resources.
   -f, --filename=[]: Filename, directory, or URL to file of resource(s) to be stopped.
       --grace-period=-1: Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.
@@ -48,11 +53,13 @@ $ kubectl stop -f path/to/resources
       --ignore-not-found=false: Treat "resource not found" as a successful stop.
   -l, --selector="": Selector (label query) to filter on.
       --timeout=0: The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -77,6 +84,7 @@ $ kubectl stop -f path/to/resources
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

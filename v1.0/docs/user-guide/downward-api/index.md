@@ -26,7 +26,9 @@ Use the [`examples/downward-api/dapi-pod.yaml`](dapi-pod.yaml) file to create a 
 downward API.
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/downward-api/dapi-pod.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Examine the logs
@@ -35,9 +37,11 @@ This pod runs the `env` command in a container that consumes the downward API.  
 through the pod logs to see that the pod was injected with the correct values:
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs dapi-test-pod | grep POD_
 2015-04-30T20:22:18.568024817Z POD_NAME=dapi-test-pod
 2015-04-30T20:22:18.568087688Z POD_NAMESPACE=default
+{% endraw %}
 {% endhighlight %}
 
 

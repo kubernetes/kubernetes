@@ -16,12 +16,15 @@ Print the logs for a container in a pod.
 Print the logs for a container in a pod. If the pod has only one container, the container name is optional.
 
 ```
+{% raw %}
 kubectl logs [-f] [-p] POD [-c CONTAINER]
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Returns snapshot of ruby-container logs from pod 123456-7890.
 $ kubectl logs 123456-7890 ruby-container
 
@@ -30,21 +33,25 @@ $ kubectl logs -p 123456-7890 ruby-container
 
 // Starts streaming of ruby-container logs from pod 123456-7890.
 $ kubectl logs -f 123456-7890 ruby-container
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
   -c, --container="": Container name
   -f, --follow=false: Specify if the logs should be streamed.
   -h, --help=false: help for logs
       --interactive=true: If true, prompt the user for input when required. Default true.
   -p, --previous=false: If true, print the logs for the previous instance of the container in a pod if it exists.
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -69,6 +76,7 @@ $ kubectl logs -f 123456-7890 ruby-container
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

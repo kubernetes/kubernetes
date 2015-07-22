@@ -18,22 +18,27 @@ displays Merged kubeconfig settings or a specified kubeconfig file.
 You can use --output=template --template=TEMPLATE to extract specific values.
 
 ```
+{% raw %}
 kubectl config view
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Show Merged kubeconfig settings.
 $ kubectl config view
 
 // Get the password for the e2e user
 $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --flatten=false: flatten the resulting kubeconfig file into self contained output (useful for creating portable kubeconfig files)
   -h, --help=false: help for view
       --merge=true: merge together the full hierarchy of kubeconfig files
@@ -43,11 +48,13 @@ $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2
       --output-version="": Output the formatted object with the given version (default api-version).
       --raw=false: display raw byte data
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -72,6 +79,7 @@ $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

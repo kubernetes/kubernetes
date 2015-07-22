@@ -32,7 +32,9 @@ Once you have installed Ceph and new Kubernetes, you can create a pod based on m
 If Ceph authentication secret is provided, the secret should be first be base64 encoded, then encoded string is placed in a secret yaml. An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secret through ```kubectl``` in the following command.
 
 {% highlight console %}
+{% raw %}
     # kubectl create -f examples/rbd/secret/ceph-secret.yaml
+{% endraw %}
 {% endhighlight %}
 
 # Get started
@@ -40,16 +42,20 @@ If Ceph authentication secret is provided, the secret should be first be base64 
 Here are my commands:
 
 {% highlight console %}
+{% raw %}
     # kubectl create -f examples/rbd/rbd.json
     # kubectl get pods
+{% endraw %}
 {% endhighlight %}
 
 On the Kubernetes host, I got these in mount output
 
 {% highlight console %}
+{% raw %}
     #mount |grep kub
 	/dev/rbd0 on /var/lib/kubelet/plugins/kubernetes.io/rbd/rbd/kube-image-foo type ext4 (ro,relatime,stripe=4096,data=ordered)
 	/dev/rbd0 on /var/lib/kubelet/pods/ec2166b4-de07-11e4-aaf5-d4bed9b39058/volumes/kubernetes.io~rbd/rbdpd type ext4 (ro,relatime,stripe=4096,data=ordered)
+{% endraw %}
 {% endhighlight %}
 
  If you ssh to that machine, you can run `docker ps` to see the actual pod and `docker inspect` to see the volumes used by the container.

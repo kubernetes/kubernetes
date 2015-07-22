@@ -11,24 +11,30 @@ layout: docwithnav
 ## Download the kubectl CLI tool
 
 {% highlight bash %}
+{% raw %}
 ### Darwin
 wget https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/darwin/amd64/kubectl
 
 ### Linux
 wget https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubectl
+{% endraw %}
 {% endhighlight %}
 
 ### Copy kubectl to your path
 
 {% highlight bash %}
+{% raw %}
 chmod +x kubectl
 mv kubectl /usr/local/bin/
+{% endraw %}
 {% endhighlight %}
 
 ### Create a secure tunnel for API communication
 
 {% highlight bash %}
+{% raw %}
 ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
+{% endraw %}
 {% endhighlight %}
 
 

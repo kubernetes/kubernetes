@@ -22,6 +22,7 @@ resource, a number of the fields of the resource are added.
 You can see this at work in the following example:
 
 {% highlight console %}
+{% raw %}
 $ cat > /tmp/original.yaml <<EOF
 apiVersion: v1
 kind: Pod
@@ -41,6 +42,7 @@ $ wc -l /tmp/original.yaml /tmp/current.yaml
       51 /tmp/current.yaml
        9 /tmp/original.yaml
       60 total
+{% endraw %}
 {% endhighlight %}
 
 The resource we posted had only 9 lines, but the one we got back had 51 lines. 

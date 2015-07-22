@@ -24,16 +24,20 @@ Rethinkdb will discover peer using endpoints provided by kubernetes service,
 so first create a service so the following pod can query its endpoint
 
 {% highlight sh %}
+{% raw %}
 $kubectl create -f examples/rethinkdb/driver-service.yaml
+{% endraw %}
 {% endhighlight %}
 
 check out:
 
 {% highlight sh %}
+{% raw %}
 $kubectl get services
 NAME               LABELS        SELECTOR       IP(S)         PORT(S)
 [...]
 rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
+{% endraw %}
 {% endhighlight %}
 
 **Step 2**
@@ -41,7 +45,9 @@ rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
 start fist server in cluster
 
 {% highlight sh %}
+{% raw %}
 $kubectl create -f examples/rethinkdb/rc.yaml
+{% endraw %}
 {% endhighlight %}
 
 Actually, you can start servers as many as you want at one time, just modify the `replicas` in `rc.ymal`
@@ -49,10 +55,12 @@ Actually, you can start servers as many as you want at one time, just modify the
 check out again:
 
 {% highlight sh %}
+{% raw %}
 $kubectl get pods
 NAME                                                  READY     REASON    RESTARTS   AGE
 [...]
 rethinkdb-rc-r4tb0                                    1/1       Running   0          1m
+{% endraw %}
 {% endhighlight %}
 
 **Done!**
@@ -67,6 +75,7 @@ You can scale up you cluster using `kubectl scale`, and new pod will join to exs
 
 
 {% highlight sh %}
+{% raw %}
 $kubectl scale rc rethinkdb-rc --replicas=3
 scaled
 
@@ -76,6 +85,7 @@ NAME                                                  READY     REASON    RESTAR
 rethinkdb-rc-f32c5                                    1/1       Running   0          1m
 rethinkdb-rc-m4d50                                    1/1       Running   0          1m
 rethinkdb-rc-r4tb0                                    1/1       Running   0          3m
+{% endraw %}
 {% endhighlight %}
 
 Admin
@@ -84,25 +94,31 @@ Admin
 You need a separate pod (labeled as role:admin) to access Web Admin UI
 
 {% highlight sh %}
+{% raw %}
 kubectl create -f examples/rethinkdb/admin-pod.yaml
 kubectl create -f examples/rethinkdb/admin-service.yaml
+{% endraw %}
 {% endhighlight %}
 
 find the service
 
 {% highlight sh %}
+{% raw %}
 $kubectl get se
 NAME               LABELS        SELECTOR                  IP(S)            PORT(S)
 [...]
 rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080/TCP
                                                            104.197.19.120
 rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      28015/TCP
+{% endraw %}
 {% endhighlight %}
 
 We request for an external load balancer in the [admin-service.yaml](admin-service.yaml) file:
 
 ```
+{% raw %}
 type: LoadBalancer
+{% endraw %}
 ```
 
 The external load balancer allows us to access the service from outside via an external IP, which is 104.197.19.120 in this case. 
@@ -110,7 +126,9 @@ The external load balancer allows us to access the service from outside via an e
 Note that you may need to create a firewall rule to allow the traffic, assuming you are using Google Compute Engine:
 
 {% highlight console %}
+{% raw %}
 $ gcloud compute firewall-rules create rethinkdb --allow=tcp:8080
+{% endraw %}
 {% endhighlight %}
 
 Now you can open a web browser and access to *http://104.197.19.120:8080* to manage your cluster.

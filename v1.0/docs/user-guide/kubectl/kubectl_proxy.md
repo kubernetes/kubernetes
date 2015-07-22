@@ -31,23 +31,28 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 
 
 ```
+{% raw %}
 kubectl proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]
+{% endraw %}
 ```
 
 ### Examples
 
 ```
+{% raw %}
 // Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 $ kubectl proxy --port=8011 --www=./local/www/
 
 // Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
 // This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
 $ kubectl proxy --api-prefix=/k8s-api
+{% endraw %}
 ```
 
 ### Options
 
 ```
+{% raw %}
       --accept-hosts="^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$": Regular expression for hosts that the proxy should accept.
       --accept-paths="^/.*": Regular expression for paths that the proxy should accept.
       --api-prefix="/api/": Prefix to serve the proxied API under.
@@ -58,11 +63,13 @@ $ kubectl proxy --api-prefix=/k8s-api
       --reject-paths="^/api/.*/exec,^/api/.*/run": Regular expression for paths that the proxy should reject.
   -w, --www="": Also serve static files from the given directory under the specified prefix.
   -P, --www-prefix="/static/": Prefix to serve static files under, if static file directory is specified.
+{% endraw %}
 ```
 
 ### Options inherited from parent commands
 
 ```
+{% raw %}
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -87,6 +94,7 @@ $ kubectl proxy --api-prefix=/k8s-api
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+{% endraw %}
 ```
 
 ### SEE ALSO

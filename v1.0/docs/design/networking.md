@@ -107,12 +107,14 @@ differentiate it from `docker0`) is set up outside of Docker proper.
 Example of GCE's advanced routing rules:
 
 {% highlight sh %}
+{% raw %}
 gcloud compute routes add "${MINION_NAMES[$i]}" \
   --project "${PROJECT}" \
   --destination-range "${MINION_IP_RANGES[$i]}" \
   --network "${NETWORK}" \
   --next-hop-instance "${MINION_NAMES[$i]}" \
   --next-hop-instance-zone "${ZONE}" &
+{% endraw %}
 {% endhighlight %}
 
 GCE itself does not know anything about these IPs, though.  This means that when

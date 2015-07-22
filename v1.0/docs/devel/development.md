@@ -34,39 +34,49 @@ Below, we outline one of the more common git workflows that core developers use.
 The commands below require that you have $GOPATH set ([$GOPATH docs](https://golang.org/doc/code.html#GOPATH)). We highly recommend you put Kubernetes' code into your GOPATH. Note: the commands below will not work if there is more than one directory in your `$GOPATH`.
 
 {% highlight sh %}
+{% raw %}
 mkdir -p $GOPATH/src/github.com/GoogleCloudPlatform/
 cd $GOPATH/src/github.com/GoogleCloudPlatform/
 # Replace "$YOUR_GITHUB_USERNAME" below with your github username
 git clone https://github.com/$YOUR_GITHUB_USERNAME/kubernetes.git
 cd kubernetes
 git remote add upstream 'https://github.com/GoogleCloudPlatform/kubernetes.git'
+{% endraw %}
 {% endhighlight %}
 
 ### Create a branch and make changes
 
 {% highlight sh %}
+{% raw %}
 git checkout -b myfeature
 # Make your code changes
+{% endraw %}
 {% endhighlight %}
 
 ### Keeping your development fork in sync
 
 {% highlight sh %}
+{% raw %}
 git fetch upstream
 git rebase upstream/master
+{% endraw %}
 {% endhighlight %}
 
 Note: If you have write access to the main repository at github.com/GoogleCloudPlatform/kubernetes, you should modify your git configuration so that you can't accidentally push to upstream:
 
 {% highlight sh %}
+{% raw %}
 git remote set-url --push upstream no_push
+{% endraw %}
 {% endhighlight %}
 
 ### Commiting changes to your fork
 
 {% highlight sh %}
+{% raw %}
 git commit
 git push -f origin myfeature
+{% endraw %}
 {% endhighlight %}
 
 ### Creating a pull request
@@ -90,16 +100,20 @@ directly from mercurial.
 2) Create a new GOPATH for your tools and install godep:
 
 {% highlight sh %}
+{% raw %}
 export GOPATH=$HOME/go-tools
 mkdir -p $GOPATH
 go get github.com/tools/godep
+{% endraw %}
 {% endhighlight %}
 
 3) Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
 
 {% highlight sh %}
+{% raw %}
 export GOPATH=$HOME/go-tools
 export PATH=$PATH:$GOPATH/bin
+{% endraw %}
 {% endhighlight %}
 
 ### Using godep
@@ -109,33 +123,40 @@ Here's a quick walkthrough of one way to use godeps to add or update a Kubernete
 1) Devote a directory to this endeavor:
 
 {% highlight sh %}
+{% raw %}
 export KPATH=$HOME/code/kubernetes
 mkdir -p $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 git clone https://path/to/your/fork .
 # Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
+{% endraw %}
 {% endhighlight %}
 
 2) Set up your GOPATH.
 
 {% highlight sh %}
+{% raw %}
 # Option A: this will let your builds see packages that exist elsewhere on your system.
 export GOPATH=$KPATH:$GOPATH
 # Option B: This will *not* let your local builds see packages that exist elsewhere on your system.
 export GOPATH=$KPATH
 # Option B is recommended if you're going to mess with the dependencies.
+{% endraw %}
 {% endhighlight %}
 
 3) Populate your new GOPATH.
 
 {% highlight sh %}
+{% raw %}
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 godep restore
+{% endraw %}
 {% endhighlight %}
 
 4) Next, you can either add a new dependency or update an existing one.
 
 {% highlight sh %}
+{% raw %}
 # To add a new dependency, do:
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 go get path/to/dependency
@@ -147,6 +168,7 @@ cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 go get -u path/to/dependency
 # Change code in Kubernetes accordingly if necessary.
 godep update path/to/dependency
+{% endraw %}
 {% endhighlight %}
 
 5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by re-restoring: `godep restore`
@@ -161,33 +183,41 @@ Before committing any changes, please link/copy these hooks into your .git
 directory. This will keep you from accidentally committing non-gofmt'd go code.
 
 {% highlight sh %}
+{% raw %}
 cd kubernetes/.git/hooks/
 ln -s ../../hooks/pre-commit .
+{% endraw %}
 {% endhighlight %}
 
 ## Unit tests
 
 {% highlight sh %}
+{% raw %}
 cd kubernetes
 hack/test-go.sh
+{% endraw %}
 {% endhighlight %}
 
 Alternatively, you could also run:
 
 {% highlight sh %}
+{% raw %}
 cd kubernetes
 godep go test ./...
+{% endraw %}
 {% endhighlight %}
 
 If you only want to run unit tests in one package, you could run ``godep go test`` under the package directory. For example, the following commands will run all unit tests in package kubelet:
 
 {% highlight console %}
+{% raw %}
 $ cd kubernetes # step into the kubernetes directory.
 $ cd pkg/kubelet
 $ godep go test
 # some output from unit tests
 PASS
 ok      github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet   0.317s
+{% endraw %}
 {% endhighlight %}
 
 ## Coverage
@@ -197,8 +227,10 @@ Currently, collecting coverage is only supported for the Go unit tests.
 To run all unit tests and generate an HTML coverage report, run the following:
 
 {% highlight sh %}
+{% raw %}
 cd kubernetes
 KUBE_COVER=y hack/test-go.sh
+{% endraw %}
 {% endhighlight %}
 
 At the end of the run, an the HTML report will be generated with the path printed to stdout.
@@ -206,8 +238,10 @@ At the end of the run, an the HTML report will be generated with the path printe
 To run tests and collect coverage in only one package, pass its relative path under the `kubernetes` directory as an argument, for example:
 
 {% highlight sh %}
+{% raw %}
 cd kubernetes
 KUBE_COVER=y hack/test-go.sh pkg/kubectl
+{% endraw %}
 {% endhighlight %}
 
 Multiple arguments can be passed, in which case the coverage results will be combined for all tests run.
@@ -219,8 +253,10 @@ Coverage results for the project can also be viewed on [Coveralls](https://cover
 You need an [etcd](https://github.com/coreos/etcd/releases/tag/v2.0.0) in your path, please make sure it is installed and in your ``$PATH``.
 
 {% highlight sh %}
+{% raw %}
 cd kubernetes
 hack/test-integration.sh
+{% endraw %}
 {% endhighlight %}
 
 ## End-to-End tests
@@ -228,14 +264,18 @@ hack/test-integration.sh
 You can run an end-to-end test which will bring up a master and two nodes, perform some tests, and then tear everything down. Make sure you have followed the getting started steps for your chosen cloud platform (which might involve changing the `KUBERNETES_PROVIDER` environment variable to something other than "gce".
 
 {% highlight sh %}
+{% raw %}
 cd kubernetes
 hack/e2e-test.sh
+{% endraw %}
 {% endhighlight %}
 
 Pressing control-C should result in an orderly shutdown but if something goes wrong and you still have some VMs running you can force a cleanup with this command:
 
 {% highlight sh %}
+{% raw %}
 go run hack/e2e.go --down
+{% endraw %}
 {% endhighlight %}
 
 ### Flag options
@@ -243,6 +283,7 @@ go run hack/e2e.go --down
 See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster, here is an overview:
 
 {% highlight sh %}
+{% raw %}
 # Build binaries for testing
 go run hack/e2e.go --build
 
@@ -269,11 +310,13 @@ go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
 
 # Alternately, if you have the e2e cluster up and no desire to see the event stream, you can run ginkgo-e2e.sh directly:
 hack/ginkgo-e2e.sh --ginkgo.focus=Pods.*env
+{% endraw %}
 {% endhighlight %}
 
 ### Combining flags
 
 {% highlight sh %}
+{% raw %}
 # Flags can be combined, and their actions will take place in this order:
 # -build, -push|-up|-pushup, -test|-tests=..., -down
 # e.g.:
@@ -287,6 +330,7 @@ go run hack/e2e.go -build -pushup -test -down
 # kubectl output.
 go run hack/e2e.go -v -ctl='get events'
 go run hack/e2e.go -v -ctl='delete pod foobar'
+{% endraw %}
 {% endhighlight %}
 
 ## Conformance testing
@@ -308,7 +352,9 @@ See [conformance-test.sh](http://releases.k8s.io/v1.0.1/hack/conformance-test.sh
 ## Regenerating the CLI documentation
 
 {% highlight sh %}
+{% raw %}
 hack/run-gendocs.sh
+{% endraw %}
 {% endhighlight %}
 
 

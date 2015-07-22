@@ -131,7 +131,9 @@ on that subnet, and is passed to docker's `--bridge` flag.
 We start Docker with:
 
 {% highlight sh %}
+{% raw %}
     DOCKER_OPTS="--bridge=cbr0 --iptables=false --ip-masq=false"
+{% endraw %}
 {% endhighlight %}
 
 This bridge is created by Kubelet (controlled by the `--configure-cbr0=true`
@@ -148,14 +150,18 @@ itself) traffic that is bound for IPs outside the GCE project network
 (10.0.0.0/8).
 
 {% highlight sh %}
+{% raw %}
 iptables -t nat -A POSTROUTING ! -d 10.0.0.0/8 -o eth0 -j MASQUERADE
+{% endraw %}
 {% endhighlight %}
 
 Lastly we enable IP forwarding in the kernel (so the kernel will process
 packets for bridged containers):
 
 {% highlight sh %}
+{% raw %}
 sysctl net.ipv4.ip_forward=1
+{% endraw %}
 {% endhighlight %}
 
 The result of all this is that all `Pods` can reach each other and can egress

@@ -18,11 +18,13 @@ This example will work in a custom namespace to demonstrate the concepts involve
 Let's create a new namespace called quota-example:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/resourcequota/namespace.yaml
 $ kubectl get namespaces
 NAME            LABELS             STATUS
 default         <none>             Active
 quota-example   <none>             Active
+{% endraw %}
 {% endhighlight %}
 
 Step 2: Apply a quota to the namespace
@@ -38,7 +40,9 @@ and API resources (pods, services, etc.) that a namespace may consume.
 Let's create a simple quota in our namespace:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/resourcequota/quota.yaml --namespace=quota-example
+{% endraw %}
 {% endhighlight %}
 
 Once your quota is applied to a namespace, the system will restrict any creation of content
@@ -48,6 +52,7 @@ You can describe your current quota usage to see what resources are being consum
 namespace.
 
 {% highlight console %}
+{% raw %}
 $ kubectl describe quota quota --namespace=quota-example
 Name:                   quota
 Namespace:              quota-example
@@ -61,6 +66,7 @@ replicationcontrollers  0       20
 resourcequotas          1       1
 secrets                 1       10
 services                0       5
+{% endraw %}
 {% endhighlight %}
 
 Step 3: Applying default resource limits
@@ -73,21 +79,26 @@ cpu and memory by creating an nginx container.
 To demonstrate, lets create a replication controller that runs nginx:
 
 {% highlight console %}
+{% raw %}
 $ kubectl run nginx --image=nginx --replicas=1 --namespace=quota-example
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 nginx        nginx          nginx      run=nginx   1
+{% endraw %}
 {% endhighlight %}
 
 Now let's look at the pods that were created.
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods --namespace=quota-example
 NAME      READY     STATUS    RESTARTS   AGE
+{% endraw %}
 {% endhighlight %}
 
 What happened?  I have no pods!  Let's describe the replication controller to get a view of what is happening.
 
 {% highlight console %}
+{% raw %}
 kubectl describe rc nginx --namespace=quota-example
 Name:   nginx
 Image(s): nginx
@@ -98,6 +109,7 @@ Pods Status:  0 Running / 0 Waiting / 0 Succeeded / 0 Failed
 Events:
   FirstSeen       LastSeen      Count From        SubobjectPath Reason    Message
   Mon, 01 Jun 2015 22:49:31 -0400 Mon, 01 Jun 2015 22:52:22 -0400 7 {replication-controller }     failedCreate  Error creating: Pod "nginx-" is forbidden: Limited to 1Gi memory, but pod has no specified memory limit
+{% endraw %}
 {% endhighlight %}
 
 The Kubernetes API server is rejecting the replication controllers requests to create a pod because our pods
@@ -106,6 +118,7 @@ do not specify any memory usage.
 So let's set some default limits for the amount of cpu and memory a pod can consume:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/resourcequota/limits.yaml --namespace=quota-example
 limitranges/limits
 $ kubectl describe limits limits --namespace=quota-example
@@ -115,6 +128,7 @@ Type            Resource        Min     Max     Default
 ----            --------        ---     ---     ---
 Container       memory          -       -       512Mi
 Container       cpu             -       -       100m
+{% endraw %}
 {% endhighlight %}
 
 Now any time a pod is created in this namespace, if it has not specified any resource limits, the default
@@ -124,14 +138,17 @@ Now that we have applied default limits for our namespace, our replication contr
 create its pods.
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods --namespace=quota-example
 NAME          READY     STATUS    RESTARTS   AGE
 nginx-t9cap   1/1       Running   0          49s
+{% endraw %}
 {% endhighlight %}
 
 And if we print out our quota usage in the namespace:
 
 {% highlight console %}
+{% raw %}
 $ kubectl describe quota quota --namespace=quota-example
 Name:                   quota
 Namespace:              default
@@ -145,6 +162,7 @@ replicationcontrollers  1               20
 resourcequotas          1               1
 secrets                 1               10
 services                0               5
+{% endraw %}
 {% endhighlight %}
 
 You can now see the pod that was created is consuming explicit amounts of resources, and the usage is being

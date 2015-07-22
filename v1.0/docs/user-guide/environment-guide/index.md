@@ -52,6 +52,7 @@ Run `curl <public ip>:80` to query the service. You should get
 something like this back:
 
 ```
+{% raw %}
 Pod Name: show-rc-xxu6i
 Pod Namespace: default
 USER_VAR: important information
@@ -71,6 +72,7 @@ Response from backend
 Backend Container
 Backend Pod Name: backend-rc-6qiya
 Backend Namespace: default
+{% endraw %}
 ```
 
 First the frontend pod's information is printed. The pod name and
