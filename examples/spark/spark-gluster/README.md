@@ -4,6 +4,8 @@ This guide is an extension of the standard [Spark on Kubernetes Guide](https://g
 
 The setup is the same in that you will setup a Spark Master Service in the same way you do with the standard Spark guide but you will deploy a modified Spark Master and a Modified Spark Worker ReplicationController, as they will be modified to use the GlusterFS volume plugin to mount a GlusterFS volume into the Spark Master and Spark Workers containers. Note that this example can be used as a guide for implementing any of the Kubernetes Volume Plugins with the Spark Example.
 
+[There is also a video available that provides a walkthrough for how to set this solution up](https://youtu.be/xyIaoM0-gM0)
+
 ## Step Zero: Prerequisites
 
 This example assumes that you have been able to successfully get the standard Spark Example working in Kubernetes and that you have a GlusterFS cluster that is accessible from your Kubernetes cluster. It is also recommended that you are familiar with the GlusterFS Volume Plugin and how to configure it. 
@@ -80,11 +82,13 @@ Identify the Container ID for the Spark Master:
 ```
 $ docker ps
 CONTAINER ID        IMAGE                                  COMMAND             CREATED             STATUS              PORTS                    NAMES
-88a8531f9329      gcr.io/google_containers/spark-master:latest              "/start.sh"         4 minutes ago       Up 4 minutes                                 k8s_spark-master.af6b2d08_sgc-sfgj0_default_446a9f27-e8a2-11e4-ad4a-000c29151bdb_b2710ef5   
+88a8531f9329        gcr.io/google_containers/spark-master:latest              "/start.sh"         4 minutes ago       Up 4 minutes                                 k8s_spark-master.af6b2d08_sgc-sfgj0_default_446a9f27-e8a2-11e4-ad4a-000c29151bdb_b2710ef5   
 4a58e1f3489b        gcr.io/google_containers/pause:0.8.0   "/pause"            4 minutes ago       Up 4 minutes        0.0.0.0:8888->8088/tcp   k8s_POD.908f04ee_sgc-sfgj0_default_446a9f27-e8a2-11e4-ad4a-000c29151bdb_895cdc58 
 ```
 
 Now we will shell into the Spark Master Container and run a Spark Job. In the example below, we are running the Spark Wordcount example and specifying the input and output directory at the location where GlusterFS is mounted in the Spark Master Container. This will submit the job to the Spark Master who will distribute the work to all the Spark Worker Containers. All the Spark Worker containers  will be able to access the data as they all have the same GlusterFS volume mounted at /mnt/glusterfs. The reason we are submitting the job from a Spark Worker and not an additional Spark Base container (as in the standard Spark Example) is due to the fact that the Spark instance submitting the job must be able to access the data. Only the Spark Master and Spark Worker containers have GlusterFS mounted.
+
+The Spark Worker and Spark Master containers include a setup_client utility script that takes two parameters, the Service IP of the Spark Master and the port that it is running on. This must be to setup the container as a Spark client prior to submitting any Spark Jobs.
 
 ```
 $ docker exec -it 88a8531f9329 sh
