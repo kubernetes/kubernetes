@@ -254,9 +254,6 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 	} else {
 		scheme = "https"
 	}
-	if *flInsecureSkipVerify {
-
-	}
 	if host == "" {
 		host = "index.docker.io"
 	}
