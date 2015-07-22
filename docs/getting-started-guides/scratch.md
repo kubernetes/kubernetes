@@ -313,10 +313,10 @@ The kubeconfig file for the administrator can be created as follows:
       - `kubectl config set-cluster $CLUSTER_NAME --server=http://$MASTER_IP --insecure-skip-tls-verify=true`
     - Otherwise, do this to set the apiserver ip, client certs, and user credentials.
       - `kubectl config set-cluster $CLUSTER_NAME --certificate-authority=$CA_CERT --embed-certs=true --server=https://$MASTER_IP`
-      - `kubectl config set-credentials $CLUSTER_NAME --client-certificate=$CLI_CERT --client-key=$CLI_KEY --embed-certs=true --token=$TOKEN`
+      - `kubectl config set-credentials $USER --client-certificate=$CLI_CERT --client-key=$CLI_KEY --embed-certs=true --token=$TOKEN`
     - Set your cluster as the default cluster to use:
-      - `kubectl config set-context $CLUSTER_NAME --cluster=$CLUSTER_NAME --user=admin`
-      - `kubectl config use-context $CONTEXT  --cluster=$CONTEXT`
+      - `kubectl config set-context $CONTEXT_NAME --cluster=$CLUSTER_NAME --user=$USER`
+      - `kubectl config use-context $CONTEXT_NAME`
 
 Next, make a kubeconfig file for the kubelets and kube-proxy.  There are a couple of options for how 
 many distinct files to make:
