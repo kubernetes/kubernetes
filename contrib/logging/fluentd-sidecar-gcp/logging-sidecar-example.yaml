@@ -14,6 +14,10 @@ spec:
       mountPath: /var/log
   - name: sidecar-log-collector
     image: gcr.io/google_containers/fluentd-sidecar-gcp:1.1
+    resources:
+      limits:
+        cpu: 100m
+        memory: 200Mi
     env:
     - name: FILES_TO_COLLECT
       value: "/mnt/log/synthetic-count.log /mnt/log/synthetic-dates.log"
