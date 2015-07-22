@@ -77,13 +77,31 @@ it is still useful to use containers for deployment and management, so we create
 
 The first step in the process is to initialize the master node.
 
-See [here](docker-multinode/master.md) for detailed instructions.
+Clone the Kubernetes repo, and run [master.sh](docker-multinode/master.sh) on the master machine with root:
+```sh
+export K8S_VERSION=<your_k8s_version>
+cd kubernetes/cluster/docker-multinode
+./master.sh
+```
+
+`Master done!`
+
+See [here](docker-multinode/master.md) for detailed instructions explaination.
 
 ## Adding a worker node
 
 Once your master is up and running you can add one or more workers on different machines.
 
-See [here](docker-multinode/worker.md) for detailed instructions.
+Clone the Kubernetes repo, and run [worker.sh](docker-multinode/work.sh) on the worker machine with root:
+```sh
+export K8S_VERSION=<your_k8s_version> MASTER_IP=<your_master_ip>
+cd kubernetes/cluster/docker-multinode
+./worker.sh
+```
+
+`Worker done!`
+
+See [here](docker-multinode/worker.md) for detailed instructions explaination.
 
 ## Testing your cluster
 
