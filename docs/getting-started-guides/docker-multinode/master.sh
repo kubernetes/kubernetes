@@ -21,95 +21,93 @@ set -e
 
 # Make sure docker daemon is running
 if ( ! ps -ef | grep "/usr/bin/docker" | grep -v 'grep' &> /dev/null ); then
-   echo "Docker is not running on this machine!"
-   exit
+    echo "Docker is not running on this machine!"
+    exit 1
 fi
 
 # Make sure k8s version env is properly set
 if [ -z ${K8S_VERSION} ]; then
     echo "Please export K8S_VERSION in your env"
-    exit
+    exit 1
 else
-	echo "k8s version is set to: ${K8S_VERSION}"
+    echo "k8s version is set to: ${K8S_VERSION}"
 fi
 
 
 # Run as root
 if [ "$(id -u)" != "0" ]; then
-  echo >&2 "Please run as root"
-  exit 1
+    echo >&2 "Please run as root"
+    exit 1
 fi
 
 # Check if a command is valid
 command_exists() {
-	command -v "$@" > /dev/null 2>&1
+    command -v "$@" > /dev/null 2>&1
 }
 
 lsb_dist=""
 
 # Detect the OS distro, we support ubuntu, debian, mint, centos, fedora dist
 detect_lsb() {
-	case "$(uname -m)" in
-	*64)
-		;;
-	*)
-		cat >&2 <<-'EOF'
-		Error: you are not using a 64-bit platform.
-		We currently only support 64-bit platforms.
-		EOF
-		exit 1
-		;;
-	esac
+    case "$(uname -m)" in
+    *64)
+        ;;
+    *)
+        echo "Error: We currently only support 64-bit platforms."       
+        exit 1
+        ;;
+    esac
 
-	if command_exists lsb_release; then
-		lsb_dist="$(lsb_release -si)"
-	fi
-	if [ -z ${lsb_dist} ] && [ -r /etc/lsb-release ]; then
-		lsb_dist="$(. /etc/lsb-release && echo "$DISTRIB_ID")"
-	fi
-	if [ -z ${lsb_dist} ] && [ -r /etc/debian_version ]; then
-		lsb_dist='debian'
-	fi
-	if [ -z ${lsb_dist} ] && [ -r /etc/fedora-release ]; then
-		lsb_dist='fedora'
-	fi
-	if [ -z ${lsb_dist} ] && [ -r /etc/os-release ]; then
-		lsb_dist="$(. /etc/os-release && echo "$ID")"
-	fi
+    if command_exists lsb_release; then
+        lsb_dist="$(lsb_release -si)"
+    fi
+    if [ -z ${lsb_dist} ] && [ -r /etc/lsb-release ]; then
+        lsb_dist="$(. /etc/lsb-release && echo "$DISTRIB_ID")"
+    fi
+    if [ -z ${lsb_dist} ] && [ -r /etc/debian_version ]; then
+        lsb_dist='debian'
+    fi
+    if [ -z ${lsb_dist} ] && [ -r /etc/fedora-release ]; then
+        lsb_dist='fedora'
+    fi
+    if [ -z ${lsb_dist} ] && [ -r /etc/os-release ]; then
+        lsb_dist="$(. /etc/os-release && echo "$ID")"
+    fi
 
-	lsb_dist="$(echo ${lsb_dist} | tr '[:upper:]' '[:lower:]')"
+    lsb_dist="$(echo ${lsb_dist} | tr '[:upper:]' '[:lower:]')"
 }
+
 
 # Start the bootstrap daemon
 bootstrap_daemon() {
-	sudo -b docker -d -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null
-
-	sleep 5
+    sudo -b docker -d -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null
+    
+    sleep 5
 }
 
 # Start k8s components in containers
 DOCKER_CONF=""
 
 start_k8s(){
-	# Start etcd 
-	docker -H unix:///var/run/docker-bootstrap.sock run --restart=always --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+    # Start etcd 
+    docker -H unix:///var/run/docker-bootstrap.sock run --restart=always --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
 
-	sleep 5
-	# Set flannel net config
-	docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
-    
+    sleep 5
+    # Set flannel net config
+    docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+
     # iface may change to a private network interface, eth0 is for default
     flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run --restart=always -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld -iface="eth0")
-	
-	sleep 8
 
-	# Copy flannel env out and source it on the host
-	docker -H unix:///var/run/docker-bootstrap.sock cp ${flannelCID}:/run/flannel/subnet.env .
-	source subnet.env
+    sleep 8
+
+    # Copy flannel env out and source it on the host
+    docker -H unix:///var/run/docker-bootstrap.sock cp ${flannelCID}:/run/flannel/subnet.env .
+    source subnet.env
 
     # Configure docker net settings, then restart it
-	case "$lsb_dist" in
-		fedora|centos|amzn)
+    case "$lsb_dist" in
+        fedora|centos|amzn)
             DOCKER_CONF="/etc/sysconfig/docker"
         ;;
         ubuntu|debian|linuxmint)
@@ -117,15 +115,15 @@ start_k8s(){
         ;;
     esac
 
-    # use insecure docker registry
-	echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+    # Append the docker opts
+    echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
 
 
     # sleep a little bit
-	ifconfig docker0 down
+    ifconfig docker0 down
 
     case "$lsb_dist" in
-		fedora|centos|amzn)
+        fedora|centos|amzn)
             yum install bridge-utils && brctl delbr docker0 && systemctl restart docker
         ;;
         ubuntu|debian|linuxmint)
@@ -134,10 +132,10 @@ start_k8s(){
     esac
 
     # sleep a little bit
-	sleep 5
+    sleep 5
 
-	# Start kubelet & proxy, then start master components as pods
-	docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
+    # Start kubelet & proxy, then start master components as pods
+    docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
     docker run -d --net=host --privileged cr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://127.0.0.1:8080 --v=2   
 }
 
