@@ -124,6 +124,16 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gce"}
     ;;
 
+  # Runs only the examples tests on GCE.
+  kubernetes-e2e-gce-examples)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-examples"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-examples"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Example"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-examples"}
+    : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
   # Runs the flaky tests on GCE, sequentially.
   kubernetes-e2e-gce-flaky)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
