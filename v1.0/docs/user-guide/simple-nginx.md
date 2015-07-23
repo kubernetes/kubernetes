@@ -19,25 +19,33 @@ From this point onwards, it is assumed that `kubectl` is on your path from one o
 The [`kubectl run`](kubectl/kubectl_run.html) line below will create two [nginx](https://registry.hub.docker.com/_/nginx/) [pods](pods.html) listening on port 80. It will also create a [replication controller](replication-controller.html) named `my-nginx` to ensure that there are always two pods running.
 
 {% highlight bash %}
+{% raw %}
 kubectl run my-nginx --image=nginx --replicas=2 --port=80
+{% endraw %}
 {% endhighlight %}
 
 Once the pods are created, you can list them to see what is up and running:
 
 {% highlight bash %}
+{% raw %}
 kubectl get pods
+{% endraw %}
 {% endhighlight %}
 
 You can also see the replication controller that was created:
 
 {% highlight bash %}
+{% raw %}
 kubectl get rc
+{% endraw %}
 {% endhighlight %}
 
 To stop the two replicated containers, stop the replication controller:
 
 {% highlight bash %}
+{% raw %}
 kubectl stop rc my-nginx
+{% endraw %}
 {% endhighlight %}
 
 ### Exposing your pods to the internet.
@@ -46,13 +54,17 @@ On some platforms (for example Google Compute Engine) the kubectl command can in
 to do this run:
 
 {% highlight bash %}
+{% raw %}
 kubectl expose rc my-nginx --port=80 --type=LoadBalancer
+{% endraw %}
 {% endhighlight %}
 
 This should print the service that has been created, and map an external IP address to the service. Where to find this external IP address will depend on the environment you run in.  For instance, for Google Compute Engine the external IP address is listed as part of the newly created service and can be retrieved by running
 
 {% highlight bash %}
+{% raw %}
 kubectl get services
+{% endraw %}
 {% endhighlight %}
 
 In order to access your nginx landing page, you also have to make sure that traffic from external IPs is allowed. Do this by opening a firewall to allow traffic on port 80.
@@ -61,6 +73,9 @@ In order to access your nginx landing page, you also have to make sure that traf
 
 Most people will eventually want to use declarative configuration files for creating/modifying their applications.  A [simplified introduction](simple-yaml.html)
 is given in a different document.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

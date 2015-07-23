@@ -280,6 +280,7 @@ in the container specification.
 A new resource for secrets will be added to the API:
 
 {% highlight go %}
+{% raw %}
 type Secret struct {
     TypeMeta
     ObjectMeta
@@ -303,6 +304,7 @@ const (
 )
 
 const MaxSecretSize = 1 * 1024 * 1024
+{% endraw %}
 {% endhighlight %}
 
 A Secret can declare a type in order to provide type information to system components that work
@@ -328,6 +330,7 @@ A new `SecretSource` type of volume source will be added to the `VolumeSource` s
 API:
 
 {% highlight go %}
+{% raw %}
 type VolumeSource struct {
     // Other fields omitted
 
@@ -338,6 +341,7 @@ type VolumeSource struct {
 type SecretSource struct {
     Target ObjectReference
 }
+{% endraw %}
 {% endhighlight %}
 
 Secret volume sources are validated to ensure that the specified object reference actually points
@@ -355,12 +359,14 @@ require access to the API server to retrieve secret data and therefore the volum
 will have to change to expose a client interface:
 
 {% highlight go %}
+{% raw %}
 type Host interface {
     // Other methods omitted
 
     // GetKubeClient returns a client interface
     GetKubeClient() client.Interface
 }
+{% endraw %}
 {% endhighlight %}
 
 The secret volume plugin will be responsible for:
@@ -400,6 +406,7 @@ suggested changes.  All of these examples are assumed to be created in a namespa
 To create a pod that uses an ssh key stored as a secret, we first need to create a secret:
 
 {% highlight json %}
+{% raw %}
 {
   "kind": "Secret",
   "apiVersion": "v1",
@@ -411,6 +418,7 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
     "id-rsa.pub": "dmFsdWUtMQ0K"
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 **Note:** The serialized JSON and YAML values of secret data are encoded as
@@ -420,6 +428,7 @@ omitted.
 Now we can create a pod which references the secret with the ssh key and consumes it in a volume:
 
 {% highlight json %}
+{% raw %}
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -453,6 +462,7 @@ Now we can create a pod which references the secret with the ssh key and consume
     ]
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 When the container's command runs, the pieces of the key will be available in:
@@ -471,6 +481,7 @@ credentials.
 The secrets:
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion": "v1",
   "kind": "List",
@@ -498,11 +509,13 @@ The secrets:
     }
   }]
 }
+{% endraw %}
 {% endhighlight %}
 
 The pods:
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion": "v1",
   "kind": "List",
@@ -574,6 +587,7 @@ The pods:
     }
   }]
 }
+{% endraw %}
 {% endhighlight %}
 
 The specs for the two pods differ only in the value of the object referred to by the secret volume
@@ -581,6 +595,9 @@ source.  Both containers will have the following files present on their filesyst
 
     /etc/secret-volume/username
     /etc/secret-volume/password
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

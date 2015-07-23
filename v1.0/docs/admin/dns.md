@@ -46,6 +46,9 @@ time.
 See [the docs for the DNS cluster addon](http://releases.k8s.io/v1.0.1/cluster/addons/dns/README.md).
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/dns.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -20,7 +20,9 @@ The first thing to debug in your cluster is if your nodes are all registered cor
 Run
 
 {% highlight sh %}
+{% raw %}
 kubectl get nodes
+{% endraw %}
 {% endhighlight %}
 
 And verify that all of the nodes you expect to see are present and that they are all in the `Ready` state.
@@ -114,6 +116,9 @@ Mitigations:
 
 - Action: [Multiple independent clusters](multi-cluster.html) (and avoid making risky changes to all clusters at once)
   - Mitigates: Everything listed above.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

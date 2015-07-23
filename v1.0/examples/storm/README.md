@@ -42,7 +42,9 @@ Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a [pod]
 the ZooKeeper service.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/storm/zookeeper.json
+{% endraw %}
 {% endhighlight %}
 
 Then, use the [`examples/storm/zookeeper-service.json`](zookeeper-service.json) file to create a
@@ -50,7 +52,9 @@ logical service endpoint that Storm can use to access the ZooKeeper
 pod.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/storm/zookeeper-service.json
+{% endraw %}
 {% endhighlight %}
 
 You should make sure the ZooKeeper pod is Running and accessible
@@ -59,14 +63,17 @@ before proceeding.
 ### Check to see if ZooKeeper is running
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get pods
 NAME        READY     STATUS    RESTARTS   AGE
 zookeeper   1/1       Running   0          43s
+{% endraw %}
 {% endhighlight %}
 
 ### Check to see if ZooKeeper is accessible
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get services
 NAME                LABELS                                    SELECTOR            IP(S)               PORT(S)
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
@@ -74,6 +81,7 @@ zookeeper           name=zookeeper                            name=zookeeper    
 
 $ echo ruok | nc 10.254.139.141 2181; echo
 imok
+{% endraw %}
 {% endhighlight %}
 
 ## Step Two: Start your Nimbus service
@@ -85,7 +93,9 @@ Use the [`examples/storm/storm-nimbus.json`](storm-nimbus.json) file to create a
 the Nimbus service.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/storm/storm-nimbus.json
+{% endraw %}
 {% endhighlight %}
 
 Then, use the [`examples/storm/storm-nimbus-service.json`](storm-nimbus-service.json) file to
@@ -93,7 +103,9 @@ create a logical service endpoint that Storm workers can use to access
 the Nimbus pod.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/storm/storm-nimbus-service.json
+{% endraw %}
 {% endhighlight %}
 
 Ensure that the Nimbus service is running and functional.
@@ -101,6 +113,7 @@ Ensure that the Nimbus service is running and functional.
 ### Check to see if Nimbus is running and accessible
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get services
 NAME                LABELS                                    SELECTOR            IP(S)               PORT(S)
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
@@ -110,6 +123,7 @@ nimbus              name=nimbus                               name=nimbus       
 $ sudo docker run -it -w /opt/apache-storm mattf/storm-base sh -c '/configure.sh 10.254.139.141 10.254.115.208; ./bin/storm list'
 ...
 No topologies running.
+{% endraw %}
 {% endhighlight %}
 
 ## Step Three: Start your Storm workers
@@ -125,7 +139,9 @@ Use the [`examples/storm/storm-worker-controller.json`](storm-worker-controller.
 [replication controller](../../docs/user-guide/replication-controller.html) that manages the worker pods.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/storm/storm-worker-controller.json
+{% endraw %}
 {% endhighlight %}
 
 ### Check to see if the workers are running
@@ -134,6 +150,7 @@ One way to check on the workers is to get information from the
 ZooKeeper service about how many clients it has.
 
 {% highlight sh %}
+{% raw %}
 $  echo stat | nc 10.254.139.141 2181; echo
 Zookeeper version: 3.4.6--1, built on 10/23/2014 14:18 GMT
 Clients:
@@ -151,6 +168,7 @@ Outstanding: 0
 Zxid: 0xa39
 Mode: standalone
 Node count: 13
+{% endraw %}
 {% endhighlight %}
 
 There should be one client from the Nimbus service and one per
@@ -174,6 +192,9 @@ Make sure the ZooKeeper Pod is running (use: ```kubectl get pods```).
 Make sure the Nimbus Pod is running.
 
 ```kubectl create -f storm-worker-controller.json```
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -91,6 +91,7 @@ namespace just as a `ReplicationController` or `Service`.
 Since an auto-scaler is a durable object it is best represented as a resource.  
 
 {% highlight go %}
+{% raw %}
     //The auto scaler interface
     type AutoScalerInterface interface {
         //ScaleApplication adjusts a resource's replica count.  Calls scale endpoint.  
@@ -204,6 +205,7 @@ Since an auto-scaler is a durable object it is best represented as a resource.
      // AutoScaleIntentionType is a lexicon for intentions such as "cpu-utilization",
      // "max-rps-per-endpoint"
      type AutoScaleIntentionType string
+{% endraw %}
 {% endhighlight %}
 
 #### Boundary Definitions
@@ -262,6 +264,9 @@ process and auto-scaler are fighting to increase and decrease the count of the t
 to prevent this, deployment orchestration should notify the auto-scaler that a deployment is occurring.  This will
 temporarily disable negative decrement thresholds until the deployment process is completed.  It is more important for
 an auto-scaler to be able to grow capacity during a deployment than to shrink the number of instances precisely.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

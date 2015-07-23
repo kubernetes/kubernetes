@@ -46,22 +46,28 @@ clear what is expected, this document will use the following conventions.
 If the command "COMMAND" is expected to run in a `Pod` and produce "OUTPUT":
 
 {% highlight console %}
+{% raw %}
 u@pod$ COMMAND
 OUTPUT
+{% endraw %}
 {% endhighlight %}
 
 If the command "COMMAND" is expected to run on a `Node` and produce "OUTPUT":
 
 {% highlight console %}
+{% raw %}
 u@node$ COMMAND
 OUTPUT
+{% endraw %}
 {% endhighlight %}
 
 If the command is "kubectl ARGS":
 
 {% highlight console %}
+{% raw %}
 $ kubectl ARGS
 OUTPUT
+{% endraw %}
 {% endhighlight %}
 
 ## Running commands in a Pod
@@ -71,6 +77,7 @@ sees.  Kubernetes does not directly support interactive `Pod`s (yet), but you ca
 approximate it:
 
 {% highlight console %}
+{% raw %}
 $ cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
@@ -85,20 +92,25 @@ spec:
     - "1000000"
 EOF
 pods/busybox-sleep
+{% endraw %}
 {% endhighlight %}
 
 Now, when you need to run a command (even an interactive shell) in a `Pod`-like
 context, use:
 
 {% highlight console %}
+{% raw %}
 $ kubectl exec busybox-sleep -- <COMMAND>
+{% endraw %}
 {% endhighlight %}
 
 or
 
 {% highlight console %}
+{% raw %}
 $ kubectl exec -ti busybox-sleep sh
 / #
+{% endraw %}
 {% endhighlight %}
 
 ## Setup
@@ -108,18 +120,21 @@ probably debugging your own `Service` you can substitute your own details, or yo
 can follow along and get a second data point.
 
 {% highlight console %}
+{% raw %}
 $ kubectl run hostnames --image=gcr.io/google_containers/serve_hostname \
                         --labels=app=hostnames \
                         --port=9376 \
                         --replicas=3
 CONTROLLER   CONTAINER(S)   IMAGE(S)                                  SELECTOR        REPLICAS
 hostnames    hostnames      gcr.io/google_containers/serve_hostname   app=hostnames   3
+{% endraw %}
 {% endhighlight %}
 
 Note that this is the same as if you had started the `ReplicationController` with
 the following YAML:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -139,16 +154,19 @@ spec:
         ports:
         - containerPort: 9376
           protocol: TCP
+{% endraw %}
 {% endhighlight %}
 
 Confirm your `Pod`s are running:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods -l app=hostnames
 NAME              READY     STATUS    RESTARTS   AGE
 hostnames-0uton   1/1       Running   0          12s
 hostnames-bvc05   1/1       Running   0          12s
 hostnames-yp2kp   1/1       Running   0          12s
+{% endraw %}
 {% endhighlight %}
 
 ## Does the Service exist?
@@ -162,43 +180,54 @@ have another `Pod` that consumes this `Service` by name you would get something
 like:
 
 {% highlight console %}
+{% raw %}
 u@pod$ wget -qO- hostnames
 wget: bad address 'hostname'
+{% endraw %}
 {% endhighlight %}
 
 or:
 
 {% highlight console %}
+{% raw %}
 u@pod$ echo $HOSTNAMES_SERVICE_HOST
+{% endraw %}
 {% endhighlight %}
 
 So the first thing to check is whether that `Service` actually exists:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get svc hostnames
 Error from server: service "hostnames" not found
+{% endraw %}
 {% endhighlight %}
 
 So we have a culprit, let's create the `Service`.  As before, this is for the
 walk-through - you can use your own `Service`'s details here.
 
 {% highlight console %}
+{% raw %}
 $ kubectl expose rc hostnames --port=80 --target-port=9376
 NAME        LABELS          SELECTOR        IP(S)     PORT(S)
 hostnames   app=hostnames   app=hostnames             80/TCP
+{% endraw %}
 {% endhighlight %}
 
 And read it back, just to be sure:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get svc hostnames
 NAME        LABELS          SELECTOR        IP(S)        PORT(S)
 hostnames   app=hostnames   app=hostnames   10.0.1.175   80/TCP
+{% endraw %}
 {% endhighlight %}
 
 As before, this is the same as if you had started the `Service` with YAML:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Service
 metadata:
@@ -211,6 +240,7 @@ spec:
     protocol: TCP
     port: 80
     targetPort: 9376
+{% endraw %}
 {% endhighlight %}
 
 Now you can confirm that the `Service` exists.
@@ -220,36 +250,42 @@ Now you can confirm that the `Service` exists.
 From a `Pod` in the same `Namespace`:
 
 {% highlight console %}
+{% raw %}
 u@pod$ nslookup hostnames
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
 Name:   hostnames
 Address: 10.0.1.175
+{% endraw %}
 {% endhighlight %}
 
 If this fails, perhaps your `Pod` and `Service` are in different
 `Namespace`s, try a namespace-qualified name:
 
 {% highlight console %}
+{% raw %}
 u@pod$ nslookup hostnames.default
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
 Name:   hostnames.default
 Address: 10.0.1.175
+{% endraw %}
 {% endhighlight %}
 
 If this works, you'll need to ensure that `Pod`s and `Service`s run in the same
 `Namespace`.  If this still fails, try a fully-qualified name:
 
 {% highlight console %}
+{% raw %}
 u@pod$ nslookup hostnames.default.svc.cluster.local
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
 Name:   hostnames.default.svc.cluster.local
 Address: 10.0.1.175
+{% endraw %}
 {% endhighlight %}
 
 Note the suffix here: "default.svc.cluster.local".  The "default" is the
@@ -260,12 +296,14 @@ You can also try this from a `Node` in the cluster (note: 10.0.0.10 is my DNS
 `Service`):
 
 {% highlight console %}
+{% raw %}
 u@node$ nslookup hostnames.default.svc.cluster.local 10.0.0.10
 Server:         10.0.0.10
 Address:        10.0.0.10#53
 
 Name:   hostnames.default.svc.cluster.local
 Address: 10.0.1.175
+{% endraw %}
 {% endhighlight %}
 
 If you are able to do a fully-qualified name lookup but not a relative one, you
@@ -282,12 +320,14 @@ can take a step back and see what else is not working.  The Kubernetes master
 `Service` should always work:
 
 {% highlight console %}
+{% raw %}
 u@pod$ nslookup kubernetes.default
 Server:    10.0.0.10
 Address 1: 10.0.0.10
 
 Name:      kubernetes
 Address 1: 10.0.0.1
+{% endraw %}
 {% endhighlight %}
 
 If this fails, you might need to go to the kube-proxy section of this doc, or
@@ -300,6 +340,7 @@ The next thing to test is whether your `Service` works at all.  From a
 `Node` in your cluster, access the `Service`'s IP (from `kubectl get` above).
 
 {% highlight console %}
+{% raw %}
 u@node$ curl 10.0.1.175:80
 hostnames-0uton
 
@@ -308,6 +349,7 @@ hostnames-yp2kp
 
 u@node$ curl 10.0.1.175:80
 hostnames-bvc05
+{% endraw %}
 {% endhighlight %}
 
 If your `Service` is working, you should get correct responses.  If not, there
@@ -320,6 +362,7 @@ It might sound silly, but you should really double and triple check that your
 verify it:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get service hostnames -o json
 {
     "kind": "Service",
@@ -356,6 +399,7 @@ $ kubectl get service hostnames -o json
         "loadBalancer": {}
     }
 }
+{% endraw %}
 {% endhighlight %}
 
 Is the port you are trying to access in `spec.ports[]`?  Is the `targetPort`
@@ -373,11 +417,13 @@ actually being selected by the `Service`.
 Earlier we saw that the `Pod`s were running.  We can re-check that:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods -l app=hostnames
 NAME              READY     STATUS    RESTARTS   AGE
 hostnames-0uton   1/1       Running   0          1h
 hostnames-bvc05   1/1       Running   0          1h
 hostnames-yp2kp   1/1       Running   0          1h
+{% endraw %}
 {% endhighlight %}
 
 The "AGE" column says that these `Pod`s are about an hour old, which implies that
@@ -388,9 +434,11 @@ has.  Inside the Kubernetes system is a control loop which evaluates the
 selector of every `Service` and save the results into an `Endpoints` object.
 
 {% highlight console %}
+{% raw %}
 $ kubectl get endpoints hostnames
 NAME        ENDPOINTS
 hostnames   10.244.0.5:9376,10.244.0.6:9376,10.244.0.7:9376
+{% endraw %}
 {% endhighlight %}
 
 This confirms that the control loop has found the correct `Pod`s for your
@@ -405,6 +453,7 @@ Let's check that the `Pod`s are actually working - we can bypass the `Service`
 mechanism and go straight to the `Pod`s.
 
 {% highlight console %}
+{% raw %}
 u@pod$ wget -qO- 10.244.0.5:9376
 hostnames-0uton
 
@@ -413,6 +462,7 @@ hostnames-bvc05
 
 u@pod$ wget -qO- 10.244.0.7:9376
 hostnames-yp2kp
+{% endraw %}
 {% endhighlight %}
 
 We expect each `Pod` in the `Endpoints` list to return its own hostname.  If
@@ -433,8 +483,10 @@ Confirm that `kube-proxy` is running on your `Node`s.  You should get something
 like the below:
 
 {% highlight console %}
+{% raw %}
 u@node$ ps auxw | grep kube-proxy
 root  4194  0.4  0.1 101864 17696 ?    Sl Jul04  25:43 /usr/local/bin/kube-proxy --master=https://kubernetes-master --kubeconfig=/var/lib/kube-proxy/kubeconfig --v=2
+{% endraw %}
 {% endhighlight %}
 
 Next, confirm that it is not failing something obvious, like contacting the
@@ -444,6 +496,7 @@ depends on your `Node` OS.  On some OSes it is a file, such as
 should see something like:
 
 {% highlight console %}
+{% raw %}
 I0707 17:34:53.945651   30031 server.go:88] Running in resource-only container "/kube-proxy"
 I0707 17:34:53.945921   30031 proxier.go:121] Setting proxy IP to 10.240.115.247 and initializing iptables
 I0707 17:34:54.053023   30031 roundrobin.go:262] LoadBalancerRR: Setting endpoints for default/kubernetes: to [10.240.169.188:443]
@@ -462,6 +515,7 @@ I0707 17:34:54.902313   30031 proxysocket.go:130] Accepted TCP connection from 1
 I0707 17:34:54.903107   30031 proxysocket.go:130] Accepted TCP connection from 10.244.3.3:42671 to 10.244.3.1:40074
 I0707 17:35:46.015868   30031 proxysocket.go:246] New UDP connection from 10.244.3.2:57493
 I0707 17:35:46.017061   30031 proxysocket.go:246] New UDP connection from 10.244.3.2:55471
+{% endraw %}
 {% endhighlight %}
 
 If you see error messages about not being able to contact the master, you
@@ -474,9 +528,11 @@ rules which implement `Service`s.  Let's check that those rules are getting
 written.
 
 {% highlight console %}
+{% raw %}
 u@node$ iptables-save | grep hostnames
 -A KUBE-PORTALS-CONTAINER -d 10.0.1.175/32 -p tcp -m comment --comment "default/hostnames:default" -m tcp --dport 80 -j REDIRECT --to-ports 48577
 -A KUBE-PORTALS-HOST -d 10.0.1.175/32 -p tcp -m comment --comment "default/hostnames:default" -m tcp --dport 80 -j DNAT --to-destination 10.240.115.247:48577
+{% endraw %}
 {% endhighlight %}
 
 There should be 2 rules for each port on your `Service` (just one in this
@@ -489,8 +545,10 @@ then look at the logs again.
 Assuming you do see the above rules, try again to access your `Service` by IP:
 
 {% highlight console %}
+{% raw %}
 u@node$ curl 10.0.1.175:80
 hostnames-0uton
+{% endraw %}
 {% endhighlight %}
 
 If this fails, we can try accessing the proxy directly.  Look back at the
@@ -499,14 +557,18 @@ using for your `Service`.  In the above examples it is "48577".  Now connect to
 that:
 
 {% highlight console %}
+{% raw %}
 u@node$ curl localhost:48577
 hostnames-yp2kp
+{% endraw %}
 {% endhighlight %}
 
 If this still fails, look at the `kube-proxy` logs for specific lines like:
 
 {% highlight console %}
+{% raw %}
 Setting endpoints for default/hostnames:default to [10.244.0.5:9376 10.244.0.6:9376 10.244.0.7:9376]
+{% endraw %}
 {% endhighlight %}
 
 If you don't see those, try restarting `kube-proxy` with the `-V` flag set to 4, and
@@ -528,6 +590,9 @@ Contact us on
 ## More information
 
 Visit [troubleshooting document](../troubleshooting.html) for more information. 
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

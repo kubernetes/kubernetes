@@ -69,6 +69,7 @@ information on how Service Accounts work.
 This is an example of a simple secret, in yaml format:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -77,6 +78,7 @@ type: Opaque
 data:
   password: dmFsdWUtMg0K
   username: dmFsdWUtMQ0K
+{% endraw %}
 {% endhighlight %}
 
 The data field is a map.  Its keys must match
@@ -96,6 +98,7 @@ Once the secret is created, you can:
 This is an example of a pod that mounts a secret in a volume:
 
 {% highlight json %}
+{% raw %}
 {
  "apiVersion": "v1",
  "kind": "Pod",
@@ -121,6 +124,7 @@ This is an example of a pod that mounts a secret in a volume:
     }]
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 Each secret you want to use needs its own `spec.volumes`.
@@ -177,6 +181,7 @@ This is the result of commands
 executed inside the container from the example above:
 
 {% highlight console %}
+{% raw %}
 $ ls /etc/foo/
 username
 password
@@ -184,6 +189,7 @@ $ cat /etc/foo/username
 value-1
 $ cat /etc/foo/password
 value-2
+{% endraw %}
 {% endhighlight %}
 
 The program in a container is responsible for reading the secret(s) from the
@@ -229,6 +235,7 @@ update the data of existing secrets, but to create new ones with distinct names.
 To create a pod that uses an ssh key stored as a secret, we first need to create a secret:
 
 {% highlight json %}
+{% raw %}
 {
   "kind": "Secret",
   "apiVersion": "v1",
@@ -240,6 +247,7 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
     "id-rsa.pub": "dmFsdWUtMQ0K"
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 **Note:** The serialized JSON and YAML values of secret data are encoded as
@@ -250,6 +258,7 @@ Now we can create a pod which references the secret with the ssh key and
 consumes it in a volume:
 
 {% highlight json %}
+{% raw %}
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -283,6 +292,7 @@ consumes it in a volume:
     ]
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 When the container's command runs, the pieces of the key will be available in:
@@ -301,6 +311,7 @@ credentials.
 The secrets:
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion": "v1",
   "kind": "List",
@@ -328,11 +339,13 @@ The secrets:
     }
   }]
 }
+{% endraw %}
 {% endhighlight %}
 
 The pods:
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion": "v1",
   "kind": "List",
@@ -404,13 +417,16 @@ The pods:
     }
   }]
 }
+{% endraw %}
 {% endhighlight %}
 
 Both containers will have the following files present on their filesystems:
 
 {% highlight console %}
+{% raw %}
     /etc/secret-volume/username
     /etc/secret-volume/password
+{% endraw %}
 {% endhighlight %}
 
 Note how the specs for the two pods differ only in one field;  this facilitates
@@ -421,6 +437,7 @@ one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
 `test-user` with the `test-db-secret`.  Then, the pod spec can be shortened to, for example:
 
 {% highlight json %}
+{% raw %}
 {
 "kind": "Pod",
 "apiVersion": "v1",
@@ -439,6 +456,7 @@ one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
     }
   ]
 }
+{% endraw %}
 {% endhighlight %}
 
 ### Use-case: Secret visible to one container in a pod
@@ -503,6 +521,9 @@ Pod level](#use-case-two-containers).
    by impersonating the kubelet.  It is a planned feature to only send secrets to
    nodes that actually require them, to restrict the impact of a root exploit on a
    single node.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -28,13 +28,16 @@ Use the [master.yaml](cloud-configs/master.yaml) and [node.yaml](cloud-configs/n
 #### Provision the Master
 
 {% highlight sh %}
+{% raw %}
 aws ec2 create-security-group --group-name kubernetes --description "Kubernetes Security Group"
 aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp --port 22 --cidr 0.0.0.0/0
 aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp --port 80 --cidr 0.0.0.0/0
 aws ec2 authorize-security-group-ingress --group-name kubernetes --source-security-group-name kubernetes
+{% endraw %}
 {% endhighlight %}
 
 {% highlight sh %}
+{% raw %}
 aws ec2 run-instances \
 --image-id <ami_image_id> \
 --key-name <keypair> \
@@ -42,12 +45,15 @@ aws ec2 run-instances \
 --security-groups kubernetes \
 --instance-type m3.medium \
 --user-data file://master.yaml
+{% endraw %}
 {% endhighlight %}
 
 #### Capture the private IP address
 
 {% highlight sh %}
+{% raw %}
 aws ec2 describe-instances --instance-id <master-instance-id>
+{% endraw %}
 {% endhighlight %}
 
 #### Edit node.yaml
@@ -57,6 +63,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the pri
 #### Provision worker nodes
 
 {% highlight sh %}
+{% raw %}
 aws ec2 run-instances \
 --count 1 \
 --image-id <ami_image_id> \
@@ -65,6 +72,7 @@ aws ec2 run-instances \
 --security-groups kubernetes \
 --instance-type m3.medium \
 --user-data file://node.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Google Compute Engine (GCE)
@@ -74,6 +82,7 @@ aws ec2 run-instances \
 #### Provision the Master
 
 {% highlight sh %}
+{% raw %}
 gcloud compute instances create master \
 --image-project coreos-cloud \
 --image <gce_image_id> \
@@ -81,12 +90,15 @@ gcloud compute instances create master \
 --machine-type n1-standard-1 \
 --zone us-central1-a \
 --metadata-from-file user-data=master.yaml
+{% endraw %}
 {% endhighlight %}
 
 #### Capture the private IP address
 
 {% highlight sh %}
+{% raw %}
 gcloud compute instances list
+{% endraw %}
 {% endhighlight %}
 
 #### Edit node.yaml
@@ -96,6 +108,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the pri
 #### Provision worker nodes
 
 {% highlight sh %}
+{% raw %}
 gcloud compute instances create node1 \
 --image-project coreos-cloud \
 --image <gce_image_id> \
@@ -103,6 +116,7 @@ gcloud compute instances create node1 \
 --machine-type n1-standard-1 \
 --zone us-central1-a \
 --metadata-from-file user-data=node.yaml
+{% endraw %}
 {% endhighlight %}
 
 #### Establish network connectivity
@@ -116,9 +130,11 @@ run `gcloud compute ssh master --ssh-flag="-R 8080:127.0.0.1:8080"`.
 #### Create the master config-drive
 
 {% highlight sh %}
+{% raw %}
 mkdir -p /tmp/new-drive/openstack/latest/
 cp master.yaml /tmp/new-drive/openstack/latest/user_data
 hdiutil makehybrid -iso -joliet -joliet-volume-name "config-2" -joliet -o master.iso /tmp/new-drive
+{% endraw %}
 {% endhighlight %}
 
 #### Provision the Master
@@ -134,14 +150,19 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the pri
 #### Create the node config-drive
 
 {% highlight sh %}
+{% raw %}
 mkdir -p /tmp/new-drive/openstack/latest/
 cp node.yaml /tmp/new-drive/openstack/latest/user_data
 hdiutil makehybrid -iso -joliet -joliet-volume-name "config-2" -joliet -o node.iso /tmp/new-drive
+{% endraw %}
 {% endhighlight %}
 
 #### Provision worker nodes
 
 Boot one or more the [vmware image](https://coreos.com/docs/running-coreos/platforms/vmware) using `node.iso` as a config drive.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

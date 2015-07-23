@@ -95,6 +95,7 @@ It is recommended that this design be implemented in two phases:
 The Kubelet will have an interface that points to a `SecurityContextProvider`. The `SecurityContextProvider` is invoked before creating and running a given container:
 
 {% highlight go %}
+{% raw %}
 type SecurityContextProvider interface {
 	// ModifyContainerConfig is called before the Docker createContainer call.
 	// The security context provider can make changes to the Config with which
@@ -110,6 +111,7 @@ type SecurityContextProvider interface {
 	// with a security context. 
 	ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig)
 }
+{% endraw %}
 {% endhighlight %}
 
 If the value of the SecurityContextProvider field on the Kubelet is nil, the kubelet will create and run the container as it does today.   
@@ -120,6 +122,7 @@ A security context resides on the container and represents the runtime parameter
 be used to create and run the container via container APIs. Following is an example of an initial implementation:
 
 {% highlight go %}
+{% raw %}
 type type Container struct {
 	... other fields omitted ...
 	// Optional: SecurityContext defines the security options the pod should be run with
@@ -159,6 +162,7 @@ type SELinuxOptions struct {
 	// SELinux level label.
 	Level string
 }
+{% endraw %}
 {% endhighlight %}
 
 ### Admission
@@ -168,6 +172,9 @@ time of writing, the admission control plugin for security contexts will only al
 has defined capabilities or privileged.  Contexts that attempt to define a UID or SELinux options
 will be denied by default.  In the future the admission plugin will base this decision upon
 configurable policies that reside within the [service account](https://github.com/GoogleCloudPlatform/kubernetes/pull/2297).
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

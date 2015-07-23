@@ -1,17 +1,18 @@
 #!/bin/sh
-# This is a hack to import from master and call it a versioned snapshot.
+# This is a hack to import from a branch and call it a versioned snapshot.
 
 OUTDIR=v1.0
-FAKE_TAG=v1.0.1
+REPORT_TAG=v1.0.1
+BRANCH=release-1.0
 
 set -e
 
 TMPDIR=docs.$RANDOM
 
-echo fetching master
+echo fetching upstream
 git fetch upstream
 go build ./_tools/release_docs
-./release_docs --branch master --output-dir $TMPDIR >/dev/null
+./release_docs --branch ${BRANCH} --output-dir $TMPDIR >/dev/null
 rm ./release_docs
 
 echo removing old
@@ -29,7 +30,7 @@ for dir in docs examples; do
     find ${OUTDIR}/${dir} -type f -name \*.md | while read X; do
         sed -i \
             -e '/<!-- BEGIN STRIP_FOR_RELEASE.*/,/<!-- END STRIP_FOR_RELEASE.*/d' \
-            -e "s|releases.k8s.io/HEAD|releases.k8s.io/${FAKE_TAG}|" \
+            -e "s|releases.k8s.io/HEAD|releases.k8s.io/${REPORT_TAG}|" \
             ${X}
     done
 done

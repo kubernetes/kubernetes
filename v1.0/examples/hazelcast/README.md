@@ -43,6 +43,7 @@ In Kubernetes a _[Service](../../docs/user-guide/services.html)_ describes a set
 Here is the service description:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Service
 metadata: 
@@ -54,6 +55,7 @@ spec:
     - port: 5701
   selector: 
     name: hazelcast
+{% endraw %}
 {% endhighlight %}
 
 The important thing to note here is the `selector`. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is `name: hazelcast`.  If you look at the Replication Controller specification below, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
@@ -61,7 +63,9 @@ The important thing to note here is the `selector`. It is a query over labels, t
 Create this service as follows:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/hazelcast/hazelcast-service.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Adding replicated nodes
@@ -73,6 +77,7 @@ In Kubernetes a _[Replication Controller](../../docs/user-guide/replication-cont
 Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Hazelcast Pod.
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: ReplicationController
 metadata: 
@@ -104,6 +109,7 @@ spec:
           ports: 
             - containerPort: 5701
               name: hazelcast
+{% endraw %}
 {% endhighlight %}
 
 There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.5`.  This is a `busybox` installation with JRE 8 Update 45.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingle.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
@@ -117,12 +123,15 @@ Last but not least, we set `DNS_DOMAIN` environment variable according to your K
 Create this controller:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/hazelcast/hazelcast-controller.yaml
+{% endraw %}
 {% endhighlight %}
 
 After the controller provisions successfully the pod, you can query the service endpoints:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get endpoints hazelcast -o json
 {
     "kind": "Endpoints",
@@ -161,6 +170,7 @@ $ kubectl get endpoints hazelcast -o json
         }
     ]
 }
+{% endraw %}
 {% endhighlight %}
 
 You can see that the _Service_ has found the pod created by the replication controller.
@@ -170,22 +180,27 @@ Now it gets even more interesting.
 Let's scale our cluster to 2 pods:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl scale rc hazelcast --replicas=2
+{% endraw %}
 {% endhighlight %}
 
 Now if you list the pods in your cluster, you should see two hazelcast pods:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get pods
 NAME              READY     STATUS    RESTARTS   AGE
 hazelcast-nanfb   1/1       Running   0          40s
 hazelcast-nsyzn   1/1       Running   0          2m
 kube-dns-xudrp    3/3       Running   0          1h
+{% endraw %}
 {% endhighlight %}
 
 To prove that this all works, you can use the `log` command to examine the logs of one pod, for example:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl log hazelcast-nanfb hazelcast
 2015-07-10 13:26:34.443  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Starting Application on hazelcast-nanfb with PID 5 (/bootstrapper.jar started by root in /)
 2015-07-10 13:26:34.535  INFO 5 --- [           main] s.c.a.AnnotationConfigApplicationContext : Refreshing org.springframework.context.annotation.AnnotationConfigApplicationContext@42cfcf1: startup date [Fri Jul 10 13:26:34 GMT 2015]; root of context hierarchy
@@ -212,12 +227,15 @@ Members [2] {
 
 2015-07-10 13:26:47.722  INFO 5 --- [           main] com.hazelcast.core.LifecycleService      : [10.244.77.3]:5701 [someGroup] [3.5] Address[10.244.77.3]:5701 is STARTED
 2015-07-10 13:26:47.723  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Started Application in 13.792 seconds (JVM running for 14.542)
+{% endraw %}
 {% endhighlight %}
 
 Now let's scale our cluster to 4 nodes:
 
 {% highlight sh %}
+{% raw %}
 $ kubectl scale rc hazelcast --replicas=4
+{% endraw %}
 {% endhighlight %}
 
 Examine the status again by checking the logs and you should see the 4 members connected.
@@ -227,6 +245,7 @@ Examine the status again by checking the logs and you should see the 4 members c
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
 
 {% highlight sh %}
+{% raw %}
 # create a service to track all hazelcast nodes
 kubectl create -f examples/hazelcast/hazelcast-service.yaml
 
@@ -238,11 +257,15 @@ kubectl scale rc hazelcast --replicas=2
 
 # scale up to 4 nodes
 kubectl scale rc hazelcast --replicas=4
+{% endraw %}
 {% endhighlight %}
 
 ### Hazelcast Discovery Source
 
 See [here](https://github.com/pires/hazelcast-kubernetes-bootstrapper/blob/master/src/main/java/com/github/pires/hazelcast/HazelcastDiscoveryController.java)
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

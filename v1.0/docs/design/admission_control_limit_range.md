@@ -18,6 +18,7 @@ A new resource, **LimitRange**, is introduced to enumerate min/max limits for a 
 Kubernetes namespace.
 
 {% highlight go %}
+{% raw %}
 const (
   // Limit that applies to all pods in a namespace
   LimitTypePod string = "Pod"
@@ -60,6 +61,7 @@ type LimitRangeList struct {
   // Items is a list of LimitRange objects
   Items []LimitRange `json:"items"`
 }
+{% endraw %}
 {% endhighlight %}
 
 ## AdmissionControl plugin: LimitRanger
@@ -104,7 +106,9 @@ The server is updated to be aware of **LimitRange** objects.
 The constraints are only enforced if the kube-apiserver is started as follows:
 
 {% highlight console %}
+{% raw %}
 $ kube-apiserver -admission_control=LimitRanger
+{% endraw %}
 {% endhighlight %}
 
 ## kubectl
@@ -116,6 +120,7 @@ kubectl is modified to support the **LimitRange** resource.
 For example,
 
 {% highlight console %}
+{% raw %}
 $ kubectl namespace myspace
 $ kubectl create -f docs/user-guide/limitrange/limits.yaml
 $ kubectl get limits
@@ -129,6 +134,7 @@ Pod             memory          1Mi     1Gi     -
 Pod             cpu             250m    2       -
 Container       memory          1Mi     1Gi     1Mi
 Container       cpu             250m    250m    250m
+{% endraw %}
 {% endhighlight %}
 
 ## Future Enhancements: Define limits for a particular pod or container.
@@ -142,6 +148,9 @@ To make a **LimitRangeItem** more restrictive, we will intend to add these addit
 ## Example
 
 See the [example of Limit Range](../user-guide/limitrange/) for more information.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

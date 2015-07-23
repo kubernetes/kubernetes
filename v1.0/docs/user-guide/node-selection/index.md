@@ -68,6 +68,9 @@ When you then run `kubectl create -f pod.yaml`, the pod will get scheduled on th
 While this example only covered one node, you can attach labels to as many nodes as you want. Then when you schedule a pod with a nodeSelector, it can be scheduled on any of the nodes that satisfy that nodeSelector. Be careful that it will match at least one node, however, because if it doesn't the pod won't be scheduled at all.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/node-selection/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

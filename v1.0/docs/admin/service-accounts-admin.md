@@ -69,6 +69,7 @@ of type `ServiceAccountToken` with an annotation referencing the service
 account, and the controller will update it with a generated token:
 
 {% highlight json %}
+{% raw %}
 secret.json:
 {
 	"kind": "Secret",
@@ -80,18 +81,26 @@ secret.json:
 	}
 	"type": "kubernetes.io/service-account-token"
 }
+{% endraw %}
 {% endhighlight %}
 
 {% highlight sh %}
+{% raw %}
 kubectl create -f ./secret.json
 kubectl describe secret mysecretname
+{% endraw %}
 {% endhighlight %}
 
 #### To delete/invalidate a service account token
 
 {% highlight sh %}
+{% raw %}
 kubectl delete secret mysecretname
+{% endraw %}
 {% endhighlight %}
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

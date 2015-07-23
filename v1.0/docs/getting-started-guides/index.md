@@ -166,6 +166,9 @@ Definition of columns:
 [1]: https://gist.github.com/erictune/4cabc010906afbcc5061
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

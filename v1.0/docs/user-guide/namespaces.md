@@ -39,10 +39,12 @@ for namespaces](#../../docs/admin/namespaces.md)
 You can list the current namespaces in a cluster using:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get namespaces
 NAME          LABELS    STATUS
 default       <none>    Active
 kube-system   <none>    Active
+{% endraw %}
 {% endhighlight %}
 
 Kubernetes starts with two initial namespaces:
@@ -56,8 +58,10 @@ To temporarily set the namespace for a request, use the `--namespace` flag.
 For example:
 
 {% highlight console %}
+{% raw %}
 $ kubectl --namespace=<insert-namespace-name-here> run nginx --image=nginx
 $ kubectl --namespace=<insert-namespace-name-here> get pods
+{% endraw %}
 {% endhighlight %}
 
 ### Setting the namespace preference
@@ -68,13 +72,17 @@ context.
 First get your current context:
 
 {% highlight console %}
+{% raw %}
 $ export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}')
+{% endraw %}
 {% endhighlight %}
 
 Then update the default namespace:
 
 {% highlight console %}
+{% raw %}
 $ kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
+{% endraw %}
 {% endhighlight %}
 
 ## Namespaces and DNS
@@ -93,6 +101,9 @@ in a some namespace.  However namespace resources are not themselves in a namesp
 And, low-level resources, such as [nodes](../../docs/admin/node.html) and
 persistentVolumes, are not in any namespace. Events are an exception: they may or may not
 have a namespace, depending on the object the event is about.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

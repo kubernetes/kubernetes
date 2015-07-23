@@ -42,14 +42,17 @@ Every namespace has a default service account resource called "default".
 You can list this and any other serviceAccount resources in the namespace with this command:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get serviceAccounts
 NAME      SECRETS
 default   1
+{% endraw %}
 {% endhighlight %}
 
 You can create additional serviceAccounts like this:
 
 {% highlight console %}
+{% raw %}
 $ cat > /tmp/serviceaccount.yaml <<EOF
 apiVersion: v1
 kind: ServiceAccount
@@ -58,11 +61,13 @@ metadata:
 EOF
 $ kubectl create -f /tmp/serviceaccount.json
 serviceacccounts/build-robot
+{% endraw %}
 {% endhighlight %}
 
 If you get a complete dump of the service account object, like this:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get serviceacccounts/build-robot -o yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -75,6 +80,7 @@ metadata:
   uid: 721ab723-13bc-11e5-aec2-42010af0021e
 secrets:
 - name: build-robot-token-bvbk5
+{% endraw %}
 {% endhighlight %}
 
 then you will see that a token has automatically been created and is referenced by the service account.
@@ -91,7 +97,9 @@ You cannot update the service account of an already created pod.
 You can clean up the service account from this example like this:
 
 {% highlight console %}
+{% raw %}
 $ kubectl delete serviceaccount/build-robot
+{% endraw %}
 {% endhighlight %}
 
 <!-- TODO: describe how to create a pod with no Service Account. -->
@@ -102,6 +110,9 @@ TODO: Test and explain how to use additional non-K8s secrets with an existing se
 
 TODO explain:
   - The token goes to: "/var/run/secrets/kubernetes.io/serviceaccount/$WHATFILENAME"
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

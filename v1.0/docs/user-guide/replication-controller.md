@@ -97,7 +97,10 @@ For instance, a service might target all pods with `tier in (frontend), environm
 
 Replication controller is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [ReplicationController API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_replicationcontroller).
+object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/v1.0.1/docs/api-reference/definitions.html#_v1_replicationcontroller).
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -14,6 +14,7 @@ Cluster level logging for Kubernetes allows us to collect logs which persist bey
 logging and DNS resolution for names of Kubernetes services:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods --namespace=kube-system
 NAME                                           READY     REASON    RESTARTS   AGE
 fluentd-cloud-logging-kubernetes-minion-0f64   1/1       Running   0          32m
@@ -22,6 +23,7 @@ fluentd-cloud-logging-kubernetes-minion-pk22   1/1       Running   0          31
 fluentd-cloud-logging-kubernetes-minion-20ej   1/1       Running   0          31m
 kube-dns-v3-pk22                               3/3       Running   0          32m
 monitoring-heapster-v1-20ej                    0/1       Running   9          32m
+{% endraw %}
 {% endhighlight %}
 
 Here is the same information in a picture which shows how the pods might be placed on specific nodes.
@@ -34,6 +36,7 @@ This diagram shows four nodes created on a Google Compute Engine cluster with th
 To help explain how cluster level logging works let’s start off with a synthetic log generator pod specification [counter-pod.yaml](../../examples/blog-logging/counter-pod.yaml):
 
 {% highlight yaml %}
+{% raw %}
  apiVersion: v1
  kind: Pod
  metadata:
@@ -45,22 +48,27 @@ To help explain how cluster level logging works let’s start off with a synthet
      image: ubuntu:14.04
      args: [bash, -c, 
             'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
+{% endraw %}
 {% endhighlight %}
 
 This pod specification has one container which runs a bash script when the container is born. This script simply writes out the value of a counter and the date once per second and runs indefinitely. Let’s create the pod in the default
 namespace.
 
 {% highlight console %}
+{% raw %}
  $ kubectl create -f examples/blog-logging/counter-pod.yaml
  pods/counter
+{% endraw %}
 {% endhighlight %}
 
 We can observe the running pod:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 counter                                        1/1       Running   0          5m
+{% endraw %}
 {% endhighlight %}
 
 This step may take a few minutes to download the ubuntu:14.04 image during which the pod status will be shown as `Pending`. 
@@ -72,6 +80,7 @@ One of the nodes is now running the counter pod:
 When the pod status changes to `Running` we can use the kubectl logs command to view the output of this counter pod.
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs counter
 0: Tue Jun  2 21:37:31 UTC 2015
 1: Tue Jun  2 21:37:32 UTC 2015
@@ -80,11 +89,13 @@ $ kubectl logs counter
 4: Tue Jun  2 21:37:35 UTC 2015
 5: Tue Jun  2 21:37:36 UTC 2015
 ...
+{% endraw %}
 {% endhighlight %}
 
 This command fetches the log text from the Docker log file for the image that is running in this container. We can connect to the running container and observe the running counter bash script.
 
 {% highlight console %}
+{% raw %}
 $ kubectl exec -i counter bash
 ps aux
 USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
@@ -92,25 +103,31 @@ root         1  0.0  0.0  17976  2888 ?        Ss   00:02   0:00 bash -c for ((i
 root       468  0.0  0.0  17968  2904 ?        Ss   00:05   0:00 bash
 root       479  0.0  0.0   4348   812 ?        S    00:05   0:00 sleep 1
 root       480  0.0  0.0  15572  2212 ?        R    00:05   0:00 ps aux
+{% endraw %}
 {% endhighlight %}
 
 What happens if for any reason the image in this pod is killed off and then restarted by Kubernetes? Will we still see the log lines from the previous invocation of the container followed by the log lines for the started container? Or will we lose the log lines from the original container’s execution and only see the log lines for the new container? Let’s find out. First let’s stop the currently running counter.
 
 {% highlight console %}
+{% raw %}
 $ kubectl stop pod counter
 pods/counter
+{% endraw %}
 {% endhighlight %}
 
 Now let’s restart the counter.
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f examples/blog-logging/counter-pod.yaml
 pods/counter
+{% endraw %}
 {% endhighlight %}
 
 Let’s wait for the container to restart and get the log lines again.
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs counter
 0: Tue Jun  2 21:51:40 UTC 2015
 1: Tue Jun  2 21:51:41 UTC 2015
@@ -121,6 +138,7 @@ $ kubectl logs counter
 6: Tue Jun  2 21:51:46 UTC 2015
 7: Tue Jun  2 21:51:47 UTC 2015
 8: Tue Jun  2 21:51:48 UTC 2015
+{% endraw %}
 {% endhighlight %}
 
 We’ve lost the log lines from the first invocation of the container in this pod! Ideally, we want to preserve all the log lines from each invocation of each container in the pod. Furthermore, even if the pod is restarted we would still like to preserve all the log lines that were ever emitted by the containers in the pod. But don’t fear, this is the functionality provided by cluster level logging in Kubernetes. When a cluster is created, the standard output and standard error output of each container can be ingested using a [Fluentd](http://www.fluentd.org/) agent running on each node into either [Google Cloud Logging](https://cloud.google.com/logging/docs/) or into Elasticsearch and viewed with Kibana.
@@ -130,6 +148,7 @@ When a Kubernetes cluster is created with logging to Google Cloud Logging enable
 This log collection pod has a specification which looks something like this [fluentd-gcp.yaml](http://releases.k8s.io/v1.0.1/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml):
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -149,6 +168,7 @@ spec:
   - name: containers
     hostPath:
       path: /var/lib/docker/containers
+{% endraw %}
 {% endhighlight %}
 
 This pod specification maps the directory on the host containing the Docker log files, `/var/lib/docker/containers`, to a directory inside the container which has the same path. The pod runs one image, `gcr.io/google_containers/fluentd-gcp:1.6`, which is configured to collect the Docker log files from the logs directory and ingest them into Google Cloud Logging. One instance of this pod runs on each node of the cluster. Kubernetes will notice if this pod fails and automatically restart it.
@@ -169,9 +189,11 @@ Note the first container counted to 108 and then it was terminated. When the nex
  We could query the ingested logs from BigQuery using the SQL query which reports the counter log lines showing the newest lines first:
 
 {% highlight console %}
+{% raw %}
  SELECT metadata.timestamp, structPayload.log
  FROM [mylogs.kubernetes_counter_default_count_20150611] 
  ORDER BY metadata.timestamp DESC
+{% endraw %}
 {% endhighlight %}
 
 Here is some sample output:
@@ -182,12 +204,15 @@ We could also fetch the logs from Google Cloud Storage buckets to our desktop or
 
 
 {% highlight console %}
+{% raw %}
 $ gsutil -m cp -r gs://myproject/kubernetes.counter_default_count/2015/06/11 .
+{% endraw %}
 {% endhighlight %}
 
 Now we can run queries over the ingested logs. The example below uses the [jq](http://stedolan.github.io/jq/) program to extract just the log lines.
 
 {% highlight console %}
+{% raw %}
 $ cat 21\:00\:00_21\:59\:59_S0.json | jq '.structPayload.log'
 "0: Thu Jun 11 21:39:38 UTC 2015\n"
 "1: Thu Jun 11 21:39:39 UTC 2015\n"
@@ -198,11 +223,15 @@ $ cat 21\:00\:00_21\:59\:59_S0.json | jq '.structPayload.log'
 "6: Thu Jun 11 21:39:44 UTC 2015\n"
 "7: Thu Jun 11 21:39:45 UTC 2015\n"
 ...
+{% endraw %}
 {% endhighlight %}
 
 This page has touched briefly on the underlying mechanisms that support gathering cluster level logs on a Kubernetes deployment. The approach here only works for gathering the standard output and standard error output of the processes running in the pod’s containers. To gather other logs that are stored in files one can use a sidecar container to gather the required files as described at the page [Collecting log files within containers with Fluentd](http://releases.k8s.io/v1.0.1/contrib/logging/fluentd-sidecar-gcp/README.md) and sending them to the Google Cloud Logging service.
 
 Some of the material in this section also appears in the blog article [Cluster Level Logging with Kubernetes](http://blog.kubernetes.io/2015/06/cluster-level-logging-with-kubernetes.html).
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

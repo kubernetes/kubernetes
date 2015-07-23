@@ -85,6 +85,7 @@ supply of Pod IPs.
 Kubectl supports creating, updating, and viewing quotas
 
 {% highlight console %}
+{% raw %}
 $ kubectl namespace myspace
 $ cat <<EOF > quota.json
 {
@@ -119,6 +120,7 @@ pods                    5       10
 replicationcontrollers  5       20
 resourcequotas          1       1
 services                3       5
+{% endraw %}
 {% endhighlight %}
 
 ## Quota and Cluster Capacity
@@ -147,6 +149,9 @@ See a [detailed example for how to use resource quota](../user-guide/resourcequo
 ## Read More
 
 See [ResourceQuota design doc](../design/admission_control_resource_quota.html) for more information.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

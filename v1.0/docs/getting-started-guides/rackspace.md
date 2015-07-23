@@ -77,6 +77,9 @@ There is a specific `cluster/rackspace` directory with the scripts for the follo
 - eth2 - Cloud Network - Used for k8s pods to communicate with one another. The proxy service will pass traffic via this interface.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rackspace.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -12,6 +12,9 @@ This directory contains a number of different examples of how to run
 applications with Kubernetes.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

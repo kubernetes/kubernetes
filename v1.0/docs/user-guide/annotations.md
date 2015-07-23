@@ -15,10 +15,12 @@ It is also useful to be able to attach arbitrary non-identifying metadata, for r
 Like labels, annotations are key-value maps.
 
 {% highlight json %}
+{% raw %}
 "annotations": {
   "key1" : "value1",
   "key2" : "value2"
 }
+{% endraw %}
 {% endhighlight %}
 
 Possible information that could be recorded in annotations:
@@ -32,6 +34,9 @@ Possible information that could be recorded in annotations:
 * phone/pager number(s) of person(s) responsible, or directory entry where that info could be found, such as a team website
 
 Yes, this information could be stored in an external database or directory, but that would make it much harder to produce shared client libraries and tools for deployment, management, introspection, etc.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

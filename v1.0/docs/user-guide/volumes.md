@@ -171,12 +171,15 @@ the PD is read-only or the replica count is 0 or 1.
 Before you can use a GCE PD with a pod, you need to create it.
 
 {% highlight sh %}
+{% raw %}
 gcloud compute disks create --size=500GB --zone=us-central1-a my-data-disk
+{% endraw %}
 {% endhighlight %}
 
 #### Example pod
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -194,6 +197,7 @@ spec:
     gcePersistentDisk:
       pdName: my-data-disk
       fsType: ext4
+{% endraw %}
 {% endhighlight %}
 
 ### awsElasticBlockStore
@@ -219,7 +223,9 @@ There are some restrictions when using an awsElasticBlockStore volume:
 Before you can use a EBS volume with a pod, you need to create it.
 
 {% highlight sh %}
+{% raw %}
 aws ec2 create-volume --availability-zone eu-west-1a --size 10 --volume-type gp2
+{% endraw %}
 {% endhighlight %}
 
 Make sure the zone matches the zone you brought up your cluster in.  (And also check that the size and EBS volume
@@ -228,6 +234,7 @@ type are suitable for your use!)
 #### AWS EBS Example configuration
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -245,6 +252,7 @@ spec:
     awsElasticBlockStore:
       volumeID: aws://<availability-zone>/<volume-id>
       fsType: ext4
+{% endraw %}
 {% endhighlight %}
 
 (Note: the syntax of volumeID is currently awkward; #10181 fixes it)
@@ -368,6 +376,9 @@ In the future, we expect that `emptyDir` and `hostPath` volumes will be able to
 request a certain amount of space using a [resource](compute-resources.html)
 specification, and to select the type of media to use, for clusters that have
 several media types.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

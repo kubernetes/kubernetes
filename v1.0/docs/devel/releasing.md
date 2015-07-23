@@ -41,7 +41,9 @@ can find the Git hash for a build by looking at the "Console Log", then look for
 `githash=`. You should see a line line:
 
 {% highlight console %}
+{% raw %}
 + githash=v0.20.2-322-g974377b
+{% endraw %}
 {% endhighlight %}
 
 Because Jenkins builds frequently, if you're looking between jobs
@@ -56,7 +58,9 @@ oncall.
 Before proceeding to the next step:
 
 {% highlight sh %}
+{% raw %}
 export BRANCHPOINT=v0.20.2-322-g974377b
+{% endraw %}
 {% endhighlight %}
 
 Where `v0.20.2-322-g974377b` is the git hash you decided on. This will become
@@ -206,10 +210,12 @@ We are using `pkg/version/base.go` as the source of versioning in absence of
 information from git. Here is a sample of that file's contents:
 
 {% highlight go %}
+{% raw %}
 var (
     gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
     gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
 )
+{% endraw %}
 {% endhighlight %}
 
 This means a build with `go install` or `go get` or a build from a tarball will
@@ -289,6 +295,7 @@ As an example, Docker commit a327d9b91edf has a `v1.1.1-N-gXXX` label but it is
 not present in Docker `v1.2.0`:
 
 {% highlight console %}
+{% raw %}
 $ git describe a327d9b91edf
 v1.1.1-822-ga327d9b91edf
 
@@ -296,6 +303,7 @@ $ git log --oneline v1.2.0..a327d9b91edf
 a327d9b91edf Fix data space reporting from Kb/Mb to KB/MB
 
 (Non-empty output here means the commit is not present on v1.2.0.)
+{% endraw %}
 {% endhighlight %}
 
 ## Release Notes
@@ -311,6 +319,9 @@ After this summary, preamble, all the relevant PRs/issues that got in that
 version should be listed and linked together with a small summary understandable
 by plain mortals (in a perfect world PR/issue's title would be enough but often
 it is just too cryptic/geeky/domain-specific that it isn't).
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

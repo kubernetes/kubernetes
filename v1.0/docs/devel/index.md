@@ -80,6 +80,9 @@ Guide](../admin/README.html).
   and how the version information gets embedded into the built binaries.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

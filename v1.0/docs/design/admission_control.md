@@ -44,6 +44,7 @@ The kube-apiserver takes the following OPTIONAL arguments to enable admission co
 An **AdmissionControl** plug-in is an implementation of the following interface:
 
 {% highlight go %}
+{% raw %}
 package admission
 
 // Attributes is an interface used by a plug-in to make an admission decision on a individual request.
@@ -60,15 +61,18 @@ type Interface interface {
   // An error is returned if it denies the request.
   Admit(a Attributes) (err error)
 }
+{% endraw %}
 {% endhighlight %}
 
 A **plug-in** must be compiled with the binary, and is registered as an available option by providing a name, and implementation
 of admission.Interface.
 
 {% highlight go %}
+{% raw %}
 func init() {
   admission.RegisterPlugin("AlwaysDeny", func(client client.Interface, config io.Reader) (admission.Interface, error) { return NewAlwaysDeny(), nil })
 }
+{% endraw %}
 {% endhighlight %}
 
 Invocation of admission control is handled by the **APIServer** and not individual **RESTStorage** implementations.
@@ -85,6 +89,9 @@ will ensure the following:
 6. Object is persisted
 
 If at any step, there is an error, the request is canceled.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

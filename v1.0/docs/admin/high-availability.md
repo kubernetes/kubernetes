@@ -112,7 +112,9 @@ a simple cluster set up, using etcd's built in discovery to build our cluster.
 First, hit the etcd discovery service to create a new token:
 
 {% highlight sh %}
+{% raw %}
 curl https://discovery.etcd.io/new?size=3
+{% endraw %}
 {% endhighlight %}
 
 On each node, copy the [etcd.yaml](high-availability/etcd.yaml) file into `/etc/kubernetes/manifests/etcd.yaml`
@@ -130,13 +132,17 @@ for `${NODE_IP}` on each machine.
 Once you copy this into all three nodes, you should have a clustered etcd set up.  You can validate with
 
 {% highlight sh %}
+{% raw %}
 etcdctl member list
+{% endraw %}
 {% endhighlight %}
 
 and
 
 {% highlight sh %}
+{% raw %}
 etcdctl cluster-health
+{% endraw %}
 {% endhighlight %}
 
 You can also validate that this is working with `etcdctl set foo bar` on one node, and `etcd get foo`
@@ -168,7 +174,9 @@ Once you have replicated etcd set up correctly, we will also install the apiserv
 First you need to create the initial log file, so that Docker mounts a file instead of a directory:
 
 {% highlight sh %}
+{% raw %}
 touch /var/log/kube-apiserver.log
+{% endraw %}
 {% endhighlight %}
 
 Next, you need to create a `/srv/kubernetes/` directory on each node.  This directory includes:
@@ -220,8 +228,10 @@ In the future, we expect to more tightly integrate this lease-locking into the s
 First, create empty log files on each node, so that Docker will mount the files not make new directories:
 
 {% highlight sh %}
+{% raw %}
 touch /var/log/kube-scheduler.log
 touch /var/log/kube-controller-manager.log
+{% endraw %}
 {% endhighlight %}
 
 Next, set up the descriptions of the scheduler and controller manager pods on each node.
@@ -254,6 +264,9 @@ set the `--apiserver` flag to your replicated endpoint.
 We indeed have an initial proof of concept tester for this, which is available [here](../../examples/high-availability/).
 
 It implements the major concepts (with a few minor reductions for simplicity), of the podmaster HA implementation alongside a quick smoke test using k8petstore.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

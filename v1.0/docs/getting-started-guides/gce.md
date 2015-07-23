@@ -50,13 +50,17 @@ You can install a client and start a cluster with either one of these commands (
 
 
 {% highlight bash %}
+{% raw %}
  curl -sS https://get.k8s.io | bash
+{% endraw %}
 {% endhighlight %}
 
 or
 
 {% highlight bash %}
+{% raw %}
 wget -q -O - https://get.k8s.io | bash
+{% endraw %}
 {% endhighlight %}
 
 Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster.
@@ -68,8 +72,10 @@ The script run by the commands above creates a cluster with the name/prefix "kub
 Alternately, you can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
 
 {% highlight bash %}
+{% raw %}
 cd kubernetes
 cluster/kube-up.sh
+{% endraw %}
 {% endhighlight %}
 
 If you want more than one cluster running in your project, want to use a different name, or want a different number of worker nodes, see the `<kubernetes>/cluster/gce/config-default.sh` file for more fine-grained configuration before you start up your cluster.
@@ -95,11 +101,13 @@ You will use it to look at your new cluster and bring up example apps.
 Add the appropriate binary folder to your `PATH` to access kubectl:
 
 {% highlight bash %}
+{% raw %}
 # OS X
 export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 
 # Linux
 export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
+{% endraw %}
 {% endhighlight %}
 
 **Note**: gcloud also ships with `kubectl`, which by default is added to your path.
@@ -114,12 +122,15 @@ potential issues with client/server version skew.
 Once `kubectl` is in your path, you can use it to look at your cluster. E.g., running:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get --all-namespaces services
+{% endraw %}
 {% endhighlight %}
 
 should show a set of [services](../user-guide/services.html) that look something like this:
 
 {% highlight console %}
+{% raw %}
 NAMESPACE     NAME                  LABELS                                                                           SELECTOR                IP(S)       PORT(S)
 default       kubernetes            component=apiserver,provider=kubernetes                                          <none>                  10.0.0.1    443/TCP
 kube-system   kube-dns              k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS   k8s-app=kube-dns        10.0.0.10   53/UDP
@@ -129,13 +140,16 @@ kube-system   monitoring-grafana    kubernetes.io/cluster-service=true,kubernete
 kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernetes.io/name=Heapster                   k8s-app=heapster        10.0.59.48     80/TCP
 kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
                                                                                                                                                             8086/TCP
+{% endraw %}
 {% endhighlight %}
 
 Similarly, you can take a look at the set of [pods](../user-guide/pods.html) that were created during cluster startup.
 You can do this via the
 
 {% highlight console %}
+{% raw %}
 $ kubectl get --all-namespaces pods
+{% endraw %}
 {% endhighlight %}
 
 command.
@@ -143,6 +157,7 @@ command.
 You'll see a list of pods that looks something like this (the name specifics will be different):
 
 {% highlight console %}
+{% raw %}
 NAMESPACE     NAME                                           READY     STATUS    RESTARTS   AGE
 kube-system   fluentd-cloud-logging-kubernetes-minion-63uo   1/1       Running   0          14m
 kube-system   fluentd-cloud-logging-kubernetes-minion-c1n9   1/1       Running   0          14m
@@ -152,6 +167,7 @@ kube-system   kube-dns-v5-7ztia                              3/3       Running  
 kube-system   kube-ui-v1-curt1                               1/1       Running   0          15m
 kube-system   monitoring-heapster-v5-ex4u3                   1/1       Running   1          15m
 kube-system   monitoring-influx-grafana-v1-piled             2/2       Running   0          15m
+{% endraw %}
 {% endhighlight %}
 
 Some of the pods may take a few seconds to start up (during this time they'll show `Pending`), but check that they all show as `Running` after a short period.
@@ -167,8 +183,10 @@ For more complete applications, please look in the [examples directory](../../ex
 To remove/delete/teardown the cluster, use the `kube-down.sh` script.
 
 {% highlight bash %}
+{% raw %}
 cd kubernetes
 cluster/kube-down.sh
+{% endraw %}
 {% endhighlight %}
 
 Likewise, the `kube-up.sh` in the same directory will bring it back up. You do not need to rerun the `curl` or `wget` command: everything needed to setup the Kubernetes cluster is now on your workstation.
@@ -221,6 +239,9 @@ field values:
 
 * Source Ranges: `10.0.0.0/8`
 * Allowed Protocols and Port: `tcp:1-65535;udp:1-65535;icmp`
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

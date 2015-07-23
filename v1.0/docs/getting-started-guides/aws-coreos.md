@@ -33,6 +33,7 @@ no security tokens, no basic auth). For demonstration purposes only.
 The [cloudformation-template.json](aws/cloudformation-template.json) can be used to bootstrap a Kubernetes cluster with a single command:
 
 {% highlight bash %}
+{% raw %}
 aws cloudformation create-stack --stack-name kubernetes --region us-west-2 \
 --template-body file://aws/cloudformation-template.json \
 --parameters ParameterKey=KeyPair,ParameterValue=<keypair> \
@@ -40,18 +41,23 @@ aws cloudformation create-stack --stack-name kubernetes --region us-west-2 \
              ParameterKey=VpcId,ParameterValue=<vpc_id> \
              ParameterKey=SubnetId,ParameterValue=<subnet_id> \
              ParameterKey=SubnetAZ,ParameterValue=<subnet_az>
+{% endraw %}
 {% endhighlight %}
 
 It will take a few minutes for the entire stack to come up. You can monitor the stack progress with the following command:
 
 {% highlight bash %}
+{% raw %}
 aws cloudformation describe-stack-events --stack-name kubernetes
+{% endraw %}
 {% endhighlight %}
 
 Record the Kubernetes Master IP address:
 
 {% highlight bash %}
+{% raw %}
 aws cloudformation describe-stacks --stack-name kubernetes
+{% endraw %}
 {% endhighlight %}
 
 [Skip to kubectl client configuration](#configure-the-kubectl-ssh-tunnel)
@@ -63,10 +69,12 @@ The following commands shall use the latest CoreOS alpha AMI for the `us-west-2`
 #### Create the Kubernetes Security Group
 
 {% highlight bash %}
+{% raw %}
 aws ec2 create-security-group --group-name kubernetes --description "Kubernetes Security Group"
 aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp --port 22 --cidr 0.0.0.0/0
 aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp --port 80 --cidr 0.0.0.0/0
 aws ec2 authorize-security-group-ingress --group-name kubernetes --source-security-group-name kubernetes
+{% endraw %}
 {% endhighlight %}
 
 #### Save the master and node cloud-configs
@@ -79,9 +87,11 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --source-securi
 *Attention:* replace `<ami_image_id>` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
 
 {% highlight bash %}
+{% raw %}
 aws ec2 run-instances --image-id <ami_image_id> --key-name <keypair> \
 --region us-west-2 --security-groups kubernetes --instance-type m3.medium \
 --user-data file://master.yaml
+{% endraw %}
 {% endhighlight %}
 
 Record the `InstanceId` for the master.
@@ -89,10 +99,13 @@ Record the `InstanceId` for the master.
 Gather the public and private IPs for the master node:
 
 {% highlight bash %}
+{% raw %}
 aws ec2 describe-instances --instance-id <instance-id>
+{% endraw %}
 {% endhighlight %}
 
 {% highlight json %}
+{% raw %}
 {
     "Reservations": [
         {
@@ -106,6 +119,7 @@ aws ec2 describe-instances --instance-id <instance-id>
                     }, 
                     "PublicIpAddress": "54.68.97.117", 
                     "PrivateIpAddress": "172.31.9.9", 
+{% endraw %}
 {% endhighlight %}
 
 #### Update the node.yaml cloud-config
@@ -117,9 +131,11 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the **p
 *Attention:* Replace `<ami_image_id>` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
 
 {% highlight bash %}
+{% raw %}
 aws ec2 run-instances --count 3 --image-id <ami_image_id> --key-name <keypair> \
 --region us-west-2 --security-groups kubernetes --instance-type m3.medium \
 --user-data file://node.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Add additional worker nodes
@@ -127,9 +143,11 @@ aws ec2 run-instances --count 3 --image-id <ami_image_id> --key-name <keypair> \
 *Attention:* replace `<ami_image_id>` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
 
 {% highlight bash %}
+{% raw %}
 aws ec2 run-instances --count 1 --image-id <ami_image_id> --key-name <keypair> \
 --region us-west-2 --security-groups kubernetes --instance-type m3.medium \
 --user-data file://node.yaml
+{% endraw %}
 {% endhighlight %}
 
 ### Configure the kubectl SSH tunnel
@@ -137,7 +155,9 @@ aws ec2 run-instances --count 1 --image-id <ami_image_id> --key-name <keypair> \
 This command enables secure communication between the kubectl client and the Kubernetes API.
 
 {% highlight bash %}
+{% raw %}
 ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
+{% endraw %}
 {% endhighlight %}
 
 ### Listing worker nodes
@@ -145,7 +165,9 @@ ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
 Once the worker instances have fully booted, they will be automatically registered with the Kubernetes API server by the kube-register service running on the master node. It may take a few mins.
 
 {% highlight bash %}
+{% raw %}
 kubectl get nodes
+{% endraw %}
 {% endhighlight %}
 
 ## Starting a simple pod
@@ -153,6 +175,7 @@ kubectl get nodes
 Create a pod manifest: `pod.json`
 
 {% highlight json %}
+{% raw %}
 {
   "apiVersion": "v1",
   "kind": "Pod",
@@ -174,18 +197,23 @@ Create a pod manifest: `pod.json`
     }]
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 ### Create the pod using the kubectl command line tool
 
 {% highlight bash %}
+{% raw %}
 kubectl create -f ./pod.json
+{% endraw %}
 {% endhighlight %}
 
 ### Testing
 
 {% highlight bash %}
+{% raw %}
 kubectl get pods
+{% endraw %}
 {% endhighlight %}
 
 Record the **Host** of the pod, which should be the private IP address.
@@ -193,10 +221,13 @@ Record the **Host** of the pod, which should be the private IP address.
 Gather the public IP address for the worker node. 
 
 {% highlight bash %}
+{% raw %}
 aws ec2 describe-instances --filters 'Name=private-ip-address,Values=<host>'
+{% endraw %}
 {% endhighlight %}
 
 {% highlight json %}
+{% raw %}
 {
     "Reservations": [
         {
@@ -209,6 +240,7 @@ aws ec2 describe-instances --filters 'Name=private-ip-address,Values=<host>'
                         "Name": "running"
                     }, 
                     "PublicIpAddress": "54.68.97.117", 
+{% endraw %}
 {% endhighlight %}
 
 Visit the public IP address in your browser to view the running pod.
@@ -216,8 +248,13 @@ Visit the public IP address in your browser to view the running pod.
 ### Delete the pod
 
 {% highlight bash %}
+{% raw %}
 kubectl delete pods hello
+{% endraw %}
 {% endhighlight %}
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

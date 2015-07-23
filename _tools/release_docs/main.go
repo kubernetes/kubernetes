@@ -112,9 +112,11 @@ func rewriteCodeBlocks(fileBytes []byte) []byte {
 	lines := strings.Split(string(fileBytes), "\n")
 	inside := false
 	highlight := false
+	output := []string{}
 	for i := range lines {
 		trimmed := []byte(strings.TrimLeft(lines[i], " "))
 		if !ticticticRE.Match(trimmed) || notTicticticRE.Match(trimmed) {
+			output = append(output, lines[i])
 			continue
 		}
 		if !inside {
@@ -129,16 +131,24 @@ func rewriteCodeBlocks(fileBytes []byte) []byte {
 				// "kramdown" will not.  They both accept this, format, and we
 				// need a hook to fixup language codes anyway (until we have a
 				// munger in master).
-				lines[i] = fmt.Sprintf("{%% highlight %s %%}", lang)
+				output = append(output, fmt.Sprintf("{%% highlight %s %%}", lang))
 				highlight = true
+			} else {
+				output = append(output, lines[i])
 			}
-		} else if highlight {
-			lines[i] = `{% endhighlight %}`
-			highlight = false
+			output = append(output, `{% raw %}`)
+		} else {
+			output = append(output, `{% endraw %}`)
+			if highlight {
+				output = append(output, `{% endhighlight %}`)
+				highlight = false
+			} else {
+				output = append(output, lines[i])
+			}
 		}
 		inside = !inside
 	}
-	return []byte(strings.Join(lines, "\n") + "\n")
+	return []byte(strings.Join(output, "\n") + "\n")
 }
 
 func runGitUpdate(remote string) error {

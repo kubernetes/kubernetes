@@ -44,6 +44,7 @@ To prevent memory leaks or other resource issues in [cluster addons](../../clust
 For example:
 
 {% highlight yaml %}
+{% raw %}
 containers:
   - image: gcr.io/google_containers/heapster:v0.15.0
     name: heapster
@@ -51,13 +52,14 @@ containers:
       limits:
         cpu: 100m
         memory: 200Mi
+{% endraw %}
 {% endhighlight %}
 
 These limits, however, are based on data collected from addons running on 4-node clusters (see [#10335](https://github.com/GoogleCloudPlatform/kubernetes/issues/10335#issuecomment-117861225)). The addons consume a lot more resources when running on large deployment clusters (see [#5880](https://github.com/GoogleCloudPlatform/kubernetes/issues/5880#issuecomment-113984085)). So, if a large cluster is deployed without adjusting these values, the addons may continuously get killed because they keep hitting the limits.
 
 To avoid running into cluster addon resource issues, when creating a cluster with many nodes, consider the following:
 * Scale memory and CPU limits for each of the following addons, if used, along with the size of cluster (there is one replica of each handling the entire cluster so memory and CPU usage tends to grow proportionally with size/load on cluster):
-  * Heapster ([GCM/GCL backed](http://releases.k8s.io/v1.0.1/cluster/addons/cluster-monitoring/google/heapster-controller.yaml), [InfluxDB backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/influxdb/heapster-controller.yaml), [InfluxDB/GCL backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/googleinfluxdb/heapster-controller-combined.yaml), [standalone](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/standalone/heapster-controller.yaml))
+  * Heapster ([GCM/GCL backed](http://releases.k8s.io/v1.0.1/cluster/addons/cluster-monitoring/google/heapster-controller.yaml), [InfluxDB backed](http://releases.k8s.io/v1.0.1/cluster/addons/cluster-monitoring/influxdb/heapster-controller.yaml), [InfluxDB/GCL backed](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/googleinfluxdb/heapster-controller-combined.yaml), [standalone](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/standalone/heapster-controller.yaml))
   * [InfluxDB and Grafana](http://releases.k8s.io/v1.0.1/cluster/addons/cluster-monitoring/influxdb/influxdb-grafana-controller.yaml)
   * [skydns, kube2sky, and dns etcd](http://releases.k8s.io/v1.0.1/cluster/addons/dns/skydns-rc.yaml.in)
   * [Kibana](http://releases.k8s.io/v1.0.1/cluster/addons/fluentd-elasticsearch/kibana-controller.yaml)
@@ -68,6 +70,9 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
   * [FluentD with GCP Plugin](http://releases.k8s.io/v1.0.1/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
 
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](../user-guide/compute-resources.html#troubleshooting).
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

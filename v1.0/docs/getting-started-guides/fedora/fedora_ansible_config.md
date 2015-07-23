@@ -31,9 +31,11 @@ The hosts can be virtual or bare metal. Ansible will take care of the rest of th
 A Kubernetes cluster requires etcd, a master, and n nodes, so we will create a cluster with three hosts, for example:
 
 {% highlight console %}
+{% raw %}
     master,etcd = kube-master.example.com
     node1 = kube-node-01.example.com
     node2 = kube-node-02.example.com
+{% endraw %}
 {% endhighlight %}
 
 **Make sure your local machine has**
@@ -45,14 +47,18 @@ A Kubernetes cluster requires etcd, a master, and n nodes, so we will create a c
 If not
 
 {% highlight sh %}
+{% raw %}
 yum install -y ansible git python-netaddr
+{% endraw %}
 {% endhighlight %}
 
 **Now clone down the Kubernetes repository**
 
 {% highlight sh %}
+{% raw %}
 git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 cd kubernetes/contrib/ansible
+{% endraw %}
 {% endhighlight %}
 
 **Tell ansible about each machine and its role in your cluster**
@@ -60,6 +66,7 @@ cd kubernetes/contrib/ansible
 Get the IP addresses from the master and nodes.  Add those to the `~/kubernetes/contrib/ansible/inventory` file on the host running Ansible.
 
 {% highlight console %}
+{% raw %}
 [masters]
 kube-master.example.com
 
@@ -69,6 +76,7 @@ kube-master.example.com
 [nodes]
 kube-node-01.example.com
 kube-node-02.example.com
+{% endraw %}
 {% endhighlight %}
 
 ## Setting up ansible access to your nodes
@@ -80,7 +88,9 @@ If you already are running on a machine which has passwordless ssh access to the
 edit: ~/kubernetes/contrib/ansible/group_vars/all.yml
 
 {% highlight yaml %}
+{% raw %}
 ansible_ssh_user: root
+{% endraw %}
 {% endhighlight %}
 
 **Configuring ssh access to the cluster**
@@ -90,15 +100,19 @@ If you already have ssh access to every machine using ssh public keys you may sk
 Make sure your local machine (root) has an ssh key pair if not
 
 {% highlight sh %}
+{% raw %}
 ssh-keygen
+{% endraw %}
 {% endhighlight %}
 
 Copy the ssh public key to **all** nodes in the cluster
 
 {% highlight sh %}
+{% raw %}
 for node in kube-master.example.com kube-node-01.example.com kube-node-02.example.com; do
   ssh-copy-id ${node}
 done
+{% endraw %}
 {% endhighlight %}
 
 ## Setting up the cluster
@@ -112,7 +126,9 @@ edit: ~/kubernetes/contrib/ansible/group_vars/all.yml
 Each Kubernetes service gets its own IP address.  These are not real IPs.  You need only select a range of IPs which are not in use elsewhere in your environment.
 
 {% highlight yaml %}
+{% raw %}
 kube_service_addresses: 10.254.0.0/16
+{% endraw %}
 {% endhighlight %}
 
 **Managing flannel**
@@ -125,19 +141,25 @@ Modify `flannel_subnet`, `flannel_prefix` and `flannel_host_prefix` only if defa
 Set `cluster_logging` to false or true (default) to disable or enable logging with elasticsearch.
 
 {% highlight yaml %}
+{% raw %}
 cluster_logging: true
+{% endraw %}
 {% endhighlight %}
 
 Turn `cluster_monitoring` to true (default) or false to enable or disable cluster monitoring with heapster and influxdb.
 
 {% highlight yaml %}
+{% raw %}
 cluster_monitoring: true
+{% endraw %}
 {% endhighlight %}
 
 Turn `dns_setup` to true (recommended) or false to enable or disable whole DNS configuration.
 
 {% highlight yaml %}
+{% raw %}
 dns_setup: true
+{% endraw %}
 {% endhighlight %}
 
 **Tell ansible to get to work!**
@@ -145,9 +167,11 @@ dns_setup: true
 This will finally setup your whole Kubernetes cluster for you.
 
 {% highlight sh %}
+{% raw %}
 cd ~/kubernetes/contrib/ansible/
 
 ./setup.sh
+{% endraw %}
 {% endhighlight %}
 
 ## Testing and using your new cluster
@@ -159,24 +183,31 @@ That's all there is to it.  It's really that easy.  At this point you should hav
 Run the following on the kube-master:
 
 {% highlight sh %}
+{% raw %}
 kubectl get nodes
+{% endraw %}
 {% endhighlight %}
 
 **Show services running on masters and nodes**
 
 {% highlight sh %}
+{% raw %}
 systemctl | grep -i kube
+{% endraw %}
 {% endhighlight %}
 
 **Show firewall rules on the masters and nodes**
 
 {% highlight sh %}
+{% raw %}
 iptables -nvL
+{% endraw %}
 {% endhighlight %}
 
 **Create /tmp/apache.json on the master with the following contents and deploy pod**
 
 {% highlight json %}
+{% raw %}
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -201,32 +232,44 @@ iptables -nvL
     ]
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 {% highlight sh %}
+{% raw %}
 kubectl create -f /tmp/apache.json
+{% endraw %}
 {% endhighlight %}
 
 **Check where the pod was created**
 
 {% highlight sh %}
+{% raw %}
 kubectl get pods
+{% endraw %}
 {% endhighlight %}
 
 **Check Docker status on nodes**
 
 {% highlight sh %}
+{% raw %}
 docker ps
 docker images
+{% endraw %}
 {% endhighlight %}
 
 **After the pod is 'Running' Check web server access on the node**
 
 {% highlight sh %}
+{% raw %}
 curl http://localhost
+{% endraw %}
 {% endhighlight %}
 
 That's it !
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -19,6 +19,7 @@ A new resource, **ResourceQuota**, is introduced to enumerate hard resource limi
 A new resource, **ResourceQuotaUsage**, is introduced to support atomic updates of a **ResourceQuota** status.
 
 {% highlight go %}
+{% raw %}
 // The following identify resource constants for Kubernetes object types
 const (
   // Pods, number
@@ -75,6 +76,7 @@ type ResourceQuotaList struct {
   // Items is a list of ResourceQuota objects
   Items []ResourceQuota `json:"items"`
 }
+{% endraw %}
 {% endhighlight %}
 
 ## AdmissionControl plugin: ResourceQuota
@@ -115,7 +117,9 @@ The server is updated to be aware of **ResourceQuota** objects.
 The quota is only enforced if the kube-apiserver is started as follows:
 
 {% highlight console %}
+{% raw %}
 $ kube-apiserver -admission_control=ResourceQuota
+{% endraw %}
 {% endhighlight %}
 
 ## kube-controller-manager
@@ -142,6 +146,7 @@ kubectl is modified to support the **ResourceQuota** resource.
 For example,
 
 {% highlight console %}
+{% raw %}
 $ kubectl namespace myspace
 $ kubectl create -f docs/user-guide/resourcequota/quota.yaml
 $ kubectl get quota
@@ -157,11 +162,15 @@ pods                    5       10
 replicationcontrollers  5       20
 resourcequotas          1       1
 services                3       5
+{% endraw %}
 {% endhighlight %}
 
 ## More information 
 
 See [resource quota document](../admin/resource-quota.html) and the [example of Resource Quota](../user-guide/resourcequota/) for more information.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

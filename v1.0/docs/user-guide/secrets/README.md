@@ -23,12 +23,15 @@ A secret contains a set of named byte arrays.
 Use the [`examples/secrets/secret.yaml`](secret.yaml) file to create a secret:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/secrets/secret.yaml
+{% endraw %}
 {% endhighlight %}
 
 You can use `kubectl` to see information about the secret:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get secrets
 NAME          TYPE      DATA
 test-secret   Opaque    2
@@ -44,6 +47,7 @@ Data
 ====
 data-1: 9 bytes
 data-2: 11 bytes
+{% endraw %}
 {% endhighlight %}
 
 ## Step Two: Create a pod that consumes a secret
@@ -54,16 +58,23 @@ consumes it.
 Use the [`examples/secrets/secret-pod.yaml`](secret-pod.yaml) file to create a Pod that consumes the secret.
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f docs/user-guide/secrets/secret-pod.yaml
+{% endraw %}
 {% endhighlight %}
 
 This pod runs a binary that displays the content of one of the pieces of secret data in the secret
 volume: 
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs secret-test-pod
 2015-04-29T21:17:24.712206409Z content of file "/etc/secret-volume/data-1": value-1
+{% endraw %}
 {% endhighlight %}
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

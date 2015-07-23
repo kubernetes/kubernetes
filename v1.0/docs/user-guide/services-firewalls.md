@@ -25,7 +25,9 @@ Google Compute Engine firewalls are documented [elsewhere](https://cloud.google.
 You can add a firewall with the `gcloud` command line tool:
 
 {% highlight console %}
+{% raw %}
 $ gcloud compute firewall-rules create my-rule --allow=tcp:<port>
+{% endraw %}
 {% endhighlight %}
 
 **Note**
@@ -56,6 +58,9 @@ This will be fixed in an upcoming release of Kubernetes.
 ### Other cloud providers
 
 Coming soon.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

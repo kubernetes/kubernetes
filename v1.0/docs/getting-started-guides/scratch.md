@@ -207,9 +207,8 @@ You have several choices for Kubernetes images:
   - Useful if you are using a private registry.
   - The release contains files such as `./kubernetes/server/bin/kube-apiserver.tar` which
     can be converted into docker images using a command like
-    `docker load -i kube-apiserver.tar`
-  - You can verify if the image is loaded successfully with the right reposity and tag using
-    command like `docker images`
+    `tar -C kube-apiserver -c . | docker import - kube-apiserver`
+  - *TODO*: test above command.
 
 For etcd, you can:
 - Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.0.12`
@@ -306,6 +305,7 @@ You can make the files by copying the `$HOME/.kube/config`, by following the cod
 in `cluster/gce/configure-vm.sh` or by using the following template:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Config
 users:
@@ -322,6 +322,7 @@ contexts:
     user: kubelet
   name: service-account-context
 current-context: service-account-context
+{% endraw %}
 {% endhighlight %}
 
 Put the kubeconfig(s) on every node.  The examples later in this
@@ -353,9 +354,11 @@ options, you may have a Docker-created bridge and iptables rules.  You may want 
 as follows before proceeding to configure Docker for Kubernetes.
 
 {% highlight sh %}
+{% raw %}
 iptables -t nat -F 
 ifconfig docker0 down
 brctl delbr docker0
+{% endraw %}
 {% endhighlight %}
 
 The way you configure docker will depend in whether you have chosen the routable-vip or overlay-network approaches for your network.
@@ -460,7 +463,9 @@ other, then you may need to do masquerading just for destination IPs outside
 the cluster network.  For example:
 
 {% highlight sh %}
+{% raw %}
 iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE \! -d ${CLUSTER_SUBNET}
+{% endraw %}
 {% endhighlight %}
 
 This will rewrite the source address from
@@ -530,6 +535,7 @@ For each of these components, the steps to start them running are similar:
 #### Apiserver pod template
 
 {% highlight json %}
+{% raw %}
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -597,6 +603,7 @@ For each of these components, the steps to start them running are similar:
     ]
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 Here are some apiserver flags you may need to set:
@@ -658,6 +665,7 @@ Some cloud providers require a config file. If so, you need to put config file i
 Complete this template for the scheduler pod:
 
 {% highlight json %}
+{% raw %}
 
 {
   "kind": "Pod",
@@ -689,6 +697,7 @@ Complete this template for the scheduler pod:
   }
 }
 
+{% endraw %}
 {% endhighlight %}
 
 Typically, no additional flags are required for the scheduler.
@@ -700,6 +709,7 @@ Optionally, you may want to mount `/var/log` as well and redirect output there.
 Template for controller manager pod:
 
 {% highlight json %}
+{% raw %}
 
 {
   "kind": "Pod",
@@ -757,6 +767,7 @@ Template for controller manager pod:
   }
 }
 
+{% endraw %}
 {% endhighlight %}
 
 Flags to consider using with controller manager:
@@ -779,13 +790,16 @@ controller manager will retry reaching the apiserver until it is up.
 Use `ps` or `docker ps` to verify that each process has started.  For example, verify that kubelet has started a container for the apiserver like this:
 
 {% highlight console %}
+{% raw %}
 $ sudo docker ps | grep apiserver:
 5783290746d5        gcr.io/google_containers/kube-apiserver:e36bf367342b5a80d7467fd7611ad873            "/bin/sh -c '/usr/lo'"    10 seconds ago      Up 9 seconds                              k8s_kube-apiserver.feb145e7_kube-apiserver-kubernetes-master_default_eaebc600cf80dae59902b44225f2fc0a_225a4695
+{% endraw %}
 {% endhighlight %}
 
 Then try to connect to the apiserver:
 
 {% highlight console %}
+{% raw %}
 $ echo $(curl -s http://localhost:8080/healthz)
 ok
 $ curl -s http://localhost:8080/api
@@ -794,6 +808,7 @@ $ curl -s http://localhost:8080/api
     "v1"
   ]
 }
+{% endraw %}
 {% endhighlight %}
 
 If you have selected the `--register-node=true` option for kubelets, they will now begin self-registering with the apiserver.
@@ -840,6 +855,9 @@ pinging or SSH-ing from one node to another.
 
 If you run into trouble, please see the section on [troubleshooting](gce.html#troubleshooting), post to the
 [google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

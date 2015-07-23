@@ -81,8 +81,13 @@ For more complete applications, please look in the [examples directory](../../ex
 ## Tearing down the cluster
 
 {% highlight sh %}
+{% raw %}
 cluster/kube-down.sh
+{% endraw %}
 {% endhighlight %}
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

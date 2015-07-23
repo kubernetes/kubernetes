@@ -47,7 +47,9 @@ your Service?
 The first step in debugging a Pod is taking a look at it.  Check the current state of the Pod and recent events with the following command:
 
 {% highlight console %}
+{% raw %}
 $ kubectl describe pods ${POD_NAME}
+{% endraw %}
 {% endhighlight %}
 
 Look at the state of the containers in the pod.  Are they all `Running`?  Have there been recent restarts?
@@ -83,19 +85,25 @@ First, take a look at the logs of
 the current container:
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs ${POD_NAME} ${CONTAINER_NAME}
+{% endraw %}
 {% endhighlight %}
 
 If your container has previously crashed, you can access the previous container's crash log with:
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs --previous ${POD_NAME} ${CONTAINER_NAME}
+{% endraw %}
 {% endhighlight %}
 
 Alternately, you can run commands inside that container with `exec`:
 
 {% highlight console %}
+{% raw %}
 $ kubectl exec ${POD_NAME} -c ${CONTAINER_NAME} -- ${CMD} ${ARG1} ${ARG2} ... ${ARGN}
+{% endraw %}
 {% endhighlight %}
 
 Note that `-c ${CONTAINER_NAME}` is optional and can be omitted for Pods that only contain a single container.
@@ -103,7 +111,9 @@ Note that `-c ${CONTAINER_NAME}` is optional and can be omitted for Pods that on
 As an example, to look at the logs from a running Cassandra pod, you might run
 
 {% highlight console %}
+{% raw %}
 $ kubectl exec cassandra -- cat /var/log/cassandra/system.log
+{% endraw %}
 {% endhighlight %}
 
 
@@ -129,7 +139,9 @@ First, verify that there are endpoints for the service. For every Service object
 You can view this resource with:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get endpoints ${SERVICE_NAME}
+{% endraw %}
 {% endhighlight %}
 
 Make sure that the endpoints match up with the number of containers that you expect to be a member of your service.
@@ -142,17 +154,21 @@ If you are missing endpoints, try listing pods using the labels that Service use
 a Service where the labels are:
 
 {% highlight yaml %}
+{% raw %}
 ...
 spec:
   - selector:
      name: nginx
      type: frontend
+{% endraw %}
 {% endhighlight %}
 
 You can use:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods --selector=name=nginx,type=frontend
+{% endraw %}
 {% endhighlight %}
 
 to list pods that match this selector.  Verify that the list matches the Pods that you expect to provide your Service.
@@ -179,6 +195,9 @@ check:
 If none of the above solves your problem, follow the instructions in [Debugging Service document](debugging-services.html) to make sure that your `Service` is running, has `Endpoints`, and your `Pods` are actually serving; you have DNS working, iptables rules installed, and kube-proxy does not seem to be misbehaving. 
 
 You may also visit [troubleshooting document](../troubleshooting.html) for more information. 
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -23,12 +23,17 @@ Get the Kubernetes source.  If you are simply building a release from source the
 Building a release is simple.
 
 {% highlight bash %}
+{% raw %}
 git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 cd kubernetes
 make release
+{% endraw %}
 {% endhighlight %}
 
 For more details on the release process see the [`build/` directory](http://releases.k8s.io/v1.0.1/build/)
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

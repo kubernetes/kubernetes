@@ -54,24 +54,30 @@ Further information is available in the Kubernetes on Mesos [contrib directory][
 Log into the future Kubernetes *master node* over SSH, replacing the placeholder below with the correct IP address.
 
 {% highlight bash %}
+{% raw %}
 ssh jclouds@${ip_address_of_master_node}
+{% endraw %}
 {% endhighlight %}
 
 Build Kubernetes-Mesos.
 
 {% highlight bash %}
+{% raw %}
 git clone https://github.com/GoogleCloudPlatform/kubernetes
 cd kubernetes
 export KUBERNETES_CONTRIB=mesos
 make
+{% endraw %}
 {% endhighlight %}
 
 Set some environment variables.
 The internal IP address of the master may be obtained via `hostname -i`.
 
 {% highlight bash %}
+{% raw %}
 export KUBERNETES_MASTER_IP=$(hostname -i)
 export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
+{% endraw %}
 {% endhighlight %}
 
 ### Deploy etcd
@@ -79,22 +85,28 @@ export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
 Start etcd and verify that it is running:
 
 {% highlight bash %}
+{% raw %}
 sudo docker run -d --hostname $(uname -n) --name etcd \
   -p 4001:4001 -p 7001:7001 quay.io/coreos/etcd:v2.0.12 \
   --listen-client-urls http://0.0.0.0:4001 \
   --advertise-client-urls http://${KUBERNETES_MASTER_IP}:4001
+{% endraw %}
 {% endhighlight %}
 
 {% highlight console %}
+{% raw %}
 $ sudo docker ps
 CONTAINER ID   IMAGE                        COMMAND   CREATED   STATUS   PORTS                NAMES
 fd7bac9e2301   quay.io/coreos/etcd:v2.0.12  "/etcd"   5s ago    Up 3s    2379/tcp, 2380/...   etcd
+{% endraw %}
 {% endhighlight %}
 
 It's also a good idea to ensure your etcd instance is reachable by testing it
 
 {% highlight bash %}
+{% raw %}
 curl -L http://${KUBERNETES_MASTER_IP}:4001/v2/keys/
+{% endraw %}
 {% endhighlight %}
 
 If connectivity is OK, you will see an output of the available keys in etcd (if any).
@@ -104,28 +116,35 @@ If connectivity is OK, you will see an output of the available keys in etcd (if 
 Update your PATH to more easily run the Kubernetes-Mesos binaries:
 
 {% highlight bash %}
+{% raw %}
 export PATH="$(pwd)/_output/local/go/bin:$PATH"
+{% endraw %}
 {% endhighlight %}
 
 Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos_master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
 In order to let Kubernetes survive Mesos master changes, the ZooKeeper URL is recommended for production environments.
 
 {% highlight bash %}
+{% raw %}
 export MESOS_MASTER=<host:port or zk:// url>
+{% endraw %}
 {% endhighlight %}
 
 Create a cloud config file `mesos-cloud.conf` in the current directory with the following contents:
 
 {% highlight console %}
+{% raw %}
 $ cat <<EOF >mesos-cloud.conf
 [mesos-cloud]
         mesos-master        = ${MESOS_MASTER}
 EOF
+{% endraw %}
 {% endhighlight %}
 
 Now start the kubernetes-mesos API server, controller manager, and scheduler on the master node:
 
 {% highlight console %}
+{% raw %}
 $ km apiserver \
   --address=${KUBERNETES_MASTER_IP} \
   --etcd-servers=http://${KUBERNETES_MASTER_IP}:4001 \
@@ -150,12 +169,15 @@ $ km scheduler \
   --cluster-dns=10.10.10.10 \
   --cluster-domain=cluster.local \
   --v=2 >scheduler.log 2>&1 &
+{% endraw %}
 {% endhighlight %}
 
 Disown your background jobs so that they'll stay running if you log out.
 
 {% highlight bash %}
+{% raw %}
 disown -a
+{% endraw %}
 {% endhighlight %}
 
 #### Validate KM Services
@@ -163,22 +185,28 @@ disown -a
 Add the appropriate binary folder to your `PATH` to access kubectl:
 
 {% highlight bash %}
+{% raw %}
 export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
+{% endraw %}
 {% endhighlight %}
 
 Interact with the kubernetes-mesos framework via `kubectl`:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
+{% endraw %}
 {% endhighlight %}
 
 {% highlight console %}
+{% raw %}
 # NOTE: your service IPs will likely differ
 $ kubectl get services
 NAME             LABELS                                    SELECTOR   IP(S)          PORT(S)
 k8sm-scheduler   component=scheduler,provider=k8sm         <none>     10.10.10.113   10251/TCP
 kubernetes       component=apiserver,provider=kubernetes   <none>     10.10.10.1     443/TCP
+{% endraw %}
 {% endhighlight %}
 
 Lastly, look for Kubernetes in the Mesos web GUI by pointing your browser to
@@ -190,10 +218,13 @@ Go to the Frameworks tab, and look for an active framework named "Kubernetes".
 Write a JSON pod description to a local file:
 
 {% highlight bash %}
+{% raw %}
 $ cat <<EOPOD >nginx.yaml
+{% endraw %}
 {% endhighlight %}
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -205,22 +236,27 @@ spec:
     ports:
     - containerPort: 80
 EOPOD
+{% endraw %}
 {% endhighlight %}
 
 Send the pod description to Kubernetes using the `kubectl` CLI:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f ./nginx.yaml
 pods/nginx
+{% endraw %}
 {% endhighlight %}
 
 Wait a minute or two while `dockerd` downloads the image layers from the internet.
 We can use the `kubectl` interface to monitor the status of our pod:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods
 NAME      READY     STATUS    RESTARTS   AGE
 nginx     1/1       Running   0          14s
+{% endraw %}
 {% endhighlight %}
 
 Verify that the pod task is running in the Mesos web GUI. Click on the
@@ -257,19 +293,23 @@ In addition the service template at [cluster/addons/dns/skydns-svc.yaml.in][12] 
 To do this automatically:
 
 {% highlight bash %}
+{% raw %}
 sed -e "s/{{ pillar\['dns_replicas'\] }}/1/g;"\
 "s,\(command = \"/kube2sky\"\),\\1\\"$'\n'"        - --kube_master_url=${KUBERNETES_MASTER},;"\
 "s/{{ pillar\['dns_domain'\] }}/cluster.local/g" \
   cluster/addons/dns/skydns-rc.yaml.in > skydns-rc.yaml
 sed -e "s/{{ pillar\['dns_server'\] }}/10.10.10.10/g" \
   cluster/addons/dns/skydns-svc.yaml.in > skydns-svc.yaml
+{% endraw %}
 {% endhighlight %}
 
 Now the kube-dns pod and service are ready to be launched:
 
 {% highlight bash %}
+{% raw %}
 kubectl create -f ./skydns-rc.yaml
 kubectl create -f ./skydns-svc.yaml
+{% endraw %}
 {% endhighlight %}
 
 Check with `kubectl get pods --namespace=kube-system` that 3/3 containers of the pods are eventually up and running. Note that the kube-dns pods run in the `kube-system` namespace, not in  `default`.
@@ -277,10 +317,13 @@ Check with `kubectl get pods --namespace=kube-system` that 3/3 containers of the
 To check that the new DNS service in the cluster works, we start a busybox pod and use that to do a DNS lookup. First create the `busybox.yaml` pod spec:
 
 {% highlight bash %}
+{% raw %}
 cat <<EOF >busybox.yaml
+{% endraw %}
 {% endhighlight %}
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -296,28 +339,35 @@ spec:
     name: busybox
   restartPolicy: Always
 EOF
+{% endraw %}
 {% endhighlight %}
 
 Then start the pod:
 
 {% highlight bash %}
+{% raw %}
 kubectl create -f ./busybox.yaml
+{% endraw %}
 {% endhighlight %}
 
 When the pod is up and running, start a lookup for the Kubernetes master service, made available on 10.10.10.1 by default:
 
 {% highlight bash %}
+{% raw %}
 kubectl  exec busybox -- nslookup kubernetes
+{% endraw %}
 {% endhighlight %}
 
 If everything works fine, you will get this output:
 
 {% highlight console %}
+{% raw %}
 Server:    10.10.10.10
 Address 1: 10.10.10.10
 
 Name:      kubernetes
 Address 1: 10.10.10.1
+{% endraw %}
 {% endhighlight %}
 
 ## What next?
@@ -344,6 +394,9 @@ Future work will add instructions to this guide to enable support for Kubernetes
 [11]: ../../cluster/addons/dns/skydns-rc.yaml.in
 [12]: ../../cluster/addons/dns/skydns-svc.yaml.in
 [13]: ../../contrib/mesos/README.md
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

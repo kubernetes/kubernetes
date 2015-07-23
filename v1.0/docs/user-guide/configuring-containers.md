@@ -34,6 +34,7 @@ In the declarative style, all configuration is stored in YAML or JSON configurat
 Kubernetes executes containers in [*Pods*](pods.html). A pod containing a simple Hello World container can be specified in YAML as follows:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -44,6 +45,7 @@ spec:  # specification of the pod’s contents
   - name: hello
     image: "ubuntu:14.04"
     command: ["/bin/echo","hello”,”world"]
+{% endraw %}
 {% endhighlight %}
 
 The value of `metadata.name`, `hello-world`, will be the name of the pod resource created, and must be unique within the cluster, whereas `containers[0].name` is just a nickname for the container within that pod. `image` is the name of the Docker image, which Kubernetes expects to be able to pull from a registry, the [Docker Hub](https://registry.hub.docker.com/) by default.
@@ -53,15 +55,19 @@ The value of `metadata.name`, `hello-world`, will be the name of the pod resourc
 The [`command`](containers.html#containers-and-commands) overrides the Docker container’s `Entrypoint`. Command arguments (corresponding to Docker’s `Cmd`) may be specified using `args`, as follows:
 
 {% highlight yaml %}
+{% raw %}
     command: ["/bin/echo"]
     args: ["hello","world"]
+{% endraw %}
 {% endhighlight %}
 
 This pod can be created using the `create` command:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f ./hello-world.yaml
 pods/hello-world
+{% endraw %}
 {% endhighlight %}
 
 `kubectl` prints the resource type and name of the resource created when successful.
@@ -71,20 +77,24 @@ pods/hello-world
 If you’re not sure you specified the resource correctly, you can ask `kubectl` to validate it for you:
 
 {% highlight console %}
+{% raw %}
 $ kubectl create -f ./hello-world.yaml --validate
+{% endraw %}
 {% endhighlight %}
 
 Let’s say you specified `entrypoint` instead of `command`. You’d see output as follows:
 
 {% highlight console %}
+{% raw %}
 I0709 06:33:05.600829   14160 schema.go:126] unknown field: entrypoint
 I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842
 pods/hello-world
+{% endraw %}
 {% endhighlight %}
 
 `kubectl create --validate` currently warns about problems it detects, but creates the resource anyway, unless a required field is absent or a field value is invalid. Unknown API fields are ignored, so be careful. This pod was created, but with no `command`, which is an optional field, since the image may specify an `Entrypoint`.
 View the [Pod API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_pod)
+object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/v1.0.1/docs/api-reference/definitions.html#_v1_pod)
 to see the list of valid fields.
 
 ## Environment variables and variable expansion
@@ -92,6 +102,7 @@ to see the list of valid fields.
 Kubernetes [does not automatically run commands in a shell](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ#use-of-environment-variables-on-the-command-line) (not all images contain shells). If you would like to run your command in a shell, such as to expand environment variables (specified using `env`), you could do the following:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -106,13 +117,16 @@ spec:  # specification of the pod’s contents
       value: "hello world"
     command: ["/bin/sh","-c"]
     args: ["/bin/echo \"${MESSAGE}\""]
+{% endraw %}
 {% endhighlight %}
 
 However, a shell isn’t necessary just to expand environment variables. Kubernetes will do it for you if you use [`$(ENVVAR)` syntax](../../docs/design/expansion.html):
 
 {% highlight yaml %}
+{% raw %}
     command: ["/bin/echo"]
     args: ["$(MESSAGE)"]
+{% endraw %}
 {% endhighlight %}
 
 ## Viewing pod status
@@ -122,9 +136,11 @@ You can see the pod you created (actually all of your cluster's pods) using the 
 If you’re quick, it will look as follows:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods
 NAME          READY     STATUS    RESTARTS   AGE
 hello-world   0/1       Pending   0          0s
+{% endraw %}
 {% endhighlight %}
 
 Initially, a newly created pod is unscheduled -- no node has been selected to run it. Scheduling happens after creation, but is fast, so you normally shouldn’t see pods in an unscheduled state unless there’s a problem.
@@ -132,9 +148,11 @@ Initially, a newly created pod is unscheduled -- no node has been selected to ru
 After the pod has been scheduled, the image may need to be pulled to the node on which it was scheduled, if it hadn’t be pulled already. After a few seconds, you should see the container running:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods
 NAME          READY     STATUS    RESTARTS   AGE
 hello-world   1/1       Running   0          5s
+{% endraw %}
 {% endhighlight %}
 
 The `READY` column shows how many containers in the pod are running.
@@ -142,9 +160,11 @@ The `READY` column shows how many containers in the pod are running.
 Almost immediately after it starts running, this command will terminate. `kubectl` shows that the container is no longer running and displays the exit status:
 
 {% highlight console %}
+{% raw %}
 $ kubectl get pods
 NAME          READY     STATUS       RESTARTS   AGE
 hello-world   0/1       ExitCode:0   0          15s
+{% endraw %}
 {% endhighlight %}
 
 ## Viewing pod output
@@ -152,8 +172,10 @@ hello-world   0/1       ExitCode:0   0          15s
 You probably want to see the output of the command you ran. As with [`docker logs`](https://docs.docker.com/userguide/usingdocker/), `kubectl logs` will show you the output:
 
 {% highlight console %}
+{% raw %}
 $ kubectl logs hello-world
 hello world
+{% endraw %}
 {% endhighlight %}
 
 ## Deleting pods
@@ -161,8 +183,10 @@ hello world
 When you’re done looking at the output, you should delete the pod:
 
 {% highlight console %}
+{% raw %}
 $ kubectl delete pod hello-world
 pods/hello-world
+{% endraw %}
 {% endhighlight %}
 
 As with `create`, `kubectl` prints the resource type and name of the resource deleted when successful.
@@ -170,8 +194,10 @@ As with `create`, `kubectl` prints the resource type and name of the resource de
 You can also use the resource/name format to specify the pod:
 
 {% highlight console %}
+{% raw %}
 $ kubectl delete pods/hello-world
 pods/hello-world
+{% endraw %}
 {% endhighlight %}
 
 Terminated pods aren’t currently automatically deleted, so that you can observe their final status, so be sure to clean up your dead pods. 
@@ -181,6 +207,9 @@ On the other hand, containers and their logs are eventually deleted automaticall
 ## What's next?
 
 [Learn about deploying continuously running applications.](deploying-applications.html)
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -54,8 +54,10 @@ Currently the list of all services that are running at the time when the contain
 For a service named **foo** that maps to a container port named **bar**, the following variables are defined:
 
 {% highlight sh %}
+{% raw %}
 FOO_SERVICE_HOST=<the host the service is running on>
 FOO_SERVICE_PORT=<the port the service is running on>
+{% endraw %}
 {% endhighlight %}
 
 Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](http://releases.k8s.io/v1.0.1/cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
@@ -119,6 +121,9 @@ Hook handlers are the way that hooks are surfaced to containers.  Containers ca
    * HTTP - Executes an HTTP request against a specific endpoint on the container.  HTTP error codes (5xx) and non-response/failure to connect are treated as container failures. Parameters are passed to the http endpoint as query args (e.g. http://some.server.com/some/path?reason=HEALTH)
 
 [1]: http://man7.org/linux/man-pages/man2/gethostname.2.html
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

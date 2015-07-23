@@ -107,12 +107,14 @@ differentiate it from `docker0`) is set up outside of Docker proper.
 Example of GCE's advanced routing rules:
 
 {% highlight sh %}
+{% raw %}
 gcloud compute routes add "${MINION_NAMES[$i]}" \
   --project "${PROJECT}" \
   --destination-range "${MINION_IP_RANGES[$i]}" \
   --network "${NETWORK}" \
   --next-hop-instance "${MINION_NAMES[$i]}" \
   --next-hop-instance-zone "${ZONE}" &
+{% endraw %}
 {% endhighlight %}
 
 GCE itself does not know anything about these IPs, though.  This means that when
@@ -182,6 +184,9 @@ External IP assignment would also simplify DNS support (see below).
 ### IPv6
 
 IPv6 would be a nice option, also, but we can't depend on it yet. Docker support is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974), [Docker issue #6923](https://github.com/dotcloud/docker/issues/6923), [Docker issue #6975](https://github.com/dotcloud/docker/issues/6975). Additionally, direct ipv6 assignment to instances doesn't appear to be supported by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull requests from people running Kubernetes on bare metal, though. :-)
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

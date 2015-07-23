@@ -82,12 +82,14 @@ Node condition is represented as a json object. For example,
 the following conditions mean the node is in sane state:
 
 {% highlight json %}
+{% raw %}
 "conditions": [
   {
     "kind": "Ready",
     "status": "True",
     },
 ]
+{% endraw %}
 {% endhighlight %}
 
 If the Status of the Ready condition
@@ -114,6 +116,7 @@ After creation, Kubernetes will check whether the node is valid or not.
 For example, if you try to create a node from the following content:
 
 {% highlight json %}
+{% raw %}
 {
   "kind": "Node",
   "apiVersion": "v1",
@@ -124,6 +127,7 @@ For example, if you try to create a node from the following content:
     }
   }
 }
+{% endraw %}
 {% endhighlight %}
 
 Kubernetes will create a Node object internally (the representation), and
@@ -170,7 +174,9 @@ its own.  (In the future, we plan to limit authorization to only allow a kubelet
 If your cluster runs short on resources you can easily add more machines to it if your cluster is running in Node self-registration mode. If you're using GCE or GKE it's done by resizing Instance Group managing your Nodes. It can be accomplished by modifying number of instances on `Compute > Compute Engine > Instance groups > your group > Edit group` [Google Cloud Console page](https://console.developers.google.com) or using gcloud CLI:
 
 ```
+{% raw %}
 gcloud preview managed-instance-groups --zone compute-zone resize my-cluster-minon-group --new-size 42
+{% endraw %}
 ```
 
 Instance Group will take care of putting appropriate image on new machines and start them, while Kubelet will register its Node with API server to make it available for scheduling. If you scale the instance group down, system will randomly choose Nodes to kill.
@@ -196,7 +202,9 @@ preparatory step before a node reboot, etc.  For example, to mark a node
 unschedulable, run this command:
 
 {% highlight sh %}
+{% raw %}
 kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
+{% endraw %}
 {% endhighlight %}
 
 ### Node capacity
@@ -215,6 +223,7 @@ If you want to explicitly reserve resources for non-Pod processes, you can creat
 pod.  Use the following template:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -227,6 +236,7 @@ spec:
       limits:
         cpu: 100m
         memory: 100Mi
+{% endraw %}
 {% endhighlight %}
 
 Set the `cpu` and `memory` values to the amount of resources you want to reserve.
@@ -237,7 +247,10 @@ on each kubelet where you want to reserve resources.
 
 Node is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Node API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_node).
+object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/v1.0.1/docs/api-reference/definitions.html#_v1_node).
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

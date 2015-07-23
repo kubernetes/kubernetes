@@ -56,6 +56,7 @@ The following pod has two containers.  Each has a limit of 0.5 core of cpu and 1
 memory.
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -74,6 +75,7 @@ spec:
       limits:
         memory: "128Mi"
         cpu: "500m"
+{% endraw %}
 {% endhighlight %}
 
 ## How Pods with Resource Limits are Scheduled
@@ -132,10 +134,12 @@ until a place can be found.    An event will be produced each time the scheduler
 place for the pod, like this:
 
 {% highlight console %}
+{% raw %}
 $ kubectl describe pods/frontend | grep -A 3 Events
 Events:
   FirstSeen				LastSeen			Count	From SubobjectPath	Reason			Message
   Tue, 30 Jun 2015 09:01:41 -0700	Tue, 30 Jun 2015 09:39:27 -0700	128	{scheduler }            failedScheduling	Error scheduling: For each of these fitness predicates, pod frontend failed on at least one node: PodFitsResources.
+{% endraw %}
 {% endhighlight %}
 
 If a pod or pods are pending with this message, then there are several things to try:
@@ -159,6 +163,7 @@ Your container may be terminated because it's resource-starved. To check if a co
 on the pod you are interested in:
 
 {% highlight console %}
+{% raw %}
 [12:54:41] $ ./cluster/kubectl.sh describe pod simmemleak-hra99
 Name:               simmemleak-hra99
 Namespace:          default
@@ -190,6 +195,7 @@ Events:
   Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  implicitly required container POD   created     Created with docker id 6a41280f516d
   Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  implicitly required container POD   started     Started with docker id 6a41280f516d
   Tue, 07 Jul 2015 12:53:51 -0700   Tue, 07 Jul 2015 12:53:51 -0700  1      {kubelet kubernetes-minion-tf0f}  spec.containers{simmemleak}         created     Created with docker id 87348f12526a
+{% endraw %}
 {% endhighlight %}
 
 The `Restart Count:  5` indicates that the `simmemleak` container in this pod was terminated and restarted 5 times.
@@ -199,9 +205,11 @@ Once [#10861](https://github.com/GoogleCloudPlatform/kubernetes/issues/10861) is
 Until then you can call `get pod` with the `-o template -t ...` option to fetch the status of previously terminated containers:
 
 {% highlight console %}
+{% raw %}
 [13:59:01] $ ./cluster/kubectl.sh  get pod -o template -t '{{range.status.containerStatuses}}{{"Container Name: "}}{{.name}}{{"\r\nLastState: "}}{{.lastState}}{{end}}'  simmemleak-60xbc
 Container Name: simmemleak
 LastState: map[terminated:map[exitCode:137 reason:OOM Killed startedAt:2015-07-07T20:58:43Z finishedAt:2015-07-07T20:58:43Z containerID:docker://0e4095bba1feccdfe7ef9fb6ebffe972b4b14285d5acdec6f0d3ae8a22fad8b2]][13:59:03] clusterScaleDoc ~/go/src/github.com/GoogleCloudPlatform/kubernetes $ 
+{% endraw %}
 {% endhighlight %}
 
 We can see that this container was terminated because `reason:OOM Killed`, where *OOM* stands for Out Of Memory.
@@ -225,6 +233,9 @@ machine types within the same cloud providers.  For example, on AWS, the capacit
 is reported in [ECUs](http://aws.amazon.com/ec2/faqs/), while in GCE it is reported in logical
 cores.  We plan to revise the definition of the cpu resource to allow for more consistency
 across providers and platforms.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

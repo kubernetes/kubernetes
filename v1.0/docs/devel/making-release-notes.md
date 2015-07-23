@@ -20,7 +20,9 @@ Find the most-recent PR that was merged with the current .0 release.  Remeber th
 ### 2) Run the release-notes tool
 
 {% highlight bash %}
+{% raw %}
 ${KUBERNETES_ROOT}/build/make-release-notes.sh $LASTPR $CURRENTPR
+{% endraw %}
 {% endhighlight %}
 
 ### 3) Trim the release notes
@@ -45,6 +47,9 @@ With the final markdown all set, cut and paste it to the top of `CHANGELOG.md`
    * Open up the release you are working on.
    * Cut and paste the final markdown from above into the release notes
    * Press Save.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -117,6 +117,9 @@ For questions on running this app, you can ask on the google containers group (f
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

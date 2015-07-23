@@ -30,7 +30,9 @@ Docker containers themselves.  To achieve this, we need a separate "bootstrap" i
 Run:
 
 {% highlight sh %}
+{% raw %}
 sudo sh -c 'docker -d -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null &'
+{% endraw %}
 {% endhighlight %}
 
 _Important Note_:
@@ -43,13 +45,17 @@ across reboots and failures.
 Run:
 
 {% highlight sh %}
+{% raw %}
 sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+{% endraw %}
 {% endhighlight %}
 
 Next, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:
 
 {% highlight sh %}
+{% raw %}
 sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+{% endraw %}
 {% endhighlight %}
 
 
@@ -66,13 +72,17 @@ To re-configure Docker to use flannel, we need to take docker down, run flannel 
 Turning down Docker is system dependent, it may be:
 
 {% highlight sh %}
+{% raw %}
 sudo /etc/init.d/docker stop
+{% endraw %}
 {% endhighlight %}
 
 or
 
 {% highlight sh %}
+{% raw %}
 sudo systemctl stop docker
+{% endraw %}
 {% endhighlight %}
 
 or it may be something else.
@@ -82,7 +92,9 @@ or it may be something else.
 Now run flanneld itself:
 
 {% highlight sh %}
+{% raw %}
 sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0
+{% endraw %}
 {% endhighlight %}
 
 The previous command should have printed a really long hash, copy this hash.
@@ -90,7 +102,9 @@ The previous command should have printed a really long hash, copy this hash.
 Now get the subnet settings from flannel:
 
 {% highlight sh %}
+{% raw %}
 sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from-above-here> cat /run/flannel/subnet.env
+{% endraw %}
 {% endhighlight %}
 
 #### Edit the docker configuration
@@ -102,7 +116,9 @@ This may be in `/etc/default/docker` or `/etc/systemd/service/docker.service` or
 Regardless, you need to add the following to the docker command line:
 
 {% highlight sh %}
+{% raw %}
 --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}
+{% endraw %}
 {% endhighlight %}
 
 #### Remove the existing Docker bridge
@@ -110,8 +126,10 @@ Regardless, you need to add the following to the docker command line:
 Docker creates a bridge named `docker0` by default.  You need to remove this:
 
 {% highlight sh %}
+{% raw %}
 sudo /sbin/ifconfig docker0 down
 sudo brctl delbr docker0
+{% endraw %}
 {% endhighlight %}
 
 You may need to install the `bridge-utils` package for the `brctl` binary.
@@ -121,13 +139,17 @@ You may need to install the `bridge-utils` package for the `brctl` binary.
 Again this is system dependent, it may be:
 
 {% highlight sh %}
+{% raw %}
 sudo /etc/init.d/docker start
+{% endraw %}
 {% endhighlight %}
 
 it may be:
 
 {% highlight sh %}
+{% raw %}
 systemctl start docker
+{% endraw %}
 {% endhighlight %}
 
 ## Starting the Kubernetes Master
@@ -135,13 +157,17 @@ systemctl start docker
 Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case, we will use the "main" instance of the Docker daemon for the Kubernetes components.
 
 {% highlight sh %}
+{% raw %}
 sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
+{% endraw %}
 {% endhighlight %}
 
 ### Also run the service proxy
 
 {% highlight sh %}
+{% raw %}
 sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+{% endraw %}
 {% endhighlight %}
 
 ### Test it out
@@ -155,14 +181,18 @@ Download the kubectl binary
 List the nodes
 
 {% highlight sh %}
+{% raw %}
 kubectl get nodes
+{% endraw %}
 {% endhighlight %}
 
 This should print:
 
 {% highlight console %}
+{% raw %}
 NAME        LABELS                             STATUS
 127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
+{% endraw %}
 {% endhighlight %}
 
 If the status of the node is `NotReady` or `Unknown` please check that all of the containers you created are successfully running.
@@ -172,6 +202,9 @@ If all else fails, ask questions on IRC at [#google-containers](http://webchat.f
 ### Next steps
 
 Move on to [adding one or more workers](worker.html)
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -56,6 +56,7 @@ This is an example of a pod that consumes its name and namespace via the
 downward API:
 
 {% highlight yaml %}
+{% raw %}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -75,11 +76,15 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
   restartPolicy: Never
+{% endraw %}
 {% endhighlight %}
 
 Some more thorough examples:
    * [environment variables](environment-guide/)
    * [downward API](downward-api/)
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -175,17 +175,21 @@ Discussed in [#2004](https://github.com/GoogleCloudPlatform/kubernetes/issues/20
 For example:
 
 {% highlight yaml %}
+{% raw %}
 ports:
   - name: www
     containerPort: 80
+{% endraw %}
 {% endhighlight %}
 
 vs.
 
 {% highlight yaml %}
+{% raw %}
 ports:
   www:
     containerPort: 80
+{% endraw %}
 {% endhighlight %}
 
 This rule maintains the invariant that all JSON/YAML keys are fields in API objects. The only exceptions are pure maps in the API (currently, labels, selectors, and annotations), as opposed to sets of subobjects.
@@ -254,20 +258,24 @@ The API supports three different PATCH operations, determined by their correspon
 In the standard JSON merge patch, JSON objects are always merged but lists are always replaced. Often that isn't what we want. Let's say we start with the following Pod:
 
 {% highlight yaml %}
+{% raw %}
 spec:
   containers:
     - name: nginx
       image: nginx-1.0
+{% endraw %}
 {% endhighlight %}
 
 ...and we POST that to the server (as JSON). Then let's say we want to *add* a container to this Pod.
 
 {% highlight yaml %}
+{% raw %}
 PATCH /api/v1/namespaces/default/pods/pod-name
 spec:
   containers:
     - name: log-tailer
       image: log-tailer-1.0
+{% endraw %}
 {% endhighlight %}
 
 If we were to use standard Merge Patch, the entire container list would be replaced with the single log-tailer container. However, our intent is for the container lists to merge together based on the `name` field.
@@ -283,20 +291,24 @@ Strategic Merge Patch also supports special operations as listed below.
 To override the container list to be strictly replaced, regardless of the default:
 
 {% highlight yaml %}
+{% raw %}
 containers:
   - name: nginx
     image: nginx-1.0
   - $patch: replace   # any further $patch operations nested in this list will be ignored
+{% endraw %}
 {% endhighlight %}
 
 To delete an element of a list that should be merged:
 
 {% highlight yaml %}
+{% raw %}
 containers:
   - name: nginx
     image: nginx-1.0
   - $patch: delete
     name: log-tailer  # merge key and value goes here
+{% endraw %}
 {% endhighlight %}
 
 ### Map Operations
@@ -304,19 +316,23 @@ containers:
 To indicate that a map should not be merged and instead should be taken literally:
 
 {% highlight yaml %}
+{% raw %}
 $patch: replace  # recursive and applies to all fields of the map it's in
 containers:
 - name: nginx
   image: nginx-1.0
+{% endraw %}
 {% endhighlight %}
 
 To delete a field of a map:
 
 {% highlight yaml %}
+{% raw %}
 name: nginx
 image: nginx-1.0
 labels:
   live: null  # set the value of the map key to null
+{% endraw %}
 {% endhighlight %}
 
 
@@ -377,10 +393,12 @@ The only way for a client to know the expected value of resourceVersion is to ha
 In the case of a conflict, the correct client action at this point is to GET the resource again, apply the changes afresh, and try submitting again. This mechanism can be used to prevent races like the following:
 
 ```
+{% raw %}
 Client #1                                  Client #2
 GET Foo                                    GET Foo
 Set Foo.Bar = "one"                        Set Foo.Baz = "two"
 PUT Foo                                    PUT Foo
+{% endraw %}
 ```
 
 When these sequences occur in parallel, either the change to Foo.Bar or the change to Foo.Baz can be lost.
@@ -501,6 +519,7 @@ The status object is encoded as JSON and provided as the body of the response.  
 **Example:**
 
 {% highlight console %}
+{% raw %}
 $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1/namespaces/default/pods/grafana
 
 > GET /api/v1/namespaces/default/pods/grafana HTTP/1.1
@@ -528,6 +547,7 @@ $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https:/
   },
   "code": 404
 }
+{% endraw %}
 {% endhighlight %}
 
 `status` field contains one of two possible values:
@@ -622,6 +642,9 @@ Possible values for the `reason` and `details` fields:
 ## Events
 
 TODO: Document events (refer to another doc for details)
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

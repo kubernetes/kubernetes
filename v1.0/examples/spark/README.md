@@ -39,7 +39,9 @@ Use the [`examples/spark/spark-master.json`](spark-master.json) file to create a
 the Master service.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/spark/spark-master.json
+{% endraw %}
 {% endhighlight %}
 
 Then, use the [`examples/spark/spark-master-service.json`](spark-master-service.json) file to
@@ -47,22 +49,27 @@ create a logical service endpoint that Spark workers can use to access
 the Master pod.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/spark/spark-master-service.json
+{% endraw %}
 {% endhighlight %}
 
 ### Check to see if Master is running and accessible
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get pods
 NAME                                           READY     STATUS    RESTARTS   AGE
 [...]
 spark-master                                   1/1       Running   0          25s
 
+{% endraw %}
 {% endhighlight %}
 
 Check logs to see the status of the master.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl logs spark-master
 
 starting org.apache.spark.deploy.master.Master, logging to /opt/spark-1.4.0-bin-hadoop2.6/sbin/../logs/spark--org.apache.spark.deploy.master.Master-1-spark-master.out
@@ -84,6 +91,7 @@ Spark Command: /usr/lib/jvm/java-7-openjdk-amd64/jre/bin/java -cp /opt/spark-1.4
 15/06/26 14:01:52 INFO Utils: Successfully started service 'MasterUI' on port 8080.
 15/06/26 14:01:52 INFO MasterWebUI: Started MasterWebUI at http://10.244.2.34:8080
 15/06/26 14:01:53 INFO Master: I have been elected leader! New state: ALIVE
+{% endraw %}
 {% endhighlight %}
 
 ## Step Two: Start your Spark workers
@@ -98,12 +106,15 @@ Use the [`examples/spark/spark-worker-controller.json`](spark-worker-controller.
 [replication controller](../../docs/user-guide/replication-controller.html) that manages the worker pods.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl create -f examples/spark/spark-worker-controller.json
+{% endraw %}
 {% endhighlight %}
 
 ### Check to see if the workers are running
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get pods
 NAME                                            READY     STATUS    RESTARTS   AGE
 [...]
@@ -117,6 +128,7 @@ $ kubectl logs spark-master
 15/06/26 14:15:43 INFO Master: Registering worker 10.244.2.35:46199 with 1 cores, 2.6 GB RAM
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.1.15:44839 with 1 cores, 2.6 GB RAM
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.0.19:60970 with 1 cores, 2.6 GB RAM
+{% endraw %}
 {% endhighlight %}
 
 ## Step Three: Do something with the cluster
@@ -124,9 +136,11 @@ $ kubectl logs spark-master
 Get the address and port of the Master service.
 
 {% highlight sh %}
+{% raw %}
 $ kubectl get service spark-master
 NAME           LABELS              SELECTOR            IP(S)          PORT(S)
 spark-master   name=spark-master   name=spark-master   10.0.204.187   7077/TCP
+{% endraw %}
 {% endhighlight %}
 
 SSH to one of your cluster nodes. On GCE/GKE you can either use [Developers Console](https://console.developers.google.com)
@@ -135,6 +149,7 @@ or run  `gcloud compute ssh <name>` where the name can be taken from `kubectl ge
 (more details [here](https://cloud.google.com/compute/docs/gcloud-compute/#connecting)).
 
 ```
+{% raw %}
 $ kubectl get nodes
 NAME                     LABELS                                          STATUS
 kubernetes-minion-5jvu   kubernetes.io/hostname=kubernetes-minion-5jvu   Ready
@@ -148,12 +163,14 @@ Linux kubernetes-minion-5jvu 3.16.0-0.bpo.4-amd64 #1 SMP Debian 3.16.7-ckt9-3~de
 === GCE Kubernetes node setup complete ===
 
 me@kubernetes-minion-5jvu:~$
+{% endraw %}
 ```
 
 Once logged in run spark-base image. Inside of the image there is a script
 that sets up the environment based on the provided IP and port of the Master.
 
 ```
+{% raw %}
 cluster-node $ sudo docker run -it gcr.io/google_containers/spark-base
 root@f12a6fec45ce:/# . /setup_client.sh 10.0.204.187 7077
 root@f12a6fec45ce:/# pyspark
@@ -172,6 +189,7 @@ SparkContext available as sc, HiveContext available as sqlContext.
 >>> import socket
 >>> sc.parallelize(range(1000)).map(lambda x:socket.gethostname()).distinct().collect()
 ['spark-worker-controller-u40r2', 'spark-worker-controller-hifwi', 'spark-worker-controller-vpgyg']
+{% endraw %}
 ```
 
 ## Result
@@ -190,6 +208,9 @@ for more information.
 Make sure the Master Pod is running (use: ```kubectl get pods```).
 
 ```kubectl create -f spark-worker-controller.json```
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

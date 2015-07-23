@@ -13,21 +13,30 @@ information in the pod description file aws-ebs-web.yaml then create
 the pod:
 
 {% highlight sh %}
+{% raw %}
   $ kubectl create -f examples/aws_ebs/aws-ebs-web.yaml
+{% endraw %}
 {% endhighlight %}
 
 Add some data to the volume if is empty:
 
 {% highlight sh %}
+{% raw %}
   $ echo  "Hello World" >& /var/lib/kubelet/plugins/kubernetes.io/aws-ebs/mounts/aws/{Region}/{Volume ID}/index.html
+{% endraw %}
 {% endhighlight %}
 
 You should now be able to query your web server:
 
 {% highlight sh %}
+{% raw %}
   $ curl <Pod IP address>
   $ Hello World
+{% endraw %}
 {% endhighlight %}
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

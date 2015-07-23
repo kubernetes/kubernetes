@@ -80,6 +80,9 @@ variety of uses cases:
      installations that want to do their own auth proxy.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/accessing-the-api.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

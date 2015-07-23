@@ -25,13 +25,17 @@ We still have [a bunch of work](https://github.com/GoogleCloudPlatform/kubernete
   To start the `rkt metadata service`, you can simply run:
 
 {% highlight console %}
+{% raw %}
   $ sudo rkt metadata-service
+{% endraw %}
 {% endhighlight %}
 
   If you want the service to be running as a systemd service, then:
 
 {% highlight console %}
+{% raw %}
   $ sudo systemd-run rkt metadata-service
+{% endraw %}
 {% endhighlight %}
 
   Alternatively, you can use the [rkt-metadata.service](https://github.com/coreos/rkt/blob/master/dist/init/systemd/rkt-metadata.service) and [rkt-metadata.socket](https://github.com/coreos/rkt/blob/master/dist/init/systemd/rkt-metadata.socket) to start the service.
@@ -42,8 +46,10 @@ We still have [a bunch of work](https://github.com/GoogleCloudPlatform/kubernete
 To use rkt as the container runtime, you just need to set the environment variable `CONTAINER_RUNTIME`:
 
 {% highlight console %}
+{% raw %}
 $ export CONTAINER_RUNTIME=rkt
 $ hack/local-up-cluster.sh
+{% endraw %}
 {% endhighlight %}
 
 ### CoreOS cluster on Google Compute Engine (GCE)
@@ -51,22 +57,28 @@ $ hack/local-up-cluster.sh
 To use rkt as the container runtime for your CoreOS cluster on GCE, you need to specify the OS distribution, project, image:
 
 {% highlight console %}
+{% raw %}
 $ export KUBE_OS_DISTRIBUTION=coreos
 $ export KUBE_GCE_MINION_IMAGE=<image_id>
 $ export KUBE_GCE_MINION_PROJECT=coreos-cloud
 $ export KUBE_CONTAINER_RUNTIME=rkt
+{% endraw %}
 {% endhighlight %}
 
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
 
 {% highlight console %}
+{% raw %}
 $ export KUBE_RKT_VERSION=0.5.6
+{% endraw %}
 {% endhighlight %}
 
 Then you can launch the cluster by:
 
 {% highlight console %}
+{% raw %}
 $ kube-up.sh
+{% endraw %}
 {% endhighlight %}
 
 Note that we are still working on making all containerized the master components run smoothly in rkt. Before that we are not able to run the master node with rkt yet.
@@ -76,27 +88,35 @@ Note that we are still working on making all containerized the master components
 To use rkt as the container runtime for your CoreOS cluster on AWS, you need to specify the provider and OS distribution:
 
 {% highlight console %}
+{% raw %}
 $ export KUBERNETES_PROVIDER=aws
 $ export KUBE_OS_DISTRIBUTION=coreos
 $ export KUBE_CONTAINER_RUNTIME=rkt
+{% endraw %}
 {% endhighlight %}
 
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
 
 {% highlight console %}
+{% raw %}
 $ export KUBE_RKT_VERSION=0.5.6
+{% endraw %}
 {% endhighlight %}
 
 You can optionally choose the CoreOS channel  by setting `COREOS_CHANNEL`:
 
 {% highlight console %}
+{% raw %}
 $ export COREOS_CHANNEL=stable
+{% endraw %}
 {% endhighlight %}
 
 Then you can launch the cluster by:
 
 {% highlight console %}
+{% raw %}
 $ kube-up.sh
+{% endraw %}
 {% endhighlight %}
 
 Note: CoreOS is not supported as the master using the automated launch
@@ -107,6 +127,9 @@ scripts. The master node is always Ubuntu.
 See [a simple nginx example](../../../docs/user-guide/simple-nginx.html) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../../examples/).
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
