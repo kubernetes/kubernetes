@@ -120,7 +120,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{""}, mount.New())
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{""}, mount.New(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), mount.New())
+	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), mount.New(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

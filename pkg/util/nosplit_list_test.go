@@ -1,5 +1,3 @@
-// +build !linux
-
 /*
 Copyright 2014 The Kubernetes Authors All rights reserved.
 
@@ -16,28 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package util
 
-type NsenterMounter struct{}
+import (
+	"reflect"
+	"testing"
+)
 
-var _ = Interface(&NsenterMounter{})
-
-func (*NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
-	return nil
-}
-
-func (*NsenterMounter) Unmount(target string) error {
-	return nil
-}
-
-func (*NsenterMounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, nil
-}
-
-func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
-	return false, nil
-}
-
-func (*NsenterMounter) SetRunner(executor ContainerExecutor) {
-
+func TestNoSplitStringListSet(t *testing.T) {
+	var sl NoSplitStringList
+	sl.Set("foo,bar")
+	sl.Set("hop")
+	expected := []string{"foo,bar", "hop"}
+	if reflect.DeepEqual(expected, []string(sl)) == false {
+		t.Errorf("expected: %v, got: %v:", expected, sl)
+	}
 }

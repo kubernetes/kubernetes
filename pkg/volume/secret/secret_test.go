@@ -272,7 +272,7 @@ func doTestSecretDataInVolume(volumePath string, secret api.Secret, t *testing.T
 }
 
 func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
-	cleaner, err := plugin.NewCleaner(testVolumeName, podUID, mount.New())
+	cleaner, err := plugin.NewCleaner(testVolumeName, podUID, mount.New(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

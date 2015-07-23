@@ -40,6 +40,9 @@ func (f *FakeMounter) ResetLog() {
 	f.Log = []FakeAction{}
 }
 
+func (f *FakeMounter) SetRunner(executor ContainerExecutor) {
+}
+
 func (f *FakeMounter) Mount(source string, target string, fstype string, options []string) error {
 	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: target, Type: fstype})
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: target, Source: source, FSType: fstype})

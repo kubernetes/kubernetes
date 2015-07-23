@@ -18,7 +18,12 @@ limitations under the License.
 // an alternate platform, we will need to abstract further.
 package mount
 
-import "github.com/golang/glog"
+import (
+	"fmt"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
+	"strings"
+)
 
 type Interface interface {
 	// Mount mounts source to target as fstype with given options.
@@ -32,7 +37,19 @@ type Interface interface {
 	List() ([]MountPoint, error)
 	// IsMountPoint determines if a directory is a mountpoint.
 	IsMountPoint(file string) (bool, error)
+	SetRunner(executor ContainerExecutor)
 }
+type ContainerExecutor interface {
+	RunInContainerBySelector(selector labels.Selector, containerName string, cmd []string) ([]byte, error)
+}
+
+type MounterType int
+
+const (
+	MounterMount MounterType = iota
+	MounterNsenter
+	MounterContainer
+)
 
 // This represents a single line in /proc/mounts or /etc/fstab.
 type MountPoint struct {
@@ -44,8 +61,95 @@ type MountPoint struct {
 	Pass   int
 }
 
+type MountContainerConfig struct {
+	Selector      labels.Selector
+	ContainerName string
+}
+
+// MounterConfig contains configuration of Volumes mounter
+type MountConfig struct {
+	// What mounter to use
+	Mounter MounterType
+
+	// Configuration of mount.ContainerMounter:
+	// Map filesystem type -> MounterContainerConfig
+	MountContainers map[string]*MountContainerConfig
+}
+
+func ParseMountConfig(volumeMounter string, mountContainers []string, containerized bool) (*MountConfig, error) {
+	glog.V(5).Infof("ParseMountConfig: parsing mounter: '%s', containers: '%s', containerized: '%v'", volumeMounter, mountContainers, containerized)
+
+	cfg := &MountConfig{}
+
+	switch volumeMounter {
+	case "":
+		// nothing on command line, use the default one
+		if containerized {
+			glog.V(5).Infof("ParseMountConfig: using default Mounter")
+			cfg.Mounter = MounterNsenter
+		} else {
+			glog.V(5).Infof("ParseMountConfig: using default NsenterMounter")
+			cfg.Mounter = MounterMount
+		}
+	case "mount":
+		glog.V(5).Infof("ParseMountConfig: using Mounter")
+		cfg.Mounter = MounterMount
+	case "nsenter":
+		glog.V(5).Infof("ParseMountConfig: using NsenterMounter")
+		cfg.Mounter = MounterNsenter
+	case "container":
+		glog.V(5).Infof("ParseMountConfig: using ContainerMounter")
+		cfg.Mounter = MounterContainer
+	default:
+		return nil, fmt.Errorf("Unknown volume-mounter value: '%v'", volumeMounter)
+	}
+	if cfg.Mounter != MounterContainer {
+		return cfg, nil
+	}
+
+	// for MounterContainer, we need to parse mountContainers
+	cfg.MountContainers = make(map[string]*MountContainerConfig)
+
+	for _, container := range mountContainers {
+		parts := strings.Split(container, ":")
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("Cannot parse --mount-container specification '%v': expected 3 parts separated by ':'", container)
+		}
+
+		selector, err := labels.Parse(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing selector '%s': %v", parts[1], err)
+		}
+
+		cfg.MountContainers[parts[0]] = &MountContainerConfig{
+			Selector:      selector,
+			ContainerName: parts[2],
+		}
+	}
+	return cfg, nil
+
+}
+
 // New returns a mount.Interface for the current system.
-func New() Interface {
+func New(cfg *MountConfig) Interface {
+	if cfg == nil {
+		glog.V(3).Infof("mount.new: no cfg specified, using Mounter")
+		return &Mounter{}
+	}
+
+	switch cfg.Mounter {
+	case MounterMount:
+		glog.V(3).Infof("mount.new: using Mounter")
+		return &Mounter{}
+	case MounterNsenter:
+		glog.V(3).Infof("mount.new: using NsenterMounter")
+		return &NsenterMounter{}
+	case MounterContainer:
+		glog.V(3).Infof("mount.new: using ContainerMounter")
+		return &ContainerMounter{
+			config: cfg,
+		}
+	}
 	return &Mounter{}
 }
 

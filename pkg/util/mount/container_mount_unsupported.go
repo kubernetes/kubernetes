@@ -18,26 +18,28 @@ limitations under the License.
 
 package mount
 
-type NsenterMounter struct{}
+type ContainerMounter struct {
+	executor ContainerExecutor
+	config   *MountConfig
+}
 
-var _ = Interface(&NsenterMounter{})
+var _ = Interface(&ContainerMounter{})
 
-func (*NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
+func (*ContainerMounter) Mount(source string, target string, fstype string, options []string) error {
 	return nil
 }
 
-func (*NsenterMounter) Unmount(target string) error {
+func (*ContainerMounter) Unmount(target string) error {
 	return nil
 }
 
-func (*NsenterMounter) List() ([]MountPoint, error) {
+func (*ContainerMounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
 
-func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
+func (*ContainerMounter) IsMountPoint(file string) (bool, error) {
 	return false, nil
 }
 
-func (*NsenterMounter) SetRunner(executor ContainerExecutor) {
-
+func (cm *ContainerMounter) SetRunner(executor ContainerExecutor) {
 }

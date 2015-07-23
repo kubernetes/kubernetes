@@ -1,5 +1,3 @@
-// +build !linux
-
 /*
 Copyright 2014 The Kubernetes Authors All rights reserved.
 
@@ -16,28 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package util
 
-type NsenterMounter struct{}
+import (
+	"fmt"
+)
 
-var _ = Interface(&NsenterMounter{})
+/* NoSpliStringList is just a list of strings.
+ * Unlike util.StringList, it does not interpret the values in any way and it
+ * does not split the values by ','.
+ * After this code, the list contains {'a,b', 'c'}:
+ * list NoSplitStringList; list.Set('a,b'); list.Set('c')
+ */
+type NoSplitStringList []string
 
-func (*NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
+func (sl *NoSplitStringList) String() string {
+	return fmt.Sprint(*sl)
+}
+
+func (sl *NoSplitStringList) Set(value string) error {
+	*sl = append(*sl, value)
 	return nil
 }
 
-func (*NsenterMounter) Unmount(target string) error {
-	return nil
-}
-
-func (*NsenterMounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, nil
-}
-
-func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
-	return false, nil
-}
-
-func (*NsenterMounter) SetRunner(executor ContainerExecutor) {
-
+func (*NoSplitStringList) Type() string {
+	return "noSplitStringList"
 }

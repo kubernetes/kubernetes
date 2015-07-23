@@ -394,6 +394,90 @@ request a certain amount of space using a [resource](compute-resources.md)
 specification, and to select the type of media to use, for clusters that have
 several media types.
 
+# Mounters
+
+Before Kubernetes start containers in a pod, it mounts all volumes to a
+subdirectory in /var/lib/kubelet/pods/<pod UUID>. It shares the volumes to the
+container using `docker -v` parameter or similar mechanism.
+
+Kubernetes can mount the volumes in various ways, controlled by
+`kubelet --volume-mounter=XYZ` parameter.
+
+## Mounter
+`kubelet --volume-mounter=mount` (default) uses simple
+`mount -t <fstype> <what> <where>` call. All mount utilities (like `mount.nfs`
+or `mount.glusterfs`) must be present on the host.
+
+## NsenterMounter
+`kubelet --volume-mounter=nsenter` (default when kubelet runs inside a
+container, i.e. `kubelet --containerized=true` is used) should be used when
+`kubelet` itself runs in a container.
+
+It calls
+`nsenter --mount=/rootfs/proc/1/ns/mnt /usr/bin/mount -t <fstype> <what> <where>`
+from inside the container where `kubelet` runs. In other words, it enters the
+host namespace and calls `/usr/bin/mount` there. The mount utilities (like
+`mount.nfs` or `mount.glusterfs`) must be present on the **host**, not inside
+`kubelet` container. Of course, `kubelet` container must be privileged in order
+to escape its own container and enter the host mount namespace.
+
+## ContainerMounter
+`kubelet --volume-mounter=container` assumes, that the host does not have some
+mount utilities (like `mount.glusterfs`) and uses container(s) with these
+utilities to mount certain filesystems. This mounter is configured by
+`--mount-container=xxx` option, which tells which container should be used for
+which filesystem. Complete syntax is:
+
+    --mount-container=<fstype>:<pod selector>:<containername>
+
+The option can be used multiple times. For example, assuming that we have a
+running pod `mounter` with two containers named `gluster` with
+`/bin/mount.gluster` and `nfs` with `/bin/mount.nfs`, we can tell `kubelet` to
+use these containers to mount glusterfs and nfs:
+
+    kubelet --volume-mounter=container \
+            --mount-countainer=glusterfs:name=glusterfs-mounter:gluster \
+            --mount-countainer=nfs:name=nfs-mounter:nfs
+
+Kubernetes will then do
+`docker exec <container ID> mount -t <fsname> <what> <where>`.
+This mount pod must exist, Kubernetes won't crete one for you! And containers
+inside the pod must mount the requested filesystem to the **host** mount
+namespace, not inside the container. See
+https://github.com/jsafrane/glusterfs-mounter for example of such container.
+The mount containers must be usually privileged to allow them to mount stuff
+into the host mount namespace.
+
+Example of a pod that can mount glusterfs:
+
+    kind: Pod
+    apiVersion: v1beta3
+    metadata:
+      name: mounter
+      labels:
+        name: glusterfs-mounter
+    spec:
+      containers:
+        - name: mounter
+          image: jsafrane/glusterfs-mounter
+          env:
+            - name: "HOSTPROCPATH"
+              value: "/host"
+          privileged: true
+          volumeMounts:
+            - name: var
+              mountPath: /var/lib/kubelet/
+            - name: proc
+              mountPath: /host/proc
+      volumes:
+        - name: var
+          hostPath:
+            path: /var/lib/kubelet
+        - name: proc
+          hostPath:
+            path: /proc
+
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/volumes.md?pixel)]()

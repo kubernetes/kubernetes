@@ -35,3 +35,7 @@ func (mounter *Mounter) List() ([]MountPoint, error) {
 func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
 	return false, nil
 }
+
+func (mounter *Mounter) SetRunner(executor ContainerExecutor) {
+
+}

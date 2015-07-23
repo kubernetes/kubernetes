@@ -118,6 +118,8 @@ type KubeletServer struct {
 	PodCIDR                        string
 	MaxPods                        int
 	DockerExecHandlerName          string
+	VolumeMounter                  string
+	MountContainerList             util.NoSplitStringList
 
 	// Flags intended for testing
 
@@ -181,6 +183,7 @@ func NewKubeletServer() *KubeletServer {
 		SystemContainer:             "",
 		ConfigureCBR0:               false,
 		DockerExecHandlerName:       "native",
+		VolumeMounter:               "",
 	}
 }
 
@@ -247,6 +250,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
 	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
+	fs.StringVar(&s.VolumeMounter, "volume-mounter", s.VolumeMounter, "The volume mounter to use. \"mount\" = standard /bin/mount is used; \"nsenter\" = NsEnter mounter is used, for kubelet running in a container; \"container\" = ContainerMounter is used, for mount utilities running in a container (Default: \"mount\").")
+	fs.Var(&s.MountContainerList, "mount-container", "If --volume-mounter=container, list containers used for mounting. (volume-type:pod selector:containername). This option can be used multiple times to specify several mount pods.")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -298,12 +303,12 @@ func (s *KubeletServer) Run(_ []string) error {
 	if err != nil {
 		return err
 	}
-
-	mounter := mount.New()
-	if s.Containerized {
-		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
-		mounter = &mount.NsenterMounter{}
+	mountConfig, err := mount.ParseMountConfig(s.VolumeMounter, s.MountContainerList, s.Containerized)
+	if err != nil {
+		return err
 	}
+
+	mounter := mount.New(mountConfig)
 
 	var dockerExecHandler dockertools.ExecHandler
 	switch s.DockerExecHandlerName {
@@ -551,7 +556,7 @@ func SimpleKubelet(client *client.Client,
 		OSInterface:               osInterface,
 		CgroupRoot:                "",
 		ContainerRuntime:          "docker",
-		Mounter:                   mount.New(),
+		Mounter:                   mount.New(nil),
 		DockerDaemonContainer:     "/docker-daemon",
 		SystemContainer:           "",
 		MaxPods:                   32,

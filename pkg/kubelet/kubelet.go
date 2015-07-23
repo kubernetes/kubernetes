@@ -267,6 +267,7 @@ func NewMainKubelet(
 		pods:                           pods,
 		syncLoopMonitor:                util.AtomicValue{},
 	}
+	klet.mounter.SetRunner(klet)
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
 		return nil, err
@@ -2317,6 +2318,25 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 	}
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	return pod.FindContainerByName(containerName), nil
+}
+
+func (kl *Kubelet) findPodBySelector(selector labels.Selector) (*api.Pod, error) {
+	pods := kl.podManager.GetPods()
+	for _, pod := range pods {
+		if selector.Matches(labels.Set(pod.Labels)) {
+			return pod, nil
+		}
+	}
+	return nil, fmt.Errorf("Cannot find pod which matches selector '%s'", selector.String())
+}
+
+func (kl *Kubelet) RunInContainerBySelector(selector labels.Selector, containerName string, cmd []string) ([]byte, error) {
+	pod, err := kl.findPodBySelector(selector)
+	if err != nil {
+		return nil, err
+	}
+
+	return kl.RunInContainer("", pod.ObjectMeta.UID, containerName, cmd)
 }
 
 // Run a command in a container, returns the combined stdout, stderr as an array of bytes
