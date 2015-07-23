@@ -145,11 +145,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 		},
 		"../examples/guestbook": {
 			"frontend-controller":     &api.ReplicationController{},
-			"redis-slave-controller":  &api.ReplicationController{},
+			"redis-worker-controller": &api.ReplicationController{},
 			"redis-master-controller": &api.ReplicationController{},
 			"frontend-service":        &api.Service{},
 			"redis-master-service":    &api.Service{},
-			"redis-slave-service":     &api.Service{},
+			"redis-worker-service":    &api.Service{},
 		},
 		"../examples/guestbook-go": {
 			"guestbook-controller":    &api.ReplicationController{},

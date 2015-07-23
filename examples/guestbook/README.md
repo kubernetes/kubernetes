@@ -43,8 +43,8 @@ This example shows how to build a simple, multi-tier web application using Kuber
     - [Optional Interlude](#optional-interlude)
   - [Step Two: Fire up the redis master service](#step-two-fire-up-the-redis-master-service)
     - [Finding a service](#finding-a-service)
-  - [Step Three: Fire up the replicated slave pods](#step-three-fire-up-the-replicated-slave-pods)
-  - [Step Four: Create the redis slave service](#step-four-create-the-redis-slave-service)
+  - [Step Three: Fire up the replicated worker pods](#step-three-fire-up-the-replicated-worker-pods)
+  - [Step Four: Create the redis worker service](#step-four-create-the-redis-worker-service)
   - [Step Five: Create the frontend replicated pods](#step-five-create-the-frontend-replicated-pods)
   - [Step Six: Set up the guestbook frontend service.](#step-six-set-up-the-guestbook-frontend-service)
     - [Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)](#using-type-loadbalancer-for-the-frontend-service-cloud-provider-specific)
@@ -57,7 +57,7 @@ This example shows how to build a simple, multi-tier web application using Kuber
 The example consists of:
 
 - A web frontend
-- A [redis](http://redis.io/) master (for storage), and a replicated set of redis 'slaves'.
+- A [redis](http://redis.io/) master (for storage), and a replicated set of redis 'workers'.
 
 The web front end interacts with the redis master via javascript redis API calls.
 
@@ -135,6 +135,12 @@ redis-master-dz33o                             1/1       Running   0          2h
 ```
 
 (Note that an initial `docker pull` to grab a container image may take a few minutes, depending on network conditions. A pod will be reported as `Pending` while its image is being downloaded.)
+
+`kubectl get pods` will show only the pods in the default [namespace](../../docs/user-guide/namespaces.md).  To see pods in all namespaces, run:
+
+```
+kubectl get pods -o wide --all-namespaces=true
+```
 
 #### Optional Interlude
 
@@ -243,9 +249,9 @@ This will cause all pods to see the redis master apparently running on <ip>:6379
 
 `targetPort` will default to `port` if it is omitted in the configuration. For simplicity's sake, we omit it in the following configurations.
 
-The traffic flow from slaves to masters can be described in two steps, like so:
+The traffic flow from workers to masters can be described in two steps, like so:
 
-  - A *redis slave* will connect to "port" on the *redis master service*
+  - A *redis worker* will connect to "port" on the *redis master service*
   - Traffic will be forwarded from the service "port" (on the service node) to the  *targetPort* on the pod that the service listens to.
 
 #### Finding a service
@@ -255,119 +261,133 @@ Kubernetes supports two primary modes of finding a service— environment variab
 The services in a Kubernetes cluster are discoverable inside other containers [via environment variables](../../docs/user-guide/services.md#environment-variables).
 
 An alternative is to use the [cluster's DNS service](../../docs/user-guide/services.md#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the service name.
-We'll use the DNS service for this example.  E.g., you can see the service name, `redis-master`, accessed as a `host` value in the PHP script in [Step 5](#step-five-create-the-frontend-replicated-pods).
 
-**Note**: **If your cluster does not have the DNS service enabled, then this example will not work out of the box.** You will need to edit `examples/guestbook/php-redis/index.php` to use environment variables for service discovery instead, then rebuild the container image from the `Dockerfile` in that directory.  (However, this is unlikely to be necessary. You can check for the DNS service in the list of the clusters' services.)
+This example has been configured to use the DNS service by default.
+
+If your cluster does not have the DNS service enabled, then you can use environment variables by setting the
+`GET_HOSTS_FROM` env value in both
+`examples/guestbook/redis-worker-controller.yaml` and `examples/guestbook/frontend-controller.yaml`
+from `dns` to `env` before you start up the app.
+(However, this is unlikely to be necessary. You can check for the DNS service in the list of the clusters' services, e.g. via
+`kubectl get services --all-namespaces=true`.)
 
 
-### Step Three: Fire up the replicated slave pods
+### Step Three: Fire up the replicated worker pods
 
-Now that the redis master is running, we can start up its 'read slaves'.
+Now that the redis master is running, we can start up its 'read workers'.
 
 We'll define these as replicated pods as well, though this time— unlike for the redis master— we'll define the number of replicas to be 2.
 In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  The replication controller will automatically launch new pods if the number of replicas falls below the specified number.
 (This particular replicated pod is a great one to test this with -- you can try killing the docker processes for your pods directly, then watch them come back online on a new node shortly thereafter.)
 
-To create the replicated pod, use the file `examples/guestbook/redis-slave-controller.yaml`, which looks like this:
+To create the replicated pod, use the file `examples/guestbook/redis-worker-controller.yaml`, which looks like this:
 
-<!-- BEGIN MUNGE: EXAMPLE redis-slave-controller.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE redis-worker-controller.yaml -->
 
 ```yaml
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: redis-slave
+  name: redis-worker
   labels:
-    name: redis-slave
+    name: redis-worker
 spec:
   replicas: 2
   selector:
-    name: redis-slave
+    name: redis-worker
   template:
     metadata:
       labels:
-        name: redis-slave
+        name: redis-worker
     spec:
       containers:
       - name: worker
-        image: kubernetes/redis-slave:v2
+        image: gcr.io/google_samples/gb-redisworker:v1
+        env:
+        - name: GET_HOSTS_FROM
+          value: dns
+          # If your cluster config does not include a dns service, then to
+          # instead access an environment variable to find the master
+          # service's host, comment out the 'value: dns' line above, and
+          # uncomment the line below.
+          # value: env
         ports:
         - containerPort: 6379
 ```
 
-[Download example](redis-slave-controller.yaml)
-<!-- END MUNGE: EXAMPLE redis-slave-controller.yaml -->
+[Download example](redis-worker-controller.yaml)
+<!-- END MUNGE: EXAMPLE redis-worker-controller.yaml -->
 
 and create the replication controller by running:
 
 ```console
-$ kubectl create -f examples/guestbook/redis-slave-controller.yaml
-replicationcontrollers/redis-slave
+$ kubectl create -f examples/guestbook/redis-worker-controller.yaml
+replicationcontrollers/redis-worker
 
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
 redis-master                           master                  redis                                    name=redis-master            1
-redis-slave                            slave                   kubernetes/redis-slave:v2                name=redis-slave             2
+redis-worker                           worker                  gcr.io/google_samples/gb-redisworker:v1  name=redis-worker            2
 ```
 
-Once the replication controller is up, you can list the pods in the cluster, to verify that the master and slaves are running.  You should see a list that includes something like the following:
+Once the replication controller is up, you can list the pods in the cluster, to verify that the master and workers are running.  You should see a list that includes something like the following:
 
 ```console
 $ kubectl get pods
-NAME                                           READY     STATUS    RESTARTS   AGE
+NAME                                       READY     STATUS    RESTARTS   AGE
 ...
-redis-master-dz33o                             1/1       Running   0          2h
-redis-slave-35mer                              1/1       Running   0          2h
-redis-slave-iqkhy                              1/1       Running   0          2h
+redis-master-dz33o                         1/1       Running   0          2h
+redis-worker-35mer                         1/1       Running   0          2h
+redis-worker-iqkhy                         1/1       Running   0          2h
 ```
 
-You should see a single redis master pod and two redis slave pods.  As mentioned above, you can get more information about any pod with: `kubectl describe pods/<pod_name>`.
+You should see a single redis master pod and two redis worker pods.  As mentioned above, you can get more information about any pod with: `kubectl describe pods/<pod_name>`.
 
-### Step Four: Create the redis slave service
+### Step Four: Create the redis worker service
 
-Just like the master, we want to have a service to proxy connections to the redis slaves. In this case, in addition to discovery, the slave service will provide transparent load balancing to web app clients.
+Just like the master, we want to have a service to proxy connections to the redis workers. In this case, in addition to discovery, the worker service will provide transparent load balancing to web app clients.
 
-The service specification for the slaves is in `examples/guestbook/redis-slave-service.yaml`:
+The service specification for the workers is in `examples/guestbook/redis-worker-service.yaml`:
 
-<!-- BEGIN MUNGE: EXAMPLE redis-slave-service.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE redis-worker-service.yaml -->
 
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis-slave
+  name: redis-worker
   labels:
-    name: redis-slave
+    name: redis-worker
 spec:
   ports:
     # the port that this service should serve on
   - port: 6379
   selector:
-    name: redis-slave
+    name: redis-worker
 ```
 
-[Download example](redis-slave-service.yaml)
-<!-- END MUNGE: EXAMPLE redis-slave-service.yaml -->
+[Download example](redis-worker-service.yaml)
+<!-- END MUNGE: EXAMPLE redis-worker-service.yaml -->
 
-This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "label=value"` command.
+This time the selector for the service is `name=redis-worker`, because that identifies the pods running redis workers. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "label=value"` command.
 
 Now that you have created the service specification, create it in your cluster by running:
 
 ```console
-$ kubectl create -f examples/guestbook/redis-slave-service.yaml
-services/redis-slave
+$ kubectl create -f examples/guestbook/redis-worker-service.yaml
+services/redis-worker
 
 $ kubectl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379
-redis-slave             name=redis-slave                          name=redis-slave             10.0.72.62          6379
+redis-worker            name=redis-worker                         name=redis-worker            10.0.72.62          6379
 ```
 
 ### Step Five: Create the frontend replicated pods
 
 <a href="#step-five-create-the-frontend-replicated-pods"></a>
 
-A frontend pod is a simple PHP server that is configured to talk to either the slave or master services, depending on whether the client request is a read or a write. It exposes a simple AJAX interface, and serves an Angular-based UX.
+A frontend pod is a simple PHP server that is configured to talk to either the worker or master services, depending on whether the client request is a read or a write. It exposes a simple AJAX interface, and serves an Angular-based UX.
 Again we'll create a set of replicated frontend pods instantiated by a replication controller— this time, with three replicas.
 
 The pod is described in the file `examples/guestbook/frontend-controller.yaml`:
@@ -392,7 +412,15 @@ spec:
     spec:
       containers:
       - name: php-redis
-        image: kubernetes/example-guestbook-php-redis:v2
+        image: gcr.io/google_samples/gb-frontend:v1
+        env:
+        - name: GET_HOSTS_FROM
+          value: dns
+          # If your cluster config does not include a dns service, then to
+          # instead access environment variables to find service host
+          # info, comment out the 'value: dns' line above, and uncomment the
+          # line below.
+          # value: env
         ports:
         - containerPort: 80
 ```
@@ -412,55 +440,65 @@ Then, list all your replication controllers:
 ```console
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                   SELECTOR                     REPLICAS
-frontend                               php-redis               kubernetes/example-guestbook-php-redis:v2  name=frontend                3
+frontend                               php-redis               gcr.io/google_samples/gb-frontend:v1       name=frontend                3
 redis-master                           master                  redis                                      name=redis-master            1
-redis-slave                            slave                   kubernetes/redis-slave:v2                  name=redis-slave             2
+redis-worker                           worker                  gcr.io/google_samples/gb-redisworker:v1    name=redis-worker            2
 ```
 
-Once it's up (again, it may take up to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and frontends are all running.  You should see a list that includes something like the following:
+Once it's up (again, it may take up to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, workers and frontends are all running.  You should see a list that includes something like the following:
 
 ```console
 $ kubectl get pods
-NAME                                           READY     STATUS    RESTARTS   AGE
+NAME                                       READY     STATUS    RESTARTS   AGE
 ...
-frontend-4o11g                                 1/1       Running   0          2h
-frontend-u9aq6                                 1/1       Running   0          2h
-frontend-yga1l                                 1/1       Running   0          2h
+frontend-4o11g                             1/1       Running   0          2h
+frontend-u9aq6                             1/1       Running   0          2h
+frontend-yga1l                             1/1       Running   0          2h
 ...
-redis-master-dz33o                             1/1       Running   0          2h
-redis-slave-35mer                              1/1       Running   0          2h
-redis-slave-iqkhy                              1/1       Running   0          2h
+redis-master-dz33o                         1/1       Running   0          2h
+redis-worker-35mer                         1/1       Running   0          2h
+redis-worker-iqkhy                         1/1       Running   0          2h
 ```
 
-You should see a single redis master pod, two redis slaves, and three frontend pods.
+You should see a single redis master pod, two redis workers, and three frontend pods.
 
-The code for the PHP server that the frontends are running looks like this:
+The code for the PHP server that the frontends are running is in `guestbook/php-redis/guestbook.php`.  It looks like this:
 
 ```php
 <?
 
-set_include_path('.:/usr/share/php:/usr/share/pear:/vendor/predis');
+set_include_path('.:/usr/local/lib/php');
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require 'predis/autoload.php';
+require 'Predis/Autoloader.php';
+
+Predis\Autoloader::register();
 
 if (isset($_GET['cmd']) === true) {
+  $host = 'redis-master';
+  if (getenv('GET_HOSTS_FROM') == 'env') {
+    $host = getenv('REDIS_MASTER_SERVICE_HOST');
+  }
   header('Content-Type: application/json');
   if ($_GET['cmd'] == 'set') {
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => 'redis-master',
+      'host'   => $host,
       'port'   => 6379,
     ]);
 
     $client->set($_GET['key'], $_GET['value']);
     print('{"message": "Updated"}');
   } else {
+    $host = 'redis-worker';
+    if (getenv('GET_HOSTS_FROM') == 'env') {
+      $host = getenv('REDIS_WORKER_SERVICE_HOST');
+    }
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => 'redis-slave',
+      'host'   => $host,
       'port'   => 6379,
     ]);
 
@@ -472,7 +510,9 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-Note the use of the `redis-master` and `redis-slave` host names-- we're finding those services via the Kubernetes cluster's DNS service, as discussed above.  All the frontend replicas will write to the load-balancing redis-slaves service, which can be highly replicated as well.
+Note the use of the `redis-master` and `redis-worker` host names-- we're finding those services via the Kubernetes cluster's DNS service, as discussed above, unless the .yaml file instructed us to fall back to use of environment variables.
+
+All the frontend replicas will write to the load-balancing redis-workers service, which can be highly replicated as well.
 
 
 ### Step Six: Set up the guestbook frontend service.
@@ -528,7 +568,7 @@ $ kubectl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT(S)
 frontend                name=frontend                             name=frontend                10.0.93.211         80/TCP
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379/TCP
-redis-slave             name=redis-slave                          name=redis-slave             10.0.72.62          6379/TCP
+redis-worker            name=redis-worker                         name=redis-worker            10.0.72.62          6379/TCP
 ```
 
 
@@ -548,7 +588,7 @@ NAME                    LABELS                                    SELECTOR      
 frontend                name=frontend                             name=frontend                10.0.93.211         80/TCP
                                                                                                130.211.135.84
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379/TCP
-redis-slave             name=redis-slave                          name=redis-slave             10.0.72.62          6379/TCP
+redis-worker            name=redis-worker                         name=redis-worker            10.0.72.62          6379/TCP
 ```
 
 Once you've exposed the service to an external IP, visit the IP to see your guestbook in action. E.g., `http://130.211.188.51:80` in the example above.
@@ -587,8 +627,8 @@ For Google Compute Engine details about limiting traffic to specific sources, se
 If you are in a live kubernetes cluster, you can just kill the pods by stopping the replication controllers and deleting the services.  Using labels to select the resources to stop or delete is an easy way to do this in one command.
 
 ```console
-kubectl stop rc -l "name in (redis-master, redis-slave, frontend)"
-kubectl delete service -l "name in (redis-master, redis-slave, frontend)"
+kubectl stop rc -l "name in (redis-master, redis-worker, frontend)"
+kubectl delete service -l "name in (redis-master, redis-worker, frontend)"
 ```
 
 To completely tear down a Kubernetes cluster, if you ran this from source, you can use:

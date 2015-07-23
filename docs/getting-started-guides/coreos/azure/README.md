@@ -131,8 +131,8 @@ frontend-0a9xi      1/1       Running   0          4m
 frontend-4wahe      1/1       Running   0          4m
 frontend-6l36j      1/1       Running   0          4m
 redis-master-talmr  1/1       Running   0          4m
-redis-slave-12zfd   1/1       Running   0          4m
-redis-slave-3nbce   1/1       Running   0          4m
+redis-worker-12zfd  1/1       Running   0          4m
+redis-worker-3nbce  1/1       Running   0          4m
 ```
 
 ## Scaling
@@ -184,16 +184,16 @@ First, double-check how many replication controllers there are:
 
 ```console
 core@kube-00 ~ $ kubectl get rc
-ONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS
-frontend       php-redis      kubernetes/example-guestbook-php-redis:v2   name=frontend       3
+CONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS
+frontend       php-redis      gcr.io/google_samples/gb-frontend:v1        name=frontend       3
 redis-master   master         redis                                       name=redis-master   1
-redis-slave    worker         kubernetes/redis-slave:v2                   name=redis-slave    2
+redis-worker   worker         gcr.io/google_samples/gb-redisworker:v1     name=redis-worker   2
 ```
 
 As there are 4 nodes, let's scale proportionally:
 
 ```console
-core@kube-00 ~ $ kubectl scale --replicas=4 rc redis-slave
+core@kube-00 ~ $ kubectl scale --replicas=4 rc redis-worker
 >>>>>>> coreos/azure: Updates for 1.0
 scaled
 core@kube-00 ~ $ kubectl scale --replicas=4 rc frontend
@@ -205,9 +205,9 @@ Check what you have now:
 ```console
 core@kube-00 ~ $ kubectl get rc
 CONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS
-frontend       php-redis      kubernetes/example-guestbook-php-redis:v2   name=frontend       4
+frontend       php-redis      gcr.io/google_samples/gb-frontend:v1        name=frontend       4
 redis-master   master         redis                                       name=redis-master   1
-redis-slave    worker         kubernetes/redis-slave:v2                   name=redis-slave    4
+redis-worker   worker         gcr.io/google_samples/gb-redisworker:v1     name=redis-worker   4
 ```
 
 You now will have more instances of front-end Guestbook apps and Redis slaves; and, if you look up all pods labeled `name=frontend`, you should see one running on each node.
