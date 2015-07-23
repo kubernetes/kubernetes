@@ -177,7 +177,7 @@ func handle(storage map[string]rest.Storage) http.Handler {
 	return handleInternal(true, storage, admissionControl, selfLinker)
 }
 
-// uses the default settings for a v1beta3 compatible api
+// uses the default settings for a v1 compatible api
 func handleNew(storage map[string]rest.Storage) http.Handler {
 	return handleInternal(false, storage, admissionControl, selfLinker)
 }

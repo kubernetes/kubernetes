@@ -1049,13 +1049,6 @@ func TestUnversionedPath(t *testing.T) {
 			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
 		}
 	}
-	for i, tc := range tt {
-		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix, Version: "v1beta3"})
-		r := c.Post().Prefix("/alpha").UnversionedPath(tc.unversioned)
-		if r.path != tc.expectedPath {
-			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
-		}
-	}
 }
 
 func TestAbsPath(t *testing.T) {

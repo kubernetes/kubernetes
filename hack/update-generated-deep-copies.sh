@@ -56,7 +56,7 @@ EOF
 }
 
 function generate_deep_copies() {
-  local versions="api v1beta3 v1"
+  local versions="api v1"
   # To avoid compile errors, remove the currently existing files.
   for ver in ${versions}; do
     rm -f `result_file_name ${ver}`

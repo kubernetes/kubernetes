@@ -139,10 +139,8 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 			EnableProfiling:   true,
 			EnableUISupport:   false,
 			APIPrefix:         "/api",
-			// Enable v1bewta3 if we are testing that version
-			EnableV1Beta3:    testapi.Version() == "v1beta3",
-			Authorizer:       apiserver.NewAlwaysAllowAuthorizer(),
-			AdmissionControl: admit.NewAlwaysAdmit(),
+			Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
+			AdmissionControl:  admit.NewAlwaysAdmit(),
 		}
 	} else {
 		helper = masterConfig.EtcdHelper
@@ -272,10 +270,8 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		EnableProfiling:   true,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		// Enable v1bewta3 if we are testing that version
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authorizer:       apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

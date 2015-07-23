@@ -73,10 +73,8 @@ func TestUnschedulableNodes(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// Enable v1beta3 if we are testing that version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authorizer:       apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})

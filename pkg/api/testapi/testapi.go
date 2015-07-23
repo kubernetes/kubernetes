@@ -99,9 +99,8 @@ func ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
 }
 
 // Returns the appropriate path for the given resource, namespace and name.
-// For ex, this is of the form:
-// /api/v1beta1/pods/pod0 for v1beta1 and
-// /api/v1beta3/namespaces/foo/pods/pod0 for v1beta3.
+// For example, this is of the form:
+// /api/v1/namespaces/foo/pods/pod0 for v1.
 func ResourcePath(resource, namespace, name string) string {
 	return ResourcePathWithPrefix("", resource, namespace, name)
 }

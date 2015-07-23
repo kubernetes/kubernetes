@@ -81,7 +81,7 @@ type APIGroupVersion struct {
 
 	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
-	// define a version "v1beta1" but want to use the Kubernetes "v1beta3" internal objects. If
+	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
 	// empty, defaults to Version.
 	ServerVersion string
 
