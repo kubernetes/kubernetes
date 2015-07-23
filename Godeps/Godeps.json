@@ -195,7 +195,7 @@
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
-			"Rev": "ae4665cf2d188c65764c73fe4af5378acc549510"
+			"Rev": "c57a80f1ab2ad67bafa83f5fd0b4c2ecbd253dd5"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
