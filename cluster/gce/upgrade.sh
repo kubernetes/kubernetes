@@ -212,8 +212,15 @@ function do-node-upgrade() {
   echo "== Upgrading nodes to ${KUBE_VERSION}. ==" >&2
   # Do the actual upgrade.
   # NOTE(mbforbes): If you are changing this gcloud command, update
-  #                 test/e2e/restart.go to match this EXACTLY.
-  gcloud preview rolling-updates \
+  #                 test/e2e/cluster_upgrade.go to match this EXACTLY.
+  # TODO(mbforbes): Remove this hack on July 29, 2015, when the migration to
+  #                 `gcloud alpha compute rolling-updates` is complete.
+  local subgroup="preview"
+  local exists=$(gcloud ${subgroup} rolling-updates -h &>/dev/null; echo $?) || true
+  if [[ "${exists}" != "0" ]]; then
+    subgroup="alpha compute"
+  fi
+  gcloud ${subgroup} rolling-updates \
       --project="${PROJECT}" \
       --zone="${ZONE}" \
       start \
