@@ -115,6 +115,28 @@ To permit an action Policy with an unset namespace applies regardless of namespa
 
 [Complete file example](http://releases.k8s.io/HEAD/pkg/auth/authorizer/abac/example_policy_file.jsonl)
 
+### A quick note on service accounts
+
+A service account automatically generates a user. The user's name is generated according to the naming convention:
+
+```
+system:serviceaccount:<namespace>:<serviceaccountname>
+```
+
+Creating a new namespace also causes a new service account to be created, of this form:*
+
+```
+system:serviceaccount:<namespace>:default
+```
+
+For example, if you wanted to grant the default service account in the kube-system full privilege to the API, you would add this line to your policy file:
+
+```json
+{"user":"system:serviceaccount:kube-system:default"}
+```
+
+The apiserver will need to be restarted to pickup the new policy lines.
+
 ## Plugin Development
 
 Other implementations can be developed fairly easily.
