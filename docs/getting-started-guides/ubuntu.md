@@ -158,7 +158,7 @@ After the previous parts, you will have a working k8s cluster, this part will te
 The configuration of dns is configured in cluster/ubuntu/config-default.sh.
 
 ```sh
-ENABLE_CLUSTER_DNS=true
+ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 
 DNS_SERVER_IP="192.168.3.10"
 
