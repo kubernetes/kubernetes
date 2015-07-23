@@ -71,25 +71,6 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func updateObject(info *resource.Info, updateFn func(runtime.Object) (runtime.Object, error)) (runtime.Object, error) {
-	helper := resource.NewHelper(info.Client, info.Mapping)
-
-	obj, err := updateFn(info.Object)
-	if err != nil {
-		return nil, err
-	}
-	data, err := helper.Codec.Encode(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = helper.Replace(info.Namespace, info.Name, true, data)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 func validateNoOverwrites(meta *api.ObjectMeta, labels map[string]string) error {
 	for key := range labels {
 		if value, found := meta.Labels[key]; found {
@@ -123,14 +104,14 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	return labels, remove, nil
 }
 
-func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) (runtime.Object, error) {
+func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) error {
 	meta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !overwrite {
 		if err := validateNoOverwrites(meta, labels); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -148,7 +129,7 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 	if len(resourceVersion) != 0 {
 		meta.ResourceVersion = resourceVersion
 	}
-	return obj, nil
+	return nil
 }
 
 func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
@@ -211,12 +192,12 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 	// TODO: support bulk generic output a la Get
 	return r.Visit(func(info *resource.Info) error {
-		obj, err := updateObject(info, func(obj runtime.Object) (runtime.Object, error) {
-			outObj, err := labelFunc(obj, overwrite, resourceVersion, labels, remove)
+		obj, err := cmdutil.UpdateObject(info, func(obj runtime.Object) error {
+			err := labelFunc(obj, overwrite, resourceVersion, labels, remove)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			return outObj, nil
+			return nil
 		})
 		if err != nil {
 			return err

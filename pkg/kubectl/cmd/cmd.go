@@ -146,6 +146,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdExposeService(f, out))
 
 	cmds.AddCommand(NewCmdLabel(f, out))
+	cmds.AddCommand(NewCmdAnnotate(f, out))
 
 	cmds.AddCommand(cmdconfig.NewCmdConfig(cmdconfig.NewDefaultPathOptions(), out))
 	cmds.AddCommand(NewCmdClusterInfo(f, out))
