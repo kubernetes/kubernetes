@@ -283,6 +283,18 @@ var _ = Describe("Kubectl client", func() {
 			})
 		})
 	})
+
+	Describe("Kubectl version", func() {
+		It("should check is all data is printed", func() {
+			version := runKubectl("version")
+			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
+			for _, item := range requiredItems {
+				if !strings.Contains(version, item) {
+					Failf("Required item %s not found in %s", item, version)
+				}
+			}
+		})
+	})
 })
 
 func curl(addr string) (string, error) {
