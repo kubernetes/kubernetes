@@ -157,6 +157,34 @@ var _ = Describe("Examples e2e", func() {
 			}
 		})
 	})
+
+	Describe("[Skipped][Example]Spark", func() {
+		It("should start spark master and workers", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "spark", file)
+			}
+			serviceJson := mkpath("spark-master-service.json")
+			masterJson := mkpath("spark-master.json")
+			workerControllerJson := mkpath("spark-worker-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("starting master")
+			runKubectl("create", "-f", serviceJson, nsFlag)
+			runKubectl("create", "-f", masterJson, nsFlag)
+			err := waitForPodRunningInNamespace(c, "spark-master", ns)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = lookForStringInLog(ns, "spark-master", "spark-master", "Starting Spark master at", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("starting workers")
+			runKubectl("create", "-f", workerControllerJson, nsFlag)
+			ScaleRC(c, ns, "spark-worker-controller", 2)
+			forEachPod(c, ns, "name", "spark-worker", func(pod api.Pod) {
+				_, err := lookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {
