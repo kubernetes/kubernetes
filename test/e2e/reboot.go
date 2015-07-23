@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/test/e2e/ssh"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -138,7 +139,7 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
 	}
 	Logf("Calling %s on %s", cmd, node.Name)
-	if _, _, code, err := SSH(cmd, host, provider); code != 0 || err != nil {
+	if _, _, code, err := ssh.SSH(cmd, host, provider); code != 0 || err != nil {
 		return fmt.Errorf("when running %s on %s, got %d and %v", cmd, node.Name, code, err)
 	}
 	return nil

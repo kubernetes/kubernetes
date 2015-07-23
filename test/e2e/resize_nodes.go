@@ -26,12 +26,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/kubernetes/test/e2e/ssh"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -365,7 +366,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 		// may fail). Manual intervention is required in such case (recreating the
 		// cluster solves the problem too).
 		err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-			_, _, code, err := SSH(undropCmd, host, testContext.Provider)
+			_, _, code, err := ssh.SSH(undropCmd, host, testContext.Provider)
 			if code == 0 && err == nil {
 				return true, nil
 			} else {
@@ -386,7 +387,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	// We could also block network traffic from the master(s)s to this node,
 	// but blocking it one way is sufficient for this test.
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if _, _, code, err := SSH(dropCmd, host, testContext.Provider); code != 0 || err != nil {
+	if _, _, code, err := ssh.SSH(dropCmd, host, testContext.Provider); code != 0 || err != nil {
 		Failf("Expected 0 exit code and nil error when running %s on %s, got %d and %v",
 			dropCmd, node.Name, code, err)
 	}
