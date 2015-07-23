@@ -109,6 +109,9 @@ then `foo-next` is synthesized using the pattern `<controller-name>-<hash-of-nex
       * Goto Rollout with `foo` and `foo-next` trading places.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/simple-rolling-update.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

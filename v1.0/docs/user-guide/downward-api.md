@@ -84,6 +84,9 @@ Some more thorough examples:
    * [downward API](downward-api/)
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/downward-api.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

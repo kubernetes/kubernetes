@@ -184,6 +184,9 @@ a bit of thought into how your work can be made easier to review.  If you do
 these things your PRs will flow much more easily.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/faster_reviews.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

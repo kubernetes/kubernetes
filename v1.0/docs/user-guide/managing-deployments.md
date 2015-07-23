@@ -486,6 +486,9 @@ replicationcontrollers/my-nginx-v4
 - [Tips and tricks when working with config](config-best-practices.html)
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/managing-deployments.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

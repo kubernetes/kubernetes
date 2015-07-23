@@ -104,6 +104,9 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
       
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/writing-a-getting-started-guide.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

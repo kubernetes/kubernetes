@@ -177,6 +177,9 @@ Any action that consumes those resources can be tweaked, or can pick up namespac
 meet your end goal.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/resourcequota/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

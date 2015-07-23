@@ -23,6 +23,9 @@ then, cd to bigtop-bigpetstore/bigpetstore-transaction-queue, and run the docker
 `Docker build -t -i jayunit100/bps-transaction-queue`.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/bps-data-generator/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

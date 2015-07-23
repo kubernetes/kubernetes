@@ -266,6 +266,9 @@ We indeed have an initial proof of concept tester for this, which is available [
 It implements the major concepts (with a few minor reductions for simplicity), of the podmaster HA implementation alongside a quick smoke test using k8petstore.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/high-availability.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

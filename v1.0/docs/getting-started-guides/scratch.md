@@ -207,9 +207,8 @@ You have several choices for Kubernetes images:
   - Useful if you are using a private registry.
   - The release contains files such as `./kubernetes/server/bin/kube-apiserver.tar` which
     can be converted into docker images using a command like
-    `docker load -i kube-apiserver.tar`
-  - You can verify if the image is loaded successfully with the right reposity and tag using
-    command like `docker images`
+    `tar -C kube-apiserver -c . | docker import - kube-apiserver`
+  - *TODO*: test above command.
 
 For etcd, you can:
 - Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.0.12`
@@ -856,6 +855,9 @@ pinging or SSH-ing from one node to another.
 
 If you run into trouble, please see the section on [troubleshooting](gce.html#troubleshooting), post to the
 [google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at [#google-containers](http://webchat.freenode.net/?channels=google-containers) on freenode.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

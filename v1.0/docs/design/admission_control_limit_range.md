@@ -150,6 +150,9 @@ To make a **LimitRangeItem** more restrictive, we will intend to add these addit
 See the [example of Limit Range](../user-guide/limitrange/) for more information.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

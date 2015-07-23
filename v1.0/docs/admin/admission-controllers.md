@@ -140,6 +140,9 @@ For Kubernetes 1.0, we strongly recommend running the following set of admission
 ```
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/admission-controllers.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

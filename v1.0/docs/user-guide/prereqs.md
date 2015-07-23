@@ -75,6 +75,9 @@ If you see a url response, you are ready to go.
 [Learn how to launch and expose your application.](quick-start.html)
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/prereqs.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

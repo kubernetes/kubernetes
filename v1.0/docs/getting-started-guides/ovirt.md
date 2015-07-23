@@ -61,6 +61,9 @@ This short screencast demonstrates how the oVirt Cloud Provider can be used to d
 [![Screencast](http://img.youtube.com/vi/JyyST4ZKne8/0.jpg)](http://www.youtube.com/watch?v=JyyST4ZKne8)
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ovirt.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

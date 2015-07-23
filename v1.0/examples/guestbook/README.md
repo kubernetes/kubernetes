@@ -613,6 +613,9 @@ If you are having trouble bringing up your guestbook app, double check that your
 Then, see the [troubleshooting documentation](../../docs/troubleshooting.html) for a further list of common issues and how you can diagnose them.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

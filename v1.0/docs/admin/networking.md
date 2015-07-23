@@ -209,6 +209,9 @@ plans are described in more detail in the [networking design
 document](../design/networking.html).
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/networking.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

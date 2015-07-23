@@ -356,6 +356,9 @@ $ curl 104.197.12.157:9200/_nodes?pretty=true | grep name
 {% endhighlight %}
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/elasticsearch/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

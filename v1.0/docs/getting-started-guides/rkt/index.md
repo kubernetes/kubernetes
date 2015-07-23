@@ -129,6 +129,9 @@ See [a simple nginx example](../../../docs/user-guide/simple-nginx.html) to try 
 For more complete applications, please look in the [examples directory](../../../examples/).
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rkt/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

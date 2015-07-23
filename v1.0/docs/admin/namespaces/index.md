@@ -283,6 +283,9 @@ As the policy support in Kubernetes evolves, we will extend this scenario to sho
 authorization rules for each namespace.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/namespaces/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

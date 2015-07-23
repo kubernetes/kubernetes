@@ -40,6 +40,9 @@ https://github.com/prometheus/client_golang/blob/master/prometheus/histogram.go
 https://github.com/prometheus/client_golang/blob/master/prometheus/summary.go
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/instrumentation.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

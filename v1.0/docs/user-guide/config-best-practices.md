@@ -29,6 +29,9 @@ This document is meant to highlight and consolidate in one place configuration b
 1. Put an object description in an annotation to allow better introspection.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/config-best-practices.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

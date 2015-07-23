@@ -71,6 +71,9 @@ Once there:
   - You should see a list of all possible resource fields, starting with `v1.pods {...}`
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/working-with-resources.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

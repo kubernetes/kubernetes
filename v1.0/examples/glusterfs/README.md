@@ -112,6 +112,9 @@ $ mount | grep kube_vol
 You may also run `docker ps` on the host to see the actual container.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/glusterfs/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

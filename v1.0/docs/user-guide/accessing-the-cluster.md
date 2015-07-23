@@ -305,6 +305,9 @@ Kubernetes users will typically not need to worry about anything other than the 
 will typically ensure that the latter types are setup correctly.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/accessing-the-cluster.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

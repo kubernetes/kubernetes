@@ -112,6 +112,9 @@ TODO explain:
   - The token goes to: "/var/run/secrets/kubernetes.io/serviceaccount/$WHATFILENAME"
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/service-accounts.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -60,6 +60,9 @@ There is a short window after a new master acquires the lease, during which data
 * Is there a desire to keep track of all nodes for a specific component type?
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/high-availability.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

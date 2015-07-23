@@ -138,6 +138,9 @@ Error: &lt;*&gt;lookup elasticsearch-logging: no such host
 {% endhighlight %}
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/explorer/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

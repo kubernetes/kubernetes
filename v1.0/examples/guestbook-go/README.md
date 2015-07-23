@@ -208,12 +208,14 @@ This is a simple Go `net/http` ([negroni](https://github.com/codegangsta/negroni
 <nop>2. To verify that the guestbook replication controller is running, run the `kubectl get rc` command:
 
     ```
+{% raw %}
     $ kubectl get rc
     CONTROLLER            CONTAINER(S)         IMAGE(S)                    SELECTOR                  REPLICAS
     guestbook             guestbook            kubernetes/guestbook:v2     app=guestbook             3
     redis-master          redis-master         gurpartap/redis             app=redis,role=master     1
     redis-slave           redis-slave          gurpartap/redis             app=redis,role=slave      2
     ...
+{% endraw %}
     ```
 
 <nop>3. To verify that the guestbook pods are running (it might take up to thirty seconds to create the pods), list all the pods in cluster with the `kubectl get pods` command:
@@ -250,6 +252,7 @@ Just like the others, we create a service to group the guestbook pods but this t
 <nop>2. To verify that the guestbook service is up, list all the services in the cluster with the `kubectl get services` command:
 
     ```
+{% raw %}
     $ kubectl get services
     NAME             LABELS                     SELECTOR                        IP(S)          PORT(S)
     guestbook        app=guestbook              app=guestbook                   10.0.217.218   3000/TCP
@@ -257,6 +260,7 @@ Just like the others, we create a service to group the guestbook pods but this t
     redis-master     app=redis,role=master      app=redis,role=master           10.0.136.3     6379/TCP
     redis-slave      app=redis,role=slave       app=redis,role=slave            10.0.21.92     6379/TCP
     ...
+{% endraw %}
     ```
 
     Result: The service is created with label `app=guestbook`.
@@ -303,6 +307,9 @@ redis-slave
 
 Tip: To turn down your Kubernetes cluster, follow the corresponding instructions in the version of the
 [Getting Started Guides](../../docs/getting-started-guides/) that you previously used to create your cluster.
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

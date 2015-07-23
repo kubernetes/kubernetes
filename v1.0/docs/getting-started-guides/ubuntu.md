@@ -203,6 +203,9 @@ Please try:
 4. You can also customize your own settings in `/etc/default/{component_name}` after configured success. 
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

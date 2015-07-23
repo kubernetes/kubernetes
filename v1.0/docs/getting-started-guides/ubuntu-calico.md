@@ -292,6 +292,9 @@ This chain should be applied on the master and all nodes. In production, these r
 In a datacenter environment, it is recommended to configure Calico to peer with the border routers over BGP. This means that the container IPs will be routable anywhere in the datacenter, and so NAT is not needed on the nodes (though it may be enabled at the datacenter edge to allow outbound-only internet connectivity).
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu-calico.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

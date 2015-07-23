@@ -48,6 +48,9 @@ that interface between Kubernetes and a bedrock authentication provider (e.g.
 github.com, google.com, enterprise directory, kerberos, etc.)
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/authentication.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

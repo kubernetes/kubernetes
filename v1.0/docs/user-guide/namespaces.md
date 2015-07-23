@@ -103,6 +103,9 @@ persistentVolumes, are not in any namespace. Events are an exception: they may o
 have a namespace, depending on the object the event is about.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/namespaces.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

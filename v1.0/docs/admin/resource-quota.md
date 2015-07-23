@@ -151,6 +151,9 @@ See a [detailed example for how to use resource quota](../user-guide/resourcequo
 See [ResourceQuota design doc](../design/admission_control_resource_quota.html) for more information.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/resource-quota.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

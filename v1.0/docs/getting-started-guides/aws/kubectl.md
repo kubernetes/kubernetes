@@ -38,6 +38,9 @@ ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
 {% endhighlight %}
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws/kubectl.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

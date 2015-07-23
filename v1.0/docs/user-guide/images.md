@@ -263,6 +263,9 @@ common use cases and suggested solutions.
      - NOT supported yet.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/images.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

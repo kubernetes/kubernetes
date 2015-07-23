@@ -49,6 +49,9 @@ With the final markdown all set, cut and paste it to the top of `CHANGELOG.md`
    * Press Save.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/making-release-notes.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

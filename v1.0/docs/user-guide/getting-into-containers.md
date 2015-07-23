@@ -91,6 +91,9 @@ root@storage:/data#
 This gets you a terminal.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/getting-into-containers.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

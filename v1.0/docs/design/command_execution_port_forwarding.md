@@ -154,6 +154,9 @@ access.
 Additional work is required to ensure that multiple command execution or port forwarding connections from different clients are not able to see each other's data. This can most likely be achieved via SELinux labeling and unique process contexts.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/command_execution_port_forwarding.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

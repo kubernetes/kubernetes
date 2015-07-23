@@ -170,6 +170,9 @@ services                3       5
 See [resource quota document](../admin/resource-quota.html) and the [example of Resource Quota](../user-guide/resourcequota/) for more information.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

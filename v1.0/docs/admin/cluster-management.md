@@ -173,6 +173,9 @@ $ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o myPod.v1.yam
 {% endhighlight %}
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-management.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

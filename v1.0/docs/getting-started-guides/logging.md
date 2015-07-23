@@ -231,6 +231,9 @@ This page has touched briefly on the underlying mechanisms that support gatherin
 Some of the material in this section also appears in the blog article [Cluster Level Logging with Kubernetes](http://blog.kubernetes.io/2015/06/cluster-level-logging-with-kubernetes.html).
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/logging.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

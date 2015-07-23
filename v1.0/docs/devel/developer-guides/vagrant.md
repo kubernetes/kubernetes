@@ -416,6 +416,9 @@ export KUBERNETES_MINION_MEMORY=2048
 `vagrant suspend` seems to mess up the network.  It's not supported at this time.
 
 
+<!-- TAG IS_VERSIONED -->
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/developer-guides/vagrant.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

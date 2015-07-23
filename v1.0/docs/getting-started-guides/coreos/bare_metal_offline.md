@@ -7,7 +7,7 @@ layout: docwithnav
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 Bare Metal CoreOS with Kubernetes (OFFLINE)
 ------------------------------------------
-Deploy a CoreOS running Kubernetes environment. This particular guild is made to help those in an OFFLINE system, wither for testing a POC before the real deal, or you are restricted to be totally offline for your applications.
+Deploy a CoreOS running Kubernetes environment. This particular guide is made to help those in an OFFLINE system, whether for testing a PoC before the real deal, or for when you're totally restricted to be offline for your applications.
 
 **Table of Contents**
 
@@ -675,6 +675,9 @@ List Kubernetes
 Kill all pods:
 
     for i in `kubectl get pods | awk '{print $1}'`; do kubectl stop pod $i; done
+
+
+<!-- TAG IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
