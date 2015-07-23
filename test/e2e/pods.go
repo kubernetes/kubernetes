@@ -35,18 +35,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
-	namespace, err := createTestingNS("pods-liveness", c)
-	Expect(err).NotTo(HaveOccurred())
-	ns := namespace.Name
-	defer func() {
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %q: %s", namespace, err)
-		}
-	}()
-
+func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool, ns string) {
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
-	_, err = c.Pods(ns).Create(podDescr)
+	_, err := c.Pods(ns).Create(podDescr)
 	expectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
@@ -91,20 +82,11 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
 }
 
 // testHostIP tests that a pod gets a host IP
-func testHostIP(c *client.Client, pod *api.Pod) {
-	namespace, err := createTestingNS("pods-host-ip", c)
-	Expect(err).NotTo(HaveOccurred())
-	ns := namespace.Name
-	defer func() {
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %q: %s", namespace, err)
-		}
-	}()
-
+func testHostIP(c *client.Client, pod *api.Pod, ns string) {
 	podClient := c.Pods(ns)
 	By("creating pod")
 	defer podClient.Delete(pod.Name, nil)
-	_, err = podClient.Create(pod)
+	_, err := podClient.Create(pod)
 	if err != nil {
 		Fail(fmt.Sprintf("Failed to create pod: %v", err))
 	}
@@ -134,12 +116,26 @@ func testHostIP(c *client.Client, pod *api.Pod) {
 
 var _ = Describe("Pods", func() {
 	var c *client.Client
+	var ns string
+
 	// TODO convert this to use the NewFramework(...)
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		expectNoError(err)
+		ns_, err := createTestingNS("pods", c)
+		ns = ns_.Name
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Clean up the namespace if a non-default one was used
+		if ns != api.NamespaceDefault {
+			By("Cleaning up the namespace")
+			err := c.Namespaces().Delete(ns)
+			expectNoError(err)
+		}
 	})
 
 	PIt("should get a host IP", func() {
@@ -156,10 +152,11 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		})
+		}, ns)
 	})
-	It("should be schedule with cpu and memory limits", func() {
-		podClient := c.Pods(api.NamespaceDefault)
+
+	It("should be scheduled with cpu and memory limits", func() {
+		podClient := c.Pods(ns)
 
 		By("creating the pod")
 		name := "pod-update-" + string(util.NewUUID())
@@ -192,10 +189,11 @@ var _ = Describe("Pods", func() {
 		if err != nil {
 			Fail(fmt.Sprintf("Error creating a pod: %v", err))
 		}
-		expectNoError(waitForPodRunning(c, pod.Name))
+		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
 	})
+
 	It("should be submitted and removed", func() {
-		podClient := c.Pods(api.NamespaceDefault)
+		podClient := c.Pods(ns)
 
 		By("creating the pod")
 		name := "pod-update-" + string(util.NewUUID())
@@ -257,7 +255,7 @@ var _ = Describe("Pods", func() {
 		}
 		Expect(len(pods.Items)).To(Equal(1))
 
-		By("veryfying pod creation was observed")
+		By("verifying pod creation was observed")
 		select {
 		case event, _ := <-w.ResultChan():
 			if event.Type != watch.Added {
@@ -275,7 +273,7 @@ var _ = Describe("Pods", func() {
 		}
 		Expect(len(pods.Items)).To(Equal(0))
 
-		By("veryfying pod deletion was observed")
+		By("verifying pod deletion was observed")
 		deleted := false
 		timeout := false
 		timer := time.After(podStartTimeout)
@@ -295,7 +293,7 @@ var _ = Describe("Pods", func() {
 	})
 
 	It("should be updated", func() {
-		podClient := c.Pods(api.NamespaceDefault)
+		podClient := c.Pods(ns)
 
 		By("creating the pod")
 		name := "pod-update-" + string(util.NewUUID())
@@ -338,7 +336,7 @@ var _ = Describe("Pods", func() {
 			Failf("Failed to create pod: %v", err)
 		}
 
-		expectNoError(waitForPodRunning(c, pod.Name))
+		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
 
 		By("verifying the pod is in kubernetes")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
@@ -368,7 +366,7 @@ var _ = Describe("Pods", func() {
 			return false, fmt.Errorf("failed to update pod: %v", err)
 		}))
 
-		expectNoError(waitForPodRunning(c, pod.Name))
+		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
 
 		By("verifying the updated pod is in kubernetes")
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
@@ -382,8 +380,9 @@ var _ = Describe("Pods", func() {
 		serverName := "server-envvars-" + string(util.NewUUID())
 		serverPod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:   serverName,
-				Labels: map[string]string{"name": serverName},
+				Name:      serverName,
+				Namespace: ns,
+				Labels:    map[string]string{"name": serverName},
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -395,12 +394,13 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
-		defer c.Pods(api.NamespaceDefault).Delete(serverPod.Name, nil)
-		_, err := c.Pods(api.NamespaceDefault).Create(serverPod)
+
+		defer c.Pods(ns).Delete(serverPod.Name, nil)
+		_, err := c.Pods(ns).Create(serverPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))
 		}
-		expectNoError(waitForPodRunning(c, serverPod.Name))
+		expectNoError(waitForPodRunningInNamespace(c, serverPod.Name, ns))
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
 		// TODO(filbranden): We would like to use a unique service name such as:
@@ -409,6 +409,9 @@ var _ = Describe("Pods", func() {
 		// service name, so that breaks this test.  One possibility is to tweak the variable names
 		// to match the service.  Another is to rethink environment variable names and possibly
 		// allow overriding the prefix in the service manifest.
+		//
+		// Once the downward API for services is available, we'll be able to inject the
+		// pod with arbitrary env vars for this that don't depend on the service name.
 		svcName := "fooservice"
 		svc := &api.Service{
 			ObjectMeta: api.ObjectMeta{
@@ -427,8 +430,8 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
-		defer c.Services(api.NamespaceDefault).Delete(svc.Name)
-		_, err = c.Services(api.NamespaceDefault).Create(svc)
+		defer c.Services(ns).Delete(svc.Name)
+		_, err = c.Services(ns).Create(svc)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create service: %v", err))
 		}
@@ -437,8 +440,9 @@ var _ = Describe("Pods", func() {
 		podName := "client-envvars-" + string(util.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:   podName,
-				Labels: map[string]string{"name": podName},
+				Name:      podName,
+				Namespace: ns,
+				Labels:    map[string]string{"name": podName},
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -452,7 +456,7 @@ var _ = Describe("Pods", func() {
 			},
 		}
 
-		testContainerOutput("service env", c, pod, 0, []string{
+		testContainerOutputInNamespace("service env", c, pod, 0, []string{
 			"FOOSERVICE_SERVICE_HOST=",
 			"FOOSERVICE_SERVICE_PORT=",
 			"FOOSERVICE_PORT=",
@@ -460,7 +464,7 @@ var _ = Describe("Pods", func() {
 			"FOOSERVICE_PORT_8765_TCP_PROTO=",
 			"FOOSERVICE_PORT_8765_TCP=",
 			"FOOSERVICE_PORT_8765_TCP_ADDR=",
-		})
+		}, ns)
 	})
 
 	It("should be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {
@@ -486,7 +490,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, true)
+		}, true, ns)
 	})
 
 	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {
@@ -512,7 +516,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, false)
+		}, false, ns)
 	})
 
 	It("should be restarted with a /healthz http liveness probe", func() {
@@ -539,7 +543,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, true)
+		}, true, ns)
 	})
 
 	// The following tests for remote command execution and port forwarding are

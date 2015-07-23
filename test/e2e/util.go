@@ -888,11 +888,6 @@ func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	return
 }
 
-// testContainerOutput runs testContainerOutputInNamespace with the default namespace.
-func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	testContainerOutputInNamespace(scenarioName, c, pod, containerIndex, expectedOutput, api.NamespaceDefault)
-}
-
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status.  It retrieves
 // the exact container log and searches for lines of expected output.
