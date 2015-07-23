@@ -63,10 +63,12 @@ const create_authinfo_example = `// Set only the "client-key" field on the "clus
 $ kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
 
 // Set basic auth for the "cluster-admin" entry
-$ kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
+$ kubectl config set-credentials cluster-admin --username=admin \
+    --password=uXFGweU9l35qcif
 
 // Embed client certificate data in the "cluster-admin" entry
-$ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
+$ kubectl config set-credentials cluster-admin \
+    --client-certificate=~/.kube/admin.crt --embed-certs=true`
 
 func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Command {
 	options := &createAuthInfoOptions{configAccess: configAccess}
