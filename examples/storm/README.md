@@ -166,12 +166,11 @@ Clients:
  /192.168.45.0:39568[1](queued=0,recved=14072,sent=14072)
  /192.168.86.1:57591[1](queued=0,recved=34,sent=34)
  /192.168.8.0:50375[1](queued=0,recved=34,sent=34)
- /192.168.45.0:39576[1](queued=0,recved=34,sent=34)
 
 Latency min/avg/max: 0/2/2570
 Received: 23199
 Sent: 23198
-Connections: 5
+Connections: 4
 Outstanding: 0
 Zxid: 0xa39
 Mode: standalone
