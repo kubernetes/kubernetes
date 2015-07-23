@@ -708,6 +708,18 @@ function kube-up {
   detect-minion-names
   detect-master
 
+  # Create autoscaler for nodes if requested
+  if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+    METRICS=""
+    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
+    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
+    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    echo "Creating node autoscaler."
+    gcloud preview autoscaler --zone "${ZONE}" create "${NODE_INSTANCE_PREFIX}-autoscaler" --target "${NODE_INSTANCE_PREFIX}-group" \
+        --min-num-replicas "${AUTOSCALER_MIN_NODES}" --max-num-replicas "${AUTOSCALER_MAX_NODES}" ${METRICS} || true
+  fi
+
   echo "Waiting for cluster initialization."
   echo
   echo "  This will continually check to see if the API for kubernetes is reachable."
@@ -768,6 +780,15 @@ function kube-down {
 
   echo "Bringing down cluster"
   set +e  # Do not stop on error
+
+  # Delete autoscaler for nodes if present.
+  local autoscaler
+  autoscaler=( $(gcloud preview autoscaler --zone "${ZONE}" list \
+                 | awk 'NR >= 2 { print $1 }' \
+                 | grep "${NODE_INSTANCE_PREFIX}-autoscaler") )
+  if [[ "${autoscaler:-}" != "" ]]; then
+    gcloud preview autoscaler --zone "${ZONE}" delete "${NODE_INSTANCE_PREFIX}-autoscaler"
+  fi
 
   # Get the name of the managed instance group template before we delete the
   # managed instange group. (The name of the managed instnace group template may
