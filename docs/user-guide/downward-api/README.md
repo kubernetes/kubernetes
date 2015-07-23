@@ -51,7 +51,7 @@ Use the [`examples/downward-api/dapi-pod.yaml`](dapi-pod.yaml) file to create a 
 downward API.
 
 ```console
-$ kubectl create -f docs/user-guide/downward-api/dapi-pod.yaml
+$ kubectl create -f examples/downward-api/dapi-pod.yaml
 ```
 
 ### Examine the logs
