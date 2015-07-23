@@ -17,7 +17,6 @@ limitations under the License.
 package gce_pd
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"strconv"
@@ -33,19 +32,17 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&gcePersistentDiskPlugin{nil, false}, &gcePersistentDiskPlugin{nil, true}}
+	return []volume.VolumePlugin{&gcePersistentDiskPlugin{nil}}
 }
 
 type gcePersistentDiskPlugin struct {
-	host       volume.VolumeHost
-	legacyMode bool // if set, plugin answers to the legacy name
+	host volume.VolumeHost
 }
 
 var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
 
 const (
-	gcePersistentDiskPluginName       = "kubernetes.io/gce-pd"
-	gcePersistentDiskPluginLegacyName = "gce-pd"
+	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
 )
 
 func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) {
@@ -53,18 +50,10 @@ func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) {
 }
 
 func (plugin *gcePersistentDiskPlugin) Name() string {
-	if plugin.legacyMode {
-		return gcePersistentDiskPluginLegacyName
-	}
 	return gcePersistentDiskPluginName
 }
 
 func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
-	if plugin.legacyMode {
-		// Legacy mode instances can be cleaned up but not created anew.
-		return false
-	}
-
 	return spec.VolumeSource.GCEPersistentDisk != nil || spec.PersistentVolumeSource.GCEPersistentDisk != nil
 }
 
@@ -81,11 +70,6 @@ func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *volume.Spec, pod *api.Po
 }
 
 func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
-	if plugin.legacyMode {
-		// Legacy mode instances can be cleaned up but not created anew.
-		return nil, fmt.Errorf("legacy mode: can not create new instances")
-	}
-
 	var gce *api.GCEPersistentDiskVolumeSource
 	if spec.VolumeSource.GCEPersistentDisk != nil {
 		gce = spec.VolumeSource.GCEPersistentDisk
@@ -112,7 +96,6 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, pod
 		mounter:     mounter,
 		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
 		plugin:      plugin,
-		legacyMode:  false,
 	}, nil
 }
 
@@ -122,10 +105,6 @@ func (plugin *gcePersistentDiskPlugin) NewCleaner(volName string, podUID types.U
 }
 
 func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Cleaner, error) {
-	legacy := false
-	if plugin.legacyMode {
-		legacy = true
-	}
 	return &gcePersistentDisk{
 		podUID:      podUID,
 		volName:     volName,
@@ -133,7 +112,6 @@ func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID
 		mounter:     mounter,
 		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
 		plugin:      plugin,
-		legacyMode:  legacy,
 	}, nil
 }
 
@@ -165,7 +143,6 @@ type gcePersistentDisk struct {
 	// diskMounter provides the interface that is used to mount the actual block device.
 	diskMounter mount.Interface
 	plugin      *gcePersistentDiskPlugin
-	legacyMode  bool
 }
 
 func detachDiskLogError(pd *gcePersistentDisk) {
@@ -182,10 +159,6 @@ func (pd *gcePersistentDisk) SetUp() error {
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (pd *gcePersistentDisk) SetUpAt(dir string) error {
-	if pd.legacyMode {
-		return fmt.Errorf("legacy mode: can not create new instances")
-	}
-
 	// TODO: handle failed mounts here.
 	mountpoint, err := pd.mounter.IsMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, mountpoint, err)
@@ -250,9 +223,6 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 
 func (pd *gcePersistentDisk) GetPath() string {
 	name := gcePersistentDiskPluginName
-	if pd.legacyMode {
-		name = gcePersistentDiskPluginLegacyName
-	}
 	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
