@@ -34,7 +34,11 @@ var _ = Describe("Etcd failure", func() {
 	framework := Framework{BaseName: "etcd-failure"}
 
 	BeforeEach(func() {
-		// These tests requires SSH, so the provider check should be identical to those tests.
+		// This test requires:
+		// - SSH
+		// - master access
+		// ... so the provider check should be identical to the intersection of
+		// providers that provide those capabilities.
 		skipped = true
 		SkipUnlessProviderIs("gce")
 		skipped = false
