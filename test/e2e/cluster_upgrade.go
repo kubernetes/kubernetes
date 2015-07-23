@@ -567,7 +567,8 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 		//                 shelling out to gcloud.
 		// NOTE(mbforbes): If you are changing this gcloud command, update
 		//                 cluster/gce/upgrade.sh to match this EXACTLY.
-		o, err := exec.Command("gcloud", "preview", "rolling-updates",
+		o, err := exec.Command("gcloud", append(migUdpateCmdBase(),
+			"rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
 			"start",
@@ -580,9 +581,9 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 			//       --max-num-concurrent-instances.
 			fmt.Sprintf("--max-num-concurrent-instances=%d", 1),
 			fmt.Sprintf("--max-num-failed-instances=%d", 0),
-			fmt.Sprintf("--min-instance-update-time=%ds", 0)).CombinedOutput()
+			fmt.Sprintf("--min-instance-update-time=%ds", 0))...).CombinedOutput()
 		if err != nil {
-			errLast = fmt.Errorf("gcloud preview rolling-updates call failed with err: %v", err)
+			errLast = fmt.Errorf("rolling-updates call failed with err: %v", err)
 			return false, nil
 		}
 		output := string(o)
@@ -609,6 +610,25 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 	return id, nil
 }
 
+// migUpdateCmdBase gets the base of the MIG rolling update command--i.e., all
+// pieces of the gcloud command that come after "gcloud" but before
+// "rolling-updates". Examples of returned values are:
+//
+//   {preview"}
+//
+//   {"alpha", "compute"}
+//
+// TODO(mbforbes): Remove this hack on July 29, 2015 when the migration to
+//                 `gcloud alpha compute rolling-updates` is complete.
+func migUdpateCmdBase() []string {
+	b := []string{"preview"}
+	a := []string{"rolling-updates", "-h"}
+	if err := exec.Command("gcloud", append(b, a...)...).Run(); err != nil {
+		b = []string{"alpha", "compute"}
+	}
+	return b
+}
+
 // migRollingUpdatePoll (CKE/GKE-only) polls the progress of the MIG rolling
 // update with ID id until it is complete. It returns an error if this takes
 // longer than nt times the number of nodes.
@@ -620,11 +640,12 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 	Logf("Waiting up to %v for MIG rolling update to complete.", timeout)
 	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
 	if wait.Poll(restartPoll, timeout, func() (bool, error) {
-		o, err := exec.Command("gcloud", "preview", "rolling-updates",
+		o, err := exec.Command("gcloud", append(migUdpateCmdBase(),
+			"rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
 			"describe",
-			id).CombinedOutput()
+			id)...).CombinedOutput()
 		if err != nil {
 			errLast = fmt.Errorf("Error calling rolling-updates describe %s: %v", id, err)
 			Logf("%v", errLast)
