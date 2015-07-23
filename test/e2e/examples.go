@@ -185,6 +185,45 @@ var _ = Describe("Examples e2e", func() {
 			})
 		})
 	})
+
+	Describe("[Skipped][Example]Cassandra", func() {
+		It("should create and scale cassandra", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "cassandra", file)
+			}
+			serviceYaml := mkpath("cassandra-service.yaml")
+			podYaml := mkpath("cassandra.yaml")
+			controllerYaml := mkpath("cassandra-controller.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("starting service and pod")
+			runKubectl("create", "-f", serviceYaml, nsFlag)
+			runKubectl("create", "-f", podYaml, nsFlag)
+			err := waitForPodRunningInNamespace(c, "cassandra", ns)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = lookForStringInLog(ns, "cassandra", "cassandra", "Listening for thrift clients", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("create and scale rc")
+			runKubectl("create", "-f", controllerYaml, nsFlag)
+			err = ScaleRC(c, ns, "cassandra", 2)
+			Expect(err).NotTo(HaveOccurred())
+			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
+				_, err = lookForStringInLog(ns, pod.Name, "cassandra", "Listening for thrift clients", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = lookForStringInLog(ns, pod.Name, "cassandra", "Handshaking version", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			output := runKubectl("exec", "cassandra", nsFlag, "--", "nodetool", "status")
+			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
+				if !strings.Contains(output, pod.Status.PodIP) {
+					Failf("Pod ip %s not found in nodetool status", pod.Status.PodIP)
+				}
+			})
+		})
+	})
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {
