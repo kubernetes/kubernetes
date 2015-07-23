@@ -29,10 +29,22 @@ set -o pipefail
 set -o xtrace
 
 # Join all args with |
-#   Example: join_regex a b "c d" e  =>  a|b|c d|e
-function join_regex() {
+#   Example: join_regex_allow_empty a b "c d" e  =>  a|b|c d|e
+function join_regex_allow_empty() {
     local IFS="|"
     echo "$*"
+}
+
+# Join all args with |, butin case of empty result prints "EMPTY\sSET" instead.
+#   Example: join_regex_no_empty a b "c d" e  =>  a|b|c d|e
+#            join_regex_no_empty => EMPTY\sSET
+function join_regex_no_empty() {
+    local IFS="|"
+    if [ -z "$*" ]; then
+        echo "EMPTY\sSET"
+    else
+        echo "$*"
+    fi
 }
 
 echo "--------------------------------------------------------------------------------"
@@ -116,7 +128,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-gce"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
@@ -139,9 +151,9 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-flaky"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ) --ginkgo.focus=$(join_regex \
+          ) --ginkgo.focus=$(join_regex_no_empty \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
@@ -153,7 +165,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-parallel"}
     : ${E2E_NETWORK:="e2e-parallel"}
     : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
@@ -169,10 +181,10 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="parallel-flaky"}
     : ${E2E_NETWORK:="e2e-parallel-flaky"}
     : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
-          ) --ginkgo.focus=$(join_regex \
+          ) --ginkgo.focus=$(join_regex_no_empty \
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
@@ -212,7 +224,7 @@ case ${JOB_NAME} in
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce-parallel. It
     # currently also excludes a slow namespace test.
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
@@ -234,7 +246,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-gce-release"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
