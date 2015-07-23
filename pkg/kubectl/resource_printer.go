@@ -809,7 +809,7 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, wit
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, pvc.Labels, pvc.Status.Phase, pvc.Spec.VolumeName); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, formatLabels(pvc.Labels), pvc.Status.Phase, pvc.Spec.VolumeName); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(pvc.Labels, columnLabels))
