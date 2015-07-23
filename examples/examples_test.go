@@ -365,8 +365,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			t.Errorf("Expected no error, Got %v", err)
 		}
 		if tested != len(expected) {
-			t.Logf("failing path: %q", path)
-			t.Errorf("Expected %d examples, Got %d", len(expected), tested)
+			t.Errorf("Directory %v: Expected %d examples, Got %d", path, len(expected), tested)
 		}
 	}
 }
