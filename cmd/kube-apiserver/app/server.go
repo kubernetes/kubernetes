@@ -217,7 +217,7 @@ func (s *APIServer) verifyClusterIPFlags() {
 }
 
 func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (helper tools.EtcdHelper, err error) {
-	var client tools.EtcdGetSet
+	var client tools.EtcdClient
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
 		if err != nil {

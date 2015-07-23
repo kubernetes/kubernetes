@@ -18,7 +18,6 @@ package tools
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 	"sync"
 
@@ -123,14 +122,6 @@ func (f *FakeEtcdClient) updateResponse(key string) {
 		return
 	}
 	f.Data[key] = *resp.N
-}
-
-func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response, error) {
-	f.Mutex.Lock()
-	defer f.Mutex.Unlock()
-
-	f.Ix = f.Ix + 1
-	return f.setLocked(fmt.Sprintf("%s/%d", key, f.Ix), data, ttl)
 }
 
 func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {

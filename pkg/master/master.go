@@ -229,7 +229,7 @@ type Master struct {
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdHelper(client tools.EtcdGetSet, version string, prefix string) (helper tools.EtcdHelper, err error) {
+func NewEtcdHelper(client tools.EtcdClient, version string, prefix string) (helper tools.EtcdHelper, err error) {
 	if version == "" {
 		version = latest.Version
 	}
