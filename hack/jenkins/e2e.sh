@@ -67,6 +67,7 @@ E2E_OPT=${E2E_OPT:-""}
 # Set environment variables shared for all of the GCE Jenkins projects.
 if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
+  : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
   : ${MASTER_SIZE:="n1-standard-2"}
   : ${MINION_SIZE:="n1-standard-2"}
@@ -272,6 +273,7 @@ export ZONE=${E2E_ZONE}
 export KUBE_GKE_NETWORK=${E2E_NETWORK}
 
 # Shared cluster variables
+export E2E_MIN_STARTUP_PODS=${E2E_MIN_STARTUP_PODS:-}
 export MASTER_SIZE=${MASTER_SIZE:-}
 export MINION_SIZE=${MINION_SIZE:-}
 export NUM_MINIONS=${NUM_MINIONS:-}
