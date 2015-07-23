@@ -135,8 +135,7 @@ If you read logs of the phabricator container you will notice the following erro
 $ kubectl logs phabricator-controller-02qp4
 [...]
 Raw MySQL Error: Attempt to connect to root@173.194.252.142 failed with error
-#2013: Lost connection to MySQL server at 'reading initial communication
-packet', system error: 0.
+#2013: Lost connection to MySQL server at 'reading initial communication packet', system error: 0.
 
 ```
 
