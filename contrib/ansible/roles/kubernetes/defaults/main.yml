@@ -28,7 +28,7 @@ kube_cert_group: kube-cert
 # Internal DNS domain name.
 # This domain must not be used in your network. Services will be discoverable
 # under <service-name>.<namespace>.<domainname>, e.g.
-# myservice.default.cluster.local
+# myservice.default.svc.cluster.local
 dns_domain: "{{ cluster_name }}"
 
 # IP address of the DNS server.

@@ -139,8 +139,8 @@ Result: ([]string)<nil>
 Error: &lt;*&gt;lookup elasticsearch-logging: no such host
 
 LookupSRV(&#34;&#34;, &#34;&#34;, elasticsearch-logging):
-cname: elasticsearch-logging.default.cluster.local.
-Result: ([]*net.SRV)[&lt;*&gt;{Target:(string)elasticsearch-logging.default.cluster.local. Port:(uint16)9200 Priority:(uint16)10 Weight:(uint16)100}]
+cname: elasticsearch-logging.default.svc.cluster.local.
+Result: ([]*net.SRV)[&lt;*&gt;{Target:(string)elasticsearch-logging.default.svc.cluster.local. Port:(uint16)9200 Priority:(uint16)10 Weight:(uint16)100}]
 Error: <nil>
 
 LookupHost(elasticsearch-logging):
