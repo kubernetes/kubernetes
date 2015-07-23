@@ -16,6 +16,8 @@ https://github.com/swagger-api/swagger-ui#how-to-use-it
 - Updated the url to "../../swagger-spec" as per instructions at:
 https://github.com/swagger-api/swagger-ui#how-to-use-it
 - Set supportedSubmitMethods: [] in index.html to remove "Try it out" buttons.
+- Set validatorUrl to null, to disable validation (which works only for swagger
+  2.0) as per https://github.com/swagger-api/swagger-ui#parameters
 
 LICENSE file has been created for compliance purposes.
 Not included in original distribution.
