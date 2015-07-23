@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,7 +33,7 @@ import (
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
-// TODO: Get some more structure aroud the metrics and this type
+// TODO: Get some more structure around the metrics and this type
 type KubeletMetric struct {
 	// eg: list, info, create
 	Operation string
@@ -51,90 +52,72 @@ func (a KubeletMetricByLatency) Len() int           { return len(a) }
 func (a KubeletMetricByLatency) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a KubeletMetricByLatency) Less(i, j int) bool { return a[i].Latency > a[j].Latency }
 
+// parseKubeletmetricsLine parse a single line in the kubelet /metrics output.
+func parseKubeletMetricsLine(line string, prefix string) (string, string, map[string]string, error) {
+	// Extract method and value from the line.
+	// E.g., kubelet_pod_worker_latency_microseconds{operation_type="create", quantile="0.99"} 1344
+	// Method is "kubelet_pod_worker_latency_microseconds"; value is "1344"
+	keyValMap := make(map[string]string)
+	r, _ := regexp.Compile(`(\w+)(?:{.*})? ([\w.]+)`)
+	matches := r.FindAllStringSubmatch(line, -1)
+	if len(matches) != 1 {
+		return "", "", keyValMap, fmt.Errorf("found zero or muiltiple matches. line: %s, matches: %v", line, matches)
+	}
+	method, value := matches[0][1], matches[0][2]
+	// Extract key value pairs from the line.
+	// E.g. {"operation_type": "create", "quantile": "0.99"}
+	r, _ = regexp.Compile(`(\w+)="([\w.]+)"`)
+	matches = r.FindAllStringSubmatch(line, -1)
+	for _, match := range matches {
+		keyValMap[match[1]] = match[2]
+	}
+	return method, value, keyValMap, nil
+}
+
+const (
+	metricsOpKey       = "operation_type"
+	metricsQuantileKey = "quantile"
+	metricsSumSuffix   = "_sum"
+	metricsCountSuffix = "_count"
+)
+
 // ReadKubeletMetrics reads metrics from the kubelet server running on the given node
+// TODO: String parsing is such a hack, but getting our rest client/proxy to cooperate with prometheus
+// client is weird, we should eventually invest some time in doing this the right way.
 func ParseKubeletMetrics(metricsBlob string) ([]KubeletMetric, error) {
 	metric := make([]KubeletMetric, 0)
 	for _, line := range strings.Split(metricsBlob, "\n") {
-
-		// A kubelet stats line starts with the KubeletSubsystem marker, followed by a stat name, followed by fields
-		// that vary by stat described on a case by case basis below.
-		// TODO: String parsing is such a hack, but getting our rest client/proxy to cooperate with prometheus
-		// client is weird, we should eventually invest some time in doing this the right way.
-		if !strings.HasPrefix(line, fmt.Sprintf("%v_", metrics.KubeletSubsystem)) {
+		// We are interested in kubelet stats lines, which start with the
+		// KubeletSubsystem marker. E.g., kubelet_pod_worker_latency_microseconds
+		prefix := fmt.Sprintf("%v_", metrics.KubeletSubsystem)
+		if !strings.HasPrefix(line, prefix) {
 			continue
 		}
-		keyVal := strings.Split(line, " ")
-		if len(keyVal) != 2 {
-			return nil, fmt.Errorf("Error parsing metric %q", line)
+		method, value, keyValMap, err := parseKubeletMetricsLine(line, prefix)
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing metric %q, err: %v", line, err)
 		}
-		keyElems := strings.Split(line, "\"")
-
-		latency, err := strconv.ParseFloat(keyVal[1], 64)
+		// Trim the kubelet prefix.
+		method = strings.TrimPrefix(method, prefix)
+		// We only care about latency stats. Ignore the sums and counts.
+		if strings.HasSuffix(method, metricsSumSuffix) || strings.HasSuffix(method, metricsCountSuffix) {
+			continue
+		}
+		if method == metrics.DockerErrorsKey {
+			Logf("ERROR %v", line)
+			continue
+		}
+		latency, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			continue
 		}
-
-		methodLine := strings.Split(keyElems[0], "{")
-		methodList := strings.Split(methodLine[0], "_")
-		if len(methodLine) != 2 || len(methodList) == 1 {
+		// Operation is optional.
+		operation, _ := keyValMap[metricsOpKey]
+		rawQuantile, ok := keyValMap[metricsQuantileKey]
+		if !ok {
 			continue
 		}
-		method := strings.Join(methodList[1:], "_")
-
-		var operation, rawQuantile string
-		var quantile float64
-
-		switch method {
-		case metrics.PodWorkerLatencyKey:
-			// eg: kubelet_pod_worker_latency_microseconds{operation_type="create",pod_name="foopause3_default",quantile="0.99"} 1344
-			if len(keyElems) != 7 {
-				continue
-			}
-			operation = keyElems[1]
-			rawQuantile = keyElems[5]
-			break
-
-		case metrics.PodWorkerStartLatencyKey:
-			// eg: kubelet_pod_worker_start_latency_microseconds{quantile="0.99"} 12
-			fallthrough
-
-		case metrics.SyncPodsLatencyKey:
-			// eg:  kubelet_sync_pods_latency_microseconds{quantile="0.5"} 9949
-			fallthrough
-
-		case metrics.PodStartLatencyKey:
-			// eg: kubelet_pod_start_latency_microseconds{quantile="0.5"} 123
-			fallthrough
-
-		case metrics.PodStatusLatencyKey:
-			// eg: kubelet_generate_pod_status_latency_microseconds{quantile="0.5"} 12715
-			if len(keyElems) != 3 {
-				continue
-			}
-			operation = ""
-			rawQuantile = keyElems[1]
-			break
-
-		case metrics.ContainerManagerOperationsKey:
-			// eg: kubelet_container_manager_latency_microseconds{operation_type="SyncPod",quantile="0.5"} 6705
-			fallthrough
-
-		case metrics.DockerOperationsKey:
-			// eg: kubelet_docker_operations_latency_microseconds{operation_type="info",quantile="0.5"} 31590
-			if len(keyElems) != 5 {
-				continue
-			}
-			operation = keyElems[1]
-			rawQuantile = keyElems[3]
-			break
-
-		case metrics.DockerErrorsKey:
-			Logf("ERROR %v", line)
-
-		default:
-			continue
-		}
-		quantile, err = strconv.ParseFloat(rawQuantile, 64)
+		quantile, err := strconv.ParseFloat(rawQuantile, 64)
 		if err != nil {
 			continue
 		}
