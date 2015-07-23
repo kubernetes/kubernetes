@@ -1355,8 +1355,8 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// Node is a worker node in Kubernetes.
-// The name of the node according to etcd is in ID.
+// Node is a worker node in Kubernetes, formerly known as minion.
+// Each node will have a unique identifier in the cache (i.e. in etcd).
 type Node struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"`
@@ -1368,7 +1368,7 @@ type Node struct {
 	Status NodeStatus `json:"status,omitempty" description:"most recently observed status of the node; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"`
 }
 
-// NodeList is a list of minions.
+// NodeList is the whole list of all Nodes which have been registered with master.
 type NodeList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"`
