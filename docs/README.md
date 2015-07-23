@@ -29,6 +29,8 @@
 * If something went wrong, see the [troubleshooting](troubleshooting.md) document for how to debug.
 You should also check the [known issues](user-guide/known-issues.md) for the release you're using.
 
+* To report a security issue, see [Reporting a Security Issue](reporting-security-issues.md).
+
 
 <!-- TAG IS_VERSIONED -->
 
