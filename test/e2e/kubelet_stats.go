@@ -32,16 +32,35 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 )
 
+type MetricsType int
+
+const (
+	MetricsTypeLatency MetricsType = iota
+	MetricsTypeSum
+	MetricsTypeCount
+)
+
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
 // TODO: Get some more structure around the metrics and this type
 type KubeletMetric struct {
+	Type MetricsType
 	// eg: list, info, create
 	Operation string
 	// eg: sync_pods, pod_worker
 	Method string
+
+	// The following fields are set for MetricsTypeLatency:
 	// 0 <= quantile <=1, e.g. 0.95 is 95%tile, 0.5 is median.
 	Quantile float64
 	Latency  time.Duration
+
+	// The following fields are set for MetricsTypeSum:
+	// Sum of all latencies for this type of operation.
+	Sum time.Duration
+
+	// The following fields are set for MetricsTypeCount:
+	// Number of operations observed.
+	Count int64
 }
 
 // KubeletMetricByLatency implements sort.Interface for []KubeletMetric based on
@@ -99,29 +118,47 @@ func ParseKubeletMetrics(metricsBlob string) ([]KubeletMetric, error) {
 		}
 		// Trim the kubelet prefix.
 		method = strings.TrimPrefix(method, prefix)
-		// We only care about latency stats. Ignore the sums and counts.
-		if strings.HasSuffix(method, metricsSumSuffix) || strings.HasSuffix(method, metricsCountSuffix) {
-			continue
-		}
 		if method == metrics.DockerErrorsKey {
 			Logf("ERROR %v", line)
 			continue
 		}
-		latency, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			continue
-		}
+		var metricsType MetricsType
+		var operation, rawQuantile string
+		var sum, quantile, latency float64
+		var count int64
+		var ok bool
 		// Operation is optional.
-		operation, _ := keyValMap[metricsOpKey]
-		rawQuantile, ok := keyValMap[metricsQuantileKey]
-		if !ok {
-			continue
+		operation, _ = keyValMap[metricsOpKey]
+
+		if strings.HasSuffix(method, metricsSumSuffix) {
+			metricsType = MetricsTypeSum
+			sum, err = strconv.ParseFloat(value, 64)
+			if err != nil {
+				continue
+			}
+		} else if strings.HasSuffix(method, metricsCountSuffix) {
+			metricsType = MetricsTypeCount
+			count, err = strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				continue
+			}
+		} else {
+			metricsType = MetricsTypeLatency
+			latency, err = strconv.ParseFloat(value, 64)
+			if err != nil {
+				continue
+			}
+			rawQuantile, ok = keyValMap[metricsQuantileKey]
+			if !ok {
+				continue
+			}
+			quantile, err = strconv.ParseFloat(rawQuantile, 64)
+			if err != nil {
+				continue
+			}
 		}
-		quantile, err := strconv.ParseFloat(rawQuantile, 64)
-		if err != nil {
-			continue
-		}
-		metric = append(metric, KubeletMetric{operation, method, quantile, time.Duration(int64(latency)) * time.Microsecond})
+		metric = append(metric, KubeletMetric{metricsType, operation, method, quantile,
+			time.Duration(int64(latency)) * time.Microsecond, time.Duration(int64(sum)) * time.Microsecond, count})
 	}
 	return metric, nil
 }
@@ -139,7 +176,14 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 	if err != nil {
 		return []KubeletMetric{}, err
 	}
-	metric, err := ParseKubeletMetrics(metricsBlob)
+	allMetric, err := ParseKubeletMetrics(metricsBlob)
+	// Only look at metric with latency information.
+	var metric []KubeletMetric
+	for _, m := range allMetric {
+		if m.Type == MetricsTypeLatency {
+			metric = append(metric, m)
+		}
+	}
 	if err != nil {
 		return []KubeletMetric{}, err
 	}
