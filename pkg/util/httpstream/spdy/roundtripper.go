@@ -135,12 +135,13 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 		responseError := ""
 		responseErrorBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			responseError = "Unable to read error from server response"
+			responseError = "unable to read error from server response"
 		} else {
 			responseError = string(responseErrorBytes)
+			responseError = strings.TrimSpace(responseError)
 		}
 
-		return nil, fmt.Errorf("Unable to upgrade connection: %s", responseError)
+		return nil, fmt.Errorf("unable to upgrade connection: %s", responseError)
 	}
 
 	return NewClientConnection(s.conn)
