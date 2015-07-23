@@ -52,7 +52,7 @@ func waitForPathToExist(devicePath string, maxRetries int) bool {
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/rbd/pool-image-image
 func makePDNameInternal(host volume.VolumeHost, pool string, image string) string {
-	return path.Join(host.GetPluginDir(RBDPluginName), "rbd", pool+"-image-"+image)
+	return path.Join(host.GetPluginDir(rbdPluginName), "rbd", pool+"-image-"+image)
 }
 
 type RBDUtil struct{}

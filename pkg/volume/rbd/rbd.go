@@ -30,29 +30,29 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&RBDPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&rbdPlugin{nil, exec.New()}}
 }
 
-type RBDPlugin struct {
+type rbdPlugin struct {
 	host volume.VolumeHost
 	exe  exec.Interface
 }
 
-var _ volume.VolumePlugin = &RBDPlugin{}
+var _ volume.VolumePlugin = &rbdPlugin{}
 
 const (
-	RBDPluginName = "kubernetes.io/rbd"
+	rbdPluginName = "kubernetes.io/rbd"
 )
 
-func (plugin *RBDPlugin) Init(host volume.VolumeHost) {
+func (plugin *rbdPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 
-func (plugin *RBDPlugin) Name() string {
-	return RBDPluginName
+func (plugin *rbdPlugin) Name() string {
+	return rbdPluginName
 }
 
-func (plugin *RBDPlugin) CanSupport(spec *volume.Spec) bool {
+func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec.VolumeSource.RBD == nil && spec.PersistentVolumeSource.RBD == nil {
 		return false
 	}
@@ -65,14 +65,14 @@ func (plugin *RBDPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *RBDPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 	}
 }
 
-func (plugin *RBDPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	secret := ""
 	source := plugin.getRBDVolumeSource(spec)
 
@@ -97,7 +97,7 @@ func (plugin *RBDPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, mounter, secret)
 }
 
-func (plugin *RBDPlugin) getRBDVolumeSource(spec *volume.Spec) *api.RBDVolumeSource {
+func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) *api.RBDVolumeSource {
 	if spec.VolumeSource.RBD != nil {
 		return spec.VolumeSource.RBD
 	} else {
@@ -105,7 +105,7 @@ func (plugin *RBDPlugin) getRBDVolumeSource(spec *volume.Spec) *api.RBDVolumeSou
 	}
 }
 
-func (plugin *RBDPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
+func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
 	source := plugin.getRBDVolumeSource(spec)
 	pool := source.RBDPool
 	if pool == "" {
@@ -137,12 +137,12 @@ func (plugin *RBDPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 	}, nil
 }
 
-func (plugin *RBDPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *rbdPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newCleanerInternal(volName, podUID, &RBDUtil{}, mounter)
 }
 
-func (plugin *RBDPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *rbdPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
 	return &rbd{
 		podUID:  podUID,
 		volName: volName,
@@ -163,14 +163,14 @@ type rbd struct {
 	secret   string
 	fsType   string
 	readOnly bool
-	plugin   *RBDPlugin
+	plugin   *rbdPlugin
 	mounter  mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 }
 
 func (rbd *rbd) GetPath() string {
-	name := RBDPluginName
+	name := rbdPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
 	return rbd.plugin.host.GetPodVolumeDir(rbd.podUID, util.EscapeQualifiedNameForDisk(name), rbd.volName)
 }
@@ -208,7 +208,7 @@ func (rbd *rbd) TearDownAt(dir string) error {
 	return diskTearDown(rbd.manager, *rbd, dir, rbd.mounter)
 }
 
-func (plugin *RBDPlugin) execCommand(command string, args []string) ([]byte, error) {
+func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
 }

@@ -73,7 +73,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	builder, err := plug.(*RBDPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{}, "secrets")
+	builder, err := plug.(*rbdPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{}, "secrets")
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -104,7 +104,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		}
 	}
 
-	cleaner, err := plug.(*RBDPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{})
+	cleaner, err := plug.(*rbdPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
