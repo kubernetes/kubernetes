@@ -196,8 +196,11 @@ var _ = Describe("Addon update", func() {
 	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		// This test requires SSH, so the provider check should be identical to
-		// those tests.
+		// This test requires:
+		// - SSH
+		// - master access
+		// ... so the provider check should be identical to the intersection of
+		// providers that provide those capabilities.
 		if !providerIs("gce") {
 			return
 		}
@@ -205,7 +208,7 @@ var _ = Describe("Addon update", func() {
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
 
-		sshClient, err = getSSHClient()
+		sshClient, err = getMasterSSHClient()
 		Expect(err).NotTo(HaveOccurred())
 
 		namespace, err = createTestingNS("addon-update-test", c)
@@ -218,8 +221,11 @@ var _ = Describe("Addon update", func() {
 	})
 
 	AfterEach(func() {
-		// This test requires SSH, so the provider check should be identical to
-		// those tests.
+		// This test requires:
+		// - SSH
+		// - master access
+		// ... so the provider check should be identical to the intersection of
+		// providers that provide those capabilities.
 		if !providerIs("gce") {
 			return
 		}
@@ -238,8 +244,11 @@ var _ = Describe("Addon update", func() {
 
 	// WARNING: the test is not parallel-friendly!
 	It("should propagate add-on file changes", func() {
-		// This test requires SSH, so the provider check should be identical to
-		// those tests.
+		// This test requires:
+		// - SSH
+		// - master access
+		// ... so the provider check should be identical to the intersection of
+		// providers that provide those capabilities.
 		SkipUnlessProviderIs("gce")
 
 		//these tests are long, so I squeezed several cases in one scenario
@@ -344,7 +353,7 @@ func waitForReplicationControllerInAddonTest(c *client.Client, addonNamespace, n
 
 // TODO marekbiskup 2015-06-11: merge the ssh code into pkg/util/ssh.go after
 // kubernetes v1.0 is released. In particular the code of sshExec.
-func getSSHClient() (*ssh.Client, error) {
+func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
 	signer, err := getSigner(testContext.Provider)
 	if err != nil {
@@ -371,7 +380,7 @@ func sshExecAndVerify(client *ssh.Client, cmd string) {
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
-	Logf(fmt.Sprintf("Executing '%s' on %v", cmd, client.RemoteAddr()))
+	Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
 	session, err := client.NewSession()
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", client.RemoteAddr(), err)
