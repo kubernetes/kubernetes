@@ -30,6 +30,7 @@ GCLOUD="${GCLOUD:-gcloud}"
 CMD_GROUP="${CMD_GROUP:-alpha}"
 GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
 ENABLE_CLUSTER_DNS=false
+ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 MINION_SCOPES="${MINION_SCOPES:-"compute-rw,storage-ro"}"
 
 # This is a hack, but I keep setting this when I run commands manually, and

@@ -79,6 +79,9 @@ DNS_SERVER_IP="10.247.0.10"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
+# Optional: Install Kubernetes UI
+ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
+
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
 #RUNTIME_CONFIG=""
 RUNTIME_CONFIG="api/v1"
