@@ -87,7 +87,7 @@ whereas, in general, they don't control what pods land together on a host.
 ## Pod to pod
 
 Because every pod gets a "real" (not machine-private) IP address, pods can
-communicate without proxies or translations.  The can use well-known port
+communicate without proxies or translations.  The pod can use well-known port
 numbers and can avoid the use of higher-level service discovery systems like
 DNS-SD, Consul, or Etcd.
 

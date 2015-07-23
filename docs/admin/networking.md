@@ -125,7 +125,7 @@ applies IP addresses at the `Pod` scope - containers within a `Pod` share their
 network namespaces - including their IP address.  This means that containers
 within a `Pod` can all reach each other’s ports on `localhost`.  This does imply
 that containers within a `Pod` must coordinate port usage, but this is no
-different that processes in a VM.  We call this the "IP-per-pod" model.  This
+different than processes in a VM.  We call this the "IP-per-pod" model.  This
 is implemented in Docker as a "pod container" which holds the network namespace
 open while "app containers" (the things the user specified) join that namespace
 with Docker's `--net=container:<id>` function.
