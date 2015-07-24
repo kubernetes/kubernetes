@@ -17,18 +17,23 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	cadvisor "github.com/google/cadvisor/info/v1"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -170,6 +175,143 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 		}
 	}
 	return badMetrics, nil
+}
+
+// getContainerInfo contacts kubelet for the container informaton. The "Stats"
+// in the returned ContainerInfo is subject to the requirements in statsRequest.
+func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsRequest) (map[string]cadvisor.ContainerInfo, error) {
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.Post().
+		Prefix("proxy").
+		Resource("nodes").
+		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Suffix("stats/container").
+		SetHeader("Content-Type", "application/json").
+		Body(reqBody).
+		Do().Raw()
+
+	var containers map[string]cadvisor.ContainerInfo
+	err = json.Unmarshal(data, &containers)
+	if err != nil {
+		return nil, err
+	}
+	return containers, nil
+}
+
+const (
+	// cadvisor records stats about every second.
+	cadvisorStatsPollingIntervalInSeconds float64 = 1.0
+	// cadvisor caches up to 2 minutes of stats (configured by kubelet).
+	maxNumStatsToRequest int = 120
+)
+
+// A list of containers for which we want to collect resource usage.
+var targetContainers = []string{
+	"/",
+	"/docker-daemon",
+	"/kubelet",
+	"/kube-proxy",
+	"/system",
+}
+
+type containerResourceUsage struct {
+	Name                    string
+	Timestamp               time.Time
+	CPUUsageInCores         float64
+	MemoryUsageInBytes      int64
+	MemoryWorkingSetInBytes int64
+	// The interval used to calculate CPUUsageInCores.
+	CPUInterval time.Duration
+}
+
+// getOneTimeResourceUsageOnNode queries the node's /stats/container endpoint
+// and returns the resource usage of targetContainers for the past
+// cpuInterval.
+// The acceptable range of the interval is 2s~120s. Be warned that as the
+// interval (and #containers) increases, the size of kubelet's response
+// could be sigificant. E.g., the 60s interval stats for ~20 containers is
+// ~1.5MB. Don't hammer the node with frequent, heavy requests.
+// TODO: Implement a constant, lightweight resource monitor, which polls
+// kubelet every few second, stores the data, and reports meaningful statistics
+// numbers over a longer period (e.g., max/mean cpu usage in the last hour).
+//
+// cadvisor records cumulative cpu usage in nanoseconds, so we need to have two
+// stats points to compute the cpu usage over the interval. Assuming cadvisor
+// polls every second, we'd need to get N stats points for N-second interval.
+// Note that this is an approximation and may not be accurate, hence we also
+// write the actual interval used for calcuation (based on the timestampes of
+// the stats points in containerResourceUsage.CPUInterval.
+func getOneTimeResourceUsageOnNode(c *client.Client, nodeName string, cpuInterval time.Duration) (map[string]*containerResourceUsage, error) {
+	numStats := int(float64(cpuInterval.Seconds()) / cadvisorStatsPollingIntervalInSeconds)
+	if numStats < 2 || numStats > maxNumStatsToRequest {
+		return nil, fmt.Errorf("numStats needs to be > 1 and < %d", maxNumStatsToRequest)
+	}
+	// Get information of all containers on the node.
+	containerInfos, err := getContainerInfo(c, nodeName, &kubelet.StatsRequest{
+		ContainerName: "/",
+		NumStats:      numStats,
+		Subcontainers: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Process container infos that are relevant to us.
+	usageMap := make(map[string]*containerResourceUsage, len(targetContainers))
+	for _, name := range targetContainers {
+		info, ok := containerInfos[name]
+		if !ok {
+			return nil, fmt.Errorf("missing info for container %q on node %q", name, nodeName)
+		}
+		first := info.Stats[0]
+		last := info.Stats[len(info.Stats)-1]
+		usageMap[name] = &containerResourceUsage{
+			Name:                    name,
+			Timestamp:               last.Timestamp,
+			CPUUsageInCores:         float64(last.Cpu.Usage.Total-first.Cpu.Usage.Total) / float64(last.Timestamp.Sub(first.Timestamp).Nanoseconds()),
+			MemoryUsageInBytes:      int64(last.Memory.Usage),
+			MemoryWorkingSetInBytes: int64(last.Memory.WorkingSet),
+			CPUInterval:             last.Timestamp.Sub(first.Timestamp),
+		}
+	}
+	return usageMap, nil
+}
+
+// logOneTimeResourceUsageSummary collects container resource for the list of
+// nodes, formats and logs the stats.
+func logOneTimeResourceUsageSummary(c *client.Client, nodeNames []string, cpuInterval time.Duration) {
+	var summary []string
+	for _, nodeName := range nodeNames {
+		stats, err := getOneTimeResourceUsageOnNode(c, nodeName, cpuInterval)
+		if err != nil {
+			summary = append(summary, fmt.Sprintf("Error getting resource usage from node %q, err: %v", nodeName, err))
+		} else {
+			summary = append(summary, formatResourceUsageStats(nodeName, stats))
+		}
+	}
+	Logf("\n%s", strings.Join(summary, "\n"))
+}
+
+func formatResourceUsageStats(nodeName string, containerStats map[string]*containerResourceUsage) string {
+	// Example output:
+	//
+	// Resource usage for node "e2e-test-foo-minion-abcde":
+	// container        cpu(cores)  memory(MB)
+	// "/"              0.363       2942.09
+	// "/docker-daemon" 0.088       521.80
+	// "/kubelet"       0.086       424.37
+	// "/kube-proxy"    0.011       4.66
+	// "/system"        0.007       119.88
+	buf := &bytes.Buffer{}
+	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
+	fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
+	for name, s := range containerStats {
+		fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", name, s.CPUUsageInCores, float64(s.MemoryUsageInBytes)/1000000)
+	}
+	w.Flush()
+	return fmt.Sprintf("Resource usage on node %q:\n%s", nodeName, buf.String())
 }
 
 // Performs a get on a node proxy endpoint given the nodename and rest client.
