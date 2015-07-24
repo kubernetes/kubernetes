@@ -200,7 +200,6 @@ function wait-cluster-readiness {
 function kube-up {
   detect-master
   detect-minions
-  get-password
   initialize-pool keep_base_image
   initialize-network
 
@@ -326,12 +325,6 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
   kube-down
-}
-
-# Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
-function get-password {
-  export KUBE_USER=''
-  export KUBE_PASSWORD=''
 }
 
 # SSH to a node by name or IP ($1) and run a command ($2).
