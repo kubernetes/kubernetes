@@ -108,11 +108,11 @@ kube::version::ldflags::new_pair() {
   local delimiter=${3-}
 
   [[ -n ${key} ]] || {
-    return ""
+    return
   }
 
   [[ -n ${value} ]] || {
-    return ""
+    return
   }
 
   # Set implicit delimiter if not set
