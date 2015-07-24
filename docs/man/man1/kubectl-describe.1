@@ -27,10 +27,10 @@ will first check for an exact match on RESOURCE and NAME\_PREFIX. If no such res
 exists, it will output details for every resource that has a name prefixed with NAME\_PREFIX
 
 .PP
-Possible resources include pods (po), replicationcontrollers (rc), services
-(svc), nodes (no), events (ev), componentstatuses (cs), limitRanges (limits),
-persistentVolumes (pv), persistentVolumeClaims (pvc), resourceQuotas (quota)
-or secrets.
+Possible resources include (case insensitive): pods (po), services (svc),
+replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
+limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
+resourcequotas (quota) or secrets.
 
 
 .SH OPTIONS
