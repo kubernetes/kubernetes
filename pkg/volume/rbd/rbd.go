@@ -123,14 +123,14 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 	return &rbd{
 		podUID:   podUID,
 		volName:  spec.Name,
-		mon:      source.CephMonitors,
-		image:    source.RBDImage,
-		pool:     pool,
-		id:       id,
-		keyring:  keyring,
-		secret:   secret,
+		Mon:      source.CephMonitors,
+		Image:    source.RBDImage,
+		Pool:     pool,
+		Id:       id,
+		Keyring:  keyring,
+		Secret:   secret,
 		fsType:   source.FSType,
-		readOnly: source.ReadOnly,
+		ReadOnly: source.ReadOnly,
 		manager:  manager,
 		mounter:  mounter,
 		plugin:   plugin,
@@ -153,16 +153,17 @@ func (plugin *rbdPlugin) newCleanerInternal(volName string, podUID types.UID, ma
 }
 
 type rbd struct {
-	volName  string
-	podUID   types.UID
-	mon      []string
-	pool     string
-	id       string
-	image    string
-	keyring  string
-	secret   string
+	volName string
+	podUID  types.UID
+	// capitalized so they can be exported in persistRBD()
+	Mon      []string
+	Pool     string
+	Id       string
+	Image    string
+	Keyring  string
+	Secret   string
 	fsType   string
-	readOnly bool
+	ReadOnly bool
 	plugin   *rbdPlugin
 	mounter  mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
@@ -190,7 +191,7 @@ func (rbd *rbd) SetUpAt(dir string) error {
 	// make mountpoint rw/ro work as expected
 	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
 	mode := "rw"
-	if rbd.readOnly {
+	if rbd.ReadOnly {
 		mode = "ro"
 	}
 	rbd.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
