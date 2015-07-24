@@ -55,7 +55,7 @@ This document describes how to deploy Kubernetes on ubuntu nodes, including 1 Ku
 
 *3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with Ubuntu 15 which use systemd instead of upstart and we are fixing this*
 
-*4 Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-0.19.3, but it may work with higher versions*
+*4 Dependencies of this guide: etcd-2.0.12, flannel-0.4.0, k8s-1.0.1, but it may work with higher versions*
 
 *5 All the remote servers can be ssh logged in without a password by using key authentication* 
 
@@ -64,12 +64,13 @@ This document describes how to deploy Kubernetes on ubuntu nodes, including 1 Ku
 
 #### Make *kubernetes* , *etcd* and *flanneld* binaries
 
-First clone the Kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
+First clone the kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
+
 then `$ cd kubernetes/cluster/ubuntu`.
 
 Then run `$ ./build.sh`, this will download all the needed binaries into `./binaries`.
 
-You can customize your etcd version, flannel version, k8s version by changing variable `ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, default etcd version is 2.0.12, flannel version is 0.4.0 and K8s version is 0.19.3.
+You can customize your etcd version, flannel version, k8s version by changing variable `ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, default etcd version is 2.0.12, flannel version is 0.4.0 and K8s version is 1.0.1.
 
 Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `kube-scheduler`, `kubelet`, `kube-proxy`, `etcd`, `etcdctl` and `flannel` in the binaries/master or binaries/minion directory.
 
@@ -90,11 +91,11 @@ First configure the cluster information in cluster/ubuntu/config-default.sh, bel
 ```sh
 export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 
-export roles="ai i i"
+export role="ai i i"
 
 export NUM_MINIONS=${NUM_MINIONS:-3}
 
-export SERVICE_CLUSTER_IP_RANGE=11.1.1.0/24
+export SERVICE_CLUSTER_IP_RANGE=192.168.3.0/24
 
 export FLANNEL_NET=172.16.0.0/16
 ```
@@ -103,7 +104,7 @@ The first variable `nodes` defines all your cluster nodes, MASTER node comes fir
 
 Then the `roles ` variable defines the role of above machine in the same order, "ai" stands for machine acts as both master and node, "a" stands for master, "i" stands for node. So they are just defined the k8s cluster as the table above described.
 
-The `NUM_MINIONS` variable defines the total number of nodes.
+The `NUM_MINIONS` variable defines the total number of minion nodes.
 
 The `SERVICE_CLUSTER_IP_RANGE` variable defines the Kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range according to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
 
