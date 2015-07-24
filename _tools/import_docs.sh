@@ -30,9 +30,10 @@ for dir in docs examples; do
     find ${OUTDIR}/${dir} -type f -name \*.md | while read X; do
         sed -i \
             -e '/<!-- BEGIN STRIP_FOR_RELEASE.*/,/<!-- END STRIP_FOR_RELEASE.*/d' \
-            -e "s|releases.k8s.io/HEAD|releases.k8s.io/${REPORT_TAG}|" \
+            -e "s|releases.k8s.io/HEAD|releases.k8s.io/${REPORT_TAG}|g" \
             ${X}
     done
+    git stage ${OUTDIR}/${dir}
 done
 
 git status
