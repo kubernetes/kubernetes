@@ -27,6 +27,7 @@ import (
 	"reflect"
 	gruntime "runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -329,6 +330,56 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	return client, nil
 }
 
+var (
+	// tlsTransports stores reusable round trippers with custom TLSClientConfig options
+	tlsTransports = map[string]*http.Transport{}
+
+	// tlsTransportLock protects retrieval and storage of round trippers into the tlsTransports map
+	tlsTransportLock sync.Mutex
+)
+
+// tlsTransportFor returns a http.RoundTripper for the given config, or an error
+// The same RoundTripper will be returned for configs with identical TLS options
+// If the config has no custom TLS options, http.DefaultTransport is returned
+func tlsTransportFor(config *Config) (http.RoundTripper, error) {
+	// Get a unique key for the TLS options in the config
+	key, err := tlsConfigKey(config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure we only create a single transport for the given TLS options
+	tlsTransportLock.Lock()
+	defer tlsTransportLock.Unlock()
+
+	// See if we already have a custom transport for this config
+	if cachedTransport, ok := tlsTransports[key]; ok {
+		return cachedTransport, nil
+	}
+
+	// Get the TLS options for this client config
+	tlsConfig, err := TLSConfigFor(config)
+	if err != nil {
+		return nil, err
+	}
+	// The options didn't require a custom TLS config
+	if tlsConfig == nil {
+		return http.DefaultTransport, nil
+	}
+
+	// Cache a single transport for these options
+	tlsTransports[key] = &http.Transport{
+		TLSClientConfig: tlsConfig,
+		Proxy:           http.ProxyFromEnvironment,
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+	return tlsTransports[key], nil
+}
+
 // TransportFor returns an http.RoundTripper that will provide the authentication
 // or transport level security defined by the provided Config. Will return the
 // default http.DefaultTransport if no special case behavior is needed.
@@ -341,28 +392,23 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
 	}
 
-	tlsConfig, err := TLSConfigFor(config)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		transport http.RoundTripper
+		err       error
+	)
 
-	var transport http.RoundTripper
 	if config.Transport != nil {
 		transport = config.Transport
 	} else {
-		if tlsConfig != nil {
-			transport = &http.Transport{
-				TLSClientConfig: tlsConfig,
-				Proxy:           http.ProxyFromEnvironment,
-				Dial: (&net.Dialer{
-					Timeout:   30 * time.Second,
-					KeepAlive: 30 * time.Second,
-				}).Dial,
-				TLSHandshakeTimeout: 10 * time.Second,
-			}
-		} else {
-			transport = http.DefaultTransport
+		transport, err = tlsTransportFor(config)
+		if err != nil {
+			return nil, err
 		}
+	}
+
+	// Call wrap prior to adding debugging wrappers
+	if config.WrapTransport != nil {
+		transport = config.WrapTransport(transport)
 	}
 
 	switch {
@@ -374,10 +420,6 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 		transport = NewDebuggingRoundTripper(transport, JustURL, RequestHeaders, ResponseStatus)
 	case bool(glog.V(6)):
 		transport = NewDebuggingRoundTripper(transport, URLTiming)
-	}
-
-	if config.WrapTransport != nil {
-		transport = config.WrapTransport(transport)
 	}
 
 	transport, err = HTTPWrappersForConfig(config, transport)

@@ -213,6 +213,66 @@ func TestTransportFor(t *testing.T) {
 	}
 }
 
+func TestTLSTransportCache(t *testing.T) {
+	// Empty the cache
+	tlsTransports = map[string]*http.Transport{}
+	// Construct several transports (Insecure=true to force a transport with custom tls settings)
+	identicalConfigurations := map[string]*Config{
+		"empty":          {Insecure: true},
+		"host":           {Insecure: true, Host: "foo"},
+		"prefix":         {Insecure: true, Prefix: "foo"},
+		"version":        {Insecure: true, Version: "foo"},
+		"codec":          {Insecure: true, Codec: latest.Codec},
+		"basic":          {Insecure: true, Username: "bob", Password: "password"},
+		"bearer":         {Insecure: true, BearerToken: "token"},
+		"user agent":     {Insecure: true, UserAgent: "useragent"},
+		"wrap transport": {Insecure: true, WrapTransport: func(http.RoundTripper) http.RoundTripper { return nil }},
+		"qps/burst":      {Insecure: true, QPS: 1.0, Burst: 10},
+	}
+	for k, v := range identicalConfigurations {
+		if _, err := TransportFor(v); err != nil {
+			t.Errorf("Unexpected error for %q: %v", k, err)
+		}
+	}
+	if len(tlsTransports) != 1 {
+		t.Errorf("Expected 1 cached transport, got %d", len(tlsTransports))
+	}
+
+	// Empty the cache
+	tlsTransports = map[string]*http.Transport{}
+	// Construct several transports with custom TLS settings
+	// (no normalization is performed on ca/cert/key data, so appending a newline lets us test "different" content)
+	uniqueConfigurations := map[string]*Config{
+		"insecure":                {Insecure: true},
+		"cadata 1":                {TLSClientConfig: TLSClientConfig{CAData: []byte(rootCACert)}},
+		"cadata 2":                {TLSClientConfig: TLSClientConfig{CAData: []byte(rootCACert + "\n")}},
+		"cert 1, key 1":           {TLSClientConfig: TLSClientConfig{CertData: []byte(certData), KeyData: []byte(keyData)}},
+		"cert 1, key 2":           {TLSClientConfig: TLSClientConfig{CertData: []byte(certData), KeyData: []byte(keyData + "\n")}},
+		"cert 2, key 1":           {TLSClientConfig: TLSClientConfig{CertData: []byte(certData + "\n"), KeyData: []byte(keyData)}},
+		"cert 2, key 2":           {TLSClientConfig: TLSClientConfig{CertData: []byte(certData + "\n"), KeyData: []byte(keyData + "\n")}},
+		"cadata 1, cert 1, key 1": {TLSClientConfig: TLSClientConfig{CAData: []byte(rootCACert), CertData: []byte(certData), KeyData: []byte(keyData)}},
+	}
+	for k, v := range uniqueConfigurations {
+		if _, err := TransportFor(v); err != nil {
+			t.Errorf("Unexpected error for %q: %v", k, err)
+		}
+	}
+	// All custom configs should result in a cache entry
+	if len(tlsTransports) != len(uniqueConfigurations) {
+		t.Errorf("Expected %d cached transports, got %d", len(uniqueConfigurations), len(tlsTransports))
+	}
+
+	// Empty the cache
+	tlsTransports = map[string]*http.Transport{}
+	if _, err := TransportFor(&Config{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// A client config with no TLS options should use http.DefaultTransport, not a cached custom transport
+	if len(tlsTransports) != 0 {
+		t.Errorf("Expected no cached transports, got %d", len(tlsTransports))
+	}
+}
+
 func TestIsConfigTransportTLS(t *testing.T) {
 	testCases := []struct {
 		Config       *Config
