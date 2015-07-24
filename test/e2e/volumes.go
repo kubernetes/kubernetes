@@ -35,6 +35,7 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -55,13 +56,15 @@ type VolumeTestConfig struct {
 }
 
 // Starts a container specified by config.serverImage and exports all
-// config.serverPorts from it. The returned pod should be used to get the server
-// IP address and create appropriate VolumeSource.
-func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod {
+// config.serverPorts from it via a service. The function returns IP
+// address of the service.
+func startVolumeServer(client *client.Client, config VolumeTestConfig) string {
 	podClient := client.Pods(config.namespace)
+	serviceClient := client.Services(config.namespace)
 
 	portCount := len(config.serverPorts)
 	serverPodPorts := make([]api.ContainerPort, portCount)
+	servicePorts := make([]api.ServicePort, portCount)
 
 	for i := 0; i < portCount; i++ {
 		portName := fmt.Sprintf("%s-%d", config.prefix, i)
@@ -70,6 +73,12 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 			Name:          portName,
 			ContainerPort: config.serverPorts[i],
 			Protocol:      api.ProtocolTCP,
+		}
+		servicePorts[i] = api.ServicePort{
+			Name:       portName,
+			Protocol:   "TCP",
+			Port:       config.serverPorts[i],
+			TargetPort: util.NewIntOrStringFromInt(config.serverPorts[i]),
 		}
 	}
 
@@ -106,13 +115,26 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 
 	expectNoError(waitForPodRunningInNamespace(client, serverPod.Name, config.namespace))
 
-	By("locating the server pod")
-	pod, err := podClient.Get(serverPod.Name)
-	expectNoError(err, "Cannot locate the server pod %v: %v", serverPod.Name, err)
+	By(fmt.Sprint("creating ", config.prefix, " service"))
+	service := &api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name: config.prefix + "-server",
+		},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{
+				"role": config.prefix + "-server",
+			},
+			Ports: servicePorts,
+		},
+	}
+	createdService, err := serviceClient.Create(service)
+	expectNoError(err, "Failed to create %s service: %v", service.Name, err)
 
 	By("sleeping a bit to give the server time to start")
 	time.Sleep(20 * time.Second)
-	return pod
+
+	ip := createdService.Spec.ClusterIP
+	return ip
 }
 
 // Clean both server and client pods.
@@ -122,9 +144,11 @@ func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
 	defer GinkgoRecover()
 
 	podClient := client.Pods(config.namespace)
+	serviceClient := client.Services(config.namespace)
 
 	// ignore all errors, the pods may not be even created
 	podClient.Delete(config.prefix+"-client", nil)
+	serviceClient.Delete(config.prefix + "-server")
 	podClient.Delete(config.prefix+"-server", nil)
 }
 
@@ -237,8 +261,7 @@ var _ = Describe("Volumes", func() {
 					volumeTestCleanup(c, config)
 				}
 			}()
-			pod := startVolumeServer(c, config)
-			serverIP := pod.Status.PodIP
+			serverIP := startVolumeServer(c, config)
 			Logf("NFS server IP address: %v", serverIP)
 
 			volume := api.VolumeSource{
@@ -274,48 +297,8 @@ var _ = Describe("Volumes", func() {
 					volumeTestCleanup(c, config)
 				}
 			}()
-			pod := startVolumeServer(c, config)
-			serverIP := pod.Status.PodIP
+			serverIP := startVolumeServer(c, config)
 			Logf("Gluster server IP address: %v", serverIP)
-
-			// create Endpoints for the server
-			endpoints := api.Endpoints{
-				TypeMeta: api.TypeMeta{
-					Kind:       "Endpoints",
-					APIVersion: "v1",
-				},
-				ObjectMeta: api.ObjectMeta{
-					Name: config.prefix + "-server",
-				},
-				Subsets: []api.EndpointSubset{
-					{
-						Addresses: []api.EndpointAddress{
-							{
-								IP: serverIP,
-							},
-						},
-						Ports: []api.EndpointPort{
-							{
-								Name:     "gluster",
-								Port:     24007,
-								Protocol: api.ProtocolTCP,
-							},
-						},
-					},
-				},
-			}
-
-			endClient := c.Endpoints(config.namespace)
-
-			defer func() {
-				if clean {
-					endClient.Delete(config.prefix + "-server")
-				}
-			}()
-
-			if _, err := endClient.Create(&endpoints); err != nil {
-				Failf("Failed to create endpoints for Gluster server: %v", err)
-			}
 
 			volume := api.VolumeSource{
 				Glusterfs: &api.GlusterfsVolumeSource{
