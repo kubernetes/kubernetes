@@ -140,7 +140,7 @@ function create-node-instance-template {
   if [[ -n ${1:-} ]]; then
     suffix="-${1}"
   fi
-   create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags[*]}" \
+   create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
     "user-data=${KUBE_ROOT}/cluster/gce/coreos/node.yaml"
 }

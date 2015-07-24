@@ -111,6 +111,7 @@ function verify-prereqs() {
 #   ZONE
 #   CLUSTER_API_VERSION (optional)
 #   NUM_MINIONS
+#   MINION_SCOPES
 function kube-up() {
   echo "... in kube-up()" >&2
   detect-project >&2
@@ -141,6 +142,7 @@ function kube-up() {
     "--project=${PROJECT}"
     "--num-nodes=${NUM_MINIONS}"
     "--network=${NETWORK}"
+    "--scopes=${MINION_SCOPES}"
   )
   if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
     create_args+=("--cluster-version=${CLUSTER_API_VERSION:-}")

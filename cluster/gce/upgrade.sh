@@ -178,11 +178,11 @@ function prepare-node-upgrade() {
   detect-minion-names
 
   # TODO(mbforbes): Refactor setting scope flags.
-  local -a scope_flags=()
-  if (( "${#MINION_SCOPES[@]}" > 0 )); then
-    scope_flags=("--scopes" "$(join_csv ${MINION_SCOPES[@]})")
+  local scope_flags=
+  if [ -n "${MINION_SCOPES}" ]; then
+    scope_flags="--scopes ${MINION_SCOPES}"
   else
-    scope_flags=("--no-scopes")
+    scope_flags="--no-scopes"
   fi
 
   # Get required node env vars from exiting template.
