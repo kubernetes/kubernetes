@@ -64,7 +64,7 @@ func TestHeaderLines(t *testing.T) {
 	for i, c := range cases {
 		in := getMungeLines(c.in)
 		expected := getMungeLines(c.expected)
-		actual, err := checkHeaderLines("filename.md", in)
+		actual, err := updateHeaderLines("filename.md", in)
 		assert.NoError(t, err)
 		if !actual.Equal(expected) {
 			t.Errorf("case[%d]: expected %q got %q", i, c.expected, actual.String())

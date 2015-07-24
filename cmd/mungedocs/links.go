@@ -115,9 +115,9 @@ func processLink(in string, filePath string) (string, error) {
 	return out, nil
 }
 
-// checkLinks assumes lines has links in markdown syntax, and verifies that
+// updateLinks assumes lines has links in markdown syntax, and verifies that
 // any relative links actually point to files that exist.
-func checkLinks(filePath string, mlines mungeLines) (mungeLines, error) {
+func updateLinks(filePath string, mlines mungeLines) (mungeLines, error) {
 	var out mungeLines
 	errors := []string{}
 

@@ -35,7 +35,7 @@ func TestBadLinks(t *testing.T) {
 	}
 	for _, c := range cases {
 		in := getMungeLines(c.in)
-		_, err := checkLinks("filename.md", in)
+		_, err := updateLinks("filename.md", in)
 		assert.Error(t, err)
 	}
 }
@@ -67,7 +67,7 @@ func TestGoodLinks(t *testing.T) {
 	for i, c := range cases {
 		in := getMungeLines(c.in)
 		expected := getMungeLines(c.expected)
-		actual, err := checkLinks("filename.md", in)
+		actual, err := updateLinks("filename.md", in)
 		assert.NoError(t, err)
 		if !actual.Equal(expected) {
 			t.Errorf("case[%d]: expected %q got %q", i, c.expected, actual.String())

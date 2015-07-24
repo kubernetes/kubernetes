@@ -132,7 +132,7 @@ func TestKubectlDashF(t *testing.T) {
 	for i, c := range cases {
 		repoRoot = ""
 		in := getMungeLines(c.in)
-		_, err := checkKubectlFileTargets("filename.md", in)
+		_, err := updateKubectlFileTargets("filename.md", in)
 		if err != nil && c.ok {
 			t.Errorf("case[%d]: expected success, got %v", i, err)
 		}

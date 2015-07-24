@@ -56,7 +56,7 @@ func fixHeaderLine(mlines mungeLines, newlines mungeLines, linenum int) mungeLin
 }
 
 // Header lines need whitespace around them and after the #s.
-func checkHeaderLines(filePath string, mlines mungeLines) (mungeLines, error) {
+func updateHeaderLines(filePath string, mlines mungeLines) (mungeLines, error) {
 	var out mungeLines
 	for i, mline := range mlines {
 		if mline.preformatted {

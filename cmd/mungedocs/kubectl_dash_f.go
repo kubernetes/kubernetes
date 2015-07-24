@@ -25,7 +25,7 @@ import (
 
 // Looks for lines that have kubectl commands with -f flags and files that
 // don't exist.
-func checkKubectlFileTargets(file string, mlines mungeLines) (mungeLines, error) {
+func updateKubectlFileTargets(file string, mlines mungeLines) (mungeLines, error) {
 	var errors []string
 	for i, mline := range mlines {
 		if !mline.preformatted {

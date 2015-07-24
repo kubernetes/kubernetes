@@ -22,36 +22,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPreformatted(t *testing.T) {
+func Test_updateWhiteSpace(t *testing.T) {
 	var cases = []struct {
 		in       string
 		expected string
 	}{
 		{"", ""},
-		{
-			"```\nbob\n```",
-			"\n```\nbob\n```\n\n",
-		},
-		{
-			"```\nbob\n```\n```\nnotbob\n```\n",
-			"\n```\nbob\n```\n\n```\nnotbob\n```\n\n",
-		},
-		{
-			"```bob```\n",
-			"```bob```\n",
-		},
-		{
-			"    ```\n    bob\n    ```",
-			"\n    ```\n    bob\n    ```\n\n",
-		},
+		{"\n", "\n"},
+		{"  \t   \t \n", "\n"},
+		{"bob  \t", "bob"},
+		{"```\n   \n```\n", "```\n   \n```\n"},
 	}
 	for i, c := range cases {
 		in := getMungeLines(c.in)
 		expected := getMungeLines(c.expected)
-		actual, err := updatePreformatted("filename.md", in)
+		actual, err := updateWhitespace("filename.md", in)
 		assert.NoError(t, err)
-		if !actual.Equal(expected) {
-			t.Errorf("case[%d]: expected %q got %q", i, c.expected, actual.String())
+		if !expected.Equal(actual) {
+			t.Errorf("Case[%d] Expected Whitespace '%v' but got '%v'", i, string(expected.Bytes()), string(actual.Bytes()))
 		}
 	}
 }

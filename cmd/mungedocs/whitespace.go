@@ -16,26 +16,16 @@ limitations under the License.
 
 package main
 
-// Blocks of ``` need to have blank lines on both sides or they don't look
-// right in HTML.
-func updatePreformatted(filePath string, mlines mungeLines) (mungeLines, error) {
+// Remove all trailing whitespace
+func updateWhitespace(file string, mlines mungeLines) (mungeLines, error) {
 	var out mungeLines
-	inpreformat := false
-	for i, mline := range mlines {
-		if !inpreformat && mline.preformatted {
-			if i == 0 || out[len(out)-1].data != "" {
-				out = append(out, blankMungeLine)
-			}
-			// start of a preformat block
-			inpreformat = true
+	for _, mline := range mlines {
+		if mline.preformatted {
+			out = append(out, mline)
+			continue
 		}
-		out = append(out, mline)
-		if inpreformat && !mline.preformatted {
-			if i >= len(mlines)-2 || mlines[i+1].data != "" {
-				out = append(out, blankMungeLine)
-			}
-			inpreformat = false
-		}
+		newline := trimRightSpace(mline.data)
+		out = append(out, newMungeLine(newline))
 	}
 	return out, nil
 }

@@ -46,13 +46,14 @@ Examples:
 	// All of the munge operations to perform.
 	// TODO: allow selection from command line. (e.g., just check links in the examples directory.)
 	allMunges = []munge{
+		{"remove-whitespace", updateWhitespace},
 		{"table-of-contents", updateTOC},
 		{"unversioned-warning", updateUnversionedWarning},
-		{"check-links", checkLinks},
-		{"blank-lines-surround-preformatted", checkPreformatted},
-		{"header-lines", checkHeaderLines},
+		{"md-links", updateLinks},
+		{"blank-lines-surround-preformatted", updatePreformatted},
+		{"header-lines", updateHeaderLines},
 		{"analytics", updateAnalytics},
-		{"kubectl-dash-f", checkKubectlFileTargets},
+		{"kubectl-dash-f", updateKubectlFileTargets},
 		{"sync-examples", syncExamples},
 	}
 	availableMungeList = func() string {
