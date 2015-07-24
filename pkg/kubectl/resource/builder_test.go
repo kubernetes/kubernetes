@@ -228,7 +228,7 @@ func TestNodeBuilder(t *testing.T) {
 func TestPathBuilderWithMultiple(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").
-		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").
+		FilenameParam(false, "../../../examples/pod").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -239,8 +239,12 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 
-	info := test.Infos[1]
-	if info.Name != "redis-master" || info.Namespace != "test" || info.Object == nil {
+	info := test.Infos[0]
+	if _, ok := info.Object.(*api.ReplicationController); !ok || info.Name != "redis-master" || info.Namespace != "test" {
+		t.Errorf("unexpected info: %#v", info)
+	}
+	info = test.Infos[1]
+	if _, ok := info.Object.(*api.Pod); !ok || info.Name != "nginx" || info.Namespace != "test" {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
@@ -684,6 +688,26 @@ func TestSingularObject(t *testing.T) {
 	}
 	if rc.Name != "redis-master" || rc.Namespace != "test" {
 		t.Errorf("unexpected controller: %#v", rc)
+	}
+}
+
+func TestSingularObjectNoExtension(t *testing.T) {
+	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		NamespaceParam("test").DefaultNamespace().
+		FilenameParam(false, "../../../examples/pod").
+		Flatten().
+		Do().Object()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+	if pod.Name != "nginx" || pod.Namespace != "test" {
+		t.Errorf("unexpected pod: %#v", pod)
 	}
 }
 
