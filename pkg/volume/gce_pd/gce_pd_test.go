@@ -74,8 +74,8 @@ type fakePDManager struct {
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+func (fake *fakePDManager) AttachAndMountDisk(b *gcePersistentDiskBuilder, globalPDPath string) error {
+	globalPath := makeGlobalPDName(b.plugin.host, b.pdName)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
@@ -83,12 +83,12 @@ func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPat
 	fake.attachCalled = true
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	pd.mounter.Mount(globalPath, globalPath, pd.fsType, nil)
+	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+func (fake *fakePDManager) DetachDisk(c *gcePersistentDiskCleaner) error {
+	globalPath := makeGlobalPDName(c.plugin.host, c.pdName)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
