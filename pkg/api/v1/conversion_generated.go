@@ -352,6 +352,7 @@ func convert_api_EndpointAddress_To_v1_EndpointAddress(in *api.EndpointAddress, 
 		defaulting.(func(*api.EndpointAddress))(in)
 	}
 	out.IP = in.IP
+	out.Hostname = in.Hostname
 	if in.TargetRef != nil {
 		out.TargetRef = new(ObjectReference)
 		if err := convert_api_ObjectReference_To_v1_ObjectReference(in.TargetRef, out.TargetRef, s); err != nil {
@@ -2602,6 +2603,7 @@ func convert_v1_EndpointAddress_To_api_EndpointAddress(in *EndpointAddress, out 
 		defaulting.(func(*EndpointAddress))(in)
 	}
 	out.IP = in.IP
+	out.Hostname = in.Hostname
 	if in.TargetRef != nil {
 		out.TargetRef = new(api.ObjectReference)
 		if err := convert_v1_ObjectReference_To_api_ObjectReference(in.TargetRef, out.TargetRef, s); err != nil {
