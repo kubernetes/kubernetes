@@ -28,6 +28,8 @@ type Indexer interface {
 	Store
 	// Retrieve list of objects that match on the named indexing function
 	Index(indexName string, obj interface{}) ([]interface{}, error)
+	// ListIndexFuncValues returns the list of generated values of an Index func
+	ListIndexFuncValues(indexName string) []string
 }
 
 // IndexFunc knows how to provide an indexed value for an object.
