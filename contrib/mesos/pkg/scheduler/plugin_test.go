@@ -370,7 +370,6 @@ func TestPlugin_New(t *testing.T) {
 // and play through the whole life cycle of the plugin while creating pods, deleting
 // and failing them.
 func TestPlugin_LifeCycle(t *testing.T) {
-	t.Skip("disabled due to flakiness; see #10795")
 	assert := &EventAssertions{*assert.New(t)}
 
 	// create a fake pod watch. We use that below to submit new pods to the scheduler
@@ -440,6 +439,8 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	}
 	mockDriver.On("LaunchTasks", mAny("[]*mesosproto.OfferID"), mAny("[]*mesosproto.TaskInfo"), mAny("*mesosproto.Filters")).
 		Return(mesos.Status_DRIVER_RUNNING, nil).Run(launchTasksCalledFunc)
+	mockDriver.On("DeclineOffer", mAny("*mesosproto.OfferID"), mAny("*mesosproto.Filters")).
+		Return(mesos.Status_DRIVER_RUNNING, nil)
 
 	// elect master with mock driver
 	driverFactory := ha.DriverFactory(func() (bindings.SchedulerDriver, error) {
@@ -497,14 +498,22 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	}
 
 	// start another pod
-	podNum := 1
-	startPod := func(offers []*mesos.Offer) (*api.Pod, *mesos.TaskInfo) {
+	podNum := 2
+	startPod := func() (*api.Pod, *mesos.TaskInfo, *mesos.Offer) {
 		podNum = podNum + 1
 
-		// create pod and matching offer
+		// create pod
 		pod := NewTestPod(podNum)
 		podListWatch.Add(pod, true) // notify watchers
+
+		// wait for failedScheduling event because there is no offer
+		assert.EventWithReason(eventObserver, "failedScheduling", "failedScheduling event not received")
+
+		// supply a matching offer
+		offers := []*mesos.Offer{NewTestOffer(podNum)}
 		testScheduler.ResourceOffers(mockDriver, offers)
+
+		// and wait to get scheduled
 		assert.EventWithReason(eventObserver, "scheduled")
 
 		// wait for driver.launchTasks call
@@ -512,15 +521,15 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		case launchedTask := <-launchedTasks:
 			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_STAGING))
 			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_RUNNING))
-			return pod, launchedTask
+			return pod, launchedTask, offers[0]
 
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for launchTasks")
-			return nil, nil
+			return nil, nil, nil
 		}
 	}
 
-	pod, launchedTask := startPod(offers1)
+	pod, launchedTask, _ := startPod()
 
 	// mock drvier.KillTask, should be invoked when a pod is deleted
 	mockDriver.On("KillTask", mAny("*mesosproto.TaskID")).Return(mesos.Status_DRIVER_RUNNING, nil).Run(func(args mock.Arguments) {
@@ -561,23 +570,23 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	}
 
 	// 1. with pod deleted from the apiserver
-	pod, launchedTask = startPod(offers1)
+	pod, launchedTask, _ = startPod()
 	podListWatch.Delete(pod, false) // not notifying the watchers
 	failPodFromExecutor(launchedTask)
 
 	// 2. with pod still on the apiserver, not bound
-	pod, launchedTask = startPod(offers1)
+	pod, launchedTask, _ = startPod()
 	failPodFromExecutor(launchedTask)
 
 	// 3. with pod still on the apiserver, bound i.e. host!=""
-	pod, launchedTask = startPod(offers1)
-	pod.Spec.NodeName = *offers1[0].Hostname
+	pod, launchedTask, usedOffer := startPod()
+	pod.Spec.NodeName = *usedOffer.Hostname
 	podListWatch.Modify(pod, false) // not notifying the watchers
 	failPodFromExecutor(launchedTask)
 
 	// 4. with pod still on the apiserver, bound i.e. host!="", notified via ListWatch
-	pod, launchedTask = startPod(offers1)
-	pod.Spec.NodeName = *offers1[0].Hostname
+	pod, launchedTask, usedOffer = startPod()
+	pod.Spec.NodeName = *usedOffer.Hostname
 	podListWatch.Modify(pod, true) // notifying the watchers
 	time.Sleep(time.Second / 2)
 	failPodFromExecutor(launchedTask)

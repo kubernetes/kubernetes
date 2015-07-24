@@ -496,15 +496,15 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
-			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
