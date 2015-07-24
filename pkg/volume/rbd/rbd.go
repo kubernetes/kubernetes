@@ -120,20 +120,22 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 		keyring = "/etc/ceph/keyring"
 	}
 
-	return &rbd{
-		podUID:   podUID,
-		volName:  spec.Name,
-		Mon:      source.CephMonitors,
-		Image:    source.RBDImage,
-		Pool:     pool,
-		Id:       id,
-		Keyring:  keyring,
-		Secret:   secret,
-		fsType:   source.FSType,
-		ReadOnly: source.ReadOnly,
-		manager:  manager,
-		mounter:  mounter,
-		plugin:   plugin,
+	return &rbdBuilder{
+		rbd: &rbd{
+			podUID:   podUID,
+			volName:  spec.Name,
+			Image:    source.RBDImage,
+			Pool:     pool,
+			ReadOnly: source.ReadOnly,
+			manager:  manager,
+			mounter:  mounter,
+			plugin:   plugin,
+		},
+		Mon:     source.CephMonitors,
+		Id:      id,
+		Keyring: keyring,
+		Secret:  secret,
+		fsType:  source.FSType,
 	}, nil
 }
 
@@ -143,26 +145,20 @@ func (plugin *rbdPlugin) NewCleaner(volName string, podUID types.UID, mounter mo
 }
 
 func (plugin *rbdPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &rbd{
+	return &rbdCleaner{&rbd{
 		podUID:  podUID,
 		volName: volName,
 		manager: manager,
 		mounter: mounter,
 		plugin:  plugin,
-	}, nil
+	}}, nil
 }
 
 type rbd struct {
-	volName string
-	podUID  types.UID
-	// capitalized so they can be exported in persistRBD()
-	Mon      []string
+	volName  string
+	podUID   types.UID
 	Pool     string
-	Id       string
 	Image    string
-	Keyring  string
-	Secret   string
-	fsType   string
 	ReadOnly bool
 	plugin   *rbdPlugin
 	mounter  mount.Interface
@@ -176,37 +172,55 @@ func (rbd *rbd) GetPath() string {
 	return rbd.plugin.host.GetPodVolumeDir(rbd.podUID, util.EscapeQualifiedNameForDisk(name), rbd.volName)
 }
 
-func (rbd *rbd) SetUp() error {
-	return rbd.SetUpAt(rbd.GetPath())
+type rbdBuilder struct {
+	*rbd
+	// capitalized so they can be exported in persistRBD()
+	Mon     []string
+	Id      string
+	Keyring string
+	Secret  string
+	fsType  string
 }
 
-func (rbd *rbd) SetUpAt(dir string) error {
+var _ volume.Builder = &rbdBuilder{}
+
+func (b *rbdBuilder) SetUp() error {
+	return b.SetUpAt(b.GetPath())
+}
+
+func (b *rbdBuilder) SetUpAt(dir string) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(rbd.manager, *rbd, dir, rbd.mounter)
+	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {
 		glog.Errorf("rbd: failed to setup")
 		return err
 	}
-	globalPDPath := rbd.manager.MakeGlobalPDName(*rbd)
+	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
 	// make mountpoint rw/ro work as expected
 	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
 	mode := "rw"
-	if rbd.ReadOnly {
+	if b.ReadOnly {
 		mode = "ro"
 	}
-	rbd.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
+	b.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
 
 	return nil
 }
 
-// Unmounts the bind mount, and detaches the disk only if the disk
-// resource was the last reference to that disk on the kubelet.
-func (rbd *rbd) TearDown() error {
-	return rbd.TearDownAt(rbd.GetPath())
+type rbdCleaner struct {
+	*rbd
 }
 
-func (rbd *rbd) TearDownAt(dir string) error {
-	return diskTearDown(rbd.manager, *rbd, dir, rbd.mounter)
+var _ volume.Cleaner = &rbdCleaner{}
+
+// Unmounts the bind mount, and detaches the disk only if the disk
+// resource was the last reference to that disk on the kubelet.
+func (c *rbdCleaner) TearDown() error {
+	return c.TearDownAt(c.GetPath())
+}
+
+func (c *rbdCleaner) TearDownAt(dir string) error {
+	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
 
 func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, error) {
