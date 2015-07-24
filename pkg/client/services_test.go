@@ -31,7 +31,7 @@ func TestListServices(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath("services", ns, ""),
-			Query:  buildQueryValues(ns, nil)},
+			Query:  buildQueryValues(nil)},
 		Response: Response{StatusCode: 200,
 			Body: &api.ServiceList{
 				Items: []api.Service{
@@ -65,7 +65,7 @@ func TestListServicesLabels(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath("services", ns, ""),
-			Query:  buildQueryValues(ns, url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
+			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: Response{StatusCode: 200,
 			Body: &api.ServiceList{
 				Items: []api.Service{
@@ -100,7 +100,7 @@ func TestGetService(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath("services", ns, "1"),
-			Query:  buildQueryValues(ns, nil)},
+			Query:  buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
 	response, err := c.Setup().Services(ns).Get("1")
@@ -125,7 +125,7 @@ func TestCreateService(t *testing.T) {
 			Method: "POST",
 			Path:   testapi.ResourcePath("services", ns, ""),
 			Body:   &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}},
-			Query:  buildQueryValues(ns, nil)},
+			Query:  buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
 	response, err := c.Setup().Services(ns).Create(&api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}})
@@ -136,7 +136,7 @@ func TestUpdateService(t *testing.T) {
 	ns := api.NamespaceDefault
 	svc := &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1", ResourceVersion: "1"}}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath("services", ns, "service-1"), Body: svc, Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath("services", ns, "service-1"), Body: svc, Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: svc},
 	}
 	response, err := c.Setup().Services(ns).Update(svc)
@@ -146,7 +146,7 @@ func TestUpdateService(t *testing.T) {
 func TestDeleteService(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("services", ns, "1"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("services", ns, "1"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().Services(ns).Delete("1")

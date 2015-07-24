@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -202,7 +203,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				ev.ValueFrom = &api.EnvVarSource{}
 				ev.ValueFrom.FieldRef = &api.ObjectFieldSelector{}
 
-				versions := []string{"v1beta1", "v1beta2", "v1beta3"}
+				versions := registered.RegisteredVersions
 
 				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
 				ev.ValueFrom.FieldRef.FieldPath = c.RandString()

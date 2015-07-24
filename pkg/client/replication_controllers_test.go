@@ -63,7 +63,7 @@ func TestListControllers(t *testing.T) {
 func TestGetController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request: testRequest{Method: "GET", Path: testapi.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -102,7 +102,7 @@ func TestUpdateController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "PUT", Path: testapi.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request: testRequest{Method: "PUT", Path: testapi.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -127,7 +127,7 @@ func TestUpdateController(t *testing.T) {
 func TestDeleteController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getRCResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().ReplicationControllers(ns).Delete("foo")
@@ -140,7 +140,7 @@ func TestCreateController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "POST", Path: testapi.ResourcePath(getRCResourceName(), ns, ""), Body: requestController, Query: buildQueryValues(ns, nil)},
+		Request: testRequest{Method: "POST", Path: testapi.ResourcePath(getRCResourceName(), ns, ""), Body: requestController, Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{

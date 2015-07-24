@@ -57,7 +57,7 @@ func TestLimitRangeCreate(t *testing.T) {
 		Request: testRequest{
 			Method: "POST",
 			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, ""),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   limitRange,
 		},
 		Response: Response{StatusCode: 200, Body: limitRange},
@@ -93,7 +93,7 @@ func TestLimitRangeGet(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: limitRange},
@@ -117,7 +117,7 @@ func TestLimitRangeList(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, ""),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: limitRangeList},
@@ -150,7 +150,7 @@ func TestLimitRangeUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: limitRange},
 	}
 	response, err := c.Setup().LimitRanges(ns).Update(limitRange)
@@ -180,7 +180,7 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: limitRange},
 	}
 	_, err := c.Setup().LimitRanges(ns).Update(limitRange)
@@ -192,7 +192,7 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 func TestLimitRangeDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().LimitRanges(ns).Delete("foo")
