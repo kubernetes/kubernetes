@@ -1,37 +1,7 @@
-<!DOCTYPE html><html lang="en"><head>
-  <meta charset="utf-8"/>
-  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
-  <meta name="description" content="Manage a cluster of Linux containers as a single system to accelerate Dev and simplify Ops with Kubernetes by Google."/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
-  <meta property="og:title" content="Kubernetes by Google"/>
-  <meta property="og:site_name" content="Kubernetes by Google"/>
-  <meta property="og:description" content="Manage a cluster of Linux containers as a single system to accelerate Dev and simplify Ops with Kubernetes by Google."/>
-  <meta property="og:type" content="website"/>
-  <meta property="og:url" content="http://kubernetes.io"/>
-  <meta property="og:image" content="http://kubernetes.io/img/global/og_img.jpg"/>
-
-  <link rel="shortcut icon" href="http://kubernetes.io/img/global/favicon.png" type="image/vnd.microsoft.icon"/>
-  <!-- apple device icons -->
-  <link rel="apple-touch-icon" href="http://kubernetes.io/img/global/apple_touch_icon_2X.jpg"/>
-  <!-- end apple device icons -->
-  <link type="text/plain" rel="author" href="http://kubernetes.io/humans.txt"/>
-  <link rel="stylesheet" href="http://kubernetes.io/css/main.css"/>
-  <link rel="canonical" href="http://kubernetes.io/v1.0/"/>
-  <title>Kubernetes by Google</title>
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-  <script>
-    if ( !window.jQuery ) {
-        document.write('<script src="http://kubernetes.io/js/jquery-2.1.1.min.js"><\/script>');
-    }
-  </script>
-  <script type="text/javascript" src="http://kubernetes.io/js/script.js"></script>
-  <script>
-    var trackOutboundLink=function(n){ga("send","event","outbound","click",n,{hitCallback:function(){document.location=n}})};
-  </script>
- </head><head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-<meta name="generator" content="Asciidoctor 0.1.4"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="generator" content="Asciidoctor 0.1.4">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Top Level API Objects</title>
 <style>
 /* Asciidoctor default stylesheet | MIT License | http://asciidoctor.org */
@@ -100,7 +70,7 @@ a:hover, a:focus { color: #00467f; }
 a img { border: none; }
 p { font-family: inherit; font-weight: normal; font-size: 1em; line-height: 1.6; margin-bottom: 1.25em; text-rendering: optimizeLegibility; }
 p aside { font-size: 0.875em; line-height: 1.35; font-style: italic; }
-h1, h2, h3, #toctitle, .sidebarblock > .content > .title, h4, h5, h6 { font-family: Georgia, "URW Bookman L", Helvetica, Arial, sans-serif; font-weight: normal; font-style: normal; color: #ba3925; text-rendering: optimizeLegibility; margin-top: 1em; margin-bottom: 0.5em; line-height: 1.2125em; }
+h1, h2, h3, #toctitle, .sidebarblock > .content > .title, h4, h5, h6 { font-family: Georgia, "URW Bookman L", Helvetica, Arial, sans-serif; font-weight: normal; font-style: normal; color: #428BCB; text-rendering: optimizeLegibility; margin-top: 1em; margin-bottom: 0.5em; line-height: 1.2125em; }
 h1 small, h2 small, h3 small, #toctitle small, .sidebarblock > .content > .title small, h4 small, h5 small, h6 small { font-size: 60%; color: #e99b8f; line-height: 0; }
 h1 { font-size: 2.125em; }
 h2 { font-size: 1.6875em; }
@@ -138,9 +108,9 @@ blockquote, blockquote p { line-height: 1.6; color: #6f6f6f; }
 .vevent abbr { cursor: auto; text-decoration: none; font-weight: bold; border: none; padding: 0 0.0625em; }
 @media only screen and (min-width: 768px) { h1, h2, h3, #toctitle, .sidebarblock > .content > .title, h4, h5, h6 { line-height: 1.4; }
   h1 { font-size: 2.75em; }
-  h2 { font-size: 2.3125em; text-align: left;}
+  h2 { font-size: 2.3125em; }
   h3, #toctitle, .sidebarblock > .content > .title { font-size: 1.6875em; }
-  h4 { font-size: 1.4375em; text-align: left;} }
+  h4 { font-size: 1.4375em; } }
 .print-only { display: none !important; }
 @media print { * { background: transparent !important; color: #000 !important; box-shadow: none !important; text-shadow: none !important; }
   a, a:visited { text-decoration: underline; }
@@ -174,7 +144,7 @@ kbd kbd:first-child { margin-left: 0; }
 kbd kbd:last-child { margin-right: 0; }
 .menuseq, .menu { color: #090909; }
 p a > code:hover { color: #561309; }
-#header, #content, #footnotes, #footer { width: 100%; margin-left: auto; margin-right: auto; margin-top: 0; margin-bottom: 0; max-width: 62.5em; *zoom: 1; position: relative; padding-left: 0.9375em; padding-right: 0.9375em; }
+#header, #content, #footnotes, #footer { width: 100%; margin-left: auto; margin-right: auto; margin-top: 0; margin-bottom: 0; max-width: auto; *zoom: 1; position: relative; padding-left: 0.9375em; padding-right: 0.9375em; }
 #header:before, #header:after, #content:before, #content:after, #footnotes:before, #footnotes:after, #footer:before, #footer:after { content: " "; display: table; }
 #header:after, #content:after, #footnotes:after, #footer:after { clear: both; }
 #header { margin-bottom: 2.5em; }
@@ -212,7 +182,7 @@ p a > code:hover { color: #561309; }
 #content h1 > a.anchor, h2 > a.anchor, h3 > a.anchor, #toctitle > a.anchor, .sidebarblock > .content > .title > a.anchor, h4 > a.anchor, h5 > a.anchor, h6 > a.anchor { position: absolute; width: 1em; margin-left: -1em; display: block; text-decoration: none; visibility: hidden; text-align: center; font-weight: normal; }
 #content h1 > a.anchor:before, h2 > a.anchor:before, h3 > a.anchor:before, #toctitle > a.anchor:before, .sidebarblock > .content > .title > a.anchor:before, h4 > a.anchor:before, h5 > a.anchor:before, h6 > a.anchor:before { content: '\00A7'; font-size: .85em; vertical-align: text-top; display: block; margin-top: 0.05em; }
 #content h1:hover > a.anchor, #content h1 > a.anchor:hover, h2:hover > a.anchor, h2 > a.anchor:hover, h3:hover > a.anchor, #toctitle:hover > a.anchor, .sidebarblock > .content > .title:hover > a.anchor, h3 > a.anchor:hover, #toctitle > a.anchor:hover, .sidebarblock > .content > .title > a.anchor:hover, h4:hover > a.anchor, h4 > a.anchor:hover, h5:hover > a.anchor, h5 > a.anchor:hover, h6:hover > a.anchor, h6 > a.anchor:hover { visibility: visible; }
-#content h1 > a.link, h2 > a.link, h3 > a.link, #toctitle > a.link, .sidebarblock > .content > .title > a.link, h4 > a.link, h5 > a.link, h6 > a.link { color: #ba3925; text-decoration: none; }
+#content h1 > a.link, h2 > a.link, h3 > a.link, #toctitle > a.link, .sidebarblock > .content > .title > a.link, h4 > a.link, h5 > a.link, h6 > a.link { color: #428BCB; text-decoration: none; }
 #content h1 > a.link:hover, h2 > a.link:hover, h3 > a.link:hover, #toctitle > a.link:hover, .sidebarblock > .content > .title > a.link:hover, h4 > a.link:hover, h5 > a.link:hover, h6 > a.link:hover { color: #a53221; }
 .imageblock, .literalblock, .listingblock, .verseblock, .videoblock { margin-bottom: 1.25em; }
 .admonitionblock td.content > .title, .exampleblock > .title, .imageblock > .title, .videoblock > .title, .listingblock > .title, .literalblock > .title, .openblock > .title, .paragraph > .title, .quoteblock > .title, .sidebarblock > .title, .tableblock > .title, .verseblock > .title, .dlist > .title, .olist > .title, .ulist > .title, .qlist > .title, .hdlist > .title { text-align: left; font-weight: bold; }
@@ -387,110 +357,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 .literalblock > .content > pre, .listingblock > .content > pre { -webkit-border-radius: 0; border-radius: 0; }
 
 </style>
+<script>
+$(document).ready(function() {
+	$("div #doccontent").removeAttr('style').attr('style','max-width: auto;');
+});
+</script>
 </head>
-<body class="article"><div id="mobile-nav-container" class="visible-sm-block visible-xs-block mobile-menu-slide">
-
-  <a href="http://kubernetes.io/">
-  <div></div>
-  <span>Home</span>
- </a>
-
-  <a href="http://kubernetes.io/gettingstarted">
-  <div></div>
-  <span>Getting Started</span>
- </a>
-
-  <a href="http://kubernetes.io/v1.0" class="active">
-  <div></div>
-  <span>Documentation</span>
- </a>
-
-  <a href="http://kubernetes.io/community">
-  <div></div>
-  <span>Community</span>
- </a>
-
-  <a href="http://kubernetes.io/events">
-  <div></div>
-  <span>Events</span>
- </a>
-
-  <a href="http://kubernetesio.blogspot.com/" onclick="trackOutboundLink(&#39;http://kubernetesio.blogspot.com/&#39;); return false;">
-  <div></div>
-  <span>Blog</span>
- </a>
-
-</div><header id="nav" class="mobile-menu-slide">
- <div class="container">
-  <div class="row hidden-sm hidden-xs">
-   <div class="col-xs-12">
-    <a href="http://kubernetes.io/"><img src="http://kubernetes.io/img/desktop/nav_logo.svg" alt="Kubernetes by Google" id="logo-desktop"/></a>
-    <nav>
-
-     <a href="http://kubernetes.io/">
-      <div>
-       Home
-      </div>
-      <div class="underline">
-        
-      </div>
-     </a>
-
-     <a href="http://kubernetes.io/gettingstarted">
-      <div>
-       Getting Started
-      </div>
-      <div class="underline">
-        
-      </div>
-     </a>
-
-     <a href="http://kubernetes.io/v1.0" class="active">
-      <div>
-       Documentation
-      </div>
-      <div class="underline">
-        
-      </div>
-     </a>
-
-     <a href="http://kubernetes.io/community">
-      <div>
-       Community
-      </div>
-      <div class="underline">
-        
-      </div>
-     </a>
-
-     <a href="http://kubernetes.io/events">
-      <div>
-       Events
-      </div>
-      <div class="underline">
-        
-      </div>
-     </a>
-
-     <a href="http://kubernetesio.blogspot.com/" onclick="trackOutboundLink(&#39;http://kubernetesio.blogspot.com/&#39;); return false;">
-      <div>
-       Blog
-      </div>
-      <div class="underline">
-        
-      </div>
-     </a>
-
-    </nav>
-    <a href="javascript:;" class="back-to-top"><svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 24 17" enable-background="new 0 0 24 17" xml:space="preserve"><g><path fill="#FFFFFF" d="M21.8,15.7c-3.2-3.9-6.5-7.9-9.7-11.8c-3.2,3.9-6.5,7.9-9.7,11.8c-1.1,1.3-2.9-0.6-1.9-1.9 c3.5-4.3,7.1-8.6,10.6-13c0.4-0.5,1.4-0.5,1.9,0c3.5,4.3,7.1,8.6,10.6,13C24.7,15.1,22.8,17,21.8,15.7z"></path></g></svg></a>
-   </div>
-  </div>
- </div>
- <div class="visible-sm-block visible-xs-block">
-    <a href="javascript:;" id="mobile-menu-button" class="mobile-menu-slide"><span></span></a>
-    <a href="javascript:;" class="back-to-top"><svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 24 17" enable-background="new 0 0 24 17" xml:space="preserve"><g><path fill="#FFFFFF" d="M21.8,15.7c-3.2-3.9-6.5-7.9-9.7-11.8c-3.2,3.9-6.5,7.9-9.7,11.8c-1.1,1.3-2.9-0.6-1.9-1.9 c3.5-4.3,7.1-8.6,10.6-13c0.4-0.5,1.4-0.5,1.9,0c3.5,4.3,7.1,8.6,10.6,13C24.7,15.1,22.8,17,21.8,15.7z"></path></g></svg></a>
- </div>
-</header>
+<body class="article">
 <div id="header">
 </div>
 <div id="content">
@@ -609,11 +482,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_node">v1.Node</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -668,11 +541,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolumeclaimlist">v1.PersistentVolumeClaimList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -720,11 +593,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_objectfieldselector">v1.ObjectFieldSelector</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -758,11 +631,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_selinuxoptions">v1.SELinuxOptions</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -810,11 +683,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_containerstaterunning">v1.ContainerStateRunning</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -841,11 +714,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_volumemount">v1.VolumeMount</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -886,11 +759,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolumeclaimspec">v1.PersistentVolumeClaimSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -931,11 +804,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_gcepersistentdiskvolumesource">v1.GCEPersistentDiskVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -983,11 +856,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_namespacestatus">v1.NamespaceStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1014,11 +887,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_resourcequotaspec">v1.ResourceQuotaSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1045,11 +918,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_namespacespec">v1.NamespaceSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1076,11 +949,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolume">v1.PersistentVolume</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1135,11 +1008,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolumestatus">v1.PersistentVolumeStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1180,11 +1053,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_endpointslist">v1.EndpointsList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1232,11 +1105,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_gitrepovolumesource">v1.GitRepoVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1270,11 +1143,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_capabilities">v1.Capabilities</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1308,11 +1181,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_nodecondition">v1.NodeCondition</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1354,7 +1227,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">reason</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">(brief) reason for the condition’s last transition</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">(brief) reason for the condition&#8217;s last transition</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1374,11 +1247,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_podtemplatelist">v1.PodTemplateList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1426,11 +1299,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_localobjectreference">v1.LocalObjectReference</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1457,11 +1330,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_resourcequotastatus">v1.ResourceQuotaStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1495,11 +1368,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_execaction">v1.ExecAction</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1513,7 +1386,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">command</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">command line to execute inside the container; working directory for the command is root (<em>/</em>) in the container’s file system; the command is exec’d, not run inside a shell; exit status of 0 is treated as live/healthy and non-zero is unhealthy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">command line to execute inside the container; working directory for the command is root (<em>/</em>) in the container&#8217;s file system; the command is exec&#8217;d, not run inside a shell; exit status of 0 is treated as live/healthy and non-zero is unhealthy</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1526,11 +1399,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_objectmeta">v1.ObjectMeta</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1631,11 +1504,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_limitrangespec">v1.LimitRangeSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1662,11 +1535,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_iscsivolumesource">v1.ISCSIVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1721,11 +1594,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_emptydirvolumesource">v1.EmptyDirVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1752,11 +1625,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_nodelist">v1.NodeList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1804,11 +1677,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolumeclaim">v1.PersistentVolumeClaim</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1863,11 +1736,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_namespacelist">v1.NamespaceList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1915,11 +1788,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_serviceaccount">v1.ServiceAccount</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -1974,11 +1847,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_nodeaddress">v1.NodeAddress</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2012,11 +1885,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_namespace">v1.Namespace</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2071,11 +1944,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_listmeta">v1.ListMeta</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2109,11 +1982,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolumeclaimvolumesource">v1.PersistentVolumeClaimVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2147,11 +2020,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolumeclaimstatus">v1.PersistentVolumeClaimStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2192,11 +2065,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_resourcequotalist">v1.ResourceQuotaList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2244,11 +2117,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_endpointsubset">v1.EndpointSubset</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2282,11 +2155,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_secretvolumesource">v1.SecretVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2300,7 +2173,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">secretName is the name of a secret in the pod’s namespace; see <a href="http://releases.k8s.io/HEAD/docs/volumes.md#secrets">http://releases.k8s.io/HEAD/docs/volumes.md#secrets</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">secretName is the name of a secret in the pod&#8217;s namespace; see <a href="http://releases.k8s.io/HEAD/docs/volumes.md#secrets">http://releases.k8s.io/HEAD/docs/volumes.md#secrets</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2313,11 +2186,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_envvarsource">v1.EnvVarSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2344,11 +2217,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_loadbalanceringress">v1.LoadBalancerIngress</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2382,11 +2255,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_service">v1.Service</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2441,11 +2314,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_serviceaccountlist">v1.ServiceAccountList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2493,11 +2366,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_limitrangelist">v1.LimitRangeList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2545,11 +2418,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_endpoints">v1.Endpoints</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2597,11 +2470,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_deleteoptions">v1.DeleteOptions</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2642,11 +2515,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_volume">v1.Volume</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2674,7 +2547,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">emptyDir</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">temporary directory that shares a pod’s lifetime; see <a href="http://releases.k8s.io/HEAD/docs/volumes.md#emptydir">http://releases.k8s.io/HEAD/docs/volumes.md#emptydir</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">temporary directory that shares a pod&#8217;s lifetime; see <a href="http://releases.k8s.io/HEAD/docs/volumes.md#emptydir">http://releases.k8s.io/HEAD/docs/volumes.md#emptydir</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_emptydirvolumesource">v1.EmptyDirVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2750,11 +2623,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_probe">v1.Probe</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2813,11 +2686,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_replicationcontroller">v1.ReplicationController</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2872,11 +2745,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_limitrange">v1.LimitRange</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -2924,11 +2797,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_podstatus">v1.PodStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3004,11 +2877,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_podspec">v1.PodSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3064,7 +2937,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">nodeSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">selector which must match a node’s labels for the pod to be scheduled on that node; see <a href="http://releases.k8s.io/HEAD/examples/node-selection/README.md">http://releases.k8s.io/HEAD/examples/node-selection/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">selector which must match a node&#8217;s labels for the pod to be scheduled on that node; see <a href="http://releases.k8s.io/HEAD/examples/node-selection/README.md">http://releases.k8s.io/HEAD/examples/node-selection/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_any">any</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3105,11 +2978,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_containerport">v1.ContainerPort</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3137,7 +3010,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">containerPort</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">number of port to expose on the pod’s IP address</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">number of port to expose on the pod&#8217;s IP address</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3164,11 +3037,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_eventlist">v1.EventList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3216,11 +3089,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_resourcequota">v1.ResourceQuota</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3275,11 +3148,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_lifecycle">v1.Lifecycle</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3313,11 +3186,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_nodestatus">v1.NodeStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3372,11 +3245,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_glusterfsvolumesource">v1.GlusterfsVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3417,11 +3290,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_handler">v1.Handler</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3462,11 +3335,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_replicationcontrollerspec">v1.ReplicationControllerSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3507,11 +3380,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_eventsource">v1.EventSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3545,11 +3418,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_statuscause">v1.StatusCause</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3590,11 +3463,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_podcondition">v1.PodCondition</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3628,11 +3501,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_rbdvolumesource">v1.RBDVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3708,11 +3581,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_status">v1.Status</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3788,11 +3661,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_podtemplate">v1.PodTemplate</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3840,11 +3713,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_servicestatus">v1.ServiceStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3871,11 +3744,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_nfsvolumesource">v1.NFSVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3916,11 +3789,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_endpointport">v1.EndpointPort</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3961,11 +3834,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_tcpsocketaction">v1.TCPSocketAction</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -3992,11 +3865,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_httpgetaction">v1.HTTPGetAction</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4044,11 +3917,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_statusdetails">v1.StatusDetails</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4096,11 +3969,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_loadbalancerstatus">v1.LoadBalancerStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4127,11 +4000,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_secretlist">v1.SecretList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4179,11 +4052,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_container">v1.Container</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4211,21 +4084,21 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">command</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">entrypoint array; not executed within a shell; the docker image’s entrypoint is used if this is not provided; cannot be updated; variable references $(VAR_NAME) are expanded using the container’s environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see <a href="http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">entrypoint array; not executed within a shell; the docker image&#8217;s entrypoint is used if this is not provided; cannot be updated; variable references $(VAR_NAME) are expanded using the container&#8217;s environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see <a href="http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">args</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">command array; the docker image’s cmd is used if this is not provided; arguments to the entrypoint; cannot be updated; variable references $(VAR_NAME) are expanded using the container’s environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see <a href="http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">command array; the docker image&#8217;s cmd is used if this is not provided; arguments to the entrypoint; cannot be updated; variable references $(VAR_NAME) are expanded using the container&#8217;s environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see <a href="http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">workingDir</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">container’s working directory; defaults to image’s default; cannot be updated</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">container&#8217;s working directory; defaults to image&#8217;s default; cannot be updated</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4253,7 +4126,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">volumeMounts</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">pod volumes to mount into the container’s filesyste; cannot be updated</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pod volumes to mount into the container&#8217;s filesyste; cannot be updated</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_volumemount">v1.VolumeMount</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4281,7 +4154,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">terminationMessagePath</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">path at which the file to which the container’s termination message will be written is mounted into the container’s filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log; cannot be updated</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">path at which the file to which the container&#8217;s termination message will be written is mounted into the container&#8217;s filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log; cannot be updated</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4308,11 +4181,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolumespec">v1.PersistentVolumeSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4326,7 +4199,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">capacity</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">a description of the persistent volume’s resources and capacityr; see <a href="http://releases.k8s.io/HEAD/docs/persistent-volumes.md#capacity">http://releases.k8s.io/HEAD/docs/persistent-volumes.md#capacity</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">a description of the persistent volume&#8217;s resources and capacityr; see <a href="http://releases.k8s.io/HEAD/docs/persistent-volumes.md#capacity">http://releases.k8s.io/HEAD/docs/persistent-volumes.md#capacity</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_any">any</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4409,11 +4282,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_replicationcontrollerstatus">v1.ReplicationControllerStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4451,11 +4324,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_serviceport">v1.ServicePort</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4497,7 +4370,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">nodePort</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">the port on each node on which this service is exposed when type=NodePort or LoadBalancer; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; see <a href="http://releases.k8s.io/HEAD/docs/services.md#type—nodeport">http://releases.k8s.io/HEAD/docs/services.md#type—nodeport</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">the port on each node on which this service is exposed when type=NodePort or LoadBalancer; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; see <a href="http://releases.k8s.io/HEAD/docs/services.md#type&#8212;nodeport">http://releases.k8s.io/HEAD/docs/services.md#type&#8212;nodeport</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4510,11 +4383,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_componentcondition">v1.ComponentCondition</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4562,11 +4435,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_componentstatuslist">v1.ComponentStatusList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4614,11 +4487,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_hostpathvolumesource">v1.HostPathVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4645,11 +4518,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_json_watchevent">json.WatchEvent</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4683,11 +4556,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_binding">v1.Binding</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4735,11 +4608,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_containerstateterminated">v1.ContainerStateTerminated</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4795,7 +4668,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">containerID</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">container’s ID in the format <em>docker://&lt;container_id&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">container&#8217;s ID in the format <em>docker://&lt;container_id&gt;</em></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4808,11 +4681,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_securitycontext">v1.SecurityContext</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4860,11 +4733,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_containerstate">v1.ContainerState</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4905,11 +4778,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_awselasticblockstorevolumesource">v1.AWSElasticBlockStoreVolumeSource</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4957,11 +4830,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_containerstatus">v1.ContainerStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -4982,14 +4855,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">state</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">details about the container’s current condition</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">details about the container&#8217;s current condition</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_containerstate">v1.ContainerState</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastState</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">details about the container’s last termination condition</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">details about the container&#8217;s last termination condition</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_containerstate">v1.ContainerState</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5017,14 +4890,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">imageID</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ID of the container’s image</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ID of the container&#8217;s image</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">containerID</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">container’s ID in the format <em>docker://&lt;container_id&gt;</em>; see <a href="http://releases.k8s.io/HEAD/docs/container-environment.md#container-information">http://releases.k8s.io/HEAD/docs/container-environment.md#container-information</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">container&#8217;s ID in the format <em>docker://&lt;container_id&gt;</em>; see <a href="http://releases.k8s.io/HEAD/docs/container-environment.md#container-information">http://releases.k8s.io/HEAD/docs/container-environment.md#container-information</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5037,11 +4910,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_replicationcontrollerlist">v1.ReplicationControllerList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5089,11 +4962,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_secret">v1.Secret</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5148,11 +5021,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_event">v1.Event</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5194,7 +5067,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">reason</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">short, machine understandable string that gives the reason for the transition into the object’s current status</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">short, machine understandable string that gives the reason for the transition into the object&#8217;s current status</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5242,11 +5115,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_envvar">v1.EnvVar</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5274,7 +5147,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">valueFrom</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">source for the environment variable’s value; cannot be used if value is not empty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">source for the environment variable&#8217;s value; cannot be used if value is not empty</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_envvarsource">v1.EnvVarSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5287,11 +5160,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_resourcerequirements">v1.ResourceRequirements</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5329,11 +5202,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_componentstatus">v1.ComponentStatus</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5381,11 +5254,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_limitrangeitem">v1.LimitRangeItem</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5433,11 +5306,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_podtemplatespec">v1.PodTemplateSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5471,11 +5344,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_podlist">v1.PodList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5523,11 +5396,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_servicelist">v1.ServiceList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5575,11 +5448,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_persistentvolumelist">v1.PersistentVolumeList</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5627,11 +5500,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_objectreference">v1.ObjectReference</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5700,11 +5573,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_containerstatewaiting">v1.ContainerStateWaiting</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5731,11 +5604,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_nodesysteminfo">v1.NodeSystemInfo</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5811,11 +5684,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_servicespec">v1.ServiceSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5877,11 +5750,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_pod">v1.Pod</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5936,11 +5809,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_nodespec">v1.NodeSpec</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -5988,11 +5861,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h3 id="_v1_endpointaddress">v1.EndpointAddress</h3>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/>
-<col style="width:20%;"/> 
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
 </colgroup>
 <thead>
 <tr>
@@ -6031,10 +5904,4 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 </div>
-<div id="footer">
-<div id="footer-text">
-Last updated 2015-07-16 20:51:53 UTC
-</div>
-</div>
-
-</body></html>
+</body>
