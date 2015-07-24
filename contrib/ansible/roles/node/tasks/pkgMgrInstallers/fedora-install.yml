@@ -1,7 +1,9 @@
-- name: Install kubernetes
+- name: Fedora | Install kubernetes node
   action: "{{ ansible_pkg_mgr }}"
   args:
     name: kubernetes-node
     state: latest
+    enablerepo: "updates-testing"
   notify:
     - restart daemons
+  when: not is_atomic

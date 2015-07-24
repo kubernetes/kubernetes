@@ -20,9 +20,9 @@ set -o pipefail
 
 # Caller should set in the ev:
 # MASTER_IP - this may be an ip or things like "_use_gce_external_ip_"
+# MASTER_NAME - DNS name for the master
 # DNS_DOMAIN - which will be passed to minions in --cluster_domain
 # SERVICE_CLUSTER_IP_RANGE - where all service IPs are allocated
-# MASTER_NAME - I'm not sure what it is...
 
 # Also the following will be respected
 # CERT_DIR - where to place the finished certs

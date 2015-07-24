@@ -1,6 +1,6 @@
 ---
-- name: DNS | Assures {{ kube_config_dir }}/addons/dns dir exists
-  file: path={{ kube_config_dir }}/addons/dns state=directory
+- name: DNS | Assures {{ kube_addons_dir }}/dns dir exists
+  file: path={{ kube_addons_dir }}/dns state=directory
 
 - name: DNS | Assures local dns addon dir exists
   local_action: file
@@ -26,7 +26,7 @@
   template:
   args:
     src: "{{ local_temp_addon_dir }}/dns/skydns-rc.yaml.j2"
-    dest: "{{ kube_config_dir }}/addons/dns/skydns-rc.yaml"
+    dest: "{{ kube_addons_dir }}/dns/skydns-rc.yaml"
     mode: 0755
     owner: root
     group: root
@@ -49,7 +49,7 @@
   template:
   args:
     src: "{{ local_temp_addon_dir }}/dns/skydns-svc.yaml.j2"
-    dest: "{{ kube_config_dir }}/addons/dns/skydns-svc.yaml"
+    dest: "{{ kube_addons_dir }}/dns/skydns-svc.yaml"
     mode: 0755
     owner: root
     group: root

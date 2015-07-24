@@ -1,11 +1,11 @@
 ---
-- name: LOGGING | Assures {{ kube_config_dir }}/addons/cluster-logging dir exists
-  file: path={{ kube_config_dir }}/addons/cluster-logging state=directory
+- name: LOGGING | Assures {{ kube_addons_dir }}/cluster-logging dir exists
+  file: path={{ kube_addons_dir }}/cluster-logging state=directory
 
 - name: LOGGING | Download logging files from Kubernetes repo
   get_url:
     url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/addons/fluentd-elasticsearch/{{ item }}
-    dest="{{ kube_config_dir }}/addons/cluster-logging/"
+    dest="{{ kube_addons_dir }}/cluster-logging/"
     force=yes
   with_items:
     - es-controller.yaml

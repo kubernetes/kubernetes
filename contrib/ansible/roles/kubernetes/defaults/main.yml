@@ -1,3 +1,6 @@
+# The port that the Kubernetes apiserver component listens on.
+kube_master_api_port: 443
+
 # This directory is where all the additional scripts go
 # that Kubernetes normally puts in /srv/kubernetes.
 # This puts them in a sane location

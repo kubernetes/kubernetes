@@ -1,0 +1,8 @@
+- name: Generic | Install kubernetes node
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+    name: kubernetes-node
+    state: latest
+  notify:
+    - restart daemons
+  when: not is_atomic

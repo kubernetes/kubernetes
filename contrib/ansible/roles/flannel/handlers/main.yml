@@ -16,3 +16,5 @@
 
 - name: start docker
   service: name=docker state=started
+  # This might fail if docker isn't installed yet
+  ignore_errors: yes

@@ -4,3 +4,4 @@
   args:
     name: docker
     state: latest
+  when: not is_atomic
