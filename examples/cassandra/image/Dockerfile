@@ -12,7 +12,7 @@ RUN gpg --keyserver pgp.mit.edu --recv-keys 0353B12C
 RUN gpg --export --armor 0353B12C | apt-key add -
 
 RUN apt-get update
-RUN apt-get -qq -y install cassandra
+RUN apt-get -qq -y install procps cassandra
 
 COPY cassandra.yaml /etc/cassandra/cassandra.yaml
 COPY run.sh /run.sh
