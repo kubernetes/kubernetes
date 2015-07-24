@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -35,10 +36,11 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/aws"
 )
 
-const serveHostnameImage = "gcr.io/google_containers/serve_hostname:1.1"
-
-const resizeNodeReadyTimeout = 2 * time.Minute
-const resizeNodeNotReadyTimeout = 2 * time.Minute
+const (
+	serveHostnameImage        = "gcr.io/google_containers/serve_hostname:1.1"
+	resizeNodeReadyTimeout    = 2 * time.Minute
+	resizeNodeNotReadyTimeout = 2 * time.Minute
+)
 
 func resizeGroup(size int) error {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
@@ -312,23 +314,25 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	if host == "" {
 		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
+
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
-
-	// TODO marekbiskup 2015-06-19 #10085
-	// The use of MasterName will cause iptables to do a DNS lookup to
-	// resolve the name to an IP address, which will slow down the test
-	// and cause it to fail if DNS is absent or broken.
-	// Use the IP address instead.
-
-	destination := testContext.CloudConfig.MasterName
-	if providerIs("aws") {
-		// This is the (internal) IP address used on AWS for the master
-		// TODO: Use IP address for all clouds?
-		// TODO: Avoid hard-coding this
-		destination = "172.20.0.9"
+	master := ""
+	switch testContext.Provider {
+	case "gce":
+		// TODO(#10085): The use of MasterName will cause iptables to do a DNS
+		// lookup to resolve the name to an IP address, which will slow down the
+		// test and cause it to fail if DNS is absent or broken. Use the
+		// internal IP address instead (i.e. NOT the one in testContext.Host).
+		master = testContext.CloudConfig.MasterName
+	case "gke":
+		master = strings.TrimPrefix(testContext.Host, "https://")
+	case "aws":
+		// TODO(justinsb): Avoid hardcoding this.
+		master = "172.20.0.9"
+	default:
+		Failf("This test is not supported for provider %s and should be disabled", testContext.Provider)
 	}
-
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", destination)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", master)
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
@@ -344,7 +348,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 		// may fail). Manual intervention is required in such case (recreating the
 		// cluster solves the problem too).
 		err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-			_, _, code, err := SSH(undropCmd, host, testContext.Provider)
+			_, _, code, err := SSHVerbose(undropCmd, host, testContext.Provider)
 			if code == 0 && err == nil {
 				return true, nil
 			} else {
@@ -370,7 +374,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	// We could also block network traffic from the master(s) to this node,
 	// but blocking it one way is sufficient for this test.
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if _, _, code, err := SSH(dropCmd, host, testContext.Provider); code != 0 || err != nil {
+	if _, _, code, err := SSHVerbose(dropCmd, host, testContext.Provider); code != 0 || err != nil {
 		Failf("Expected 0 exit code and nil error when running %s on %s, got %d and %v",
 			dropCmd, node.Name, code, err)
 	}
