@@ -35,6 +35,7 @@ import (
 // Eventual goal is to merge this with integration test framework.
 type Framework struct {
 	BaseName string
+	Reuse    bool
 
 	Namespace *api.Namespace
 	Client    *client.Client
@@ -42,9 +43,10 @@ type Framework struct {
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
-func NewFramework(baseName string) *Framework {
+func NewFramework(baseName string, reuse bool) *Framework {
 	f := &Framework{
 		BaseName: baseName,
+		Reuse:    reuse,
 	}
 
 	BeforeEach(f.beforeEach)
@@ -55,21 +57,25 @@ func NewFramework(baseName string) *Framework {
 
 // beforeEach gets a client and makes a namespace.
 func (f *Framework) beforeEach() {
-	By("Creating a kubernetes client")
-	c, err := loadClient()
-	Expect(err).NotTo(HaveOccurred())
+	// Skip creating a new framework client and namespace if the framework
+	// client and namespace already exiest. Result of reusing the framework.
+	if f.Namespace == nil && f.Client == nil {
+		By("Creating a kubernetes client")
+		c, err := loadClient()
+		Expect(err).NotTo(HaveOccurred())
 
-	f.Client = c
+		f.Client = c
 
-	By("Building a namespace api object")
-	namespace, err := createTestingNS(f.BaseName, f.Client)
-	Expect(err).NotTo(HaveOccurred())
+		By("Building a namespace api object")
+		namespace, err := createTestingNS(f.BaseName, f.Client)
+		Expect(err).NotTo(HaveOccurred())
 
-	f.Namespace = namespace
+		f.Namespace = namespace
 
-	By("Waiting for a default service account to be provisioned in namespace")
-	err = waitForDefaultServiceAccountInNamespace(c, namespace.Name)
-	Expect(err).NotTo(HaveOccurred())
+		By("Waiting for a default service account to be provisioned in namespace")
+		err = waitForDefaultServiceAccountInNamespace(c, namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+	}
 }
 
 // afterEach deletes the namespace, after reading its events.
@@ -93,13 +99,20 @@ func (f *Framework) afterEach() {
 		Failf("All nodes should be ready after test, %v", err)
 	}
 
-	By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
-	if err := f.Client.Namespaces().Delete(f.Namespace.Name); err != nil {
-		Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
+	// Skip dumping the framework client and namespace if the Reuse field is true
+	if !f.Reuse {
+		By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
+		if err := f.Client.Namespaces().Delete(f.Namespace.Name); err != nil {
+			Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
+		}
+		f.Namespace = nil
+		f.Client = nil
 	}
-	// Paranoia-- prevent reuse!
-	f.Namespace = nil
-	f.Client = nil
+}
+
+// ToggleReuse negates the current value of the Reuse boolean field
+func (f *Framework) ToggleReuse() {
+	f.Reuse = !f.Reuse
 }
 
 // WaitForPodRunning waits for the pod to run in the namespace.

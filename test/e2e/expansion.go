@@ -24,7 +24,7 @@ import (
 )
 
 var _ = Describe("Variable Expansion", func() {
-	framework := NewFramework("var-expansion")
+	framework := NewFramework("var-expansion", false)
 
 	It("should allow composing env vars into new env vars", func() {
 		podName := "var-expansion-" + string(util.NewUUID())

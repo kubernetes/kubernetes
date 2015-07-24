@@ -26,7 +26,7 @@ import (
 )
 
 var _ = Describe("Downward API", func() {
-	framework := NewFramework("downward-api")
+	framework := NewFramework("downward-api", false)
 
 	It("should provide pod name and namespace as env vars", func() {
 		podName := "downward-api-" + string(util.NewUUID())

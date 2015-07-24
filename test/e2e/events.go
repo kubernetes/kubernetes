@@ -32,7 +32,7 @@ import (
 )
 
 var _ = Describe("Events", func() {
-	framework := NewFramework("events")
+	framework := NewFramework("events", false)
 
 	It("should be sent by kubelets and the scheduler about pods scheduling and running", func() {
 

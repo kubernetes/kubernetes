@@ -29,7 +29,9 @@ import (
 )
 
 var _ = Describe("Probing container", func() {
-	framework := Framework{BaseName: "container-probe"}
+	framework := Framework{BaseName: "container-probe",
+		Reuse: false,
+	}
 	var podClient client.PodInterface
 	probe := webserverProbeBuilder{}
 

@@ -196,7 +196,9 @@ var _ = Describe("Skipped", func() {
 		svcName, replicas := "baz", 2
 		var rcName, ip, v string
 		var ingress api.LoadBalancerIngress
-		f := Framework{BaseName: "cluster-upgrade"}
+		f := Framework{BaseName: "cluster-upgrade",
+			Reuse: false,
+		}
 		var w *WebserverTest
 
 		BeforeEach(func() {
