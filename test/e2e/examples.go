@@ -274,6 +274,37 @@ var _ = Describe("Examples e2e", func() {
 		})
 	})
 
+	Describe("[Skipped][Example]Liveness", func() {
+		It("liveness pods should be automatically restarted", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "liveness", file)
+			}
+			execYaml := mkpath("exec-liveness.yaml")
+			httpYaml := mkpath("http-liveness.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			runKubectl("create", "-f", execYaml, nsFlag)
+			runKubectl("create", "-f", httpYaml, nsFlag)
+			checkRestart := func(podName string, timeout time.Duration) {
+				err := waitForPodRunningInNamespace(c, podName, ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
+					pod, err := c.Pods(ns).Get(podName)
+					expectNoError(err, fmt.Sprintf("getting pod %s", podName))
+					restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
+					Logf("Pod: %s   restart count:%d", podName, restartCount)
+					if restartCount > 0 {
+						return
+					}
+				}
+				Failf("Pod %s was not restarted", podName)
+			}
+			By("Check restarts")
+			checkRestart("liveness-exec", time.Minute)
+			checkRestart("liveness-http", time.Minute)
+		})
+	})
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {
