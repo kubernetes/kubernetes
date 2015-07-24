@@ -24,7 +24,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	pkg_runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
@@ -33,7 +32,7 @@ import (
 
 var (
 	functionDest = flag.StringP("func-dest", "f", "-", "Output for deep copy functions; '-' means stdout")
-	version      = flag.StringP("version", "v", "v1beta3", "Version for deep copies.")
+	version      = flag.StringP("version", "v", "v1", "Version for deep copies.")
 	overwrites   = flag.StringP("overwrites", "o", "", "Comma-separated overwrites for package names")
 )
 

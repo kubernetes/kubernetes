@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -303,10 +302,6 @@ func isReplicasDefaulted(info *resource.Info) bool {
 	switch info.Mapping.APIVersion {
 	case "v1":
 		if rc, ok := info.VersionedObject.(*v1.ReplicationController); ok {
-			return rc.Spec.Replicas == nil
-		}
-	case "v1beta3":
-		if rc, ok := info.VersionedObject.(*v1beta3.ReplicationController); ok {
 			return rc.Spec.Replicas == nil
 		}
 	}

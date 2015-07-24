@@ -410,10 +410,8 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authorizer:       apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -528,10 +526,8 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authorizer:       apiserver.NewAlwaysDenyAuthorizer(),
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authorizer:            apiserver.NewAlwaysDenyAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -597,11 +593,9 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       allowAliceAuthorizer{},
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -686,11 +680,9 @@ func TestBobIsForbidden(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       allowAliceAuthorizer{},
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -749,11 +741,9 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       allowAliceAuthorizer{},
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -831,11 +821,9 @@ func TestNamespaceAuthorization(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       a,
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -948,11 +936,9 @@ func TestKindAuthorization(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       a,
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -1052,11 +1038,9 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		EnableUISupport:       false,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
-		// enable v1beta3 if we are testing that api version.
-		EnableV1Beta3:    testapi.Version() == "v1beta3",
-		Authenticator:    getTestTokenAuth(),
-		Authorizer:       a,
-		AdmissionControl: admit.NewAlwaysAdmit(),
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport

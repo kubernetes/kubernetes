@@ -806,11 +806,10 @@ type ContainerStatus struct {
 	Ready bool `json:"ready"`
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
-	RestartCount int `json:"restartCount"`
-	// TODO(dchen1107): Need to decide how to represent this in v1beta3
-	Image       string `json:"image"`
-	ImageID     string `json:"imageID"`
-	ContainerID string `json:"containerID,omitempty"`
+	RestartCount int    `json:"restartCount"`
+	Image        string `json:"image"`
+	ImageID      string `json:"imageID"`
+	ContainerID  string `json:"containerID,omitempty"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -1009,7 +1008,7 @@ type ReplicationControllerSpec struct {
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
 	// insufficient replicas are detected. This reference is ignored if a Template is set.
-	// Must be set before converting to a v1beta3 API object
+	// Must be set before converting to a versioned API object
 	//TemplateRef *ObjectReference `json:"templateRef,omitempty"`
 
 	// Template is the object that describes the pod that will be created if
@@ -1163,10 +1162,8 @@ type ServicePort struct {
 
 	// Optional: The target port on pods selected by this service.  If this
 	// is a string, it will be looked up as a named port in the target
-	// Pod's container ports.  If this is not specified, the first port on
-	// the destination pod will be used.  This behavior is deprecated.  As
-	// of v1beta3 the default value is the sames as the Port field (an
-	// identity map).
+	// Pod's container ports.  If this is not specified, the default value
+	// is the sames as the Port field (an identity map).
 	TargetPort util.IntOrString `json:"targetPort"`
 
 	// The port on each node on which this service is exposed.

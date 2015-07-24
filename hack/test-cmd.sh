@@ -125,16 +125,14 @@ kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kub
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
-KUBE_API_VERSIONS="v1,v1beta3" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public_address_override="127.0.0.1" \
   --port="${API_PORT}" \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
-  --runtime_config=api/v1beta3 \
   --runtime_config=api/v1 \
-  --runtime_config=api/v1beta3 \
   --cert_dir="${TMPDIR:-/tmp/}" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
@@ -237,7 +235,7 @@ runTests() {
   kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Node:" "Labels:" "Status:" "Replication Controllers"
 
   ### Dump current valid-pod POD
-  output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1beta3 "${kube_flags[@]}")
+  output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1 "${kube_flags[@]}")
 
   ### Delete POD valid-pod by id
   # Pre-condition: valid-pod POD is running
@@ -456,8 +454,6 @@ runTests() {
   # Pod templates #
   #################
 
-  # Note: pod templates exist only in v1beta3 and above, so output will always be in that form
-
   ### Create PODTEMPLATE
   # Pre-condition: no PODTEMPLATE
   kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" ''
@@ -496,7 +492,7 @@ runTests() {
   kube::test::describe_object_assert services 'redis-master' "Name:" "Labels:" "Selector:" "IP:" "Port:" "Endpoints:" "Session Affinity:"
 
   ### Dump current redis-master service
-  output_service=$(kubectl get service redis-master -o json --output-version=v1beta3 "${kube_flags[@]}")
+  output_service=$(kubectl get service redis-master -o json --output-version=v1 "${kube_flags[@]}")
 
   ### Delete redis-master-service by id
   # Pre-condition: redis-master service is running
@@ -776,11 +772,10 @@ __EOF__
 
 kube_api_versions=(
   ""
-  v1beta3
   v1
 )
 for version in "${kube_api_versions[@]}"; do
-  KUBE_API_VERSIONS="v1,v1beta3" runTests "${version}"
+  KUBE_API_VERSIONS="v1" runTests "${version}"
 done
 
 kube::log::status "TEST PASSED"

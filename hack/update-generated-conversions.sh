@@ -53,7 +53,7 @@ EOF
 	mv $TMPFILE pkg/api/${version}/conversion_generated.go
 }
 
-VERSIONS="v1beta3 v1"
+VERSIONS="v1"
 for ver in $VERSIONS; do
   # Ensure that the version being processed is registered by setting
   # KUBE_API_VERSIONS.

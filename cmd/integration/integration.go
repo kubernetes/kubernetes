@@ -152,8 +152,6 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		glog.Fatalf("no public address for %s", host)
 	}
 
-	// Enable v1beta3 in master only if we are starting the components for that api version.
-	enableV1Beta3 := apiVersion == "v1beta3"
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
 		EtcdHelper:            helper,
@@ -162,7 +160,6 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		EnableLogsSupport:     false,
 		EnableProfiling:       true,
 		APIPrefix:             "/api",
-		EnableV1Beta3:         enableV1Beta3,
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,
@@ -332,7 +329,7 @@ containers:
 			desc: "static-pod-from-spec",
 			fileContents: `{
 				"kind": "Pod",
-				"apiVersion": "v1beta3",
+				"apiVersion": "v1",
 				"metadata": {
 					"name": "static-pod-from-spec"
 				},
@@ -611,23 +608,6 @@ func runPatchTest(c *client.Client) {
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte
 	}{
-		"v1beta3": {
-			api.JSONPatchType: {
-				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
-				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
-				[]byte(`[{"op":"remove","path":"/metadata/labels"}]`),
-			},
-			api.MergePatchType: {
-				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
-				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
-				[]byte(`{"metadata":{"labels":null}}`),
-			},
-			api.StrategicMergePatchType: {
-				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
-				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
-				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
-			},
-		},
 		"v1": {
 			api.JSONPatchType: {
 				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
@@ -1027,7 +1007,7 @@ func ServeCachedManifestFile(contents string) (servingAddress string) {
 const (
 	testPodSpecFile = `{
 		"kind": "Pod",
-		"apiVersion": "v1beta3",
+		"apiVersion": "v1",
 		"metadata": {
 			"name": "container-vm-guestbook-pod-spec"
 		},
