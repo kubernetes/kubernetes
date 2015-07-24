@@ -202,6 +202,36 @@ func (c *cache) Replace(list []interface{}) error {
 	return nil
 }
 
+// BulkAdd inserts multiple items into the cache at once
+func (c *cache) BulkAdd(list []interface{}) error {
+	items := map[string]interface{}{}
+	for _, item := range list {
+		key, err := c.keyFunc(item)
+		if err != nil {
+			return KeyError{item, err}
+		}
+		items[key] = item
+	}
+	c.cacheStorage.BulkAdd(items)
+	return nil
+}
+
+func (c *cache) DeleteByIndex(indexName string, obj interface{}) error {
+	return c.cacheStorage.DeleteByIndex(indexName, obj)
+}
+
+func (c *cache) ReplaceByIndex(indexName string, obj interface{}, list []interface{}) error {
+	items := map[string]interface{}{}
+	for _, item := range list {
+		key, err := c.keyFunc(item)
+		if err != nil {
+			return KeyError{item, err}
+		}
+		items[key] = item
+	}
+	return c.cacheStorage.ReplaceByIndex(indexName, obj, items)
+}
+
 // NewStore returns a Store implemented simply with a map and a lock.
 func NewStore(keyFunc KeyFunc) Store {
 	return &cache{
@@ -212,6 +242,14 @@ func NewStore(keyFunc KeyFunc) Store {
 
 // NewIndexer returns an Indexer implemented simply with a map and a lock.
 func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
+	return &cache{
+		cacheStorage: NewThreadSafeStore(indexers, Indices{}),
+		keyFunc:      keyFunc,
+	}
+}
+
+// NewBulkIndexer returns a BulkIndexer implemented simply with a map and a lock
+func NewBulkIndexer(keyFunc KeyFunc, indexers Indexers) BulkIndexer {
 	return &cache{
 		cacheStorage: NewThreadSafeStore(indexers, Indices{}),
 		keyFunc:      keyFunc,

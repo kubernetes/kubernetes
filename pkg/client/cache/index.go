@@ -32,6 +32,15 @@ type Indexer interface {
 	ListIndexFuncValues(indexName string) []string
 }
 
+// BulkIndexer provides some bulk operations on top of Indexer
+type BulkIndexer interface {
+	Indexer
+
+	BulkAdd([]interface{}) error
+	DeleteByIndex(indexName string, obj interface{}) error
+	ReplaceByIndex(indexName string, obj interface{}, list []interface{}) error
+}
+
 // IndexFunc knows how to provide an indexed value for an object.
 type IndexFunc func(obj interface{}) (string, error)
 

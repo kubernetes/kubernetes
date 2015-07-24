@@ -44,6 +44,9 @@ type ThreadSafeStore interface {
 	Replace(map[string]interface{})
 	Index(indexName string, obj interface{}) ([]interface{}, error)
 	ListIndexFuncValues(name string) []string
+	BulkAdd(map[string]interface{})
+	DeleteByIndex(indexName string, obj interface{}) error
+	ReplaceByIndex(indexName string, obj interface{}, items map[string]interface{}) error
 }
 
 // threadSafeMap implements ThreadSafeStore
@@ -65,12 +68,50 @@ func (c *threadSafeMap) Add(key string, obj interface{}) {
 	c.updateIndices(oldObject, obj, key)
 }
 
+func (c *threadSafeMap) BulkAdd(items map[string]interface{}) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	for key, obj := range items {
+		oldObject := c.items[key]
+		c.items[key] = obj
+		c.updateIndices(oldObject, obj, key)
+	}
+}
+
 func (c *threadSafeMap) Update(key string, obj interface{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	oldObject := c.items[key]
 	c.items[key] = obj
 	c.updateIndices(oldObject, obj, key)
+}
+
+func (c *threadSafeMap) ReplaceByIndex(indexName string, obj interface{}, items map[string]interface{}) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	indexFunc := c.indexers[indexName]
+	if indexFunc == nil {
+		return fmt.Errorf("Index with name %s does not exist", indexName)
+	}
+
+	indexKey, err := indexFunc(obj)
+	if err != nil {
+		return err
+	}
+	index := c.indices[indexName]
+	set := index[indexKey]
+	for _, key := range set.List() {
+		c.deleteFromIndices(c.items[key], key)
+		delete(c.items, key)
+	}
+
+	for key, obj := range items {
+		c.items[key] = obj
+		c.updateIndices(nil, obj, key)
+	}
+
+	return nil
 }
 
 func (c *threadSafeMap) Delete(key string) {
@@ -80,6 +121,28 @@ func (c *threadSafeMap) Delete(key string) {
 		c.deleteFromIndices(obj, key)
 		delete(c.items, key)
 	}
+}
+
+func (c *threadSafeMap) DeleteByIndex(indexName string, obj interface{}) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	indexFunc := c.indexers[indexName]
+	if indexFunc == nil {
+		return fmt.Errorf("Index with name %s does not exist", indexName)
+	}
+
+	indexKey, err := indexFunc(obj)
+	if err != nil {
+		return err
+	}
+	index := c.indices[indexName]
+	set := index[indexKey]
+	for _, key := range set.List() {
+		c.deleteFromIndices(c.items[key], key)
+		delete(c.items, key)
+	}
+	return nil
 }
 
 func (c *threadSafeMap) Get(key string) (item interface{}, exists bool) {
