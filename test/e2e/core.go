@@ -22,8 +22,6 @@ import (
 	"net"
 	"strings"
 	"sync"
-
-	"github.com/GoogleCloudPlatform/kubernetes/test/e2e/ssh"
 )
 
 type command struct {
@@ -46,7 +44,7 @@ func coreDump(dir string) {
 	}
 
 	// Get all nodes' external IPs.
-	hosts, err := ssh.NodeSSHHosts(c)
+	hosts, err := NodeSSHHosts(c)
 	if err != nil {
 		fmt.Printf("Error getting node hostnames: %v", err)
 		return
@@ -87,7 +85,7 @@ func logCore(cmds []command, hosts []string, dir, provider string) {
 				defer wg.Done()
 				logfile := fmt.Sprintf("%s/%s-%s.log", dir, host, cmd.component)
 				fmt.Printf("Writing to %s.\n", logfile)
-				stdout, stderr, _, err := ssh.SSH(cmd.cmd, host, provider)
+				stdout, stderr, _, err := SSH(cmd.cmd, host, provider)
 				if err != nil {
 					fmt.Printf("Error running command: %v\n", err)
 				}

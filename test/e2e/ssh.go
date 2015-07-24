@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/test/e2e/ssh"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,7 +41,7 @@ var _ = Describe("SSH", func() {
 	It("should SSH to all nodes and run commands", func() {
 		// Get all nodes' external IPs.
 		By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := ssh.NodeSSHHosts(c)
+		hosts, err := NodeSSHHosts(c)
 		if err != nil {
 			Failf("Error getting node hostnames: %v", err)
 		}
@@ -66,7 +65,7 @@ var _ = Describe("SSH", func() {
 		for _, testCase := range testCases {
 			By(fmt.Sprintf("SSH'ing to all nodes and running %s", testCase.cmd))
 			for _, host := range hosts {
-				stdout, stderr, code, err := ssh.SSH(testCase.cmd, host, testContext.Provider)
+				stdout, stderr, code, err := SSH(testCase.cmd, host, testContext.Provider)
 				stdout, stderr = strings.TrimSpace(stdout), strings.TrimSpace(stderr)
 				if err != testCase.expectedError {
 					Failf("Ran %s on %s, got error %v, expected %v", testCase.cmd, host, err, testCase.expectedError)
@@ -80,12 +79,19 @@ var _ = Describe("SSH", func() {
 				if code != testCase.expectedCode {
 					Failf("Ran %s on %s, got exit code %d, expected %d", testCase.cmd, host, code, testCase.expectedCode)
 				}
+				// Show stdout, stderr for logging purposes.
+				if len(stdout) > 0 {
+					Logf("Got stdout from %s: %s", host, strings.TrimSpace(stdout))
+				}
+				if len(stderr) > 0 {
+					Logf("Got stderr from %s: %s", host, strings.TrimSpace(stderr))
+				}
 			}
 		}
 
 		// Quickly test that SSH itself errors correctly.
 		By("SSH'ing to a nonexistent host")
-		if _, _, _, err = ssh.SSH(`echo "hello"`, "i.do.not.exist", testContext.Provider); err == nil {
+		if _, _, _, err = SSH(`echo "hello"`, "i.do.not.exist", testContext.Provider); err == nil {
 			Failf("Expected error trying to SSH to nonexistent host.")
 		}
 	})
