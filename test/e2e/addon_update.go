@@ -26,6 +26,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	sshutil "github.com/GoogleCloudPlatform/kubernetes/test/e2e/ssh"
+
 	"golang.org/x/crypto/ssh"
 
 	. "github.com/onsi/ginkgo"
@@ -355,7 +357,7 @@ func waitForReplicationControllerInAddonTest(c *client.Client, addonNamespace, n
 // kubernetes v1.0 is released. In particular the code of sshExec.
 func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
-	signer, err := getSigner(testContext.Provider)
+	signer, err := sshutil.GetSigner(testContext.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", testContext.Provider, err)
 	}
