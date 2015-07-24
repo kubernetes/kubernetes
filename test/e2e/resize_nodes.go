@@ -119,12 +119,7 @@ func waitForGroupSize(size int) error {
 }
 
 func waitForClusterSize(c *client.Client, size int) error {
-	timeout := 4 * time.Minute
-	if providerIs("aws") {
-		// AWS is not as fast as gce/gke at having nodes come online
-		timeout = 10 * time.Minute
-	}
-
+	timeout := 10 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		if err != nil {
