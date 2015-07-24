@@ -9,6 +9,7 @@ can be real hardware, VMs, things in a public cloud, etc.
 * Record the IP address/hostname of which machine you want to be your master (only support a single master)
 * Record the IP address/hostname of the machine you want to be your etcd server (often same as master, only one)
 * Record the IP addresses/hostname of the machines you want to be your nodes. (the master can also be a node)
+* Make sure your ansible running machine has ansible 1.9 and python-netaddr installed.
 
 ### Configure the inventory file
 
