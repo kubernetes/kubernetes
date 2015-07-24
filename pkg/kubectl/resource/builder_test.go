@@ -947,32 +947,32 @@ func TestReceiveMultipleErrors(t *testing.T) {
 func TestReplaceAliases(t *testing.T) {
 	tests := []struct {
 		name     string
-		args     []string
-		expected []string
+		arg      string
+		expected string
 	}{
 		{
 			name:     "no-replacement",
-			args:     []string{"service", "pods", "rc"},
-			expected: []string{"service", "pods", "rc"},
+			arg:      "service",
+			expected: "service",
 		},
 		{
 			name:     "all-replacement",
-			args:     []string{"all"},
-			expected: []string{"rc,svc,pods,pvc"},
+			arg:      "all",
+			expected: "rc,svc,pods,pvc",
+		},
+		{
+			name:     "alias-in-comma-separated-arg",
+			arg:      "all,secrets",
+			expected: "rc,svc,pods,pvc,secrets",
 		},
 	}
 
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient())
 
 	for _, test := range tests {
-		replaced := b.replaceAliases(test.args)
-		if len(replaced) != len(test.expected) {
-			t.Errorf("%s: unexpected args length: expected %d, got %d", test.name, len(test.expected), len(replaced))
-		}
-		for i, arg := range test.expected {
-			if arg != replaced[i] {
-				t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, arg, replaced[i])
-			}
+		replaced := b.replaceAliases(test.arg)
+		if replaced != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }
