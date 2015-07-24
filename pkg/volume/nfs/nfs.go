@@ -187,20 +187,21 @@ func (b *nfsBuilder) SetUpAt(dir string) error {
 	return nil
 }
 
+func (b *nfsBuilder) IsReadOnly() bool {
+	return b.readOnly
+}
+
+//
+//func (c *nfsCleaner) GetPath() string {
+//	name := nfsPluginName
+//	return c.plugin.host.GetPodVolumeDir(c.pod.UID, util.EscapeQualifiedNameForDisk(name), c.volName)
+//}
+
+var _ volume.Cleaner = &nfsCleaner{}
+
 type nfsCleaner struct {
 	*nfs
 }
-
-func (nfsVolume *nfs) IsReadOnly() bool {
-	return nfsVolume.readOnly
-}
-
-func (nfsVolume *nfs) GetPath() string {
-	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
-}
-
-var _ volume.Cleaner = &nfsCleaner{}
 
 func (c *nfsCleaner) TearDown() error {
 	return c.TearDownAt(c.GetPath())
