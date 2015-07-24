@@ -305,6 +305,45 @@ var _ = Describe("Examples e2e", func() {
 			checkRestart("liveness-http", time.Minute)
 		})
 	})
+
+	Describe("[Skipped][Example]Secret", func() {
+		It("should create a pod that reads a secret", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "secrets", file)
+			}
+			secretYaml := mkpath("secret.yaml")
+			podYaml := mkpath("secret-pod.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("creating secret and pod")
+			runKubectl("create", "-f", secretYaml, nsFlag)
+			runKubectl("create", "-f", podYaml, nsFlag)
+
+			By("checking if secret was read correctly")
+			_, err := lookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Describe("[Skipped][Example]Downward API", func() {
+		It("should create a pod that prints his name and namespace", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "downward-api", file)
+			}
+			podYaml := mkpath("dapi-pod.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			podName := "dapi-test-pod"
+
+			By("creating the pod")
+			runKubectl("create", "-f", podYaml, nsFlag)
+
+			By("checking if name and namespace were passed correctly")
+			_, err := lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("POD_NAMESPACE=%v", ns), serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("POD_NAME=%v", podName), serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {
