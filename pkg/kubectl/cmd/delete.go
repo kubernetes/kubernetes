@@ -74,7 +74,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
-	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete.")
+	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
 	cmd.Flags().Bool("cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
@@ -86,13 +86,14 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if err != nil {
 		return err
 	}
+	deleteAll := cmdutil.GetFlagBool(cmd, "all")
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, filenames...).
 		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
-		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
+		SelectAllParam(deleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
@@ -102,6 +103,18 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	ignoreNotFound := cmdutil.GetFlagBool(cmd, "ignore-not-found")
+	if deleteAll {
+		f := cmd.Flags().Lookup("ignore-not-found")
+		// The flag should never be missing
+		if f == nil {
+			return fmt.Errorf("missing --ignore-not-found flag")
+		}
+		// If the user didn't explicitly set the option, default to ignoring NotFound errors when used with --all
+		if !f.Changed {
+			ignoreNotFound = true
+		}
+	}
+
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
 		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"))
