@@ -753,25 +753,43 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 		fmt.Fprintf(out, "Name:\t%s\n", serviceAccount.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", serviceAccount.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(serviceAccount.Labels))
+		fmt.Fprintln(out)
 
-		if len(serviceAccount.Secrets) == 0 {
-			fmt.Fprintf(out, "Secrets:\t<none>\n")
-		} else {
-			prefix := "Secrets:"
-			for _, s := range serviceAccount.Secrets {
-				fmt.Fprintf(out, "%s\t%s\n", prefix, s)
-				prefix = "        "
-			}
-			fmt.Fprintln(out)
+		var (
+			emptyHeader = "                   "
+			pullHeader  = "Image pull secrets:"
+			mountHeader = "Mountable secrets: "
+			tokenHeader = "Tokens:            "
+
+			pullSecretNames  = []string{}
+			mountSecretNames = []string{}
+			tokenSecretNames = []string{}
+		)
+
+		for _, s := range serviceAccount.ImagePullSecrets {
+			pullSecretNames = append(pullSecretNames, s.Name)
+		}
+		for _, s := range serviceAccount.Secrets {
+			mountSecretNames = append(mountSecretNames, s.Name)
+		}
+		for _, s := range tokens {
+			tokenSecretNames = append(tokenSecretNames, s.Name)
 		}
 
-		if len(tokens) == 0 {
-			fmt.Fprintf(out, "Tokens: \t<none>\n")
-		} else {
-			prefix := "Tokens: "
-			for _, t := range tokens {
-				fmt.Fprintf(out, "%s\t%s\n", prefix, t.Name)
-				prefix = "        "
+		types := map[string][]string{
+			pullHeader:  pullSecretNames,
+			mountHeader: mountSecretNames,
+			tokenHeader: tokenSecretNames,
+		}
+		for header, names := range types {
+			if len(names) == 0 {
+				fmt.Fprintf(out, "%s\t<none>\n", header)
+			} else {
+				prefix := header
+				for _, name := range names {
+					fmt.Fprintf(out, "%s\t%s\n", prefix, name)
+					prefix = emptyHeader
+				}
 			}
 			fmt.Fprintln(out)
 		}
