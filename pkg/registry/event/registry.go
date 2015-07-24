@@ -30,8 +30,8 @@ type registry struct {
 }
 
 // NewEtcdRegistry returns a registry which will store Events in the given
-// EtcdHelper. ttl is the time that Events will be retained by the system.
-func NewEtcdRegistry(h tools.EtcdHelper, ttl uint64) generic.Registry {
+// EtcdStorage. ttl is the time that Events will be retained by the system.
+func NewEtcdRegistry(s tools.StorageInterface, ttl uint64) generic.Registry {
 	prefix := "/events"
 	return registry{
 		Etcd: &etcdgeneric.Etcd{
@@ -47,7 +47,7 @@ func NewEtcdRegistry(h tools.EtcdHelper, ttl uint64) generic.Registry {
 			TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 				return ttl, nil
 			},
-			Helper: h,
+			Storage: s,
 		},
 	}
 }

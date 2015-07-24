@@ -44,17 +44,17 @@ const (
 // Registry implements BindingRegistry, ControllerRegistry, EndpointRegistry,
 // MinionRegistry, PodRegistry and ServiceRegistry, backed by etcd.
 type Registry struct {
-	tools.EtcdHelper
+	tools.StorageInterface
 	pods      pod.Registry
 	endpoints endpoint.Registry
 }
 
 // NewRegistry creates an etcd registry.
-func NewRegistry(helper tools.EtcdHelper, pods pod.Registry, endpoints endpoint.Registry) *Registry {
+func NewRegistry(storage tools.StorageInterface, pods pod.Registry, endpoints endpoint.Registry) *Registry {
 	registry := &Registry{
-		EtcdHelper: helper,
-		pods:       pods,
-		endpoints:  endpoints,
+		StorageInterface: storage,
+		pods:             pods,
+		endpoints:        endpoints,
 	}
 	return registry
 }

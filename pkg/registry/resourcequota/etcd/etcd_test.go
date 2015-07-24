@@ -38,15 +38,15 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
+func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, tools.StorageInterface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	return fakeEtcdClient, helper
+	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
+	return fakeEtcdClient, etcdStorage
 }
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, tools.EtcdHelper) {
-	fakeEtcdClient, h := newHelper(t)
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, tools.StorageInterface) {
+	fakeEtcdClient, h := newEtcdStorage(t)
 	storage, statusStorage := NewStorage(h)
 	return storage, statusStorage, fakeEtcdClient, h
 }
@@ -85,8 +85,8 @@ func TestStorage(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage, _ := NewStorage(helper)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+	storage, _ := NewStorage(etcdStorage)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 	resourcequota := validNewResourceQuota()
 	resourcequota.ObjectMeta = api.ObjectMeta{}
@@ -110,9 +110,9 @@ func expectResourceQuota(t *testing.T, out runtime.Object) (*api.ResourceQuota, 
 }
 
 func TestCreateRegistryError(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _ := NewStorage(helper)
+	storage, _ := NewStorage(etcdStorage)
 
 	resourcequota := validNewResourceQuota()
 	_, err := storage.Create(api.NewDefaultContext(), resourcequota)
@@ -122,8 +122,8 @@ func TestCreateRegistryError(t *testing.T) {
 }
 
 func TestCreateSetsFields(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage, _ := NewStorage(helper)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+	storage, _ := NewStorage(etcdStorage)
 	ctx := api.NewDefaultContext()
 	resourcequota := validNewResourceQuota()
 	_, err := storage.Create(api.NewDefaultContext(), resourcequota)
@@ -133,7 +133,7 @@ func TestCreateSetsFields(t *testing.T) {
 
 	actual := &api.ResourceQuota{}
 	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
-	if err := helper.ExtractObj(key, actual, false); err != nil {
+	if err := etcdStorage.ExtractObj(key, actual, false); err != nil {
 		t.Fatalf("unexpected extraction error: %v", err)
 	}
 	if actual.Name != resourcequota.Name {
@@ -145,9 +145,9 @@ func TestCreateSetsFields(t *testing.T) {
 }
 
 func TestListError(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _ := NewStorage(helper)
+	storage, _ := NewStorage(etcdStorage)
 	resourcequotas, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != fakeEtcdClient.Err {
 		t.Fatalf("Expected %#v, Got %#v", fakeEtcdClient.Err, err)
@@ -158,9 +158,9 @@ func TestListError(t *testing.T) {
 }
 
 func TestListEmptyResourceQuotaList(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
 	fakeEtcdClient.ChangeIndex = 1
-	storage, _ := NewStorage(helper)
+	storage, _ := NewStorage(etcdStorage)
 	ctx := api.NewContext()
 	key := storage.Etcd.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)
@@ -184,8 +184,8 @@ func TestListEmptyResourceQuotaList(t *testing.T) {
 }
 
 func TestListResourceQuotaList(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage, _ := NewStorage(helper)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+	storage, _ := NewStorage(etcdStorage)
 	ctx := api.NewDefaultContext()
 	key := storage.Etcd.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)
@@ -225,8 +225,8 @@ func TestListResourceQuotaList(t *testing.T) {
 }
 
 func TestListResourceQuotaListSelection(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage, _ := NewStorage(helper)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+	storage, _ := NewStorage(etcdStorage)
 	ctx := api.NewDefaultContext()
 	key := storage.Etcd.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)
@@ -294,7 +294,8 @@ func TestListResourceQuotaListSelection(t *testing.T) {
 }
 
 func TestResourceQuotaDecode(t *testing.T) {
-	storage, _ := NewStorage(tools.EtcdHelper{})
+	_, etcdStorage := newEtcdStorage(t)
+	storage, _ := NewStorage(etcdStorage)
 	expected := validNewResourceQuota()
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {
@@ -313,8 +314,8 @@ func TestResourceQuotaDecode(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	expect := validNewResourceQuota()
-	fakeEtcdClient, helper := newHelper(t)
-	storage, _ := NewStorage(helper)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+	storage, _ := NewStorage(etcdStorage)
 	key := "/resourcequotas/test/foo"
 	key = etcdtest.AddPrefix(key)
 	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
@@ -336,9 +337,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestDeleteResourceQuota(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
 	fakeEtcdClient.ChangeIndex = 1
-	storage, _ := NewStorage(helper)
+	storage, _ := NewStorage(etcdStorage)
 	ctx := api.NewDefaultContext()
 	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
@@ -470,7 +471,7 @@ func TestEtcdCreateAlreadyExisting(t *testing.T) {
 }
 
 func TestEtcdUpdateStatus(t *testing.T) {
-	registry, status, fakeClient, helper := newStorage(t)
+	registry, status, fakeClient, etcdStorage := newStorage(t)
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
@@ -516,7 +517,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	}
 	var resourcequotaOut api.ResourceQuota
 	key, _ = registry.KeyFunc(ctx, "foo")
-	if err := helper.ExtractObj(key, &resourcequotaOut, false); err != nil {
+	if err := etcdStorage.ExtractObj(key, &resourcequotaOut, false); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if !api.Semantic.DeepEqual(expected, resourcequotaOut) {

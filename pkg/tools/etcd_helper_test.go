@@ -65,6 +65,10 @@ func init() {
 	)
 }
 
+func newEtcdHelper(client EtcdClient, codec runtime.Codec, prefix string) etcdHelper {
+	return *NewEtcdStorage(client, codec, prefix).(*etcdHelper)
+}
+
 func TestIsEtcdNotFound(t *testing.T) {
 	try := func(err error, isNotFound bool) {
 		if IsEtcdNotFound(err) != isNotFound {
@@ -87,7 +91,7 @@ func getEncodedPod(name string) string {
 
 func TestExtractToList(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
@@ -157,7 +161,7 @@ func TestExtractToList(t *testing.T) {
 // TestExtractToListAcrossDirectories ensures that the client excludes directories and flattens tree-response - simulates cross-namespace query
 func TestExtractToListAcrossDirectories(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
@@ -240,7 +244,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 
 func TestExtractToListExcludesDirectories(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
@@ -311,7 +315,7 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 
 func TestExtractObj(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 	expect := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -333,7 +337,7 @@ func TestExtractObj(t *testing.T) {
 
 func TestExtractObjNotFoundErr(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key1 := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key1] = EtcdResponseWithError{
 		R: &etcd.Response{
@@ -377,7 +381,7 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 func TestCreateObj(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
 	err := helper.CreateObj("/some/key", obj, returnedObj, 5)
 	if err != nil {
@@ -403,7 +407,7 @@ func TestCreateObj(t *testing.T) {
 func TestCreateObjNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	err := helper.CreateObj("/some/key", obj, nil, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
@@ -413,7 +417,7 @@ func TestCreateObjNilOutParam(t *testing.T) {
 func TestSetObj(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
 	err := helper.SetObj("/some/key", obj, returnedObj, 5)
 	if err != nil {
@@ -441,7 +445,7 @@ func TestSetObjFailCAS(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.CasErr = fakeClient.NewError(123)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	err := helper.SetObj("/some/key", obj, nil, 5)
 	if err == nil {
 		t.Errorf("Expecting error.")
@@ -452,7 +456,7 @@ func TestSetObjWithVersion(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 	fakeClient.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
@@ -488,8 +492,8 @@ func TestSetObjWithVersion(t *testing.T) {
 func TestSetObjWithoutResourceVersioner(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
-	helper.Versioner = nil
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper.versioner = nil
 	returnedObj := &api.Pod{}
 	err := helper.SetObj("/some/key", obj, returnedObj, 3)
 	key := etcdtest.AddPrefix("/some/key")
@@ -516,8 +520,8 @@ func TestSetObjWithoutResourceVersioner(t *testing.T) {
 func TestSetObjNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
-	helper.Versioner = nil
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper.versioner = nil
 	err := helper.SetObj("/some/key", obj, nil, 3)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
@@ -527,7 +531,7 @@ func TestSetObjNilOutParam(t *testing.T) {
 func TestGuaranteedUpdate(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 
 	// Create a new node.
@@ -582,7 +586,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 func TestGuaranteedUpdateTTL(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 
 	// Create a new node.
@@ -683,7 +687,7 @@ func TestGuaranteedUpdateTTL(t *testing.T) {
 func TestGuaranteedUpdateNoChange(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 
 	// Create a new node.
@@ -715,7 +719,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 
 	// Create a new node.
@@ -742,7 +746,7 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	helper := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
 
 	fakeClient.ExpectNotFoundGet(key)
@@ -840,7 +844,7 @@ func TestGetEtcdVersion_NotListening(t *testing.T) {
 func TestPrefixEtcdKey(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	prefix := path.Join("/", etcdtest.PathPrefix())
-	helper := NewEtcdHelper(fakeClient, testapi.Codec(), prefix)
+	helper := newEtcdHelper(fakeClient, testapi.Codec(), prefix)
 
 	baseKey := "/some/key"
 

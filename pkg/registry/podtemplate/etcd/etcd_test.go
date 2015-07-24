@@ -26,11 +26,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 )
 
-func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
+func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, tools.StorageInterface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, helper
+	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
+	return fakeEtcdClient, etcdStorage
 }
 
 func validNewPodTemplate(name string) *api.PodTemplate {
@@ -61,8 +61,8 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 }
 
 func TestCreate(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+	storage := NewREST(etcdStorage)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 	pod := validNewPodTemplate("foo")
 	pod.ObjectMeta = api.ObjectMeta{}
@@ -77,8 +77,8 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+	storage := NewREST(etcdStorage)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 	key, err := storage.KeyFunc(test.TestContext(), "foo")
 	if err != nil {

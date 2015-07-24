@@ -132,9 +132,9 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: apiVersion})
 
-	helper, err := master.NewEtcdHelper(etcdClient, "", etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, "", etcdtest.PathPrefix())
 	if err != nil {
-		glog.Fatalf("Unable to get etcd helper: %v", err)
+		glog.Fatalf("Unable to get etcd storage: %v", err)
 	}
 
 	// Master
@@ -154,7 +154,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         fakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,

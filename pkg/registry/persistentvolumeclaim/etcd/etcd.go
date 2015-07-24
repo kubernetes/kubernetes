@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against PersistentVolumeClaim objects.
-func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
+func NewStorage(s tools.StorageInterface) (*REST, *StatusREST) {
 	prefix := "/persistentvolumeclaims"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
@@ -52,7 +52,7 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
 		},
 		EndpointName: "persistentvolumeclaims",
 
-		Helper: h,
+		Storage: s,
 	}
 
 	store.CreateStrategy = persistentvolumeclaim.Strategy

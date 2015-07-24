@@ -34,27 +34,26 @@ import (
 	"github.com/golang/glog"
 )
 
-func NewEtcdHelper(client EtcdClient, codec runtime.Codec, prefix string) EtcdHelper {
-	return EtcdHelper{
-		Client:     client,
-		Codec:      codec,
-		Versioner:  APIObjectVersioner{},
-		Copier:     api.Scheme,
-		PathPrefix: prefix,
+func NewEtcdStorage(client EtcdClient, codec runtime.Codec, prefix string) StorageInterface {
+	return &etcdHelper{
+		client:     client,
+		codec:      codec,
+		versioner:  APIObjectVersioner{},
+		copier:     api.Scheme,
+		pathPrefix: prefix,
 		cache:      util.NewCache(maxEtcdCacheEntries),
 	}
 }
 
-// EtcdHelper is the reference implementation of StorageInterface.
-// TODO(wojtekt): Make it private and expose only StorageInterface to outside world.
-type EtcdHelper struct {
-	Client EtcdClient
-	Codec  runtime.Codec
-	Copier runtime.ObjectCopier
+// etcdHelper is the reference implementation of StorageInterface.
+type etcdHelper struct {
+	client EtcdClient
+	codec  runtime.Codec
+	copier runtime.ObjectCopier
 	// optional, has to be set to perform any atomic operations
-	Versioner EtcdVersioner
+	versioner StorageVersioner
 	// prefix for all etcd keys
-	PathPrefix string
+	pathPrefix string
 
 	// We cache objects stored in etcd. For keys we use Node.ModifiedIndex which is equivalent
 	// to resourceVersion.
@@ -71,20 +70,30 @@ func init() {
 }
 
 // Implements StorageInterface.
-func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) Backends() []string {
+	return h.client.GetCluster()
+}
+
+// Implements StorageInterface.
+func (h *etcdHelper) Versioner() StorageVersioner {
+	return h.versioner
+}
+
+// Implements StorageInterface.
+func (h *etcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) error {
 	key = h.prefixEtcdKey(key)
-	data, err := h.Codec.Encode(obj)
+	data, err := h.codec.Encode(obj)
 	if err != nil {
 		return err
 	}
-	if h.Versioner != nil {
-		if version, err := h.Versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
+	if h.versioner != nil {
+		if version, err := h.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 			return errors.New("resourceVersion may not be set on objects to be created")
 		}
 	}
 
 	startTime := time.Now()
-	response, err := h.Client.Create(key, string(data), ttl)
+	response, err := h.client.Create(key, string(data), ttl)
 	metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	if err != nil {
 		return err
@@ -99,20 +108,20 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 }
 
 // Implements StorageInterface.
-func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) error {
 	var response *etcd.Response
-	data, err := h.Codec.Encode(obj)
+	data, err := h.codec.Encode(obj)
 	if err != nil {
 		return err
 	}
 	key = h.prefixEtcdKey(key)
 
 	create := true
-	if h.Versioner != nil {
-		if version, err := h.Versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
+	if h.versioner != nil {
+		if version, err := h.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 			create = false
 			startTime := time.Now()
-			response, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
+			response, err = h.client.CompareAndSwap(key, string(data), ttl, "", version)
 			metrics.RecordEtcdRequestLatency("compareAndSwap", getTypeName(obj), startTime)
 			if err != nil {
 				return err
@@ -122,7 +131,7 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	if create {
 		// Create will fail if a key already exists.
 		startTime := time.Now()
-		response, err = h.Client.Create(key, string(data), ttl)
+		response, err = h.client.Create(key, string(data), ttl)
 		metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	}
 
@@ -140,14 +149,14 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 }
 
 // Implements StorageInterface.
-func (h *EtcdHelper) DeleteObj(key string, out runtime.Object) error {
+func (h *etcdHelper) DeleteObj(key string, out runtime.Object) error {
 	key = h.prefixEtcdKey(key)
 	if _, err := conversion.EnforcePtr(out); err != nil {
 		panic("unable to convert output object to pointer")
 	}
 
 	startTime := time.Now()
-	response, err := h.Client.Delete(key, false)
+	response, err := h.client.Delete(key, false)
 	metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
 	if !IsEtcdNotFound(err) {
 		// if the object that existed prior to the delete is returned by etcd, update out.
@@ -159,16 +168,16 @@ func (h *EtcdHelper) DeleteObj(key string, out runtime.Object) error {
 }
 
 // Implements StorageInterface.
-func (h *EtcdHelper) Delete(key string, recursive bool) error {
+func (h *etcdHelper) Delete(key string, recursive bool) error {
 	key = h.prefixEtcdKey(key)
 	startTime := time.Now()
-	_, err := h.Client.Delete(key, recursive)
+	_, err := h.client.Delete(key, recursive)
 	metrics.RecordEtcdRequestLatency("delete", "UNKNOWN", startTime)
 	return err
 }
 
 // Implements StorageInterface.
-func (h *EtcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) error {
+func (h *etcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) error {
 	key = h.prefixEtcdKey(key)
 	_, _, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
 	return err
@@ -176,9 +185,9 @@ func (h *EtcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFoun
 
 // bodyAndExtractObj performs the normal Get path to etcd, returning the parsed node and response for additional information
 // about the response, like the current etcd index and the ttl.
-func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, node *etcd.Node, res *etcd.Response, err error) {
+func (h *etcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, node *etcd.Node, res *etcd.Response, err error) {
 	startTime := time.Now()
-	response, err := h.Client.Get(key, false, false)
+	response, err := h.client.Get(key, false, false)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
 
 	if err != nil && !IsEtcdNotFound(err) {
@@ -188,7 +197,7 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignore
 	return body, node, response, err
 }
 
-func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr runtime.Object, ignoreNotFound, prevNode bool) (body string, node *etcd.Node, err error) {
+func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr runtime.Object, ignoreNotFound, prevNode bool) (body string, node *etcd.Node, err error) {
 	if response != nil {
 		if prevNode {
 			node = response.PrevNode
@@ -210,16 +219,16 @@ func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 		return "", nil, fmt.Errorf("unable to locate a value on the response: %#v", response)
 	}
 	body = node.Value
-	err = h.Codec.DecodeInto([]byte(body), objPtr)
-	if h.Versioner != nil {
-		_ = h.Versioner.UpdateObject(objPtr, node.Expiration, node.ModifiedIndex)
+	err = h.codec.DecodeInto([]byte(body), objPtr)
+	if h.versioner != nil {
+		_ = h.versioner.UpdateObject(objPtr, node.Expiration, node.ModifiedIndex)
 		// being unable to set the version does not prevent the object from being extracted
 	}
 	return body, node, err
 }
 
 // Implements StorageInterface.
-func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error {
+func (h *etcdHelper) ExtractObjToList(key string, listObj runtime.Object) error {
 	trace := util.NewTrace("ExtractObjToList " + getTypeName(listObj))
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
@@ -228,7 +237,7 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 	key = h.prefixEtcdKey(key)
 	startTime := time.Now()
 	trace.Step("About to read etcd node")
-	response, err := h.Client.Get(key, false, false)
+	response, err := h.client.Get(key, false, false)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	trace.Step("Etcd node read")
 	if err != nil {
@@ -245,8 +254,8 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 		return err
 	}
 	trace.Step("Object decoded")
-	if h.Versioner != nil {
-		if err := h.Versioner.UpdateList(listObj, response.EtcdIndex); err != nil {
+	if h.versioner != nil {
+		if err := h.versioner.UpdateList(listObj, response.EtcdIndex); err != nil {
 			return err
 		}
 	}
@@ -254,7 +263,7 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 }
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
-func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) error {
+func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) error {
 	trace := util.NewTrace("decodeNodeList " + getTypeName(slicePtr))
 	defer trace.LogIfLong(500 * time.Millisecond)
 	v, err := conversion.EnforcePtr(slicePtr)
@@ -275,12 +284,12 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 		} else {
 			obj := reflect.New(v.Type().Elem())
-			if err := h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object)); err != nil {
+			if err := h.codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object)); err != nil {
 				return err
 			}
-			if h.Versioner != nil {
+			if h.versioner != nil {
 				// being unable to set the version does not prevent the object from being extracted
-				_ = h.Versioner.UpdateObject(obj.Interface().(runtime.Object), node.Expiration, node.ModifiedIndex)
+				_ = h.versioner.UpdateObject(obj.Interface().(runtime.Object), node.Expiration, node.ModifiedIndex)
 			}
 			v.Set(reflect.Append(v, obj.Elem()))
 			if node.ModifiedIndex != 0 {
@@ -293,7 +302,7 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 }
 
 // Implements StorageInterface.
-func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
+func (h *etcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 	trace := util.NewTrace("ExtractToList " + getTypeName(listObj))
 	defer trace.LogIfLong(time.Second)
 	listPtr, err := runtime.GetItemsPtr(listObj)
@@ -313,16 +322,16 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 		return err
 	}
 	trace.Step("Node list decoded")
-	if h.Versioner != nil {
-		if err := h.Versioner.UpdateList(listObj, index); err != nil {
+	if h.versioner != nil {
+		if err := h.versioner.UpdateList(listObj, index); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
-	result, err := h.Client.Get(key, true, true)
+func (h *etcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
+	result, err := h.client.Get(key, true, true)
 	if err != nil {
 		index, ok := etcdErrorIndex(err)
 		if !ok {
@@ -349,7 +358,7 @@ func SimpleUpdate(fn SimpleEtcdUpdateFunc) StorageUpdateFunc {
 }
 
 // Implements StorageInterface.
-func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate StorageUpdateFunc) error {
+func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate StorageUpdateFunc) error {
 	v, err := conversion.EnforcePtr(ptrToType)
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.
@@ -391,7 +400,7 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 			ttl = *newTTL
 		}
 
-		data, err := h.Codec.Encode(ret)
+		data, err := h.codec.Encode(ret)
 		if err != nil {
 			return err
 		}
@@ -399,7 +408,7 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		// First time this key has been used, try creating new value.
 		if index == 0 {
 			startTime := time.Now()
-			response, err := h.Client.Create(key, string(data), ttl)
+			response, err := h.client.Create(key, string(data), ttl)
 			metrics.RecordEtcdRequestLatency("create", getTypeName(ptrToType), startTime)
 			if IsEtcdNodeExist(err) {
 				continue
@@ -414,7 +423,7 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 
 		startTime := time.Now()
 		// Swap origBody with data, if origBody is the latest etcd data.
-		response, err := h.Client.CompareAndSwap(key, string(data), ttl, origBody, index)
+		response, err := h.client.CompareAndSwap(key, string(data), ttl, origBody, index)
 		metrics.RecordEtcdRequestLatency("compareAndSwap", getTypeName(ptrToType), startTime)
 		if IsEtcdTestFailed(err) {
 			// Try again.
@@ -425,11 +434,11 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 	}
 }
 
-func (h *EtcdHelper) prefixEtcdKey(key string) string {
-	if strings.HasPrefix(key, path.Join("/", h.PathPrefix)) {
+func (h *etcdHelper) prefixEtcdKey(key string) string {
+	if strings.HasPrefix(key, path.Join("/", h.pathPrefix)) {
 		return key
 	}
-	return path.Join("/", h.PathPrefix, key)
+	return path.Join("/", h.pathPrefix, key)
 }
 
 // etcdCache defines interface used for caching objects stored in etcd. Objects are keyed by
@@ -446,7 +455,7 @@ func getTypeName(obj interface{}) string {
 	return reflect.TypeOf(obj).String()
 }
 
-func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
+func (h *etcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 	startTime := time.Now()
 	defer func() {
 		metrics.ObserveGetCache(startTime)
@@ -455,7 +464,7 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 	if found {
 		// We should not return the object itself to avoid poluting the cache if someone
 		// modifies returned values.
-		objCopy, err := h.Copier.Copy(obj.(runtime.Object))
+		objCopy, err := h.copier.Copy(obj.(runtime.Object))
 		if err != nil {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
 			return nil, false
@@ -467,12 +476,12 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 	return nil, false
 }
 
-func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
+func (h *etcdHelper) addToCache(index uint64, obj runtime.Object) {
 	startTime := time.Now()
 	defer func() {
 		metrics.ObserveAddCache(startTime)
 	}()
-	objCopy, err := h.Copier.Copy(obj)
+	objCopy, err := h.copier.Copy(obj)
 	if err != nil {
 		glog.Errorf("Error during DeepCopy of cached object: %q", err)
 		return
