@@ -55,10 +55,14 @@ Documentation for other releases can be found at
   3. The version of this type.
   4. The above must specify a unique object (maybe we should pack it into the
      name, as well as having it in separate fields for convenience).
-  5. Swagger spec for this type (or a `Provider` from which to get this spec).
-  6. A choice: validation could be performed by a hook (see below), or by
+  5. Whether or not the resource is namespaced (ThirdPartyType objects are *not*
+     themselves in a namespace, like Node and Namespace objects.)
+  6. Swagger spec for this type (or a `Provider` from which to get this spec).
+     Alternatively, some other method of specification. But apiserver needs to
+     be able to integrate this information into the swagger docs it exports.
+  7. A choice: validation could be performed by a hook (see below), or by
      apiserver based on the swagger spec, or by both.
-  7. Note that it's *optional* for a provider to request hooks for its own
+  8. Note that it's *optional* for a provider to request hooks for its own
      types; the default behavior will give you ordinary CRUD behavior.
 3. Types representing the input and expected outputs for all the hooks below.
   1. This will include at minimum information about the user making the request.
