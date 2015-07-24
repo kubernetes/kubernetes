@@ -53,7 +53,7 @@ If you are running a cluster in Google Container Engine (GKE), instead see the [
 
 This example assumes that you have a working cluster. See the [Getting Started Guides](../../docs/getting-started-guides/) for details about creating a cluster.
 
-**Tip:** View all the `kubectl` commands, including their options and descriptions in the [kudectl CLI reference](../../docs/user-guide/kubectl/kubectl.md).
+**Tip:** View all the `kubectl` commands, including their options and descriptions in the [kubectl CLI reference](../../docs/user-guide/kubectl/kubectl.md).
 
 ### Step One: Create the Redis master pod<a id="step-one"></a>
 
