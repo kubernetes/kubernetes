@@ -7,8 +7,8 @@ ul, ul ul {
 	list-style: none;
 }
 #wrapper {
-	position: absolute;
-	top: 134px;
+	position: fixed;
+	top: 155px;
 	left: 0px;
 	float:left;
 	width: 250px;
@@ -90,4 +90,8 @@ ul, ul ul {
 .navSubMenu3 {
     font-weight: normal;
 	margin-left:.6em;
+}
+#gcse-wrapper {
+  z-index: 1;
+  position: fixed;
 }
