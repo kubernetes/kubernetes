@@ -27,53 +27,57 @@ func TestAnalytics(t *testing.T) {
 		in  string
 		out string
 	}{
-		{`aoeu`, `aoeu
-
-
-` + beginMungeTag("GENERATED_ANALYTICS") + `
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()
-` + endMungeTag("GENERATED_ANALYTICS") + `
-`},
-		{`aoeu
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()
-`, `aoeu
-
-
-` + beginMungeTag("GENERATED_ANALYTICS") + `
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()
-` + endMungeTag("GENERATED_ANALYTICS") + `
-`},
-		{`aoeu
-
-` + beginMungeTag("GENERATED_ANALYTICS") + `
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()
-` + endMungeTag("GENERATED_ANALYTICS") + `
-`, `aoeu
-
-
-` + beginMungeTag("GENERATED_ANALYTICS") + `
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()
-` + endMungeTag("GENERATED_ANALYTICS") + `
-`},
-		{`aoeu
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()
-
-
-
-` + beginMungeTag("GENERATED_ANALYTICS") + `
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()
-` + endMungeTag("GENERATED_ANALYTICS") + `
-`, `aoeu
-
-
-` + beginMungeTag("GENERATED_ANALYTICS") + `
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()
-` + endMungeTag("GENERATED_ANALYTICS") + `
-`},
+		{
+			"aoeu",
+			"aoeu" + "\n" + "\n" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+		{
+			"aoeu" + "\n" + "\n" + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()",
+			"aoeu" + "\n" + "\n" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+		{
+			"aoeu" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n",
+			"aoeu" + "\n" + "\n" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+		{
+			"aoeu" + "\n" + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" + "\n" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n",
+			"aoeu" + "\n" + "\n" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+		{
+			"prefix" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") +
+				"\n" + "suffix",
+			"prefix" + "\n" + "suffix" + "\n" + "\n" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+		{
+			"aoeu" + "\n" + "\n" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n",
+			"aoeu" + "\n" + "\n" + "\n" +
+				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
+				endMungeTag("GENERATED_ANALYTICS") + "\n"},
 	}
 	for _, c := range cases {
 		out, err := checkAnalytics("path/to/file-name.md", []byte(c.in))

@@ -32,7 +32,7 @@ var (
 
 	// Matches the analytics blurb, with or without the munge headers.
 	analyticsRE = regexp.MustCompile(`[\n]*` + analyticsExp + `[\n]?` +
-		`|` + `[\n]*` + beginMungeExp + `[^<]*` + endMungeExp + `[\n]*`)
+		`|` + `[\n]*` + beginMungeExp + `[^<]*` + endMungeExp)
 )
 
 // This adds the analytics link to every .md file.
