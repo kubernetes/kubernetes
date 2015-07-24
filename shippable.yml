@@ -43,4 +43,4 @@ script:
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-update-storage-objects.sh
 
 notifications:
-  irc: "chat.freenode.net#google-containers"
+  irc: "chat.freenode.net#kubernetes-dev"

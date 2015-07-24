@@ -22,4 +22,4 @@ script:
   - godep go test ./cmd/mungedocs
 
 notifications:
-  irc: "chat.freenode.net#google-containers"
+  irc: "chat.freenode.net#kubernetes-dev"
