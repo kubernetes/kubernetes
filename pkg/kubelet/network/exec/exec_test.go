@@ -72,7 +72,7 @@ func TestSelectPlugin(t *testing.T) {
 	defer tearDownPlugin(pluginName)
 	installPluginUnderTest(t, "", pluginName)
 
-	plug, err := network.InitNetworkPlugin(probeNetworkPluginsWithExecDir(testPluginPath), pluginName, network.NewFakeHost(nil))
+	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 	if err != nil {
 		t.Errorf("Failed to select the desired plugin: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestSelectVendoredPlugin(t *testing.T) {
 	installPluginUnderTest(t, vendor, pluginName)
 
 	vendoredPluginName := fmt.Sprintf("%s/%s", vendor, pluginName)
-	plug, err := network.InitNetworkPlugin(probeNetworkPluginsWithExecDir(testPluginPath), vendoredPluginName, network.NewFakeHost(nil))
+	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), vendoredPluginName, network.NewFakeHost(nil))
 	if err != nil {
 		t.Errorf("Failed to select the desired plugin: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestSelectWrongPlugin(t *testing.T) {
 	installPluginUnderTest(t, "", pluginName)
 
 	wrongPlugin := "abcd"
-	plug, err := network.InitNetworkPlugin(probeNetworkPluginsWithExecDir(testPluginPath), wrongPlugin, network.NewFakeHost(nil))
+	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), wrongPlugin, network.NewFakeHost(nil))
 	if plug != nil || err == nil {
 		t.Errorf("Expected to see an error. Wrong plugin selected.")
 	}
@@ -127,7 +127,7 @@ func TestPluginValidation(t *testing.T) {
 	}
 	f.Close()
 
-	_, err = network.InitNetworkPlugin(probeNetworkPluginsWithExecDir(testPluginPath), pluginName, network.NewFakeHost(nil))
+	_, err = network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 	if err == nil {
 		// we expected an error here because validation would have failed
 		t.Errorf("Expected non-nil value.")
@@ -139,7 +139,7 @@ func TestPluginSetupHook(t *testing.T) {
 	defer tearDownPlugin(pluginName)
 	installPluginUnderTest(t, "", pluginName)
 
-	plug, err := network.InitNetworkPlugin(probeNetworkPluginsWithExecDir(testPluginPath), pluginName, network.NewFakeHost(nil))
+	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 
 	err = plug.SetUpPod("podNamespace", "podName", "dockerid2345")
 	if err != nil {
@@ -161,7 +161,7 @@ func TestPluginTearDownHook(t *testing.T) {
 	defer tearDownPlugin(pluginName)
 	installPluginUnderTest(t, "", pluginName)
 
-	plug, err := network.InitNetworkPlugin(probeNetworkPluginsWithExecDir(testPluginPath), pluginName, network.NewFakeHost(nil))
+	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
 
 	err = plug.TearDownPod("podNamespace", "podName", "dockerid2345")
 	if err != nil {
