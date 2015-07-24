@@ -333,7 +333,7 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 	}}
 }
 
-// IsNotFound returns true if the specified error was created by NewNotFoundErr.
+// IsNotFound returns true if the specified error was created by NewNotFound.
 func IsNotFound(err error) bool {
 	return reasonForError(err) == api.StatusReasonNotFound
 }
