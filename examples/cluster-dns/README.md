@@ -171,7 +171,7 @@ $ kubectl logs dns-frontend
 
 #### Note about default namespace
 
-If you prefer not using namespace, then all your services can be addressed using `default` namespace, e.g. `http://dns-backend.default.cluster.local:8000`, or shorthand version `http://dns-backend:8000`
+If you prefer not using namespace, then all your services can be addressed using `default` namespace, e.g. `http://dns-backend.default.svc.cluster.local:8000`, or shorthand version `http://dns-backend:8000`
 
 
 ### tl; dr;
