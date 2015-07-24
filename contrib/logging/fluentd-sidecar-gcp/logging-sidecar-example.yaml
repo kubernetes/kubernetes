@@ -13,7 +13,7 @@ spec:
     - name: log-storage
       mountPath: /var/log
   - name: sidecar-log-collector
-    image: gcr.io/google_containers/fluentd-sidecar-gcp:1.1
+    image: gcr.io/google_containers/fluentd-sidecar-gcp:1.3
     resources:
       limits:
         cpu: 100m
