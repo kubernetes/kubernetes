@@ -1244,8 +1244,9 @@ func ScaleRC(c *client.Client, ns, name string, size uint) error {
 	if err != nil {
 		return err
 	}
+	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-	if err = scaler.Scale(ns, name, size, nil, nil, waitForReplicas); err != nil {
+	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
 		return err
 	}
 	return waitForRCPodsRunning(c, ns, name)
