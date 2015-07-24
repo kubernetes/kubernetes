@@ -482,6 +482,49 @@ var _ = Describe("Kubectl client", func() {
 			}
 		})
 	})
+
+	Describe("Kubectl run", func() {
+		var nsFlag string
+		var rcName string
+
+		BeforeEach(func() {
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			rcName = "e2e-test-nginx-rc"
+		})
+
+		AfterEach(func() {
+			runKubectl("stop", "rc", rcName, nsFlag)
+		})
+
+		It("should create an rc from an image", func() {
+			image := "nginx"
+
+			By("running the image " + image)
+			runKubectl("run", rcName, "--image="+image, nsFlag)
+			By("verifying the rc " + rcName + " was created")
+			rc, err := c.ReplicationControllers(ns).Get(rcName)
+			if err != nil {
+				Failf("Failed getting rc %s: %v", rcName, err)
+			}
+			containers := rc.Spec.Template.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != image {
+				Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, image)
+			}
+
+			By("verifying the pod controlled by rc " + rcName + " was created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": rcName}))
+			podlist, err := waitForPodsWithLabel(c, ns, label)
+			if err != nil {
+				Failf("Failed getting pod controlled by rc %s: %v", rcName, err)
+			}
+			pods := podlist.Items
+			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != image {
+				runKubectl("get", "pods", "-L", "run", nsFlag)
+				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", image, len(pods))
+			}
+		})
+	})
+
 })
 
 // Checks whether the output split by line contains the required elements.
