@@ -32,6 +32,8 @@ layout: docwithnav
 * If something went wrong, see the [troubleshooting](troubleshooting.html) document for how to debug.
 You should also check the [known issues](user-guide/known-issues.html) for the release you're using.
 
+* To report a security issue, see [Reporting a Security Issue](reporting-security-issues.html).
+
 
 <!-- TAG IS_VERSIONED -->
 
