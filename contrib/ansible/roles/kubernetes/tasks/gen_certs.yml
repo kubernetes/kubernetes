@@ -1,4 +1,10 @@
 ---
+- name: Install openssl for easy-rsa stuff
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+    name: openssl
+    state: latest
+
 #- name: Get create ca cert script from Kubernetes
 #  get_url:
 #    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/saltbase/salt/generate-cert/make-ca-cert.sh
