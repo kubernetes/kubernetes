@@ -29,6 +29,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -202,39 +204,123 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl label", func() {
-		var podPath string
-		var nsFlag string
-		BeforeEach(func() {
-			podPath = filepath.Join(testContext.RepoRoot, "docs/user-guide/pod.yaml")
-			By("creating the pod")
-			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			runKubectl("create", "-f", podPath, nsFlag)
-			checkPodsRunningReady(c, ns, []string{simplePodName}, podStartTimeout)
-		})
-		AfterEach(func() {
-			cleanup(podPath, ns, simplePodSelector)
-		})
-
-		It("should update the label on a resource", func() {
-			labelName := "testing-label"
-			labelValue := "testing-label-value"
-
-			By("adding the label " + labelName + " with value " + labelValue + " to a pod")
-			runKubectl("label", "pods", simplePodName, labelName+"="+labelValue, nsFlag)
-			By("verifying the pod has the label " + labelName + " with the value " + labelValue)
-			output := runKubectl("get", "pod", simplePodName, "-L", labelName, nsFlag)
-			if !strings.Contains(output, labelValue) {
-				Failf("Failed updating label " + labelName + " to the pod " + simplePodName)
+	Describe("Kubectl api-versions", func() {
+		It("should check if v1 is in available api versions", func() {
+			By("validating api verions")
+			output := runKubectl("api-versions")
+			if !strings.Contains(output, "Available Server Api Versions:") {
+				Failf("Missing caption in kubectl api-versions")
 			}
-
-			By("removing the label " + labelName + " of a pod")
-			runKubectl("label", "pods", simplePodName, labelName+"-", nsFlag)
-			By("verifying the pod doesn't have the label " + labelName)
-			output = runKubectl("get", "pod", simplePodName, "-L", labelName, nsFlag)
-			if strings.Contains(output, labelValue) {
-				Failf("Failed removing label " + labelName + " of the pod " + simplePodName)
+			if !strings.Contains(output, "v1") {
+				Failf("No v1 in kubectl api-versions")
 			}
+		})
+	})
+
+	Describe("Kubectl cluster-info", func() {
+		It("should check if Kubernetes master services is included in cluster-info", func() {
+			By("validating cluster-info")
+			output := runKubectl("cluster-info")
+			// Can't check exact strings due to terminal controll commands (colors)
+			requiredItems := []string{"Kubernetes master", "is running at"}
+			if providerIs("gce", "gke") {
+				requiredItems = append(requiredItems, "KubeDNS", "Heapster")
+			}
+			for _, item := range requiredItems {
+				if !strings.Contains(output, item) {
+					Failf("Missing %s in kubectl cluster-info", item)
+				}
+			}
+		})
+	})
+
+	Describe("Kubectl describe", func() {
+		It("should check if kubectl describe prints relevant information for rc and pods", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			controllerJson := mkpath("redis-master-controller.json")
+			serviceJson := mkpath("redis-master-service.json")
+
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			runKubectl("create", "-f", controllerJson, nsFlag)
+			runKubectl("create", "-f", serviceJson, nsFlag)
+
+			// Pod
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				output := runKubectl("describe", "pod", pod.Name, nsFlag)
+				requiredStrings := [][]string{
+					{"Name:", "redis-master-"},
+					{"Namespace:", ns},
+					{"Image(s):", "redis"},
+					{"Node:"},
+					{"Labels:", "app=redis", "role=master"},
+					{"Status:", "Running"},
+					{"Reason:"},
+					{"Message:"},
+					{"IP:"},
+					{"Replication Controllers:", "redis-master"}}
+				checkOutput(output, requiredStrings)
+			})
+
+			// Rc
+			output := runKubectl("describe", "rc", "redis-master", nsFlag)
+			requiredStrings := [][]string{
+				{"Name:", "redis-master"},
+				{"Namespace:", ns},
+				{"Image(s):", "redis"},
+				{"Selector:", "app=redis,role=master"},
+				{"Labels:", "app=redis,role=master"},
+				{"Replicas:", "1 current", "1 desired"},
+				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
+				{"Events:"}}
+			checkOutput(output, requiredStrings)
+
+			// Service
+			output = runKubectl("describe", "service", "redis-master", nsFlag)
+			requiredStrings = [][]string{
+				{"Name:", "redis-master"},
+				{"Namespace:", ns},
+				{"Labels:", "app=redis", "role=master"},
+				{"Selector:", "app=redis", "role=master"},
+				{"Type:", "ClusterIP"},
+				{"IP:"},
+				{"Port:", "<unnamed>", "6379/TCP"},
+				{"Endpoints:"},
+				{"Session Affinity:", "None"}}
+			checkOutput(output, requiredStrings)
+
+			// Node
+			minions, err := c.Nodes().List(labels.Everything(), fields.Everything())
+			Expect(err).NotTo(HaveOccurred())
+			node := minions.Items[0]
+			output = runKubectl("describe", "node", node.Name)
+			requiredStrings = [][]string{
+				{"Name:", node.Name},
+				{"Labels:"},
+				{"CreationTimestamp:"},
+				{"Conditions:"},
+				{"Type", "Status", "LastHeartbeatTime", "LastTransitionTime", "Reason", "Message"},
+				{"Addresses:"},
+				{"Capacity:"},
+				{"Version:"},
+				{"Kernel Version:"},
+				{"OS Image:"},
+				{"Container Runtime Version:"},
+				{"Kubelet Version:"},
+				{"Kube-Proxy Version:"},
+				{"Pods:"}}
+			checkOutput(output, requiredStrings)
+
+			// Namespace
+			output = runKubectl("describe", "namespace", ns)
+			requiredStrings = [][]string{
+				{"Name:", ns},
+				{"Labels:"},
+				{"Status:", "Active"}}
+			checkOutput(output, requiredStrings)
+
+			// Quota and limitrange are skipped for now.
 		})
 	})
 
@@ -303,6 +389,42 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
+	Describe("Kubectl label", func() {
+		var podPath string
+		var nsFlag string
+		BeforeEach(func() {
+			podPath = filepath.Join(testContext.RepoRoot, "docs/user-guide/pod.yaml")
+			By("creating the pod")
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			runKubectl("create", "-f", podPath, nsFlag)
+			checkPodsRunningReady(c, ns, []string{simplePodName}, podStartTimeout)
+		})
+		AfterEach(func() {
+			cleanup(podPath, ns, simplePodSelector)
+		})
+
+		It("should update the label on a resource", func() {
+			labelName := "testing-label"
+			labelValue := "testing-label-value"
+
+			By("adding the label " + labelName + " with value " + labelValue + " to a pod")
+			runKubectl("label", "pods", simplePodName, labelName+"="+labelValue, nsFlag)
+			By("verifying the pod has the label " + labelName + " with the value " + labelValue)
+			output := runKubectl("get", "pod", simplePodName, "-L", labelName, nsFlag)
+			if !strings.Contains(output, labelValue) {
+				Failf("Failed updating label " + labelName + " to the pod " + simplePodName)
+			}
+
+			By("removing the label " + labelName + " of a pod")
+			runKubectl("label", "pods", simplePodName, labelName+"-", nsFlag)
+			By("verifying the pod doesn't have the label " + labelName)
+			output = runKubectl("get", "pod", simplePodName, "-L", labelName, nsFlag)
+			if strings.Contains(output, labelValue) {
+				Failf("Failed removing label " + labelName + " of the pod " + simplePodName)
+			}
+		})
+	})
+
 	Describe("Kubectl logs", func() {
 		It("should find a string in pod logs", func() {
 			mkpath := func(file string) string {
@@ -361,6 +483,25 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 })
+
+// Checks whether the output split by line contains the required elements.
+func checkOutput(output string, required [][]string) {
+	outputLines := strings.Split(output, "\n")
+	currentLine := 0
+	for _, requirement := range required {
+		for currentLine < len(outputLines) && !strings.Contains(outputLines[currentLine], requirement[0]) {
+			currentLine++
+		}
+		if currentLine == len(outputLines) {
+			Failf("Failed to find %s in %s", requirement[0], output)
+		}
+		for _, item := range requirement[1:] {
+			if !strings.Contains(outputLines[currentLine], item) {
+				Failf("Failed to find %s in %s", item, outputLines[currentLine])
+			}
+		}
+	}
+}
 
 func curl(addr string) (string, error) {
 	resp, err := http.Get(addr)
