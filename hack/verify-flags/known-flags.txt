@@ -80,6 +80,7 @@ executor-cgroup-prefix
 executor-logv
 executor-path
 executor-suicide-timeout
+experimental-keystone-url
 experimental-prefix
 external-hostname
 failover-timeout
