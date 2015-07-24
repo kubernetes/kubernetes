@@ -36,7 +36,7 @@ Documentation for other releases can be found at
 This doc is about cluster troubleshooting; we assume you have already ruled out your application as the root cause of the
 problem you are experiencing. See
 the [application troubleshooting guide](../user-guide/application-troubleshooting.md) for tips on application debugging.
-You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
+You may also visit [troubleshooting document](../troubleshooting.md) for more information.
 
 ## Listing your cluster
 
@@ -73,7 +73,7 @@ This is an incomplete list of things that could go wrong, and how to adjust your
 Root causes:
   - VM(s) shutdown
   - Network partition within cluster, or between cluster and users
-  - Crashes in Kubernetes software 
+  - Crashes in Kubernetes software
   - Data loss or unavailability of persistent storage (e.g. GCE PD or AWS EBS volume)
   - Operator error, e.g. misconfigured Kubernetes software or application software
 

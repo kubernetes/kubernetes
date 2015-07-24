@@ -47,7 +47,7 @@ Each node runs Docker, of course.  Docker takes care of the details of downloadi
 
 ### Kubelet
 
-The **Kubelet** manages [pods](../user-guide/pods.md) and their containers, their images, their volumes, etc. 
+The **Kubelet** manages [pods](../user-guide/pods.md) and their containers, their images, their volumes, etc.
 
 ### Kube-Proxy
 

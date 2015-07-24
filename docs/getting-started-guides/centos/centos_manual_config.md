@@ -60,7 +60,7 @@ centos-minion = 192.168.121.65
 ```
 
 **Prepare the hosts:**
-    
+
 * Create virt7-testing repo on all hosts - centos-{master,minion} with following information.
 
 ```
@@ -175,7 +175,7 @@ KUBELET_HOSTNAME="--hostname_override=centos-minion"
 
 # Add your own!
 KUBELET_ARGS=""
-```       
+```
 
 * Start the appropriate services on node (centos-minion).
 

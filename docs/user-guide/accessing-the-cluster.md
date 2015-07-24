@@ -150,7 +150,7 @@ There are [client libraries](../devel/client-libraries.md) for accessing the API
 from several languages.  The Kubernetes project-supported
 [Go](http://releases.k8s.io/HEAD/pkg/client/)
 client library can use the same [kubeconfig file](kubeconfig-file.md)
-as the kubectl CLI does to locate and authenticate to the apiserver.  
+as the kubectl CLI does to locate and authenticate to the apiserver.
 
 See documentation for other libraries for how they authenticate.
 
@@ -241,7 +241,7 @@ at `https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/elasticse
 
 #### Manually constructing apiserver proxy URLs
 
-As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:  
+As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:
 `http://`*`kubernetes_master_address`*`/`*`service_path`*`/`*`service_name`*`/`*`service_endpoint-suffix-parameter`*
 <!--- TODO: update this part of doc because it doesn't seem to be valid. What
 about namespaces? 'proxy' verb? -->
@@ -297,7 +297,7 @@ There are several different proxies you may encounter when using Kubernetes:
     - can be used to reach a Node, Pod, or Service
     - does load balancing when used to reach a Service
   1. The [kube proxy](services.md#ips-and-vips):
-    - runs on each node 
+    - runs on each node
     - proxies UDP and TCP
     - does not understand HTTP
     - provides load balancing

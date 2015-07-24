@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 ## Introduction
 
-Celery is an asynchronous task queue based on distributed message passing. It is used to create execution units (i.e. tasks) which are then executed on one or more worker nodes, either synchronously or asynchronously. 
+Celery is an asynchronous task queue based on distributed message passing. It is used to create execution units (i.e. tasks) which are then executed on one or more worker nodes, either synchronously or asynchronously.
 
 Celery is implemented in Python.
 
@@ -249,7 +249,7 @@ On GCE this can be done with:
 ```
 
 Please remember to delete the rule after you are done with the example (on GCE: `$ gcloud compute firewall-rules delete kubernetes-minion-5555`)
- 
+
 To bring up the pods, run this command `$ kubectl create -f examples/celery-rabbitmq/flower-controller.yaml`. This controller is defined as so:
 
 <!-- BEGIN MUNGE: EXAMPLE flower-controller.yaml -->

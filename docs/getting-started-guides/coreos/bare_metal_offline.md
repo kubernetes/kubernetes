@@ -59,13 +59,13 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 
 ## High Level Design
 
-1. Manage the tftp directory 
+1. Manage the tftp directory
   * /tftpboot/(coreos)(centos)(RHEL)
   * /tftpboot/pxelinux.0/(MAC) -> linked to Linux image config file
 2. Update per install the link for pxelinux
 3. Update the DHCP config to reflect the host needing deployment
-4. Setup nodes to deploy CoreOS creating a etcd cluster. 
-5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/). 
+4. Setup nodes to deploy CoreOS creating a etcd cluster.
+5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/).
 6. Installing the CoreOS slaves to become Kubernetes nodes.
 
 ## This Guides variables
@@ -115,7 +115,7 @@ To setup CentOS PXELINUX environment there is a complete [guide here](http://doc
         timeout 15
         ONTIMEOUT local
         display boot.msg
-        
+
         MENU TITLE Main Menu
 
         LABEL local
@@ -126,7 +126,7 @@ Now you should have a working PXELINUX setup to image CoreOS nodes. You can veri
 
 ## Adding CoreOS to PXE
 
-This section describes how to setup the CoreOS images to live alongside a pre-existing PXELINUX environment. 
+This section describes how to setup the CoreOS images to live alongside a pre-existing PXELINUX environment.
 
 1. Find or create the TFTP root directory that everything will be based off of.
     * For this document we will assume `/tftpboot/` is our root directory.
@@ -170,9 +170,9 @@ This section describes how to setup the CoreOS images to live alongside a pre-ex
                 APPEND initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<xxx.xxx.xxx.xxx>/pxe-cloud-config-slave.yml
         MENU END
 
-This configuration file will now boot from local drive but have the option to PXE image CoreOS. 
+This configuration file will now boot from local drive but have the option to PXE image CoreOS.
 
-## DHCP configuration 
+## DHCP configuration
 
 This section covers configuring the DHCP server to hand out our new images. In this case we are assuming that there are other servers that will boot alongside other images.
 
@@ -186,7 +186,7 @@ This section covers configuring the DHCP server to hand out our new images. In t
                 next-server 10.20.30.242;
                 option broadcast-address 10.20.30.255;
                 filename "<other default image>";
-        
+
                 ...
                 # http://www.syslinux.org/wiki/index.php/PXELINUX
                 host core_os_master {
@@ -194,7 +194,7 @@ This section covers configuring the DHCP server to hand out our new images. In t
                         option routers 10.20.30.1;
                         fixed-address 10.20.30.40;
                         option domain-name-servers 10.20.30.242;
-                        filename "/pxelinux.0";        
+                        filename "/pxelinux.0";
                 }
                 host core_os_slave {
                         hardware ethernet d0:00:67:13:0d:01;
@@ -217,7 +217,7 @@ We will be specifying the node configuration later in the guide.
 
 ## Kubernetes
 
-To deploy our configuration we need to create an `etcd` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here. 
+To deploy our configuration we need to create an `etcd` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here.
 1. Is to template the cloud config file and programmatically create new static configs for different cluster setups.
 2. Have a service discovery protocol running in our stack to do auto discovery.
 
@@ -427,7 +427,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
             --logtostderr=true
             Restart=always
             RestartSec=10
-        - name: kube-controller-manager.service 
+        - name: kube-controller-manager.service
           command: start
           content: |
             [Unit]
@@ -535,7 +535,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
           command: start
           content: |
             [Unit]
-            After=network-online.target 
+            After=network-online.target
             Wants=network-online.target
             Description=flannel is an etcd backed overlay network for containers
             [Service]

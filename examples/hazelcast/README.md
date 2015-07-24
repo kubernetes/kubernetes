@@ -56,7 +56,7 @@ Source is freely available at:
 
 ### Simple Single Pod Hazelcast Node
 
-In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes. 
+In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
 
 In this case, we shall not run a single Hazelcast pod, because the discovery mechanism now relies on a service definition.
 

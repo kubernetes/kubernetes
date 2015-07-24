@@ -39,7 +39,7 @@ crafting your own customized cluster.  We'll guide you in picking a solution tha
 
 ## Picking the Right Solution
 
-If you just want to "kick the tires" on Kubernetes, we recommend the [local Docker-based](docker.md) solution.  
+If you just want to "kick the tires" on Kubernetes, we recommend the [local Docker-based](docker.md) solution.
 
 The local Docker-based solution is one of several [Local cluster](#local-machine-solutions) solutions
 that are quick to set up, but are limited to running on one machine.
@@ -50,9 +50,9 @@ solution is the easiest to create and maintain.
 [Turn-key cloud solutions](#turn-key-cloud-solutions) require only a few commands to create
 and cover a wider range of cloud providers.
 
-[Custom solutions](#custom-solutions) require more effort to setup but cover and even 
+[Custom solutions](#custom-solutions) require more effort to setup but cover and even
 they vary from step-by-step instructions to general advice for setting up
-a Kubernetes cluster from scratch. 
+a Kubernetes cluster from scratch.
 
 ### Local-machine Solutions
 
@@ -117,8 +117,8 @@ These solutions are combinations of cloud provider and OS not covered by the abo
 
 - [Offline](coreos/bare_metal_offline.md) (no internet required.  Uses CoreOS and Flannel)
 - [fedora/fedora_ansible_config.md](fedora/fedora_ansible_config.md)
-- [Fedora single node](fedora/fedora_manual_config.md) 
-- [Fedora multi node](fedora/flannel_multi_node_cluster.md) 
+- [Fedora single node](fedora/fedora_manual_config.md)
+- [Fedora multi node](fedora/flannel_multi_node_cluster.md)
 - [Centos](centos/centos_manual_config.md)
 - [Ubuntu](ubuntu.md)
 - [Docker Multi Node](docker-multinode.md)

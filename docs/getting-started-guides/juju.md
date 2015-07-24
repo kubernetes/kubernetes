@@ -262,10 +262,10 @@ works with [Amazon Web Service](https://jujucharms.com/docs/stable/config-aws),
 [Vmware vSphere](https://jujucharms.com/docs/stable/config-vmware).
 
 If you do not see your favorite cloud provider listed many clouds can be
-configured for [manual provisioning](https://jujucharms.com/docs/stable/config-manual).  
+configured for [manual provisioning](https://jujucharms.com/docs/stable/config-manual).
 
 The Kubernetes bundle has been tested on GCE and AWS and found to work with
-version 1.0.0.  
+version 1.0.0.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 This document is meant to highlight and consolidate in one place configuration best practices that are introduced throughout the user-guide and getting-started documentation and examples. This is a living document so if you think of something that is not on this list but might be useful to others, please don't hesitate to file an issue or submit a PR.
 
-1. When writing configuration, use the latest stable API version (currently v1). 
+1. When writing configuration, use the latest stable API version (currently v1).
 1. Configuration should be stored in version control before being pushed to the cluster. This allows configuration to be quickly rolled back if needed and will aid with cluster re-creation and restoration if the worst were to happen.
 1. Use YAML rather than JSON. They can be used interchangeably in almost all scenarios but YAML tends to be more user-friendly for config.
 1. Group related objects together in a single file. This is often better than separate files.

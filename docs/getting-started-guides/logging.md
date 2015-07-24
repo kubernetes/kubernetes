@@ -92,7 +92,7 @@ NAME                                           READY     STATUS    RESTARTS   AG
 counter                                        1/1       Running   0          5m
 ```
 
-This step may take a few minutes to download the ubuntu:14.04 image during which the pod status will be shown as `Pending`. 
+This step may take a few minutes to download the ubuntu:14.04 image during which the pod status will be shown as `Pending`.
 
 One of the nodes is now running the counter pod:
 

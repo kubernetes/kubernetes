@@ -38,7 +38,7 @@ nginx serving content from your persistent volume.
 
 This guide assumes knowledge of Kubernetes fundamentals and that you have a cluster up and running.
 
-See [Persistent Storage design document](../../design/persistent-storage.md) for more information. 
+See [Persistent Storage design document](../../design/persistent-storage.md) for more information.
 
 ## Provisioning
 
@@ -51,7 +51,7 @@ for ease of development and testing.  You'll create a local `HostPath` for this 
 > IMPORTANT! For `HostPath` to work, you will need to run a single node cluster.  Kubernetes does not
 support local storage on the host at this time.  There is no guarantee your pod ends up on the correct node where the `HostPath` resides.
 
-  
+
 
 ```console
 # This will be nginx's webroot
@@ -70,7 +70,7 @@ pv0001    type=local   10737418240   RWO           Available
 ## Requesting storage
 
 Users of Kubernetes request persistent storage for their pods.  They don't know how the underlying cluster is provisioned.
-They just know they can rely on their claim to storage and can manage its lifecycle independently from the many pods that may use it.  
+They just know they can rely on their claim to storage and can manage its lifecycle independently from the many pods that may use it.
 
 Claims must be created in the same namespace as the pods that use them.
 
@@ -114,7 +114,7 @@ kubernetes        component=apiserver,provider=kubernetes   <none>              
 
 ## Next steps
 
-You should be able to query your service endpoint and see what content nginx is serving.  A "forbidden" error might mean you 
+You should be able to query your service endpoint and see what content nginx is serving.  A "forbidden" error might mean you
 need to disable SELinux (setenforce 0).
 
 ```console

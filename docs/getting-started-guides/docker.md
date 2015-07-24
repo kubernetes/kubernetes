@@ -80,7 +80,7 @@ docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.1 
 
 ### Test it out
 
-At this point you should have a running Kubernetes cluster.  You can test this by downloading the kubectl 
+At this point you should have a running Kubernetes cluster.  You can test this by downloading the kubectl
 binary
 ([OS X](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
 ([linux](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))

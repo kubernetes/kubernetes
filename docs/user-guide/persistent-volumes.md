@@ -65,7 +65,7 @@ Managing storage is a distinct problem from managing compute. The `PersistentVol
 
 A `PersistentVolume` (PV) is a piece of networked storage in the cluster that has been provisioned by an administrator.  It is a resource in the cluster just like a node is a cluster resource.   PVs are volume plugins like Volumes, but have a lifecycle independent of any individual pod that uses the PV.  This API object captures the details of the implementation of the storage, be that NFS, iSCSI, or a cloud-provider-specific storage system.
 
-A `PersistentVolumeClaim` (PVC) is a request for storage by a user.  It is similar to a pod.  Pods consume node resources and PVCs consume PV resources.  Pods can request specific levels of resources (CPU and Memory).  Claims can request specific size and access modes (e.g, can be mounted once read/write or many times read-only).  
+A `PersistentVolumeClaim` (PVC) is a request for storage by a user.  It is similar to a pod.  Pods consume node resources and PVCs consume PV resources.  Pods can request specific levels of resources (CPU and Memory).  Claims can request specific size and access modes (e.g, can be mounted once read/write or many times read-only).
 
 Please see the [detailed walkthrough with working examples](persistent-volumes/).
 
@@ -113,7 +113,7 @@ A `PersistentVolume's` reclaim policy tells the cluster what to do with the volu
 
 ## Persistent Volumes
 
-Each PV contains a spec and status, which is the specification and status of the volume.  
+Each PV contains a spec and status, which is the specification and status of the volume.
 
 
 ```yaml
