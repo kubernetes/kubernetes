@@ -60,24 +60,25 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectResta
 	initialRestartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
 	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
 
-	// Wait for at most 48 * 5 = 240s = 4 minutes until restartCount is incremented
-	restarts := false
-	for i := 0; i < 48; i++ {
-		// Wait until restartCount is incremented.
-		time.Sleep(5 * time.Second)
+	// Wait for the restart state to be as desired.
+	restarts, deadline := false, time.Now().Add(2*time.Minute)
+	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = c.Pods(ns).Get(podDescr.Name)
 		expectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
 		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
-		By(fmt.Sprintf("Restart count of pod %s in namespace %s is now %d", podDescr.Name, ns, restartCount))
+		By(fmt.Sprintf("Restart count of pod %s/%s is now %d (%v elapsed)",
+			ns, podDescr.Name, restartCount, time.Since(start)))
 		if restartCount > initialRestartCount {
-			By(fmt.Sprintf("Restart count of pod %s in namespace %s increased from %d to %d during the test", podDescr.Name, ns, initialRestartCount, restartCount))
+			By(fmt.Sprintf("Restart count of pod %s/%s changed from %d to %d",
+				ns, podDescr.Name, initialRestartCount, restartCount))
 			restarts = true
 			break
 		}
 	}
 
 	if restarts != expectRestart {
-		Fail(fmt.Sprintf("pod %s in namespace %s - expected restarts: %v, found restarts: %v", podDescr.Name, ns, expectRestart, restarts))
+		Failf("pod %s/%s - expected restarts: %t, found restarts: %t",
+			ns, podDescr.Name, expectRestart, restarts)
 	}
 }
 
@@ -88,7 +89,7 @@ func testHostIP(c *client.Client, ns string, pod *api.Pod) {
 	defer podClient.Delete(pod.Name, nil)
 	_, err := podClient.Create(pod)
 	if err != nil {
-		Fail(fmt.Sprintf("Failed to create pod: %v", err))
+		Failf("Failed to create pod: %v", err)
 	}
 	By("ensuring that pod is running and has a hostIP")
 	// Wait for the pods to enter the running state. Waiting loops until the pods
@@ -166,7 +167,7 @@ var _ = Describe("Pods", func() {
 		defer podClient.Delete(pod.Name, nil)
 		_, err := podClient.Create(pod)
 		if err != nil {
-			Fail(fmt.Sprintf("Error creating a pod: %v", err))
+			Failf("Error creating a pod: %v", err)
 		}
 		expectNoError(framework.WaitForPodRunning(pod.Name))
 	})
@@ -208,13 +209,13 @@ var _ = Describe("Pods", func() {
 		By("setting up watch")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
+			Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
 		w, err := podClient.Watch(
 			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(), pods.ListMeta.ResourceVersion)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to set up watch: %v", err))
+			Failf("Failed to set up watch: %v", err)
 		}
 
 		By("submitting the pod to kubernetes")
@@ -224,13 +225,13 @@ var _ = Describe("Pods", func() {
 		defer podClient.Delete(pod.Name, nil)
 		_, err = podClient.Create(pod)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to create pod: %v", err))
+			Failf("Failed to create pod: %v", err)
 		}
 
 		By("verifying the pod is in kubernetes")
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
+			Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(1))
 
@@ -238,7 +239,7 @@ var _ = Describe("Pods", func() {
 		select {
 		case event, _ := <-w.ResultChan():
 			if event.Type != watch.Added {
-				Fail(fmt.Sprintf("Failed to observe pod creation: %v", event))
+				Failf("Failed to observe pod creation: %v", event)
 			}
 		case <-time.After(podStartTimeout):
 			Fail("Timeout while waiting for pod creation")
@@ -248,7 +249,7 @@ var _ = Describe("Pods", func() {
 		podClient.Delete(pod.Name, nil)
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to delete pod: %v", err))
+			Failf("Failed to delete pod: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
 
@@ -375,7 +376,7 @@ var _ = Describe("Pods", func() {
 		defer framework.Client.Pods(framework.Namespace.Name).Delete(serverPod.Name, nil)
 		_, err := framework.Client.Pods(framework.Namespace.Name).Create(serverPod)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))
+			Failf("Failed to create serverPod: %v", err)
 		}
 		expectNoError(framework.WaitForPodRunning(serverPod.Name))
 
@@ -407,7 +408,7 @@ var _ = Describe("Pods", func() {
 		defer framework.Client.Services(framework.Namespace.Name).Delete(svc.Name)
 		_, err = framework.Client.Services(framework.Namespace.Name).Create(svc)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to create service: %v", err))
+			Failf("Failed to create service: %v", err)
 		}
 
 		// Make a client pod that verifies that it has the service environment variables.
@@ -528,7 +529,7 @@ var _ = Describe("Pods", func() {
 		It("should support remote command execution", func() {
 			clientConfig, err := loadConfig()
 			if err != nil {
-				Fail(fmt.Sprintf("Failed to create client config: %v", err))
+				Failf("Failed to create client config: %v", err)
 			}
 
 			podClient := framework.Client.Pods(framework.Namespace.Name)
@@ -557,7 +558,7 @@ var _ = Describe("Pods", func() {
 			By("submitting the pod to kubernetes")
 			_, err = podClient.Create(pod)
 			if err != nil {
-				Fail(fmt.Sprintf("Failed to create pod: %v", err))
+				Failf("Failed to create pod: %v", err)
 			}
 			defer func() {
 				// We call defer here in case there is a problem with
@@ -572,7 +573,7 @@ var _ = Describe("Pods", func() {
 			By("verifying the pod is in kubernetes")
 			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 			if err != nil {
-				Fail(fmt.Sprintf("Failed to query for pods: %v", err))
+				Failf("Failed to query for pods: %v", err)
 			}
 			Expect(len(pods.Items)).To(Equal(1))
 
@@ -589,18 +590,18 @@ var _ = Describe("Pods", func() {
 			e := remotecommand.New(req, clientConfig, []string{"whoami"}, nil, out, nil, false)
 			err = e.Execute()
 			if err != nil {
-				Fail(fmt.Sprintf("Failed to execute command on host %s pod %s in container %s: %v",
-					pod.Status.Host, pod.Name, pod.Spec.Containers[0].Name, err))
+				Failf("Failed to execute command on host %s pod %s in container %s: %v",
+					pod.Status.Host, pod.Name, pod.Spec.Containers[0].Name, err)
 			}
 			if e, a := "root\n", out.String(); e != a {
-				Fail(fmt.Sprintf("exec: whoami: expected '%s', got '%s'", e, a))
+				Failf("exec: whoami: expected '%s', got '%s'", e, a)
 			}
 		})
 
 		It("should support port forwarding", func() {
 			clientConfig, err := loadConfig()
 			if err != nil {
-				Fail(fmt.Sprintf("Failed to create client config: %v", err))
+				Failf("Failed to create client config: %v", err)
 			}
 
 			podClient := framework.Client.Pods(framework.Namespace.Name)
@@ -630,7 +631,7 @@ var _ = Describe("Pods", func() {
 			By("submitting the pod to kubernetes")
 			_, err = podClient.Create(pod)
 			if err != nil {
-				Fail(fmt.Sprintf("Failed to create pod: %v", err))
+				Failf("Failed to create pod: %v", err)
 			}
 			defer func() {
 				// We call defer here in case there is a problem with
@@ -645,7 +646,7 @@ var _ = Describe("Pods", func() {
 			By("verifying the pod is in kubernetes")
 			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 			if err != nil {
-				Fail(fmt.Sprintf("Failed to query for pods: %v", err))
+				Failf("Failed to query for pods: %v", err)
 			}
 			Expect(len(pods.Items)).To(Equal(1))
 
@@ -662,7 +663,7 @@ var _ = Describe("Pods", func() {
 			stopChan := make(chan struct{})
 			pf, err := portforward.New(req, clientConfig, []string{"5678:80"}, stopChan)
 			if err != nil {
-				Fail(fmt.Sprintf("Error creating port forwarder: %s", err))
+				Failf("Error creating port forwarder: %s", err)
 			}
 
 			errorChan := make(chan error)
@@ -675,11 +676,11 @@ var _ = Describe("Pods", func() {
 
 			resp, err := http.Get("http://localhost:5678/")
 			if err != nil {
-				Fail(fmt.Sprintf("Error with http get to localhost:5678: %s", err))
+				Failf("Error with http get to localhost:5678: %s", err)
 			}
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				Fail(fmt.Sprintf("Error reading response body: %s", err))
+				Failf("Error reading response body: %s", err)
 			}
 
 			titleRegex := regexp.MustCompile("<title>(.+)</title>")
@@ -688,7 +689,7 @@ var _ = Describe("Pods", func() {
 				Fail("Unable to locate page title in response HTML")
 			}
 			if e, a := "Welcome to nginx on Debian!", matches[1]; e != a {
-				Fail(fmt.Sprintf("<title>: expected '%s', got '%s'", e, a))
+				Failf("<title>: expected '%s', got '%s'", e, a)
 			}
 		})
 	*/
