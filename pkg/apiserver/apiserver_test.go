@@ -2196,7 +2196,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		t:           t,
 		name:        "bar",
 		namespace:   "other",
-		expectedSet: "/api/version/foo/bar?namespace=other",
+		expectedSet: "/api/version/namespaces/other/foo/bar",
 	}
 	handler := handleInternal(true, map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
 	server := httptest.NewServer(handler)
@@ -2207,7 +2207,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		Other: "bar",
 	}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/api/version/foo?namespace=other", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2330,7 +2330,7 @@ func TestCreateTimeout(t *testing.T) {
 
 	simple := &Simple{Other: "foo"}
 	data, _ := codec.Encode(simple)
-	itemOut := expectApiStatus(t, "POST", server.URL+"/api/version/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
+	itemOut := expectApiStatus(t, "POST", server.URL+"/api/version/namespaces/default/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
 	if itemOut.Status != api.StatusFailure || itemOut.Reason != api.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
