@@ -57,6 +57,8 @@ Documentation for other releases can be found at
 * If something went wrong, see the [troubleshooting](troubleshooting.md) document for how to debug.
 You should also check the [known issues](user-guide/known-issues.md) for the release you're using.
 
+* To report a security issue, see [Reporting a Security Issue](reporting-security-issues.md).
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/README.md?pixel)]()
