@@ -344,6 +344,46 @@ var _ = Describe("Examples e2e", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Describe("[Skipped][Example]RethinkDB", func() {
+		It("should create and stop rethinkdb servers", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "rethinkdb", file)
+			}
+			driverServiceYaml := mkpath("driver-service.yaml")
+			rethinkDbControllerYaml := mkpath("rc.yaml")
+			adminPodYaml := mkpath("admin-pod.yaml")
+			adminServiceYaml := mkpath("admin-service.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("starting rethinkdb")
+			runKubectl("create", "-f", driverServiceYaml, nsFlag)
+			runKubectl("create", "-f", rethinkDbControllerYaml, nsFlag)
+			checkDbInstances := func() {
+				forEachPod(c, ns, "db", "rethinkdb", func(pod api.Pod) {
+					_, err := lookForStringInLog(ns, pod.Name, "rethinkdb", "Server ready", serverStartTimeout)
+					Expect(err).NotTo(HaveOccurred())
+				})
+			}
+			checkDbInstances()
+
+			By("scaling rethinkdb")
+			ScaleRC(c, ns, "rethinkdb-rc", 2)
+			checkDbInstances()
+
+			By("starting admin")
+			runKubectl("create", "-f", adminServiceYaml, nsFlag)
+			runKubectl("create", "-f", adminPodYaml, nsFlag)
+			err := waitForPodRunningInNamespace(c, "rethinkdb-admin", ns)
+			Expect(err).NotTo(HaveOccurred())
+			checkDbInstances()
+			content, err := makeHttpRequestToService(c, ns, "rethinkdb-admin", "/")
+			Expect(err).NotTo(HaveOccurred())
+			if !strings.Contains(content, "<title>RethinkDB Administration Console</title>") {
+				Failf("RethinkDB console is not running")
+			}
+		})
+	})
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {
