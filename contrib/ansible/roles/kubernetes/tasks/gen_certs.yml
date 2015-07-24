@@ -7,6 +7,7 @@
   with_items:
     - openssl
     - curl
+  when: not is_atomic
 
 #- name: Get create ca cert script from Kubernetes
 #  get_url:

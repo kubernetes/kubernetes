@@ -1,13 +1,7 @@
 ---
-- name: Check if selinux enforcing
-  command: getenforce
-  register: selinux
-  changed_when: false
-  when: ansible_selinux
-
 - name: Set selinux permissive because tokens and selinux don't work together
-  selinux: state=permissive policy=targeted
-  when: ansible_selinux and 'Enforcing' in selinux.stdout
+  selinux: state=permissive policy={{ ansible_selinux.type }}
+  when: ansible_selinux is defined and ansible_selinux.status == "enabled"
 
 - include: packageManagerInstall.yml
   when: source_type == "packageManager"
