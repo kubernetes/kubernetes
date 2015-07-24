@@ -17,335 +17,229 @@ limitations under the License.
 package config
 
 import (
-	"errors"
-	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-func TestServices(t *testing.T) {
-	service := api.Service{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}}
+type fakeLW struct {
+	listResp  runtime.Object
+	watchResp watch.Interface
+}
 
+func (lw fakeLW) List() (runtime.Object, error) {
+	return lw.listResp, nil
+}
+
+func (lw fakeLW) Watch(resourceVersion string) (watch.Interface, error) {
+	return lw.watchResp, nil
+}
+
+var _ cache.ListerWatcher = fakeLW{}
+
+func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
+	service1v1 := &api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}}}
+	service1v2 := &api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}}}
+	service2 := &api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "s2"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 30}}}}
+
+	// Setup fake api client.
 	fakeWatch := watch.NewFake()
-	fakeClient := &testclient.Fake{Watch: fakeWatch}
-	services := make(chan ServiceUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll), services: services},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll)}}
-	resourceVersion := "1"
-	go func() {
-		// called twice
-		source.s.run(&resourceVersion)
-		source.s.run(&resourceVersion)
-	}()
-
-	// test adding a service to the watch
-	fakeWatch.Add(&service)
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"watch-services", "1"}}) {
-		t.Errorf("expected call to watch-services, got %#v", fakeClient)
+	lw := fakeLW{
+		listResp:  &api.ServiceList{Items: []api.Service{}},
+		watchResp: fakeWatch,
 	}
 
-	actual := <-services
-	expected := ServiceUpdate{Op: ADD, Services: []api.Service{service}}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
+	ch := make(chan ServiceUpdate)
+
+	newServicesSourceApiFromLW(lw, 30*time.Second, ch)
+
+	got, ok := <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	expected := ServiceUpdate{Op: SET, Services: []api.Service{}}
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v; Got %#v", expected, got)
 	}
 
-	// verify that a delete results in a config change
-	fakeWatch.Delete(&service)
-	actual = <-services
-	expected = ServiceUpdate{Op: REMOVE, Services: []api.Service{service}}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
+	// Add the first service
+	fakeWatch.Add(service1v1)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	expected = ServiceUpdate{Op: SET, Services: []api.Service{*service1v1}}
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v; Got %#v", expected, got)
 	}
 
-	// verify that closing the channel results in a new call to WatchServices with a higher resource version
-	newFakeWatch := watch.NewFake()
-	fakeClient.Watch = newFakeWatch
-	fakeWatch.Stop()
-
-	newFakeWatch.Add(&service)
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"watch-services", "1"}, {"watch-services", "2"}}) {
-		t.Errorf("expected call to watch-endpoints, got %#v", fakeClient)
+	// Add another service
+	fakeWatch.Add(service2)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
 	}
-}
+	// Could be sorted either of these two ways:
+	expectedA := ServiceUpdate{Op: SET, Services: []api.Service{*service1v1, *service2}}
+	expectedB := ServiceUpdate{Op: SET, Services: []api.Service{*service2, *service1v1}}
 
-func TestServicesFromZero(t *testing.T) {
-	service := api.Service{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}}
-
-	fakeWatch := watch.NewFake()
-	fakeWatch.Stop()
-	fakeClient := testclient.NewSimpleFake(&api.ServiceList{
-		ListMeta: api.ListMeta{ResourceVersion: "2"},
-		Items: []api.Service{
-			service,
-		},
-	})
-	fakeClient.Watch = fakeWatch
-	services := make(chan ServiceUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll), services: services},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll)}}
-	resourceVersion := ""
-	ch := make(chan struct{})
-	go func() {
-		source.s.run(&resourceVersion)
-		close(ch)
-	}()
-
-	// should get services SET
-	actual := <-services
-	expected := ServiceUpdate{Op: SET, Services: []api.Service{service}}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
+	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
+		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
 	}
 
-	// should have listed, then watched
-	<-ch
-	if resourceVersion != "2" {
-		t.Errorf("unexpected resource version, got %#v", resourceVersion)
+	// Modify service1
+	fakeWatch.Modify(service1v2)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
 	}
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"list-services", nil}, {"watch-services", "2"}}) {
-		t.Errorf("unexpected actions, got %#v", fakeClient)
+	expectedA = ServiceUpdate{Op: SET, Services: []api.Service{*service1v2, *service2}}
+	expectedB = ServiceUpdate{Op: SET, Services: []api.Service{*service2, *service1v2}}
+
+	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
+		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	}
+
+	// Delete service1
+	fakeWatch.Delete(service1v2)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	expected = ServiceUpdate{Op: SET, Services: []api.Service{*service2}}
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v, Got %#v", expected, got)
+	}
+
+	// Delete service2
+	fakeWatch.Delete(service2)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	expected = ServiceUpdate{Op: SET, Services: []api.Service{}}
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
 }
 
-func TestServicesError(t *testing.T) {
-	fakeClient := &testclient.Fake{Err: errors.New("test")}
-	services := make(chan ServiceUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll), services: services},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll)}}
-	resourceVersion := "1"
-	ch := make(chan struct{})
-	go func() {
-		source.s.run(&resourceVersion)
-		close(ch)
-	}()
-
-	// should have listed only
-	<-ch
-	if resourceVersion != "" {
-		t.Errorf("unexpected resource version, got %#v", resourceVersion)
-	}
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"watch-services", "1"}}) {
-		t.Errorf("unexpected actions, got %#v", fakeClient)
-	}
-}
-
-func TestServicesErrorTimeout(t *testing.T) {
-	fakeClient := &testclient.Fake{Err: errors.New("use of closed network connection")}
-	services := make(chan ServiceUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll), services: services},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll)}}
-	resourceVersion := "1"
-	ch := make(chan struct{})
-	go func() {
-		source.s.run(&resourceVersion)
-		close(ch)
-	}()
-
-	// should have listed only
-	<-ch
-	if resourceVersion != "1" {
-		t.Errorf("unexpected resource version, got %#v", resourceVersion)
-	}
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"watch-services", "1"}}) {
-		t.Errorf("unexpected actions, got %#v", fakeClient)
-	}
-}
-
-func TestServicesFromZeroError(t *testing.T) {
-	fakeClient := &testclient.Fake{Err: errors.New("test")}
-	services := make(chan ServiceUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll), services: services},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll)}}
-	resourceVersion := ""
-	ch := make(chan struct{})
-	go func() {
-		source.s.run(&resourceVersion)
-		close(ch)
-	}()
-
-	// should have listed only
-	<-ch
-	if resourceVersion != "" {
-		t.Errorf("unexpected resource version, got %#v", resourceVersion)
-	}
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"list-services", nil}}) {
-		t.Errorf("unexpected actions, got %#v", fakeClient)
-	}
-}
-
-func TestEndpoints(t *testing.T) {
-	endpoint := api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
+func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
+	endpoints1v1 := &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
 		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-			Ports:     []api.EndpointPort{{Port: 9000}},
+			Addresses: []api.EndpointAddress{
+				{IP: "1.2.3.4"},
+			},
+			Ports: []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	}
+	endpoints1v2 := &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{
+				{IP: "1.2.3.4"},
+				{IP: "4.3.2.1"},
+			},
+			Ports: []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	}
+	endpoints2 := &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "e2"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{
+				{IP: "5.6.7.8"},
+			},
+			Ports: []api.EndpointPort{{Port: 80, Protocol: "TCP"}},
 		}},
 	}
 
+	// Setup fake api client.
 	fakeWatch := watch.NewFake()
-	fakeClient := &testclient.Fake{Watch: fakeWatch}
-	endpoints := make(chan EndpointsUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll)},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll), endpoints: endpoints}}
-	resourceVersion := "1"
-	go func() {
-		// called twice
-		source.e.run(&resourceVersion)
-		source.e.run(&resourceVersion)
-	}()
-
-	// test adding an endpoint to the watch
-	fakeWatch.Add(&endpoint)
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"watch-endpoints", "1"}}) {
-		t.Errorf("expected call to watch-endpoints, got %#v", fakeClient)
+	lw := fakeLW{
+		listResp:  &api.EndpointsList{Items: []api.Endpoints{}},
+		watchResp: fakeWatch,
 	}
 
-	actual := <-endpoints
-	expected := EndpointsUpdate{Op: ADD, Endpoints: []api.Endpoints{endpoint}}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
+	ch := make(chan EndpointsUpdate)
+
+	newEndpointsSourceApiFromLW(lw, 30*time.Second, ch)
+
+	got, ok := <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	expected := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{}}
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v; Got %#v", expected, got)
 	}
 
-	// verify that a delete results in a config change
-	fakeWatch.Delete(&endpoint)
-	actual = <-endpoints
-	expected = EndpointsUpdate{Op: REMOVE, Endpoints: []api.Endpoints{endpoint}}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
+	// Add the first endpoints
+	fakeWatch.Add(endpoints1v1)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v1}}
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v; Got %#v", expected, got)
 	}
 
-	// verify that closing the channel results in a new call to WatchEndpoints with a higher resource version
-	newFakeWatch := watch.NewFake()
-	fakeClient.Watch = newFakeWatch
-	fakeWatch.Stop()
-
-	newFakeWatch.Add(&endpoint)
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"watch-endpoints", "1"}, {"watch-endpoints", "2"}}) {
-		t.Errorf("expected call to watch-endpoints, got %#v", fakeClient)
+	// Add another endpoints
+	fakeWatch.Add(endpoints2)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
 	}
-}
+	// Could be sorted either of these two ways:
+	expectedA := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v1, *endpoints2}}
+	expectedB := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2, *endpoints1v1}}
 
-func TestEndpointsFromZero(t *testing.T) {
-	endpoint := api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-			Ports:     []api.EndpointPort{{Port: 9000}},
-		}},
+	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
+		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
 	}
 
-	fakeWatch := watch.NewFake()
-	fakeWatch.Stop()
-	fakeClient := testclient.NewSimpleFake(&api.EndpointsList{
-		ListMeta: api.ListMeta{ResourceVersion: "2"},
-		Items: []api.Endpoints{
-			endpoint,
-		},
-	})
-	fakeClient.Watch = fakeWatch
-	endpoints := make(chan EndpointsUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll)},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll), endpoints: endpoints}}
-	resourceVersion := ""
-	ch := make(chan struct{})
-	go func() {
-		source.e.run(&resourceVersion)
-		close(ch)
-	}()
+	// Modify endpoints1
+	fakeWatch.Modify(endpoints1v2)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	expectedA = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v2, *endpoints2}}
+	expectedB = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2, *endpoints1v2}}
 
-	// should get endpoints SET
-	actual := <-endpoints
-	expected := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{endpoint}}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
+	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
+		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
 	}
 
-	// should have listed, then watched
-	<-ch
-	if resourceVersion != "2" {
-		t.Errorf("unexpected resource version, got %#v", resourceVersion)
+	// Delete endpoints1
+	fakeWatch.Delete(endpoints1v2)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
 	}
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"list-endpoints", nil}, {"watch-endpoints", "2"}}) {
-		t.Errorf("unexpected actions, got %#v", fakeClient)
+	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2}}
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
-}
 
-func TestEndpointsError(t *testing.T) {
-	fakeClient := &testclient.Fake{Err: errors.New("test")}
-	endpoints := make(chan EndpointsUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll)},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll), endpoints: endpoints}}
-	resourceVersion := "1"
-	ch := make(chan struct{})
-	go func() {
-		source.e.run(&resourceVersion)
-		close(ch)
-	}()
-
-	// should have listed only
-	<-ch
-	if resourceVersion != "" {
-		t.Errorf("unexpected resource version, got %#v", resourceVersion)
+	// Delete endpoints2
+	fakeWatch.Delete(endpoints2)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
 	}
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"watch-endpoints", "1"}}) {
-		t.Errorf("unexpected actions, got %#v", fakeClient)
-	}
-}
-
-func TestEndpointsErrorTimeout(t *testing.T) {
-	fakeClient := &testclient.Fake{Err: errors.New("use of closed network connection")}
-	endpoints := make(chan EndpointsUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll)},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll), endpoints: endpoints}}
-	resourceVersion := "1"
-	ch := make(chan struct{})
-	go func() {
-		source.e.run(&resourceVersion)
-		close(ch)
-	}()
-
-	// should have listed only
-	<-ch
-	if resourceVersion != "1" {
-		t.Errorf("unexpected resource version, got %#v", resourceVersion)
-	}
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"watch-endpoints", "1"}}) {
-		t.Errorf("unexpected actions, got %#v", fakeClient)
-	}
-}
-
-func TestEndpointsFromZeroError(t *testing.T) {
-	fakeClient := &testclient.Fake{Err: errors.New("test")}
-	endpoints := make(chan EndpointsUpdate)
-	source := SourceAPI{
-		s: servicesReflector{watcher: fakeClient.Services(api.NamespaceAll)},
-		e: endpointsReflector{watcher: fakeClient.Endpoints(api.NamespaceAll), endpoints: endpoints}}
-	resourceVersion := ""
-	ch := make(chan struct{})
-	go func() {
-		source.e.run(&resourceVersion)
-		close(ch)
-	}()
-
-	// should have listed only
-	<-ch
-	if resourceVersion != "" {
-		t.Errorf("unexpected resource version, got %#v", resourceVersion)
-	}
-	if !reflect.DeepEqual(fakeClient.Actions, []testclient.FakeAction{{"list-endpoints", nil}}) {
-		t.Errorf("unexpected actions, got %#v", fakeClient)
+	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{}}
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
 }
