@@ -29,11 +29,12 @@ rmdir $tmpdir
 echo stripping
 for dir in docs examples; do
     find ${OUTDIR}/${dir} -type f -name \*.md | while read X; do
-        sed -i \
+        sed -i .import_docs_tmp \
             -e '/<!-- BEGIN STRIP_FOR_RELEASE.*/,/<!-- END STRIP_FOR_RELEASE.*/d' \
             -e "s|releases.k8s.io/HEAD|releases.k8s.io/${REPORT_TAG}|g" \
             ${X}
     done
+    rm $(find ${OUTDIR}/${dir} -name \*.import_docs_tmp)
     git stage ${OUTDIR}/${dir}
 done
 
