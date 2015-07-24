@@ -80,8 +80,8 @@ function create-kubeconfig() {
   fi
 
   "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
-  if [ -n "${user_args[@]:-}" ]; then
-      "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
+  if [[ -n "${user_args[@]:-}" ]]; then
+    "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
   fi
   "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
   "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
