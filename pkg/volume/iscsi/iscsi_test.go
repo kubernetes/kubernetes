@@ -72,22 +72,22 @@ type fakeDiskManager struct {
 func (fake *fakeDiskManager) MakeGlobalPDName(disk iscsiDisk) string {
 	return "/tmp/fake_iscsi_path"
 }
-func (fake *fakeDiskManager) AttachDisk(disk iscsiDisk) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) AttachDisk(b iscsiDiskBuilder) error {
+	globalPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
 	}
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	disk.mounter.Mount(globalPath, globalPath, disk.fsType, nil)
+	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
 
 	fake.attachCalled = true
 	return nil
 }
 
-func (fake *fakeDiskManager) DetachDisk(disk iscsiDisk, mntPath string) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) DetachDisk(c iscsiDiskCleaner, mntPath string) error {
+	globalPath := c.manager.MakeGlobalPDName(*c.iscsiDisk)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err

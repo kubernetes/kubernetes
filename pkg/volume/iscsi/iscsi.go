@@ -89,17 +89,19 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 
 	lun := strconv.Itoa(iscsi.Lun)
 
-	return &iscsiDisk{
-		podUID:   podUID,
-		volName:  spec.Name,
-		portal:   iscsi.TargetPortal,
-		iqn:      iscsi.IQN,
-		lun:      lun,
+	return &iscsiDiskBuilder{
+		iscsiDisk: &iscsiDisk{
+			podUID:  podUID,
+			volName: spec.Name,
+			portal:  iscsi.TargetPortal,
+			iqn:     iscsi.IQN,
+			lun:     lun,
+			manager: manager,
+			mounter: mounter,
+			plugin:  plugin},
+
 		fsType:   iscsi.FSType,
 		readOnly: iscsi.ReadOnly,
-		manager:  manager,
-		mounter:  mounter,
-		plugin:   plugin,
 	}, nil
 }
 
@@ -109,13 +111,13 @@ func (plugin *iscsiPlugin) NewCleaner(volName string, podUID types.UID, mounter 
 }
 
 func (plugin *iscsiPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &iscsiDisk{
+	return &iscsiDiskCleaner{&iscsiDisk{
 		podUID:  podUID,
 		volName: volName,
 		manager: manager,
 		mounter: mounter,
 		plugin:  plugin,
-	}, nil
+	}}, nil
 }
 
 func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, error) {
@@ -124,15 +126,13 @@ func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, e
 }
 
 type iscsiDisk struct {
-	volName  string
-	podUID   types.UID
-	portal   string
-	iqn      string
-	readOnly bool
-	lun      string
-	fsType   string
-	plugin   *iscsiPlugin
-	mounter  mount.Interface
+	volName string
+	podUID  types.UID
+	portal  string
+	iqn     string
+	lun     string
+	plugin  *iscsiPlugin
+	mounter mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 }
@@ -143,33 +143,47 @@ func (iscsi *iscsiDisk) GetPath() string {
 	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, util.EscapeQualifiedNameForDisk(name), iscsi.volName)
 }
 
-func (iscsi *iscsiDisk) SetUp() error {
-	return iscsi.SetUpAt(iscsi.GetPath())
+type iscsiDiskBuilder struct {
+	*iscsiDisk
+	readOnly bool
+	fsType   string
 }
 
-func (iscsi *iscsiDisk) SetUpAt(dir string) error {
+var _ volume.Builder = &iscsiDiskBuilder{}
+
+func (b *iscsiDiskBuilder) SetUp() error {
+	return b.SetUpAt(b.GetPath())
+}
+
+func (b *iscsiDiskBuilder) SetUpAt(dir string) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(iscsi.manager, *iscsi, dir, iscsi.mounter)
+	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {
 		glog.Errorf("iscsi: failed to setup")
 		return err
 	}
-	globalPDPath := iscsi.manager.MakeGlobalPDName(*iscsi)
+	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	var options []string
-	if iscsi.readOnly {
+	if b.readOnly {
 		options = []string{"remount", "ro"}
 	} else {
 		options = []string{"remount", "rw"}
 	}
-	return iscsi.mounter.Mount(globalPDPath, dir, "", options)
+	return b.mounter.Mount(globalPDPath, dir, "", options)
 }
+
+type iscsiDiskCleaner struct {
+	*iscsiDisk
+}
+
+var _ volume.Cleaner = &iscsiDiskCleaner{}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
-func (iscsi *iscsiDisk) TearDown() error {
-	return iscsi.TearDownAt(iscsi.GetPath())
+func (c *iscsiDiskCleaner) TearDown() error {
+	return c.TearDownAt(c.GetPath())
 }
 
-func (iscsi *iscsiDisk) TearDownAt(dir string) error {
-	return diskTearDown(iscsi.manager, *iscsi, dir, iscsi.mounter)
+func (c *iscsiDiskCleaner) TearDownAt(dir string) error {
+	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
