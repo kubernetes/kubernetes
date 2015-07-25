@@ -17,13 +17,13 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"math/rand"
 	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	utilrand "github.com/GoogleCloudPlatform/kubernetes/pkg/util/rand"
 )
 
 type testGenerator struct {
@@ -107,7 +107,8 @@ func createdTokenSecret() *api.Secret {
 		},
 		Type: api.SecretTypeServiceAccountToken,
 		Data: map[string][]byte{
-			"token": []byte("ABC"),
+			"token":  []byte("ABC"),
+			"ca.crt": []byte("CA Data"),
 		},
 	}
 }
@@ -127,7 +128,8 @@ func serviceAccountTokenSecret() *api.Secret {
 		},
 		Type: api.SecretTypeServiceAccountToken,
 		Data: map[string][]byte{
-			"token": []byte("ABC"),
+			"token":  []byte("ABC"),
+			"ca.crt": []byte("CA Data"),
 		},
 	}
 }
@@ -135,7 +137,21 @@ func serviceAccountTokenSecret() *api.Secret {
 // serviceAccountTokenSecretWithoutTokenData returns an existing ServiceAccountToken secret that lacks token data
 func serviceAccountTokenSecretWithoutTokenData() *api.Secret {
 	secret := serviceAccountTokenSecret()
-	secret.Data = nil
+	delete(secret.Data, api.ServiceAccountTokenKey)
+	return secret
+}
+
+// serviceAccountTokenSecretWithoutCAData returns an existing ServiceAccountToken secret that lacks ca data
+func serviceAccountTokenSecretWithoutCAData() *api.Secret {
+	secret := serviceAccountTokenSecret()
+	delete(secret.Data, api.ServiceAccountRootCAKey)
+	return secret
+}
+
+// serviceAccountTokenSecretWithCAData returns an existing ServiceAccountToken secret with the specified ca data
+func serviceAccountTokenSecretWithCAData(data []byte) *api.Secret {
+	secret := serviceAccountTokenSecret()
+	secret.Data[api.ServiceAccountRootCAKey] = data
 	return secret
 }
 
@@ -321,6 +337,24 @@ func TestTokenCreation(t *testing.T) {
 				{Action: "update-secret", Value: serviceAccountTokenSecret()},
 			},
 		},
+		"added token secret without ca data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithoutCAData()},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			AddedSecret: serviceAccountTokenSecretWithoutCAData(),
+			ExpectedActions: []testclient.FakeAction{
+				{Action: "update-secret", Value: serviceAccountTokenSecret()},
+			},
+		},
+		"added token secret with mismatched ca data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithCAData([]byte("mismatched"))},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			AddedSecret: serviceAccountTokenSecretWithCAData([]byte("mismatched")),
+			ExpectedActions: []testclient.FakeAction{
+				{Action: "update-secret", Value: serviceAccountTokenSecret()},
+			},
+		},
 
 		"updated secret without serviceaccount": {
 			ClientObjects: []runtime.Object{serviceAccountTokenSecret()},
@@ -342,6 +376,24 @@ func TestTokenCreation(t *testing.T) {
 			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
 
 			UpdatedSecret: serviceAccountTokenSecretWithoutTokenData(),
+			ExpectedActions: []testclient.FakeAction{
+				{Action: "update-secret", Value: serviceAccountTokenSecret()},
+			},
+		},
+		"updated token secret without ca data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithoutCAData()},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			UpdatedSecret: serviceAccountTokenSecretWithoutCAData(),
+			ExpectedActions: []testclient.FakeAction{
+				{Action: "update-secret", Value: serviceAccountTokenSecret()},
+			},
+		},
+		"updated token secret with mismatched ca data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithCAData([]byte("mismatched"))},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			UpdatedSecret: serviceAccountTokenSecretWithCAData([]byte("mismatched")),
 			ExpectedActions: []testclient.FakeAction{
 				{Action: "update-secret", Value: serviceAccountTokenSecret()},
 			},
@@ -372,13 +424,13 @@ func TestTokenCreation(t *testing.T) {
 	for k, tc := range testcases {
 
 		// Re-seed to reset name generation
-		rand.Seed(1)
+		utilrand.Seed(1)
 
 		generator := &testGenerator{Token: "ABC"}
 
 		client := testclient.NewSimpleFake(tc.ClientObjects...)
 
-		controller := NewTokensController(client, TokensControllerOptions{TokenGenerator: generator})
+		controller := NewTokensController(client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data")})
 
 		// Tell the token controller whether its stores have been synced
 		controller.serviceAccountsSynced = func() bool { return !tc.ServiceAccountsSyncPending }

@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/examples/explorer/README.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ### explorer
 
 Explorer is a little container for examining the runtime environment kubernetes produces for your pods.
@@ -12,8 +45,9 @@ Currently, you can look at:
 `pod.json` is supplied as an example. You can control the port it serves on with the -port flag.
 
 Example from command line (the DNS lookup looks better from a web browser):
-```
-$ kubectl create -f pod.json
+
+```console
+$ kubectl create -f examples/explorer/pod.json
 $ kubectl proxy &
 Starting to serve on localhost:8001
 
@@ -105,8 +139,8 @@ Result: ([]string)<nil>
 Error: &lt;*&gt;lookup elasticsearch-logging: no such host
 
 LookupSRV(&#34;&#34;, &#34;&#34;, elasticsearch-logging):
-cname: elasticsearch-logging.default.cluster.local.
-Result: ([]*net.SRV)[&lt;*&gt;{Target:(string)elasticsearch-logging.default.cluster.local. Port:(uint16)9200 Priority:(uint16)10 Weight:(uint16)100}]
+cname: elasticsearch-logging.default.svc.cluster.local.
+Result: ([]*net.SRV)[&lt;*&gt;{Target:(string)elasticsearch-logging.default.svc.cluster.local. Port:(uint16)9200 Priority:(uint16)10 Weight:(uint16)100}]
 Error: <nil>
 
 LookupHost(elasticsearch-logging):
@@ -127,4 +161,6 @@ Error: &lt;*&gt;lookup elasticsearch-logging: no such host
 ```
 
 
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/explorer/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

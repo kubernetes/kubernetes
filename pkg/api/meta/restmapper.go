@@ -66,8 +66,7 @@ type typeMeta struct {
 // can be mapped with the provided MetadataAccessor and Codec interfaces.
 //
 // The resource name of a Kind is defined as the lowercase,
-// English-plural version of the Kind string in v1beta3 and onwards,
-// and as the camelCase version of the name in v1beta1 and v1beta2.
+// English-plural version of the Kind string.
 // When converting from resource to Kind, the singular version of the
 // resource name is also accepted for convenience.
 //

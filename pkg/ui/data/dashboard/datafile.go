@@ -71,12 +71,12 @@ func www_app_assets_css_app_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 39855, mode: os.FileMode(420), modTime: time.Unix(1435851600, 0)}
+	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 39855, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _www_app_assets_img_docarrow_png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00!\x00\x00\x00\"\b\x06\x00\x00\x00\xd1p\xb0\xc1\x00\x00\x00\x04sBIT\b\b\b\b|\bd\x88\x00\x00\x00\tpHYs\x00\x00\x15\xfd\x00\x00\x15\xfd\x01\xcdpQa\x00\x00\x00\x1ctEXtSoftware\x00Adobe Fireworks CS6\u8f32\x8c\x00\x00\x00\xefIDATX\x85\xd5\xd71\x0e\xc20\f\x05\u0406\xebq\x0568\x01\x8c\x1c\x80\xeep\x1aV\x18Y`\x05\xc1\x19\x10e\x81\xe13\x05UU\xab\xd8\xf1\xb7\xa2~\xc9K\x87\xf4)\x8e\xea4\x00\xa8JgR\x1aPUcB\x84\x10\xfeU\xef.X\xac\x8eh?KU2\x00\x92\x15\xb3\u065e\x01\x00\xaf\xe6\x83\xf9\xf2 >L\xc9\xf5\xa5\x88\b\x88\xd1@(\x88u}B_\xa4\x10\nb:\xdb\xe3\xf6xfCh\xed\xb0@h\b\v\x84\x8a\u0205\xd0\x119\x10\x17\x84\x16\xe2\x86\xd0@\\\x11R\x88;\x82\x01\xa1 \xac\x10\xea(\x1f\xf2&')\xab\x1d\xd7{\xff.4\xef\xaf\u007f;\xac\x003B\x02\x90\xec\xb6\xe9c%\x01\xb8!4\x00\x17\x84\x16@G\xe4\x00\xa8\x88\\\x00\ra\x01\xd0\x10C\x17]\t\x80\u068e\xee\x95_\n\xa0\"\xda\x10\r\x80\x8e\x88\x10\r@\x82\b\u0757\x94\xc8x\xfe\u02bd\xf3\x03\xba\v\x18\x94\x12\x8b\x872\x00\x00\x00\x00IEND\xaeB`\x82")
+var _www_app_assets_img_docarrow_png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00!\x00\x00\x00\"\b\x06\x00\x00\x00\xd1p\xb0\xc1\x00\x00\x00\x04sBIT\b\b\b\b|\bd\x88\x00\x00\x00\tpHYs\x00\x00\x15\xfd\x00\x00\x15\xfd\x01\xcdpQa\x00\x00\x00\x1ctEXtSoftware\x00Adobe Fireworks CS6輲\x8c\x00\x00\x00\xefIDATX\x85\xd5\xd71\x0e\xc20\f\x05І\xebq\x0568\x01\x8c\x1c\x80\xeep\x1aV\x18Y`\x05\xc1\x19\x10e\x81\xe13\x05UU\xab\xd8\xf1\xb7\xa2~\xc9K\x87\xf4)\x8e\xea4\x00\xa8JgR\x1aPUcB\x84\x10\xfeU\xef.X\xac\x8eh?KU2\x00\x92\x15\xb3ٞ\x01\x00\xaf\xe6\x83\xf9\xf2 >L\xc9\xf5\xa5\x88\b\x88\xd1@(\x88u}B_\xa4\x10\nb:\xdb\xe3\xf6xfCh\xed\xb0@h\b\v\x84\x8aȅ\xd0\x119\x10\x17\x84\x16\xe2\x86\xd0@\\\x11R\x88;\x82\x01\xa1 \xac\x10\xea(\x1f\xf2&')\xab\x1d\xd7{\xff.4\xef\xaf\u007f;\xac\x003B\x02\x90\xec\xb6\xe9c%\x01\xb8!4\x00\x17\x84\x16@G\xe4\x00\xa8\x88\\\x00\ra\x01\xd0\x10C\x17]\t\x80ڎ\xee\x95_\n\xa0\"\xda\x10\r\x80\x8e\x88\x10\r@\x82\bݗ\x94\xc8x\xfeʽ\xf3\x03\xba\v\x18\x94\x12\x8b\x872\x00\x00\x00\x00IEND\xaeB`\x82")
 
 func www_app_assets_img_docarrow_png_bytes() ([]byte, error) {
 	return _www_app_assets_img_docarrow_png, nil
@@ -88,7 +88,7 @@ func www_app_assets_img_docarrow_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/docArrow.png", size: 373, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/docArrow.png", size: 373, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -109,7 +109,7 @@ func www_app_assets_img_ic_arrow_drop_down_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -151,7 +151,7 @@ func www_app_assets_img_ic_arrow_drop_up_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_up_24px.svg", size: 795, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_up_24px.svg", size: 795, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -168,7 +168,7 @@ func www_app_assets_img_ic_keyboard_arrow_left_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_left_24px.svg", size: 151, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_left_24px.svg", size: 151, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -185,12 +185,12 @@ func www_app_assets_img_ic_keyboard_arrow_right_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_right_24px.svg", size: 149, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_right_24px.svg", size: 149, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _www_app_assets_img_icons_arrow_back_png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x80\x00\x00\x00\x80\b\x06\x00\x00\x00\xc3>a\xcb\x00\x00\x00\x06bKGD\x00\xff\x00\xff\x00\xff\xa0\xbd\xa7\x93\x00\x00\x020IDATx\x9c\xed\xddIn\x13q\x10F\xf1\u05c4\x05\xd7\xe0f\t\xc3\x166\x1c\xc0\x10\xa60\xc5!\x90\x046\x84Ab\xba\v7r`aY2\x02B\xecj\xf7_\xd5\xf5~\x92\x97\x91Jz_za\xc96H\x92$I\x92$I\x92$I\x92$I\x92$I\x92\xa4\xac\xb6Z\x1f\x90\xdc\x1ep\x15\xf8\xd1\xfa\x10\r\xab\x03\xde\x00?\x813\xe0V\xdbs4\xa4\xe5\xf8\x8b\x97#(\xa2\x03N\xf8=\xbe#(\xa2\x03\xa6\xfc=\xfe\xf2\bn\xb7:P\x9bs\x91\xf8\x8e`\xa4V\x89\xef\bF\xa6\x03\xf6Y-\xbe#\x18\x91\x87\xac\x17\u007f\xf1:\x1a\xfed\xf5e\xdd\xff\xfc\xc5k\xca\xfc\t\xa2\x84\xa2\xf1\x0f0~Z\xc6/,\x1a\xff%\xc6O\xeb\x05\xc6/+\x1a\xff\x10\xe3\xa7e\xfc\u008c_\xd8sb\xf1_a\xfc\xb4\x8c_X4\xfek\x8c\x9f\x96\xf1\v3~a\u03c8\xc5?\xc2\xf8i\x19\xbf0\xe3\x17\x16\x8d\u007f\x8c\xf1\xd3z\x8a\xf1\u02ca\xc6?\xc1\xf8iE\xe3\x9f\x02\x97\x86>Z\xfd0~aO0~Y\xd1\xf8\xef1~Z}\xc4\xf7;\x12\x922~a{\xc4\xe2\u007f\xc0\xf8i\x19\xbf\xb0h\xfc\x8f\x18?-\xe3\x17\xf6\x18\xe3\x975!\x16\xff\x13\xc6\xff\xa7\fo\x80\\\t\xfe\xfd\x8c\xf9\x10\x94\u0604\xd8S\xe0;py\xe8\xa3\u056f\t\x8e\xa0\xbc\t\xb1\x11|\xc3\x11\xa4w\x17GP\x9e#\x90#\x90#\x10p\x0fGP^t\x04_q\x04\xe99\x029\x02\xc1.\x8e\xa0<G G G \xe0>\x8e\xa0<G\xa0\xf0\b\xbe\xe0\b\xd2s\x04r\x04\x82\a8\x82\xf2\x1c\x81\x1c\x81\xe2#\xf8\x8c#H/\xfa\x03\x91\x8e`\x04\xfa\x18\x81\x1fAK\xce\x11\xc8\x11\b\x1e\x11\x1b\xc1)9>x\xabsDG\xf0\x0eG\x90Z\xc7\xfc\xeb\xe2##\xf0\xe7\xe3G`\xdd'\xc1\f\xd8\x1e\xfe\\m\u00aa_Qc\xfc\x11\xba\xe8\bf\xc0N\xa3\x1b\xb5A\x1d0\xe5\xff\xf1\xaf\xb5:P\x9bw\xde\bf\xc0\xf5v\xa7i(\x1dp\xc0\x9f\xf1o\xb4<J\xc3Z\x1e\xc1\x19p\xb3\xed9j\xa1\x03\xde\x02wZ\x1f\"I\x92$I\x92$I\x92$I\x92$I\x92$I\x92j\xfa\x05\xe7\xe1x\xb9\xc1\tI\xe0\x00\x00\x00\x00IEND\xaeB`\x82")
+var _www_app_assets_img_icons_arrow_back_png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x80\x00\x00\x00\x80\b\x06\x00\x00\x00\xc3>a\xcb\x00\x00\x00\x06bKGD\x00\xff\x00\xff\x00\xff\xa0\xbd\xa7\x93\x00\x00\x020IDATx\x9c\xed\xddIn\x13q\x10F\xf1ׄ\x05\xd7\xe0f\t\xc3\x166\x1c\xc0\x10\xa60\xc5!\x90\x046\x84Ab\xba\v7r`aY2\x02B\xecj\xf7_\xd5\xf5~\x92\x97\x91Jz_za\xc96H\x92$I\x92$I\x92$I\x92$I\x92$I\x92\xa4\xac\xb6Z\x1f\x90\xdc\x1ep\x15\xf8\xd1\xfa\x10\r\xab\x03\xde\x00?\x813\xe0V\xdbs4\xa4\xe5\xf8\x8b\x97#(\xa2\x03N\xf8=\xbe#(\xa2\x03\xa6\xfc=\xfe\xf2\bn\xb7:P\x9bs\x91\xf8\x8e`\xa4V\x89\xef\bF\xa6\x03\xf6Y-\xbe#\x18\x91\x87\xac\x17\u007f\xf1:\x1a\xfed\xf5e\xdd\xff\xfc\xc5k\xca\xfc\t\xa2\x84\xa2\xf1\x0f0~Z\xc6/,\x1a\xff%\xc6O\xeb\x05\xc6/+\x1a\xff\x10\xe3\xa7e\xfc\u008c_\xd8sb\xf1_a\xfc\xb4\x8c_X4\xfek\x8c\x9f\x96\xf1\v3~aψ\xc5?\xc2\xf8i\x19\xbf0\xe3\x17\x16\x8d\u007f\x8c\xf1\xd3z\x8a\xf1ˊ\xc6?\xc1\xf8iE\xe3\x9f\x02\x97\x86>Z\xfd0~aO0~Y\xd1\xf8\xef1~Z}\xc4\xf7;\x12\x922~a{\xc4\xe2\u007f\xc0\xf8i\x19\xbf\xb0h\xfc\x8f\x18?-\xe3\x17\xf6\x18\xe3\x975!\x16\xff\x13\xc6\xff\xa7\fo\x80\\\t\xfe\xfd\x8c\xf9\x10\x94\u0604\xd8S\xe0;py\xe8\xa3կ\t\x8e\xa0\xbc\t\xb1\x11|\xc3\x11\xa4w\x17GP\x9e#\x90#\x90#\x10p\x0fGP^t\x04_q\x04\xe99\x029\x02\xc1.\x8e\xa0<G G G \xe0>\x8e\xa0<G\xa0\xf0\b\xbe\xe0\b\xd2s\x04r\x04\x82\a8\x82\xf2\x1c\x81\x1c\x81\xe2#\xf8\x8c#H/\xfa\x03\x91\x8e`\x04\xfa\x18\x81\x1fAK\xce\x11\xc8\x11\b\x1e\x11\x1b\xc1)9>x\xabsDG\xf0\x0eG\x90Z\xc7\xfc\xeb\xe2##\xf0\xe7\xe3G`\xdd'\xc1\f\xd8\x1e\xfe\\mª_Qc\xfc\x11\xba\xe8\bf\xc0N\xa3\x1b\xb5A\x1d0\xe5\xff\xf1\xaf\xb5:P\x9bw\xde\bf\xc0\xf5v\xa7i(\x1dp\xc0\x9f\xf1o\xb4<J\xc3Z\x1e\xc1\x19p\xb3\xed9j\xa1\x03\xde\x02wZ\x1f\"I\x92$I\x92$I\x92$I\x92$I\x92$I\x92j\xfa\x05\xe7\xe1x\xb9\xc1\tI\xe0\x00\x00\x00\x00IEND\xaeB`\x82")
 
 func www_app_assets_img_icons_arrow_back_png_bytes() ([]byte, error) {
 	return _www_app_assets_img_icons_arrow_back_png, nil
@@ -202,12 +202,12 @@ func www_app_assets_img_icons_arrow_back_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/arrow-back.png", size: 635, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/arrow-back.png", size: 635, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _www_app_assets_img_icons_favicon_png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\b\x06\x00\x00\x00\x1f\xf3\xffa\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x03!iTXtXML:com.adobe.xmp\x00\x00\x00\x00\x00<?xpacket begin=\"\ufeff\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?> <x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Adobe XMP Core 5.5-c014 79.151481, 2013/03/13-12:09:15        \"> <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"> <rdf:Description rdf:about=\"\" xmlns:xmpMM=\"http://ns.adobe.com/xap/1.0/mm/\" xmlns:stRef=\"http://ns.adobe.com/xap/1.0/sType/ResourceRef#\" xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\" xmpMM:DocumentID=\"xmp.did:756CA584644F11E4939EE4369DBF39D4\" xmpMM:InstanceID=\"xmp.iid:756CA583644F11E4939EE4369DBF39D4\" xmp:CreatorTool=\"Adobe Photoshop CC (Windows)\"> <xmpMM:DerivedFrom stRef:instanceID=\"xmp.iid:62F2AD71555711E48EAC88F7A4D19BF1\" stRef:documentID=\"xmp.did:62F2AD72555711E48EAC88F7A4D19BF1\"/> </rdf:Description> </rdf:RDF> </x:xmpmeta> <?xpacket end=\"r\"?>\xf7#U\x14\x00\x00\x02\xf4IDATx\xda|SkHSa\x18~\xce\u0659\xd3m\xce\xcd\xcdL\x99I\xf7D\xa2?QXYBBZ\x19i\xa8\xe4\r\xaa\x95\x18*\x95B\xa4T&\bQZa\x96\x81\x05I\x14R\x96\x81H\x17B\xbbHY\x16d\x14\xa5\xa2&\xe4e\xe66\xdd\u0699\xbb\x9c\xad\xef\x9cyL\xff\xf4\xfd\xfa.\xcf\xf3\xbc\xcfy\xde\xf7P\x98\xb7|>\x9f\xba\u007f\xd4}\xd1h\xf1&5<\xb5\xe9\xbf\x0e\xbb\x85\xfb\xd8%R\x18\x92\x94\xa3a!\x92\xe71Q\xd2R\x8a\xa2L\"\x87\x9a%\ua18c\x9e\x9a\x91I.\xf1z\x9b-\xb2\xf7\x97\x9f\xa8\x92\xd3\b`\x80I\xabW8\xaf\xd6Kq$Yi\x8c\xd0H\xda\u027e\x98\bMR&+\x1778\xeeyx\xa1y:b`\xcc3\xdf\x106\xc5\xc8\x10\xa9\x95\xa0\xb9\x93]p\xbfl1\x83\x924\xd5D\xb8F\x92N\xf5\x8d\xb8\x9e\x1c\xbclJb\x9d\xbe\x05\xa0\xd8h)\xf6m\x96#(\x80B\xd3k\x16=\x83\xae\x05\xef\xfc\xfd\x8d\"\xed\v\xc6\xe6\xf0\xe9Er}a(\xeaZm0\xecPb\xdd\xd2\x00\x98\xff\xf8\xadW\x1f\u0480wW\xd7j\xc5\xf1T\x15\xf2\xaf\x9a\xe0p\xf9`c\xbdzz\xcc\xcciE\xd5\xf2\xc6)\xd4\x15\x84B\xafc\xb0\xeb\xec\x04\xda{f\xd0\xf5\u0749\xdd\x15\x13$\x0f\n7\x8fiQF0\x1e\u038f\x1f1q:\xa6\xeb\x87S'\n\x90\x94A\x1c\x91\xe0(T\xe6\xaa!\x93R\xc2\xfe\\\x8e\x1a\xc1$\xd0q3G\xc4%0Z\xfc\n\xdd}N-\xf3y\xc0%\x15\x056\xac\n@\xdb\a\a\x1et\xdaq\xfb\x84\x0er\x19E:\x04\xc1\xae\xe1\x8a\t)\x1b\x83\x84`?\xf5\xfb\xf3\xe8\x19rS\u0328\x99\x9b\v\x86\xaf\x12\x1d\u01a0\"[\x8dp\xb5\x04\x8f\u07f1\u012e\x0f\xe9\xf1\n\x9c\xca\b\x81\xc7\xeb\u00f4\xdd;\x87\xff=\u0341\x11\xfb}\xfe\x80ZH\x96'\xde{i\x17B\xcb\u06ee\x10\x80w;\xec\xe0\ve%(0E\x82\xad1hp\xa9\xc5\xcag\xe0\x17\xb0\xb2^\x1c\xbdf\x16,7\x97\x87\xe1}\xaf\v\xfb\x13\xe4h\xebv\x80#\x0e\xb4*\x1a-oY\xe4'+q\xb8\xd62\x97\x01\xbf\x98\x8cx9{\xff\r+\xe7\x0f|;\xab\x9a\xa6Q[\xa0Ap\x10\x8d\xbc\xeaIp\xc4q\xd3I\x1d\u05af\x94\tU\xe7\x93\xf7\xc6\u025d\xd4O\xa3\xfb\xd9\xe9;S\x89\u07c6\u0774\xf8@D\x91\xb9U\x01\x9dJ\x02\x8a\f\xfb\x04\xf9V\xbe\x9d\u054f\xacs\xe45QRT\xe6\xa8;\x98\xe8ELjY\x9a\xac\xb7\xb0\x81\xd3[f\ag\xdb\xda@\xe4\x92\xea\xe2\x80\xf1\"\xb7\xc8\f\u0424\x84\xd7\xeb\xcf\xecLV\xc8\xe0\xf2\b&\x85&?\x04\xfb\xf1nmiU\xb6\xc2L\xd3\xff\x06j\xfeh\xf3\xad,i\xb0\bd\x1eS\x95\xab\xb4\x90\xb0w\x12\xae\x9d\x12A#&O\xe6\xab/3\xf5\u0126\x06\xffY\xc5{\x82m[b\x03\x8bVDJ\x1b\xf9\xf3_\x01\x06\x00\xf19?q\xaaE\xa0\xa4\x00\x00\x00\x00IEND\xaeB`\x82")
+var _www_app_assets_img_icons_favicon_png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\b\x06\x00\x00\x00\x1f\xf3\xffa\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x03!iTXtXML:com.adobe.xmp\x00\x00\x00\x00\x00<?xpacket begin=\"\ufeff\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?> <x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Adobe XMP Core 5.5-c014 79.151481, 2013/03/13-12:09:15        \"> <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"> <rdf:Description rdf:about=\"\" xmlns:xmpMM=\"http://ns.adobe.com/xap/1.0/mm/\" xmlns:stRef=\"http://ns.adobe.com/xap/1.0/sType/ResourceRef#\" xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\" xmpMM:DocumentID=\"xmp.did:756CA584644F11E4939EE4369DBF39D4\" xmpMM:InstanceID=\"xmp.iid:756CA583644F11E4939EE4369DBF39D4\" xmp:CreatorTool=\"Adobe Photoshop CC (Windows)\"> <xmpMM:DerivedFrom stRef:instanceID=\"xmp.iid:62F2AD71555711E48EAC88F7A4D19BF1\" stRef:documentID=\"xmp.did:62F2AD72555711E48EAC88F7A4D19BF1\"/> </rdf:Description> </rdf:RDF> </x:xmpmeta> <?xpacket end=\"r\"?>\xf7#U\x14\x00\x00\x02\xf4IDATx\xda|SkHSa\x18~\xceٙ\xd3m\xce\xcd\xcdL\x99I\xf7D\xa2?QXYBBZ\x19i\xa8\xe4\r\xaa\x95\x18*\x95B\xa4T&\bQZa\x96\x81\x05I\x14R\x96\x81H\x17B\xbbHY\x16d\x14\xa5\xa2&\xe4e\xe66\xddڙ\xbb\x9c\xad\xef\x9cyL\xff\xf4\xfd\xfa.\xcf\xf3\xbc\xcfy\xde\xf7P\x98\xb7|>\x9f\xba\u007f\xd4}\xd1h\xf1&5<\xb5\xe9\xbf\x0e\xbb\x85\xfb\xd8%R\x18\x92\x94\xa3a!\x92\xe71Q\xd2R\x8a\xa2L\"\x87\x9a%ꆌ\x9e\x9a\x91I.\xf1z\x9b-\xb2\xf7\x97\x9f\xa8\x92\xd3\b`\x80I\xabW8\xaf\xd6Kq$Yi\x8c\xd0H\xdaɾ\x98\bMR&+\x1778\xeeyx\xa1y:b`\xcc3\xdf\x106\xc5\xc8\x10\xa9\x95\xa0\xb9\x93]p\xbfl1\x83\x924\xd5D\xb8F\x92N\xf5\x8d\xb8\x9e\x1c\xbclJb\x9d\xbe\x05\xa0\xd8h)\xf6m\x96#(\x80B\xd3k\x16=\x83\xae\x05\xef\xfc\xfd\x8d\"\xed\v\xc6\xe6\xf0\xe9Er}a(\xeaZm0\xecPb\xdd\xd2\x00\x98\xff\xf8\xadW\x1fҀwW\xd7j\xc5\xf1T\x15\xf2\xaf\x9a\xe0p\xf9`c\xbdzz\xcc\xcciE\xd5\xf2\xc6)\xd4\x15\x84B\xafc\xb0\xeb\xec\x04\xda{f\xd0\xf5݉\xdd\x15\x13$\x0f\n7\x8fiQF0\x1eΏ\x1f1q:\xa6\xeb\x87S'\n\x90\x94A\x1c\x91\xe0(T\xe6\xaa!\x93R\xc2\xfe\\\x8e\x1a\xc1$\xd0q3G\xc4%0Z\xfc\n\xdd}N-\xf3y\xc0%\x15\x056\xac\n@\xdb\a\a\x1et\xdaq\xfb\x84\x0er\x19E:\x04\xc1\xae\xe1\x8a\t)\x1b\x83\x84`?\xf5\xfb\xf3\xe8\x19rS̨\x99\x9b\v\x86\xaf\x12\x1dƠ\"[\x8dp\xb5\x04\x8f߱Į\x0f\xe9\xf1\n\x9c\xca\b\x81\xc7\xebô\xdd;\x87\xff=́\x11\xfb}\xfe\x80ZH\x96'\xde{i\x17B\xcbۮ\x10\x80w;\xec\xe0\ve%(0E\x82\xad1hp\xa9\xc5\xcag\xe0\x17\xb0\xb2^\x1c\xbdf\x16,7\x97\x87\xe1}\xaf\v\xfb\x13\xe4h\xebv\x80#\x0e\xb4*\x1a-oY\xe4'+q\xb8\xd62\x97\x01\xbf\x98\x8cx9{\xff\r+\xe7\x0f|;\xab\x9a\xa6Q[\xa0Ap\x10\x8d\xbc\xeaIp\xc4q\xd3I\x1d֯\x94\tU\xe7\x93\xf7\xc6ɝ\xd4O\xa3\xfb\xd9\xe9;S\x89߆ݴ\xf8@D\x91\xb9U\x01\x9dJ\x02\x8a\f\xfb\x04\xf9V\xbe\x9dՏ\xacs\xe45QRT\xe6\xa8;\x98\xe8ELjY\x9a\xac\xb7\xb0\x81\xd3[f\ag\xdb\xda@\xe4\x92\xea\xe2\x80\xf1\"\xb7\xc8\fФ\x84\xd7\xeb\xcf\xecLV\xc8\xe0\xf2\b&\x85&?\x04\xfb\xf1nmiU\xb6\xc2L\xd3\xff\x06j\xfeh\xf3\xad,i\xb0\bd\x1eS\x95\xab\xb4\x90\xb0w\x12\xae\x9d\x12A#&O\xe6\xab/3\xf5Ħ\x06\xffY\xc5{\x82m[b\x03\x8bVDJ\x1b\xf9\xf3_\x01\x06\x00\xf19?q\xaaE\xa0\xa4\x00\x00\x00\x00IEND\xaeB`\x82")
 
 func www_app_assets_img_icons_favicon_png_bytes() ([]byte, error) {
 	return _www_app_assets_img_icons_favicon_png, nil
@@ -219,7 +219,7 @@ func www_app_assets_img_icons_favicon_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/favicon.png", size: 1663, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/favicon.png", size: 1663, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -236,7 +236,7 @@ func www_app_assets_img_icons_ic_arrow_forward_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_arrow_forward_24px.svg", size: 158, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_arrow_forward_24px.svg", size: 158, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -253,7 +253,7 @@ func www_app_assets_img_icons_ic_cancel_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_cancel_24px.svg", size: 276, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_cancel_24px.svg", size: 276, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -270,7 +270,7 @@ func www_app_assets_img_icons_ic_close_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -300,7 +300,7 @@ func www_app_assets_img_icons_ic_menu_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu.svg", size: 791, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu.svg", size: 791, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -340,12 +340,12 @@ func www_app_assets_img_icons_ic_menu_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu_24px.svg", size: 841, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu_24px.svg", size: 841, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _www_app_assets_img_icons_list_control_down_png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x000\x00\x00\x000\b\x03\x00\x00\x00`\xdc\t\xb5\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x00'PLTE\xa8\xa8\xa8\xfc\xfc\xfc\xc0\xc0\xc0\xb6\xb6\xb6\xf7\xf7\xf7\xaa\xaa\xaa\xf6\xf6\xf6\xe6\xe6\xe6\xe8\xe8\u8d75\xb5\xc3\xc3\xc3\xe5\xe5\xe5\xff\xff\xffZLu\xde\x00\x00\x00\rtRNS\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00=\xe8\"\x86\x00\x00\x00\x8bIDATx\xda\xec\xd4I\x12\x80 \fD\xd1\x04\x04\x9c\xee\u007f^\u02c1\xd2`\xb7\x96k\xc3\xd2\xfao\xa1\t\xca\xfc\xf1\x88\x03\a\xbf\x01}\xd7\x06\xb9\u007f\x02S\x8a\x8d\xc8C*\x1c\x94$bE\x1eD\xac0`\x14\xb1\"\xc7\xf5\xc9H\x81\x06+\xba\xad\x0f\xca\xdf\xc1\n\u0537_\xe9*`\u007f\x9b\xc3)p\u007f\x1f\\\x15\xa4\a\x93>\x04\xe9\xd1j\xec\x82\xf4p\x97\xaa@=^\xbe]\xc0\x9el\xeb*p\xcf\xd6[\x03\xe9\xe9}P\xf5\x9f\x80\x03\a\xafg\x11`\x00\xb0\xe4e\a\x17\x87\xea}\x00\x00\x00\x00IEND\xaeB`\x82")
+var _www_app_assets_img_icons_list_control_down_png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x000\x00\x00\x000\b\x03\x00\x00\x00`\xdc\t\xb5\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x00'PLTE\xa8\xa8\xa8\xfc\xfc\xfc\xc0\xc0\xc0\xb6\xb6\xb6\xf7\xf7\xf7\xaa\xaa\xaa\xf6\xf6\xf6\xe6\xe6\xe6\xe8\xe8赵\xb5\xc3\xc3\xc3\xe5\xe5\xe5\xff\xff\xffZLu\xde\x00\x00\x00\rtRNS\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00=\xe8\"\x86\x00\x00\x00\x8bIDATx\xda\xec\xd4I\x12\x80 \fD\xd1\x04\x04\x9c\xee\u007f^ˁ\xd2`\xb7\x96k\xc3\xd2\xfao\xa1\t\xca\xfc\xf1\x88\x03\a\xbf\x01}\xd7\x06\xb9\u007f\x02S\x8a\x8d\xc8C*\x1c\x94$bE\x1eD\xac0`\x14\xb1\"\xc7\xf5\xc9H\x81\x06+\xba\xad\x0f\xca\xdf\xc1\nԷ_\xe9*`\u007f\x9b\xc3)p\u007f\x1f\\\x15\xa4\a\x93>\x04\xe9\xd1j\xec\x82\xf4p\x97\xaa@=^\xbe]\xc0\x9el\xeb*p\xcf\xd6[\x03\xe9\xe9}P\xf5\x9f\x80\x03\a\xafg\x11`\x00\xb0\xe4e\a\x17\x87\xea}\x00\x00\x00\x00IEND\xaeB`\x82")
 
 func www_app_assets_img_icons_list_control_down_png_bytes() ([]byte, error) {
 	return _www_app_assets_img_icons_list_control_down_png, nil
@@ -357,7 +357,7 @@ func www_app_assets_img_icons_list_control_down_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/list_control_down.png", size: 309, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/list_control_down.png", size: 309, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -379,7 +379,7 @@ func www_app_assets_img_kubernetes_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/kubernetes.svg", size: 11663, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/kubernetes.svg", size: 11663, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3105,7 +3105,7 @@ func www_app_assets_js_app_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 91996, mode: os.FileMode(420), modTime: time.Unix(1435851600, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 91996, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3147,7 +3147,7 @@ func www_app_assets_js_base_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1435787535, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3164,7 +3164,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3185,7 +3185,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_24px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3202,7 +3202,7 @@ func www_app_components_dashboard_img_icons_ic_close_18px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3219,7 +3219,7 @@ func www_app_components_dashboard_img_icons_ic_close_24px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3301,7 +3301,7 @@ func www_app_components_dashboard_manifest_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3318,7 +3318,7 @@ func www_app_components_dashboard_pages_footer_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3361,7 +3361,7 @@ func www_app_components_dashboard_pages_header_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3385,7 +3385,7 @@ func www_app_components_dashboard_pages_home_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3437,7 +3437,7 @@ func www_app_components_dashboard_views_groups_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1302, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1302, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3461,7 +3461,7 @@ func www_app_components_dashboard_views_listevents_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 341, mode: os.FileMode(420), modTime: time.Unix(1435851600, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 341, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3485,7 +3485,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3509,7 +3509,7 @@ func www_app_components_dashboard_views_listpods_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3585,7 +3585,7 @@ func www_app_components_dashboard_views_listpodscards_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(416), modTime: time.Unix(1431743547, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3619,7 +3619,7 @@ func www_app_components_dashboard_views_listpodsvisualizer_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(416), modTime: time.Unix(1431743547, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3643,7 +3643,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3667,7 +3667,7 @@ func www_app_components_dashboard_views_listservices_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3773,7 +3773,7 @@ func www_app_components_dashboard_views_node_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(416), modTime: time.Unix(1433423161, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3799,7 +3799,7 @@ func www_app_components_dashboard_views_partials_cadvisor_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 454, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 454, mode: os.FileMode(416), modTime: time.Unix(1433748525, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3836,7 +3836,7 @@ func www_app_components_dashboard_views_partials_groupbox_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 768, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 768, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3900,7 +3900,7 @@ func www_app_components_dashboard_views_partials_groupitem_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2311, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2311, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3950,7 +3950,7 @@ func www_app_components_dashboard_views_partials_podtilesbyname_html() (*asset, 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(416), modTime: time.Unix(1431743547, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4000,7 +4000,7 @@ func www_app_components_dashboard_views_partials_podtilesbyserver_html() (*asset
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(416), modTime: time.Unix(1431743547, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4131,7 +4131,7 @@ func www_app_components_dashboard_views_pod_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4162, mode: os.FileMode(420), modTime: time.Unix(1435851600, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4162, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4248,7 +4248,7 @@ func www_app_components_dashboard_views_replication_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 3208, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 3208, mode: os.FileMode(416), modTime: time.Unix(1435043836, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4385,7 +4385,7 @@ func www_app_components_dashboard_views_service_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 3826, mode: os.FileMode(420), modTime: time.Unix(1435851600, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 3826, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4460,7 +4460,7 @@ func www_app_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/index.html", size: 2569, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/index.html", size: 2569, mode: os.FileMode(416), modTime: time.Unix(1433748525, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4477,7 +4477,7 @@ func www_app_vendor_angular_json_human_dist_angular_json_human_css() (*asset, er
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/angular-json-human/dist/angular-json-human.css", size: 1151, mode: os.FileMode(420), modTime: time.Unix(1435787559, 0)}
+	info := bindata_file_info{name: "www/app/vendor/angular-json-human/dist/angular-json-human.css", size: 1151, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4499,7 +4499,7 @@ func www_app_vendor_angular_material_angular_material_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/angular-material/angular-material.css", size: 159606, mode: os.FileMode(420), modTime: time.Unix(1435787535, 0)}
+	info := bindata_file_info{name: "www/app/vendor/angular-material/angular-material.css", size: 159606, mode: os.FileMode(416), modTime: time.Unix(1433748525, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4520,7 +4520,7 @@ func www_app_vendor_d3_d3_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/d3/d3.min.js", size: 151123, mode: os.FileMode(420), modTime: time.Unix(1435787559, 0)}
+	info := bindata_file_info{name: "www/app/vendor/d3/d3.min.js", size: 151123, mode: os.FileMode(416), modTime: time.Unix(1433748525, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4537,7 +4537,7 @@ func www_app_views_partials_404_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/404.html", size: 60, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/404.html", size: 60, mode: os.FileMode(416), modTime: time.Unix(1430167784, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4568,7 +4568,7 @@ func www_app_views_partials_kubernetes_ui_menu_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/kubernetes-ui-menu.tmpl.html", size: 764, mode: os.FileMode(420), modTime: time.Unix(1435787527, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/kubernetes-ui-menu.tmpl.html", size: 764, mode: os.FileMode(416), modTime: time.Unix(1433748525, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4632,7 +4632,7 @@ func www_app_views_partials_md_table_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 3057, mode: os.FileMode(420), modTime: time.Unix(1435851600, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 3057, mode: os.FileMode(416), modTime: time.Unix(1436215736, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4659,7 +4659,7 @@ func www_app_views_partials_menu_toggle_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/menu-toggle.tmpl.html", size: 587, mode: os.FileMode(420), modTime: time.Unix(1435787528, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/menu-toggle.tmpl.html", size: 587, mode: os.FileMode(416), modTime: time.Unix(1433748525, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4677,17 +4677,6 @@ func Asset(name string) ([]byte, error) {
 		return a.bytes, nil
 	}
 	return nil, fmt.Errorf("Asset %s not found", name)
-}
-
-// MustAsset is like Asset but panics when Asset would return an error.
-// It simplifies safe initialization of global variables.
-func MustAsset(name string) []byte {
-	a, err := Asset(name)
-	if err != nil {
-		panic("asset: Asset(" + name + "): " + err.Error())
-	}
-
-	return a
 }
 
 // AssetInfo loads and returns the asset info for the given name.
@@ -4797,8 +4786,8 @@ func AssetDir(name string) ([]string, error) {
 		return nil, fmt.Errorf("Asset %s not found", name)
 	}
 	rv := make([]string, 0, len(node.Children))
-	for childName := range node.Children {
-		rv = append(rv, childName)
+	for name := range node.Children {
+		rv = append(rv, name)
 	}
 	return rv, nil
 }

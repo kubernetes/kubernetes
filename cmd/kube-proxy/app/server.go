@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
@@ -130,8 +129,7 @@ func (s *ProxyServer) Run(_ []string) error {
 	}
 
 	config.NewSourceAPI(
-		client.Services(api.NamespaceAll),
-		client.Endpoints(api.NamespaceAll),
+		client,
 		30*time.Second,
 		serviceConfig.Channel("api"),
 		endpointsConfig.Channel("api"),

@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -105,7 +104,7 @@ func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filena
 }
 
 func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if os.Args[1] == "rollingupdate" {
+	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}
 	deploymentKey, filename, image, oldName, err := validateArguments(cmd, args)
@@ -258,13 +257,14 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		updateCleanupPolicy = kubectl.RenameRollingUpdateCleanupPolicy
 	}
 	config := &kubectl.RollingUpdaterConfig{
-		Out:           out,
-		OldRc:         oldRc,
-		NewRc:         newRc,
-		UpdatePeriod:  period,
-		Interval:      interval,
-		Timeout:       timeout,
-		CleanupPolicy: updateCleanupPolicy,
+		Out:            out,
+		OldRc:          oldRc,
+		NewRc:          newRc,
+		UpdatePeriod:   period,
+		Interval:       interval,
+		Timeout:        timeout,
+		CleanupPolicy:  updateCleanupPolicy,
+		UpdateAcceptor: kubectl.DefaultUpdateAcceptor,
 	}
 	if cmdutil.GetFlagBool(cmd, "rollback") {
 		kubectl.AbortRollingUpdate(config)
@@ -302,10 +302,6 @@ func isReplicasDefaulted(info *resource.Info) bool {
 	switch info.Mapping.APIVersion {
 	case "v1":
 		if rc, ok := info.VersionedObject.(*v1.ReplicationController); ok {
-			return rc.Spec.Replicas == nil
-		}
-	case "v1beta3":
-		if rc, ok := info.VersionedObject.(*v1beta3.ReplicationController); ok {
 			return rc.Spec.Replicas == nil
 		}
 	}

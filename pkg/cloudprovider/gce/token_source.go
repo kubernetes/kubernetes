@@ -31,7 +31,7 @@ import (
 
 const (
 	// Max QPS to allow through to the token URL.
-	tokenURLQPS = 1
+	tokenURLQPS = .05 // back off to once every 20 seconds when failing
 	// Maximum burst of requests to token URL before limiting.
 	tokenURLBurst = 3
 )

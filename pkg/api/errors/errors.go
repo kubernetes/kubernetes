@@ -193,6 +193,16 @@ func NewBadRequest(reason string) error {
 	}}
 }
 
+// NewServiceUnavailable creates an error that indicates that the requested service is unavailable.
+func NewServiceUnavailable(reason string) error {
+	return &StatusError{api.Status{
+		Status:  api.StatusFailure,
+		Code:    http.StatusServiceUnavailable,
+		Reason:  api.StatusReasonServiceUnavailable,
+		Message: reason,
+	}}
+}
+
 // NewMethodNotSupported returns an error indicating the requested action is not supported on this kind.
 func NewMethodNotSupported(kind, action string) error {
 	return &StatusError{api.Status{
@@ -323,7 +333,7 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 	}}
 }
 
-// IsNotFound returns true if the specified error was created by NewNotFoundErr.
+// IsNotFound returns true if the specified error was created by NewNotFound.
 func IsNotFound(err error) bool {
 	return reasonForError(err) == api.StatusReasonNotFound
 }

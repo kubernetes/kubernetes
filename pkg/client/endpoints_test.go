@@ -27,7 +27,7 @@ import (
 func TestListEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, ""), Query: buildQueryValues(ns, nil)},
+		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, ""), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200,
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
@@ -49,7 +49,7 @@ func TestListEndpoints(t *testing.T) {
 func TestGetEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, "endpoint-1"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, "endpoint-1"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
 	response, err := c.Setup().Endpoints(ns).Get("endpoint-1")

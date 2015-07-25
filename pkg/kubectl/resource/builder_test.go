@@ -228,7 +228,7 @@ func TestNodeBuilder(t *testing.T) {
 func TestPathBuilderWithMultiple(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").
-		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").
+		FilenameParam(false, "../../../examples/pod").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -239,8 +239,12 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 
-	info := test.Infos[1]
-	if info.Name != "redis-master" || info.Namespace != "test" || info.Object == nil {
+	info := test.Infos[0]
+	if _, ok := info.Object.(*api.ReplicationController); !ok || info.Name != "redis-master" || info.Namespace != "test" {
+		t.Errorf("unexpected info: %#v", info)
+	}
+	info = test.Infos[1]
+	if _, ok := info.Object.(*api.Pod); !ok || info.Name != "nginx" || info.Namespace != "test" {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
@@ -687,6 +691,26 @@ func TestSingularObject(t *testing.T) {
 	}
 }
 
+func TestSingularObjectNoExtension(t *testing.T) {
+	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		NamespaceParam("test").DefaultNamespace().
+		FilenameParam(false, "../../../examples/pod").
+		Flatten().
+		Do().Object()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+	if pod.Name != "nginx" || pod.Namespace != "test" {
+		t.Errorf("unexpected pod: %#v", pod)
+	}
+}
+
 func TestSingularRootScopedObject(t *testing.T) {
 	node := &api.Node{ObjectMeta: api.ObjectMeta{Name: "test"}, Spec: api.NodeSpec{ExternalID: "test"}}
 	r := streamTestObject(node)
@@ -923,32 +947,32 @@ func TestReceiveMultipleErrors(t *testing.T) {
 func TestReplaceAliases(t *testing.T) {
 	tests := []struct {
 		name     string
-		args     []string
-		expected []string
+		arg      string
+		expected string
 	}{
 		{
 			name:     "no-replacement",
-			args:     []string{"service", "pods", "rc"},
-			expected: []string{"service", "pods", "rc"},
+			arg:      "service",
+			expected: "service",
 		},
 		{
 			name:     "all-replacement",
-			args:     []string{"all"},
-			expected: []string{"rc,svc,pods,pvc"},
+			arg:      "all",
+			expected: "rc,svc,pods,pvc",
+		},
+		{
+			name:     "alias-in-comma-separated-arg",
+			arg:      "all,secrets",
+			expected: "rc,svc,pods,pvc,secrets",
 		},
 	}
 
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient())
 
 	for _, test := range tests {
-		replaced := b.replaceAliases(test.args)
-		if len(replaced) != len(test.expected) {
-			t.Errorf("%s: unexpected args length: expected %d, got %d", test.name, len(test.expected), len(replaced))
-		}
-		for i, arg := range test.expected {
-			if arg != replaced[i] {
-				t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, arg, replaced[i])
-			}
+		replaced := b.replaceAliases(test.arg)
+		if replaced != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }

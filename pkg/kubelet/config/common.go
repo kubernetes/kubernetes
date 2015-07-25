@@ -69,14 +69,10 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 
 func getSelfLink(name, namespace string) string {
 	var selfLink string
-	if api.PreV1Beta3(latest.Version) {
-		selfLink = fmt.Sprintf("/api/"+latest.Version+"/pods/%s?namespace=%s", name, namespace)
-	} else {
-		if len(namespace) == 0 {
-			namespace = api.NamespaceDefault
-		}
-		selfLink = fmt.Sprintf("/api/"+latest.Version+"/pods/namespaces/%s/%s", name, namespace)
+	if len(namespace) == 0 {
+		namespace = api.NamespaceDefault
 	}
+	selfLink = fmt.Sprintf("/api/"+latest.Version+"/pods/namespaces/%s/%s", name, namespace)
 	return selfLink
 }
 

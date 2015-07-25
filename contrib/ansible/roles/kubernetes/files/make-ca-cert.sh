@@ -20,9 +20,9 @@ set -o pipefail
 
 # Caller should set in the ev:
 # MASTER_IP - this may be an ip or things like "_use_gce_external_ip_"
+# MASTER_NAME - DNS name for the master
 # DNS_DOMAIN - which will be passed to minions in --cluster_domain
 # SERVICE_CLUSTER_IP_RANGE - where all service IPs are allocated
-# MASTER_NAME - I'm not sure what it is...
 
 # Also the following will be respected
 # CERT_DIR - where to place the finished certs
@@ -76,9 +76,9 @@ cd "${tmpdir}"
 # distributed.
 
 # Calculate the first ip address in the service range
-octects=($(echo "${service_range}" | sed -e 's|/.*||' -e 's/\./ /g'))
-((octects[3]+=1))
-service_ip=$(echo "${octects[*]}" | sed 's/ /./g')
+octets=($(echo "${service_range}" | sed -e 's|/.*||' -e 's/\./ /g'))
+((octets[3]+=1))
+service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
 
 # Determine appropriete subject alt names
 sans="IP:${cert_ip},IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${dns_domain},DNS:${master_name}"

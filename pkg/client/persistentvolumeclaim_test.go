@@ -54,7 +54,7 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 		Request: testRequest{
 			Method: "POST",
 			Path:   testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, ""),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   pv,
 		},
 		Response: Response{StatusCode: 200, Body: pv},
@@ -87,7 +87,7 @@ func TestPersistentVolumeClaimGet(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "abc"),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: persistentVolumeClaim},
@@ -110,7 +110,7 @@ func TestPersistentVolumeClaimList(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, ""),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: persistentVolumeList},
@@ -139,7 +139,7 @@ func TestPersistentVolumeClaimUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: persistentVolumeClaim},
 	}
 	response, err := c.Setup().PersistentVolumeClaims(ns).Update(persistentVolumeClaim)
@@ -172,7 +172,7 @@ func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
 		Request: testRequest{
 			Method: "PUT",
 			Path:   testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "abc") + "/status",
-			Query:  buildQueryValues(ns, nil)},
+			Query:  buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: persistentVolumeClaim},
 	}
 	response, err := c.Setup().PersistentVolumeClaims(ns).UpdateStatus(persistentVolumeClaim)
@@ -182,7 +182,7 @@ func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
 func TestPersistentVolumeClaimDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().PersistentVolumeClaims(ns).Delete("foo")

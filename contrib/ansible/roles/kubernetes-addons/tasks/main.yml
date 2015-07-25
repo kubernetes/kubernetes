@@ -1,6 +1,6 @@
 ---
-- name: Assures /etc/kubernetes/addons/ dir exists
-  file: path=/etc/kubernetes/addons/ state=directory
+- name: Assures addons dir exists
+  file: path={{ kube_addons_dir }} state=directory
 
 - include: generic-install.yml
   when: not is_atomic
@@ -11,6 +11,12 @@
     state=directory
   sudo: no
 
+- name: Make sure the system services namespace exists
+  get_url:
+    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/saltbase/salt/kube-addons/namespace.yaml
+    dest="{{ kube_config_dir }}/addons/"
+    force=yes
+
 - include: dns.yml
   when: dns_setup
 
@@ -19,6 +25,9 @@
 
 - include: cluster-logging.yml
   when: cluster_logging
+
+- include: kube-ui.yml
+  when: kube-ui
 
 #- name: Get kube-addons script from Kubernetes
 #  get_url:

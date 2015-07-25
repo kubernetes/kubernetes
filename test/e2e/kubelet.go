@@ -34,6 +34,8 @@ import (
 const (
 	// Interval to poll /runningpods on a node
 	pollInterval = 1 * time.Second
+	// Interval used compute cpu usage of a container
+	cpuIntervalInSeconds = 60
 )
 
 // getPodMatches returns a set of pod names on the given node that matches the
@@ -98,6 +100,7 @@ var _ = Describe("Clean up pods on node", func() {
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
+		logOneTimeResourceUsageSummary(framework.Client, nodeNames.List(), cpuIntervalInSeconds)
 	})
 
 	type DeleteTest struct {
@@ -125,13 +128,13 @@ var _ = Describe("Clean up pods on node", func() {
 				Image:     "gcr.io/google_containers/pause:go",
 				Replicas:  totalPods,
 			})).NotTo(HaveOccurred())
-
 			// Perform a sanity check so that we know all desired pods are
 			// running on the nodes according to kubelet. The timeout is set to
 			// only 30 seconds here because RunRC already waited for all pods to
 			// transition to the running status.
 			Expect(waitTillNPodsRunningOnNodes(framework.Client, nodeNames, rcName, framework.Namespace.Name, totalPods,
 				time.Second*30)).NotTo(HaveOccurred())
+			logOneTimeResourceUsageSummary(framework.Client, nodeNames.List(), cpuIntervalInSeconds)
 
 			By("Deleting the RC")
 			DeleteRC(framework.Client, framework.Namespace.Name, rcName)

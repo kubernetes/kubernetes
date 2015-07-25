@@ -97,7 +97,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 	generators := map[string]kubectl.Generator{
 		"run/v1":     kubectl.BasicReplicationController{},
-		"service/v1": kubectl.ServiceGenerator{},
+		"service/v1": kubectl.ServiceGeneratorV1{},
+		"service/v2": kubectl.ServiceGeneratorV2{},
 	}
 
 	clientConfig := optionalClientConfig
@@ -162,11 +163,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return kubectl.MakeLabels(t.Spec.Selector), nil
 			default:
-				kind, err := meta.NewAccessor().Kind(object)
+				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 				if err != nil {
 					return "", err
 				}
-				return "", fmt.Errorf("it is not possible to get a pod selector from %s", kind)
+				return "", fmt.Errorf("cannot extract pod selector from %s", kind)
 			}
 		},
 		PortsForObject: func(object runtime.Object) ([]string, error) {
@@ -176,12 +177,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return getPorts(t.Spec.Template.Spec), nil
 			case *api.Pod:
 				return getPorts(t.Spec), nil
+			case *api.Service:
+				return getServicePorts(t.Spec), nil
 			default:
-				kind, err := meta.NewAccessor().Kind(object)
+				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("it is not possible to get ports from %s", kind)
+				return nil, fmt.Errorf("cannot extract ports from %s", kind)
 			}
 		},
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
@@ -256,6 +259,15 @@ func getPorts(spec api.PodSpec) []string {
 		for _, port := range container.Ports {
 			result = append(result, strconv.Itoa(port.ContainerPort))
 		}
+	}
+	return result
+}
+
+// Extracts the ports exposed by a service from the given service spec.
+func getServicePorts(spec api.ServiceSpec) []string {
+	result := []string{}
+	for _, servicePort := range spec.Ports {
+		result = append(result, strconv.Itoa(servicePort.Port))
 	}
 	return result
 }

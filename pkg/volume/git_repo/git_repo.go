@@ -32,19 +32,17 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&gitRepoPlugin{nil, false}, &gitRepoPlugin{nil, true}}
+	return []volume.VolumePlugin{&gitRepoPlugin{nil}}
 }
 
 type gitRepoPlugin struct {
-	host       volume.VolumeHost
-	legacyMode bool // if set, plugin answers to the legacy name
+	host volume.VolumeHost
 }
 
 var _ volume.VolumePlugin = &gitRepoPlugin{}
 
 const (
-	gitRepoPluginName       = "kubernetes.io/git-repo"
-	gitRepoPluginLegacyName = "git"
+	gitRepoPluginName = "kubernetes.io/git-repo"
 )
 
 func (plugin *gitRepoPlugin) Init(host volume.VolumeHost) {
@@ -52,65 +50,46 @@ func (plugin *gitRepoPlugin) Init(host volume.VolumeHost) {
 }
 
 func (plugin *gitRepoPlugin) Name() string {
-	if plugin.legacyMode {
-		return gitRepoPluginLegacyName
-	}
 	return gitRepoPluginName
 }
 
 func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
-	if plugin.legacyMode {
-		// Legacy mode instances can be cleaned up but not created anew.
-		return false
-	}
-
 	return spec.VolumeSource.GitRepo != nil
 }
 
 func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	if plugin.legacyMode {
-		// Legacy mode instances can be cleaned up but not created anew.
-		return nil, fmt.Errorf("legacy mode: can not create new instances")
-	}
 	return &gitRepo{
-		pod:        *pod,
-		volName:    spec.Name,
-		source:     spec.VolumeSource.GitRepo.Repository,
-		revision:   spec.VolumeSource.GitRepo.Revision,
-		exec:       exec.New(),
-		plugin:     plugin,
-		legacyMode: false,
-		opts:       opts,
-		mounter:    mounter,
+		pod:      *pod,
+		volName:  spec.Name,
+		source:   spec.VolumeSource.GitRepo.Repository,
+		revision: spec.VolumeSource.GitRepo.Revision,
+		exec:     exec.New(),
+		plugin:   plugin,
+		opts:     opts,
+		mounter:  mounter,
 	}, nil
 }
 
 func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	legacy := false
-	if plugin.legacyMode {
-		legacy = true
-	}
 	return &gitRepo{
-		pod:        api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
-		volName:    volName,
-		plugin:     plugin,
-		legacyMode: legacy,
-		mounter:    mounter,
+		pod:     api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		volName: volName,
+		plugin:  plugin,
+		mounter: mounter,
 	}, nil
 }
 
 // gitRepo volumes are directories which are pre-filled from a git repository.
 // These do not persist beyond the lifetime of a pod.
 type gitRepo struct {
-	volName    string
-	pod        api.Pod
-	source     string
-	revision   string
-	exec       exec.Interface
-	plugin     *gitRepoPlugin
-	legacyMode bool
-	opts       volume.VolumeOptions
-	mounter    mount.Interface
+	volName  string
+	pod      api.Pod
+	source   string
+	revision string
+	exec     exec.Interface
+	plugin   *gitRepoPlugin
+	opts     volume.VolumeOptions
+	mounter  mount.Interface
 }
 
 // SetUp creates new directory and clones a git repo.
@@ -128,9 +107,6 @@ var wrappedVolumeSpec = &volume.Spec{
 func (gr *gitRepo) SetUpAt(dir string) error {
 	if volumeutil.IsReady(gr.getMetaDir()) {
 		return nil
-	}
-	if gr.legacyMode {
-		return fmt.Errorf("legacy mode: can not create new instances")
 	}
 
 	// Wrap EmptyDir, let it do the setup.
@@ -183,9 +159,6 @@ func (gr *gitRepo) execCommand(command string, args []string, dir string) ([]byt
 
 func (gr *gitRepo) GetPath() string {
 	name := gitRepoPluginName
-	if gr.legacyMode {
-		name = gitRepoPluginLegacyName
-	}
 	return gr.plugin.host.GetPodVolumeDir(gr.pod.UID, util.EscapeQualifiedNameForDisk(name), gr.volName)
 }
 

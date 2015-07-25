@@ -300,7 +300,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 		return nil, nil, err
 	}
 	if len(eps.Subsets) == 0 {
-		return nil, nil, fmt.Errorf("no endpoints available for %q", svcName)
+		return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", svcName))
 	}
 	// Pick a random Subset to start searching from.
 	ssSeed := rand.Intn(len(eps.Subsets))
@@ -320,7 +320,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 			}
 		}
 	}
-	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
+	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
 // This is O(N), but we expect haystack to be small;

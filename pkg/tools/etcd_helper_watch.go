@@ -71,7 +71,7 @@ func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
 // watch.Interface. resourceVersion may be used to specify what version to begin
 // watching (e.g., for reconnecting without missing any updates).
 func (h *EtcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
-	key = h.PrefixEtcdKey(key)
+	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(true, exceptKey(key), filter, h.Codec, h.Versioner, nil, h)
 	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w, nil
@@ -81,7 +81,7 @@ func (h *EtcdHelper) WatchList(key string, resourceVersion uint64, filter Filter
 // API objects and sent down the returned watch.Interface.
 // Errors will be sent down the channel.
 func (h *EtcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
-	key = h.PrefixEtcdKey(key)
+	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(false, nil, filter, h.Codec, h.Versioner, nil, h)
 	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w, nil
@@ -103,12 +103,12 @@ func (h *EtcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc
 //   })
 //
 // Errors will be sent down the channel.
-func (h *EtcdHelper) WatchAndTransform(key string, resourceVersion uint64, transform TransformFunc) watch.Interface {
-	key = h.PrefixEtcdKey(key)
+/*func (h *EtcdHelper) WatchAndTransform(key string, resourceVersion uint64, transform TransformFunc) watch.Interface {
+	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(false, nil, Everything, h.Codec, h.Versioner, transform, h)
 	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w
-}
+}*/
 
 // TransformFunc attempts to convert an object to another object for use with a watcher.
 type TransformFunc func(runtime.Object) (runtime.Object, error)
@@ -186,7 +186,7 @@ func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding 
 
 // etcdWatch calls etcd's Watch function, and handles any errors. Meant to be called
 // as a goroutine.
-func (w *etcdWatcher) etcdWatch(client EtcdGetSet, key string, resourceVersion uint64) {
+func (w *etcdWatcher) etcdWatch(client EtcdClient, key string, resourceVersion uint64) {
 	defer util.HandleCrash()
 	defer close(w.etcdError)
 	if resourceVersion == 0 {
@@ -204,7 +204,7 @@ func (w *etcdWatcher) etcdWatch(client EtcdGetSet, key string, resourceVersion u
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
-func etcdGetInitialWatchState(client EtcdGetSet, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
+func etcdGetInitialWatchState(client EtcdClient, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
 	resp, err := client.Get(key, false, recursive)
 	if err != nil {
 		if !IsEtcdNotFound(err) {

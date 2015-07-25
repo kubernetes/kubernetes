@@ -3,7 +3,6 @@ package assetfs
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -11,6 +10,10 @@ import (
 	"path"
 	"path/filepath"
 	"time"
+)
+
+var (
+	fileTimestamp = time.Now()
 )
 
 // FakeFile implements os.FileInfo interface for a given path and size
@@ -37,7 +40,7 @@ func (f *FakeFile) Mode() os.FileMode {
 }
 
 func (f *FakeFile) ModTime() time.Time {
-	return time.Unix(0, 0)
+	return fileTimestamp
 }
 
 func (f *FakeFile) Size() int64 {
@@ -70,6 +73,10 @@ func (f *AssetFile) Readdir(count int) ([]os.FileInfo, error) {
 	return nil, errors.New("not a directory")
 }
 
+func (f *AssetFile) Size() int64 {
+	return f.FakeFile.Size()
+}
+
 func (f *AssetFile) Stat() (os.FileInfo, error) {
 	return f, nil
 }
@@ -98,7 +105,6 @@ func NewAssetDirectory(name string, children []string, fs *AssetFS) *AssetDirect
 }
 
 func (f *AssetDirectory) Readdir(count int) ([]os.FileInfo, error) {
-	fmt.Println(f, count)
 	if count <= 0 {
 		return f.Children, nil
 	}

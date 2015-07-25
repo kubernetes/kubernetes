@@ -29,6 +29,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -79,7 +81,7 @@ var _ = Describe("Kubectl client", func() {
 	Describe("Update Demo", func() {
 		var updateDemoRoot, nautilusPath, kittenPath string
 		BeforeEach(func() {
-			updateDemoRoot = filepath.Join(testContext.RepoRoot, "examples/update-demo")
+			updateDemoRoot = filepath.Join(testContext.RepoRoot, "docs/user-guide/update-demo")
 			nautilusPath = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
 			kittenPath = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 		})
@@ -142,7 +144,7 @@ var _ = Describe("Kubectl client", func() {
 		var podPath string
 
 		BeforeEach(func() {
-			podPath = filepath.Join(testContext.RepoRoot, "examples/pod.yaml")
+			podPath = filepath.Join(testContext.RepoRoot, "docs/user-guide/pod.yaml")
 			By("creating the pod")
 			runKubectl("create", "-f", podPath, fmt.Sprintf("--namespace=%v", ns))
 			checkPodsRunningReady(c, ns, []string{simplePodName}, podStartTimeout)
@@ -202,11 +204,196 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
+	Describe("Kubectl api-versions", func() {
+		It("should check if v1 is in available api versions", func() {
+			By("validating api verions")
+			output := runKubectl("api-versions")
+			if !strings.Contains(output, "Available Server Api Versions:") {
+				Failf("Missing caption in kubectl api-versions")
+			}
+			if !strings.Contains(output, "v1") {
+				Failf("No v1 in kubectl api-versions")
+			}
+		})
+	})
+
+	Describe("Kubectl cluster-info", func() {
+		It("should check if Kubernetes master services is included in cluster-info", func() {
+			By("validating cluster-info")
+			output := runKubectl("cluster-info")
+			// Can't check exact strings due to terminal controll commands (colors)
+			requiredItems := []string{"Kubernetes master", "is running at"}
+			if providerIs("gce", "gke") {
+				requiredItems = append(requiredItems, "KubeDNS", "Heapster")
+			}
+			for _, item := range requiredItems {
+				if !strings.Contains(output, item) {
+					Failf("Missing %s in kubectl cluster-info", item)
+				}
+			}
+		})
+	})
+
+	Describe("Kubectl describe", func() {
+		It("should check if kubectl describe prints relevant information for rc and pods", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			controllerJson := mkpath("redis-master-controller.json")
+			serviceJson := mkpath("redis-master-service.json")
+
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			runKubectl("create", "-f", controllerJson, nsFlag)
+			runKubectl("create", "-f", serviceJson, nsFlag)
+
+			// Pod
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				output := runKubectl("describe", "pod", pod.Name, nsFlag)
+				requiredStrings := [][]string{
+					{"Name:", "redis-master-"},
+					{"Namespace:", ns},
+					{"Image(s):", "redis"},
+					{"Node:"},
+					{"Labels:", "app=redis", "role=master"},
+					{"Status:", "Running"},
+					{"Reason:"},
+					{"Message:"},
+					{"IP:"},
+					{"Replication Controllers:", "redis-master"}}
+				checkOutput(output, requiredStrings)
+			})
+
+			// Rc
+			output := runKubectl("describe", "rc", "redis-master", nsFlag)
+			requiredStrings := [][]string{
+				{"Name:", "redis-master"},
+				{"Namespace:", ns},
+				{"Image(s):", "redis"},
+				{"Selector:", "app=redis,role=master"},
+				{"Labels:", "app=redis,role=master"},
+				{"Replicas:", "1 current", "1 desired"},
+				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
+				{"Events:"}}
+			checkOutput(output, requiredStrings)
+
+			// Service
+			output = runKubectl("describe", "service", "redis-master", nsFlag)
+			requiredStrings = [][]string{
+				{"Name:", "redis-master"},
+				{"Namespace:", ns},
+				{"Labels:", "app=redis", "role=master"},
+				{"Selector:", "app=redis", "role=master"},
+				{"Type:", "ClusterIP"},
+				{"IP:"},
+				{"Port:", "<unnamed>", "6379/TCP"},
+				{"Endpoints:"},
+				{"Session Affinity:", "None"}}
+			checkOutput(output, requiredStrings)
+
+			// Node
+			minions, err := c.Nodes().List(labels.Everything(), fields.Everything())
+			Expect(err).NotTo(HaveOccurred())
+			node := minions.Items[0]
+			output = runKubectl("describe", "node", node.Name)
+			requiredStrings = [][]string{
+				{"Name:", node.Name},
+				{"Labels:"},
+				{"CreationTimestamp:"},
+				{"Conditions:"},
+				{"Type", "Status", "LastHeartbeatTime", "LastTransitionTime", "Reason", "Message"},
+				{"Addresses:"},
+				{"Capacity:"},
+				{"Version:"},
+				{"Kernel Version:"},
+				{"OS Image:"},
+				{"Container Runtime Version:"},
+				{"Kubelet Version:"},
+				{"Kube-Proxy Version:"},
+				{"Pods:"}}
+			checkOutput(output, requiredStrings)
+
+			// Namespace
+			output = runKubectl("describe", "namespace", ns)
+			requiredStrings = [][]string{
+				{"Name:", ns},
+				{"Labels:"},
+				{"Status:", "Active"}}
+			checkOutput(output, requiredStrings)
+
+			// Quota and limitrange are skipped for now.
+		})
+	})
+
+	Describe("Kubectl expose", func() {
+		It("should create services for rc", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			controllerJson := mkpath("redis-master-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			redisPort := 6379
+			serviceTimeout := 30 * time.Second
+
+			By("creating Redis RC")
+			runKubectl("create", "-f", controllerJson, nsFlag)
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
+			})
+			validateService := func(name string, servicePort int, timeout time.Duration) {
+				endpointFound := false
+				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
+					endpoints, err := c.Endpoints(ns).Get(name)
+					Expect(err).NotTo(HaveOccurred())
+
+					ipToPort := getPortsByIp(endpoints.Subsets)
+					if len(ipToPort) != 1 {
+						Logf("No IP found, retrying")
+						continue
+					}
+					for _, port := range ipToPort {
+						if port[0] != redisPort {
+							Failf("Wrong endpoint port: %d", port[0])
+						}
+					}
+					endpointFound = true
+					break
+				}
+				if !endpointFound {
+					Failf("1 endpoint is expected")
+				}
+				service, err := c.Services(ns).Get(name)
+				Expect(err).NotTo(HaveOccurred())
+
+				if len(service.Spec.Ports) != 1 {
+					Failf("1 port is expected")
+				}
+				port := service.Spec.Ports[0]
+				if port.Port != servicePort {
+					Failf("Wrong service port: %d", port.Port)
+				}
+				if port.TargetPort.IntVal != redisPort {
+					Failf("Wrong target port: %d")
+				}
+			}
+
+			By("exposing RC")
+			runKubectl("expose", "rc", "redis-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			waitForService(c, ns, "rm2", true, poll, serviceTimeout)
+			validateService("rm2", 1234, serviceTimeout)
+
+			By("exposing service")
+			runKubectl("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			waitForService(c, ns, "rm3", true, poll, serviceTimeout)
+			validateService("rm3", 2345, serviceTimeout)
+		})
+	})
+
 	Describe("Kubectl label", func() {
 		var podPath string
 		var nsFlag string
 		BeforeEach(func() {
-			podPath = filepath.Join(testContext.RepoRoot, "examples/pod.yaml")
+			podPath = filepath.Join(testContext.RepoRoot, "docs/user-guide/pod.yaml")
 			By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			runKubectl("create", "-f", podPath, nsFlag)
@@ -238,7 +425,126 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
+	Describe("Kubectl logs", func() {
+		It("should find a string in pod logs", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			controllerJson := mkpath("redis-master-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			By("creating Redis RC")
+			runKubectl("create", "-f", controllerJson, nsFlag)
+			By("checking logs")
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				_, err := lookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", podStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("Kubectl patch", func() {
+		It("should add annotations for pods in rc", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
+			}
+			controllerJson := mkpath("redis-master-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			By("creating Redis RC")
+			runKubectl("create", "-f", controllerJson, nsFlag)
+			By("patching all pods")
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				runKubectl("patch", "pod", pod.Name, nsFlag, "-p", "{\"metadata\":{\"annotations\":{\"x\":\"y\"}}}")
+			})
+
+			By("checking annotations")
+			forEachPod(c, ns, "app", "redis", func(pod api.Pod) {
+				found := false
+				for key, val := range pod.Annotations {
+					if key == "x" && val == "y" {
+						found = true
+					}
+				}
+				if !found {
+					Failf("Added annation not found")
+				}
+			})
+		})
+	})
+
+	Describe("Kubectl version", func() {
+		It("should check is all data is printed", func() {
+			version := runKubectl("version")
+			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
+			for _, item := range requiredItems {
+				if !strings.Contains(version, item) {
+					Failf("Required item %s not found in %s", item, version)
+				}
+			}
+		})
+	})
+
+	Describe("Kubectl run", func() {
+		var nsFlag string
+		var rcName string
+
+		BeforeEach(func() {
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			rcName = "e2e-test-nginx-rc"
+		})
+
+		AfterEach(func() {
+			runKubectl("stop", "rc", rcName, nsFlag)
+		})
+
+		It("should create an rc from an image", func() {
+			image := "nginx"
+
+			By("running the image " + image)
+			runKubectl("run", rcName, "--image="+image, nsFlag)
+			By("verifying the rc " + rcName + " was created")
+			rc, err := c.ReplicationControllers(ns).Get(rcName)
+			if err != nil {
+				Failf("Failed getting rc %s: %v", rcName, err)
+			}
+			containers := rc.Spec.Template.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != image {
+				Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, image)
+			}
+
+			By("verifying the pod controlled by rc " + rcName + " was created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": rcName}))
+			podlist, err := waitForPodsWithLabel(c, ns, label)
+			if err != nil {
+				Failf("Failed getting pod controlled by rc %s: %v", rcName, err)
+			}
+			pods := podlist.Items
+			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != image {
+				runKubectl("get", "pods", "-L", "run", nsFlag)
+				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", image, len(pods))
+			}
+		})
+	})
+
 })
+
+// Checks whether the output split by line contains the required elements.
+func checkOutput(output string, required [][]string) {
+	outputLines := strings.Split(output, "\n")
+	currentLine := 0
+	for _, requirement := range required {
+		for currentLine < len(outputLines) && !strings.Contains(outputLines[currentLine], requirement[0]) {
+			currentLine++
+		}
+		if currentLine == len(outputLines) {
+			Failf("Failed to find %s in %s", requirement[0], output)
+		}
+		for _, item := range requirement[1:] {
+			if !strings.Contains(outputLines[currentLine], item) {
+				Failf("Failed to find %s in %s", item, outputLines[currentLine])
+			}
+		}
+	}
+}
 
 func curl(addr string) (string, error) {
 	resp, err := http.Get(addr)

@@ -5,10 +5,6 @@
   changed_when: false
   failed_when: false
 
-- name: Init the has_firewalld fact
-  set_fact:
-    has_firewalld: false
-
 - name: Set the has_firewalld fact
   set_fact:
     has_firewalld: true
@@ -19,10 +15,6 @@
   register: s
   changed_when: false
   failed_when: false
-
-- name: Init the has_iptables fact
-  set_fact:
-    has_iptables: false
 
 - name: Set the has_iptables fact
   set_fact:

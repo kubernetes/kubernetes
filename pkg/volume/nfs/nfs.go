@@ -82,16 +82,16 @@ func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mou
 	} else {
 		source = spec.PersistentVolumeSource.NFS
 	}
-	return &nfs{
-		volName:    spec.Name,
+	return &nfsBuilder{
+		nfs: &nfs{
+			volName: spec.Name,
+			mounter: mounter,
+			pod:     pod,
+			plugin:  plugin,
+		},
 		server:     source.Server,
 		exportPath: source.Path,
-		readOnly:   source.ReadOnly,
-		mounter:    mounter,
-		pod:        pod,
-		plugin:     plugin,
-	}, nil
-
+		readOnly:   source.ReadOnly}, nil
 }
 
 func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
@@ -99,19 +99,127 @@ func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mo
 }
 
 func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	return &nfs{
-		volName:    volName,
-		server:     "",
-		exportPath: "",
-		readOnly:   false,
-		mounter:    mounter,
-		pod:        &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
-		plugin:     plugin,
-	}, nil
+	return &nfsCleaner{&nfs{
+		volName: volName,
+		mounter: mounter,
+		pod:     &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		plugin:  plugin,
+	}}, nil
 }
 
 func (plugin *nfsPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
 	return plugin.newRecyclerFunc(spec, plugin.host)
+}
+
+// NFS volumes represent a bare host file or directory mount of an NFS export.
+type nfs struct {
+	volName string
+	pod     *api.Pod
+	mounter mount.Interface
+	plugin  *nfsPlugin
+	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)
+}
+
+func (nfsVolume *nfs) GetPath() string {
+	name := nfsPluginName
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+}
+
+type nfsBuilder struct {
+	*nfs
+	server     string
+	exportPath string
+	readOnly   bool
+}
+
+var _ volume.Builder = &nfsBuilder{}
+
+// SetUp attaches the disk and bind mounts to the volume path.
+func (b *nfsBuilder) SetUp() error {
+	return b.SetUpAt(b.GetPath())
+}
+
+func (b *nfsBuilder) SetUpAt(dir string) error {
+	mountpoint, err := b.mounter.IsMountPoint(dir)
+	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, mountpoint, err)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if mountpoint {
+		return nil
+	}
+	os.MkdirAll(dir, 0750)
+	source := fmt.Sprintf("%s:%s", b.server, b.exportPath)
+	options := []string{}
+	if b.readOnly {
+		options = append(options, "ro")
+	}
+	err = b.mounter.Mount(source, dir, "nfs", options)
+	if err != nil {
+		mountpoint, mntErr := b.mounter.IsMountPoint(dir)
+		if mntErr != nil {
+			glog.Errorf("IsMountpoint check failed: %v", mntErr)
+			return err
+		}
+		if mountpoint {
+			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
+				glog.Errorf("Failed to unmount: %v", mntErr)
+				return err
+			}
+			mountpoint, mntErr := b.mounter.IsMountPoint(dir)
+			if mntErr != nil {
+				glog.Errorf("IsMountpoint check failed: %v", mntErr)
+				return err
+			}
+			if mountpoint {
+				// This is very odd, we don't expect it.  We'll try again next sync loop.
+				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				return err
+			}
+		}
+		os.Remove(dir)
+		return err
+	}
+	return nil
+}
+
+type nfsCleaner struct {
+	*nfs
+}
+
+var _ volume.Cleaner = &nfsCleaner{}
+
+func (c *nfsCleaner) TearDown() error {
+	return c.TearDownAt(c.GetPath())
+}
+
+func (c *nfsCleaner) TearDownAt(dir string) error {
+	mountpoint, err := c.mounter.IsMountPoint(dir)
+	if err != nil {
+		glog.Errorf("Error checking IsMountPoint: %v", err)
+		return err
+	}
+	if !mountpoint {
+		return os.Remove(dir)
+	}
+
+	if err := c.mounter.Unmount(dir); err != nil {
+		glog.Errorf("Unmounting failed: %v", err)
+		return err
+	}
+	mountpoint, mntErr := c.mounter.IsMountPoint(dir)
+	if mntErr != nil {
+		glog.Errorf("IsMountpoint check failed: %v", mntErr)
+		return mntErr
+	}
+	if !mountpoint {
+		if err := os.Remove(dir); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
@@ -130,105 +238,6 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, er
 			host:   host,
 		}, nil
 	}
-}
-
-// NFS volumes represent a bare host file or directory mount of an NFS export.
-type nfs struct {
-	volName    string
-	pod        *api.Pod
-	server     string
-	exportPath string
-	readOnly   bool
-	mounter    mount.Interface
-	plugin     *nfsPlugin
-	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)
-}
-
-// SetUp attaches the disk and bind mounts to the volume path.
-func (nfsVolume *nfs) SetUp() error {
-	return nfsVolume.SetUpAt(nfsVolume.GetPath())
-}
-
-func (nfsVolume *nfs) SetUpAt(dir string) error {
-	mountpoint, err := nfsVolume.mounter.IsMountPoint(dir)
-	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, mountpoint, err)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if mountpoint {
-		return nil
-	}
-	os.MkdirAll(dir, 0750)
-	source := fmt.Sprintf("%s:%s", nfsVolume.server, nfsVolume.exportPath)
-	options := []string{}
-	if nfsVolume.readOnly {
-		options = append(options, "ro")
-	}
-	err = nfsVolume.mounter.Mount(source, dir, "nfs", options)
-	if err != nil {
-		mountpoint, mntErr := nfsVolume.mounter.IsMountPoint(dir)
-		if mntErr != nil {
-			glog.Errorf("IsMountpoint check failed: %v", mntErr)
-			return err
-		}
-		if mountpoint {
-			if mntErr = nfsVolume.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
-				return err
-			}
-			mountpoint, mntErr := nfsVolume.mounter.IsMountPoint(dir)
-			if mntErr != nil {
-				glog.Errorf("IsMountpoint check failed: %v", mntErr)
-				return err
-			}
-			if mountpoint {
-				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
-				return err
-			}
-		}
-		os.Remove(dir)
-		return err
-	}
-	return nil
-}
-
-func (nfsVolume *nfs) GetPath() string {
-	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
-}
-
-func (nfsVolume *nfs) TearDown() error {
-	return nfsVolume.TearDownAt(nfsVolume.GetPath())
-}
-
-func (nfsVolume *nfs) TearDownAt(dir string) error {
-	mountpoint, err := nfsVolume.mounter.IsMountPoint(dir)
-	if err != nil {
-		glog.Errorf("Error checking IsMountPoint: %v", err)
-		return err
-	}
-	if !mountpoint {
-		return os.Remove(dir)
-	}
-
-	if err := nfsVolume.mounter.Unmount(dir); err != nil {
-		glog.Errorf("Unmounting failed: %v", err)
-		return err
-	}
-	mountpoint, mntErr := nfsVolume.mounter.IsMountPoint(dir)
-	if mntErr != nil {
-		glog.Errorf("IsMountpoint check failed: %v", mntErr)
-		return mntErr
-	}
-	if !mountpoint {
-		if err := os.Remove(dir); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // nfsRecycler scrubs an NFS volume by running "rm -rf" on the volume in a pod.

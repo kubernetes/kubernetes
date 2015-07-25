@@ -34,7 +34,11 @@ var _ = Describe("Etcd failure", func() {
 	framework := Framework{BaseName: "etcd-failure"}
 
 	BeforeEach(func() {
-		// These tests requires SSH, so the provider check should be identical to those tests.
+		// This test requires:
+		// - SSH
+		// - master access
+		// ... so the provider check should be identical to the intersection of
+		// providers that provide those capabilities.
 		skipped = true
 		SkipUnlessProviderIs("gce")
 		skipped = false
@@ -80,7 +84,7 @@ func etcdFailTest(framework Framework, failCommand, fixCommand string) {
 
 	checkExistingRCRecovers(framework)
 
-	ServeImageOrFail(framework.Client, "basic", "gcr.io/google_containers/serve_hostname:1.1")
+	ServeImageOrFail(&framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.

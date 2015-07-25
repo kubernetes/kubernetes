@@ -15,28 +15,48 @@
 # limitations under the License.
 
 # loadedImageFlags is a bit-flag to track which docker images loaded successfully.
-let loadedImageFlags=0;
+let loadedImageFlags=0
 
 while true; do
- if which docker 1>/dev/null 2>&1; then
-   if docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1; then
-     let loadedImageFlags="$loadedImageFlags|1";
-   fi;
-   if docker load -i /srv/salt/kube-bins/kube-scheduler.tar 1>/dev/null 2>&1; then
-     let loadedImageFlags="$loadedImageFlags|2";
-   fi;
-   if docker load -i /srv/salt/kube-bins/kube-controller-manager.tar 1>/dev/null 2>&1; then
-     let loadedImageFlags="$loadedImageFlags|4";
-   fi;
- fi;
+  restart_docker=false
 
- # required docker images got installed. exit while loop.
- if [ $loadedImageFlags == 7 ]; then break; fi;
+  if which docker 1>/dev/null 2>&1; then
 
- # sleep for 5 seconds before attempting to load docker images again.
- sleep 5;
+    timeout 30 docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1
+    rc=$?
+    if [[ $rc == 0 ]]; then
+      let loadedImageFlags="$loadedImageFlags|1"
+    elif [[ $rc == 124 ]]; then
+      restart_docker=true
+    fi
 
-done;
+    timeout 30 docker load -i /srv/salt/kube-bins/kube-scheduler.tar 1>/dev/null 2>&1
+    rc=$?
+    if [[ $rc == 0 ]]; then
+      let loadedImageFlags="$loadedImageFlags|2"
+    elif [[ $rc == 124 ]]; then
+      restart_docker=true
+    fi
+
+    timeout 30 docker load -i /srv/salt/kube-bins/kube-controller-manager.tar 1>/dev/null 2>&1
+    rc=$?
+    if [[ $rc == 0 ]]; then
+      let loadedImageFlags="$loadedImageFlags|4"
+    elif [[ $rc == 124 ]]; then
+      restart_docker=true
+    fi
+  fi
+
+  # required docker images got installed. exit while loop.
+  if [[ $loadedImageFlags == 7 ]]; then break; fi
+
+  # Sometimes docker load hang, restart docker daemon resolve the issue
+  if [[ $restart_docker ]]; then service docker restart; fi
+
+  # sleep for 15 seconds before attempting to load docker images again
+  sleep 15
+
+done
 
 # Now exit. After kube-push, salt will notice that the service is down and it
 # will start it and new docker images will be loaded.

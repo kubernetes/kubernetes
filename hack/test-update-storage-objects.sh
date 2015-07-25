@@ -24,7 +24,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # The api version in which objects are currently stored in etcd.
-KUBE_OLD_API_VERSION=${KUBE_OLD_API_VERSION:-"v1beta3"}
+KUBE_OLD_API_VERSION=${KUBE_OLD_API_VERSION:-"v1"}
 # The api version in which our etcd objects should be converted to.
 # The new api version
 KUBE_NEW_API_VERSION=${KUBE_NEW_API_VERSION:-"v1"}
@@ -93,7 +93,7 @@ startApiServer
 
 # Create a pod
 kube::log::status "Creating a pod"
-${KUBECTL} create -f examples/pod.yaml
+${KUBECTL} create -f docs/user-guide/pod.yaml
 
 killApiServer
 

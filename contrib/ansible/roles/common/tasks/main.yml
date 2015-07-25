@@ -27,6 +27,14 @@
     has_rpm: true
   when: s.stat.exists
 
+- name: Init the has_firewalld fact
+  set_fact:
+    has_firewalld: false
+
+- name: Init the has_iptables fact
+  set_fact:
+    has_iptables: false
+
 # collect information about what packages are installed
 - include: rpm.yml
   when: has_rpm

@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -336,22 +337,31 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 		secret.Data = map[string][]byte{}
 	}
 
-	tokenData, ok := secret.Data[api.ServiceAccountTokenKey]
-	if ok && len(tokenData) > 0 {
+	caData := secret.Data[api.ServiceAccountRootCAKey]
+	needsCA := len(e.rootCA) > 0 && bytes.Compare(caData, e.rootCA) != 0
+
+	tokenData := secret.Data[api.ServiceAccountTokenKey]
+	needsToken := len(tokenData) == 0
+
+	if !needsCA && !needsToken {
 		return nil
 	}
-	if e.rootCA != nil && len(e.rootCA) > 0 {
+
+	// Set the CA
+	if needsCA {
 		secret.Data[api.ServiceAccountRootCAKey] = e.rootCA
 	}
 
 	// Generate the token
-	token, err := e.token.GenerateToken(*serviceAccount, *secret)
-	if err != nil {
-		return err
+	if needsToken {
+		token, err := e.token.GenerateToken(*serviceAccount, *secret)
+		if err != nil {
+			return err
+		}
+		secret.Data[api.ServiceAccountTokenKey] = []byte(token)
 	}
 
-	// Set the token and annotations
-	secret.Data[api.ServiceAccountTokenKey] = []byte(token)
+	// Set annotations
 	secret.Annotations[api.ServiceAccountNameKey] = serviceAccount.Name
 	secret.Annotations[api.ServiceAccountUIDKey] = string(serviceAccount.UID)
 

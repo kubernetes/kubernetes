@@ -1,18 +1,17 @@
 ---
-- name: Check if selinux enforcing
-  command: getenforce
-  register: selinux
-  changed_when: false
-
 - name: Set selinux permissive because tokens and selinux don't work together
-  selinux: state=permissive policy=targeted
-  when: "'Enforcing' in selinux.stdout"
+  selinux: state=permissive policy={{ ansible_selinux.type }}
+  when: ansible_selinux is defined and ansible_selinux.status == "enabled"
 
-- include: generic-install.yml
-  when: not is_atomic and not ansible_distribution == "CentOS"
+- include: packageManagerInstall.yml
+  when: source_type == "packageManager"
+  tags:
+    - binary-update
 
-- include: centos.yml
-  when: not is_atomic and ansible_distribution == "CentOS"
+- include: localBuildInstall.yml
+  when: source_type == "localBuild"
+  tags:
+    - binary-update
 
 - name: Make sure manifest directory exists
   file: path={{ kube_manifest_dir }} state=directory
