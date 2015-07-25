@@ -31,11 +31,11 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# What is Kubernetes? 
+# What is Kubernetes?
 
-Kubernetes is an open-source platform for automating deployment, scaling, and operations of application containers across clusters of hosts. 
+Kubernetes is an open-source platform for automating deployment, scaling, and operations of application containers across clusters of hosts.
 
-With Kubernetes, you are able to quickly and efficiently respond to customer demand: 
+With Kubernetes, you are able to quickly and efficiently respond to customer demand:
 
  - Scale your applications on the fly.
  - Seamlessly roll out new features.
@@ -54,7 +54,7 @@ The Kubernetes project was started by Google in 2014. Kubernetes builds upon a [
 
 <hr>
 
-Looking for reasons why you should be using [containers](http://aucouranton.com/2014/06/13/linux-containers-parallels-lxc-openvz-docker-and-more/)? 
+Looking for reasons why you should be using [containers](http://aucouranton.com/2014/06/13/linux-containers-parallels-lxc-openvz-docker-and-more/)?
 
 Here are some key points:
 
