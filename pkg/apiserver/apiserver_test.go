@@ -247,9 +247,16 @@ func (*SimpleRoot) IsAnAPIObject() {}
 
 type SimpleGetOptions struct {
 	api.TypeMeta `json:",inline"`
-	Param1       string `json:"param1" description:"description for param1"`
-	Param2       string `json:"param2" description:"description for param2"`
+	Param1       string `json:"param1"`
+	Param2       string `json:"param2"`
 	Path         string `json:"atAPath"`
+}
+
+func (SimpleGetOptions) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"param1": "description for param1",
+		"param2": "description for param2",
+	}
 }
 
 func (*SimpleGetOptions) IsAnAPIObject() {}
