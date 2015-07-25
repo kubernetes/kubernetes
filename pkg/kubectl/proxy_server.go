@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/golang/glog"
@@ -34,6 +35,16 @@ const (
 	DefaultPathAcceptRE   = "^/.*"
 	DefaultPathRejectRE   = "^/api/.*/exec,^/api/.*/run"
 	DefaultMethodRejectRE = "POST,PUT,PATCH"
+)
+
+var (
+	// The reverse proxy will periodically flush the io writer at this frequency.
+	// Only matters for long poll connections like the one used to watch. With an
+	// interval of 0 the reverse proxy will buffer content sent on any connection
+	// with transfer-encoding=chunked.
+	// TODO: Flush after each chunk so the client doesn't suffer a 100ms latency per
+	// watch event.
+	ReverseProxyFlushInterval = 100 * time.Millisecond
 )
 
 // FilterServer rejects requests which don't match one of the specified regular expressions
@@ -171,7 +182,7 @@ func newProxy(target *url.URL) *httputil.ReverseProxy {
 		req.URL.Host = target.Host
 		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
 	}
-	return &httputil.ReverseProxy{Director: director}
+	return &httputil.ReverseProxy{Director: director, FlushInterval: ReverseProxyFlushInterval}
 }
 
 func newFileHandler(prefix, base string) http.Handler {

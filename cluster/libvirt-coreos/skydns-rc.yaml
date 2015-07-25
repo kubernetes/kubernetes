@@ -1,10 +1,10 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
     k8s-app: skydns
   name: skydns
-  namespace: default
+  namespace: kube-system
 spec:
   replicas: ${DNS_REPLICAS}
   selector:

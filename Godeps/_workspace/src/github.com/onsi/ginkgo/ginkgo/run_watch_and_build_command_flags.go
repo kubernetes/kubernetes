@@ -20,6 +20,7 @@ type RunWatchAndBuildCommandFlags struct {
 	NumCompilers   int
 	ParallelStream bool
 	Notify         bool
+	AfterSuiteHook string
 	AutoNodes      bool
 
 	//only for run command
@@ -105,6 +106,7 @@ func (c *RunWatchAndBuildCommandFlags) flags(mode int) {
 		if !onWindows {
 			c.FlagSet.BoolVar(&(c.Notify), "notify", false, "Send desktop notifications when a test run completes")
 		}
+		c.FlagSet.StringVar(&(c.AfterSuiteHook), "afterSuiteHook", "", "Run a command when a suite test run completes")
 	}
 
 	if mode == runMode {

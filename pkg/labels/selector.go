@@ -618,7 +618,7 @@ func (p *Parser) parseExactValue() (util.StringSet, error) {
 // <requirement> ::= KEY [ <set-based-restriction> | <exact-match-restriction>
 // <set-based-restriction> ::= "" | <inclusion-exclusion> <value-set>
 // <inclusion-exclusion> ::= <inclusion> | <exclusion>
-//           <exclusion> ::= "not" <inclusion>
+//           <exclusion> ::= "notin"
 //           <inclusion> ::= "in"
 //           <value-set> ::= "(" <values> ")"
 //              <values> ::= VALUE | VALUE "," <values>
@@ -627,12 +627,12 @@ func (p *Parser) parseExactValue() (util.StringSet, error) {
 // VALUE is a sequence of zero or more characters "([A-Za-z0-9_-\.])". Max length is 64 character.
 // Delimiter is white space: (' ', '\t')
 // Example of valid syntax:
-//  "x in (foo,,baz),y,z not in ()"
+//  "x in (foo,,baz),y,z notin ()"
 //
 // Note:
 //  (1) Inclusion - " in " - denotes that the KEY is equal to any of the
 //      VALUEs in its requirement
-//  (2) Exclusion - " not in " - denotes that the KEY is not equal to any
+//  (2) Exclusion - " notin " - denotes that the KEY is not equal to any
 //      of the VALUEs in its requirement
 //  (3) The empty string is a valid VALUE
 //  (4) A requirement with just a KEY - as in "y" above - denotes that

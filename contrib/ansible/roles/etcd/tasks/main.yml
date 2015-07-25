@@ -1,17 +1,31 @@
 ---
 - name: Install etcd
-  yum: pkg=etcd state=latest
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+        name: etcd
+        state: latest
   notify:
-        - restart etcd
+    - restart etcd
   when: not is_atomic
 
 - name: Write etcd config file
   template: src=etcd.conf.j2 dest=/etc/etcd/etcd.conf
   notify:
-        - restart etcd
+    - restart etcd
+
+- name: Write etcd systemd unit file for Debian
+  copy: src=etcd.service dest=/etc/systemd/system
+  notify:
+    - reload systemd
+    - restart etcd
+  when: ansible_distribution == "Debian"
 
 - name: Enable etcd
-  service: name=etcd enabled=yes state=started
+  service: name=etcd enabled=yes
+
+- name: Start etcd
+  service: name=etcd state=started
+  register: etcd_started
 
 - include: firewalld.yml
   when: has_firewalld

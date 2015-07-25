@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
@@ -1172,7 +1173,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: "v1beta3",
+								APIVersion: testapi.Version(),
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -1181,7 +1182,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAMESPACE",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: "v1beta3",
+								APIVersion: testapi.Version(),
 								FieldPath:  "metadata.namespace",
 							},
 						},
@@ -1208,7 +1209,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: "v1beta3",
+								APIVersion: testapi.Version(),
 								FieldPath:  "metadata.name",
 							},
 						},

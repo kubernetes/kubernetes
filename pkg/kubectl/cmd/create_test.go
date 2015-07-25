@@ -147,7 +147,7 @@ func TestPrintObjectSpecificMessage(t *testing.T) {
 		},
 		{
 			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer}},
-			expectOutput: true,
+			expectOutput: false,
 		},
 		{
 			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort}},

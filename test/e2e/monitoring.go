@@ -39,14 +39,11 @@ var _ = Describe("Monitoring", func() {
 		var err error
 		c, err = loadClient()
 		expectNoError(err)
+
+		SkipUnlessProviderIs("gce")
 	})
 
 	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
-		if !providerIs("gce") {
-			By(fmt.Sprintf("Skipping Monitoring test, which is only supported for provider gce (not %s)",
-				testContext.Provider))
-			return
-		}
 		testMonitoringUsingHeapsterInfluxdb(c)
 	})
 })
@@ -81,7 +78,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 	// situaiton when a heapster-monitoring-v1 and heapster-monitoring-v2 replication controller
 	// is running (which would be an error except during a rolling update).
 	for _, rcLabel := range rcLabels {
-		rcList, err := c.ReplicationControllers(api.NamespaceDefault).List(labels.Set{"k8s-app": rcLabel}.AsSelector())
+		rcList, err := c.ReplicationControllers(api.NamespaceSystem).List(labels.Set{"k8s-app": rcLabel}.AsSelector())
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +87,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 				rcLabel, len(rcList.Items))
 		}
 		for _, rc := range rcList.Items {
-			podList, err := c.Pods(api.NamespaceDefault).List(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything())
+			podList, err := c.Pods(api.NamespaceSystem).List(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything())
 			if err != nil {
 				return nil, err
 			}
@@ -103,7 +100,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 }
 
 func expectedServicesExist(c *client.Client) error {
-	serviceList, err := c.Services(api.NamespaceDefault).List(labels.Everything())
+	serviceList, err := c.Services(api.NamespaceSystem).List(labels.Everything())
 	if err != nil {
 		return err
 	}
@@ -208,7 +205,7 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	if !ok {
 		Failf("failed to get master http client")
 	}
-	proxyUrl := fmt.Sprintf("%s/api/v1/proxy/namespaces/default/services/%s:api/", getMasterHost(), influxdbService)
+	proxyUrl := fmt.Sprintf("%s/api/v1/proxy/namespaces/%s/services/%s:api/", getMasterHost(), api.NamespaceSystem, influxdbService)
 	config := &influxdb.ClientConfig{
 		Host: proxyUrl,
 		// TODO(vishh): Infer username and pw from the Pod spec.

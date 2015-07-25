@@ -26,6 +26,9 @@
 {% set proxy_ssh_options = "" -%}
 {% if grains.proxy_ssh_user is defined -%}
   {% set proxy_ssh_options = "--ssh-user=" + grains.proxy_ssh_user + " --ssh-keyfile=/srv/sshproxy/.sshkeyfile" -%}
+  {# Append 40 characters onto command to work around #9822. #}
+  {# If mount list changes, this may also need to change. #}
+  {% set proxy_ssh_options = proxy_ssh_options + "                                        " -%}
 {% endif -%}
 
 {% set address = "--address=127.0.0.1" -%}
@@ -89,7 +92,7 @@
 {% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
 
 {
-"apiVersion": "v1beta3",
+"apiVersion": "v1",
 "kind": "Pod",
 "metadata": {"name":"kube-apiserver"},
 "spec":{
@@ -98,6 +101,11 @@
     {
     "name": "kube-apiserver",
     "image": "gcr.io/google_containers/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
+    "resources": {
+      "limits": {
+        "cpu": "200m"
+      }
+    },
     "command": [
                  "/bin/sh",
                  "-c",

@@ -118,12 +118,18 @@ func waitForGroupSize(size int) error {
 }
 
 func waitForClusterSize(c *client.Client, size int) error {
-	for start := time.Now(); time.Since(start) < 4*time.Minute; time.Sleep(20 * time.Second) {
+	timeout := 10 * time.Minute
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Logf("Failed to list nodes: %v", err)
 			continue
 		}
+		// Filter out not-ready nodes.
+		filterNodes(nodes, func(node api.Node) bool {
+			return isNodeReadySetAsExpected(&node, true)
+		})
+
 		if len(nodes.Items) == size {
 			Logf("Cluster has reached the desired size %d", size)
 			return nil
@@ -294,11 +300,11 @@ func verifyPods(c *client.Client, ns, name string, wantName bool, replicas int) 
 	}
 	e := podsRunning(c, pods)
 	if len(e) > 0 {
-		return fmt.Errorf("Failed to wait for pods running: %v", e)
+		return fmt.Errorf("failed to wait for pods running: %v", e)
 	}
 	err = podsResponding(c, ns, name, wantName, pods)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to wait for pods responding: %v", err)
 	}
 	return nil
 }
@@ -330,7 +336,15 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	// and cause it to fail if DNS is absent or broken.
 	// Use the IP address instead.
 
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", testContext.CloudConfig.MasterName)
+	destination := testContext.CloudConfig.MasterName
+	if providerIs("aws") {
+		// This is the (internal) IP address used on AWS for the master
+		// TODO: Use IP address for all clouds?
+		// TODO: Avoid hard-coding this
+		destination = "172.20.0.9"
+	}
+
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", destination)
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
@@ -386,8 +400,6 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 }
 
 var _ = Describe("Nodes", func() {
-	supportedProviders := []string{"aws", "gce", "gke"}
-	var testName string
 	var c *client.Client
 	var ns string
 
@@ -401,6 +413,10 @@ var _ = Describe("Nodes", func() {
 	})
 
 	AfterEach(func() {
+		By("checking whether all nodes are healthy")
+		if err := allNodesReady(c, time.Minute); err != nil {
+			Failf("Not all nodes are ready: %v", err)
+		}
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
 		if err := c.Namespaces().Delete(ns); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
@@ -408,17 +424,20 @@ var _ = Describe("Nodes", func() {
 	})
 
 	Describe("Resize", func() {
+		var skipped bool
+
 		BeforeEach(func() {
-			if !providerIs(supportedProviders...) {
-				Failf("Nodes.Resize test is only supported for providers %v (not %s). You can avoid this failure by using ginkgo.skip=Nodes.Resize in your environment.",
-					supportedProviders, testContext.Provider)
-			}
+			skipped = true
+			SkipUnlessProviderIs("gce", "gke", "aws")
+			SkipUnlessNodeCountIsAtLeast(2)
+			skipped = false
 		})
 
 		AfterEach(func() {
-			if !providerIs(supportedProviders...) {
+			if skipped {
 				return
 			}
+
 			By("restoring the original node instance group size")
 			if err := resizeGroup(testContext.CloudConfig.NumNodes); err != nil {
 				Failf("Couldn't restore the original node instance group size: %v", err)
@@ -431,15 +450,7 @@ var _ = Describe("Nodes", func() {
 			}
 		})
 
-		testName = "should be able to delete nodes."
-		It(testName, func() {
-			Logf("starting test %s", testName)
-
-			if testContext.CloudConfig.NumNodes < 2 {
-				Failf("Failing test %s as it requires at least 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
-				return
-			}
-
+		It("should be able to delete nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
@@ -461,16 +472,8 @@ var _ = Describe("Nodes", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		testName = "should be able to add nodes."
-		It(testName, func() {
-			// TODO: Bug here - testName is not correct
-			Logf("starting test %s", testName)
-
-			if testContext.CloudConfig.NumNodes < 2 {
-				Failf("Failing test %s as it requires at least 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
-				return
-			}
-
+		// TODO: Bug here - testName is not correct
+		It("should be able to add nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
@@ -497,68 +500,62 @@ var _ = Describe("Nodes", func() {
 	})
 
 	Describe("Network", func() {
-		BeforeEach(func() {
-			if !providerIs(supportedProviders...) {
-				Failf("Nodes.Network test is only supported for providers %v (not %s). You can avoid this failure by using ginkgo.skip=Nodes.Network in your environment.",
-					supportedProviders, testContext.Provider)
-			}
-		})
+		Context("when a minion node becomes unreachable", func() {
+			BeforeEach(func() {
+				SkipUnlessProviderIs("gce", "gke", "aws")
+				SkipUnlessNodeCountIsAtLeast(2)
+			})
 
-		// TODO marekbiskup 2015-06-19 #10085
-		// This test has nothing to do with resizing nodes so it should be moved elsewhere.
-		// Two things are tested here:
-		// 1. pods from a uncontactable nodes are rescheduled
-		// 2. when a node joins the cluster, it can host new pods.
-		// Factor out the cases into two separate tests.
+			// TODO marekbiskup 2015-06-19 #10085
+			// This test has nothing to do with resizing nodes so it should be moved elsewhere.
+			// Two things are tested here:
+			// 1. pods from a uncontactable nodes are rescheduled
+			// 2. when a node joins the cluster, it can host new pods.
+			// Factor out the cases into two separate tests.
+			It("[replication controller] recreates pods scheduled on the unreachable minion node "+
+				"AND allows scheduling of pods on a minion after it rejoins the cluster", func() {
 
-		testName = "Uncontactable nodes, have their pods recreated by a replication controller, and can host new pods after rejoining."
-		It(testName, func() {
-			if testContext.CloudConfig.NumNodes < 2 {
-				By(fmt.Sprintf("skipping %s test, which requires at least 2 nodes (not %d)",
-					testName, testContext.CloudConfig.NumNodes))
-				return
-			}
+				// Create a replication controller for a service that serves its hostname.
+				// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+				name := "my-hostname-net"
+				newSVCByName(c, ns, name)
+				replicas := testContext.CloudConfig.NumNodes
+				newRCByName(c, ns, name, replicas)
+				err := verifyPods(c, ns, name, true, replicas)
+				Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
-			// Create a replication controller for a service that serves its hostname.
-			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
-			name := "my-hostname-net"
-			newSVCByName(c, ns, name)
-			replicas := testContext.CloudConfig.NumNodes
-			newRCByName(c, ns, name, replicas)
-			err := verifyPods(c, ns, name, true, replicas)
-			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
-
-			By("choose a node with at least one pod - we will block some network traffic on this node")
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-			pods, err := c.Pods(ns).List(label, fields.Everything()) // list pods after all have been scheduled
-			Expect(err).NotTo(HaveOccurred())
-			nodeName := pods.Items[0].Spec.NodeName
-
-			node, err := c.Nodes().Get(nodeName)
-			Expect(err).NotTo(HaveOccurred())
-
-			By(fmt.Sprintf("block network traffic from node %s", node.Name))
-			performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
-			Logf("Waiting for node %s to be ready", node.Name)
-			waitForNodeToBe(c, node.Name, true, 2*time.Minute)
-
-			By("verify wheter new pods can be created on the re-attached node")
-			// increasing the RC size is not a valid way to test this
-			// since we have no guarantees the pod will be scheduled on our node.
-			additionalPod := "additionalpod"
-			err = newPodOnNode(c, ns, additionalPod, node.Name)
-			Expect(err).NotTo(HaveOccurred())
-			err = verifyPods(c, ns, additionalPod, true, 1)
-			Expect(err).NotTo(HaveOccurred())
-
-			// verify that it is really on the requested node
-			{
-				pod, err := c.Pods(ns).Get(additionalPod)
+				By("choose a node with at least one pod - we will block some network traffic on this node")
+				label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+				pods, err := c.Pods(ns).List(label, fields.Everything()) // list pods after all have been scheduled
 				Expect(err).NotTo(HaveOccurred())
-				if pod.Spec.NodeName != node.Name {
-					Logf("Pod %s found on invalid node: %s instead of %s", pod.Spec.NodeName, node.Name)
+				nodeName := pods.Items[0].Spec.NodeName
+
+				node, err := c.Nodes().Get(nodeName)
+				Expect(err).NotTo(HaveOccurred())
+
+				By(fmt.Sprintf("block network traffic from node %s", node.Name))
+				performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
+				Logf("Waiting for node %s to be ready", node.Name)
+				waitForNodeToBe(c, node.Name, true, 2*time.Minute)
+
+				By("verify whether new pods can be created on the re-attached node")
+				// increasing the RC size is not a valid way to test this
+				// since we have no guarantees the pod will be scheduled on our node.
+				additionalPod := "additionalpod"
+				err = newPodOnNode(c, ns, additionalPod, node.Name)
+				Expect(err).NotTo(HaveOccurred())
+				err = verifyPods(c, ns, additionalPod, true, 1)
+				Expect(err).NotTo(HaveOccurred())
+
+				// verify that it is really on the requested node
+				{
+					pod, err := c.Pods(ns).Get(additionalPod)
+					Expect(err).NotTo(HaveOccurred())
+					if pod.Spec.NodeName != node.Name {
+						Logf("Pod %s found on invalid node: %s instead of %s", pod.Spec.NodeName, node.Name)
+					}
 				}
-			}
+			})
 		})
 	})
 })

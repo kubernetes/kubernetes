@@ -54,11 +54,7 @@ import (
 var nodeResourceName string
 
 func init() {
-	if api.PreV1Beta3(testapi.Version()) {
-		nodeResourceName = "minions"
-	} else {
-		nodeResourceName = "nodes"
-	}
+	nodeResourceName = "nodes"
 }
 
 const (
@@ -90,7 +86,7 @@ func timeoutPath(resource, namespace, name string) string {
 var aPod string = `
 {
   "kind": "Pod",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "creationTimestamp": null%s
@@ -108,7 +104,7 @@ var aPod string = `
 var aRC string = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "labels": {
@@ -141,7 +137,7 @@ var aRC string = `
 var aService string = `
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "labels": {
@@ -158,14 +154,14 @@ var aService string = `
     "selector": {
       "name": "a"
     },
-    "portalIP": "10.0.0.100"
+    "clusterIP": "10.0.0.100"
   }
 }
 `
 var aNode string = `
 {
   "kind": "Node",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -177,7 +173,7 @@ var aNode string = `
 var aEvent string = `
 {
   "kind": "Event",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -185,7 +181,7 @@ var aEvent string = `
     "kind": "Node",
     "namespace": "default",
     "name": "a",
-    "apiVersion": "v1beta3"
+    "apiVersion": "v1"
   }
 }
 `
@@ -193,7 +189,7 @@ var aEvent string = `
 var aBinding string = `
 {
   "kind": "Binding",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -203,10 +199,20 @@ var aBinding string = `
 }
 `
 
+var emptyEndpoints string = `
+{
+  "kind": "Endpoints",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "a"%s
+  }
+}
+`
+
 var aEndpoints string = `
 {
   "kind": "Endpoints",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -214,7 +220,7 @@ var aEndpoints string = `
     {
       "addresses": [
         {
-          "IP": "10.10.1.1"
+          "ip": "10.10.1.1"
         }
       ],
       "ports": [
@@ -231,7 +237,7 @@ var aEndpoints string = `
 var deleteNow string = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "gracePeriodSeconds": null%s
 }
 `
@@ -247,6 +253,7 @@ var code405 = map[int]bool{405: true}
 var code409 = map[int]bool{409: true}
 var code422 = map[int]bool{422: true}
 var code500 = map[int]bool{500: true}
+var code503 = map[int]bool{503: true}
 
 // To ensure that a POST completes before a dependent GET, set a timeout.
 func addTimeoutFlag(URLString string) string {
@@ -275,6 +282,16 @@ func getTestRequests() []struct {
 		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code201},
 		{"PUT", timeoutPath("pods", api.NamespaceDefault, "a"), aPod, code200},
 		{"GET", path("pods", api.NamespaceDefault, "a"), "", code200},
+		// GET and POST for /exec should return Bad Request (400) since the pod has not been assigned a node yet.
+		{"GET", path("pods", api.NamespaceDefault, "a") + "/exec", "", code400},
+		{"POST", path("pods", api.NamespaceDefault, "a") + "/exec", "", code400},
+		// PUT for /exec should return Method Not Allowed (405).
+		{"PUT", path("pods", api.NamespaceDefault, "a") + "/exec", "", code405},
+		// GET and POST for /portforward should return Bad Request (400) since the pod has not been assigned a node yet.
+		{"GET", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code400},
+		{"POST", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code400},
+		// PUT for /portforward should return Method Not Allowed (405).
+		{"PUT", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code405},
 		{"PATCH", path("pods", api.NamespaceDefault, "a"), "{%v}", code200},
 		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), deleteNow, code200},
 
@@ -293,8 +310,14 @@ func getTestRequests() []struct {
 		{"GET", path("services", "", ""), "", code200},
 		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
 		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
+		// Create an endpoint for the service (this is done automatically by endpoint controller
+		// whenever a service is created, but this test does not run that controller)
+		{"POST", timeoutPath("endpoints", api.NamespaceDefault, ""), emptyEndpoints, code201},
+		// Should return service unavailable when endpoint.subset is empty.
+		{"GET", pathWithPrefix("proxy", "services", api.NamespaceDefault, "a") + "/", "", code503},
 		{"PUT", timeoutPath("services", api.NamespaceDefault, "a"), aService, code200},
 		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
+		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
 		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
 
 		// Normal methods on replicationControllers
@@ -452,17 +475,6 @@ func parseResourceVersion(response []byte) (string, float64, error) {
 	if err != nil {
 		return "", 0, fmt.Errorf("unexpected error unmarshaling resultBody: %v", err)
 	}
-	apiVersion, ok := resultBodyMap["apiVersion"].(string)
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, apiVersion not found in JSON response: %v", string(response))
-	}
-	if api.PreV1Beta3(apiVersion) {
-		return parsePreV1Beta3ResourceVersion(resultBodyMap, response)
-	}
-	return parseV1Beta3ResourceVersion(resultBodyMap, response)
-}
-
-func parseV1Beta3ResourceVersion(resultBodyMap map[string]interface{}, response []byte) (string, float64, error) {
 	metadata, ok := resultBodyMap["metadata"].(map[string]interface{})
 	if !ok {
 		return "", 0, fmt.Errorf("unexpected error, metadata not found in JSON response: %v", string(response))
@@ -478,19 +490,6 @@ func parseV1Beta3ResourceVersion(resultBodyMap map[string]interface{}, response 
 	resourceVersion, err := strconv.ParseFloat(resourceVersionString, 64)
 	if err != nil {
 		return "", 0, fmt.Errorf("unexpected error, could not parse resourceVersion as float64, err: %s. JSON response: %v", err, string(response))
-	}
-	return id, resourceVersion, nil
-}
-
-func parsePreV1Beta3ResourceVersion(resultBodyMap map[string]interface{}, response []byte) (string, float64, error) {
-	id, ok := resultBodyMap["id"].(string)
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, id not found in JSON response: %v", string(response))
-	}
-
-	resourceVersion, ok := resultBodyMap["resourceVersion"].(float64)
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, resourceVersion not found in JSON response: %v", string(response))
 	}
 	return id, resourceVersion, nil
 }

@@ -74,8 +74,8 @@ type fakePDManager struct {
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+func (fake *fakePDManager) AttachAndMountDisk(b *gcePersistentDiskBuilder, globalPDPath string) error {
+	globalPath := makeGlobalPDName(b.plugin.host, b.pdName)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
@@ -83,12 +83,12 @@ func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPat
 	fake.attachCalled = true
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	pd.mounter.Mount(globalPath, globalPath, pd.fsType, nil)
+	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+func (fake *fakePDManager) DetachDisk(c *gcePersistentDiskCleaner) error {
+	globalPath := makeGlobalPDName(c.plugin.host, c.pdName)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
@@ -169,36 +169,5 @@ func TestPlugin(t *testing.T) {
 	}
 	if !fakeManager.detachCalled {
 		t.Errorf("Detach watch not called")
-	}
-
-}
-
-func TestPluginLegacy(t *testing.T) {
-	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
-
-	plug, err := plugMgr.FindPluginByName("gce-pd")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
-	if plug.Name() != "gce-pd" {
-		t.Errorf("Wrong name: %s", plug.Name())
-	}
-	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
-		t.Errorf("Expected false")
-	}
-
-	spec := &api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	if _, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{""}, nil); err == nil {
-		t.Errorf("Expected failiure")
-	}
-
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), nil)
-	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
-	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner")
 	}
 }

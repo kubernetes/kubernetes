@@ -17,12 +17,18 @@ limitations under the License.
 package client
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 )
 
 const (
@@ -312,5 +318,86 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 	}
 	if !strings.Contains(config.UserAgent, "kubernetes/") {
 		t.Errorf("no user agent set: %#v", config)
+	}
+}
+
+func objBody(object interface{}) io.ReadCloser {
+	output, err := json.MarshalIndent(object, "", "")
+	if err != nil {
+		panic(err)
+	}
+	return ioutil.NopCloser(bytes.NewReader([]byte(output)))
+}
+
+func TestNegotiateVersion(t *testing.T) {
+	tests := []struct {
+		name, version, expectedVersion string
+		serverVersions                 []string
+		clientVersions                 []string
+		config                         *Config
+		expectErr                      bool
+	}{
+		{
+			name:            "server supports client default",
+			version:         "version1",
+			config:          &Config{},
+			serverVersions:  []string{"version1", testapi.Version()},
+			clientVersions:  []string{"version1", testapi.Version()},
+			expectedVersion: "version1",
+			expectErr:       false,
+		},
+		{
+			name:            "server falls back to client supported",
+			version:         testapi.Version(),
+			config:          &Config{},
+			serverVersions:  []string{"version1"},
+			clientVersions:  []string{"version1", testapi.Version()},
+			expectedVersion: "version1",
+			expectErr:       false,
+		},
+		{
+			name:            "explicit version supported",
+			version:         "",
+			config:          &Config{Version: testapi.Version()},
+			serverVersions:  []string{"version1", testapi.Version()},
+			clientVersions:  []string{"version1", testapi.Version()},
+			expectedVersion: testapi.Version(),
+			expectErr:       false,
+		},
+		{
+			name:            "explicit version not supported",
+			version:         "",
+			config:          &Config{Version: testapi.Version()},
+			serverVersions:  []string{"version1"},
+			clientVersions:  []string{"version1", testapi.Version()},
+			expectedVersion: "",
+			expectErr:       true,
+		},
+	}
+	codec := testapi.Codec()
+
+	for _, test := range tests {
+		fakeClient := &FakeRESTClient{
+			Codec: codec,
+			Resp: &http.Response{
+				StatusCode: 200,
+				Body:       objBody(&api.APIVersions{Versions: test.serverVersions}),
+			},
+			Client: HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Body: objBody(&api.APIVersions{Versions: test.serverVersions})}, nil
+			}),
+		}
+		c := NewOrDie(test.config)
+		c.Client = fakeClient.Client
+		response, err := NegotiateVersion(c, test.config, test.version, test.clientVersions)
+		if err == nil && test.expectErr {
+			t.Errorf("expected error, got nil for [%s].", test.name)
+		}
+		if err != nil && !test.expectErr {
+			t.Errorf("unexpected error for [%s]: %v.", test.name, err)
+		}
+		if response != test.expectedVersion {
+			t.Errorf("expected version %s, got %s.", test.expectedVersion, response)
+		}
 	}
 }

@@ -1,6 +1,6 @@
 ---
 - name: Get iptables rules
-  shell: iptables -L
+  command: iptables -L
   register: iptablesrules
   always_run: yes
 
@@ -9,9 +9,9 @@
 
 - name: Open etcd client port with iptables
   command: /sbin/iptables -I INPUT 1 -p tcp --dport {{ item }} -j ACCEPT -m comment --comment "etcd"
-  when: etcd not in iptablesrules.stdout
+  when: "'etcd' not in iptablesrules.stdout"
   notify:
-          - Save iptables rules
+    - Save iptables rules
   with_items:
-          - 2379
-          - 2380
+    - 2379
+    - 2380

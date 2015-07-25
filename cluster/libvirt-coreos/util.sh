@@ -183,7 +183,7 @@ function wait-cluster-readiness {
 
   local timeout=120
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_minions=$("${kubectl}" get nodes -o template -t "{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1beta3 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    nb_ready_minions=$("${kubectl}" get nodes -o template -t "{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
     echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
     if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
         return 0
@@ -200,7 +200,6 @@ function wait-cluster-readiness {
 function kube-up {
   detect-master
   detect-minions
-  get-password
   initialize-pool keep_base_image
   initialize-network
 
@@ -326,12 +325,6 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
   kube-down
-}
-
-# Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
-function get-password {
-  export KUBE_USER=''
-  export KUBE_PASSWORD=''
 }
 
 # SSH to a node by name or IP ($1) and run a command ($2).

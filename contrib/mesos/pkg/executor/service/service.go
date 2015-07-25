@@ -240,7 +240,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		KubeClient:                     apiclient,
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  app.ProbeVolumePlugins(),
-		NetworkPlugins:                 app.ProbeNetworkPlugins(),
+		NetworkPlugins:                 app.ProbeNetworkPlugins(s.NetworkPluginDir),
 		NetworkPluginName:              s.NetworkPluginName,
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		TLSOptions:                     tlsOptions,

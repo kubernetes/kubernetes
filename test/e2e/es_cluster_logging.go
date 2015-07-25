@@ -34,6 +34,13 @@ import (
 var _ = Describe("Cluster level logging using Elasticsearch", func() {
 	f := NewFramework("es-logging")
 
+	BeforeEach(func() {
+		// TODO: For now assume we are only testing cluster logging with Elasticsearch
+		// on GCE. Once we are sure that Elasticsearch cluster level logging
+		// works for other providers we should widen this scope of this test.
+		SkipUnlessProviderIs("gce")
+	})
+
 	It("should check that logs from pods on all nodes are ingested into Elasticsearch", func() {
 		ClusterLevelLoggingWithElasticsearch(f)
 	})
@@ -55,14 +62,6 @@ func bodyToJSON(body []byte) (map[string]interface{}, error) {
 
 // ClusterLevelLoggingWithElasticsearch is an end to end test for cluster level logging.
 func ClusterLevelLoggingWithElasticsearch(f *Framework) {
-	// TODO: For now assume we are only testing cluster logging with Elasticsearch
-	// on GCE. Once we are sure that Elasticsearch cluster level logging
-	// works for other providers we should widen this scope of this test.
-	if !providerIs("gce") {
-		Logf("Skipping cluster level logging test for provider %s", testContext.Provider)
-		return
-	}
-
 	// graceTime is how long to keep retrying requests for status information.
 	const graceTime = 2 * time.Minute
 	// ingestionTimeout is how long to keep retrying to wait for all the
@@ -71,7 +70,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
-	s := f.Client.Services(api.NamespaceDefault)
+	s := f.Client.Services(api.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
@@ -86,10 +85,10 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{esKey: esValue}))
-	pods, err := f.Client.Pods(api.NamespaceDefault).List(label, fields.Everything())
+	pods, err := f.Client.Pods(api.NamespaceSystem).List(label, fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
-		err = waitForPodRunning(f.Client, pod.Name)
+		err = waitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -98,10 +97,11 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	var statusCode float64
 	var esResponse map[string]interface{}
 	err = nil
+	var body []byte
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		// Query against the root URL for Elasticsearch.
-		body, err := f.Client.Get().
-			Namespace(api.NamespaceDefault).
+		body, err = f.Client.Get().
+			Namespace(api.NamespaceSystem).
 			Prefix("proxy").
 			Resource("services").
 			Name("elasticsearch-logging").
@@ -144,10 +144,9 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Now assume we really are talking to an Elasticsearch instance.
 	// Check the cluster health.
 	By("Checking health of Elasticsearch service.")
-	var body []byte
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		body, err = f.Client.Get().
-			Namespace(api.NamespaceDefault).
+			Namespace(api.NamespaceSystem).
 			Prefix("proxy").
 			Resource("services").
 			Name("elasticsearch-logging").
@@ -189,7 +188,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		return isNodeReadySetAsExpected(&node, true)
 	})
 	if len(nodes.Items) < 2 {
-		Failf("Less than two nodes were found Ready.")
+		Failf("Less than two nodes were found Ready: %d", len(nodes.Items))
 	}
 	Logf("Found %d healthy nodes.", len(nodes.Items))
 
@@ -258,7 +257,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(10 * time.Second) {
 
 		// Debugging code to report the status of the elasticsearch logging endpoints.
-		esPods, err := f.Client.Pods(api.NamespaceDefault).List(labels.Set{esKey: esValue}.AsSelector(), fields.Everything())
+		esPods, err := f.Client.Pods(api.NamespaceSystem).List(labels.Set{esKey: esValue}.AsSelector(), fields.Everything())
 		if err != nil {
 			Logf("Attempt to list Elasticsearch nodes encountered a problem -- may retry: %v", err)
 			continue
@@ -273,7 +272,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		// verison of the name. Ask for twice as many log lines as we expect to check for
 		// duplication bugs.
 		body, err = f.Client.Get().
-			Namespace(api.NamespaceDefault).
+			Namespace(api.NamespaceSystem).
 			Prefix("proxy").
 			Resource("services").
 			Name("elasticsearch-logging").

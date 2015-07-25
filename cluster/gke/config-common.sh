@@ -30,6 +30,7 @@ GCLOUD="${GCLOUD:-gcloud}"
 CMD_GROUP="${CMD_GROUP:-alpha}"
 GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
 ENABLE_CLUSTER_DNS=false
+MINION_SCOPES="${MINION_SCOPES:-"compute-rw,storage-ro"}"
 
 # This is a hack, but I keep setting this when I run commands manually, and
 # then things grossly fail during normal runs because cluster/kubecfg.sh and

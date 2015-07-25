@@ -525,7 +525,7 @@ func validateLeadershipTransition(desired, current string) {
 }
 
 // hacked from https://github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
-func newEtcd(etcdConfigFile string, etcdServerList util.StringList) (client tools.EtcdGetSet, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList util.StringList) (client tools.EtcdClient, err error) {
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
 	} else {
@@ -534,7 +534,7 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList) (client tool
 	return
 }
 
-func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, tools.EtcdGetSet, *uid.UID) {
+func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, tools.EtcdClient, *uid.UID) {
 
 	s.FrameworkName = strings.TrimSpace(s.FrameworkName)
 	if s.FrameworkName == "" {
@@ -737,7 +737,7 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 	return
 }
 
-func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdGetSet) (*mesos.FrameworkID, error) {
+func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdClient) (*mesos.FrameworkID, error) {
 	if s.FailoverTimeout > 0 {
 		if response, err := client.Get(meta.FrameworkIDKey, false, false); err != nil {
 			if !tools.IsEtcdNotFound(err) {

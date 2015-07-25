@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -34,33 +33,24 @@ import (
 )
 
 var _ = Describe("ReplicationController", func() {
-	var c *client.Client
-
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-	})
+	framework := NewFramework("replication-controller")
 
 	It("should serve a basic image on each replica with a public image", func() {
-		ServeImageOrFail(c, "basic", "gcr.io/google_containers/serve_hostname:1.1")
+		ServeImageOrFail(framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
 	})
 
 	It("should serve a basic image on each replica with a private image", func() {
-		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping private variant, which is only supported for providers gce and gke (not %s)",
-				testContext.Provider))
-			return
-		}
-		ServeImageOrFail(c, "private", "gcr.io/_b_k8s_authenticated_test/serve_hostname:1.1")
+		// requires private images
+		SkipUnlessProviderIs("gce", "gke")
+
+		ServeImageOrFail(framework, "private", "gcr.io/_b_k8s_authenticated_test/serve_hostname:1.1")
 	})
 })
 
 // A basic test to check the deployment of an image using
 // a replication controller. The image serves its hostname
 // which is checked for each replica.
-func ServeImageOrFail(c *client.Client, test string, image string) {
-	ns := api.NamespaceDefault
+func ServeImageOrFail(f *Framework, test string, image string) {
 	name := "my-hostname-" + test + "-" + string(util.NewUUID())
 	replicas := 2
 
@@ -69,7 +59,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating replication controller %s", name))
-	controller, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
+	controller, err := f.Client.ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -99,11 +89,11 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
 		By("Cleaning up the replication controller")
-		rcReaper, err := kubectl.ReaperFor("ReplicationController", c)
+		rcReaper, err := kubectl.ReaperFor("ReplicationController", f.Client)
 		if err != nil {
 			Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
-		if _, err = rcReaper.Stop(ns, controller.Name, 0, nil); err != nil {
+		if _, err = rcReaper.Stop(f.Namespace.Name, controller.Name, 0, nil); err != nil {
 			Logf("Failed to stop replication controller %v: %v.", controller.Name, err)
 		}
 	}()
@@ -111,7 +101,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	// List the pods, making sure we observe all the replicas.
 	listTimeout := time.Minute
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := c.Pods(ns).List(label, fields.Everything())
+	pods, err := f.Client.Pods(f.Namespace.Name).List(label, fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	t := time.Now()
 	for {
@@ -124,7 +114,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 				name, replicas, len(pods.Items), time.Since(t).Seconds())
 		}
 		time.Sleep(5 * time.Second)
-		pods, err = c.Pods(ns).List(label, fields.Everything())
+		pods, err = f.Client.Pods(f.Namespace.Name).List(label, fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -133,7 +123,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	for _, pod := range pods.Items {
-		err = waitForPodRunning(c, pod.Name)
+		err = f.WaitForPodRunning(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -141,7 +131,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	By("Trying to dial each unique pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
-	err = wait.Poll(retryInterval, retryTimeout, podResponseChecker{c, ns, label, name, true, pods}.checkAllResponses)
+	err = wait.Poll(retryInterval, retryTimeout, podResponseChecker{f.Client, f.Namespace.Name, label, name, true, pods}.checkAllResponses)
 	if err != nil {
 		Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}

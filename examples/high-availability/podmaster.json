@@ -1,0 +1,57 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {"name":"scheduler-master"},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "scheduler-elector",
+    "image": "gcr.io/google_containers/podmaster:1.1",
+    "command": [
+              "/podmaster",
+              "--etcd-servers=http://192.168.4.100:2379,http://192.168.4.101:2379,http://192.168.4.102:2379",
+              "--key=scheduler",
+              "--source-file=/kubernetes/kube-scheduler.manifest",
+              "--dest-file=/manifests/kube-scheduler.manifest"
+            ],
+    "volumeMounts": [
+      { "name": "k8s",
+        "mountPath": "/kubernetes",
+        "readOnly": true},
+      { "name": "manifests",
+        "mountPath": "/manifests",
+        "readOnly": false}
+    ]
+   },
+   {
+    "name": "controller-manager-elector",
+    "image": "gcr.io/google_containers/podmaster:1.1",
+    "command": [
+              "/podmaster",
+              "--etcd-servers=http://192.168.4.101:2379,http://192.168.4.102:2379,http://192.168.4.100:2379",
+              "--key=controller",
+              "--source-file=/kubernetes/kube-controller-manager.manifest",
+              "--dest-file=/manifests/kube-controller-manager.manifest"
+            ],
+    "volumeMounts": [
+      { "name": "k8s",
+        "mountPath": "/kubernetes",
+        "readOnly": true},
+      { "name": "manifests",
+        "mountPath": "/manifests",
+        "readOnly": false}
+    ]
+   }
+],
+"volumes":[
+  { "name": "k8s",
+    "hostPath": {
+        "path": "/srv/kubernetes"}
+  },
+{ "name": "manifests",
+    "hostPath": {
+        "path": "/etc/kubernetes/manifests"}
+  }
+]
+}}

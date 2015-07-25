@@ -70,7 +70,7 @@ func NewCmdRun(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func Run(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if os.Args[1] == "run-container" {
+	if len(os.Args) > 1 && os.Args[1] == "run-container" {
 		printDeprecationWarning("run", "run-container")
 	}
 
@@ -78,7 +78,7 @@ func Run(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) e
 		return cmdutil.UsageError(cmd, "NAME is required for run")
 	}
 
-	namespace, err := f.DefaultNamespace()
+	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

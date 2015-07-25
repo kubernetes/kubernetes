@@ -33,7 +33,6 @@ import (
 )
 
 const (
-	image             = "gcr.io/google_containers/serve_hostname:1.1"
 	smallRCSize       = 5
 	mediumRCSize      = 30
 	bigRCSize         = 250
@@ -87,24 +86,29 @@ var _ = Describe("Load capacity", func() {
 		}
 
 		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 1*time.Second, util.NewStringSet("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
 	type Load struct {
 		podsPerNode int
+		image       string
+		command     []string
 	}
 
 	loadTests := []Load{
-		{podsPerNode: 30},
+		// The container will consume 1 cpu and 512mb of memory.
+		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}},
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:1.1"},
 	}
 
 	for _, testArg := range loadTests {
-		name := fmt.Sprintf("[Skipped] should be able to handle %v pods per node", testArg.podsPerNode)
+		name := fmt.Sprintf("[Skipped] [Performance suite] should be able to handle %v pods per node", testArg.podsPerNode)
+		itArg := testArg
 
 		It(name, func() {
-			configs = generateRCConfigs(testArg.podsPerNode*nodeCount, c, ns)
+			configs = generateRCConfigs(itArg.podsPerNode*nodeCount, itArg.image, itArg.command, c, ns)
 
 			// Simulate lifetime of RC:
 			//  * create with initial size
@@ -134,23 +138,25 @@ func computeRCCounts(total int) (int, int, int) {
 	//  - 25 medium RCs each 30 pods
 	//  - 3 big RCs each 250 pods
 	bigRCCount := total / 4 / bigRCSize
-	mediumRCCount := total / 4 / mediumRCSize
-	smallRCCount := total / 2 / smallRCSize
+	total -= bigRCCount * bigRCSize
+	mediumRCCount := total / 3 / mediumRCSize
+	total -= mediumRCCount * mediumRCSize
+	smallRCCount := total / smallRCSize
 	return smallRCCount, mediumRCCount, bigRCCount
 }
 
-func generateRCConfigs(totalPods int, c *client.Client, ns string) []*RCConfig {
+func generateRCConfigs(totalPods int, image string, command []string, c *client.Client, ns string) []*RCConfig {
 	configs := make([]*RCConfig, 0)
 
 	smallRCCount, mediumRCCount, bigRCCount := computeRCCounts(totalPods)
-	configs = append(configs, generateRCConfigsForGroup(c, ns, smallRCGroupName, smallRCSize, smallRCCount)...)
-	configs = append(configs, generateRCConfigsForGroup(c, ns, mediumRCGroupName, mediumRCSize, mediumRCCount)...)
-	configs = append(configs, generateRCConfigsForGroup(c, ns, bigRCGroupName, bigRCSize, bigRCCount)...)
+	configs = append(configs, generateRCConfigsForGroup(c, ns, smallRCGroupName, smallRCSize, smallRCCount, image, command)...)
+	configs = append(configs, generateRCConfigsForGroup(c, ns, mediumRCGroupName, mediumRCSize, mediumRCCount, image, command)...)
+	configs = append(configs, generateRCConfigsForGroup(c, ns, bigRCGroupName, bigRCSize, bigRCCount, image, command)...)
 
 	return configs
 }
 
-func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, count int) []*RCConfig {
+func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, count int, image string, command []string) []*RCConfig {
 	configs := make([]*RCConfig, 0, count)
 	for i := 1; i <= count; i++ {
 		config := &RCConfig{
@@ -159,6 +165,7 @@ func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, cou
 			Namespace: ns,
 			Timeout:   10 * time.Minute,
 			Image:     image,
+			Command:   command,
 			Replicas:  size,
 		}
 		configs = append(configs, config)

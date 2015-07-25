@@ -17,7 +17,7 @@
 
 # A library of helper functions for Wheezy.
 
-source "${KUBE_ROOT}/cluster/aws/ubuntu/common.sh"
+source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
 
 SSH_USER=admin
 

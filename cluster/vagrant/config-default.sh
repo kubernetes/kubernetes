@@ -21,14 +21,14 @@ NUM_MINIONS=${NUM_MINIONS-"1"}
 export NUM_MINIONS
 
 # The IP of the master
-export MASTER_IP="10.245.1.2"
-export KUBE_MASTER_IP="10.245.1.2"
+export MASTER_IP=${MASTER_IP-"10.245.1.2"}
+export KUBE_MASTER_IP=${MASTER_IP}
 
 export INSTANCE_PREFIX="kubernetes"
 export MASTER_NAME="${INSTANCE_PREFIX}-master"
 
 # Map out the IPs, names and container subnets of each minion
-export MINION_IP_BASE="10.245.1."
+export MINION_IP_BASE=${MINION_IP_BASE-"10.245.1."}
 MINION_CONTAINER_SUBNET_BASE="10.246"
 MASTER_CONTAINER_NETMASK="255.255.255.0"
 MASTER_CONTAINER_ADDR="${MINION_CONTAINER_SUBNET_BASE}.0.1"
@@ -52,9 +52,6 @@ MASTER_PASSWD=vagrant
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING=true
-
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch
@@ -64,8 +61,8 @@ ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup 
-#   influxdb - Heapster, InfluxDB, and Grafana 
+#   none     - No cluster monitoring setup
+#   influxdb - Heapster, InfluxDB, and Grafana
 #   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
@@ -77,11 +74,17 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 EXTRA_DOCKER_OPTS="-b=cbr0 --insecure-registry 10.0.0.0/8"
 
 # Optional: Install cluster DNS.
-ENABLE_CLUSTER_DNS=true
+ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.247.0.10"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
 #RUNTIME_CONFIG=""
-RUNTIME_CONFIG="api/v1beta3"
+RUNTIME_CONFIG="api/v1"
+
+# Determine extra certificate names for master
+octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
+((octets[3]+=1))
+service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
+MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"

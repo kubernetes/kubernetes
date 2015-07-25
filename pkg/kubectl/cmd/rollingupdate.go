@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -103,7 +104,7 @@ func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filena
 }
 
 func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if os.Args[1] == "rollingupdate" {
+	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}
 	deploymentKey, filename, image, oldName, err := validateArguments(cmd, args)
@@ -115,7 +116,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
 	dryrun := cmdutil.GetFlagBool(cmd, "dry-run")
 
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -143,6 +144,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	}
 
 	var keepOldName bool
+	var replicasDefaulted bool
 
 	mapper, typer := f.Object()
 
@@ -151,12 +153,13 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		if err != nil {
 			return err
 		}
-		obj, err := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+
+		request := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 			Schema(schema).
-			NamespaceParam(cmdNamespace).RequireNamespace().
-			FilenameParam(filename).
-			Do().
-			Object()
+			NamespaceParam(cmdNamespace).DefaultNamespace().
+			FilenameParam(enforceNamespace, filename).
+			Do()
+		obj, err := request.Object()
 		if err != nil {
 			return err
 		}
@@ -176,6 +179,12 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			}
 			glog.V(4).Infof("Object %#v is not a ReplicationController", obj)
 			return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
+		}
+		infos, err := request.Infos()
+		if err != nil || len(infos) != 1 {
+			glog.V(2).Infof("was not able to recover adequate information to discover if .spec.replicas was defaulted")
+		} else {
+			replicasDefaulted = isReplicasDefaulted(infos[0])
 		}
 	}
 	// If the --image option is specified, we need to create a new rc with at least one different selector
@@ -228,7 +237,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			filename, oldName)
 	}
 	// TODO: handle scales during rolling update
-	if newRc.Spec.Replicas == 0 {
+	if replicasDefaulted {
 		newRc.Spec.Replicas = oldRc.Spec.Replicas
 	}
 	if dryrun {
@@ -248,13 +257,14 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		updateCleanupPolicy = kubectl.RenameRollingUpdateCleanupPolicy
 	}
 	config := &kubectl.RollingUpdaterConfig{
-		Out:           out,
-		OldRc:         oldRc,
-		NewRc:         newRc,
-		UpdatePeriod:  period,
-		Interval:      interval,
-		Timeout:       timeout,
-		CleanupPolicy: updateCleanupPolicy,
+		Out:            out,
+		OldRc:          oldRc,
+		NewRc:          newRc,
+		UpdatePeriod:   period,
+		Interval:       interval,
+		Timeout:        timeout,
+		CleanupPolicy:  updateCleanupPolicy,
+		UpdateAcceptor: kubectl.DefaultUpdateAcceptor,
 	}
 	if cmdutil.GetFlagBool(cmd, "rollback") {
 		kubectl.AbortRollingUpdate(config)
@@ -282,4 +292,18 @@ func findNewName(args []string, oldRc *api.ReplicationController) string {
 		return newName
 	}
 	return ""
+}
+
+func isReplicasDefaulted(info *resource.Info) bool {
+	if info == nil || info.VersionedObject == nil {
+		// was unable to recover versioned info
+		return false
+	}
+	switch info.Mapping.APIVersion {
+	case "v1":
+		if rc, ok := info.VersionedObject.(*v1.ReplicationController); ok {
+			return rc.Spec.Replicas == nil
+		}
+	}
+	return false
 }

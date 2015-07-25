@@ -43,7 +43,7 @@ func TestPodTemplateCreate(t *testing.T) {
 		Request: testRequest{
 			Method: "POST",
 			Path:   testapi.ResourcePath(getPodTemplatesResoureName(), ns, ""),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   &podTemplate,
 		},
 		Response: Response{StatusCode: 200, Body: &podTemplate},
@@ -66,7 +66,7 @@ func TestPodTemplateGet(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath(getPodTemplatesResoureName(), ns, "abc"),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: podTemplate},
@@ -92,7 +92,7 @@ func TestPodTemplateList(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath(getPodTemplatesResoureName(), ns, ""),
-			Query:  buildQueryValues(ns, nil),
+			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: podTemplateList},
@@ -112,7 +112,7 @@ func TestPodTemplateUpdate(t *testing.T) {
 		Template: api.PodTemplateSpec{},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getPodTemplatesResoureName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getPodTemplatesResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: podTemplate},
 	}
 	response, err := c.Setup().PodTemplates(ns).Update(podTemplate)
@@ -122,7 +122,7 @@ func TestPodTemplateUpdate(t *testing.T) {
 func TestPodTemplateDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPodTemplatesResoureName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPodTemplatesResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().PodTemplates(ns).Delete("foo", nil)

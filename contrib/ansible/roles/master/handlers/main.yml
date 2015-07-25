@@ -1,10 +1,15 @@
 ---
+- name: reload systemd
+  command: systemctl --system daemon-reload
+  notify:
+    - restart daemons
+
 - name: restart daemons
   command: /bin/true
   notify:
-          - restart apiserver
-          - restart controller-manager
-          - restart scheduler
+    - restart apiserver
+    - restart controller-manager
+    - restart scheduler
 
 - name: restart apiserver
   service: name=kube-apiserver state=restarted

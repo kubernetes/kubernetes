@@ -30,12 +30,11 @@ var RegisteredVersions []string
 
 func init() {
 	validAPIVersions := map[string]bool{
-		"v1":      true,
-		"v1beta3": true,
+		"v1": true,
 	}
 
 	// The default list of supported api versions, in order of most preferred to the least.
-	defaultSupportedVersions := "v1,v1beta3"
+	defaultSupportedVersions := "v1"
 	// Env var KUBE_API_VERSIONS is a comma separated list of API versions that should be registered in the scheme.
 	// The versions should be in the order of most preferred to the least.
 	supportedVersions := os.Getenv("KUBE_API_VERSIONS")

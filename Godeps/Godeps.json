@@ -195,7 +195,7 @@
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
-			"Rev": "ae4665cf2d188c65764c73fe4af5378acc549510"
+			"Rev": "c57a80f1ab2ad67bafa83f5fd0b4c2ecbd253dd5"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
@@ -369,6 +369,10 @@
 			"Rev": "afde71eb1740fd763ab9450e1f700ba0e53c36d0"
 		},
 		{
+			"ImportPath": "github.com/juju/ratelimit",
+			"Rev": "772f5c38e468398c4511514f4f6aa9a4185bc0a0"
+		},
+		{
 			"ImportPath": "github.com/kardianos/osext",
 			"Rev": "8fef92e41e22a70e700a96b29f066cda30ea24ef"
 		},
@@ -383,7 +387,7 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/auth",
-			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
@@ -423,8 +427,8 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
-			"Comment": "v1.2.0-beta-9-gfbb6632",
-			"Rev": "fbb663242655b700c623e9629d7781db98957501"
+			"Comment": "v1.2.0-6-gd981d36",
+			"Rev": "d981d36e9884231afa909627b9c275e4ba678f90"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
@@ -492,15 +496,15 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
-			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",

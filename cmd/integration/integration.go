@@ -59,6 +59,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
 	docker "github.com/fsouza/go-dockerclient"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -328,7 +329,7 @@ containers:
 			desc: "static-pod-from-spec",
 			fileContents: `{
 				"kind": "Pod",
-				"apiVersion": "v1beta3",
+				"apiVersion": "v1",
 				"metadata": {
 					"name": "static-pod-from-spec"
 				},
@@ -607,23 +608,6 @@ func runPatchTest(c *client.Client) {
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte
 	}{
-		"v1beta3": {
-			api.JSONPatchType: {
-				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
-				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
-				[]byte(`[{"op":"remove","path":"/metadata/labels"}]`),
-			},
-			api.MergePatchType: {
-				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
-				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
-				[]byte(`{"metadata":{"labels":null}}`),
-			},
-			api.StrategicMergePatchType: {
-				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
-				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
-				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
-			},
-		},
 		"v1": {
 			api.JSONPatchType: {
 				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
@@ -1000,6 +984,11 @@ func main() {
 	// parallel and also it schedules extra pods which would change the
 	// above pod counting logic.
 	runSchedulerNoPhantomPodsTest(kubeClient)
+
+	glog.Infof("\n\nLogging high latency metrics from the 10250 kubelet")
+	e2e.HighLatencyKubeletOperations(nil, 1*time.Second, "localhost:10250")
+	glog.Infof("\n\nLogging high latency metrics from the 10251 kubelet")
+	e2e.HighLatencyKubeletOperations(nil, 1*time.Second, "localhost:10251")
 }
 
 // ServeCachedManifestFile serves a file for kubelet to read.
@@ -1018,7 +1007,7 @@ func ServeCachedManifestFile(contents string) (servingAddress string) {
 const (
 	testPodSpecFile = `{
 		"kind": "Pod",
-		"apiVersion": "v1beta3",
+		"apiVersion": "v1",
 		"metadata": {
 			"name": "container-vm-guestbook-pod-spec"
 		},

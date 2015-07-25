@@ -519,6 +519,7 @@ func deepCopy_v1_HTTPGetAction(in HTTPGetAction, out *HTTPGetAction, c *conversi
 		return err
 	}
 	out.Host = in.Host
+	out.Scheme = in.Scheme
 	return nil
 }
 
@@ -1323,6 +1324,7 @@ func deepCopy_v1_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error {
 		out.AntiAffinitySelectors = nil
 	}
 	out.ServiceAccountName = in.ServiceAccountName
+	out.DeprecatedServiceAccount = in.DeprecatedServiceAccount
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
 	if in.ImagePullSecrets != nil {

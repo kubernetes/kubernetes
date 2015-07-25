@@ -1,5 +1,5 @@
 {
-"apiVersion": "v1beta3",
+"apiVersion": "v1",
 "kind": "Pod",
 "metadata": {"name":"kube-scheduler"},
 "spec":{
@@ -8,6 +8,11 @@
     {
     "name": "kube-scheduler",
     "image": "gcr.io/google_containers/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
+    "resources": {
+      "limits": {
+        "cpu": "200m"
+      }
+    },
     "command": [
                  "/bin/sh",
                  "-c",

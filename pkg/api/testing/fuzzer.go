@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -30,8 +31,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/google/gofuzz"
 
+	"github.com/google/gofuzz"
 	"speter.net/go/exp/math/dec/inf"
 )
 
@@ -202,7 +203,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				ev.ValueFrom = &api.EnvVarSource{}
 				ev.ValueFrom.FieldRef = &api.ObjectFieldSelector{}
 
-				versions := []string{"v1beta1", "v1beta2", "v1beta3"}
+				versions := registered.RegisteredVersions
 
 				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
 				ev.ValueFrom.FieldRef.FieldPath = c.RandString()
@@ -252,8 +253,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			s.Phase = api.NamespaceActive
 		},
 		func(http *api.HTTPGetAction, c fuzz.Continue) {
-			c.FuzzNoCustom(http)        // fuzz self without calling this function again
-			http.Path = "/" + http.Path // can't be blank
+			c.FuzzNoCustom(http)            // fuzz self without calling this function again
+			http.Path = "/" + http.Path     // can't be blank
+			http.Scheme = "x" + http.Scheme // can't be blank
 		},
 		func(ss *api.ServiceSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(ss) // fuzz self without calling this function again

@@ -33,6 +33,9 @@ IAM_PROFILE_MINION="kubernetes-minion"
 
 LOG="/dev/null"
 
+MASTER_DISK_TYPE="${MASTER_DISK_TYPE:-gp2}"
+MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20}
+
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
@@ -45,10 +48,6 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # If set to auto, a new Elastic IP will be aquired
 # Otherwise amazon-given public ip will be used (it'll change with reboot).
 MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
-
-
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
@@ -69,7 +68,7 @@ if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
 fi
 
 # Optional: Install cluster DNS.
-ENABLE_CLUSTER_DNS=true
+ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
@@ -82,7 +81,7 @@ ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContext
 ENABLE_MINION_PUBLIC_IP=${KUBE_ENABLE_MINION_PUBLIC_IP:-true}
 
 # OS options for minions
-KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-ubuntu}"
+KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-vivid}"
 KUBE_MINION_IMAGE="${KUBE_MINION_IMAGE:-}"
 COREOS_CHANNEL="${COREOS_CHANNEL:-alpha}"
 CONTAINER_RUNTIME="${KUBE_CONTAINER_RUNTIME:-docker}"

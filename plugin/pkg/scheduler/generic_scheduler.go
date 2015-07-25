@@ -41,12 +41,15 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 // implementation of the error interface
 func (f *FitError) Error() string {
-	predicates := util.NewStringSet()
+	var reason string
+	// We iterate over all nodes for logging purposes, even though we only return one reason from one node
 	for node, predicateList := range f.FailedPredicates {
-		predicates = predicates.Union(predicateList)
 		glog.Infof("failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
+		if len(reason) == 0 {
+			reason, _ = predicateList.PopAny()
+		}
 	}
-	return fmt.Sprintf("For each of these fitness predicates, pod %v failed on at least one node: %v.", f.Pod.Name, strings.Join(predicates.List(), ","))
+	return fmt.Sprintf("Failed for reason %s and possibly others", reason)
 }
 
 type genericScheduler struct {
@@ -71,7 +74,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, minionLister algorithm.MinionL
 		return "", err
 	}
 
-	priorityList, err := prioritizeNodes(pod, g.pods, g.prioritizers, algorithm.FakeMinionLister(filteredNodes))
+	priorityList, err := PrioritizeNodes(pod, g.pods, g.prioritizers, algorithm.FakeMinionLister(filteredNodes))
 	if err != nil {
 		return "", err
 	}
@@ -139,7 +142,7 @@ func findNodesThatFit(pod *api.Pod, podLister algorithm.PodLister, predicateFunc
 // Each priority function can also have its own weight
 // The minion scores returned by the priority function are multiplied by the weights to get weighted scores
 // All scores are finally combined (added) to get the total weighted scores of all minions
-func prioritizeNodes(pod *api.Pod, podLister algorithm.PodLister, priorityConfigs []algorithm.PriorityConfig, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func PrioritizeNodes(pod *api.Pod, podLister algorithm.PodLister, priorityConfigs []algorithm.PriorityConfig, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	result := algorithm.HostPriorityList{}
 
 	// If no priority configs are provided, then the EqualPriority function is applied
@@ -165,6 +168,7 @@ func prioritizeNodes(pod *api.Pod, podLister algorithm.PodLister, priorityConfig
 		}
 	}
 	for host, score := range combinedScores {
+		glog.V(10).Infof("Host %s Score %d", host, score)
 		result = append(result, algorithm.HostPriority{Host: host, Score: score})
 	}
 	return result, nil

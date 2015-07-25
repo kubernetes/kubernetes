@@ -90,12 +90,16 @@ type ValidationError struct {
 var _ error = &ValidationError{}
 
 func (v *ValidationError) Error() string {
+	return fmt.Sprintf("%s: %s", v.Field, v.ErrorBody())
+}
+
+func (v *ValidationError) ErrorBody() string {
 	var s string
 	switch v.Type {
 	case ValidationErrorTypeRequired, ValidationErrorTypeTooLong:
-		s = spew.Sprintf("%s: %s", v.Field, v.Type)
+		s = spew.Sprintf("%s", v.Type)
 	default:
-		s = spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
+		s = spew.Sprintf("%s '%+v'", v.Type, v.BadValue)
 	}
 	if len(v.Detail) != 0 {
 		s += fmt.Sprintf(": %s", v.Detail)
@@ -113,9 +117,13 @@ func NewFieldInvalid(field string, value interface{}, detail string) *Validation
 	return &ValidationError{ValidationErrorTypeInvalid, field, value, detail}
 }
 
-// NewFieldNotSupported returns a *ValidationError indicating "unsupported value"
-func NewFieldNotSupported(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeNotSupported, field, value, ""}
+// NewFieldValueNotSupported returns a *ValidationError indicating "unsupported value"
+func NewFieldValueNotSupported(field string, value interface{}, validValues []string) *ValidationError {
+	detail := ""
+	if validValues != nil && len(validValues) > 0 {
+		detail = "supported values: " + strings.Join(validValues, ", ")
+	}
+	return &ValidationError{ValidationErrorTypeNotSupported, field, value, detail}
 }
 
 // NewFieldForbidden returns a *ValidationError indicating "forbidden"

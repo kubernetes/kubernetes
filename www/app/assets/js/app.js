@@ -378,7 +378,7 @@ app.controller('TabCtrl', [
       .service('cAdvisorService', ["$http", "$q", "ENV", function($http, $q, ENV) {
         var _baseUrl = function(minionIp) {
           var minionPort = ENV['/']['cAdvisorPort'] || "8081";
-          var proxy = ENV['/']['cAdvisorProxy'] || "/api/v1beta3/proxy/nodes/";
+          var proxy = ENV['/']['cAdvisorProxy'] || "/api/v1/proxy/nodes/";
 
           return proxy + minionIp + ':' + minionPort + '/api/v1.0/';
         };
@@ -961,7 +961,7 @@ app.controller('cAdvisorController', [
         var f = fsDataArray[i];
 
         items.push({
-          label: 'FS #' + f.filesystemNumber,
+          label: 'Filesystem #' + f.filesystemNumber,
           stats: f.usageDescription + ' / ' + f.capacityDescription,
           value: f.totalUsage,
           classNames: getColorForIndex(2 + i, f.totalUsage),
@@ -1042,7 +1042,7 @@ app.controller('GroupCtrl', [
     $scope.clearSelector = function(grouping) { $location.path("/dashboard/groups/" + grouping + "/selector/"); };
 
     $scope.changeGroupBy = function() {
-      var grouping = $scope.selectedGroupBy;
+      var grouping = encodeURIComponent($scope.selectedGroupBy);
 
       var s = _.clone($location.search());
       if ($scope.routeParams.grouping != grouping)
@@ -1067,14 +1067,16 @@ app.controller('GroupCtrl', [
       $scope.groupBy = parts;
       $scope.loading = true;
       $scope.selector = selector;
+      $scope.selectorName = decodeURIComponent(selector);
       var args = [];
       var type = "";
+      var selectedHost = "";
       if (selector && selector.length > 0) {
         $scope.selectorPieces = selector.split(",");
         var labels = [];
         var fields = [];
         for (var i = 0; i < $scope.selectorPieces.length; i++) {
-          var piece = $scope.selectorPieces[i];
+          var piece = decodeURIComponent($scope.selectorPieces[i]);
           if (piece[0] == '$') {
             fields.push(piece.slice(2));
           } else {
@@ -1083,13 +1085,21 @@ app.controller('GroupCtrl', [
               if (labelParts.length > 1) {
                 type = labelParts[1];
               }
-            } else {
+            }
+            else if (piece.indexOf("host=") === 0){
+              var labelParts = piece.split("=");
+              if (labelParts.length > 1) {
+                selectedHost = labelParts[1];
+              }
+            }
+            else {
               labels.push(piece);
             }
           }
         }
+
         if (labels.length > 0) {
-          args.push("labels=" + encodeURI(labels.join(",")));
+          args.push("labelSelector=" + encodeURI(labels.join(",")));
         }
         if (fields.length > 0) {
           args.push("fields=" + encodeURI(fields.join(",")));
@@ -1098,6 +1108,9 @@ app.controller('GroupCtrl', [
       var query = "?" + args.join("&");
       var list = [];
       var count = type.length > 0 ? 1 : 3;
+
+      $scope.selectedGroupByName = decodeURIComponent($routeParams.grouping)
+
       var barrier = $scope.createBarrier(count, function() {
         $scope.groups = $scope.groupData(list, 0);
         $scope.loading = false;
@@ -1109,8 +1122,9 @@ app.controller('GroupCtrl', [
         k8sApi.getPods(query).success(function(data) {
           $scope.addLabel("type", "pod", data.items);
           for (var i = 0; data.items && i < data.items.length; ++i) {
-            data.items[i].metadata.labels.host = data.items[i].spec.host;
-            list.push(data.items[i]);
+            data.items[i].metadata.labels.host = data.items[i].spec.nodeName;
+            if(selectedHost.length == 0 || selectedHost == data.items[i].metadata.labels.host)
+              list.push(data.items[i]);
           }
           barrier();
         }).error($scope.handleError);
@@ -1141,7 +1155,7 @@ app.controller('GroupCtrl', [
       }
       for (var i = 0; i < items.length; i++) {
         if (!items[i].metadata.labels) {
-          items[i].metadata.labels = [];
+          items[i].metadata.labels = {};
         }
         items[i].metadata.labels[key] = value;
       }
@@ -1153,7 +1167,7 @@ app.controller('GroupCtrl', [
         "kind": "grouping"
       };
       for (var i = 0; i < items.length; i++) {
-        key = items[i].metadata.labels[$scope.groupBy[index]];
+        key = items[i].metadata.labels[decodeURIComponent($scope.groupBy[index])];
         if (!key) {
           key = "";
         }
@@ -1275,8 +1289,8 @@ app.controller('ListEventsCtrl', [
     $scope.serverView = false;
 
     $scope.headers = [
-      {name: 'First Seen', field: 'firstSeen'},
       {name: 'Last Seen', field: 'lastSeen'},
+      {name: 'First Seen', field: 'firstSeen'},
       {name: 'Count', field: 'count'},
       {name: 'Name', field: 'name'},
       {name: 'Kind', field: 'kind'},
@@ -1287,8 +1301,8 @@ app.controller('ListEventsCtrl', [
     ];
 
 
-    $scope.sortable = ['firstSeen', 'lastSeen', 'count', 'name', 'kind', 'subObject', 'reason', 'source'];
-    $scope.count = 10;
+    $scope.sortable = ['lastSeen', 'firstSeen', 'count', 'name', 'kind', 'subObject', 'reason', 'source', 'message'];
+    $scope.count = 50;
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
       $scope.loading = false;
@@ -1332,6 +1346,11 @@ app.controller('ListEventsCtrl', [
 
         });
 
+        $scope.content = _.sortBy($scope.content, function(e){
+          return e.lastSeen;
+        }).reverse();
+
+
       }).error($scope.handleError);
     }
 
@@ -1366,9 +1385,9 @@ app.controller('ListMinionsCtrl', [
       status: 'grey',
       ip: 'grey'
     };
-    $scope.sortable = ['name', 'status', 'ip'];
+    $scope.sortable = ['name', 'status', 'addresses'];
     $scope.thumbs = 'thumb';
-    $scope.count = 10;
+    $scope.count = 50;
 
     $scope.go = function(d) { $location.path('/dashboard/nodes/' + d.name); };
 
@@ -1449,8 +1468,8 @@ app.controller('ListPodsCtrl', [
       labels: 'grey',
       status: 'grey'
     };
-    $scope.sortable = ['pod', 'ip', 'status'];
-    $scope.count = 10;
+    $scope.sortable = ['pod', 'ip', 'status','containers','images','host','labels'];
+    $scope.count = 50;
 
     $scope.go = function(data) { $location.path('/dashboard/pods/' + data.pod); };
 
@@ -1490,24 +1509,16 @@ app.controller('ListPodsCtrl', [
           }
 
           if (pod.metadata.labels) {
-            Object.keys(pod.metadata.labels)
-                .forEach(function(key) {
-                  if (key == 'name') {
-                    _labels += ', ' + pod.metadata.labels[key];
-                  }
-                  if (key == 'uses') {
-                    _uses += ', ' + pod.metadata.labels[key];
-                  }
-                });
-            }
+            _labels = _.map(pod.metadata.labels, function(v, k) { return k + ': ' + v }).join(', ');
+          }
 
           $scope.content.push({
             pod: pod.metadata.name,
             ip: pod.status.podIP,
             containers: _fixComma(_containers),
             images: _fixComma(_images),
-            host: pod.spec.host,
-            labels: _fixComma(_labels) + ':' + _fixComma(_uses),
+            host: pod.spec.nodeName,
+            labels: _labels,
             status: pod.status.phase
           });
 
@@ -1579,9 +1590,9 @@ app.controller('ListReplicationControllersCtrl', [
       selector: 'grey',
       replicas: 'grey'
     };
-    $scope.sortable = ['controller', 'containers', 'images'];
+    $scope.sortable = ['controller', 'containers', 'images', 'selector', 'replicas'];
     $scope.thumbs = 'thumb';
-    $scope.count = 10;
+    $scope.count = 50;
 
     $scope.go = function(data) { $location.path('/dashboard/replicationcontrollers/' + data.controller); };
 
@@ -1672,8 +1683,8 @@ app.controller('ListServicesCtrl', [
       port: 'grey',
       labels: 'grey'
     };
-    $scope.sortable = ['name', 'ip', 'port'];
-    $scope.count = 10;
+    $scope.sortable = ['name', 'ip', 'port', 'labels', 'selector'];
+    $scope.count = 50;
 
     $scope.go = function(data) { $location.path('/dashboard/services/' + data.name); };
 
@@ -1713,7 +1724,7 @@ app.controller('ListServicesCtrl', [
             var _labels = '';
 
             if (service.metadata.labels) {
-              _labels = _.map(service.metadata.labels, function(v, k) { return k + '=' + v }).join(', ');
+              _labels = _.map(service.metadata.labels, function(v, k) { return k + ': ' + v }).join(', ');
             }
 
             var _selectors = '';
@@ -1736,7 +1747,7 @@ app.controller('ListServicesCtrl', [
 
             $scope.content.push({
               name: service.metadata.name,
-              ip: service.spec.portalIP,
+              ip: service.spec.clusterIP,
               port: _ports,
               selector: _selectors,
               labels: _labels
@@ -1967,7 +1978,7 @@ app.controller('ServiceCtrl', [
 
                   var label_legend_area = legendSvg.append("svg:g")
                                               .attr("class", "label_legend_area")
-                                              .attr("transform", "translate(" + ((w - 185) / 2) + "," + 35 + ")");
+                                              .attr("transform", "translate(" + ((w - 215) / 2) + "," + 35 + ")");
 
                   var legend_group = label_legend_area.append("svg:g").attr("class", "legend_group");
 
@@ -1977,7 +1988,7 @@ app.controller('ServiceCtrl', [
 
                   var stats_group = label_legend_area.append("svg:g")
                                         .attr("class", "stats_group")
-                                        .attr("transform", "translate(" + 85 + "," + 11 + ")");
+                                        .attr("transform", "translate(" + 115 + "," + 11 + ")");
 
                   var path_group = chart.append("svg:g")
                                        .attr("class", "path_group")
@@ -2134,9 +2145,7 @@ app.controller('ServiceCtrl', [
                   valueLabels.enter()
                       .append("svg:text")
                       .attr("class", "value")
-                      .attr(
-                           "transform", function(d) { return "translate(" + (getRadiusRing(ir, counts - 1)) + ", 0)"; })
-                      .attr("dx", function(d, i) { return 0; })
+                      .attr("dx", function(d, i) { return 68; })
                       .attr("dy", function(d, i) { return (thickness + 3) * i; })
                       .attr("text-anchor", function(d) { return "start"; })
                       .text(function(d) { return d.value; });
@@ -2219,7 +2228,8 @@ app.controller('ServiceCtrl', [
                     return;
                   }
 
-                  svg.selectAll("*").remove();
+                  d3.select(element[0]).select("svg.chart").remove();
+                  d3.select(element[0]).select("svg.legend").remove();
 
                   var graph = $(element[0]);
                   var w = scope.graphWidth;
@@ -2267,7 +2277,6 @@ app.controller('ServiceCtrl', [
                        $location.path(newValue);
                      }
                    });
-
                    $scope.subpages = [
                      {
                        category: 'dashboard',
@@ -2312,6 +2321,7 @@ app.controller('ServiceCtrl', [
             customClass: '=customClass',
             thumbs: '=',
             count: '=',
+            reverse: '=',
             doSelect: '&onSelect'
           },
           transclude: true,
@@ -2330,7 +2340,11 @@ app.controller('ServiceCtrl', [
               $scope.content = orderBy($scope.content, predicate, reverse);
               $scope.predicate = predicate;
             };
-            $scope.order($scope.sortable[0], false);
+            var reverse = false;
+            if($scope.reverse)
+              reverse = $scope.reverse;
+
+            $scope.order($scope.sortable[0], reverse);
             $scope.getNumber = function(num) { return new Array(num); };
             $scope.goToPage = function(page) { $scope.currentPage = page; };
             $scope.showMore = function() { return angular.isDefined($scope.moreClick);}

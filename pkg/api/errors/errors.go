@@ -165,7 +165,7 @@ func NewInvalid(kind, name string, errs fielderrors.ValidationErrorList) error {
 		if err, ok := errs[i].(*fielderrors.ValidationError); ok {
 			causes = append(causes, api.StatusCause{
 				Type:    api.CauseType(err.Type),
-				Message: err.Error(),
+				Message: err.ErrorBody(),
 				Field:   err.Field,
 			})
 		}
@@ -189,6 +189,16 @@ func NewBadRequest(reason string) error {
 		Status:  api.StatusFailure,
 		Code:    http.StatusBadRequest,
 		Reason:  api.StatusReasonBadRequest,
+		Message: reason,
+	}}
+}
+
+// NewServiceUnavailable creates an error that indicates that the requested service is unavailable.
+func NewServiceUnavailable(reason string) error {
+	return &StatusError{api.Status{
+		Status:  api.StatusFailure,
+		Code:    http.StatusServiceUnavailable,
+		Reason:  api.StatusReasonServiceUnavailable,
 		Message: reason,
 	}}
 }
@@ -323,7 +333,7 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 	}}
 }
 
-// IsNotFound returns true if the specified error was created by NewNotFoundErr.
+// IsNotFound returns true if the specified error was created by NewNotFound.
 func IsNotFound(err error) bool {
 	return reasonForError(err) == api.StatusReasonNotFound
 }

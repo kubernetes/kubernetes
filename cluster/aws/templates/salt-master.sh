@@ -44,6 +44,12 @@ if [[ -n "${KUBELET_ROOT}" ]]; then
 EOF
 fi
 
+if [[ -n "${MASTER_EXTRA_SANS}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
+EOF
+fi
+
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
 cat <<EOF >/etc/salt/master.d/auto-accept.conf

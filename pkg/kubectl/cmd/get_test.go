@@ -238,7 +238,7 @@ func TestGetSchemaObject(t *testing.T) {
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: "v1beta3"}
+	tf.ClientConfig = &client.Config{Version: "v1"}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)

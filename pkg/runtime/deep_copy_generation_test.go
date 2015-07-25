@@ -25,8 +25,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
@@ -64,7 +64,7 @@ func generateDeepCopies(t *testing.T, version string) bytes.Buffer {
 }
 
 func TestNoManualChangesToGenerateDeepCopies(t *testing.T) {
-	versions := []string{"api", "v1beta3", "v1"}
+	versions := []string{"api", testapi.Version()}
 
 	for _, version := range versions {
 		fileName := ""

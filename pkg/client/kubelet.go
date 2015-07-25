@@ -44,10 +44,8 @@ type ConnectionInfoGetter interface {
 
 // HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
 type HTTPKubeletClient struct {
-	Client      *http.Client
-	Config      *KubeletConfig
-	Port        uint
-	EnableHttps bool
+	Client *http.Client
+	Config *KubeletConfig
 }
 
 func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
@@ -83,33 +81,31 @@ func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 		Timeout:   config.HTTPTimeout,
 	}
 	return &HTTPKubeletClient{
-		Client:      c,
-		Config:      config,
-		Port:        config.Port,
-		EnableHttps: config.EnableHttps,
+		Client: c,
+		Config: config,
 	}, nil
 }
 
 func (c *HTTPKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	scheme := "http"
-	if c.EnableHttps {
+	if c.Config.EnableHttps {
 		scheme = "https"
 	}
-	return scheme, c.Port, c.Client.Transport, nil
+	return scheme, c.Config.Port, c.Client.Transport, nil
 }
 
-func (c *HTTPKubeletClient) url(host, path, query string) string {
+func (c *HTTPKubeletClient) url(host, path, query string) *url.URL {
 	scheme := "http"
-	if c.EnableHttps {
+	if c.Config.EnableHttps {
 		scheme = "https"
 	}
 
-	return (&url.URL{
+	return &url.URL{
 		Scheme:   scheme,
-		Host:     net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)),
+		Host:     net.JoinHostPort(host, strconv.FormatUint(uint64(c.Config.Port), 10)),
 		Path:     path,
 		RawQuery: query,
-	}).String()
+	}
 }
 
 func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Result, string, error) {

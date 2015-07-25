@@ -19,8 +19,10 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -40,12 +42,12 @@ import (
 
 const (
 	// version applies to upgrades; kube-push always pushes local binaries.
-	version       = "latest_ci"
 	versionURLFmt = "https://storage.googleapis.com/kubernetes-release/%s/%s.txt"
 )
 
-// realVersion turns a version constant--one accepted by cluster/gce/upgrade.sh--
-// into a deployable version string.
+// realVersion turns a version constant s--one accepted by cluster/gce/upgrade.sh--
+// into a deployable version string. If the s is not known to be a version
+// constant, it will assume it is already a valid version, and return s directly.
 //
 // NOTE: KEEP THIS LIST UP-TO-DATE WITH THE CODE BELOW.
 // The version strings supported are:
@@ -63,7 +65,10 @@ func realVersion(s string) (string, error) {
 	case "latest_ci":
 		bucket, file = "ci", "latest"
 	default:
-		return "", fmt.Errorf("version %s is not supported", s)
+		// If we don't match one of the above, we assume that the passed version
+		// is already valid (such as "0.19.1" or "0.19.1-669-gabac8c8").
+		Logf("Assuming %q is already a valid version.", s)
+		return s, nil
 	}
 
 	url := fmt.Sprintf(versionURLFmt, bucket, file)
@@ -198,11 +203,11 @@ var _ = Describe("Skipped", func() {
 			// The version is determined once at the beginning of the test so that
 			// the master and nodes won't be skewed if the value changes during the
 			// test.
-			By(fmt.Sprintf("Getting real version for %q", version))
+			By(fmt.Sprintf("Getting real version for %q", testContext.UpgradeTarget))
 			var err error
-			v, err = realVersion(version)
+			v, err = realVersion(testContext.UpgradeTarget)
 			expectNoError(err)
-			Logf("Version for %q is %s", version, v)
+			Logf("Version for %q is %s", testContext.UpgradeTarget, v)
 
 			By("Setting up the service, RC, and pods")
 			f.beforeEach()
@@ -240,11 +245,11 @@ var _ = Describe("Skipped", func() {
 		})
 
 		Describe("kube-push", func() {
+			BeforeEach(func() {
+				SkipUnlessProviderIs("gce")
+			})
+
 			It("of master should maintain responsive services", func() {
-				if !providerIs("gce") {
-					By(fmt.Sprintf("Skipping kube-push test, which is not implemented for %s", testContext.Provider))
-					return
-				}
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
@@ -255,11 +260,11 @@ var _ = Describe("Skipped", func() {
 		})
 
 		Describe("upgrade-master", func() {
+			BeforeEach(func() {
+				SkipUnlessProviderIs("gce", "gke")
+			})
+
 			It("should maintain responsive services", func() {
-				if !providerIs("gce", "gke") {
-					By(fmt.Sprintf("Skipping upgrade test, which is not implemented for %s", testContext.Provider))
-					return
-				}
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
@@ -315,10 +320,8 @@ var _ = Describe("Skipped", func() {
 			})
 
 			It("should maintain a functioning cluster", func() {
-				if !providerIs("gce", "gke") {
-					By(fmt.Sprintf("Skipping upgrade test, which is not implemented for %s", testContext.Provider))
-					return
-				}
+				SkipUnlessProviderIs("gce", "gke")
+
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
@@ -442,20 +445,22 @@ func retryCmd(command string, args ...string) (string, string, error) {
 	return stdout, stderr, err
 }
 
-// runCmd runs cmd using args and returns stdout and stderr.
+// runCmd runs cmd using args and returns its stdout and stderr. It also outputs
+// cmd's stdout and stderr to their respective OS streams.
 func runCmd(command string, args ...string) (string, string, error) {
 	Logf("Running %s %v", command, args)
 	var bout, berr bytes.Buffer
 	cmd := exec.Command(command, args...)
-	cmd.Stdout, cmd.Stderr = &bout, &berr
+	// We also output to the OS stdout/stderr to aid in debugging in case cmd
+	// hangs and never retruns before the test gets killed.
+	cmd.Stdout = io.MultiWriter(os.Stdout, &bout)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &berr)
 	err := cmd.Run()
 	stdout, stderr := bout.String(), berr.String()
 	if err != nil {
 		return "", "", fmt.Errorf("error running %s %v; got error %v, stdout %q, stderr %q",
 			command, args, err, stdout, stderr)
 	}
-	Logf("stdout: %s", stdout)
-	Logf("stderr: %s", stderr)
 	return stdout, stderr, nil
 }
 
@@ -490,5 +495,176 @@ func validate(f Framework, svcNameWant, rcNameWant string, ingress api.LoadBalan
 	testLoadBalancerReachable(ingress, 80)
 
 	Logf("Cluster validation succeeded")
+	return nil
+}
+
+// migRollingUpdate starts a MIG rolling update, upgrading the nodes to a new
+// instance template named tmpl, and waits up to nt times the nubmer of nodes
+// for it to complete.
+func migRollingUpdate(tmpl string, nt time.Duration) error {
+	By(fmt.Sprintf("starting the MIG rolling update to %s", tmpl))
+	id, err := migRollingUpdateStart(tmpl, nt)
+	if err != nil {
+		return fmt.Errorf("couldn't start the MIG rolling update: %v", err)
+	}
+
+	By(fmt.Sprintf("polling the MIG rolling update (%s) until it completes", id))
+	if err := migRollingUpdatePoll(id, nt); err != nil {
+		return fmt.Errorf("err waiting until update completed: %v", err)
+	}
+
+	return nil
+}
+
+// migTemlate (GCE/GKE-only) returns the name of the MIG template that the
+// nodes of the cluster use.
+func migTemplate() (string, error) {
+	var errLast error
+	var templ string
+	key := "instanceTemplate"
+	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
+	if wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		// TODO(mbforbes): make this hit the compute API directly instead of
+		// shelling out to gcloud.
+		o, err := exec.Command("gcloud", "preview", "managed-instance-groups",
+			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
+			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
+			"describe",
+			testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
+		if err != nil {
+			errLast = fmt.Errorf("gcloud preview managed-instance-groups describe call failed with err: %v", err)
+			return false, nil
+		}
+		output := string(o)
+
+		// The 'describe' call probably succeeded; parse the output and try to
+		// find the line that looks like "instanceTemplate: url/to/<templ>" and
+		// return <templ>.
+		if val := parseKVLines(output, key); len(val) > 0 {
+			url := strings.Split(val, "/")
+			templ = url[len(url)-1]
+			Logf("MIG group %s using template: %s", testContext.CloudConfig.NodeInstanceGroup, templ)
+			return true, nil
+		}
+		errLast = fmt.Errorf("couldn't find %s in output to get MIG template. Output: %s", key, output)
+		return false, nil
+	}) != nil {
+		return "", fmt.Errorf("migTemplate() failed with last error: %v", errLast)
+	}
+	return templ, nil
+}
+
+// migRollingUpdateStart (GCE/GKE-only) starts a MIG rolling update using templ
+// as the new template, waiting up to nt per node, and returns the ID of that
+// update.
+func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
+	var errLast error
+	var id string
+	prefix, suffix := "Started [", "]."
+	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
+	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		// TODO(mbforbes): make this hit the compute API directly instead of
+		//                 shelling out to gcloud.
+		// NOTE(mbforbes): If you are changing this gcloud command, update
+		//                 cluster/gce/upgrade.sh to match this EXACTLY.
+		o, err := exec.Command("gcloud", append(migUdpateCmdBase(),
+			"rolling-updates",
+			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
+			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
+			"start",
+			// Required args.
+			fmt.Sprintf("--group=%s", testContext.CloudConfig.NodeInstanceGroup),
+			fmt.Sprintf("--template=%s", templ),
+			// Optional args to fine-tune behavior.
+			fmt.Sprintf("--instance-startup-timeout=%ds", int(nt.Seconds())),
+			// NOTE: We can speed up this process by increasing
+			//       --max-num-concurrent-instances.
+			fmt.Sprintf("--max-num-concurrent-instances=%d", 1),
+			fmt.Sprintf("--max-num-failed-instances=%d", 0),
+			fmt.Sprintf("--min-instance-update-time=%ds", 0))...).CombinedOutput()
+		if err != nil {
+			errLast = fmt.Errorf("rolling-updates call failed with err: %v", err)
+			return false, nil
+		}
+		output := string(o)
+
+		// The 'start' call probably succeeded; parse the output and try to find
+		// the line that looks like "Started [url/to/<id>]." and return <id>.
+		for _, line := range strings.Split(output, "\n") {
+			// As a sanity check, ensure the line starts with prefix and ends
+			// with suffix.
+			if strings.Index(line, prefix) != 0 || strings.Index(line, suffix) != len(line)-len(suffix) {
+				continue
+			}
+			url := strings.Split(strings.TrimSuffix(strings.TrimPrefix(line, prefix), suffix), "/")
+			id = url[len(url)-1]
+			Logf("Started MIG rolling update; ID: %s", id)
+			return true, nil
+		}
+		errLast = fmt.Errorf("couldn't find line like '%s ... %s' in output to MIG rolling-update start. Output: %s",
+			prefix, suffix, output)
+		return false, nil
+	}); err != nil {
+		return "", fmt.Errorf("migRollingUpdateStart() failed with last error: %v", errLast)
+	}
+	return id, nil
+}
+
+// migUpdateCmdBase gets the base of the MIG rolling update command--i.e., all
+// pieces of the gcloud command that come after "gcloud" but before
+// "rolling-updates". Examples of returned values are:
+//
+//   {preview"}
+//
+//   {"alpha", "compute"}
+//
+// TODO(mbforbes): Remove this hack on July 29, 2015 when the migration to
+//                 `gcloud alpha compute rolling-updates` is complete.
+func migUdpateCmdBase() []string {
+	b := []string{"preview"}
+	a := []string{"rolling-updates", "-h"}
+	if err := exec.Command("gcloud", append(b, a...)...).Run(); err != nil {
+		b = []string{"alpha", "compute"}
+	}
+	return b
+}
+
+// migRollingUpdatePoll (CKE/GKE-only) polls the progress of the MIG rolling
+// update with ID id until it is complete. It returns an error if this takes
+// longer than nt times the number of nodes.
+func migRollingUpdatePoll(id string, nt time.Duration) error {
+	// Two keys and a val.
+	status, progress, done := "status", "statusMessage", "ROLLED_OUT"
+	start, timeout := time.Now(), nt*time.Duration(testContext.CloudConfig.NumNodes)
+	var errLast error
+	Logf("Waiting up to %v for MIG rolling update to complete.", timeout)
+	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
+	if wait.Poll(restartPoll, timeout, func() (bool, error) {
+		o, err := exec.Command("gcloud", append(migUdpateCmdBase(),
+			"rolling-updates",
+			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
+			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
+			"describe",
+			id)...).CombinedOutput()
+		if err != nil {
+			errLast = fmt.Errorf("Error calling rolling-updates describe %s: %v", id, err)
+			Logf("%v", errLast)
+			return false, nil
+		}
+		output := string(o)
+
+		// The 'describe' call probably succeeded; parse the output and try to
+		// find the line that looks like "status: <status>" and see whether it's
+		// done.
+		Logf("Waiting for MIG rolling update: %s (%v elapsed)",
+			parseKVLines(output, progress), time.Since(start))
+		if st := parseKVLines(output, status); st == done {
+			return true, nil
+		}
+		return false, nil
+	}) != nil {
+		return fmt.Errorf("timeout waiting %v for MIG rolling update to complete. Last error: %v", timeout, errLast)
+	}
+	Logf("MIG rolling update complete after %v", time.Since(start))
 	return nil
 }

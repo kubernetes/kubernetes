@@ -164,6 +164,11 @@ func (c *cache) Index(indexName string, obj interface{}) ([]interface{}, error) 
 	return c.cacheStorage.Index(indexName, obj)
 }
 
+// ListIndexFuncValues returns the list of generated values of an Index func
+func (c *cache) ListIndexFuncValues(indexName string) []string {
+	return c.cacheStorage.ListIndexFuncValues(indexName)
+}
+
 // Get returns the requested item, or sets exists=false.
 // Get is completely threadsafe as long as you treat all items as immutable.
 func (c *cache) Get(obj interface{}) (item interface{}, exists bool, err error) {

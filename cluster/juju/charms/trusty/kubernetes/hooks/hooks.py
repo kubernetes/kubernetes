@@ -216,7 +216,7 @@ def register_machine(apiserver, retry=False):
 
     response, result = registration_request.register(parsed.hostname,
                                                      parsed.port,
-                                                     '/api/v1beta3/nodes')
+                                                     '/api/v1/nodes')
 
     print(response)
 

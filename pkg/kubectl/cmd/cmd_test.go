@@ -24,6 +24,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -35,6 +36,7 @@ import (
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type internalType struct {
@@ -140,14 +142,14 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func() (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
-		DefaultNamespace: func() (string, error) {
-			return t.Namespace, t.Err
+		DefaultNamespace: func() (string, bool, error) {
+			return t.Namespace, false, t.Err
 		},
 		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
@@ -175,7 +177,8 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	}
 	generators := map[string]kubectl.Generator{
 		"run/v1":     kubectl.BasicReplicationController{},
-		"service/v1": kubectl.ServiceGenerator{},
+		"service/v1": kubectl.ServiceGeneratorV1{},
+		"service/v2": kubectl.ServiceGeneratorV2{},
 	}
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
@@ -194,14 +197,14 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func() (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
-		DefaultNamespace: func() (string, error) {
-			return t.Namespace, t.Err
+		DefaultNamespace: func() (string, bool, error) {
+			return t.Namespace, false, t.Err
 		},
 		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
@@ -241,9 +244,9 @@ func stringBody(body string) io.ReadCloser {
 //	}
 //}
 
-func ExamplePrintReplicationController() {
+func ExamplePrintReplicationControllerWithNamespace() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, []string{})
 	tf.Client = &client.FakeRESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -251,8 +254,9 @@ func ExamplePrintReplicationController() {
 	cmd := NewCmdRun(f, os.Stdout)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Name:   "foo",
-			Labels: map[string]string{"foo": "bar"},
+			Name:      "foo",
+			Namespace: "beep",
+			Labels:    map[string]string{"foo": "bar"},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
@@ -277,8 +281,109 @@ func ExamplePrintReplicationController() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
-	// foo          foo            someimage   foo=bar    1
+	// NAMESPACE   CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
+	// beep        foo          foo            someimage   foo=bar    1
+}
+
+func ExamplePrintPodWithWideFormat() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, []string{})
+	tf.Client = &client.FakeRESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	nodeName := "kubernetes-minion-abcd"
+	cmd := NewCmdRun(f, os.Stdout)
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "test1",
+			CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.PodSpec{
+			Containers: make([]api.Container, 2),
+			NodeName:   nodeName,
+		},
+		Status: api.PodStatus{
+			Phase: "podPhase",
+			ContainerStatuses: []api.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				{RestartCount: 3},
+			},
+		},
+	}
+	err := f.PrintObject(cmd, pod, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      READY     STATUS     RESTARTS   AGE       NODE
+	// test1     1/2       podPhase   6          10y       kubernetes-minion-abcd
+}
+
+func ExamplePrintServiceWithNamespacesAndLabels() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, []string{"l1"})
+	tf.Client = &client.FakeRESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := NewCmdRun(f, os.Stdout)
+	svc := &api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "svc1",
+					Namespace: "ns1",
+					Labels: map[string]string{
+						"l1": "value",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{Protocol: "UDP", Port: 53},
+						{Protocol: "TCP", Port: 53},
+					},
+					Selector: map[string]string{
+						"s": "magic",
+					},
+					ClusterIP: "10.1.1.1",
+				},
+				Status: api.ServiceStatus{},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "svc2",
+					Namespace: "ns2",
+					Labels: map[string]string{
+						"l1": "dolla-bill-yall",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{Protocol: "TCP", Port: 80},
+						{Protocol: "TCP", Port: 8080},
+					},
+					Selector: map[string]string{
+						"s": "kazam",
+					},
+					ClusterIP: "10.1.1.2",
+				},
+				Status: api.ServiceStatus{},
+			}},
+	}
+	ld := util.NewLineDelimiter(os.Stdout, "|")
+	defer ld.Flush()
+	err := f.PrintObject(cmd, svc, ld)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// |NAMESPACE   NAME      LABELS               SELECTOR   IP(S)      PORT(S)    L1|
+	// |ns1         svc1      l1=value             s=magic    10.1.1.1   53/UDP     value|
+	// |                                                                 53/TCP     |
+	// |ns2         svc2      l1=dolla-bill-yall   s=kazam    10.1.1.2   80/TCP     dolla-bill-yall|
+	// |                                                                 8080/TCP   |
+	// ||
 }
 
 func TestNormalizationFuncGlobalExistance(t *testing.T) {

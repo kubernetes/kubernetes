@@ -177,7 +177,7 @@ func (v *testVisitor) Objects() []runtime.Object {
 
 func TestPathBuilder(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml")
+		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml")
 
 	test := &testVisitor{}
 	singular := false
@@ -227,8 +227,8 @@ func TestNodeBuilder(t *testing.T) {
 
 func TestPathBuilderWithMultiple(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").
-		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").
+		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").
+		FilenameParam(false, "../../../examples/pod").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -239,15 +239,19 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 
-	info := test.Infos[1]
-	if info.Name != "redis-master" || info.Namespace != "test" || info.Object == nil {
+	info := test.Infos[0]
+	if _, ok := info.Object.(*api.ReplicationController); !ok || info.Name != "redis-master" || info.Namespace != "test" {
+		t.Errorf("unexpected info: %#v", info)
+	}
+	info = test.Infos[1]
+	if _, ok := info.Object.(*api.Pod); !ok || info.Name != "nginx" || info.Namespace != "test" {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
 
 func TestDirectoryBuilder(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook").
+		FilenameParam(false, "../../../examples/guestbook").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -269,6 +273,36 @@ func TestDirectoryBuilder(t *testing.T) {
 	}
 }
 
+func TestNamespaceOverride(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(runtime.EncodeOrDie(latest.Codec, &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test"}})))
+	}))
+	defer s.Close()
+
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		FilenameParam(false, s.URL).
+		NamespaceParam("test")
+
+	test := &testVisitor{}
+
+	err := b.Do().Visit(test.Handle)
+	if err != nil || len(test.Infos) != 1 && test.Infos[0].Namespace != "foo" {
+		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
+	}
+
+	b = NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		FilenameParam(true, s.URL).
+		NamespaceParam("test")
+
+	test = &testVisitor{}
+
+	err = b.Do().Visit(test.Handle)
+	if err == nil {
+		t.Fatalf("expected namespace error. got: %#v", test.Infos)
+	}
+}
+
 func TestURLBuilder(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -277,7 +311,7 @@ func TestURLBuilder(t *testing.T) {
 	defer s.Close()
 
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam(s.URL).
+		FilenameParam(false, s.URL).
 		NamespaceParam("test")
 
 	test := &testVisitor{}
@@ -301,7 +335,7 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 	defer s.Close()
 
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam(s.URL).
+		FilenameParam(false, s.URL).
 		NamespaceParam("test").RequireNamespace()
 
 	test := &testVisitor{}
@@ -640,7 +674,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 func TestSingularObject(t *testing.T) {
 	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").
+		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").
 		Flatten().
 		Do().Object()
 
@@ -654,6 +688,26 @@ func TestSingularObject(t *testing.T) {
 	}
 	if rc.Name != "redis-master" || rc.Namespace != "test" {
 		t.Errorf("unexpected controller: %#v", rc)
+	}
+}
+
+func TestSingularObjectNoExtension(t *testing.T) {
+	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		NamespaceParam("test").DefaultNamespace().
+		FilenameParam(false, "../../../examples/pod").
+		Flatten().
+		Do().Object()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+	if pod.Name != "nginx" || pod.Namespace != "test" {
+		t.Errorf("unexpected pod: %#v", pod)
 	}
 }
 
@@ -751,7 +805,7 @@ func TestWatch(t *testing.T) {
 		}),
 	})).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master-service.yaml").Flatten().
+		FilenameParam(false, "../../../examples/guestbook/redis-master-service.yaml").Flatten().
 		Do().Watch("12")
 
 	if err != nil {
@@ -778,8 +832,8 @@ func TestWatch(t *testing.T) {
 func TestWatchMultipleError(t *testing.T) {
 	_, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").Flatten().
-		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").Flatten().
+		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").Flatten().
+		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml").Flatten().
 		Do().Watch("")
 
 	if err == nil {
@@ -893,32 +947,32 @@ func TestReceiveMultipleErrors(t *testing.T) {
 func TestReplaceAliases(t *testing.T) {
 	tests := []struct {
 		name     string
-		args     []string
-		expected []string
+		arg      string
+		expected string
 	}{
 		{
 			name:     "no-replacement",
-			args:     []string{"service", "pods", "rc"},
-			expected: []string{"service", "pods", "rc"},
+			arg:      "service",
+			expected: "service",
 		},
 		{
 			name:     "all-replacement",
-			args:     []string{"all"},
-			expected: []string{"rc,svc,pods,pvc"},
+			arg:      "all",
+			expected: "rc,svc,pods,pvc",
+		},
+		{
+			name:     "alias-in-comma-separated-arg",
+			arg:      "all,secrets",
+			expected: "rc,svc,pods,pvc,secrets",
 		},
 	}
 
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient())
 
 	for _, test := range tests {
-		replaced := b.replaceAliases(test.args)
-		if len(replaced) != len(test.expected) {
-			t.Errorf("%s: unexpected args length: expected %d, got %d", test.name, len(test.expected), len(replaced))
-		}
-		for i, arg := range test.expected {
-			if arg != replaced[i] {
-				t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, arg, replaced[i])
-			}
+		replaced := b.replaceAliases(test.arg)
+		if replaced != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }

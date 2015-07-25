@@ -83,7 +83,7 @@ func updateObject(info *resource.Info, updateFn func(runtime.Object) (runtime.Ob
 		return nil, err
 	}
 
-	_, err = helper.Update(info.Namespace, info.Name, true, data)
+	_, err = helper.Replace(info.Namespace, info.Name, true, data)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

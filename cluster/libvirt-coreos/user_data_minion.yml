@@ -37,7 +37,7 @@ coreos:
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-proxy \
-        --master=http://${MASTER_IP}:7080
+        --master=http://${MASTER_IP}:8080
         Restart=always
         RestartSec=2
 

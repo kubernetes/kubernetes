@@ -1,6 +1,6 @@
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "nettest-controller",
     "labels": {
@@ -22,7 +22,7 @@
         "containers": [
           {
             "name": "webserver",
-            "image": "gcr.io/google_containers/nettest:1.4",
+            "image": "gcr.io/google_containers/nettest:1.6",
             "imagePullPolicy": "Always",
             "args": [
               "-service=nettest",

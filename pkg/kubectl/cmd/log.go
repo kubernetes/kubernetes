@@ -61,15 +61,20 @@ func selectContainer(pod *api.Pod, in io.Reader, out io.Writer) string {
 	}
 }
 
+type logParams struct {
+	containerName string
+}
+
 // NewCmdLog creates a new pod log command
 func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	params := &logParams{}
 	cmd := &cobra.Command{
-		Use:     "logs [-f] [-p] POD [CONTAINER]",
+		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
 		Short:   "Print the logs for a container in a pod.",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: log_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunLog(f, out, cmd, args)
+			err := RunLog(f, out, cmd, args, params)
 			cmdutil.CheckErr(err)
 		},
 		Aliases: []string{"log"},
@@ -77,11 +82,12 @@ func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Bool("interactive", true, "If true, prompt the user for input when required. Default true.")
 	cmd.Flags().BoolP("previous", "p", false, "If true, print the logs for the previous instance of the container in a pod if it exists.")
+	cmd.Flags().StringVarP(&params.containerName, "container", "c", "", "Container name")
 	return cmd
 }
 
 // RunLog retrieves a pod log
-func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, p *logParams) error {
 	if len(os.Args) > 1 && os.Args[1] == "log" {
 		printDeprecationWarning("logs", "log")
 	}
@@ -94,7 +100,7 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return cmdutil.UsageError(cmd, "log POD [CONTAINER]")
 	}
 
-	namespace, err := f.DefaultNamespace()
+	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -111,13 +117,19 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	var container string
-	if len(args) == 1 {
-		if len(pod.Spec.Containers) != 1 {
-			return fmt.Errorf("POD %s has more than one container; please specify the container to print logs for", pod.ObjectMeta.Name)
-		}
-		container = pod.Spec.Containers[0].Name
+	if cmdutil.GetFlagString(cmd, "container") != "" {
+		// [-c CONTAINER]
+		container = p.containerName
 	} else {
-		container = args[1]
+		// [CONTAINER] (container as arg not flag) is supported as legacy behavior. See PR #10519 for more details.
+		if len(args) == 1 {
+			if len(pod.Spec.Containers) != 1 {
+				return fmt.Errorf("POD %s has more than one container; please specify the container to print logs for", pod.ObjectMeta.Name)
+			}
+			container = pod.Spec.Containers[0].Name
+		} else {
+			container = args[1]
+		}
 	}
 
 	follow := false

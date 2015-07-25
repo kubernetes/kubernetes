@@ -31,7 +31,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
@@ -84,14 +83,6 @@ type CMServer struct {
 
 	Master     string
 	Kubeconfig string
-
-	// The following fields are deprecated and unused except in flag parsing.
-	MinionRegexp   string
-	MachineList    util.StringList
-	SyncNodeList   bool
-	SyncNodeStatus bool
-	NodeMilliCPU   int64
-	NodeMemory     resource.Quantity
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -107,7 +98,6 @@ func NewCMServer() *CMServer {
 		PVClaimBinderSyncPeriod: 10 * time.Second,
 		RegisterRetryCount:      10,
 		PodEvictionTimeout:      5 * time.Minute,
-		SyncNodeList:            true,
 		ClusterName:             "kubernetes",
 	}
 	return &s
@@ -121,8 +111,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
-	fs.StringVar(&s.MinionRegexp, "minion-regexp", s.MinionRegexp, "If non empty, and --cloud-provider is specified, a regular expression for matching minion VMs.")
-	fs.MarkDeprecated("minion-regexp", "will be removed in a future version")
 	fs.DurationVar(&s.NodeSyncPeriod, "node-sync-period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
 		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
@@ -134,12 +122,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.DeletingPodsBurst, "deleting-pods-burst", 10, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")
 	fs.IntVar(&s.RegisterRetryCount, "register-retry-count", s.RegisterRetryCount, ""+
 		"The number of retries for initial node registration.  Retry interval equals node-sync-period.")
-	fs.Var(&s.MachineList, "machines", "List of machines to schedule onto, comma separated.")
-	fs.MarkDeprecated("machines", "will be removed in a future version")
-	fs.BoolVar(&s.SyncNodeList, "sync-nodes", s.SyncNodeList, "If true, and --cloud-provider is specified, sync nodes from the cloud provider. Default true.")
-	fs.MarkDeprecated("sync-nodes", "will be removed in a future version")
-	fs.BoolVar(&s.SyncNodeStatus, "sync-node-status", s.SyncNodeStatus,
-		"DEPRECATED. Does not have any effect now and it will be removed in a later release.")
 	fs.DurationVar(&s.NodeMonitorGracePeriod, "node-monitor-grace-period", 40*time.Second,
 		"Amount of time which we allow running Node to be unresponsive before marking it unhealty. "+
 			"Must be N times more than kubelet's nodeStatusUpdateFrequency, "+
@@ -149,10 +131,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.NodeMonitorPeriod, "node-monitor-period", 5*time.Second,
 		"The period for syncing NodeStatus in NodeController.")
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
-	fs.Int64Var(&s.NodeMilliCPU, "node-milli-cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
-	fs.MarkDeprecated("node-milli-cpu", "will be removed in a future version")
-	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node-memory", "The amount of memory (in bytes) provisioned on each node")
-	fs.MarkDeprecated("node-memory", "will be removed in a future version")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.Var(&s.ClusterCIDR, "cluster-cidr", "CIDR Range for Pods in cluster.")
@@ -208,10 +186,9 @@ func (s *CMServer) Run(_ []string) error {
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient, replicationControllerPkg.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
-	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-
-	if s.SyncNodeStatus {
-		glog.Warning("DEPRECATION NOTICE: sync-node-status flag is being deprecated. It has no effect now and it will be removed in a future version.")
+	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	if err != nil {
+		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
 	nodeController := nodecontroller.NewNodeController(cloud, kubeClient, s.RegisterRetryCount,

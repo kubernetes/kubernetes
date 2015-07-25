@@ -1,4 +1,4 @@
-{% if grains['os_family'] != 'RedHat' %}
+{% if not pillar.get('is_systemd') %}
 
 monit:
   pkg:
@@ -30,6 +30,7 @@ monit:
     - mode: 644
 {% endif %}
 
+{% if grains['roles'][0] == 'kubernetes-master' -%}
 /etc/monit/conf.d/kube-addons:
   file:
     - managed
@@ -37,6 +38,7 @@ monit:
     - user: root
     - group: root
     - mode: 644
+{% endif %}
 
 /etc/monit/monit_watcher.sh:
   file.managed:

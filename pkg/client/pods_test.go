@@ -29,7 +29,7 @@ import (
 func TestListEmptyPods(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: testapi.ResourcePath("pods", ns, ""), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "GET", Path: testapi.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: &api.PodList{}},
 	}
 	podList, err := c.Setup().Pods(ns).List(labels.Everything(), fields.Everything())
@@ -39,7 +39,7 @@ func TestListEmptyPods(t *testing.T) {
 func TestListPods(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("pods", ns, ""), Query: buildQueryValues(ns, nil)},
+		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200,
 			Body: &api.PodList{
 				Items: []api.Pod{
@@ -69,7 +69,7 @@ func TestListPodsLabels(t *testing.T) {
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath("pods", ns, ""),
-			Query:  buildQueryValues(ns, url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
+			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.PodList{
@@ -99,7 +99,7 @@ func TestListPodsLabels(t *testing.T) {
 func TestGetPod(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.Pod{
@@ -133,7 +133,7 @@ func TestGetPodWithNoName(t *testing.T) {
 func TestDeletePod(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().Pods(ns).Delete("foo", nil)
@@ -154,7 +154,7 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "POST", Path: testapi.ResourcePath("pods", ns, ""), Query: buildQueryValues(ns, nil), Body: requestPod},
+		Request: testRequest{Method: "POST", Path: testapi.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil), Body: requestPod},
 		Response: Response{
 			StatusCode: 200,
 			Body:       requestPod,
@@ -180,7 +180,7 @@ func TestUpdatePod(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(nil)},
 		Response: Response{StatusCode: 200, Body: requestPod},
 	}
 	receivedPod, err := c.Setup().Pods(ns).Update(requestPod)

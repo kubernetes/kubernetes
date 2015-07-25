@@ -275,6 +275,15 @@ func GetFlagStringList(cmd *cobra.Command, flag string) util.StringList {
 	return *f.Value.(*util.StringList)
 }
 
+// GetWideFlag is used to determine if "-o wide" is used
+func GetWideFlag(cmd *cobra.Command) bool {
+	f := cmd.Flags().Lookup("output")
+	if f.Value.String() == "wide" {
+		return true
+	}
+	return false
+}
+
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	f := getFlag(cmd, flag)
 	result, err := strconv.ParseBool(f.Value.String())
@@ -396,4 +405,29 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+// DumpReaderToFile writes all data from the given io.Reader to the specified file
+// (usually for temporary use).
+func DumpReaderToFile(reader io.Reader, filename string) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+	buffer := make([]byte, 1024)
+	for {
+		count, err := reader.Read(buffer)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		_, err = f.Write(buffer[:count])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

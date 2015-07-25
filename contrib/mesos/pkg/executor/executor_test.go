@@ -436,7 +436,7 @@ func TestExecutorStaticPods(t *testing.T) {
 		w, err := zw.Create(fileName)
 		assert.NoError(t, err)
 		spod := `{
-	"apiVersion": "v1beta3",
+	"apiVersion": "v1",
 	"kind": "Pod",
 	"metadata": {
 		"name": "%v",

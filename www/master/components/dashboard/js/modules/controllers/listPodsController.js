@@ -34,8 +34,8 @@ app.controller('ListPodsCtrl', [
       labels: 'grey',
       status: 'grey'
     };
-    $scope.sortable = ['pod', 'ip', 'status'];
-    $scope.count = 10;
+    $scope.sortable = ['pod', 'ip', 'status','containers','images','host','labels'];
+    $scope.count = 50;
 
     $scope.go = function(data) { $location.path('/dashboard/pods/' + data.pod); };
 
@@ -75,24 +75,16 @@ app.controller('ListPodsCtrl', [
           }
 
           if (pod.metadata.labels) {
-            Object.keys(pod.metadata.labels)
-                .forEach(function(key) {
-                  if (key == 'name') {
-                    _labels += ', ' + pod.metadata.labels[key];
-                  }
-                  if (key == 'uses') {
-                    _uses += ', ' + pod.metadata.labels[key];
-                  }
-                });
-            }
+            _labels = _.map(pod.metadata.labels, function(v, k) { return k + ': ' + v }).join(', ');
+          }
 
           $scope.content.push({
             pod: pod.metadata.name,
             ip: pod.status.podIP,
             containers: _fixComma(_containers),
             images: _fixComma(_images),
-            host: pod.spec.host,
-            labels: _fixComma(_labels) + ':' + _fixComma(_uses),
+            host: pod.spec.nodeName,
+            labels: _labels,
             status: pod.status.phase
           });
 

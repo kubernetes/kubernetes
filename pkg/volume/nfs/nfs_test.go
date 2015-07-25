@@ -141,7 +141,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if builder.(*nfs).readOnly {
+	if builder.(*nfsBuilder).readOnly {
 		t.Errorf("The volume source should not be read-only and it is.")
 	}
 	if len(fake.Log) != 1 {

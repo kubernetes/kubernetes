@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,9 +30,19 @@ import (
 
 var _ = Describe("Etcd failure", func() {
 
+	var skipped bool
 	framework := Framework{BaseName: "etcd-failure"}
 
 	BeforeEach(func() {
+		// This test requires:
+		// - SSH
+		// - master access
+		// ... so the provider check should be identical to the intersection of
+		// providers that provide those capabilities.
+		skipped = true
+		SkipUnlessProviderIs("gce")
+		skipped = false
+
 		framework.beforeEach()
 
 		Expect(RunRC(RCConfig{
@@ -45,7 +54,13 @@ var _ = Describe("Etcd failure", func() {
 		})).NotTo(HaveOccurred())
 	})
 
-	AfterEach(framework.afterEach)
+	AfterEach(func() {
+		if skipped {
+			return
+		}
+
+		framework.afterEach()
+	})
 
 	It("should recover from network partition with master", func() {
 		etcdFailTest(
@@ -65,18 +80,11 @@ var _ = Describe("Etcd failure", func() {
 })
 
 func etcdFailTest(framework Framework, failCommand, fixCommand string) {
-	// This test requires SSH, so the provider check should be identical to
-	// those tests.
-	if !providerIs("gce") {
-		By(fmt.Sprintf("Skippingt test, which is not implemented for %s", testContext.Provider))
-		return
-	}
-
 	doEtcdFailure(failCommand, fixCommand)
 
 	checkExistingRCRecovers(framework)
 
-	ServeImageOrFail(framework.Client, "basic", "gcr.io/google_containers/serve_hostname:1.1")
+	ServeImageOrFail(&framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.

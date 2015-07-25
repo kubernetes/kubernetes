@@ -1,0 +1,8 @@
+- name: Generic | Install kubernetes master
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+    name: kubernetes-master
+    state: latest
+  notify:
+    - restart daemons
+  when: not is_atomic

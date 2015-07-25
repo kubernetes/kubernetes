@@ -169,6 +169,8 @@ const (
 	NamespaceAll string = ""
 	// NamespaceNone is the argument for a context when there is no namespace.
 	NamespaceNone string = ""
+	// NamespaceSystem is the system namespace where we place system components.
+	NamespaceSystem string = "kube-system"
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
@@ -245,7 +247,7 @@ type PersistentVolumeSource struct {
 
 type PersistentVolumeClaimVolumeSource struct {
 	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume
-	ClaimName string `json:"claimName" description:"the name of the claim in the same namespace to be mounted as a volume"`
+	ClaimName string `json:"claimName"`
 	// Optional: Defaults to false (read/write).  ReadOnly here
 	// will force the ReadOnly setting in VolumeMounts
 	ReadOnly bool `json:"readOnly,omitempty"`
@@ -274,7 +276,7 @@ type PersistentVolumeSpec struct {
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 	// Optional: what happens to a persistent volume when released from its claim.
-	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" description:"what happens to a volume when released from its claim; Valid options are Retain (default) and Recycle.  Recyling must be supported by the volume plugin underlying this persistent volume."`
+	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -551,7 +553,7 @@ type RBDVolumeSource struct {
 
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
-	// Optional: If specified, this must be a IANA_SVC_NAME  Each named port
+	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
@@ -616,7 +618,19 @@ type HTTPGetAction struct {
 	Port util.IntOrString `json:"port,omitempty"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty"`
+	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
+	Scheme URIScheme `json:"scheme,omitempty"`
 }
+
+// URIScheme identifies the scheme used for connection to a host for Get actions
+type URIScheme string
+
+const (
+	// URISchemeHTTP means that the scheme used will be http://
+	URISchemeHTTP URIScheme = "HTTP"
+	// URISchemeHTTPS means that the scheme used will be https://
+	URISchemeHTTPS URIScheme = "HTTPS"
+)
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
@@ -711,7 +725,7 @@ type Container struct {
 	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy"`
 	// Optional: SecurityContext defines the security options the pod should be run with
-	SecurityContext *SecurityContext `json:"securityContext,omitempty" description:"security options the pod should run with"`
+	SecurityContext *SecurityContext `json:"securityContext,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -792,11 +806,10 @@ type ContainerStatus struct {
 	Ready bool `json:"ready"`
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
-	RestartCount int `json:"restartCount"`
-	// TODO(dchen1107): Need to decide how to represent this in v1beta3
-	Image       string `json:"image"`
-	ImageID     string `json:"imageID"`
-	ContainerID string `json:"containerID,omitempty"`
+	RestartCount int    `json:"restartCount"`
+	Image        string `json:"image"`
+	ImageID      string `json:"imageID"`
+	ContainerID  string `json:"containerID,omitempty"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -909,7 +922,7 @@ type PodSpec struct {
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
-	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling the container images"`
+	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -920,7 +933,7 @@ type PodStatus struct {
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty"`
 	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'
-	Reason string `json:"reason,omitempty" description:"(brief-CamelCase) reason indicating details about why the pod is in this condition"`
+	Reason string `json:"reason,omitempty"`
 
 	HostIP string `json:"hostIP,omitempty"`
 	PodIP  string `json:"podIP,omitempty"`
@@ -997,7 +1010,7 @@ type ReplicationControllerSpec struct {
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
 	// insufficient replicas are detected. This reference is ignored if a Template is set.
-	// Must be set before converting to a v1beta3 API object
+	// Must be set before converting to a versioned API object
 	//TemplateRef *ObjectReference `json:"templateRef,omitempty"`
 
 	// Template is the object that describes the pod that will be created if
@@ -1092,7 +1105,7 @@ type ServiceStatus struct {
 type LoadBalancerStatus struct {
 	// Ingress is a list containing ingress points for the load-balancer;
 	// traffic intended for the service should be sent to these ingress points.
-	Ingress []LoadBalancerIngress `json:"ingress,omitempty" description:"load-balancer ingress points"`
+	Ingress []LoadBalancerIngress `json:"ingress,omitempty"`
 }
 
 // LoadBalancerIngress represents the status of a load-balancer ingress point:
@@ -1100,11 +1113,11 @@ type LoadBalancerStatus struct {
 type LoadBalancerIngress struct {
 	// IP is set for load-balancer ingress points that are IP based
 	// (typically GCE or OpenStack load-balancers)
-	IP string `json:"ip,omitempty" description:"IP address of ingress point"`
+	IP string `json:"ip,omitempty"`
 
 	// Hostname is set for load-balancer ingress points that are DNS based
 	// (typically AWS load-balancers)
-	Hostname string `json:"hostname,omitempty" description:"hostname of ingress point"`
+	Hostname string `json:"hostname,omitempty"`
 }
 
 // ServiceSpec describes the attributes that a user creates on a service
@@ -1151,15 +1164,13 @@ type ServicePort struct {
 
 	// Optional: The target port on pods selected by this service.  If this
 	// is a string, it will be looked up as a named port in the target
-	// Pod's container ports.  If this is not specified, the first port on
-	// the destination pod will be used.  This behavior is deprecated.  As
-	// of v1beta3 the default value is the sames as the Port field (an
-	// identity map).
+	// Pod's container ports.  If this is not specified, the default value
+	// is the sames as the Port field (an identity map).
 	TargetPort util.IntOrString `json:"targetPort"`
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
-	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
+	NodePort int `json:"nodePort"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -1190,7 +1201,7 @@ type ServiceAccount struct {
 	// ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
 	// in pods that reference this ServiceAccount.  ImagePullSecrets are distinct from Secrets because Secrets
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
-	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling container images"`
+	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // ServiceAccountList is a list of ServiceAccount objects
@@ -1696,6 +1707,12 @@ const (
 	//   "causes" - The original error
 	// Status code 500
 	StatusReasonInternalError = "InternalError"
+
+	// StatusReasonServiceUnavailable means that the request itself was valid,
+	// but the requested service is unavailable at this time.
+	// Retrying the request after some time might succeed.
+	// Status code 503
+	StatusReasonServiceUnavailable StatusReason = "ServiceUnavailable"
 )
 
 // StatusCause provides more information about an api.Status failure, including
@@ -1774,7 +1791,7 @@ type LocalObjectReference struct {
 
 type SerializedReference struct {
 	TypeMeta  `json:",inline"`
-	Reference ObjectReference `json:"reference,omitempty" description:"the reference to an object in the system"`
+	Reference ObjectReference `json:"reference,omitempty"`
 }
 
 type EventSource struct {
@@ -2065,32 +2082,32 @@ type ComponentStatusList struct {
 // both the Container AND the SecurityContext will result in an error.
 type SecurityContext struct {
 	// Capabilities are the capabilities to add/drop when running the container
-	Capabilities *Capabilities `json:"capabilities,omitempty" description:"the linux capabilites that should be added or removed"`
+	Capabilities *Capabilities `json:"capabilities,omitempty"`
 
 	// Run the container in privileged mode
-	Privileged *bool `json:"privileged,omitempty" description:"run the container in privileged mode"`
+	Privileged *bool `json:"privileged,omitempty"`
 
 	// SELinuxOptions are the labels to be applied to the container
 	// and volumes
-	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" description:"options that control the SELinux labels applied"`
+	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty"`
 
 	// RunAsUser is the UID to run the entrypoint of the container process.
-	RunAsUser *int64 `json:"runAsUser,omitempty" description:"the user id that runs the first process in the container"`
+	RunAsUser *int64 `json:"runAsUser,omitempty"`
 }
 
 // SELinuxOptions are the labels to be applied to the container.
 type SELinuxOptions struct {
 	// SELinux user label
-	User string `json:"user,omitempty" description:"the user label to apply to the container"`
+	User string `json:"user,omitempty"`
 
 	// SELinux role label
-	Role string `json:"role,omitempty" description:"the role label to apply to the container"`
+	Role string `json:"role,omitempty"`
 
 	// SELinux type label
-	Type string `json:"type,omitempty" description:"the type label to apply to the container"`
+	Type string `json:"type,omitempty"`
 
 	// SELinux level label.
-	Level string `json:"level,omitempty" description:"the level label to apply to the container"`
+	Level string `json:"level,omitempty"`
 }
 
 // RangeAllocation is an opaque API object (not exposed to end users) that can be persisted to record

@@ -50,6 +50,12 @@ var _ = Describe("Reboot", func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
+
+		// These tests requires SSH to nodes, so the provider check should be identical to there
+		// (the limiting factor is the implementation of util.go's getSigner(...)).
+
+		// Cluster must support node reboot
+		SkipUnlessProviderIs("gce", "gke", "aws")
 	})
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
@@ -79,26 +85,21 @@ var _ = Describe("Reboot", func() {
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
-		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A INPUT -j DROP && sleep 120 && sudo iptables -D INPUT -j DROP' >/dev/null 2>&1 &")
+		// We still accept packages send from localhost to prevent monit from restarting kubelet.
+		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A INPUT -s 127.0.0.1 -j ACCEPT && sudo iptables -A INPUT -j DROP && "+
+			" sleep 120 && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 
 	It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
-		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A OUTPUT -j DROP && sleep 120 && sudo iptables -D OUTPUT -j DROP' >/dev/null 2>&1 &")
+		// We still accept packages send to localhost to prevent monit from restarting kubelet.
+		testReboot(c, "nohup sh -c 'sleep 10 &&  sudo iptables -A OUTPUT -s 127.0.0.1 -j ACCEPT && sudo iptables -A OUTPUT -j DROP && "+
+			" sleep 120 && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 })
 
 func testReboot(c *client.Client, rebootCmd string) {
-	// This test requires SSH, so the provider check should be identical to
-	// there (the limiting factor is the implementation of util.go's
-	// getSigner(...)).
-	provider := testContext.Provider
-	if !providerIs("aws", "gce") {
-		By(fmt.Sprintf("Skipping reboot test, which is not implemented for %s", provider))
-		return
-	}
-
 	// Get all nodes, and kick off the test on each.
 	nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
 	if err != nil {
@@ -106,7 +107,7 @@ func testReboot(c *client.Client, rebootCmd string) {
 	}
 	result := make(chan bool, len(nodelist.Items))
 	for _, n := range nodelist.Items {
-		go rebootNode(c, provider, n.ObjectMeta.Name, rebootCmd, result)
+		go rebootNode(c, testContext.Provider, n.ObjectMeta.Name, rebootCmd, result)
 	}
 
 	// Wait for all to finish and check the final result.
@@ -155,7 +156,7 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 // failed step, it will return false through result and not run the rest.
 func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan bool) {
 	// Setup
-	ns := api.NamespaceDefault
+	ns := api.NamespaceSystem
 	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
 	defer ps.Stop()
 
@@ -174,11 +175,21 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 		return
 	}
 
-	// Get all the pods on the node.
+	// Get all the pods on the node that don't have liveness probe set.
+	// Liveness probe may cause restart of a pod during node reboot, and the pod may not be running.
 	pods := ps.List()
-	podNames := make([]string, len(pods))
-	for i, p := range pods {
-		podNames[i] = p.ObjectMeta.Name
+	podNames := []string{}
+	for _, p := range pods {
+		probe := false
+		for _, c := range p.Spec.Containers {
+			if c.LivenessProbe != nil {
+				probe = true
+				break
+			}
+		}
+		if !probe {
+			podNames = append(podNames, p.ObjectMeta.Name)
+		}
 	}
 	Logf("Node %s has %d pods: %v", name, len(podNames), podNames)
 

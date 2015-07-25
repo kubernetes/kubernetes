@@ -86,10 +86,13 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 	return b
 }
 
-// Filename is parameters passed via a filename argument which may be URLs, the "-" argument indicating
-// STDIN, or paths to files or directories. If ContinueOnError() is set prior to this method being called,
-// objects on the path that are unrecognized will be ignored (but logged at V(2)).
-func (b *Builder) FilenameParam(paths ...string) *Builder {
+// FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
+// If enforceNamespace is false, namespaces in the specs will be allowed to
+// override the default namespace. If it is true, namespaces that don't match
+// will cause an error.
+// If ContinueOnError() is set prior to this method, objects on the path that are not
+// recognized will be ignored (but logged at V(2)).
+func (b *Builder) FilenameParam(enforceNamespace bool, paths ...string) *Builder {
 	for _, s := range paths {
 		switch {
 		case s == "-":
@@ -105,6 +108,11 @@ func (b *Builder) FilenameParam(paths ...string) *Builder {
 			b.Path(s)
 		}
 	}
+
+	if enforceNamespace {
+		b.RequireNamespace()
+	}
+
 	return b
 }
 
@@ -124,7 +132,9 @@ func (b *Builder) URL(urls ...*url.URL) *Builder {
 // prior to this method being called, objects in the stream that are unrecognized
 // will be ignored (but logged at V(2)).
 func (b *Builder) Stdin() *Builder {
-	return b.Stream(os.Stdin, "STDIN")
+	b.stream = true
+	b.paths = append(b.paths, FileVisitorForSTDIN(b.mapper, b.continueOnError, b.schema))
+	return b
 }
 
 // Stream will read objects from the provided reader, and if an error occurs will
@@ -133,16 +143,18 @@ func (b *Builder) Stdin() *Builder {
 // will be ignored (but logged at V(2)).
 func (b *Builder) Stream(r io.Reader, name string) *Builder {
 	b.stream = true
-	b.paths = append(b.paths, NewStreamVisitor(r, b.mapper, b.schema, name, b.continueOnError))
+	b.paths = append(b.paths, NewStreamVisitor(r, b.mapper, name, b.continueOnError, b.schema))
 	return b
 }
 
-// Path is a set of filesystem paths that may be files containing one or more
-// resources. If ContinueOnError() is set prior to this method being called,
-// objects on the path that are unrecognized will be ignored (but logged at V(2)).
+// Path accepts a set of paths that may be files, directories (all can containing
+// one or more resources). Creates a FileVisitor for each file and then each
+// FileVisitor is streaming the content to a StreamVisitor. If ContinueOnError() is set
+// prior to this method being called, objects on the path that are unrecognized will be
+// ignored (but logged at V(2)).
 func (b *Builder) Path(paths ...string) *Builder {
 	for _, p := range paths {
-		i, err := os.Stat(p)
+		_, err := os.Stat(p)
 		if os.IsNotExist(err) {
 			b.errs = append(b.errs, fmt.Errorf("the path %q does not exist", p))
 			continue
@@ -151,26 +163,16 @@ func (b *Builder) Path(paths ...string) *Builder {
 			b.errs = append(b.errs, fmt.Errorf("the path %q cannot be accessed: %v", p, err))
 			continue
 		}
-		var visitor Visitor
-		if i.IsDir() {
-			b.dir = true
-			visitor = &DirectoryVisitor{
-				Mapper:       b.mapper,
-				Path:         p,
-				Extensions:   []string{".json", ".yaml", ".yml"},
-				Recursive:    false,
-				IgnoreErrors: b.continueOnError,
-				Schema:       b.schema,
-			}
-		} else {
-			visitor = &PathVisitor{
-				Mapper:       b.mapper,
-				Path:         p,
-				IgnoreErrors: b.continueOnError,
-				Schema:       b.schema,
-			}
+
+		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, []string{".json", ".stdin", ".yaml", ".yml"}, b.continueOnError, b.schema)
+		if err != nil {
+			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
 		}
-		b.paths = append(b.paths, visitor)
+		if len(visitors) > 1 {
+			b.dir = true
+		}
+
+		b.paths = append(b.paths, visitors...)
 	}
 	return b
 }
@@ -207,8 +209,8 @@ func (b *Builder) Selector(selector labels.Selector) *Builder {
 	return b
 }
 
-// The namespace that these resources should be assumed to under - used by DefaultNamespace()
-// and RequireNamespace()
+// NamespaceParam accepts the namespace that these resources should be
+// considered under from - used by DefaultNamespace() and RequireNamespace()
 func (b *Builder) NamespaceParam(namespace string) *Builder {
 	b.namespace = namespace
 	return b
@@ -254,7 +256,6 @@ func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 // When two or more arguments are received, they must be a single type and resource name(s).
 // The allowEmptySelector permits to select all the resources (via Everything func).
 func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
-	args = b.replaceAliases(args)
 	if ok, err := hasCombinedTypeArgs(args); ok {
 		if err != nil {
 			b.errs = append(b.errs, err)
@@ -275,6 +276,10 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 		}
 		return b
 	}
+	if len(args) > 0 {
+		// Try replacing aliases only in types
+		args[0] = b.replaceAliases(args[0])
+	}
 	switch {
 	case len(args) > 2:
 		b.names = append(b.names, args[1:]...)
@@ -294,16 +299,17 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 	return b
 }
 
-func (b *Builder) replaceAliases(args []string) []string {
+// replaceAliases accepts an argument and tries to expand any existing
+// aliases found in it
+func (b *Builder) replaceAliases(input string) string {
 	replaced := []string{}
-	for _, arg := range args {
+	for _, arg := range strings.Split(input, ",") {
 		if aliases, ok := b.mapper.AliasesForResource(arg); ok {
 			arg = strings.Join(aliases, ",")
 		}
 		replaced = append(replaced, arg)
 	}
-
-	return replaced
+	return strings.Join(replaced, ",")
 }
 
 func hasCombinedTypeArgs(args []string) (bool, error) {
@@ -321,20 +327,6 @@ func hasCombinedTypeArgs(args []string) (bool, error) {
 	default:
 		return false, nil
 	}
-}
-
-// ResourceTypeAndNameArgs expects two arguments, a resource type, and a resource name. The resource
-// matching that type and and name will be retrieved from the server.
-func (b *Builder) ResourceTypeAndNameArgs(args ...string) *Builder {
-	switch len(args) {
-	case 2:
-		b.names = append(b.names, args[1])
-		b.ResourceTypes(SplitResourceArgument(args[0])...)
-	case 0:
-	default:
-		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource and name"))
-	}
-	return b
 }
 
 // Flatten will convert any objects with a field named "Items" that is an array of runtime.Object

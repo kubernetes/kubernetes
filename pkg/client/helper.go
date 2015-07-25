@@ -31,7 +31,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -145,12 +144,14 @@ func New(c *Config) (*Client, error) {
 // MatchesServerVersion queries the server to compares the build version
 // (git hash) of the client with the server's build version. It returns an error
 // if it failed to contact the server or if the versions are not an exact match.
-func MatchesServerVersion(c *Config) error {
-	client, err := New(c)
-	if err != nil {
-		return err
+func MatchesServerVersion(client *Client, c *Config) error {
+	var err error
+	if client == nil {
+		client, err = New(c)
+		if err != nil {
+			return err
+		}
 	}
-
 	clientVersion := version.Get()
 	serverVersion, err := client.ServerVersion()
 	if err != nil {
@@ -165,20 +166,23 @@ func MatchesServerVersion(c *Config) error {
 
 // NegotiateVersion queries the server's supported api versions to find
 // a version that both client and server support.
-// - If no version is provided, try the client's registered versions in order of
+// - If no version is provided, try registered client versions in order of
 //   preference.
 // - If version is provided, but not default config (explicitly requested via
 //   commandline flag), and is unsupported by the server, print a warning to
 //   stderr and try client's registered versions in order of preference.
 // - If version is config default, and the server does not support it,
 //   return an error.
-func NegotiateVersion(c *Config, version string) (string, error) {
-	client, err := New(c)
-	if err != nil {
-		return "", err
+func NegotiateVersion(client *Client, c *Config, version string, clientRegisteredVersions []string) (string, error) {
+	var err error
+	if client == nil {
+		client, err = New(c)
+		if err != nil {
+			return "", err
+		}
 	}
 	clientVersions := util.StringSet{}
-	for _, v := range registered.RegisteredVersions {
+	for _, v := range clientRegisteredVersions {
 		clientVersions.Insert(v)
 	}
 	apiVersions, err := client.ServerAPIVersions()
@@ -209,7 +213,7 @@ func NegotiateVersion(c *Config, version string) (string, error) {
 		}
 	}
 
-	for _, clientVersion := range registered.RegisteredVersions {
+	for _, clientVersion := range clientRegisteredVersions {
 		if serverVersions.Has(clientVersion) {
 			// Version was not explicitly requested in command config (--api-version).
 			// Ok to fall back to a supported version with a warning.
@@ -220,7 +224,7 @@ func NegotiateVersion(c *Config, version string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("Failed to negotiate an api version. Server supports: %v. Client supports: %v.",
-		serverVersions, registered.RegisteredVersions)
+		serverVersions, clientRegisteredVersions)
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.
@@ -244,7 +248,7 @@ func InClusterConfig() (*Config, error) {
 	tlsClientConfig := TLSClientConfig{}
 	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
 	if _, err := util.CertPoolFromFile(rootCAFile); err != nil {
-		glog.Errorf("expected to load root ca config from %s, but got err: %v", rootCAFile, err)
+		glog.Errorf("expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
 	}
@@ -252,7 +256,6 @@ func InClusterConfig() (*Config, error) {
 	return &Config{
 		// TODO: switch to using cluster DNS.
 		Host:            "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")),
-		Version:         "v1beta3",
 		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
 	}, nil

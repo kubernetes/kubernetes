@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -522,8 +523,8 @@ func TestValidatePorts(t *testing.T) {
 		"zero container port":    {[]api.ContainerPort{{ContainerPort: 0, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort", portRangeErrorMsg},
 		"invalid container port": {[]api.ContainerPort{{ContainerPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort", portRangeErrorMsg},
 		"invalid host port":      {[]api.ContainerPort{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].hostPort", portRangeErrorMsg},
-		"invalid protocol case":  {[]api.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol", ""},
-		"invalid protocol":       {[]api.ContainerPort{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol", ""},
+		"invalid protocol case":  {[]api.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol", "supported values: TCP, UDP"},
+		"invalid protocol":       {[]api.ContainerPort{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol", "supported values: TCP, UDP"},
 		"protocol required":      {[]api.ContainerPort{{Name: "abc", ContainerPort: 80}}, errors.ValidationErrorTypeRequired, "[0].protocol", ""},
 	}
 	for k, v := range errorCases {
@@ -556,7 +557,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: "v1beta3",
+					APIVersion: testapi.Version(),
 					FieldPath:  "metadata.name",
 				},
 			},
@@ -588,7 +589,7 @@ func TestValidateEnv(t *testing.T) {
 				Value: "foo",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: "v1beta3",
+						APIVersion: testapi.Version(),
 						FieldPath:  "metadata.name",
 					},
 				},
@@ -601,7 +602,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: "v1beta3",
+						APIVersion: testapi.Version(),
 					},
 				},
 			}},
@@ -626,7 +627,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "metadata.whoops",
-						APIVersion: "v1beta3",
+						APIVersion: testapi.Version(),
 					},
 				},
 			}},
@@ -639,11 +640,11 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "status.phase",
-						APIVersion: "v1beta3",
+						APIVersion: testapi.Version(),
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'status.phase'",
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'status.phase': supported values: metadata.name, metadata.namespace",
 		},
 	}
 	for _, tc := range errorCases {
@@ -713,9 +714,9 @@ func TestValidateProbe(t *testing.T) {
 func TestValidateHandler(t *testing.T) {
 	successCases := []api.Handler{
 		{Exec: &api.ExecAction{Command: []string{"echo"}}},
-		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromInt(1), Host: ""}},
-		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: util.NewIntOrStringFromInt(65535), Host: "host"}},
-		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromString("port"), Host: ""}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromInt(1), Host: "", Scheme: "HTTP"}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: util.NewIntOrStringFromInt(65535), Host: "host", Scheme: "HTTP"}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromString("port"), Host: "", Scheme: "HTTP"}},
 	}
 	for _, h := range successCases {
 		if errs := validateHandler(&h); len(errs) != 0 {
@@ -1831,6 +1832,16 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(12345)})
 			},
 			numErrs: 0,
+		},
+		{
+			// For now we open firewalls, and its insecure if we open 10250, remove this
+			// when we have better protections in place.
+			name: "invalid port type=LoadBalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(12345)})
+			},
+			numErrs: 1,
 		},
 	}
 

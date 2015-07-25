@@ -1,5 +1,5 @@
 # Working with the Kubernetes UI
-This document explains how to work with the Kubernetes UI. For information on how to access and use it, see [docs/ui.md](../docs/ui.md).
+This document explains how to work with the Kubernetes UI. For information on how to access and use it, see [docs/user-guide/ui.md](../docs/user-guide/ui.md).
 
 ## Installing dependencies
 There are two kinds of dependencies in the UI project: tools and frameworks. The tools help
@@ -56,7 +56,7 @@ http-server -a localhost -p 8001
 Note that you'll need to tell the application where to find the api server by setting the value of the `k8sApiServer` configuration parameter in `www/master/shared/config/development.json` and then rebuilding the application. For example, for a cluster running locally at `localhost:8080`, as described [here](../docs/getting-started-guides/locally.md), you'll want to set it as follows:
 
 ```
-"k8sApiServer": "http://localhost:8080/api/v1beta3"
+"k8sApiServer": "http://localhost:8080/api/v1"
 ```
 
 ### Building the app for production
@@ -71,15 +71,15 @@ Like `npm start`, it runs `bower install` to install and/or update the framework
 To make the production code available to the Kubernetes api server, run this command from the top level directory:
 
 ```
-hack/build-ui.sh
+hack/build-ui.sh dashboard
 ```
 
-It runs the `go-bindata` tool to package the generated `app` directory and other user interface content, such as the Swagger documentation, into `pkg/ui/datafile.go`. Note: go-bindata can be installed with `go get github.com/jteeuwen/go-bindata/...`.
+It runs the `go-bindata` tool to package the generated `app` directory into `pkg/ui/data/dashboard/datafile.go`. It can also be used to package other user interface content, such as the Swagger documentation. Note: go-bindata can be installed with `go get github.com/jteeuwen/go-bindata/...`.
 
-Then, run one of the go build scripts, such as `hack/build-go.sh`, to build a new `kube-apiserver` binary that includes the updated `pkg/ui/datafile.go`.
+Then, run `make kube-ui` in the `cluster/addons/kube-ui/image` directory to build a new `kube-ui` binary that includes the updated `datafile.go`. When the updated UI is ready for release, increment the version tag in `cluster/addons/kube-ui/image/Makefile` and run `make push` in the same directory to build & push the new kube-ui docker image.
 
 ### Serving the app in production
-The app is served in production by `kube-apiserver` at:
+The app is served in production by the `kube-ui` binary at:
 
 ```
 https://<kubernetes-master>/ui/
@@ -88,7 +88,7 @@ https://<kubernetes-master>/ui/
 which redirects to:
 
 ```
-https://<kubernetes-master>/static/app/
+https://<kubernetes-master>/api/v1/proxy/namespaces/kube-system/services/kube-ui/
 ```
 
 ## Configuration

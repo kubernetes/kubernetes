@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
@@ -176,9 +175,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 	obj := a.GetObject()
 	// handle max counts for each kind of resource (pods, services, replicationControllers, etc.)
 	if a.GetOperation() == admission.Create {
-		// TODO v1beta1 had camel case, v1beta3 went to all lower, we can remove this line when we deprecate v1beta1
-		resourceNormalized := strings.ToLower(a.GetResource())
-		resourceName := resourceToResourceName[resourceNormalized]
+		resourceName := resourceToResourceName[a.GetResource()]
 		hard, hardFound := status.Hard[resourceName]
 		if hardFound {
 			used, usedFound := status.Used[resourceName]

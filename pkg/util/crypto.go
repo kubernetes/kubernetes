@@ -35,10 +35,11 @@ import (
 
 // GenerateSelfSignedCert creates a self-signed certificate and key for the given host.
 // Host may be an IP or a DNS name
+// You may also specify additional subject alt names (either ip or dns names) for the certificate
 // The certificate will be created with file mode 0644. The key will be created with file mode 0600.
 // If the certificate or key files already exist, they will be overwritten.
 // Any parent directories of the certPath or keyPath will be created as needed with file mode 0755.
-func GenerateSelfSignedCert(host, certPath, keyPath string) error {
+func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.IP, alternateDNS []string) error {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return err
@@ -62,6 +63,9 @@ func GenerateSelfSignedCert(host, certPath, keyPath string) error {
 	} else {
 		template.DNSNames = append(template.DNSNames, host)
 	}
+
+	template.IPAddresses = append(template.IPAddresses, alternateIPs...)
+	template.DNSNames = append(template.DNSNames, alternateDNS...)
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {

@@ -40,8 +40,8 @@ VERSION_MAJOR="${BASH_REMATCH[1]}"
 VERSION_MINOR="${BASH_REMATCH[2]}"
 VERSION_PATCH="${BASH_REMATCH[3]}"
 
-if ! git diff-index --quiet --cached HEAD; then
-  echo "!!! You must not have any changes in your index when running this command"
+if ! git diff HEAD --quiet; then
+  echo "!!! You must not have any uncommitted changes when running this command"
   exit 1
 fi
 
@@ -85,33 +85,23 @@ SED=sed
 if which gsed &>/dev/null; then
   SED=gsed
 fi
-if ! ("$SED" --version 2>&1 | grep -q GNU); then
+if ! ($SED --version 2>&1 | grep -q GNU); then
   echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
 fi
 
+echo "+++ Running ./versionize-docs"
+${KUBE_ROOT}/build/versionize-docs.sh ${NEW_VERSION}
+git commit -am "Versioning docs and examples for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+
+dochash=$(git log -n1 --format=%H)
+
 VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
-
-if [[ "${VERSION_PATCH}" == "0" ]]; then
-  RELEASE_DIR=release-${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
-  echo "+++ Cloning documentation and examples into ${RELEASE_DIR}/..."
-  mkdir ${RELEASE_DIR}
-  cp -r docs ${RELEASE_DIR}/docs
-  cp -r examples ${RELEASE_DIR}/examples
-
-  # Update the docs to match this version.
-  perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" ${RELEASE_DIR}/docs/README.md
-  perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" ${RELEASE_DIR}/examples/README.md
-
-  ${KUBE_ROOT}/hack/run-gendocs.sh
-  git add ${RELEASE_DIR}
-  git commit -m "Cloning docs for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
-fi
 
 GIT_MINOR="${VERSION_MINOR}.${VERSION_PATCH}"
 echo "+++ Updating to ${NEW_VERSION}"
-"$SED" -r -i -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
-"$SED" -r -i -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\"/" "${VERSION_FILE}"
-"$SED" -r -i -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION\"/" "${VERSION_FILE}"
 gofmt -s -w "${VERSION_FILE}"
 
 echo "+++ Committing version change"
@@ -122,9 +112,9 @@ echo "+++ Tagging version"
 git tag -a -m "Kubernetes version $NEW_VERSION" "${NEW_VERSION}"
 
 echo "+++ Updating to ${NEW_VERSION}-dev"
-"$SED" -r -i -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
-"$SED" -r -i -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\+\"/" "${VERSION_FILE}"
-"$SED" -r -i -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION-dev\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitMinor\s+string = \"[^\"]*\"/gitMinor string = \"${GIT_MINOR}\+\"/" "${VERSION_FILE}"
+$SED -ri -e "s/gitVersion\s+string = \"[^\"]*\"/gitVersion string = \"$NEW_VERSION-dev\"/" "${VERSION_FILE}"
 gofmt -s -w "${VERSION_FILE}"
 
 echo "+++ Committing version change"
@@ -137,44 +127,18 @@ echo ""
 echo "- Push the tag:"
 echo "   git push ${push_url} v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 echo "   - Please note you are pushing the tag live BEFORE your PRs."
-echo "       You need this so the builds pick up the right tag info."
+echo "       You need this so the builds pick up the right tag info (and so your reviewers can see it)."
 echo "       If something goes wrong further down please fix the tag!"
 echo "       Either delete this tag and give up, fix the tag before your next PR,"
 echo "       or find someone who can help solve the tag problem!"
 echo ""
 
 if [[ "${VERSION_PATCH}" == "0" ]]; then
-  echo "- Send branch: ${current_branch} as a PR to master"
-  echo "- Get someone to review and merge that PR"
-  echo "- Push the new release branch"
+  echo "- Send branch: ${current_branch} as a PR to ${push_url}/master"
+  echo "   For major/minor releases, this gets the branch tag merged and changes the version numbers."
+  echo "- Push the new release branch:"
   echo "   git push ${push_url} ${current_branch}:${release_branch}"
 else
-  echo "- Send branch: ${current_branch} as a PR to ${release_branch}"
-  echo "- Get someone to review and merge that PR"
-  echo ""
-  echo "Now you need to back merge the release branch into master. This should"
-  echo "only be done if you are committing to the latest release branch. If the"
-  echo "latest release branch is, for example, release-0.10 and you are adding"
-  echo "a commit to release-0.9, you may skip the remaining instructions"
-  echo ""
-  echo "We do this back merge so that master will always show the latest version."
-  echo "The version in master would, for exampe show v0.10.2+ instead of v0.10.0+"
-  echo "It is not enough to just edit the version file in pkg/version/base.go in a"
-  echo "seperate PR. Doing it this way means that git will see the tag you just"
-  echo "pushed as an ancestor of master, even though the tag is on on a release"
-  echo "branch. The tag will thus be found by tools like git describe"
-  echo ""
-  echo "- Update so you see that merge in ${fetch_remote}"
-  echo "   git remote update"
-  echo "- Create and check out a new branch based on master"
-  echo "   git checkout -b merge-${release_branch}-to-master ${fetch_remote}/master"
-  echo "- Merge the ${release_branch} into your merge-${release_branch}-to-master branch:"
-  echo "   git merge -s recursive -X ours ${fetch_remote}/${release_branch}"
-  echo "   - It's possible you have merge conflicts that weren't resolved by the merge strategy."
-  echo "     - You will almost always want to take what is in HEAD"
-  echo "   - If you are not SURE how to solve these correctly, ask for help."
-  echo "   - It is possible to break other people's work if you didn't understand why"
-  echo "     the conflict happened and the correct way to solve it."
-  echo "- Send merge-${release_branch}-to-master as a PR to master"
-  echo "- Take the afternoon off"
+  echo "- Send branch: ${current_branch} as a PR to ${release_branch} <-- NOTE THIS"
+  echo "  Get someone to review and merge that PR"
 fi

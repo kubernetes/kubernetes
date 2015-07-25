@@ -103,10 +103,6 @@ var _ = Describe("Networking", func() {
 
 	//Now we can proceed with the test.
 	It("should function for intra-pod communication", func() {
-		if testContext.Provider == "vagrant" {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
-			return
-		}
 
 		By(fmt.Sprintf("Creating a service named %q in namespace %q", svcname, f.Namespace.Name))
 		svc, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
@@ -166,7 +162,7 @@ var _ = Describe("Networking", func() {
 				"Rerun it with at least two nodes to get complete coverage.")
 		}
 
-		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.4")
+		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.6")
 
 		// Clean up the pods
 		defer func() {

@@ -2,6 +2,7 @@ package messenger
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -263,6 +264,66 @@ func TestTransporterStartAndStop(t *testing.T) {
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
+	}
+}
+
+func TestMutatedHostUPid(t *testing.T) {
+	serverId := "testserver"
+	serverPort := getNewPort()
+	serverHost := "127.0.0.1"
+	serverAddr := serverHost + ":" + strconv.Itoa(serverPort)
+
+	// override the upid.Host with this listener IP
+	addr := net.ParseIP("127.0.0.2")
+
+	// setup receiver (server) process
+	uPid, err := upid.Parse(fmt.Sprintf("%s@%s", serverId, serverAddr))
+	assert.NoError(t, err)
+	receiver := NewHTTPTransporter(uPid, addr)
+
+	err = receiver.listen()
+	assert.NoError(t, err)
+
+	if receiver.upid.Host != "127.0.0.1" {
+		t.Fatalf("reciever.upid.Host was expected to return %s, got %s\n", serverHost, receiver.upid.Host)
+	}
+
+	if receiver.upid.Port != strconv.Itoa(serverPort) {
+		t.Fatalf("receiver.upid.Port was expected to return %d, got %s\n", serverPort, receiver.upid.Port)
+	}
+}
+
+func TestEmptyHostPortUPid(t *testing.T) {
+	serverId := "testserver"
+	serverPort := getNewPort()
+	serverHost := "127.0.0.1"
+	serverAddr := serverHost + ":" + strconv.Itoa(serverPort)
+
+	// setup receiver (server) process
+	uPid, err := upid.Parse(fmt.Sprintf("%s@%s", serverId, serverAddr))
+	assert.NoError(t, err)
+
+	// Unset upid host and port
+	uPid.Host = ""
+	uPid.Port = ""
+
+	// override the upid.Host with this listener IP
+	addr := net.ParseIP("127.0.0.2")
+
+	receiver := NewHTTPTransporter(uPid, addr)
+
+	err = receiver.listen()
+	assert.NoError(t, err)
+
+	// This should be the host that overrides as uPid.Host is empty
+	if receiver.upid.Host != "127.0.0.2" {
+		t.Fatalf("reciever.upid.Host was expected to return %s, got %s\n", serverHost, receiver.upid.Host)
+	}
+
+	// This should end up being a random port, not the server port as uPid
+	// port is empty
+	if receiver.upid.Port == strconv.Itoa(serverPort) {
+		t.Fatalf("receiver.upid.Port was not expected to return %d, got %s\n", serverPort, receiver.upid.Port)
 	}
 }
 

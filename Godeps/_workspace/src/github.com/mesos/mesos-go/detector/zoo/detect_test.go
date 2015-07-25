@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
 	"github.com/mesos/mesos-go/detector"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 const (
@@ -324,10 +326,10 @@ func TestMasterDetectMultiple(t *testing.T) {
 	// **** Test 4 consecutive ChildrenChangedEvents ******
 	// setup event changes
 	sequences := [][]string{
-		[]string{"info_014", "info_010", "info_005"},
-		[]string{"info_005", "info_004", "info_022"},
-		[]string{}, // indicates no master
-		[]string{"info_017", "info_099", "info_200"},
+		{"info_014", "info_010", "info_005"},
+		{"info_005", "info_004", "info_022"},
+		{}, // indicates no master
+		{"info_017", "info_099", "info_200"},
 	}
 
 	var wg sync.WaitGroup
@@ -424,4 +426,139 @@ func TestMasterDetect_selectTopNode_mixedEntries(t *testing.T) {
 	}
 	node := selectTopNode(nodeList)
 	assert.Equal("info_0000000032", node)
+}
+
+// implements MasterChanged and AllMasters extension
+type allMastersListener struct {
+	mock.Mock
+}
+
+func (a *allMastersListener) OnMasterChanged(mi *mesos.MasterInfo) {
+	a.Called(mi)
+}
+
+func (a *allMastersListener) UpdatedMasters(mi []*mesos.MasterInfo) {
+	a.Called(mi)
+}
+
+func afterFunc(f func()) <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		defer close(ch)
+		f()
+	}()
+	return ch
+}
+
+func fatalAfter(t *testing.T, d time.Duration, f func(), msg string, args ...interface{}) {
+	ch := afterFunc(f)
+	select {
+	case <-ch:
+		return
+	case <-time.After(d):
+		t.Fatalf(msg, args...)
+	}
+}
+
+func TestNotifyAllMasters(t *testing.T) {
+	c, err := newClient(test_zk_hosts, test_zk_path)
+	assert.NoError(t, err)
+
+	childEvents := make(chan zk.Event, 5)
+	connector := NewMockConnector()
+
+	c.setFactory(asFactory(func() (Connector, <-chan zk.Event, error) {
+		sessionEvents := make(chan zk.Event, 1)
+		sessionEvents <- zk.Event{
+			Type:  zk.EventSession,
+			State: zk.StateConnected,
+		}
+		return connector, sessionEvents, nil
+	}))
+
+	md, err := NewMasterDetector(zkurl)
+	defer md.Cancel()
+
+	assert.NoError(t, err)
+
+	c.errorHandler = ErrorHandler(func(c *Client, e error) {
+		t.Fatalf("unexpected error: %v", e)
+	})
+	md.client = c
+
+	listener := &allMastersListener{}
+
+	//-- expect primer
+	var primer sync.WaitGroup
+	ignoreArgs := func(f func()) func(mock.Arguments) {
+		primer.Add(1)
+		return func(_ mock.Arguments) {
+			f()
+		}
+	}
+	connector.On("Children", test_zk_path).Return([]string{}, &zk.Stat{}, nil).Run(ignoreArgs(primer.Done)).Once()
+	listener.On("UpdatedMasters", []*mesos.MasterInfo{}).Return().Run(ignoreArgs(primer.Done)).Once()
+	connector.On("ChildrenW", test_zk_path).Return([]string{test_zk_path}, &zk.Stat{}, (<-chan zk.Event)(childEvents), nil).Run(ignoreArgs(primer.Done)).Once()
+	md.Detect(listener)
+	fatalAfter(t, 3*time.Second, primer.Wait, "timed out waiting for detection primer")
+
+	listener.AssertExpectations(t)
+	connector.AssertExpectations(t)
+
+	//-- test membership changes
+	type expectedGets struct {
+		info []byte
+		err  error
+	}
+	tt := []struct {
+		zkEntry   []string
+		gets      []expectedGets
+		leaderIdx int
+	}{
+		{[]string{"info_004"}, []expectedGets{{newTestMasterInfo(1), nil}}, 0},
+		{[]string{"info_007", "info_005", "info_006"}, []expectedGets{{newTestMasterInfo(2), nil}, {newTestMasterInfo(3), nil}, {newTestMasterInfo(4), nil}}, 1},
+		{nil, nil, -1},
+	}
+	for j, tc := range tt {
+		// expectations
+		var tcwait sync.WaitGroup
+		ignoreArgs = func(f func()) func(mock.Arguments) {
+			tcwait.Add(1)
+			return func(_ mock.Arguments) {
+				f()
+			}
+		}
+
+		expectedInfos := []*mesos.MasterInfo{}
+		for i, zke := range tc.zkEntry {
+			connector.On("Get", fmt.Sprintf("%s/%s", test_zk_path, zke)).Return(tc.gets[i].info, &zk.Stat{}, tc.gets[i].err).Run(ignoreArgs(tcwait.Done)).Once()
+			masterInfo := &mesos.MasterInfo{}
+			err = proto.Unmarshal(tc.gets[i].info, masterInfo)
+			if err != nil {
+				t.Fatalf("failed to unmarshall MasterInfo data: %v", err)
+			}
+			expectedInfos = append(expectedInfos, masterInfo)
+		}
+		if len(tc.zkEntry) > 0 {
+			connector.On("Get", fmt.Sprintf("%s/%s", test_zk_path, tc.zkEntry[tc.leaderIdx])).Return(
+				tc.gets[tc.leaderIdx].info, &zk.Stat{}, tc.gets[tc.leaderIdx].err).Run(ignoreArgs(tcwait.Done)).Once()
+		}
+		connector.On("Children", test_zk_path).Return(tc.zkEntry, &zk.Stat{}, nil).Run(ignoreArgs(tcwait.Done)).Once()
+		listener.On("OnMasterChanged", mock.AnythingOfType("*mesosproto.MasterInfo")).Return().Run(ignoreArgs(tcwait.Done)).Once()
+		listener.On("UpdatedMasters", expectedInfos).Return().Run(ignoreArgs(tcwait.Done)).Once()
+		connector.On("ChildrenW", test_zk_path).Return([]string{test_zk_path}, &zk.Stat{}, (<-chan zk.Event)(childEvents), nil).Run(ignoreArgs(tcwait.Done)).Once()
+
+		// fire the event that triggers the test case
+		childEvents <- zk.Event{
+			Type: zk.EventNodeChildrenChanged,
+			Path: test_zk_path,
+		}
+
+		// allow plenty of time for all the async processing to happen
+		fatalAfter(t, 5*time.Second, tcwait.Wait, "timed out waiting for all-masters test case %d", j+1)
+		listener.AssertExpectations(t)
+		connector.AssertExpectations(t)
+	}
+
+	connector.On("Close").Return(nil)
 }

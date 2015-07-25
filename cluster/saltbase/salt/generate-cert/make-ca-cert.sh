@@ -19,6 +19,7 @@ set -o nounset
 set -o pipefail
 
 cert_ip=$1
+extra_sans=${2:-}
 cert_dir=/srv/kubernetes
 cert_group=kube-cert
 
@@ -38,6 +39,11 @@ fi
 if [ "$cert_ip" == "_use_azure_dns_name_" ]; then
   cert_ip=$(uname -n | awk -F. '{ print $2 }').cloudapp.net
   use_cn=true
+fi
+
+sans="IP:${cert_ip}"
+if [[ -n "${extra_sans}" ]]; then
+  sans="${sans},${extra_sans}"
 fi
 
 tmpdir=$(mktemp -d --tmpdir kubernetes_cacert.XXXXXX)
@@ -67,7 +73,7 @@ if [ $use_cn = "true" ]; then
     cp -p pki/issued/$cert_ip.crt "${cert_dir}/server.cert" > /dev/null 2>&1
     cp -p pki/private/$cert_ip.key "${cert_dir}/server.key" > /dev/null 2>&1
 else
-    ./easyrsa --subject-alt-name=IP:$cert_ip build-server-full kubernetes-master nopass > /dev/null 2>&1
+    ./easyrsa --subject-alt-name="${sans}" build-server-full kubernetes-master nopass > /dev/null 2>&1
     cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
     cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
 fi

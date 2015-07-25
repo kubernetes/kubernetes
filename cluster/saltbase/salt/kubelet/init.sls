@@ -1,4 +1,4 @@
-{% if grains['os_family'] == 'RedHat' %}
+{% if pillar.get('is_systemd') %}
 {% set environment_file = '/etc/sysconfig/kubelet' %}
 {% else %}
 {% set environment_file = '/etc/default/kubelet' %}
@@ -18,25 +18,6 @@
     - user: root
     - group: root
     - mode: 755
-
-{% if grains['os_family'] == 'RedHat' %}
-
-/usr/lib/systemd/system/kubelet.service:
-  file.managed:
-    - source: salt://kubelet/kubelet.service
-    - user: root
-    - group: root
-
-{% else %}
-
-/etc/init.d/kubelet:
-  file.managed:
-    - source: salt://kubelet/initd
-    - user: root
-    - group: root
-    - mode: 755
-
-{% endif %}
 
 # The default here is that this file is blank.  If this is the case, the kubelet
 # won't be able to parse it as JSON and will try to use the kubernetes_auth file
@@ -64,13 +45,50 @@
     - mode: 400
     - makedirs: true
 
+{% if pillar.get('is_systemd') %}
+
+{{ pillar.get('systemd_system_path') }}/kubelet.service:
+  file.managed:
+    - source: salt://kubelet/kubelet.service
+    - user: root
+    - group: root
+
+# The service.running block below doesn't work reliably
+# Instead we run our script which e.g. does a systemd daemon-reload
+# But we keep the service block below, so it can be used by dependencies
+# TODO: Fix this
+fix-service-kubelet:
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce kubelet
+    - watch:
+      - file: /usr/local/bin/kubelet
+      - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
+      - file: {{ environment_file }}
+      - file: /var/lib/kubelet/kubernetes_auth
+
+{% else %}
+
+/etc/init.d/kubelet:
+  file.managed:
+    - source: salt://kubelet/initd
+    - user: root
+    - group: root
+    - mode: 755
+
+{% endif %}
+
 kubelet:
   service.running:
     - enable: True
     - watch:
       - file: /usr/local/bin/kubelet
-{% if grains['os_family'] != 'RedHat' %}
+{% if pillar.get('is_systemd') %}
+      - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
+{% else %}
       - file: /etc/init.d/kubelet
+{% endif %}
+{% if grains['os_family'] == 'RedHat' %}
+      - file: /usr/lib/systemd/system/kubelet.service
 {% endif %}
       - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubernetes_auth

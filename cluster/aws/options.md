@@ -5,11 +5,11 @@ specific to AWS are documented here, for cross-provider options see [this docume
 
 This is a work-in-progress; not all options are documented yet!
 
-## ZONE
+**KUBE_AWS_ZONE**
 
 The AWS availability zone to deploy to.  Defaults to us-west-2a.
 
-## AWS_IMAGE
+**AWS_IMAGE**
 
 The AMI to use.  If not specified, the image will be selected based on the AWS region.
 
@@ -38,6 +38,10 @@ export MASTER_SIZE=c4.large
 export MINION_SIZE=r3.large
 ```
 
+Please note: `kube-up` utilizes ephemeral storage available on instances for docker storage. EBS-only instance types do not
+support ephemeral storage and will default to docker storage on the root disk which is usually only 8GB.
+EBS-only instance types include `t2`, `c4`, and `m4`.
+
 **KUBE_ENABLE_MINION_PUBLIC_IP**
 
 Should a public IP automatically assigned to the minions? "true" or "false"  
@@ -50,7 +54,7 @@ Please note: Do not set this to "false" unless you...
 - ... already configured a route for "YOUR_IP/32" to an AWS internet gateway (for the master instance to reach your
   client directly during setup)
 
-## DOCKER_STORAGE
+**DOCKER_STORAGE**
 
 Choose the docker storage driver to use.  This is an advanced option; most people should leave it as the default aufs
 for parity with GCE.
@@ -72,8 +76,13 @@ If your machines don't have any ephemeral disks, this will default to the aufs d
 
 **KUBE_OS_DISTRIBUTION**
 
-The distribution to use.  Valid options: `wheezy`, `ubuntu`, `coreos`.
+The distribution to use.  Valid options: `trusty`, `vivid`, `coreos`, `wheezy`, `jessie`
 
-Defaults to wheezy (Debian Wheezy), which is the same as is used by default on GCE.
+Defaults to vivid (Ubuntu Vivid Vervet), which has a modern kernel and does not require updating or a reboot.
+
+`coreos` is also a good option.
+
+Other options may require reboots, updates or configuration, and should be used only if you have a compelling
+requirement to do so.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()

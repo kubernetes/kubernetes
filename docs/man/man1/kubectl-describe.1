@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl describe \- Show details of a specific resource
+kubectl describe \- Show details of a specific resource or group of resources
 
 
 .SH SYNOPSIS
@@ -13,11 +13,24 @@ kubectl describe \- Show details of a specific resource
 
 .SH DESCRIPTION
 .PP
-Show details of a specific resource.
+Show details of a specific resource or group of resources.
 
 .PP
 This command joins many API calls together to form a detailed description of a
-given resource.
+given resource or group of resources.
+
+.PP
+$ kubectl describe RESOURCE NAME\_PREFIX
+
+.PP
+will first check for an exact match on RESOURCE and NAME\_PREFIX. If no such resource
+exists, it will output details for every resource that has a name prefixed with NAME\_PREFIX
+
+.PP
+Possible resources include (case insensitive): pods (po), services (svc),
+replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
+limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
+resourcequotas (quota) or secrets.
 
 
 .SH OPTIONS
@@ -141,6 +154,10 @@ $ kubectl describe pods/nginx
 
 // Describe pods by label name=myLabel
 $ kubectl describe po \-l name=myLabel
+
+// Describe all pods managed by the 'frontend' replication controller (rc\-created pods
+// get the name of the rc as a prefix in the pod the name).
+$ kubectl describe pods frontend
 
 .fi
 .RE

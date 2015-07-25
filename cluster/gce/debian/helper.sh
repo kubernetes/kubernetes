@@ -35,7 +35,6 @@ SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
 ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
-ENABLE_NODE_MONITORING: $(yaml-quote ${ENABLE_NODE_MONITORING:-false})
 ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
 ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
 LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
@@ -106,7 +105,7 @@ function create-master-instance {
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
-    --scopes "storage-ro,compute-rw" \
+    --scopes "storage-ro,compute-rw,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
       "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
@@ -121,7 +120,7 @@ function create-node-instance-template {
   if [[ -n ${1:-} ]]; then
     suffix="-${1}"
   fi
-  create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags[*]}" \
+  create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
 }

@@ -1,13 +1,9 @@
 ---
-- name: Determine if firewalld installed
+- name: RPM | Determine if firewalld installed
   command: "rpm -q firewalld"
   register: s
   changed_when: false
   failed_when: false
-
-- name: Init the has_firewalld fact
-  set_fact:
-    has_firewalld: false
 
 - name: Set the has_firewalld fact
   set_fact:
@@ -19,10 +15,6 @@
   register: s
   changed_when: false
   failed_when: false
-
-- name: Init the has_iptables fact
-  set_fact:
-    has_iptables: false
 
 - name: Set the has_iptables fact
   set_fact:

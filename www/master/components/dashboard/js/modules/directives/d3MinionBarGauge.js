@@ -71,7 +71,7 @@
 
                   var label_legend_area = legendSvg.append("svg:g")
                                               .attr("class", "label_legend_area")
-                                              .attr("transform", "translate(" + ((w - 185) / 2) + "," + 35 + ")");
+                                              .attr("transform", "translate(" + ((w - 215) / 2) + "," + 35 + ")");
 
                   var legend_group = label_legend_area.append("svg:g").attr("class", "legend_group");
 
@@ -81,7 +81,7 @@
 
                   var stats_group = label_legend_area.append("svg:g")
                                         .attr("class", "stats_group")
-                                        .attr("transform", "translate(" + 85 + "," + 11 + ")");
+                                        .attr("transform", "translate(" + 115 + "," + 11 + ")");
 
                   var path_group = chart.append("svg:g")
                                        .attr("class", "path_group")
@@ -238,9 +238,7 @@
                   valueLabels.enter()
                       .append("svg:text")
                       .attr("class", "value")
-                      .attr(
-                           "transform", function(d) { return "translate(" + (getRadiusRing(ir, counts - 1)) + ", 0)"; })
-                      .attr("dx", function(d, i) { return 0; })
+                      .attr("dx", function(d, i) { return 68; })
                       .attr("dy", function(d, i) { return (thickness + 3) * i; })
                       .attr("text-anchor", function(d) { return "start"; })
                       .text(function(d) { return d.value; });
@@ -323,7 +321,8 @@
                     return;
                   }
 
-                  svg.selectAll("*").remove();
+                  d3.select(element[0]).select("svg.chart").remove();
+                  d3.select(element[0]).select("svg.legend").remove();
 
                   var graph = $(element[0]);
                   var w = scope.graphWidth;

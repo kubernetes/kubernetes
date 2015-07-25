@@ -249,7 +249,7 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 	nodeHost := pod.Spec.NodeName
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
-		return nil, nil, fmt.Errorf("pod %s does not have a host assigned", name)
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
 	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
 	if err != nil {

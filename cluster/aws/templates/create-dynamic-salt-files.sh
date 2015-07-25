@@ -26,7 +26,6 @@ cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
 service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
-enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
 enable_cluster_logging: '$(echo "$ENABLE_CLUSTER_LOGGING" | sed -e "s/'/''/g")'
 enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
@@ -78,6 +77,27 @@ contexts:
 - context:
     cluster: local
     user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+
+mkdir -p /srv/salt-overlay/salt/kubelet
+kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+cat > "${kubelet_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    token: ${kubelet_token}
+clusters:
+- name: local
+  cluster:
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: kubelet
   name: service-account-context
 current-context: service-account-context
 EOF

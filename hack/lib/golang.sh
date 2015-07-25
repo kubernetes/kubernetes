@@ -64,6 +64,7 @@ kube::golang::test_targets() {
     cmd/integration
     cmd/gendocs
     cmd/genman
+    cmd/mungedocs
     cmd/genbashcomp
     cmd/genconversion
     cmd/gendeepcopy
@@ -483,8 +484,8 @@ kube::golang::build_binaries() {
       local gigs
       gigs=$(kube::golang::get_physmem)
 
-      if [[ ${gigs} -gt ${KUBE_PARALLEL_BUILD_MEMORY} ]]; then
-        kube::log::status "Multiple platforms requested and available ${gigs}G > threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in parallel"
+      if [[ ${gigs} -ge ${KUBE_PARALLEL_BUILD_MEMORY} ]]; then
+        kube::log::status "Multiple platforms requested and available ${gigs}G >= threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in parallel"
         parallel=true
       else
         kube::log::status "Multiple platforms requested, but available ${gigs}G < threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in serial"

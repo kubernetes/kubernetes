@@ -23,6 +23,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+
+	"github.com/golang/glog"
 )
 
 type NodeInfo interface {
@@ -80,7 +82,7 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // NoDiskConflict evaluates if a pod can fit due to the volumes it requests, and those that
 // are already mounted. Some times of volumes are mounted onto node machines.  For now, these mounts
 // are exclusive so if there is already a volume mounted on that node, another pod can't schedule
-// there. This is GCE specific for now.
+// there. This is GCE and Amazon EBS specific for now.
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	manifest := &(pod.Spec)
@@ -150,8 +152,10 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	pods = append(existingPods, pod)
 	_, exceeding := CheckPodsExceedingCapacity(pods, info.Status.Capacity)
 	if len(exceeding) > 0 || int64(len(pods)) > info.Status.Capacity.Pods().Value() {
+		glog.V(4).Infof("Cannot schedule Pod %v, because Node %v is full, running %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
 		return false, nil
 	}
+	glog.V(4).Infof("Schedule Pod %v on Node %v is allowed, Node is running only %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
 	return true, nil
 }
 

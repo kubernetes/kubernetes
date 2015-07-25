@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
@@ -116,38 +117,24 @@ func TestPodAndContainer(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
+	version := testapi.Version()
 	tests := []struct {
 		name, version, podPath, execPath, container string
 		pod                                         *api.Pod
 		execErr                                     bool
 	}{
 		{
-			name:     "v1beta3 - pod exec",
-			version:  "v1beta3",
-			podPath:  "/api/v1beta3/namespaces/test/pods/foo",
-			execPath: "/api/v1beta3/namespaces/test/pods/foo/exec",
+			name:     "pod exec",
+			version:  version,
+			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
+			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
 			pod:      execPod(),
 		},
 		{
-			name:     "v1beta3 - pod exec error",
-			version:  "v1beta3",
-			podPath:  "/api/v1beta3/namespaces/test/pods/foo",
-			execPath: "/api/v1beta3/namespaces/test/pods/foo/exec",
-			pod:      execPod(),
-			execErr:  true,
-		},
-		{
-			name:     "v1 - pod exec",
-			version:  "v1",
-			podPath:  "/api/v1/namespaces/test/pods/foo",
-			execPath: "/api/v1/namespaces/test/pods/foo/exec",
-			pod:      execPod(),
-		},
-		{
-			name:     "v1 - pod exec error",
-			version:  "v1",
-			podPath:  "/api/v1/namespaces/test/pods/foo",
-			execPath: "/api/v1/namespaces/test/pods/foo/exec",
+			name:     "pod exec error",
+			version:  version,
+			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
+			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
 			pod:      execPod(),
 			execErr:  true,
 		},

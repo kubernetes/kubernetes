@@ -544,9 +544,9 @@ function write-node-env {
 function create-certs {
   local -r cert_ip="${1}"
 
-  local octects=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
-  ((octects[3]+=1))
-  local -r service_ip=$(echo "${octects[*]}" | sed 's/ /./g')
+  local octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
+  ((octets[3]+=1))
+  local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   local -r sans="IP:${cert_ip},IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
   # Note: This was heavily cribbed from make-ca-cert.sh
@@ -685,11 +685,11 @@ function kube-up {
   echo "Creating minions."
 
   # TODO(mbforbes): Refactor setting scope flags.
-  local -a scope_flags=()
-  if (( "${#MINION_SCOPES[@]}" > 0 )); then
-    scope_flags=("--scopes" "$(join_csv ${MINION_SCOPES[@]})")
+  local scope_flags=
+  if [ -n "${MINION_SCOPES}" ]; then
+    scope_flags="--scopes ${MINION_SCOPES}"
   else
-    scope_flags=("--no-scopes")
+    scope_flags="--no-scopes"
   fi
 
   write-node-env
@@ -707,6 +707,18 @@ function kube-up {
   wait-for-minions-to-run
   detect-minion-names
   detect-master
+
+  # Create autoscaler for nodes if requested
+  if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+    METRICS=""
+    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
+    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
+    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
+    echo "Creating node autoscaler."
+    gcloud preview autoscaler --zone "${ZONE}" create "${NODE_INSTANCE_PREFIX}-autoscaler" --target "${NODE_INSTANCE_PREFIX}-group" \
+        --min-num-replicas "${AUTOSCALER_MIN_NODES}" --max-num-replicas "${AUTOSCALER_MAX_NODES}" ${METRICS} || true
+  fi
 
   echo "Waiting for cluster initialization."
   echo
@@ -728,7 +740,7 @@ function kube-up {
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           ${secure} \
           --max-time 5 --fail --output /dev/null --silent \
-          "https://${KUBE_MASTER_IP}/api/v1beta3/pods"; do
+          "https://${KUBE_MASTER_IP}/api/v1/pods"; do
       printf "."
       sleep 2
   done
@@ -769,7 +781,21 @@ function kube-down {
   echo "Bringing down cluster"
   set +e  # Do not stop on error
 
-  # The gcloud APIs don't return machine parsable error codes/retry information. Therefore the best we can
+  # Delete autoscaler for nodes if present.
+  local autoscaler
+  autoscaler=( $(gcloud preview autoscaler --zone "${ZONE}" list \
+                 | awk 'NR >= 2 { print $1 }' \
+                 | grep "${NODE_INSTANCE_PREFIX}-autoscaler") )
+  if [[ "${autoscaler:-}" != "" ]]; then
+    gcloud preview autoscaler --zone "${ZONE}" delete "${NODE_INSTANCE_PREFIX}-autoscaler"
+  fi
+
+  # Get the name of the managed instance group template before we delete the
+  # managed instange group. (The name of the managed instnace group template may
+  # change during a cluster upgrade.)
+  local template=$(get-template "${PROJECT}" "${ZONE}" "${NODE_INSTANCE_PREFIX}-group")
+
+  # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
   if gcloud preview managed-instance-groups --project "${PROJECT}" --zone "${ZONE}" describe "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
     deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
@@ -777,7 +803,7 @@ function kube-down {
       --quiet \
       "${NODE_INSTANCE_PREFIX}-group")
     if [[ "$deleteCmdOutput" != ""  ]]; then
-      # Managed instance group deletion is done asyncronously, we must wait for it to complete, or subsequent steps fail
+      # Managed instance group deletion is done asynchronously, we must wait for it to complete, or subsequent steps fail
       deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:[[:space:]]*\([^[:space:]]*\).*/\1/g")
       if [[ "$deleteCmdOperationId" != ""  ]]; then
         deleteCmdStatus="PENDING"
@@ -792,11 +818,11 @@ function kube-down {
     fi
   fi
 
-  if gcloud compute instance-templates describe --project "${PROJECT}" "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
+  if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
       --quiet \
-      "${NODE_INSTANCE_PREFIX}-template"
+      "${template}"
   fi
 
   # First delete the master (if it exists).
@@ -886,6 +912,22 @@ function kube-down {
   set -e
 }
 
+# Gets the instance template for the managed instance group with the provided
+# project, zone, and group name. It echos the template name so that the function
+# output can be used.
+#
+# $1: project
+# $2: zone
+# $3: managed instance group name
+function get-template {
+  # url is set to https://www.googleapis.com/compute/v1/projects/$1/global/instanceTemplates/<template>
+  local url=$(gcloud preview managed-instance-groups --project="${1}" --zone="${2}" describe "${3}" | grep instanceTemplate)
+  # template is set to <template> (the pattern strips off all but last slash)
+  local template="${url##*/}"
+  echo "${template}"
+}
+
+
 # Checks if there are any present resources related kubernetes cluster.
 #
 # Assumed vars:
@@ -894,7 +936,6 @@ function kube-down {
 #   ZONE
 # Vars set:
 #   KUBE_RESOURCE_FOUND
-
 function check-resources {
   detect-project
 
@@ -933,12 +974,12 @@ function check-resources {
   fi
 
   if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Firewal rules for ${MASTER_NAME}-https"
+    KUBE_RESOURCE_FOUND="Firewall rules for ${MASTER_NAME}-https"
     return 1
   fi
 
   if gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Firewal rules for ${MASTER_NAME}-all"
+    KUBE_RESOURCE_FOUND="Firewall rules for ${MASTER_NAME}-all"
     return 1
   fi
 
@@ -987,11 +1028,11 @@ function prepare-push() {
     write-node-env
 
     # TODO(mbforbes): Refactor setting scope flags.
-    local -a scope_flags=()
-    if (( "${#MINION_SCOPES[@]}" > 0 )); then
-      scope_flags=("--scopes" "${MINION_SCOPES[@]}")
+    local scope_flags=
+    if [ -n "${MINION_SCOPES}" ]; then
+      scope_flags="--scopes ${MINION_SCOPES}"
     else
-      scope_flags=("--no-scopes")
+      scope_flags="--no-scopes"
     fi
 
     # Ugly hack: Since it is not possible to delete instance-template that is currently

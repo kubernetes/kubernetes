@@ -28,7 +28,6 @@ Config                                              | GCE   | Vagrant | AWS | Az
 [nginx](nginx/)                                     | M     | M       | M   | M
 [openvpn-client](openvpn-client/)                   |       |         |     |   n
 [openvpn](openvpn/)                                 |       |         |     | M
-[sdn](sdn/) (Vagrant only)                          |   n   | M n     |   n |
 [static-routes](static-routes/) (vsphere only)      |       |         |     |
 [base](base.sls)                                    | M n   | M n     | M n | M n
 [kube-client-tools](kube-client-tools.sls)          | M     | M       | M   | M

@@ -313,7 +313,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string)
 			if found {
 				data, err := ioutil.ReadFile(path)
 				if err != nil {
-					glog.Errorf("Error on reading termination-log %s: %v", path, err)
+					result.status.State.Terminated.Message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
 				} else {
 					result.status.State.Terminated.Message = string(data)
 				}
@@ -945,7 +945,8 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 		glog.V(2).Infof("StartExec With error: %v", err)
 		return nil, err
 	}
-	tick := time.Tick(2 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
 	for {
 		inspect, err2 := dm.client.InspectExec(execObj.ID)
 		if err2 != nil {
@@ -959,7 +960,7 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 			}
 			break
 		}
-		<-tick
+		<-ticker.C
 	}
 
 	return buf.Bytes(), err
@@ -1206,7 +1207,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	// labels for Cloud Logging.
 	podFullName := kubecontainer.GetPodFullName(pod)
 	containerLogFile := path.Join(dm.dockerRoot, "containers", id, fmt.Sprintf("%s-json.log", id))
-	symlinkFile := path.Join(dm.containerLogsDir, fmt.Sprintf("%s_%s-%s.log", podFullName, container.Name, id))
+	symlinkFile := LogSymlink(dm.containerLogsDir, podFullName, container.Name, id)
 	if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
 		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", podFullName, container.Name, err)
 	}

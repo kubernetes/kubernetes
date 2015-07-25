@@ -44,13 +44,6 @@ func newRedFederalCowHammerConfig() clientcmdapi.Config {
 	}
 }
 
-type configCommandTest struct {
-	args            []string
-	startingConfig  clientcmdapi.Config
-	expectedConfig  clientcmdapi.Config
-	expectedOutputs []string
-}
-
 func ExampleView() {
 	expectedConfig := newRedFederalCowHammerConfig()
 	test := configCommandTest{
@@ -83,13 +76,33 @@ func ExampleView() {
 
 func TestSetCurrentContext(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	expectedConfig.CurrentContext = "the-new-context"
+	startingConfig := newRedFederalCowHammerConfig()
+
+	newContextName := "the-new-context"
+	newContext := clientcmdapi.NewContext()
+
+	startingConfig.Contexts[newContextName] = *newContext
+	expectedConfig.Contexts[newContextName] = *newContext
+
+	expectedConfig.CurrentContext = newContextName
+
 	test := configCommandTest{
 		args:           []string{"use-context", "the-new-context"},
-		startingConfig: newRedFederalCowHammerConfig(),
+		startingConfig: startingConfig,
 		expectedConfig: expectedConfig,
 	}
 
+	test.run(t)
+}
+
+func TestSetNonExistantContext(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"use-context", "non-existant-config"},
+		startingConfig:  expectedConfig,
+		expectedConfig:  expectedConfig,
+		expectedOutputs: []string{`No context exists with the name: "non-existant-config"`},
+	}
 	test.run(t)
 }
 
@@ -689,6 +702,13 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config) (strin
 	config := getConfigFromFileOrDie(fakeKubeFile.Name())
 
 	return buf.String(), *config
+}
+
+type configCommandTest struct {
+	args            []string
+	startingConfig  clientcmdapi.Config
+	expectedConfig  clientcmdapi.Config
+	expectedOutputs []string
 }
 
 func (test configCommandTest) run(t *testing.T) string {

@@ -1,7 +1,8 @@
 .PHONY:	elasticsearch_logging_discovery build push
 
-# Keep this one version ahead to help prevent accidental pushes.
-TAG = 1.4
+# The current value of the tag to be used for building and
+# pushing an image to gcr.io
+TAG = 1.7
 
 build:	elasticsearch_logging_discovery
 	docker build -t gcr.io/google_containers/elasticsearch:$(TAG) .
