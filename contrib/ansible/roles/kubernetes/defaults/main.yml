@@ -1,3 +1,6 @@
+# The port that the Kubernetes apiserver component listens on.
+kube_master_api_port: 443
+
 # This directory is where all the additional scripts go
 # that Kubernetes normally puts in /srv/kubernetes.
 # This puts them in a sane location
@@ -28,7 +31,7 @@ kube_cert_group: kube-cert
 # Internal DNS domain name.
 # This domain must not be used in your network. Services will be discoverable
 # under <service-name>.<namespace>.<domainname>, e.g.
-# myservice.default.cluster.local
+# myservice.default.svc.cluster.local
 dns_domain: "{{ cluster_name }}"
 
 # IP address of the DNS server.

@@ -34,6 +34,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
@@ -113,6 +114,7 @@ type TestContextType struct {
 	OutputDir      string
 	prefix         string
 	MinStartupPods int
+	UpgradeTarget  string
 }
 
 var testContext TestContextType
@@ -166,6 +168,8 @@ type RCConfig struct {
 	Timeout       time.Duration
 	PodStatusFile *os.File
 	Replicas      int
+	CpuLimit      int64 // millicores
+	MemLimit      int64 // bytes
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -282,11 +286,24 @@ func podRunningReady(p *api.Pod) (bool, error) {
 	return true, nil
 }
 
+// check if a Pod is controlled by a Replication Controller in the List
+func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api.Pod) bool {
+	for _, rc := range rcs.Items {
+		selector := labels.SelectorFromSet(rc.Spec.Selector)
+		if selector.Matches(labels.Set(pod.ObjectMeta.Labels)) {
+			return true
+		}
+	}
+	return false
+}
+
 // waitForPodsRunningReady waits up to timeout to ensure that all pods in
-// namespace ns are running and ready, requiring that it finds at least minPods.
-// It has separate behavior from other 'wait for' pods functions in that it re-
-// queries the list of pods on every iteration. This is useful, for example, in
-// cluster startup, because the number of pods increases while waiting.
+// namespace ns are either running and ready, or failed but controlled by a
+// replication controller. Also, it ensures that at least minPods are running
+// and ready. It has separate behavior from other 'wait for' pods functions in
+// that it requires the list of pods on every iteration. This is useful, for
+// example, in cluster startup, because the number of pods increases while
+// waiting.
 func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) error {
 	c, err := loadClient()
 	if err != nil {
@@ -296,24 +313,48 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
 	if wait.Poll(poll, timeout, func() (bool, error) {
-		// We get the new list of pods in every iteration beause more pods come
-		// online during startup and we want to ensure they are also checked.
+		// We get the new list of pods and replication controllers in every
+		// iteration because more pods come online during startup and we want to
+		// ensure they are also checked.
+		rcList, err := c.ReplicationControllers(ns).List(labels.Everything())
+		if err != nil {
+			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
+			return false, nil
+		}
+		replicas := 0
+		for _, rc := range rcList.Items {
+			replicas += rc.Spec.Replicas
+		}
+
 		podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		nOk, badPods := 0, []api.Pod{}
+		nOk, replicaOk, badPods := 0, 0, []api.Pod{}
 		for _, pod := range podList.Items {
 			if res, err := podRunningReady(&pod); res && err == nil {
 				nOk++
+				if hasReplicationControllersForPod(rcList, pod) {
+					replicaOk++
+				}
 			} else {
-				badPods = append(badPods, pod)
+				if pod.Status.Phase != api.PodFailed {
+					Logf("The status of Pod %s is %s, waiting for it to be either Running or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
+					badPods = append(badPods, pod)
+				} else if !hasReplicationControllersForPod(rcList, pod) {
+					Logf("Pod %s is Failed, but it's not controlled by a ReplicationController", pod.ObjectMeta.Name)
+					badPods = append(badPods, pod)
+				}
+				//ignore failed pods that are controlled by a replication controller
 			}
 		}
+
 		Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
 			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
-		if nOk == len(podList.Items) && nOk >= minPods {
+		Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
+
+		if replicaOk == replicas && nOk >= minPods && len(badPods) == 0 {
 			return true, nil
 		}
 		logPodStates(badPods)
@@ -475,10 +516,6 @@ func waitForPodRunningInNamespace(c *client.Client, podName string, namespace st
 	})
 }
 
-func waitForPodRunning(c *client.Client, podName string) error {
-	return waitForPodRunningInNamespace(c, podName, api.NamespaceDefault)
-}
-
 // waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	return waitForPodCondition(c, ns, podName, "!pending", podStartTimeout, func(pod *api.Pod) (bool, error) {
@@ -511,12 +548,6 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 		}
 		return false, nil
 	})
-}
-
-// waitForPodSuccess returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-// The default namespace is used to identify pods.
-func waitForPodSuccess(c *client.Client, podName string, contName string) error {
-	return waitForPodSuccessInNamespace(c, podName, contName, api.NamespaceDefault)
 }
 
 // waitForRCPodOnNode returns the pod from the given replication controller (decribed by rcName) which is scheduled on the given node.
@@ -752,6 +783,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+waitLoop:
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1", "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
@@ -764,20 +796,20 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
 				Logf("%s is created but not running", podID)
-				continue
+				continue waitLoop
 			}
 
 			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1", fmt.Sprintf("--namespace=%v", ns))
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
-				continue
+				continue waitLoop
 			}
 
 			// Call the generic validator function here.
 			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
 			if err := validator(c, podID); err != nil {
 				Logf("%s is running right image but validator function failed: %v", podID, err)
-				continue
+				continue waitLoop
 			}
 
 			Logf("%s is verified up and running", podID)
@@ -853,11 +885,6 @@ func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	Logf("Asynchronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	err = cmd.Start()
 	return
-}
-
-// testContainerOutput runs testContainerOutputInNamespace with the default namespace.
-func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	testContainerOutputInNamespace(scenarioName, c, pod, containerIndex, expectedOutput, api.NamespaceDefault)
 }
 
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits
@@ -1048,6 +1075,16 @@ func RunRC(config RCConfig) error {
 			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v})
 		}
 	}
+	if config.CpuLimit > 0 || config.MemLimit > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Limits = api.ResourceList{}
+	}
+	if config.CpuLimit > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Limits[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuLimit, resource.DecimalSI)
+	}
+	if config.MemLimit > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Limits[api.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
+	}
+
 	_, err := config.Client.ReplicationControllers(config.Namespace).Create(rc)
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
@@ -1186,7 +1223,7 @@ func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 // restart and node unhealthy events. Note that listing events like this will mess
 // with latency metrics, beware of calling it during a test.
 func getNodeEvents(c *client.Client, nodeName string) []api.Event {
-	events, err := c.Events(api.NamespaceDefault).List(
+	events, err := c.Events(api.NamespaceSystem).List(
 		labels.Everything(),
 		fields.Set{
 			"involvedObject.kind":      "Node",
@@ -1207,8 +1244,9 @@ func ScaleRC(c *client.Client, ns, name string, size uint) error {
 	if err != nil {
 		return err
 	}
+	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-	if err = scaler.Scale(ns, name, size, nil, nil, waitForReplicas); err != nil {
+	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
 		return err
 	}
 	return waitForRCPodsRunning(c, ns, name)
@@ -1220,11 +1258,12 @@ func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
 	podStore := newPodStore(c, ns, label, fields.Everything())
 	defer podStore.Stop()
+waitLoop:
 	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
 		pods := podStore.List()
 		for _, p := range pods {
 			if p.Status.Phase != api.PodRunning {
-				continue
+				continue waitLoop
 			}
 		}
 		running = true
@@ -1234,6 +1273,21 @@ func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
 		return fmt.Errorf("Timeout while waiting for replication controller %s pods to be running", rcName)
 	}
 	return nil
+}
+
+// Wait up to 10 minutes for getting pods with certain label
+func waitForPodsWithLabel(c *client.Client, ns string, label labels.Selector) (pods *api.PodList, err error) {
+	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
+		pods, err = c.Pods(ns).List(label, fields.Everything())
+		Expect(err).NotTo(HaveOccurred())
+		if len(pods.Items) > 0 {
+			break
+		}
+	}
+	if pods == nil || len(pods.Items) == 0 {
+		err = fmt.Errorf("Timeout while waiting for pods with label %v", label)
+	}
+	return
 }
 
 // Delete a Replication Controller and all pods it spawned

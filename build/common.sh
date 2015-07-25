@@ -332,7 +332,7 @@ function kube::build::source_targets() {
     api
     build
     cmd
-    docs/getting-started-guides
+    docs
     examples
     Godeps/_workspace/src
     Godeps/Godeps.json
@@ -770,6 +770,7 @@ function kube::release::package_full_tarball() {
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
 
   cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
+  cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/LICENSE" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"

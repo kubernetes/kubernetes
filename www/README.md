@@ -1,5 +1,5 @@
 # Working with the Kubernetes UI
-This document explains how to work with the Kubernetes UI. For information on how to access and use it, see [docs/ui.md](../docs/ui.md).
+This document explains how to work with the Kubernetes UI. For information on how to access and use it, see [docs/user-guide/ui.md](../docs/user-guide/ui.md).
 
 ## Installing dependencies
 There are two kinds of dependencies in the UI project: tools and frameworks. The tools help

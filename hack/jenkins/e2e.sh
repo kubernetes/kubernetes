@@ -28,6 +28,25 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+# Join all args with |
+#   Example: join_regex_allow_empty a b "c d" e  =>  a|b|c d|e
+function join_regex_allow_empty() {
+    local IFS="|"
+    echo "$*"
+}
+
+# Join all args with |, butin case of empty result prints "EMPTY\sSET" instead.
+#   Example: join_regex_no_empty a b "c d" e  =>  a|b|c d|e
+#            join_regex_no_empty => EMPTY\sSET
+function join_regex_no_empty() {
+    local IFS="|"
+    if [ -z "$*" ]; then
+        echo "EMPTY\sSET"
+    else
+        echo "$*"
+    fi
+}
+
 echo "--------------------------------------------------------------------------------"
 echo "Initial Environment:"
 printenv | sort
@@ -48,10 +67,11 @@ E2E_OPT=${E2E_OPT:-""}
 # Set environment variables shared for all of the GCE Jenkins projects.
 if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
+  : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
   : ${MASTER_SIZE:="n1-standard-2"}
   : ${MINION_SIZE:="n1-standard-2"}
-  : ${NUM_MINIONS:="2"}
+  : ${NUM_MINIONS:="3"}
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
@@ -66,41 +86,41 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
 fi
 
 # Specialized tests which should be skipped by default for projects.
-GCE_DEFAULT_SKIP_TEST_REGEX="\
-Skipped|\
-Reboot|\
-Restart|\
-Example\
-"
+GCE_DEFAULT_SKIP_TESTS=(
+    "Skipped"
+    "Reboot"
+    "Restart"
+    "Example"
+    )
+
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TEST_REGEX="\
-MaxPods.*\
-"
+GCE_FLAKY_TESTS=(
+    "PD\son\stwo\shosts.*remove\sboth"
+    )
+
 # Tests which are not able to be run in parallel.
-GCE_PARALLEL_SKIP_TEST_REGEX="\
-${GCE_DEFAULT_SKIP_TEST_REGEX}\
-|Etcd\
-|NetworkingNew\
-|Nodes\sNetwork\
-|Nodes\sResize\
-|MaxPods\
-"
+GCE_PARALLEL_SKIP_TESTS=(
+    ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}}
+    "Etcd"
+    "NetworkingNew"
+    "Nodes\sNetwork"
+    "Nodes\sResize"
+    "MaxPods"
+    "Shell.*services"
+    )
+
 # Tests which are known to be flaky when run in parallel.
-# TODO: figure out why GCE_FLAKY_TEST_REGEX is not a perfect subset of this list.
-GCE_PARALLEL_FLAKY_TEST_REGEX="\
-Elasticsearch\
-|Hostdir.*MOD\
-|Networking.*intra\
-|PD\
-|ServiceAccounts\
-|Service\sendpoints\slatency\
-|Services.*change\sthe\stype\
-|Services.*functioning\sexternal\sload\sbalancer\
-|Services.*identically\snamed\
-|Services.*release.*load\sbalancer\
-|multiport\sendpoints\
-"
+GCE_PARALLEL_FLAKY_TESTS=(
+    "Elasticsearch"
+    "PD"
+    "ServiceAccounts"
+    "Service\sendpoints\slatency"
+    "Services.*change\sthe\stype"
+    "Services.*functioning\sexternal\sload\sbalancer"
+    "Services.*identically\snamed"
+    "Services.*release.*load\sbalancer"
+    )
 
 # Define environment variables based on the Jenkins project name.
 case ${JOB_NAME} in
@@ -109,9 +129,22 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-gce"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
+    ;;
+
+  # Runs only the examples tests on GCE.
+  kubernetes-e2e-gce-examples)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-examples"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="e2e-examples"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Example"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-examples"}
+    : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
   # Runs the flaky tests on GCE, sequentially.
@@ -119,7 +152,11 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flaky"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-flaky"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX} --ginkgo.focus=${GCE_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ) --ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
     ;;
@@ -129,7 +166,11 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-parallel"}
     : ${E2E_NETWORK:="e2e-parallel"}
     : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
@@ -141,7 +182,12 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="parallel-flaky"}
     : ${E2E_NETWORK:="e2e-parallel-flaky"}
     : ${GINKGO_PARALLEL:="y"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX} --ginkgo.focus=${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ) --ginkgo.focus=$(join_regex_no_empty \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
     # Override GCE defaults.
@@ -179,7 +225,11 @@ case ${JOB_NAME} in
     : ${GINKGO_PARALLEL:="y"}
     # This list should match the list in kubernetes-e2e-gce-parallel. It
     # currently also excludes a slow namespace test.
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_PARALLEL_SKIP_TEST_REGEX}|${GCE_PARALLEL_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
@@ -197,7 +247,10 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-release"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-gce-release"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=${GCE_DEFAULT_SKIP_TEST_REGEX}|${GCE_FLAKY_TEST_REGEX}"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce-release"}
     ;;
@@ -220,6 +273,7 @@ export ZONE=${E2E_ZONE}
 export KUBE_GKE_NETWORK=${E2E_NETWORK}
 
 # Shared cluster variables
+export E2E_MIN_STARTUP_PODS=${E2E_MIN_STARTUP_PODS:-}
 export MASTER_SIZE=${MASTER_SIZE:-}
 export MINION_SIZE=${MINION_SIZE:-}
 export NUM_MINIONS=${NUM_MINIONS:-}
@@ -296,22 +350,22 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
 
     if [[ ! "${CIRCLECI:-}" == "true" ]]; then
         # Copy GCE keys so we don't keep cycling them.
-        # To set this up, you must know the <project>, <zone>, and <instance> that
+        # To set this up, you must know the <project>, <zone>, and <instance>
         # on which your jenkins jobs are running. Then do:
         #
-        # # Get into the instance.
+        # # SSH from your computer into the instance.
         # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
         #
-        # # Generate a key by ssh'ing into itself, then exit.
+        # # Generate a key by ssh'ing from the instance into itself, then exit.
         # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
         # $ ^D
         #
-        # # Copy the keys to the desired location, e.g. /var/lib/jenkins/gce_keys/
+        # # Copy the keys to the desired location (e.g. /var/lib/jenkins/gce_keys/).
         # $ sudo mkdir -p /var/lib/jenkins/gce_keys/
         # $ sudo cp ~/.ssh/google_compute_engine /var/lib/jenkins/gce_keys/
         # $ sudo cp ~/.ssh/google_compute_engine.pub /var/lib/jenkins/gce_keys/
         #
-        # Move the permissions to jenkins.
+        # # Move the permissions for the keys to Jenkins.
         # $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
         # $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
         if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then

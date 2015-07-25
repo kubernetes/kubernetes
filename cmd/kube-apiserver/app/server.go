@@ -86,7 +86,6 @@ type APIServer struct {
 	EtcdServerList             util.StringList
 	EtcdConfigFile             string
 	EtcdPathPrefix             string
-	OldEtcdPathPrefix          string
 	CorsAllowedOriginList      util.StringList
 	AllowPrivileged            bool
 	ServiceClusterIPRange      util.IPNet // TODO: make this a list
@@ -187,7 +186,6 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.EtcdServerList, "etcd-servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd-config")
 	fs.StringVar(&s.EtcdConfigFile, "etcd-config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with -etcd-servers.")
 	fs.StringVar(&s.EtcdPathPrefix, "etcd-prefix", s.EtcdPathPrefix, "The prefix for all resource paths in etcd.")
-	fs.StringVar(&s.OldEtcdPathPrefix, "old-etcd-prefix", s.OldEtcdPathPrefix, "The previous prefix for all resource paths in etcd, if any.")
 	fs.Var(&s.CorsAllowedOriginList, "cors-allowed-origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.Var(&s.ServiceClusterIPRange, "service-cluster-ip-range", "A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
@@ -217,7 +215,7 @@ func (s *APIServer) verifyClusterIPFlags() {
 }
 
 func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (helper tools.EtcdHelper, err error) {
-	var client tools.EtcdGetSet
+	var client tools.EtcdClient
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
 		if err != nil {
@@ -260,7 +258,10 @@ func (s *APIServer) Run(_ []string) error {
 		HostNetworkSources: []string{},
 	})
 
-	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	if err != nil {
+		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
 
 	kubeletClient, err := client.NewKubeletClient(&s.KubeletConfig)
 	if err != nil {
@@ -282,9 +283,6 @@ func (s *APIServer) Run(_ []string) error {
 	}
 	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
 
-	// v1beta3 is disabled by default. Users can enable it using "api/v1beta3=true"
-	enableV1beta3 := s.getRuntimeConfigValue("api/v1beta3", false)
-
 	// "api/v1={true|false} allows users to enable/disable v1 API.
 	// This takes preference over api/all and api/legacy, if specified.
 	disableV1 := disableAllAPIs
@@ -303,14 +301,6 @@ func (s *APIServer) Run(_ []string) error {
 	helper, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
-	}
-
-	// TODO Is this the right place for migration to happen? Must *both* old and
-	// new etcd prefix params be supplied for this to be valid?
-	if s.OldEtcdPathPrefix != "" {
-		if err = helper.MigrateKeys(s.OldEtcdPathPrefix); err != nil {
-			glog.Fatalf("Migration of old etcd keys failed: %v", err)
-		}
 	}
 
 	n := net.IPNet(s.ServiceClusterIPRange)
@@ -384,7 +374,6 @@ func (s *APIServer) Run(_ []string) error {
 		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
-		EnableV1Beta3:          enableV1beta3,
 		DisableV1:              disableV1,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,

@@ -51,11 +51,11 @@ var _ = Describe("Reboot", func() {
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
 
-		// These tests requires SSH, so the provider check should be identical to there
+		// These tests requires SSH to nodes, so the provider check should be identical to there
 		// (the limiting factor is the implementation of util.go's getSigner(...)).
 
 		// Cluster must support node reboot
-		SkipUnlessProviderIs("gce", "aws")
+		SkipUnlessProviderIs("gce", "gke", "aws")
 	})
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
@@ -156,7 +156,7 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 // failed step, it will return false through result and not run the rest.
 func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan bool) {
 	// Setup
-	ns := api.NamespaceDefault
+	ns := api.NamespaceSystem
 	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
 	defer ps.Stop()
 

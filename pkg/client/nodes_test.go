@@ -44,13 +44,12 @@ func TestListMinions(t *testing.T) {
 }
 
 func TestListMinionsLabels(t *testing.T) {
-	ns := api.NamespaceNone
 	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Version())
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
-			Query:  buildQueryValues(ns, url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
+			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.NodeList{

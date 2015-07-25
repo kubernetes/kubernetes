@@ -13,6 +13,13 @@
   notify:
     - restart etcd
 
+- name: Write etcd systemd unit file for Debian
+  copy: src=etcd.service dest=/etc/systemd/system
+  notify:
+    - reload systemd
+    - restart etcd
+  when: ansible_distribution == "Debian"
+
 - name: Enable etcd
   service: name=etcd enabled=yes
 

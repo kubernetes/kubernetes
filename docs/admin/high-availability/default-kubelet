@@ -1,0 +1,8 @@
+# This should be the IP address of the load balancer for all masters
+MASTER_IP=<insert-ip-here>
+# This should be the internal service IP address reserved for DNS
+DNS_IP=<insert-dns-ip-here>
+
+DAEMON_ARGS="$DAEMON_ARGS --api_servers=https://${MASTER_IP} --enable-debugging-handlers=true  --cloud_provider=
+gce --config=/etc/kubernetes/manifests --allow_privileged=False --v=2 --cluster_dns=${DNS_IP} --cluster_domain=c
+luster.local   --configure-cbr0=true --cgroup_root=/ --system-container=/system "

@@ -27,8 +27,12 @@ import (
 
 var _ = Describe("Shell", func() {
 	It("should pass tests for services.sh", func() {
-		SkipUnlessProviderIs("gce", "gke")
-
+		// This test requires:
+		// - SSH
+		// - master access
+		// ... so the provider check should be identical to the intersection of
+		// providers that provide those capabilities.
+		SkipUnlessProviderIs("gce")
 		runCmdTest(filepath.Join(testContext.RepoRoot, "hack/e2e-suite/services.sh"))
 	})
 })

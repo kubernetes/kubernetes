@@ -19,7 +19,9 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -35,13 +37,13 @@ const (
 
 JSON and YAML formats are accepted.`
 	replace_example = `// Replace a pod using the data in pod.json.
-$ kubectl replace -f pod.json
+$ kubectl replace -f ./pod.json
 
 // Replace a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl replace -f -
 
 // Force replace, delete and then re-create the resource
-kubectl replace --force -f pod.json`
+kubectl replace --force -f ./pod.json`
 )
 
 func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -69,7 +71,7 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
-	if os.Args[1] == "update" {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
 		printDeprecationWarning("replace", "update")
 	}
 	schema, err := f.Validator()
@@ -129,6 +131,22 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+
+	for i, filename := range filenames {
+		if filename == "-" {
+			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(tempDir)
+			tempFilename := filepath.Join(tempDir, "resource.stdin")
+			err = cmdutil.DumpReaderToFile(os.Stdin, tempFilename)
+			if err != nil {
+				return err
+			}
+			filenames[i] = tempFilename
+		}
 	}
 
 	mapper, typer := f.Object()

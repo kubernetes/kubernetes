@@ -47,7 +47,7 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckCustomErr("Patch failed", err)
 		},
 	}
-	cmd.Flags().StringP("patch", "p", "", "The patch to be appied to the resource JSON file.")
+	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
 	return cmd
 }

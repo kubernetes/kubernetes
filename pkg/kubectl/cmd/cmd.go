@@ -91,6 +91,18 @@ __custom_func() {
     esac
 }
 `
+	valid_resources = `Valid resource types include:
+   * pods (aka 'po')
+   * replicationcontrollers (aka 'rc')
+   * services (aka 'svc')
+   * nodes (aka 'no')
+   * events (aka 'ev')
+   * secrets
+   * limits
+   * persistentVolumes (aka 'pv')
+   * persistentVolumeClaims (aka 'pvc')
+   * quota
+`
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.

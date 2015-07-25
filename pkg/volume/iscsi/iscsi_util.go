@@ -69,7 +69,7 @@ func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/iscsi/portal-iqn-some_iqn-lun-0
 func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string) string {
-	return path.Join(host.GetPluginDir(ISCSIPluginName), "iscsi", portal+"-iqn-"+iqn+"-lun-"+lun)
+	return path.Join(host.GetPluginDir(iscsiPluginName), "iscsi", portal+"-iqn-"+iqn+"-lun-"+lun)
 }
 
 type ISCSIUtil struct{}
@@ -78,18 +78,18 @@ func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
 	return makePDNameInternal(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
 }
 
-func (util *ISCSIUtil) AttachDisk(iscsi iscsiDisk) error {
-	devicePath := strings.Join([]string{"/dev/disk/by-path/ip", iscsi.portal, "iscsi", iscsi.iqn, "lun", iscsi.lun}, "-")
+func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
+	devicePath := strings.Join([]string{"/dev/disk/by-path/ip", b.portal, "iscsi", b.iqn, "lun", b.lun}, "-")
 	exist := waitForPathToExist(devicePath, 1)
 	if exist == false {
 		// discover iscsi target
-		out, err := iscsi.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", iscsi.portal})
+		out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", b.portal})
 		if err != nil {
-			glog.Errorf("iscsi: failed to sendtargets to portal %s error: %s", iscsi.portal, string(out))
+			glog.Errorf("iscsi: failed to sendtargets to portal %s error: %s", b.portal, string(out))
 			return err
 		}
 		// login to iscsi target
-		out, err = iscsi.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", iscsi.portal, "-T", iscsi.iqn, "--login"})
+		out, err = b.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", b.portal, "-T", b.iqn, "--login"})
 		if err != nil {
 			glog.Errorf("iscsi: failed to attach disk:Error: %s (%v)", string(out), err)
 			return err
@@ -100,8 +100,8 @@ func (util *ISCSIUtil) AttachDisk(iscsi iscsiDisk) error {
 		}
 	}
 	// mount it
-	globalPDPath := iscsi.manager.MakeGlobalPDName(iscsi)
-	mountpoint, err := iscsi.mounter.IsMountPoint(globalPDPath)
+	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
+	mountpoint, err := b.mounter.IsMountPoint(globalPDPath)
 	if mountpoint {
 		glog.Infof("iscsi: %s already mounted", globalPDPath)
 		return nil
@@ -112,21 +112,21 @@ func (util *ISCSIUtil) AttachDisk(iscsi iscsiDisk) error {
 		return err
 	}
 
-	err = iscsi.mounter.Mount(devicePath, globalPDPath, iscsi.fsType, nil)
+	err = b.mounter.Mount(devicePath, globalPDPath, b.fsType, nil)
 	if err != nil {
-		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, iscsi.fsType, globalPDPath, err)
+		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
 
 	return err
 }
 
-func (util *ISCSIUtil) DetachDisk(iscsi iscsiDisk, mntPath string) error {
-	device, cnt, err := mount.GetDeviceNameFromMount(iscsi.mounter, mntPath)
+func (util *ISCSIUtil) DetachDisk(c iscsiDiskCleaner, mntPath string) error {
+	device, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
 	if err != nil {
 		glog.Errorf("iscsi detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
 		return err
 	}
-	if err = iscsi.mounter.Unmount(mntPath); err != nil {
+	if err = c.mounter.Unmount(mntPath); err != nil {
 		glog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 		return err
 	}
@@ -136,7 +136,7 @@ func (util *ISCSIUtil) DetachDisk(iscsi iscsiDisk, mntPath string) error {
 		// strip -lun- from device path
 		ind := strings.LastIndex(device, "-lun-")
 		prefix := device[:(ind - 1)]
-		refCount, err := getDevicePrefixRefCount(iscsi.mounter, prefix)
+		refCount, err := getDevicePrefixRefCount(c.mounter, prefix)
 
 		if err == nil && refCount == 0 {
 			// this portal/iqn are no longer referenced, log out
@@ -146,7 +146,7 @@ func (util *ISCSIUtil) DetachDisk(iscsi iscsiDisk, mntPath string) error {
 			iqn := device[ind1+len("-iscsi-") : ind]
 
 			glog.Infof("iscsi: log out target %s iqn %s", portal, iqn)
-			out, err := iscsi.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"})
+			out, err := c.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"})
 			if err != nil {
 				glog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
 			}

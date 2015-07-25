@@ -213,28 +213,3 @@ func TestPluginBackCompat(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 }
-
-func TestPluginLegacy(t *testing.T) {
-	plug := makePluginUnderTest(t, "empty")
-
-	if plug.Name() != "empty" {
-		t.Errorf("Wrong name: %s", plug.Name())
-	}
-	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}) {
-		t.Errorf("Expected false")
-	}
-
-	spec := api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	if _, err := plug.(*emptyDirPlugin).newBuilderInternal(volume.NewSpecFromVolume(&spec), pod, &mount.FakeMounter{}, &fakeMountDetector{}, volume.VolumeOptions{""}); err == nil {
-		t.Errorf("Expected failiure")
-	}
-
-	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mount.FakeMounter{}, &fakeMountDetector{})
-	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
-	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner")
-	}
-}

@@ -20,4 +20,4 @@ KUBE_LOG_LEVEL="--v=0"
 KUBE_ALLOW_PRIV="--allow_privileged=true"
 
 # How the replication controller, scheduler, and proxy
-KUBE_MASTER="--master=https://{{ groups['masters'][0] }}:443"
+KUBE_MASTER="--master=https://{{ groups['masters'][0] }}:{{ kube_master_api_port }}"

@@ -44,10 +44,10 @@ source "${KUBE_ROOT}/cluster/kube-env.sh"
 # ---- Do cloud-provider-specific setup
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     echo "Conformance test: not doing test setup."
-  KUBERNETES_PROVIDER=""
-  auth_config=(
-    "--kubeconfig=${KUBECONFIG}"
-  )
+    KUBERNETES_PROVIDER=""
+    auth_config=(
+      "--kubeconfig=${KUBECONFIG}"
+    )
 else
     echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
 
@@ -58,7 +58,7 @@ else
     detect-master >/dev/null
 
     auth_config=(
-    "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
+      "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
     )
 fi
 
@@ -73,8 +73,9 @@ if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
 fi
 
 ginkgo_args=()
-if [[ -n ${CONFORMANCE_TEST_SKIP_REGEX:-} ]]; then
-  ginkgo_args+=("--skip=\"${CONFORMANCE_TEST_SKIP_REGEX}\"")
+if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
+  ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
+  ginkgo_args+=("--seed=1436380640")
 fi
 if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("-p")
@@ -99,5 +100,6 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --num-nodes="${NUM_MINIONS:-}" \
   --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
-  ${E2E_REPORT_DIR+"--report-dir=${E2E_REPORT_DIR}"} \
+  ${E2E_MIN_STARTUP_PODS:+"--minStartupPods=${E2E_MIN_STARTUP_PODS}"} \
+  ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   "${@:-}"

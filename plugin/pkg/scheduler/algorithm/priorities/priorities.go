@@ -112,7 +112,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 // LeastRequestedPriority is a priority function that favors nodes with fewer requested resources.
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
-// Details: (Sum(requested cpu) / Capacity + Sum(requested memory) / Capacity) * 50
+// Details: cpu((capacity - sum(requested)) * 10 / capacity) + memory((capacity - sum(requested)) * 10 / capacity) / 2
 func LeastRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	if err != nil {
@@ -212,8 +212,8 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
 	capacityMemory := node.Status.Capacity.Memory().Value()
 
-	cpuFraction := fractionOfCapacity(totalMilliCPU, capacityMilliCPU, node.Name)
-	memoryFraction := fractionOfCapacity(totalMemory, capacityMemory, node.Name)
+	cpuFraction := fractionOfCapacity(totalMilliCPU, capacityMilliCPU)
+	memoryFraction := fractionOfCapacity(totalMemory, capacityMemory)
 	if cpuFraction >= 1 || memoryFraction >= 1 {
 		// if requested >= capacity, the corresponding host should never be preferrred.
 		score = 0
@@ -239,7 +239,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	}
 }
 
-func fractionOfCapacity(requested, capacity int64, node string) float64 {
+func fractionOfCapacity(requested, capacity int64) float64 {
 	if capacity == 0 {
 		return 1
 	}

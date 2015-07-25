@@ -423,7 +423,7 @@ func TestIncrementUsageReplicationControllers(t *testing.T) {
 	r := api.ResourceReplicationControllers
 	status.Hard[r] = resource.MustParse("2")
 	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, "ReplicationController", namespace, "name", "replicationControllers", "", admission.Create, nil), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, "ReplicationController", namespace, "name", "replicationcontrollers", "", admission.Create, nil), status, client)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -452,7 +452,7 @@ func TestExceedUsageReplicationControllers(t *testing.T) {
 	r := api.ResourceReplicationControllers
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, "ReplicationController", namespace, "name", "replicationControllers", "", admission.Create, nil), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, "ReplicationController", namespace, "name", "replicationcontrollers", "", admission.Create, nil), status, client)
 	if err == nil {
 		t.Errorf("Expected error for exceeding hard limits")
 	}
@@ -496,7 +496,7 @@ func TestExceedUsagePersistentVolumeClaims(t *testing.T) {
 	r := api.ResourcePersistentVolumeClaims
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.PersistentVolumeClaim{}, "PersistentVolumeClaim", namespace, "name", "persistentVolumeClaims", "", admission.Create, nil), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.PersistentVolumeClaim{}, "PersistentVolumeClaim", namespace, "name", "persistentvolumeclaims", "", admission.Create, nil), status, client)
 	if err == nil {
 		t.Errorf("Expected error for exceeding hard limits")
 	}

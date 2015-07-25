@@ -1959,6 +1959,7 @@ func (kl *Kubelet) syncNetworkStatus() {
 			glog.Errorf("Error on adding ip table rules: %v", err)
 		}
 		if len(kl.podCIDR) == 0 {
+			glog.Warningf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
 			networkConfigured = false
 		} else if err := kl.reconcileCBR0(kl.podCIDR); err != nil {
 			networkConfigured = false
@@ -2130,7 +2131,9 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	if node == nil {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
+	kl.networkConfigMutex.Lock()
 	kl.podCIDR = node.Spec.PodCIDR
+	kl.networkConfigMutex.Unlock()
 
 	if err := kl.setNodeStatus(node); err != nil {
 		return err

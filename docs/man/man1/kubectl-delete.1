@@ -51,7 +51,7 @@ will be lost along with the rest of the resource.
 
 .PP
 \fB\-\-ignore\-not\-found\fP=false
-    Treat "resource not found" as a successful delete.
+    Treat "resource not found" as a successful delete. Defaults to "true" when \-\-all is specified.
 
 .PP
 \fB\-l\fP, \fB\-\-selector\fP=""
@@ -166,7 +166,7 @@ will be lost along with the rest of the resource.
 
 .nf
 // Delete a pod using the type and name specified in pod.json.
-$ kubectl delete \-f pod.json
+$ kubectl delete \-f ./pod.json
 
 // Delete a pod based on the type and name in the JSON passed into stdin.
 $ cat pod.json | kubectl delete \-f \-

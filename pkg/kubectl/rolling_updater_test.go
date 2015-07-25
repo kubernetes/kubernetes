@@ -132,165 +132,395 @@ func newRc(replicas int, desired int) *api.ReplicationController {
 }
 
 func TestUpdate(t *testing.T) {
+	// Helpers
+	Percent := func(p int) *int {
+		return &p
+	}
+	var NilPercent *int
+	// Scenarios
 	tests := []struct {
 		oldRc, newRc *api.ReplicationController
+		accepted     bool
+		percent      *int
 		responses    []fakeResponse
 		output       string
 	}{
 		{
-			oldRc(1), newRc(1, 1),
-			[]fakeResponse{
+			oldRc:    oldRc(1),
+			newRc:    newRc(1, 1),
+			accepted: true,
+			percent:  NilPercent,
+			responses: []fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 4 gets for each scale
-				{newRc(1, 1), nil},
-				{newRc(1, 1), nil},
-				{newRc(1, 1), nil},
-				{newRc(1, 1), nil},
-				{newRc(1, 1), nil},
+				// scaling iteration
 				{newRc(1, 1), nil},
 				{oldRc(0), nil},
-				{oldRc(0), nil},
-				{oldRc(0), nil},
-				//				{oldRc(0), nil},
 				// cleanup annotations
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
+				{newRc(1, 1), nil},
 			},
-			`Creating foo-v2
-Updating foo-v1 replicas: 0, foo-v2 replicas: 1
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (scale up first by 1 each interval)
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 0
 Update succeeded. Deleting foo-v1
 `,
 		}, {
-			oldRc(2), newRc(2, 2),
-			[]fakeResponse{
+			oldRc:    oldRc(1),
+			newRc:    newRc(1, 1),
+			accepted: true,
+			percent:  NilPercent,
+			responses: []fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 4 gets for each scale
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
+				// scaling iteration
+				{newRc(1, 1), nil},
+				{oldRc(0), nil},
+				// cleanup annotations
+				{newRc(1, 1), nil},
+				{newRc(1, 1), nil},
+				{newRc(1, 1), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 1, scaling down foo-v1 from 1 to 0 (scale up first by 1 each interval)
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 0
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(2),
+			newRc:    newRc(2, 2),
+			accepted: true,
+			percent:  NilPercent,
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
 				{newRc(1, 2), nil},
 				{oldRc(1), nil},
-				{oldRc(1), nil},
-				{oldRc(1), nil},
-				//				{oldRc(1), nil},
-				{newRc(2, 2), nil},
-				{newRc(2, 2), nil},
-				{newRc(2, 2), nil},
+				// scaling iteration
 				{newRc(2, 2), nil},
 				{oldRc(0), nil},
-				{oldRc(0), nil},
-				{oldRc(0), nil},
-				//				{oldRc(0), nil},
 				// cleanup annotations
 				{newRc(2, 2), nil},
 				{newRc(2, 2), nil},
+				{newRc(1, 1), nil},
 			},
-			`Creating foo-v2
-Updating foo-v1 replicas: 1, foo-v2 replicas: 1
-Updating foo-v1 replicas: 0, foo-v2 replicas: 2
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 2 to 0 (scale up first by 1 each interval)
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 1
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 0
 Update succeeded. Deleting foo-v1
 `,
 		}, {
-			oldRc(2), newRc(7, 7),
-			[]fakeResponse{
+			oldRc:    oldRc(2),
+			newRc:    newRc(7, 7),
+			accepted: true,
+			percent:  NilPercent,
+			responses: []fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 4 gets for each scale
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
+				// scaling iteration
+				{newRc(1, 7), nil},
 				{oldRc(1), nil},
-				{oldRc(1), nil},
-				{oldRc(1), nil},
-				{newRc(2, 2), nil},
-				{newRc(2, 2), nil},
-				{newRc(2, 2), nil},
-				{newRc(2, 2), nil},
-				{oldRc(0), nil},
-				{oldRc(0), nil},
+				// scaling iteration
+				{newRc(2, 7), nil},
 				{oldRc(0), nil},
 				// final scale on newRc
 				{newRc(7, 7), nil},
-				{newRc(7, 7), nil},
-				{newRc(7, 7), nil},
-				{newRc(7, 7), nil},
 				// cleanup annotations
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
+				{newRc(7, 7), nil},
 			},
-			`Creating foo-v2
-Updating foo-v1 replicas: 1, foo-v2 replicas: 1
-Updating foo-v1 replicas: 0, foo-v2 replicas: 2
-Scaling foo-v2 replicas: 2 -> 7
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 7, scaling down foo-v1 from 2 to 0 (scale up first by 1 each interval)
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 1
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 7
 Update succeeded. Deleting foo-v1
 `,
 		}, {
-			oldRc(7), newRc(2, 2),
-			[]fakeResponse{
+			oldRc:    oldRc(7),
+			newRc:    newRc(2, 2),
+			accepted: true,
+			percent:  NilPercent,
+			responses: []fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 4 gets for each update
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
-				{newRc(1, 2), nil},
+				// scaling iteration
 				{newRc(1, 2), nil},
 				{oldRc(6), nil},
-				{oldRc(6), nil},
-				{oldRc(6), nil},
+				// scaling iteration
 				{newRc(2, 2), nil},
-				{newRc(2, 2), nil},
-				{newRc(2, 2), nil},
-				{newRc(2, 2), nil},
-				{oldRc(5), nil},
-				{oldRc(5), nil},
-				{oldRc(5), nil},
-				// stop oldRc
-				{oldRc(0), nil},
-				{oldRc(0), nil},
-				{oldRc(0), nil},
 				{oldRc(0), nil},
 				// cleanup annotations
 				{newRc(2, 2), nil},
 				{newRc(2, 2), nil},
+				{newRc(2, 2), nil},
 			},
-			`Creating foo-v2
-Updating foo-v1 replicas: 6, foo-v2 replicas: 1
-Updating foo-v1 replicas: 5, foo-v2 replicas: 2
-Stopping foo-v1 replicas: 5 -> 0
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 7 to 0 (scale up first by 1 each interval)
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 6
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 0
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(7),
+			newRc:    newRc(2, 2),
+			accepted: false,
+			percent:  NilPercent,
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration (only up occurs since the update is rejected)
+				{newRc(1, 2), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 7 to 0 (scale up first by 1 each interval)
+Scaling foo-v2 up to 1
+`,
+		}, {
+			oldRc:    oldRc(10),
+			newRc:    newRc(10, 10),
+			accepted: true,
+			percent:  Percent(20),
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
+				{newRc(2, 10), nil},
+				{oldRc(8), nil},
+				// scaling iteration
+				{newRc(4, 10), nil},
+				{oldRc(6), nil},
+				// scaling iteration
+				{newRc(6, 10), nil},
+				{oldRc(4), nil},
+				// scaling iteration
+				{newRc(8, 10), nil},
+				{oldRc(2), nil},
+				// scaling iteration
+				{newRc(10, 10), nil},
+				{oldRc(0), nil},
+				// cleanup annotations
+				{newRc(10, 10), nil},
+				{newRc(10, 10), nil},
+				{newRc(10, 10), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 10, scaling down foo-v1 from 10 to 0 (scale up first by 2 each interval)
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 8
+Scaling foo-v2 up to 4
+Scaling foo-v1 down to 6
+Scaling foo-v2 up to 6
+Scaling foo-v1 down to 4
+Scaling foo-v2 up to 8
+Scaling foo-v1 down to 2
+Scaling foo-v2 up to 10
+Scaling foo-v1 down to 0
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(2),
+			newRc:    newRc(6, 6),
+			accepted: true,
+			percent:  Percent(50),
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
+				{newRc(3, 6), nil},
+				{oldRc(0), nil},
+				// scaling iteration
+				{newRc(6, 6), nil},
+				// cleanup annotations
+				{newRc(6, 6), nil},
+				{newRc(6, 6), nil},
+				{newRc(6, 6), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 6, scaling down foo-v1 from 2 to 0 (scale up first by 3 each interval)
+Scaling foo-v2 up to 3
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 6
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(10),
+			newRc:    newRc(3, 3),
+			accepted: true,
+			percent:  Percent(50),
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
+				{newRc(2, 3), nil},
+				{oldRc(8), nil},
+				// scaling iteration
+				{newRc(3, 3), nil},
+				{oldRc(0), nil},
+				// cleanup annotations
+				{newRc(3, 3), nil},
+				{newRc(3, 3), nil},
+				{newRc(3, 3), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 3, scaling down foo-v1 from 10 to 0 (scale up first by 2 each interval)
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 8
+Scaling foo-v2 up to 3
+Scaling foo-v1 down to 0
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(4),
+			newRc:    newRc(4, 4),
+			accepted: true,
+			percent:  Percent(-50),
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
+				{oldRc(2), nil},
+				{newRc(2, 4), nil},
+				// scaling iteration
+				{oldRc(0), nil},
+				{newRc(4, 4), nil},
+				// cleanup annotations
+				{newRc(4, 4), nil},
+				{newRc(4, 4), nil},
+				{newRc(4, 4), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 4, scaling down foo-v1 from 4 to 0 (scale down first by 2 each interval)
+Scaling foo-v1 down to 2
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 4
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(2),
+			newRc:    newRc(4, 4),
+			accepted: true,
+			percent:  Percent(-50),
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
+				{oldRc(0), nil},
+				{newRc(4, 4), nil},
+				// cleanup annotations
+				{newRc(4, 4), nil},
+				{newRc(4, 4), nil},
+				{newRc(4, 4), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 4, scaling down foo-v1 from 2 to 0 (scale down first by 2 each interval)
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 4
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(4),
+			newRc:    newRc(2, 2),
+			accepted: true,
+			percent:  Percent(-50),
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
+				{oldRc(3), nil},
+				{newRc(1, 2), nil},
+				// scaling iteration
+				{oldRc(2), nil},
+				{newRc(2, 2), nil},
+				// scaling iteration
+				{oldRc(0), nil},
+				// cleanup annotations
+				{newRc(2, 2), nil},
+				{newRc(2, 2), nil},
+				{newRc(2, 2), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 2, scaling down foo-v1 from 4 to 0 (scale down first by 1 each interval)
+Scaling foo-v1 down to 3
+Scaling foo-v2 up to 1
+Scaling foo-v1 down to 2
+Scaling foo-v2 up to 2
+Scaling foo-v1 down to 0
+Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc:    oldRc(4),
+			newRc:    newRc(4, 4),
+			accepted: true,
+			percent:  Percent(-100),
+			responses: []fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// scaling iteration
+				{oldRc(0), nil},
+				{newRc(4, 4), nil},
+				// cleanup annotations
+				{newRc(4, 4), nil},
+				{newRc(4, 4), nil},
+				{newRc(4, 4), nil},
+			},
+			output: `Creating foo-v2
+Scaling up foo-v2 from 0 to 4, scaling down foo-v1 from 4 to 0 (scale down first by 4 each interval)
+Scaling foo-v1 down to 0
+Scaling foo-v2 up to 4
 Update succeeded. Deleting foo-v1
 `,
 		},
 	}
 
 	for _, test := range tests {
+		client := NewRollingUpdaterClient(fakeClientFor("default", test.responses))
 		updater := RollingUpdater{
-			NewRollingUpdaterClient(fakeClientFor("default", test.responses)),
-			"default",
+			c:  client,
+			ns: "default",
+			scaleAndWait: func(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
+				return client.GetReplicationController(rc.Namespace, rc.Name)
+			},
 		}
 		var buffer bytes.Buffer
-		config := &RollingUpdaterConfig{
-			Out:           &buffer,
-			OldRc:         test.oldRc,
-			NewRc:         test.newRc,
-			UpdatePeriod:  0,
-			Interval:      time.Millisecond,
-			Timeout:       time.Millisecond,
-			CleanupPolicy: DeleteRollingUpdateCleanupPolicy,
+		acceptor := &testAcceptor{
+			accept: func(rc *api.ReplicationController) error {
+				if test.accepted {
+					return nil
+				}
+				return fmt.Errorf("rejecting controller %s", rc.Name)
+			},
 		}
-		if err := updater.Update(config); err != nil {
+		config := &RollingUpdaterConfig{
+			Out:            &buffer,
+			OldRc:          test.oldRc,
+			NewRc:          test.newRc,
+			UpdatePeriod:   0,
+			Interval:       time.Millisecond,
+			Timeout:        time.Millisecond,
+			CleanupPolicy:  DeleteRollingUpdateCleanupPolicy,
+			UpdateAcceptor: acceptor,
+			UpdatePercent:  test.percent,
+		}
+		err := updater.Update(config)
+		if test.accepted && err != nil {
 			t.Errorf("Update failed: %v", err)
+		}
+		if !test.accepted && err == nil {
+			t.Errorf("Expected update to fail")
 		}
 		if buffer.String() != test.output {
 			t.Errorf("Bad output. expected:\n%s\ngot:\n%s", test.output, buffer.String())
@@ -304,41 +534,47 @@ func PTestUpdateRecovery(t *testing.T) {
 	rcExisting := newRc(1, 3)
 
 	output := `Continuing update with existing controller foo-v2.
-Updating foo-v1 replicas: 1, foo-v2 replicas: 2
-Updating foo-v1 replicas: 0, foo-v2 replicas: 3
+Scaling up foo-v2 from 1 to 3, scaling down foo-v1 from 2 to 0 (scale up first by 1 each interval)	
+Scaling foo-v2 to 2
+Scaling foo-v1 to 1
+Scaling foo-v2 to 3
+Scaling foo-v2 to 0
 Update succeeded. Deleting foo-v1
 `
 	responses := []fakeResponse{
 		// Existing newRc
 		{rcExisting, nil},
-		// 3 gets for each scale
-		{newRc(2, 2), nil},
-		{newRc(2, 2), nil},
+		// scaling iteration
 		{newRc(2, 2), nil},
 		{oldRc(1), nil},
-		{oldRc(1), nil},
-		{oldRc(1), nil},
+		// scaling iteration
 		{newRc(3, 3), nil},
-		{newRc(3, 3), nil},
-		{newRc(3, 3), nil},
-		{oldRc(0), nil},
-		{oldRc(0), nil},
 		{oldRc(0), nil},
 		// cleanup annotations
 		{newRc(3, 3), nil},
 		{newRc(3, 3), nil},
+		{newRc(3, 3), nil},
 	}
-	updater := RollingUpdater{NewRollingUpdaterClient(fakeClientFor("default", responses)), "default"}
+
+	client := NewRollingUpdaterClient(fakeClientFor("default", responses))
+	updater := RollingUpdater{
+		c:  client,
+		ns: "default",
+		scaleAndWait: func(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
+			return client.GetReplicationController(rc.Namespace, rc.Name)
+		},
+	}
 
 	var buffer bytes.Buffer
 	config := &RollingUpdaterConfig{
-		Out:           &buffer,
-		OldRc:         rc,
-		NewRc:         rcExisting,
-		UpdatePeriod:  0,
-		Interval:      time.Millisecond,
-		Timeout:       time.Millisecond,
-		CleanupPolicy: DeleteRollingUpdateCleanupPolicy,
+		Out:            &buffer,
+		OldRc:          rc,
+		NewRc:          rcExisting,
+		UpdatePeriod:   0,
+		Interval:       time.Millisecond,
+		Timeout:        time.Millisecond,
+		CleanupPolicy:  DeleteRollingUpdateCleanupPolicy,
+		UpdateAcceptor: DefaultUpdateAcceptor,
 	}
 	if err := updater.Update(config); err != nil {
 		t.Errorf("Update failed: %v", err)
@@ -354,46 +590,49 @@ func TestRollingUpdater_preserveCleanup(t *testing.T) {
 	rc := oldRc(2)
 	rcExisting := newRc(1, 3)
 
-	updater := &RollingUpdater{
-		ns: "default",
-		c: &rollingUpdaterClientImpl{
-			GetReplicationControllerFn: func(namespace, name string) (*api.ReplicationController, error) {
-				switch name {
-				case rc.Name:
-					return rc, nil
-				case rcExisting.Name:
-					return rcExisting, nil
-				default:
-					return nil, fmt.Errorf("unexpected get call for %s/%s", namespace, name)
-				}
-			},
-			UpdateReplicationControllerFn: func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+	client := &rollingUpdaterClientImpl{
+		GetReplicationControllerFn: func(namespace, name string) (*api.ReplicationController, error) {
+			switch name {
+			case rc.Name:
 				return rc, nil
-			},
-			CreateReplicationControllerFn: func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
-				t.Fatalf("unexpected call to create %s/rc:%#v", namespace, rc)
-				return nil, nil
-			},
-			DeleteReplicationControllerFn: func(namespace, name string) error {
-				t.Fatalf("unexpected call to delete %s/%s", namespace, name)
-				return nil
-			},
-			ControllerHasDesiredReplicasFn: func(rc *api.ReplicationController) wait.ConditionFunc {
-				return func() (done bool, err error) {
-					return true, nil
-				}
-			},
+			case rcExisting.Name:
+				return rcExisting, nil
+			default:
+				return nil, fmt.Errorf("unexpected get call for %s/%s", namespace, name)
+			}
 		},
+		UpdateReplicationControllerFn: func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+			return rc, nil
+		},
+		CreateReplicationControllerFn: func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+			t.Fatalf("unexpected call to create %s/rc:%#v", namespace, rc)
+			return nil, nil
+		},
+		DeleteReplicationControllerFn: func(namespace, name string) error {
+			t.Fatalf("unexpected call to delete %s/%s", namespace, name)
+			return nil
+		},
+		ControllerHasDesiredReplicasFn: func(rc *api.ReplicationController) wait.ConditionFunc {
+			return func() (done bool, err error) {
+				return true, nil
+			}
+		},
+	}
+	updater := &RollingUpdater{
+		ns:           "default",
+		c:            client,
+		scaleAndWait: scalerScaleAndWait(client, "default"),
 	}
 
 	config := &RollingUpdaterConfig{
-		Out:           ioutil.Discard,
-		OldRc:         rc,
-		NewRc:         rcExisting,
-		UpdatePeriod:  0,
-		Interval:      time.Millisecond,
-		Timeout:       time.Millisecond,
-		CleanupPolicy: PreserveRollingUpdateCleanupPolicy,
+		Out:            ioutil.Discard,
+		OldRc:          rc,
+		NewRc:          rcExisting,
+		UpdatePeriod:   0,
+		Interval:       time.Millisecond,
+		Timeout:        time.Millisecond,
+		CleanupPolicy:  PreserveRollingUpdateCleanupPolicy,
+		UpdateAcceptor: DefaultUpdateAcceptor,
 	}
 	err := updater.Update(config)
 	if err != nil {
@@ -854,4 +1093,12 @@ func (c *rollingUpdaterClientImpl) DeleteReplicationController(namespace, name s
 
 func (c *rollingUpdaterClientImpl) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
 	return c.ControllerHasDesiredReplicasFn(rc)
+}
+
+type testAcceptor struct {
+	accept func(*api.ReplicationController) error
+}
+
+func (a *testAcceptor) Accept(rc *api.ReplicationController) error {
+	return a.accept(rc)
 }

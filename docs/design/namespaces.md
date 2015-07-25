@@ -1,3 +1,36 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/namespaces.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Namespaces
 
 ## Abstract
@@ -41,7 +74,7 @@ The Namespace provides a unique scope for:
 
 A *Namespace* defines a logically named group for multiple *Kind*s of resources.
 
-```
+```go
 type Namespace struct {
   TypeMeta   `json:",inline"`
   ObjectMeta `json:"metadata,omitempty"`
@@ -72,7 +105,7 @@ distinguish distinct entities, and reference particular entities across operatio
 
 A *Namespace* provides an authorization scope for accessing content associated with the *Namespace*.
 
-See [Authorization plugins](../authorization.md)
+See [Authorization plugins](../admin/authorization.md)
 
 ### Limit Resource Consumption
 
@@ -92,7 +125,7 @@ See [Admission control: Resource Quota](admission_control_resource_quota.md)
 
 Upon creation of a *Namespace*, the creator may provide a list of *Finalizer* objects.
 
-```
+```go
 type FinalizerName string
 
 // These are internal finalizers to Kubernetes, must be qualified name unless defined here
@@ -121,7 +154,7 @@ set by default.
 
 A *Namespace* may exist in the following phases.
 
-```
+```go
 type NamespacePhase string
 const(
   NamespaceActive NamespacePhase = "Active"
@@ -229,7 +262,7 @@ to take part in Namespace termination.
 
 OpenShift creates a Namespace in Kubernetes
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -254,7 +287,7 @@ own storage associated with the "development" namespace unknown to Kubernetes.
 
 User deletes the Namespace in Kubernetes, and Namespace now has following state:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -279,7 +312,7 @@ and begins to terminate all of the content in the namespace that it knows about.
 success, it executes a *finalize* action that modifies the *Namespace* by
 removing *kubernetes* from the list of finalizers:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -307,7 +340,7 @@ from the list of finalizers.
 
 This results in the following state:
 
-```
+```json
 {
   "apiVersion":"v1",
   "kind": "Namespace",
@@ -334,4 +367,7 @@ to remove that Namespace from the storage.
 
 At this point, all content associated with that Namespace, and the Namespace itself are gone.
 
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/namespaces.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

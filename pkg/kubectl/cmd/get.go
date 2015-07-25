@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
@@ -33,10 +32,10 @@ import (
 const (
 	get_long = `Display one or many resources.
 
-Possible resources include pods (po), replication controllers (rc), services
-(svc), nodes, events (ev), component statuses (cs), limit ranges (limits),
-nodes (no), persistent volumes (pv), persistent volume claims (pvc)
-or resource quotas (quota).
+Possible resources include (case insensitive): pods (po), services (svc),
+replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
+limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
+resourcequotas (quota) or secrets.
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).`
@@ -101,25 +100,8 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	if len(args) == 0 {
-		fmt.Fprint(out, `
-You must specify the type of resource to get. Valid resource types include:
-   * componentStatuses (aka 'cs')
-   * endpoints (aka 'ep')
-   * events (aka 'ev')
-   * limits
-   * namespaces
-   * nodes (aka 'no')
-   * persistentVolumeClaims (aka 'pvc')
-   * persistentVolumes (aka 'pv')
-   * pods (aka 'po')
-   * podTemplates
-   * quota
-   * replicationcontrollers (aka 'rc')
-   * secrets
-   * serviceAccounts
-   * services
-`)
-		return errors.New("Required resource not specified.")
+		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources)
+		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
 	// handle watch separately since we cannot watch multiple resource types

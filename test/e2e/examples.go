@@ -157,6 +157,233 @@ var _ = Describe("Examples e2e", func() {
 			}
 		})
 	})
+
+	Describe("[Skipped][Example]Spark", func() {
+		It("should start spark master and workers", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "spark", file)
+			}
+			serviceJson := mkpath("spark-master-service.json")
+			masterJson := mkpath("spark-master.json")
+			workerControllerJson := mkpath("spark-worker-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("starting master")
+			runKubectl("create", "-f", serviceJson, nsFlag)
+			runKubectl("create", "-f", masterJson, nsFlag)
+			err := waitForPodRunningInNamespace(c, "spark-master", ns)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = lookForStringInLog(ns, "spark-master", "spark-master", "Starting Spark master at", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("starting workers")
+			runKubectl("create", "-f", workerControllerJson, nsFlag)
+			ScaleRC(c, ns, "spark-worker-controller", 2)
+			forEachPod(c, ns, "name", "spark-worker", func(pod api.Pod) {
+				_, err := lookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("[Skipped][Example]Cassandra", func() {
+		It("should create and scale cassandra", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "cassandra", file)
+			}
+			serviceYaml := mkpath("cassandra-service.yaml")
+			podYaml := mkpath("cassandra.yaml")
+			controllerYaml := mkpath("cassandra-controller.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("starting service and pod")
+			runKubectl("create", "-f", serviceYaml, nsFlag)
+			runKubectl("create", "-f", podYaml, nsFlag)
+			err := waitForPodRunningInNamespace(c, "cassandra", ns)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = lookForStringInLog(ns, "cassandra", "cassandra", "Listening for thrift clients", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("create and scale rc")
+			runKubectl("create", "-f", controllerYaml, nsFlag)
+			err = ScaleRC(c, ns, "cassandra", 2)
+			Expect(err).NotTo(HaveOccurred())
+			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
+				_, err = lookForStringInLog(ns, pod.Name, "cassandra", "Listening for thrift clients", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = lookForStringInLog(ns, pod.Name, "cassandra", "Handshaking version", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			output := runKubectl("exec", "cassandra", nsFlag, "--", "nodetool", "status")
+			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
+				if !strings.Contains(output, pod.Status.PodIP) {
+					Failf("Pod ip %s not found in nodetool status", pod.Status.PodIP)
+				}
+			})
+		})
+	})
+
+	Describe("[Skipped][Example]Storm", func() {
+		It("should create and stop Zookeeper, Nimbus and Storm worker servers", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "storm", file)
+			}
+			zookeeperServiceJson := mkpath("zookeeper-service.json")
+			zookeeperPodJson := mkpath("zookeeper.json")
+			nimbusServiceJson := mkpath("storm-nimbus-service.json")
+			nimbusPodJson := mkpath("storm-nimbus.json")
+			workerControllerJson := mkpath("storm-worker-controller.json")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			zookeeperPod := "zookeeper"
+
+			By("starting Zookeeper")
+			runKubectl("create", "-f", zookeeperPodJson, nsFlag)
+			runKubectl("create", "-f", zookeeperServiceJson, nsFlag)
+			err := waitForPodRunningInNamespace(c, zookeeperPod, ns)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking if zookeeper is up and running")
+			_, err = lookForStringInLog(ns, zookeeperPod, "zookeeper", "binding to port", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("starting Nimbus")
+			runKubectl("create", "-f", nimbusPodJson, nsFlag)
+			runKubectl("create", "-f", nimbusServiceJson, nsFlag)
+			err = waitForPodRunningInNamespace(c, "nimbus", ns)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("starting workers")
+			runKubectl("create", "-f", workerControllerJson, nsFlag)
+			forEachPod(c, ns, "name", "storm-worker", func(pod api.Pod) {
+				//do nothing, just wait for the pod to be running
+			})
+			// TODO: Add logging configuration to nimbus & workers images and then
+			// look for a string instead of sleeping.
+			time.Sleep(20 * time.Second)
+
+			By("checking if there are established connections to Zookeeper")
+			_, err = lookForStringInLog(ns, zookeeperPod, "zookeeper", "Established session", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking if Nimbus responds to requests")
+			lookForString("No topologies running.", time.Minute, func() string {
+				return runKubectl("exec", "nimbus", nsFlag, "--", "bin/storm", "list")
+			})
+		})
+	})
+
+	Describe("[Skipped][Example]Liveness", func() {
+		It("liveness pods should be automatically restarted", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "liveness", file)
+			}
+			execYaml := mkpath("exec-liveness.yaml")
+			httpYaml := mkpath("http-liveness.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			runKubectl("create", "-f", execYaml, nsFlag)
+			runKubectl("create", "-f", httpYaml, nsFlag)
+			checkRestart := func(podName string, timeout time.Duration) {
+				err := waitForPodRunningInNamespace(c, podName, ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				for t := time.Now(); time.Since(t) < timeout; time.Sleep(poll) {
+					pod, err := c.Pods(ns).Get(podName)
+					expectNoError(err, fmt.Sprintf("getting pod %s", podName))
+					restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
+					Logf("Pod: %s   restart count:%d", podName, restartCount)
+					if restartCount > 0 {
+						return
+					}
+				}
+				Failf("Pod %s was not restarted", podName)
+			}
+			By("Check restarts")
+			checkRestart("liveness-exec", time.Minute)
+			checkRestart("liveness-http", time.Minute)
+		})
+	})
+
+	Describe("[Skipped][Example]Secret", func() {
+		It("should create a pod that reads a secret", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "secrets", file)
+			}
+			secretYaml := mkpath("secret.yaml")
+			podYaml := mkpath("secret-pod.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("creating secret and pod")
+			runKubectl("create", "-f", secretYaml, nsFlag)
+			runKubectl("create", "-f", podYaml, nsFlag)
+
+			By("checking if secret was read correctly")
+			_, err := lookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Describe("[Skipped][Example]Downward API", func() {
+		It("should create a pod that prints his name and namespace", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "docs", "user-guide", "downward-api", file)
+			}
+			podYaml := mkpath("dapi-pod.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			podName := "dapi-test-pod"
+
+			By("creating the pod")
+			runKubectl("create", "-f", podYaml, nsFlag)
+
+			By("checking if name and namespace were passed correctly")
+			_, err := lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("POD_NAMESPACE=%v", ns), serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = lookForStringInLog(ns, podName, "test-container", fmt.Sprintf("POD_NAME=%v", podName), serverStartTimeout)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Describe("[Skipped][Example]RethinkDB", func() {
+		It("should create and stop rethinkdb servers", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "rethinkdb", file)
+			}
+			driverServiceYaml := mkpath("driver-service.yaml")
+			rethinkDbControllerYaml := mkpath("rc.yaml")
+			adminPodYaml := mkpath("admin-pod.yaml")
+			adminServiceYaml := mkpath("admin-service.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("starting rethinkdb")
+			runKubectl("create", "-f", driverServiceYaml, nsFlag)
+			runKubectl("create", "-f", rethinkDbControllerYaml, nsFlag)
+			checkDbInstances := func() {
+				forEachPod(c, ns, "db", "rethinkdb", func(pod api.Pod) {
+					_, err := lookForStringInLog(ns, pod.Name, "rethinkdb", "Server ready", serverStartTimeout)
+					Expect(err).NotTo(HaveOccurred())
+				})
+			}
+			checkDbInstances()
+
+			By("scaling rethinkdb")
+			ScaleRC(c, ns, "rethinkdb-rc", 2)
+			checkDbInstances()
+
+			By("starting admin")
+			runKubectl("create", "-f", adminServiceYaml, nsFlag)
+			runKubectl("create", "-f", adminPodYaml, nsFlag)
+			err := waitForPodRunningInNamespace(c, "rethinkdb-admin", ns)
+			Expect(err).NotTo(HaveOccurred())
+			checkDbInstances()
+			content, err := makeHttpRequestToService(c, ns, "rethinkdb-admin", "/")
+			Expect(err).NotTo(HaveOccurred())
+			if !strings.Contains(content, "<title>RethinkDB Administration Console</title>") {
+				Failf("RethinkDB console is not running")
+			}
+		})
+	})
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {

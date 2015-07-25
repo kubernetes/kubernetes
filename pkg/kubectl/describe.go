@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fieldpath"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -528,7 +529,30 @@ func describeContainers(pod *api.Pod, out io.Writer) {
 
 		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
 		fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
+		fmt.Fprintf(out, "    Variables:\n")
+		for _, e := range container.Env {
+			if e.ValueFrom != nil && e.ValueFrom.FieldRef != nil {
+				valueFrom := envValueFrom(pod, e)
+				fmt.Fprintf(out, "      %s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
+			} else {
+				fmt.Fprintf(out, "      %s:\t%s\n", e.Name, e.Value)
+			}
+		}
 	}
+}
+
+func envValueFrom(pod *api.Pod, e api.EnvVar) string {
+	internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(e.ValueFrom.FieldRef.APIVersion, "Pod", e.ValueFrom.FieldRef.FieldPath, "")
+	if err != nil {
+		return "" // pod validation should catch this on create
+	}
+
+	valueFrom, err := fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
+	if err != nil {
+		return "" // pod validation should catch this on create
+	}
+
+	return valueFrom
 }
 
 func printBool(value bool) string {
@@ -729,25 +753,43 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 		fmt.Fprintf(out, "Name:\t%s\n", serviceAccount.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", serviceAccount.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(serviceAccount.Labels))
+		fmt.Fprintln(out)
 
-		if len(serviceAccount.Secrets) == 0 {
-			fmt.Fprintf(out, "Secrets:\t<none>\n")
-		} else {
-			prefix := "Secrets:"
-			for _, s := range serviceAccount.Secrets {
-				fmt.Fprintf(out, "%s\t%s\n", prefix, s)
-				prefix = "        "
-			}
-			fmt.Fprintln(out)
+		var (
+			emptyHeader = "                   "
+			pullHeader  = "Image pull secrets:"
+			mountHeader = "Mountable secrets: "
+			tokenHeader = "Tokens:            "
+
+			pullSecretNames  = []string{}
+			mountSecretNames = []string{}
+			tokenSecretNames = []string{}
+		)
+
+		for _, s := range serviceAccount.ImagePullSecrets {
+			pullSecretNames = append(pullSecretNames, s.Name)
+		}
+		for _, s := range serviceAccount.Secrets {
+			mountSecretNames = append(mountSecretNames, s.Name)
+		}
+		for _, s := range tokens {
+			tokenSecretNames = append(tokenSecretNames, s.Name)
 		}
 
-		if len(tokens) == 0 {
-			fmt.Fprintf(out, "Tokens: \t<none>\n")
-		} else {
-			prefix := "Tokens: "
-			for _, t := range tokens {
-				fmt.Fprintf(out, "%s\t%s\n", prefix, t.Name)
-				prefix = "        "
+		types := map[string][]string{
+			pullHeader:  pullSecretNames,
+			mountHeader: mountSecretNames,
+			tokenHeader: tokenSecretNames,
+		}
+		for header, names := range types {
+			if len(names) == 0 {
+				fmt.Fprintf(out, "%s\t<none>\n", header)
+			} else {
+				prefix := header
+				for _, name := range names {
+					fmt.Fprintf(out, "%s\t%s\n", prefix, name)
+					prefix = emptyHeader
+				}
 			}
 			fmt.Fprintln(out)
 		}

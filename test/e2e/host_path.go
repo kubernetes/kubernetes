@@ -31,7 +31,7 @@ import (
 
 //TODO : Consolodate this code with the code for emptyDir.
 //This will require some smart.
-var _ = Describe("hostDir", func() {
+var _ = Describe("hostPath", func() {
 	var (
 		c         *client.Client
 		namespace *api.Namespace
@@ -43,7 +43,7 @@ var _ = Describe("hostDir", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Building a namespace api object")
-		namespace, err = createTestingNS("hostdir", c)
+		namespace, err = createTestingNS("hostpath", c)
 		Expect(err).NotTo(HaveOccurred())
 
 		//cleanup before running the test.
@@ -68,13 +68,13 @@ var _ = Describe("hostDir", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		testContainerOutputInNamespace("emptydir r/w on tmpfs", c, pod, 0, []string{
+		testContainerOutputInNamespace("hostPath mode", c, pod, 0, []string{
 			"mode of file \"/test-volume\": dtrwxrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		},
 			namespace.Name)
 	})
 
-	It("should support r/w on tmpfs", func() {
+	It("should support r/w", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		source := &api.HostPathVolumeSource{
@@ -87,7 +87,7 @@ var _ = Describe("hostDir", func() {
 			fmt.Sprintf("--rw_new_file=%v", filePath),
 			fmt.Sprintf("--file_mode=%v", filePath),
 		}
-		testContainerOutputInNamespace("emptydir r/w on tmpfs", c, pod, 0, []string{
+		testContainerOutputInNamespace("hostPath r/w", c, pod, 0, []string{
 			"mode of file \"/test-volume/test-file\": -rw-r--r--",
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		}, namespace.Name,

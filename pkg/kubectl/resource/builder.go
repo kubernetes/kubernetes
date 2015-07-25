@@ -164,7 +164,7 @@ func (b *Builder) Path(paths ...string) *Builder {
 			continue
 		}
 
-		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, []string{".json", ".yaml", ".yml"}, b.continueOnError, b.schema)
+		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, []string{".json", ".stdin", ".yaml", ".yml"}, b.continueOnError, b.schema)
 		if err != nil {
 			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
 		}
@@ -256,7 +256,6 @@ func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 // When two or more arguments are received, they must be a single type and resource name(s).
 // The allowEmptySelector permits to select all the resources (via Everything func).
 func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
-	args = b.replaceAliases(args)
 	if ok, err := hasCombinedTypeArgs(args); ok {
 		if err != nil {
 			b.errs = append(b.errs, err)
@@ -277,6 +276,10 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 		}
 		return b
 	}
+	if len(args) > 0 {
+		// Try replacing aliases only in types
+		args[0] = b.replaceAliases(args[0])
+	}
 	switch {
 	case len(args) > 2:
 		b.names = append(b.names, args[1:]...)
@@ -296,16 +299,17 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 	return b
 }
 
-func (b *Builder) replaceAliases(args []string) []string {
+// replaceAliases accepts an argument and tries to expand any existing
+// aliases found in it
+func (b *Builder) replaceAliases(input string) string {
 	replaced := []string{}
-	for _, arg := range args {
+	for _, arg := range strings.Split(input, ",") {
 		if aliases, ok := b.mapper.AliasesForResource(arg); ok {
 			arg = strings.Join(aliases, ",")
 		}
 		replaced = append(replaced, arg)
 	}
-
-	return replaced
+	return strings.Join(replaced, ",")
 }
 
 func hasCombinedTypeArgs(args []string) (bool, error) {
@@ -323,20 +327,6 @@ func hasCombinedTypeArgs(args []string) (bool, error) {
 	default:
 		return false, nil
 	}
-}
-
-// ResourceTypeAndNameArgs expects two arguments, a resource type, and a resource name. The resource
-// matching that type and and name will be retrieved from the server.
-func (b *Builder) ResourceTypeAndNameArgs(args ...string) *Builder {
-	switch len(args) {
-	case 2:
-		b.names = append(b.names, args[1])
-		b.ResourceTypes(SplitResourceArgument(args[0])...)
-	case 0:
-	default:
-		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource and name"))
-	}
-	return b
 }
 
 // Flatten will convert any objects with a field named "Items" that is an array of runtime.Object

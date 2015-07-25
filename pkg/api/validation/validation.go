@@ -1039,6 +1039,14 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	if len(service.Spec.Ports) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.ports"))
 	}
+	if service.Spec.Type == api.ServiceTypeLoadBalancer {
+		for ix := range service.Spec.Ports {
+			port := &service.Spec.Ports[ix]
+			if port.Port == 10250 {
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].port", ix), port.Port, "can not expose port 10250 externally since it is used by kubelet"))
+			}
+		}
+	}
 	allPortNames := util.StringSet{}
 	for i := range service.Spec.Ports {
 		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)

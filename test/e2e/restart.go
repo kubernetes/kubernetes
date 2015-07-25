@@ -61,10 +61,10 @@ var _ = Describe("Restart", func() {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
 		skipped = true
-		SkipUnlessProviderIs("gce")
+		SkipUnlessProviderIs("gce", "gke")
 		skipped = false
 
-		ps = newPodStore(c, api.NamespaceDefault, labels.Everything(), fields.Everything())
+		ps = newPodStore(c, api.NamespaceSystem, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
@@ -89,7 +89,7 @@ var _ = Describe("Restart", func() {
 		for i, p := range pods {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
-		ns := api.NamespaceDefault
+		ns := api.NamespaceSystem
 		if !checkPodsRunningReady(c, ns, podNamesBefore, podReadyBeforeTimeout) {
 			Failf("At least one pod wasn't running and ready at test start.")
 		}
@@ -214,7 +214,7 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 // allowing up to nt per node.
 func restartNodes(provider string, nt time.Duration) error {
 	switch provider {
-	case "gce":
+	case "gce", "gke":
 		return migRollingUpdateSelf(nt)
 	default:
 		return fmt.Errorf("restartNodes(...) not implemented for %s", provider)

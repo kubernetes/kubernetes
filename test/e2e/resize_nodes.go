@@ -118,7 +118,8 @@ func waitForGroupSize(size int) error {
 }
 
 func waitForClusterSize(c *client.Client, size int) error {
-	for start := time.Now(); time.Since(start) < 4*time.Minute; time.Sleep(20 * time.Second) {
+	timeout := 10 * time.Minute
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Logf("Failed to list nodes: %v", err)

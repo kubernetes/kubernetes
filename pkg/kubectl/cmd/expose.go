@@ -56,9 +56,9 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", "service/v1", "The name of the API generator to use.  Default is 'service/v1'.")
+	cmd.Flags().String("generator", "service/v2", "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.")
 	cmd.Flags().String("protocol", "TCP", "The network protocol for the service to be created. Default is 'tcp'.")
-	cmd.Flags().Int("port", -1, "The port that the service should serve on. Required.")
+	cmd.Flags().Int("port", -1, "The port that the service should serve on. Copied from the resource being exposed, if unspecified")
 	cmd.MarkFlagRequired("port")
 	cmd.Flags().String("type", "", "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP' unless --create-external-load-balancer is specified.")
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.")
@@ -126,7 +126,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		if len(s) == 0 {
 			s, err := f.PodSelectorForObject(inputObject)
 			if err != nil {
-				return err
+				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find selectors via --selector flag or introspection: %s", err))
 			}
 			params["selector"] = s
 		}
@@ -140,15 +140,15 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		if cmdutil.GetFlagInt(cmd, "port") < 0 && !noPorts {
 			ports, err := f.PortsForObject(inputObject)
 			if err != nil {
-				return err
+				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find port via --port flag or introspection: %s", err))
 			}
 			switch len(ports) {
 			case 0:
-				return cmdutil.UsageError(cmd, "couldn't find a suitable port via --port flag or introspection")
+				return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
 			case 1:
 				params["port"] = ports[0]
 			default:
-				return cmdutil.UsageError(cmd, "more than one port to choose from, please explicitly specify a port using the --port flag.")
+				return cmdutil.UsageError(cmd, fmt.Sprintf("multiple ports to choose from: %v, please explicitly specify a port using the --port flag.", ports))
 			}
 		}
 	}
@@ -199,16 +199,6 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		if err != nil {
 			return err
 		}
-	}
-
-	if cmdutil.GetFlagBool(cmd, "create-external-load-balancer") {
-		msg := fmt.Sprintf(`
-			An external load-balanced service was created.  On many platforms (e.g. Google Compute Engine),
-			you will also need to explicitly open a firewall rule for the service port (%d) to serve traffic.
-			
-			See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewall.md for more details.
-			`, cmdutil.GetFlagInt(cmd, "port"))
-		out.Write([]byte(msg))
 	}
 
 	return f.PrintObject(cmd, object, out)
