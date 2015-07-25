@@ -129,6 +129,14 @@ KUBE_API_ARGS=""
 ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
 ```
 
+* Create /var/run/kubernetes on master:
+
+```sh
+mkdir /var/run/kubernetes
+chown kube:kube /var/run/kubernetes
+chmod 750 /var/run/kubernetes
+```
+
 * Start the appropriate services on master:
 
 ```sh
