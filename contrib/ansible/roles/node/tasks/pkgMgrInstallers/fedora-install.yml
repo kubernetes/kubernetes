@@ -6,4 +6,3 @@
     enablerepo: "updates-testing"
   notify:
     - restart daemons
-  when: not is_atomic
