@@ -71,6 +71,9 @@ func nitFix(filename string) error {
 	newContents := strings.Replace(string(file), "<h2 id=\"_paths\">Paths</h2>", "<h2 id=\"_paths\">Operations</h2>", 1)
 	//Adapt the color of headings to k8s style
 	newContents = strings.Replace(newContents, "color: #ba3925", "color: #428BCB", -1)
+	//remove the underline in hyperlinks
+	newContents = strings.Replace(newContents, "a { color: #005498; text-decoration: underline; line-height: inherit; }",
+		"a { color: #005498; line-height: inherit; }", -1)
 
 	if err = ioutil.WriteFile(filename, []byte(newContents), 0666); err != nil {
 		return err
