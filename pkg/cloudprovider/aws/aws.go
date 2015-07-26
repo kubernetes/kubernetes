@@ -1694,7 +1694,9 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 		createResponse, err := s.ec2.CreateSecurityGroup(createRequest)
 		if err != nil {
 			ignore := false
-			if awsError, ok := err.(awserr.Error); ok {
+			switch err.(type) {
+			case awserr.Error:
+				awsError := err.(awserr.Error)
 				if awsError.Code() == "InvalidGroup.Duplicate" && attempt < MaxReadThenCreateRetries {
 					glog.V(2).Infof("Got InvalidGroup.Duplicate while creating security group (race?); will retry")
 					ignore = true
@@ -1725,8 +1727,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 	tagRequest := &ec2.CreateTagsInput{}
 	tagRequest.Resources = []*string{&groupID}
 	tagRequest.Tags = tags
-	_, err := s.createTags(tagRequest)
-	if err != nil {
+	if _, err := s.createTags(tagRequest); err != nil {
 		// Not clear how to recover fully from this; we're OK because we don't match on tags, but that is a little odd
 		return "", fmt.Errorf("error tagging security group: %v", err)
 	}
@@ -1737,6 +1738,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 // We retry mainly because if we create an object, we cannot tag it until it is "fully created" (eventual consistency)
 // The error code varies though (depending on what we are tagging), so we simply retry on all errors
 func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
+	// TODO: We really should do exponential backoff here
 	attempt := 0
 	maxAttempts := 60
 
