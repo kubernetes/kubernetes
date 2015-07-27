@@ -384,6 +384,34 @@ var _ = Describe("Examples e2e", func() {
 			}
 		})
 	})
+
+	Describe("[Skipped][Example]Hazelcast", func() {
+		It("should create and scale hazelcast", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(testContext.RepoRoot, "examples", "hazelcast", file)
+			}
+			serviceYaml := mkpath("hazelcast-service.yaml")
+			controllerYaml := mkpath("hazelcast-controller.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("starting hazelcast")
+			runKubectl("create", "-f", serviceYaml, nsFlag)
+			runKubectl("create", "-f", controllerYaml, nsFlag)
+			forEachPod(c, ns, "name", "hazelcast", func(pod api.Pod) {
+				_, err := lookForStringInLog(ns, pod.Name, "hazelcast", "Members [1]", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = lookForStringInLog(ns, pod.Name, "hazelcast", "is STARTED", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			By("scaling hazelcast")
+			ScaleRC(c, ns, "hazelcast", 2)
+			forEachPod(c, ns, "name", "hazelcast", func(pod api.Pod) {
+				_, err := lookForStringInLog(ns, pod.Name, "hazelcast", "Members [2]", serverStartTimeout)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
 })
 
 func makeHttpRequestToService(c *client.Client, ns, service, path string) (string, error) {
