@@ -6,13 +6,14 @@ REPORT_TAG=v1.0.1
 BRANCH=release-1.0
 
 set -e
+set -x
 
-TMPDIR=docs.$RANDOM
+tmpdir=docs.$RANDOM
 
 echo fetching upstream
 git fetch upstream
 go build ./_tools/release_docs
-./release_docs --branch ${BRANCH} --output-dir $TMPDIR >/dev/null
+./release_docs --branch ${BRANCH} --output-dir $tmpdir >/dev/null
 rm ./release_docs
 
 echo removing old
@@ -20,19 +21,20 @@ git rm -rf ${OUTDIR}/docs/ ${OUTDIR}/examples/ > /dev/null
 rm -rf ${OUTDIR}/docs/ ${OUTDIR}/examples/
 
 echo adding new
-mv $TMPDIR/docs ${OUTDIR}
-mv $TMPDIR/examples ${OUTDIR}
+mv $tmpdir/docs ${OUTDIR}
+mv $tmpdir/examples ${OUTDIR}
 git add ${OUTDIR}/docs/ ${OUTDIR}/examples/ > /dev/null
-rmdir $TMPDIR
+rmdir $tmpdir
 
 echo stripping
 for dir in docs examples; do
     find ${OUTDIR}/${dir} -type f -name \*.md | while read X; do
-        sed -i \
+        sed -i .import_docs_tmp \
             -e '/<!-- BEGIN STRIP_FOR_RELEASE.*/,/<!-- END STRIP_FOR_RELEASE.*/d' \
             -e "s|releases.k8s.io/HEAD|releases.k8s.io/${REPORT_TAG}|g" \
             ${X}
     done
+    rm $(find ${OUTDIR}/${dir} -name \*.import_docs_tmp)
     git stage ${OUTDIR}/${dir}
 done
 
