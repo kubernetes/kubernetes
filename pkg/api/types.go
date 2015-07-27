@@ -1138,11 +1138,6 @@ type ServiceSpec struct {
 	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
 	Type ServiceType `json:"type,omitempty"`
 
-	// DeprecatedPublicIPs are deprecated and silently ignored.
-	// Old behaviour: PublicIPs are used by external load balancers, or can be set by
-	// users to handle external traffic that arrives at a node.
-	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
-
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
 }

@@ -1068,14 +1068,6 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
-	for _, ip := range service.Spec.DeprecatedPublicIPs {
-		if ip == "0.0.0.0" {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.publicIPs", ip, "is not an IP address"))
-		} else if util.IsValidIPv4(ip) && net.ParseIP(ip).IsLoopback() {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.publicIPs", ip, "publicIP cannot be a loopback"))
-		}
-	}
-
 	if service.Spec.Type == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
 	} else if !supportedServiceType.Has(string(service.Spec.Type)) {

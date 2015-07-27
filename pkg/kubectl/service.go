@@ -135,9 +135,6 @@ func generate(params map[string]string) (runtime.Object, error) {
 	if params["create-external-load-balancer"] == "true" {
 		service.Spec.Type = api.ServiceTypeLoadBalancer
 	}
-	if len(params["public-ip"]) != 0 {
-		service.Spec.DeprecatedPublicIPs = []string{params["public-ip"]}
-	}
 	if len(params["type"]) != 0 {
 		service.Spec.Type = api.ServiceType(params["type"])
 	}

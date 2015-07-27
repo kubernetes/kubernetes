@@ -73,7 +73,7 @@ Changes to services are the most significant difference between v1beta3 and v1.
 
 * The `service.spec.portalIP` property is renamed to `service.spec.clusterIP`.
 * The `service.spec.createExternalLoadBalancer` property is removed. Specify `service.spec.type: "LoadBalancer"` to create an external load balancer instead.
-* The `service.spec.publicIPs` property is deprecated and now called `service.spec.deprecatedPublicIPs`. This property will be removed entirely when v1beta3 is removed. The vast majority of users of this field were using it to expose services on ports on the node. Those users should specify `service.spec.type: "NodePort"` instead. Read [External Services](user-guide/services.md#external-services) for more info. If this is not sufficient for your use case, please file an issue or contact @thockin.
+* The `service.spec.publicIPs` property is removed. The vast majority of users of this field were using it to expose services on ports on the node. Those users should specify `service.spec.type: "NodePort"` instead. Read [External Services](user-guide/services.md#external-services) for more info. If this is not sufficient for your use case, please file an issue or contact @thockin.
 
 Some other difference between v1beta3 and v1:
 
