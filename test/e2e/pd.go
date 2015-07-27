@@ -35,6 +35,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	gcePDDetachTimeout  = 10 * time.Minute
+	gcePDDetachPollTime = 10 * time.Second
+)
+
 var _ = Describe("Pod Disks", func() {
 	var (
 		podClient client.PodInterface
@@ -145,6 +150,7 @@ var _ = Describe("Pod Disks", func() {
 		expectNoError(err, "Failed to create rwPod")
 		expectNoError(framework.WaitForPodRunning(rwPod.Name))
 		expectNoError(podClient.Delete(rwPod.Name, nil), "Failed to delete host0Pod")
+		expectNoError(waitForPDDetach(diskName, host0Name))
 
 		By("submitting host0ROPod to kubernetes")
 		_, err = podClient.Create(host0ROPod)
@@ -378,4 +384,34 @@ func testPDPod(diskName, targetHost string, readOnly bool, numContainers int) *a
 	}
 
 	return pod
+}
+
+// Waits for specified PD to to detach from specified hostName
+func waitForPDDetach(diskName, hostName string) error {
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+		for start := time.Now(); time.Since(start) < gcePDDetachTimeout; time.Sleep(gcePDDetachPollTime) {
+			zone := testContext.CloudConfig.Zone
+
+			cmd := exec.Command("gcloud", "compute", "--project="+testContext.CloudConfig.ProjectID, "instances", "describe", "--zone="+zone, hostName)
+			data, err := cmd.CombinedOutput()
+			if err != nil {
+				Logf("Error waiting for PD %q to detach from node %q. 'gcloud compute instances describe' failed with %s (%v)", diskName, hostName, string(data), err)
+				return err
+			}
+
+			dataStr := strings.ToLower(string(data))
+			diskName = strings.ToLower(diskName)
+			if !strings.Contains(string(dataStr), diskName) {
+				// Specified disk does not appear to be attached to specified node
+				Logf("GCE PD %q appears to have successfully detached from %q.", diskName, hostName)
+				return nil
+			}
+
+			Logf("Waiting for GCE PD %q to detach from %q.", diskName, hostName)
+		}
+
+		return fmt.Errorf("Gave up waiting for GCE PD %q to detach from %q after %v", diskName, hostName, gcePDDetachTimeout)
+	}
+
+	return nil
 }
