@@ -308,7 +308,7 @@ type FakeMetadata struct {
 	aws *FakeAWSServices
 }
 
-func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
+func (self *FakeMetadata) GetMetadata(key string) ([]byte, error) {
 	if key == "placement/availability-zone" {
 		return []byte(self.aws.availabilityZone), nil
 	} else if key == "instance-id" {
