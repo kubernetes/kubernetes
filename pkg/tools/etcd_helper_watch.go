@@ -70,45 +70,22 @@ func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
 // API objects, and any items passing 'filter' are sent down the returned
 // watch.Interface. resourceVersion may be used to specify what version to begin
 // watching (e.g., for reconnecting without missing any updates).
-func (h *EtcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(true, exceptKey(key), filter, h.Codec, h.Versioner, nil, h)
-	go w.etcdWatch(h.Client, key, resourceVersion)
+	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
+	go w.etcdWatch(h.client, key, resourceVersion)
 	return w, nil
 }
 
 // Watch begins watching the specified key. Events are decoded into
 // API objects and sent down the returned watch.Interface.
 // Errors will be sent down the channel.
-func (h *EtcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(false, nil, filter, h.Codec, h.Versioner, nil, h)
-	go w.etcdWatch(h.Client, key, resourceVersion)
+	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
+	go w.etcdWatch(h.client, key, resourceVersion)
 	return w, nil
 }
-
-// WatchAndTransform begins watching the specified key. Events are decoded into
-// API objects and sent down the returned watch.Interface. If the transform
-// function is provided, the value decoded from etcd will be passed to the function
-// prior to being returned.
-//
-// The transform function can be used to populate data not available to etcd, or to
-// change or wrap the serialized etcd object.
-//
-//   startTime := time.Now()
-//   helper.WatchAndTransform(key, version, func(input runtime.Object) (runtime.Object, error) {
-//     value := input.(TimeAwareValue)
-//     value.Since = startTime
-//     return value, nil
-//   })
-//
-// Errors will be sent down the channel.
-/*func (h *EtcdHelper) WatchAndTransform(key string, resourceVersion uint64, transform TransformFunc) watch.Interface {
-	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(false, nil, Everything, h.Codec, h.Versioner, transform, h)
-	go w.etcdWatch(h.Client, key, resourceVersion)
-	return w
-}*/
 
 // TransformFunc attempts to convert an object to another object for use with a watcher.
 type TransformFunc func(runtime.Object) (runtime.Object, error)
@@ -126,7 +103,7 @@ func exceptKey(except string) includeFunc {
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
 	encoding  runtime.Codec
-	versioner EtcdVersioner
+	versioner StorageVersioner
 	transform TransformFunc
 
 	list    bool // If we're doing a recursive watch, should be true.
@@ -154,7 +131,7 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding runtime.Codec, versioner EtcdVersioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
+func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding runtime.Codec, versioner StorageVersioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:  encoding,
 		versioner: versioner,

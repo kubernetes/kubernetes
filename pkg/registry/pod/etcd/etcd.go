@@ -55,7 +55,7 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter) PodStorage {
+func NewStorage(s tools.StorageInterface, k client.ConnectionInfoGetter) PodStorage {
 	prefix := "/pods"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
@@ -74,7 +74,7 @@ func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter) PodStorage {
 		},
 		EndpointName: "pods",
 
-		Helper: h,
+		Storage: s,
 	}
 	statusStore := *store
 
@@ -142,7 +142,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 	if err != nil {
 		return nil, err
 	}
-	err = r.store.Helper.GuaranteedUpdate(podKey, &api.Pod{}, false, tools.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+	err = r.store.Storage.GuaranteedUpdate(podKey, &api.Pod{}, false, tools.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)

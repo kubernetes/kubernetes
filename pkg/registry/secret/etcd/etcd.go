@@ -32,9 +32,8 @@ type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewStorage returns a registry which will store Secret in the given helper
-func NewStorage(h tools.EtcdHelper) *REST {
-
+// NewStorage returns a registry which will store Secret in the given etcdStorage
+func NewStorage(s tools.StorageInterface) *REST {
 	prefix := "/secrets"
 
 	store := &etcdgeneric.Etcd{
@@ -54,7 +53,7 @@ func NewStorage(h tools.EtcdHelper) *REST {
 		},
 		EndpointName: "secrets",
 
-		Helper: h,
+		Storage: s,
 	}
 
 	store.CreateStrategy = secret.Strategy

@@ -35,7 +35,7 @@ type REST struct {
 const Prefix = "/serviceaccounts"
 
 // NewStorage returns a RESTStorage object that will work against service accounts objects.
-func NewStorage(h tools.EtcdHelper) *REST {
+func NewStorage(s tools.StorageInterface) *REST {
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ServiceAccount{} },
 		NewListFunc: func() runtime.Object { return &api.ServiceAccountList{} },
@@ -53,7 +53,7 @@ func NewStorage(h tools.EtcdHelper) *REST {
 		},
 		EndpointName: "serviceaccounts",
 
-		Helper: h,
+		Storage: s,
 	}
 
 	store.CreateStrategy = serviceaccount.Strategy

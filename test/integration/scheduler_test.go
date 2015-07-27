@@ -53,9 +53,9 @@ type nodeStateManager struct {
 }
 
 func TestUnschedulableNodes(t *testing.T) {
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
-		t.Fatalf("Couldn't create etcd helper: %v", err)
+		t.Fatalf("Couldn't create etcd storage: %v", err)
 	}
 	framework.DeleteAllEtcdKeys()
 
@@ -66,7 +66,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,

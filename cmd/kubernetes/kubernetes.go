@@ -78,14 +78,14 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
 	handler := delegateHandler{}
 
-	helper, err := master.NewEtcdHelper(etcdClient, "", master.DefaultEtcdPathPrefix)
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, "", master.DefaultEtcdPathPrefix)
 	if err != nil {
-		glog.Fatalf("Unable to get etcd helper: %v", err)
+		glog.Fatalf("Unable to get etcd storage: %v", err)
 	}
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		EtcdHelper: helper,
+		DatabaseStorage: etcdStorage,
 		KubeletClient: &client.HTTPKubeletClient{
 			Client: http.DefaultClient,
 			Config: &client.KubeletConfig{Port: 10250},

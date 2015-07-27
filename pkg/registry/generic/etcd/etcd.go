@@ -103,7 +103,7 @@ type Etcd struct {
 	ReturnDeletedObject bool
 
 	// Used for all etcd access functions
-	Helper tools.EtcdHelper
+	Storage tools.StorageInterface
 }
 
 // NamespaceKeyRootFunc is the default function for constructing etcd paths to resource directories enforcing namespace rules.
@@ -157,14 +157,14 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		err = e.Helper.ExtractObjToList(key, list)
+		err = e.Storage.ExtractObjToList(key, list)
 		trace.Step("Object extracted")
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		trace.Step("About to list directory")
-		err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
+		err := e.Storage.ExtractToList(e.KeyRootFunc(ctx), list)
 		trace.Step("List extracted")
 		if err != nil {
 			return nil, err
@@ -190,7 +190,7 @@ func (e *Etcd) CreateWithName(ctx api.Context, name string, obj runtime.Object) 
 	if err != nil {
 		return err
 	}
-	err = e.Helper.CreateObj(key, obj, nil, ttl)
+	err = e.Storage.CreateObj(key, obj, nil, ttl)
 	err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 	if err == nil && e.Decorator != nil {
 		err = e.Decorator(obj)
@@ -219,7 +219,7 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 	}
 	trace.Step("About to create object")
 	out := e.NewFunc()
-	if err := e.Helper.CreateObj(key, obj, out, ttl); err != nil {
+	if err := e.Storage.CreateObj(key, obj, out, ttl); err != nil {
 		err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		return nil, err
@@ -249,7 +249,7 @@ func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) 
 	if err != nil {
 		return err
 	}
-	err = e.Helper.SetObj(key, obj, nil, ttl)
+	err = e.Storage.SetObj(key, obj, nil, ttl)
 	err = etcderr.InterpretUpdateError(err, e.EndpointName, name)
 	if err == nil && e.Decorator != nil {
 		err = e.Decorator(obj)
@@ -274,7 +274,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// If AllowUnconditionalUpdate() is true and the object specified by the user does not have a resource version,
 	// then we populate it with the latest version.
 	// Else, we check that the version specified by the user matches the version of latest etcd object.
-	resourceVersion, err := e.Helper.Versioner.ObjectResourceVersion(obj)
+	resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 	if err != nil {
 		return nil, false, err
 	}
@@ -282,8 +282,8 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
-	err = e.Helper.GuaranteedUpdate(key, out, true, func(existing runtime.Object, res tools.ResponseMeta) (runtime.Object, *uint64, error) {
-		version, err := e.Helper.Versioner.ObjectResourceVersion(existing)
+	err = e.Storage.GuaranteedUpdate(key, out, true, func(existing runtime.Object, res tools.ResponseMeta) (runtime.Object, *uint64, error) {
+		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -305,13 +305,13 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		creating = false
 		if doUnconditionalUpdate {
 			// Update the object's resource version to match the latest etcd object's resource version.
-			err = e.Helper.Versioner.UpdateObject(obj, res.Expiration, res.ResourceVersion)
+			err = e.Storage.Versioner().UpdateObject(obj, res.Expiration, res.ResourceVersion)
 			if err != nil {
 				return nil, nil, err
 			}
 		} else {
 			// Check if the object's resource version matches the latest resource version.
-			newVersion, err := e.Helper.Versioner.ObjectResourceVersion(obj)
+			newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -372,7 +372,7 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 		return nil, err
 	}
 	trace.Step("About to read object")
-	if err := e.Helper.ExtractObj(key, obj, false); err != nil {
+	if err := e.Storage.ExtractObj(key, obj, false); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.EndpointName, name)
 	}
 	trace.Step("Object read")
@@ -395,7 +395,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	trace := util.NewTrace("Delete " + reflect.TypeOf(obj).String())
 	defer trace.LogIfLong(time.Second)
 	trace.Step("About to read object")
-	if err := e.Helper.ExtractObj(key, obj, false); err != nil {
+	if err := e.Storage.ExtractObj(key, obj, false); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
 
@@ -413,7 +413,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	if graceful && *options.GracePeriodSeconds != 0 {
 		trace.Step("Graceful deletion")
 		out := e.NewFunc()
-		if err := e.Helper.SetObj(key, obj, out, uint64(*options.GracePeriodSeconds)); err != nil {
+		if err := e.Storage.SetObj(key, obj, out, uint64(*options.GracePeriodSeconds)); err != nil {
 			return nil, etcderr.InterpretUpdateError(err, e.EndpointName, name)
 		}
 		return e.finalizeDelete(out, true)
@@ -422,7 +422,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
 	trace.Step("About to delete object")
-	if err := e.Helper.DeleteObj(key, out); err != nil {
+	if err := e.Storage.DeleteObj(key, out); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
 	return e.finalizeDelete(out, true)
@@ -480,10 +480,10 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 		if err != nil {
 			return nil, err
 		}
-		return e.Helper.Watch(key, version, filterFunc)
+		return e.Storage.Watch(key, version, filterFunc)
 	}
 
-	return e.Helper.WatchList(e.KeyRootFunc(ctx), version, filterFunc)
+	return e.Storage.WatchList(e.KeyRootFunc(ctx), version, filterFunc)
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or returning an error

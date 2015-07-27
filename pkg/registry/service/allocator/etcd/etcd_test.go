@@ -30,18 +30,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 )
 
-func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
+func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, tools.StorageInterface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, helper
+	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
+	return fakeEtcdClient, etcdStorage
 }
 
 func newStorage(t *testing.T) (*Etcd, allocator.Interface, *tools.FakeEtcdClient) {
-	fakeEtcdClient, h := newHelper(t)
+	fakeEtcdClient, s := newEtcdStorage(t)
 
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
-	etcd := NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", h)
+	etcd := NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", s)
 
 	return etcd, mem, fakeEtcdClient
 }
@@ -101,7 +101,7 @@ func TestStore(t *testing.T) {
 	other := allocator.NewAllocationMap(100, "rangeSpecValue")
 
 	allocation := &api.RangeAllocation{}
-	if err := storage.helper.ExtractObj(key(), allocation, false); err != nil {
+	if err := storage.storage.ExtractObj(key(), allocation, false); err != nil {
 		t.Fatal(err)
 	}
 	if allocation.ResourceVersion != "1" {
@@ -118,7 +118,7 @@ func TestStore(t *testing.T) {
 	}
 
 	other = allocator.NewAllocationMap(100, "rangeSpecValue")
-	otherStorage := NewEtcd(other, "/ranges/serviceips", "serviceipallocation", storage.helper)
+	otherStorage := NewEtcd(other, "/ranges/serviceips", "serviceipallocation", storage.storage)
 	if ok, err := otherStorage.Allocate(2); ok || err != nil {
 		t.Fatal(err)
 	}

@@ -41,8 +41,8 @@ func NewEtcdClient() *etcd.Client {
 	return etcd.NewClient([]string{})
 }
 
-func NewHelper() (tools.EtcdHelper, error) {
-	return master.NewEtcdHelper(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+func NewEtcdStorage() (tools.StorageInterface, error) {
+	return master.NewEtcdStorage(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 }
 
 func RequireEtcd() {

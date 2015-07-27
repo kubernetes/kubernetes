@@ -29,7 +29,7 @@ import (
 // for objects that have an embedded ObjectMeta or ListMeta field.
 type APIObjectVersioner struct{}
 
-// UpdateObject implements EtcdVersioner
+// UpdateObject implements StorageVersioner
 func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error {
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
@@ -46,7 +46,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Ti
 	return nil
 }
 
-// UpdateList implements EtcdVersioner
+// UpdateList implements StorageVersioner
 func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64) error {
 	listMeta, err := api.ListMetaFor(obj)
 	if err != nil || listMeta == nil {
@@ -60,7 +60,7 @@ func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint6
 	return nil
 }
 
-// ObjectResourceVersion implements EtcdVersioner
+// ObjectResourceVersion implements StorageVersioner
 func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
 	meta, err := api.ObjectMetaFor(obj)
 	if err != nil {
@@ -73,5 +73,5 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 	return strconv.ParseUint(version, 10, 64)
 }
 
-// APIObjectVersioner implements EtcdVersioner
-var _ EtcdVersioner = APIObjectVersioner{}
+// APIObjectVersioner implements StorageVersioner
+var _ StorageVersioner = APIObjectVersioner{}

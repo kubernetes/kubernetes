@@ -29,8 +29,8 @@ type registry struct {
 	*etcdgeneric.Etcd
 }
 
-// NewEtcdRegistry returns a registry which will store LimitRange in the given helper
-func NewEtcdRegistry(h tools.EtcdHelper) generic.Registry {
+// NewEtcdRegistry returns a registry which will store LimitRange in the given storage
+func NewEtcdRegistry(s tools.StorageInterface) generic.Registry {
 	prefix := "/limitranges"
 	return registry{
 		Etcd: &etcdgeneric.Etcd{
@@ -43,7 +43,7 @@ func NewEtcdRegistry(h tools.EtcdHelper) generic.Registry {
 			KeyFunc: func(ctx api.Context, id string) (string, error) {
 				return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
 			},
-			Helper: h,
+			Storage: s,
 		},
 	}
 }
