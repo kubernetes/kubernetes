@@ -357,7 +357,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	}
 	var pvcOut api.PersistentVolumeClaim
 	key, _ = storage.KeyFunc(ctx, "foo")
-	if err := etcdStorage.ExtractObj(key, &pvcOut, false); err != nil {
+	if err := etcdStorage.Get(key, &pvcOut, false); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if !api.Semantic.DeepEqual(expected, pvcOut) {

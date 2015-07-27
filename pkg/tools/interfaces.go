@@ -99,29 +99,22 @@ type StorageInterface interface {
 	// Returns StorageVersioner associated with this interface.
 	Versioner() StorageVersioner
 
-	// CreateObj adds a new object at a key unless it already exists. 'ttl' is time-to-live
+	// Create adds a new object at a key unless it already exists. 'ttl' is time-to-live
 	// in seconds (0 means forever). If no error is returned and out is not nil, out will be
 	// set to the read value from etcd.
-	//
-	// TODO(wojtekt): Rename to Create().
-	CreateObj(key string, obj, out runtime.Object, ttl uint64) error
+	Create(key string, obj, out runtime.Object, ttl uint64) error
 
-	// SetObj marshals obj via json and stores in etcd under key. Will do an atomic update
+	// Set marshals obj via json and stores in etcd under key. Will do an atomic update
 	// if obj's ResourceVersion field is set. 'ttl' is time-to-live in seconds (0 means forever).
 	// If no error is returned and out is not nil, out will be set to the read value from etcd.
-	//
-	// TODO(wojtekt): Rename to Set() (or Update?).
-	SetObj(key string, obj, out runtime.Object, ttl uint64) error
+	Set(key string, obj, out runtime.Object, ttl uint64) error
 
-	// DeleteObj removes the specified key and returns the value that existed at that spot.
-	//
-	// TODO(wojtekt): Rename to Delete().
-	DeleteObj(key string, out runtime.Object) error
+	// Delete removes the specified key and returns the value that existed at that spot.
+	Delete(key string, out runtime.Object) error
 
-	// Delete removes the specified key.
-	//
-	// TODO(wojtekt): Unify it with DeleteObj().
-	Delete(key string, recursive bool) error
+	// RecursiveDelete removes the specified key.
+	// TODO: Get rid of this method and use Delete() instead.
+	RecursiveDelete(key string, recursive bool) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items passing 'filter' are sent down to returned watch.Interface.
@@ -135,24 +128,18 @@ type StorageInterface interface {
 	// (e.g. reconnecting without missing any updates).
 	WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
 
-	// ExtractObj unmarshals json found at key into objPtr. On a not found error, will either
+	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
 	// Treats empty responses and nil response nodes exactly like a not found error.
-	//
-	// TODO(wojtekt): Rename to Get().
-	ExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) error
+	Get(key string, objPtr runtime.Object, ignoreNotFound bool) error
 
-	// ExtractObjToList unmarshals json found at key and opaque it into *List api object
+	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	//
-	// TODO(wojtekt): Rename to GetToList().
-	ExtractObjToList(key string, listObj runtime.Object) error
+	GetToList(key string, listObj runtime.Object) error
 
-	// ExtractToList unmarshalls jsons found at directory defined by key and opaque them
+	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
-	//
-	// TODO(wojtekt): Rename to List().
-	ExtractToList(key string, listObj runtime.Object) error
+	List(key string, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is etcd index conflict.

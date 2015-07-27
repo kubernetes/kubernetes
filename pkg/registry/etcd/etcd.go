@@ -96,7 +96,7 @@ func makeServiceKey(ctx api.Context, name string) (string, error) {
 // ListServices obtains a list of Services.
 func (r *Registry) ListServices(ctx api.Context) (*api.ServiceList, error) {
 	list := &api.ServiceList{}
-	err := r.ExtractToList(makeServiceListKey(ctx), list)
+	err := r.List(makeServiceListKey(ctx), list)
 	return list, err
 }
 
@@ -107,7 +107,7 @@ func (r *Registry) CreateService(ctx api.Context, svc *api.Service) (*api.Servic
 		return nil, err
 	}
 	out := &api.Service{}
-	err = r.CreateObj(key, svc, out, 0)
+	err = r.Create(key, svc, out, 0)
 	return out, etcderr.InterpretCreateError(err, "service", svc.Name)
 }
 
@@ -118,7 +118,7 @@ func (r *Registry) GetService(ctx api.Context, name string) (*api.Service, error
 		return nil, err
 	}
 	var svc api.Service
-	err = r.ExtractObj(key, &svc, false)
+	err = r.Get(key, &svc, false)
 	if err != nil {
 		return nil, etcderr.InterpretGetError(err, "service", name)
 	}
@@ -131,7 +131,7 @@ func (r *Registry) DeleteService(ctx api.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	err = r.Delete(key, true)
+	err = r.RecursiveDelete(key, true)
 	if err != nil {
 		return etcderr.InterpretDeleteError(err, "service", name)
 	}
@@ -152,7 +152,7 @@ func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) (*api.Servic
 		return nil, err
 	}
 	out := &api.Service{}
-	err = r.SetObj(key, svc, out, 0)
+	err = r.Set(key, svc, out, 0)
 	return out, etcderr.InterpretUpdateError(err, "service", svc.Name)
 }
 

@@ -89,7 +89,7 @@ func getEncodedPod(name string) string {
 	return string(pod)
 }
 
-func TestExtractToList(t *testing.T) {
+func TestList(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
@@ -149,7 +149,7 @@ func TestExtractToList(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.ExtractToList("/some/key", &got)
+	err := helper.List("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -158,8 +158,8 @@ func TestExtractToList(t *testing.T) {
 	}
 }
 
-// TestExtractToListAcrossDirectories ensures that the client excludes directories and flattens tree-response - simulates cross-namespace query
-func TestExtractToListAcrossDirectories(t *testing.T) {
+// TestListAcrossDirectories ensures that the client excludes directories and flattens tree-response - simulates cross-namespace query
+func TestListAcrossDirectories(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
@@ -233,7 +233,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.ExtractToList("/some/key", &got)
+	err := helper.List("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -242,7 +242,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 	}
 }
 
-func TestExtractToListExcludesDirectories(t *testing.T) {
+func TestListExcludesDirectories(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
@@ -304,7 +304,7 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.ExtractToList("/some/key", &got)
+	err := helper.List("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -313,7 +313,7 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 	}
 }
 
-func TestExtractObj(t *testing.T) {
+func TestGet(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
@@ -326,7 +326,7 @@ func TestExtractObj(t *testing.T) {
 	}
 	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &expect), 0)
 	var got api.Pod
-	err := helper.ExtractObj("/some/key", &got, false)
+	err := helper.Get("/some/key", &got, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -335,7 +335,7 @@ func TestExtractObj(t *testing.T) {
 	}
 }
 
-func TestExtractObjNotFoundErr(t *testing.T) {
+func TestGetNotFoundErr(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key1 := etcdtest.AddPrefix("/some/key")
@@ -363,11 +363,11 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 	}
 	try := func(key string) {
 		var got api.Pod
-		err := helper.ExtractObj(key, &got, false)
+		err := helper.Get(key, &got, false)
 		if err == nil {
 			t.Errorf("%s: wanted error but didn't get one", key)
 		}
-		err = helper.ExtractObj(key, &got, true)
+		err = helper.Get(key, &got, true)
 		if err != nil {
 			t.Errorf("%s: didn't want error but got %#v", key, err)
 		}
@@ -378,12 +378,12 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 	try("/some/key3")
 }
 
-func TestCreateObj(t *testing.T) {
+func TestCreate(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
-	err := helper.CreateObj("/some/key", obj, returnedObj, 5)
+	err := helper.Create("/some/key", obj, returnedObj, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -404,22 +404,22 @@ func TestCreateObj(t *testing.T) {
 	}
 }
 
-func TestCreateObjNilOutParam(t *testing.T) {
+func TestCreateNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
-	err := helper.CreateObj("/some/key", obj, nil, 5)
+	err := helper.Create("/some/key", obj, nil, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
 }
 
-func TestSetObj(t *testing.T) {
+func TestSet(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	returnedObj := &api.Pod{}
-	err := helper.SetObj("/some/key", obj, returnedObj, 5)
+	err := helper.Set("/some/key", obj, returnedObj, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -441,18 +441,18 @@ func TestSetObj(t *testing.T) {
 	}
 }
 
-func TestSetObjFailCAS(t *testing.T) {
+func TestSetFailCAS(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.CasErr = fakeClient.NewError(123)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
-	err := helper.SetObj("/some/key", obj, nil, 5)
+	err := helper.Set("/some/key", obj, nil, 5)
 	if err == nil {
 		t.Errorf("Expecting error.")
 	}
 }
 
-func TestSetObjWithVersion(t *testing.T) {
+func TestSetWithVersion(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
@@ -468,7 +468,7 @@ func TestSetObjWithVersion(t *testing.T) {
 	}
 
 	returnedObj := &api.Pod{}
-	err := helper.SetObj("/some/key", obj, returnedObj, 7)
+	err := helper.Set("/some/key", obj, returnedObj, 7)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
@@ -489,13 +489,13 @@ func TestSetObjWithVersion(t *testing.T) {
 	}
 }
 
-func TestSetObjWithoutResourceVersioner(t *testing.T) {
+func TestSetWithoutResourceVersioner(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	helper.versioner = nil
 	returnedObj := &api.Pod{}
-	err := helper.SetObj("/some/key", obj, returnedObj, 3)
+	err := helper.Set("/some/key", obj, returnedObj, 3)
 	key := etcdtest.AddPrefix("/some/key")
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
@@ -517,12 +517,12 @@ func TestSetObjWithoutResourceVersioner(t *testing.T) {
 	}
 }
 
-func TestSetObjNilOutParam(t *testing.T) {
+func TestSetNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := newEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	helper.versioner = nil
-	err := helper.SetObj("/some/key", obj, nil, 3)
+	err := helper.Set("/some/key", obj, nil, 3)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
