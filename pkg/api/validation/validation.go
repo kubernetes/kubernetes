@@ -484,6 +484,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.AccessModes"))
 	}
 
+	for _, mode := range pv.Spec.AccessModes {
+		if mode != api.ReadWriteOnce && mode != api.ReadOnlyMany && mode != api.ReadWriteMany {
+			allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolume.Spec.AccessModes", mode, fmt.Sprintf("only %s, %s, and %s are valid", api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany)))
+		}
+	}
+
 	if len(pv.Spec.Capacity) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.Capacity"))
 	}
@@ -556,6 +562,11 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.Validati
 	allErrs := ValidateObjectMeta(&pvc.ObjectMeta, true, ValidatePersistentVolumeName)
 	if len(pvc.Spec.AccessModes) == 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.AccessModes", pvc.Spec.AccessModes, "at least 1 PersistentVolumeAccessMode is required"))
+	}
+	for _, mode := range pvc.Spec.AccessModes {
+		if mode != api.ReadWriteOnce && mode != api.ReadOnlyMany && mode != api.ReadWriteMany {
+			allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.AccessModes", mode, fmt.Sprintf("only %s, %s, and %s are valid", api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany)))
+		}
 	}
 	if _, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; !ok {
 		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.Resources.Requests, "No Storage size specified"))
