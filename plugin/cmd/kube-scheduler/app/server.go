@@ -47,21 +47,25 @@ import (
 
 // SchedulerServer has all the context and params needed to run a Scheduler
 type SchedulerServer struct {
-	Port              int
-	Address           util.IP
-	AlgorithmProvider string
-	PolicyConfigFile  string
-	EnableProfiling   bool
-	Master            string
-	Kubeconfig        string
+	Port    int
+	Address util.IP
+	//AlgorithmProvider    string
+	DefaultProvider      string
+	AlgorithmProviderMap map[string]factory.AlgorithmProviderConfig
+	PolicyConfigFile     string
+	EnableProfiling      bool
+	Master               string
+	Kubeconfig           string
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
 func NewSchedulerServer() *SchedulerServer {
 	s := SchedulerServer{
-		Port:              ports.SchedulerPort,
-		Address:           util.IP(net.ParseIP("127.0.0.1")),
-		AlgorithmProvider: factory.DefaultProvider,
+		Port:    ports.SchedulerPort,
+		Address: util.IP(net.ParseIP("127.0.0.1")),
+		//		AlgorithmProvider: factory.DefaultProvider,
+		AlgorithmProviderMap: factory.AlgorithmProviderMap,
+		DefaultProvider:      factory.DefaultProvider,
 	}
 	return &s
 }
@@ -70,7 +74,9 @@ func NewSchedulerServer() *SchedulerServer {
 func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the scheduler's http service runs on")
 	fs.Var(&s.Address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.StringVar(&s.AlgorithmProvider, "algorithm-provider", s.AlgorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
+	// TODO (dingh), condider how to print the info
+	//	fs.StringVar(&s.AlgorithmProvider, "algorithm-provider", s.AlgorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
+	fs.StringVar(&s.DefaultProvider, "algorithm-provider", s.DefaultProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
 	fs.StringVar(&s.PolicyConfigFile, "policy-config-file", s.PolicyConfigFile, "File with scheduler policy configuration")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
@@ -152,10 +158,11 @@ func (s *SchedulerServer) createConfig(configFactory *factory.ConfigFactory) (*s
 
 	// if the config file isn't provided, use the specified (or default) provider
 	// check of algorithm provider is registered and fail fast
-	_, err := factory.GetAlgorithmProvider(s.AlgorithmProvider)
+	//	_, err := factory.GetAlgorithmProvider(s.AlgorithmProvider)
+	_, err := factory.GetAlgorithmProvider(s.DefaultProvider)
 	if err != nil {
 		return nil, err
 	}
 
-	return configFactory.CreateFromProvider(s.AlgorithmProvider)
+	return configFactory.CreateFromProvider(s.AlgorithmProviderMap)
 }

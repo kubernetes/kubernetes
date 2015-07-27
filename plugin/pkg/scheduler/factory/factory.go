@@ -118,18 +118,32 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 
 // Create creates a scheduler with the default algorithm provider.
 func (f *ConfigFactory) Create() (*scheduler.Config, error) {
-	return f.CreateFromProvider(DefaultProvider)
+	//return f.CreateFromProvider(DefaultProvider)
+	return f.CreateFromProvider(AlgorithmProviderMap)
 }
 
 // Creates a scheduler from the name of a registered algorithm provider.
-func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Config, error) {
-	glog.V(2).Infof("creating scheduler from algorithm provider '%v'", providerName)
-	provider, err := GetAlgorithmProvider(providerName)
-	if err != nil {
-		return nil, err
-	}
+//func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Config, error) {
+//	glog.V(2).Infof("creating scheduler from algorithm provider '%v'", providerName)
+//	provider, err := GetAlgorithmProvider(providerName)
+//	if err != nil {
+//		return nil, err
+//	}
 
-	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys)
+//	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys)
+//}
+func (f *ConfigFactory) CreateFromProvider(providerConfigMap map[string]AlgorithmProviderConfig) (*scheduler.Config, error) {
+	//	providerMap := make(map[string]*AlgorithmProviderConfig)
+	//	for _, name := range providerNames {
+	//		var err error
+	//		glog.V(2).Infof("creating scheduler from algorithm provider '%v'", name)
+	//		providerMap[name], err = GetAlgorithmProvider(name)
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//	}
+	//	return f.CreateFromKeys(providerMap)
+	return f.CreateFromKeys(providerConfigMap)
 }
 
 // Creates a scheduler from the configuration file
@@ -153,12 +167,80 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
 	}
 
-	return f.CreateFromKeys(predicateKeys, priorityKeys)
+	algorithmConfig := AlgorithmProviderConfig{predicateKeys, priorityKeys}
+	// TODO (dingh): Maybe set a new field in the config file to specify the provider name
+	name := "ConfigFile"
+	AlgorithmProviderMap[name] = algorithmConfig
+	//return f.CreateFromKeys(predicateKeys, priorityKeys)
+	return f.CreateFromKeys(AlgorithmProviderMap)
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
-	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
+//func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
+//	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
+//	pluginArgs := PluginFactoryArgs{
+//		PodLister:     f.PodLister,
+//		ServiceLister: f.ServiceLister,
+//		// All fit predicates only need to consider schedulable nodes.
+//		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+//		NodeInfo:   f.NodeLister,
+//	}
+//	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
+//	if err != nil {
+//		return nil, err
+//	}
+
+//	priorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, pluginArgs)
+//	if err != nil {
+//		return nil, err
+//	}
+
+//	// Watch and queue pods that need scheduling.
+//	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).RunUntil(f.StopEverything)
+
+//	// Begin populating scheduled pods.
+//	go f.scheduledPodPopulator.Run(f.StopEverything)
+
+//	// Watch minions.
+//	// Minions may be listed frequently, so provide a local up-to-date cache.
+//	cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
+
+//	// Watch and cache all service objects. Scheduler needs to find all pods
+//	// created by the same service, so that it can spread them correctly.
+//	// Cache this locally.
+//	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).RunUntil(f.StopEverything)
+
+//	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+//	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
+
+//	podBackoff := podBackoff{
+//		perPodBackoff: map[string]*backoffEntry{},
+//		clock:         realClock{},
+
+//		defaultDuration: 1 * time.Second,
+//		maxDuration:     60 * time.Second,
+//	}
+
+//	return &scheduler.Config{
+//		Modeler: f.modeler,
+//		// The scheduler only needs to consider schedulable nodes.
+//		MinionLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+//		Algorithm:    algo,
+//		Binder:       &binder{f.Client},
+//		NextPod: func() *api.Pod {
+//			pod := f.PodQueue.Pop().(*api.Pod)
+//			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
+//			return pod
+//		},
+//		Error:               f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
+//		BindPodsRateLimiter: f.BindPodsRateLimiter,
+//		StopEverything:      f.StopEverything,
+//	}, nil
+//}
+func (f *ConfigFactory) CreateFromKeys(providerMap map[string]AlgorithmProviderConfig) (*scheduler.Config, error) {
+	//glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
+	// TODO (dingh): add logs
 	pluginArgs := PluginFactoryArgs{
 		PodLister:     f.PodLister,
 		ServiceLister: f.ServiceLister,
@@ -166,14 +248,21 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
 		NodeInfo:   f.NodeLister,
 	}
-	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
-	if err != nil {
-		return nil, err
-	}
+	algoMap := make(map[string]algorithm.ScheduleAlgorithm)
+	for name, _ := range providerMap {
+		predicateFuncs, err := getFitPredicateFunctions(providerMap[name].FitPredicateKeys, pluginArgs)
+		if err != nil {
+			return nil, err
+		}
 
-	priorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, pluginArgs)
-	if err != nil {
-		return nil, err
+		priorityConfigs, err := getPriorityFunctionConfigs(providerMap[name].PriorityFunctionKeys, pluginArgs)
+		if err != nil {
+			return nil, err
+		}
+
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+		algoMap[name] = scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
 	}
 
 	// Watch and queue pods that need scheduling.
@@ -191,10 +280,6 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	// Cache this locally.
 	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).RunUntil(f.StopEverything)
 
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
-
 	podBackoff := podBackoff{
 		perPodBackoff: map[string]*backoffEntry{},
 		clock:         realClock{},
@@ -207,7 +292,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 		Modeler: f.modeler,
 		// The scheduler only needs to consider schedulable nodes.
 		MinionLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
-		Algorithm:    algo,
+		AlgorithmMap: algoMap,
 		Binder:       &binder{f.Client},
 		NextPod: func() *api.Pod {
 			pod := f.PodQueue.Pop().(*api.Pod)
