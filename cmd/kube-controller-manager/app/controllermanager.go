@@ -38,7 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/routecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
-	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/namespace"
