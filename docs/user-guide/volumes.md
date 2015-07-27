@@ -61,7 +61,7 @@ Familiarity with [pods](pods.md) is suggested.
     - [glusterfs](#glusterfs)
     - [rbd](#rbd)
     - [gitRepo](#gitrepo)
-    - [Secrets](#secrets)
+    - [secret](#secret)
     - [persistentVolumeClaim](#persistentvolumeclaim)
   - [Resources](#resources)
 
@@ -358,7 +358,7 @@ mounts an empty directory and clones a git repository into it for your pod to
 use.  In the future, such volumes may be moved to an even more decoupled model,
 rather than extending the Kubernetes API for every such use case.
 
-### Secrets
+### secret
 
 A `secret` volume is used to pass sensitive information, such as passwords, to
 pods.  You can store secrets in the Kubernetes API and mount them as files for
