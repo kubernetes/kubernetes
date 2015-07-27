@@ -209,6 +209,11 @@ func (rm *ReplicationManager) getPodControllers(pod *api.Pod) *api.ReplicationCo
 		glog.V(4).Infof("No controllers found for pod %v, replication manager will avoid syncing", pod.Name)
 		return nil
 	}
+	// In theory, overlapping controllers is user error. This sorting will not prevent
+	// osciallation of replicas in all cases, eg:
+	// rc1 (older rc): [(k1:v1)], replicas=1 rc2: [(k2:v2), (k1:v1)], replicas=2
+	// pod: [(k1:v1)] will wake both rc1 and rc2, and we will sync rc1.
+	// pod: [(k2:v2), (k1:v1)] will wake rc2 which creates a new replica.
 	sort.Sort(overlappingControllers(controllers))
 	return &controllers[0]
 }
@@ -281,6 +286,12 @@ func (rm *ReplicationManager) enqueueController(obj interface{}) {
 		return
 	}
 
+	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
+	// deterministically avoid syncing controllers that fight over pods. Currently, we only
+	// ensure that the same controller is synced for a given pod. When we periodically relist
+	// all controllers there will still be some replica instability. One way to handle this is
+	// by querying the store for all controllers that this rc overlaps, as well as all
+	// controllers that overlap this rc, and sorting them.
 	rm.queue.Add(key)
 }
 
