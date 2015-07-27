@@ -1,0 +1,47 @@
+.override_api_page{
+   font-family: $fontsMontserrat;
+   font-weight: 400;
+   font-size: 14px;
+   line-height: 16.8px;
+   padding-top: 82px;
+   z-index: $zContent;
+   a {
+      text-decoration: none;
+   }
+   .underline { text-decoration: none }
+}
+
+ul.menu{
+   line-height: inherit;
+}
+
+div#gcse-wrapper td {
+   padding: 0;
+}
+
+div .sect1 {
+    h1 {
+            font-family: "Roboto",sans-serif;
+            color: #428BCB;
+        }
+
+    h2 {
+            font-family: "Roboto",sans-serif;
+            color: #428BCB;
+        }
+
+    h3 {
+            font-family: "Roboto",sans-serif;
+            color: #428BCB;
+        }
+
+    h4 {
+            font-family: "Roboto",sans-serif;
+            color: #428BCB;
+        }
+
+    h5 {
+            font-family: "Roboto",sans-serif;
+            color: #428BCB;
+        }
+}
