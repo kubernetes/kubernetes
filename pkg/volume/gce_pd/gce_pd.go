@@ -229,8 +229,8 @@ func (b *gcePersistentDiskBuilder) SetUpAt(dir string) error {
 	return nil
 }
 
-func (pd *gcePersistentDisk) IsReadOnly() bool {
-	return pd.readOnly
+func (b *gcePersistentDiskBuilder) IsReadOnly() bool {
+	return b.readOnly
 }
 
 func makeGlobalPDName(host volume.VolumeHost, devName string) string {
