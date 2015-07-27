@@ -28,7 +28,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v5
+          image: gcr.io/google_containers/cassandra:v6
           name: cassandra
           ports:
             - containerPort: 9042
