@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 
 	"github.com/golang/glog"
@@ -174,6 +175,22 @@ func (h *etcdHelper) Delete(key string, recursive bool) error {
 	_, err := h.client.Delete(key, recursive)
 	metrics.RecordEtcdRequestLatency("delete", "UNKNOWN", startTime)
 	return err
+}
+
+// Implements StorageInterface.
+func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+	key = h.prefixEtcdKey(key)
+	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
+	go w.etcdWatch(h.client, key, resourceVersion)
+	return w, nil
+}
+
+// Implements StorageInterface.
+func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+	key = h.prefixEtcdKey(key)
+	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
+	go w.etcdWatch(h.client, key, resourceVersion)
+	return w, nil
 }
 
 // Implements StorageInterface.

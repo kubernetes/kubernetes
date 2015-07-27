@@ -66,27 +66,6 @@ func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
 	return version + 1, nil
 }
 
-// WatchList begins watching the specified key's items. Items are decoded into
-// API objects, and any items passing 'filter' are sent down the returned
-// watch.Interface. resourceVersion may be used to specify what version to begin
-// watching (e.g., for reconnecting without missing any updates).
-func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
-	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
-	go w.etcdWatch(h.client, key, resourceVersion)
-	return w, nil
-}
-
-// Watch begins watching the specified key. Events are decoded into
-// API objects and sent down the returned watch.Interface.
-// Errors will be sent down the channel.
-func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
-	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
-	go w.etcdWatch(h.client, key, resourceVersion)
-	return w, nil
-}
-
 // TransformFunc attempts to convert an object to another object for use with a watcher.
 type TransformFunc func(runtime.Object) (runtime.Object, error)
 
