@@ -634,9 +634,13 @@ __EOF__
   kubectl expose rc frontend --port=80 --name=frontend-4 --generator=service/v1 "${kube_flags[@]}"
   # Post-condition: service exists and the port is named default.
   kube::test::get_object_assert 'service frontend-4' "{{$port_name}} {{$port_field}}" 'default 80'
+  # Verify that expose service works without specifying a port.
+  kubectl expose service frontend --name=frontend-5 "${kube_flags[@]}"
+  # Post-condition: service exists with the same port as the original service.
+  kube::test::get_object_assert 'service frontend-5' "{{$port_field}}" '80'
   # Cleanup services
   kubectl delete pod valid-pod "${kube_flags[@]}"
-  kubectl delete service frontend{,-2,-3,-4} "${kube_flags[@]}"
+  kubectl delete service frontend{,-2,-3,-4,-5} "${kube_flags[@]}"
 
   ### Perform a rolling update with --image
   # Command

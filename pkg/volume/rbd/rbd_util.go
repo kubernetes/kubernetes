@@ -63,32 +63,32 @@ func (util *RBDUtil) MakeGlobalPDName(rbd rbd) string {
 	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
 }
 
-func (util *RBDUtil) rbdLock(rbd rbd, lock bool) error {
+func (util *RBDUtil) rbdLock(b rbdBuilder, lock bool) error {
 	var err error
 	var output, locker string
 	var cmd []byte
 	var secret_opt []string
 
-	if rbd.Secret != "" {
-		secret_opt = []string{"--key=" + rbd.Secret}
+	if b.Secret != "" {
+		secret_opt = []string{"--key=" + b.Secret}
 	} else {
-		secret_opt = []string{"-k", rbd.Keyring}
+		secret_opt = []string{"-k", b.Keyring}
 	}
 	// construct lock id using host name and a magic prefix
 	lock_id := "kubelet_lock_magic_" + node.GetHostname("")
 
-	l := len(rbd.Mon)
+	l := len(b.Mon)
 	// avoid mount storm, pick a host randomly
 	start := rand.Int() % l
 	// iterate all hosts until mount succeeds.
 	for i := start; i < start+l; i++ {
-		mon := rbd.Mon[i%l]
+		mon := b.Mon[i%l]
 		// cmd "rbd lock list" serves two purposes:
 		// for fencing, check if lock already held for this host
 		// this edge case happens if host crashes in the middle of acquiring lock and mounting rbd
 		// for defencing, get the locker name, something like "client.1234"
-		cmd, err = rbd.plugin.execCommand("rbd",
-			append([]string{"lock", "list", rbd.Image, "--pool", rbd.Pool, "--id", rbd.Id, "-m", mon}, secret_opt...))
+		cmd, err = b.plugin.execCommand("rbd",
+			append([]string{"lock", "list", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		output = string(cmd)
 
 		if err != nil {
@@ -103,8 +103,8 @@ func (util *RBDUtil) rbdLock(rbd rbd, lock bool) error {
 				return nil
 			}
 			// hold a lock: rbd lock add
-			cmd, err = rbd.plugin.execCommand("rbd",
-				append([]string{"lock", "add", rbd.Image, lock_id, "--pool", rbd.Pool, "--id", rbd.Id, "-m", mon}, secret_opt...))
+			cmd, err = b.plugin.execCommand("rbd",
+				append([]string{"lock", "add", b.Image, lock_id, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		} else {
 			// defencing, find locker name
 			ind := strings.LastIndex(output, lock_id) - 1
@@ -115,8 +115,8 @@ func (util *RBDUtil) rbdLock(rbd rbd, lock bool) error {
 				}
 			}
 			// remove a lock: rbd lock remove
-			cmd, err = rbd.plugin.execCommand("rbd",
-				append([]string{"lock", "remove", rbd.Image, lock_id, locker, "--pool", rbd.Pool, "--id", rbd.Id, "-m", mon}, secret_opt...))
+			cmd, err = b.plugin.execCommand("rbd",
+				append([]string{"lock", "remove", b.Image, lock_id, locker, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		}
 
 		if err == nil {
@@ -127,7 +127,7 @@ func (util *RBDUtil) rbdLock(rbd rbd, lock bool) error {
 	return err
 }
 
-func (util *RBDUtil) persistRBD(rbd rbd, mnt string) error {
+func (util *RBDUtil) persistRBD(rbd rbdBuilder, mnt string) error {
 	file := path.Join(mnt, "rbd.json")
 	fp, err := os.Create(file)
 	if err != nil {
@@ -159,47 +159,47 @@ func (util *RBDUtil) loadRBD(rbd *rbd, mnt string) error {
 	return nil
 }
 
-func (util *RBDUtil) fencing(rbd rbd) error {
+func (util *RBDUtil) fencing(b rbdBuilder) error {
 	// no need to fence readOnly
-	if rbd.ReadOnly {
+	if b.ReadOnly {
 		return nil
 	}
-	return util.rbdLock(rbd, true)
+	return util.rbdLock(b, true)
 }
 
-func (util *RBDUtil) defencing(rbd rbd) error {
+func (util *RBDUtil) defencing(c rbdCleaner) error {
 	// no need to fence readOnly
-	if rbd.ReadOnly {
+	if c.ReadOnly {
 		return nil
 	}
 
-	return util.rbdLock(rbd, false)
+	return util.rbdLock(rbdBuilder{rbd: c.rbd}, false)
 }
 
-func (util *RBDUtil) AttachDisk(rbd rbd) error {
+func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	var err error
-	devicePath := strings.Join([]string{"/dev/rbd", rbd.Pool, rbd.Image}, "/")
+	devicePath := strings.Join([]string{"/dev/rbd", b.Pool, b.Image}, "/")
 	exist := waitForPathToExist(devicePath, 1)
 	if !exist {
 		// modprobe
-		_, err = rbd.plugin.execCommand("modprobe", []string{"rbd"})
+		_, err = b.plugin.execCommand("modprobe", []string{"rbd"})
 		if err != nil {
 			return fmt.Errorf("rbd: failed to modprobe rbd error:%v", err)
 		}
 		// rbd map
-		l := len(rbd.Mon)
+		l := len(b.Mon)
 		// avoid mount storm, pick a host randomly
 		start := rand.Int() % l
 		// iterate all hosts until mount succeeds.
 		for i := start; i < start+l; i++ {
-			mon := rbd.Mon[i%l]
+			mon := b.Mon[i%l]
 			glog.V(1).Infof("rbd: map mon %s", mon)
-			if rbd.Secret != "" {
-				_, err = rbd.plugin.execCommand("rbd",
-					[]string{"map", rbd.Image, "--pool", rbd.Pool, "--id", rbd.Id, "-m", mon, "--key=" + rbd.Secret})
+			if b.Secret != "" {
+				_, err = b.plugin.execCommand("rbd",
+					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "--key=" + b.Secret})
 			} else {
-				_, err = rbd.plugin.execCommand("rbd",
-					[]string{"map", rbd.Image, "--pool", rbd.Pool, "--id", rbd.Id, "-m", mon, "-k", rbd.Keyring})
+				_, err = b.plugin.execCommand("rbd",
+					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "-k", b.Keyring})
 			}
 			if err == nil {
 				break
@@ -214,8 +214,8 @@ func (util *RBDUtil) AttachDisk(rbd rbd) error {
 		return errors.New("Could not map image: Timeout after 10s")
 	}
 	// mount it
-	globalPDPath := rbd.manager.MakeGlobalPDName(rbd)
-	mountpoint, err := rbd.mounter.IsMountPoint(globalPDPath)
+	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
+	mountpoint, err := b.mounter.IsMountPoint(globalPDPath)
 	// in the first time, the path shouldn't exist and IsMountPoint is expected to get NotExist
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("rbd: %s failed to check mountpoint", globalPDPath)
@@ -229,43 +229,42 @@ func (util *RBDUtil) AttachDisk(rbd rbd) error {
 	}
 
 	// fence off other mappers
-	if err := util.fencing(rbd); err != nil {
-		return fmt.Errorf("rbd: image %s is locked by other nodes", rbd.Image)
+	if err := util.fencing(b); err != nil {
+		return fmt.Errorf("rbd: image %s is locked by other nodes", b.Image)
 	}
 	// rbd lock remove needs ceph and image config
 	// but kubelet doesn't get them from apiserver during teardown
 	// so persit rbd config so upon disk detach, rbd lock can be removed
 	// since rbd json is persisted in the same local directory that is used as rbd mountpoint later,
 	// the json file remains invisible during rbd mount and thus won't be removed accidentally.
-	util.persistRBD(rbd, globalPDPath)
+	util.persistRBD(b, globalPDPath)
 
-	if err = rbd.mounter.Mount(devicePath, globalPDPath, rbd.fsType, nil); err != nil {
-		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, rbd.fsType, globalPDPath, err)
+	if err = b.mounter.Mount(devicePath, globalPDPath, b.fsType, nil); err != nil {
+		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
-
 	return err
 }
 
-func (util *RBDUtil) DetachDisk(rbd rbd, mntPath string) error {
-	device, cnt, err := mount.GetDeviceNameFromMount(rbd.mounter, mntPath)
+func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
+	device, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
 	if err != nil {
 		return fmt.Errorf("rbd detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
 	}
-	if err = rbd.mounter.Unmount(mntPath); err != nil {
+	if err = c.mounter.Unmount(mntPath); err != nil {
 		return fmt.Errorf("rbd detach disk: failed to umount: %s\nError: %v", mntPath, err)
 	}
 	// if device is no longer used, see if can unmap
 	if cnt <= 1 {
 		// rbd unmap
-		_, err = rbd.plugin.execCommand("rbd", []string{"unmap", device})
+		_, err = c.plugin.execCommand("rbd", []string{"unmap", device})
 		if err != nil {
 			return fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err)
 		}
 
 		// load ceph and image/pool info to remove fencing
-		if err := util.loadRBD(&rbd, mntPath); err == nil {
+		if err := util.loadRBD(c.rbd, mntPath); err == nil {
 			// remove rbd lock
-			util.defencing(rbd)
+			util.defencing(c)
 		}
 
 		glog.Infof("rbd: successfully unmap device %s", device)

@@ -340,7 +340,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	deleteAllEtcdKeys()
 
 	// Etcd
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -410,7 +410,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 
 	// Create a master and install handlers into mux.
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
+		DatabaseStorage:   etcdStorage,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,

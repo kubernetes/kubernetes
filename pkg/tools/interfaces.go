@@ -52,9 +52,9 @@ type EtcdClient interface {
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
 }
 
-// EtcdVersioner abstracts setting and retrieving fields from the etcd response onto the object
+// StorageVersioner abstracts setting and retrieving metadata fields from the etcd response onto the object
 // or list.
-type EtcdVersioner interface {
+type StorageVersioner interface {
 	// UpdateObject sets etcd storage metadata into an API object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from etcd.
@@ -91,6 +91,14 @@ type StorageUpdateFunc func(input runtime.Object, res ResponseMeta) (output runt
 // StorageInterface offers a common interface for object marshaling/unmarshling operations and
 // hids all the storage-related operations behind it.
 type StorageInterface interface {
+	// Returns list of servers addresses of the underyling database.
+	// TODO: This method is used only in a single place. Consider refactoring and getting rid
+	// of this method from the interface.
+	Backends() []string
+
+	// Returns StorageVersioner associated with this interface.
+	Versioner() StorageVersioner
+
 	// CreateObj adds a new object at a key unless it already exists. 'ttl' is time-to-live
 	// in seconds (0 means forever). If no error is returned and out is not nil, out will be
 	// set to the read value from etcd.

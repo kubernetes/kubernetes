@@ -272,7 +272,7 @@ function kube::build::docker_image_exists() {
 
   # We cannot just specify the IMAGE here as `docker images` doesn't behave as
   # expected.  See: https://github.com/docker/docker/issues/8048
-  "${DOCKER[@]}" images | grep -Eq "^${1}\s+${2}\s+"
+  "${DOCKER[@]}" images | grep -Eq "^(\S+/)?${1}\s+${2}\s+"
 }
 
 # Takes $1 and computes a short has for it. Useful for unique tag generation

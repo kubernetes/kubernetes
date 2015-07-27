@@ -71,11 +71,11 @@ func (r *registryGetter) GetSecret(namespace, name string) (*api.Secret, error) 
 	return r.secrets.GetSecret(ctx, name)
 }
 
-// NewGetterFromEtcdHelper returns a ServiceAccountTokenGetter that
-// uses the specified helper to retrieve service accounts and secrets.
-func NewGetterFromEtcdHelper(helper tools.EtcdHelper) ServiceAccountTokenGetter {
+// NewGetterFromStorageInterface returns a ServiceAccountTokenGetter that
+// uses the specified storage to retrieve service accounts and secrets.
+func NewGetterFromStorageInterface(storage tools.StorageInterface) ServiceAccountTokenGetter {
 	return NewGetterFromRegistries(
-		serviceaccount.NewRegistry(serviceaccountetcd.NewStorage(helper)),
-		secret.NewRegistry(secretetcd.NewStorage(helper)),
+		serviceaccount.NewRegistry(serviceaccountetcd.NewStorage(storage)),
+		secret.NewRegistry(secretetcd.NewStorage(storage)),
 	)
 }

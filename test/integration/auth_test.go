@@ -392,7 +392,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -403,7 +403,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -507,7 +507,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -519,7 +519,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -574,7 +574,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -586,7 +586,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -661,7 +661,7 @@ func TestBobIsForbidden(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -673,7 +673,7 @@ func TestBobIsForbidden(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -722,7 +722,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -734,7 +734,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -799,7 +799,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -814,7 +814,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -914,7 +914,7 @@ func TestKindAuthorization(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -929,7 +929,7 @@ func TestKindAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
@@ -1017,7 +1017,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1031,7 +1031,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,

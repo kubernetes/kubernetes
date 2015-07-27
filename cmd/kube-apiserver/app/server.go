@@ -214,12 +214,12 @@ func (s *APIServer) verifyClusterIPFlags() {
 	}
 }
 
-func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (helper tools.EtcdHelper, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (etcdStorage tools.StorageInterface, err error) {
 	var client tools.EtcdClient
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
 		if err != nil {
-			return helper, err
+			return nil, err
 		}
 	} else {
 		etcdClient := etcd.NewClient(etcdServerList)
@@ -234,7 +234,7 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 		client = etcdClient
 	}
 
-	return master.NewEtcdHelper(client, storageVersion, pathPrefix)
+	return master.NewEtcdStorage(client, storageVersion, pathPrefix)
 }
 
 // Run runs the specified APIServer.  This should never exit.
@@ -298,7 +298,7 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	helper, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion, s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
@@ -313,7 +313,7 @@ func (s *APIServer) Run(_ []string) error {
 			glog.Warning("no RSA key provided, service account token authentication disabled")
 		}
 	}
-	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile, s.ServiceAccountKeyFile, s.ServiceAccountLookup, helper)
+	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile, s.ServiceAccountKeyFile, s.ServiceAccountLookup, etcdStorage)
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
@@ -356,7 +356,7 @@ func (s *APIServer) Run(_ []string) error {
 		}
 	}
 	config := &master.Config{
-		EtcdHelper:             helper,
+		DatabaseStorage:        etcdStorage,
 		EventTTL:               s.EventTTL,
 		KubeletClient:          kubeletClient,
 		ServiceClusterIPRange:  &n,
@@ -401,13 +401,19 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	longRunningRE := regexp.MustCompile(s.LongRunningRequestRE)
+	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
+		// TODO unify this with apiserver.MaxInFlightLimit
+		if longRunningRE.MatchString(req.URL.Path) || req.URL.Query().Get("watch") == "true" {
+			return nil, ""
+		}
+		return time.After(time.Minute), ""
+	}
 
 	if secureLocation != "" {
+		handler := apiserver.TimeoutHandler(m.Handler, longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(m.Handler)),
-			ReadTimeout:    ReadWriteTimeout,
-			WriteTimeout:   ReadWriteTimeout,
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(handler)),
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
@@ -456,11 +462,10 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}()
 	}
+	handler := apiserver.TimeoutHandler(m.InsecureHandler, longRunningTimeout)
 	http := &http.Server{
 		Addr:           insecureLocation,
-		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
-		ReadTimeout:    ReadWriteTimeout,
-		WriteTimeout:   ReadWriteTimeout,
+		Handler:        apiserver.RecoverPanics(handler),
 		MaxHeaderBytes: 1 << 20,
 	}
 	if secureLocation == "" {

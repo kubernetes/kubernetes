@@ -179,7 +179,7 @@ func BenchmarkPodListEtcd(b *testing.B) {
 			defer func() {
 				glog.V(3).Infof("Worker %d: listing pods took %v", id, time.Since(now))
 			}()
-			if response, err := m.EtcdHelper.Client.Get(key, true, true); err != nil {
+			if response, err := m.EtcdStorage.Client.Get(key, true, true); err != nil {
 				return err
 			} else if len(response.Node.Nodes) < podsPerNode {
 				glog.Fatalf("List retrieved %d pods, which is less than %d", len(response.Node.Nodes), podsPerNode)

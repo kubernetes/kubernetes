@@ -362,7 +362,7 @@ Future work will add instructions to this guide to enable support for Kubernetes
 [4]: ../../cluster/addons/dns/README.md
 [5]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/
 [6]: http://mesos.apache.org/
-[7]: https://github.com/mesosphere/kubernetes-mesos/blob/master/docs/issues.md
+[7]: ../../contrib/mesos/docs/issues.md
 [8]: https://github.com/mesosphere/kubernetes-mesos/issues
 [9]: ../../examples/
 [10]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/#vpn-setup

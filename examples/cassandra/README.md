@@ -61,13 +61,13 @@ metadata:
   name: cassandra
 spec:
   containers:
-  - args:
+  - name: cassandra
+    image: gcr.io/google_containers/cassandra:v5
+    args:
     - /run.sh
     resources:
       limits:
         cpu: "0.5"
-    image: gcr.io/google_containers/cassandra:v5
-    name: cassandra
     ports:
     - name: cql
       containerPort: 9042
@@ -120,19 +120,19 @@ The important thing to note here is the ```selector```. It is a query over label
 
 Create this service as follows:
 
-```sh
+```console
 $ kubectl create -f examples/cassandra/cassandra-service.yaml
 ```
 
 Now, as the service is running, we can create the first Cassandra pod using the mentioned specification.
 
-```sh
+```console
 $ kubectl create -f examples/cassandra/cassandra.yaml
 ```
 
 After a few moments, you should be able to see the pod running, plus its single container:
 
-```sh
+```console
 $ kubectl get pods cassandra
 NAME        READY     STATUS    RESTARTS   AGE
 cassandra   1/1       Running   0          55s
@@ -140,7 +140,7 @@ cassandra   1/1       Running   0          55s
 
 You can also query the service endpoints to check if the pod has been correctly selected.
 
-```sh
+```console
 $ kubectl get endpoints cassandra -o yaml
 apiVersion: v1
 kind: Endpoints
@@ -192,7 +192,9 @@ spec:
         name: cassandra
     spec:
       containers:
-        - command:
+        - name: cassandra
+          image: gcr.io/google_containers/cassandra:v5
+          command:
             - /run.sh
           resources:
             limits:
@@ -206,8 +208,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v5
-          name: cassandra
           ports:
             - containerPort: 9042
               name: cql
@@ -225,7 +225,7 @@ Most of this replication controller definition is identical to the Cassandra pod
 
 Create this controller:
 
-```sh
+```console
 $ kubectl create -f examples/cassandra/cassandra-controller.yaml
 ```
 
@@ -233,13 +233,13 @@ Now this is actually not that interesting, since we haven't actually done anythi
 
 Let's scale our cluster to 2:
 
-```sh
+```console
 $ kubectl scale rc cassandra --replicas=2
 ```
 
 Now if you list the pods in your cluster, and filter to the label ```name=cassandra```, you should see two cassandra pods:
 
-```sh
+```console 
 $ kubectl get pods -l="name=cassandra"
 NAME              READY     STATUS    RESTARTS   AGE
 cassandra         1/1       Running   0          3m
@@ -250,7 +250,7 @@ Notice that one of the pods has the human readable name ```cassandra``` that you
 
 To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster.  To do this, use the ```kubectl exec``` command to run ```nodetool``` in one of your Cassandra pods.
 
-```sh
+```console
 $ kubectl exec -ti cassandra -- nodetool status
 Datacenter: datacenter1
 =======================

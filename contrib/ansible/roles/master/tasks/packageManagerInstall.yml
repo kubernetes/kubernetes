@@ -1,4 +1,9 @@
 ---
+- name: Set fact for Atomic Host package install
+  set_fact:
+    did_install: true
+  when: is_atomic
+
 - include: pkgMgrInstallers/centos-install.yml
   when: ansible_distribution == "CentOS"
 

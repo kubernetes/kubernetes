@@ -751,7 +751,7 @@ func cleanup(filePath string, ns string, selectors ...string) {
 	runKubectl("stop", "-f", filePath, nsArg)
 
 	for _, selector := range selectors {
-		resources := runKubectl("get", "pods,rc,se", "-l", selector, "--no-headers", nsArg)
+		resources := runKubectl("get", "pods,rc,svc", "-l", selector, "--no-headers", nsArg)
 		if resources != "" {
 			Failf("Resources left running after stop:\n%s", resources)
 		}
@@ -1759,4 +1759,44 @@ func parseKVLines(output, key string) string {
 		}
 	}
 	return ""
+}
+
+func restartKubeProxy(host string) error {
+	// TODO: Make it work for all providers.
+	if !providerIs("gce", "gke", "aws") {
+		return fmt.Errorf("unsupported provider: %s", testContext.Provider)
+	}
+	_, _, code, err := SSH("sudo /etc/init.d/kube-proxy restart", host, testContext.Provider)
+	if err != nil || code != 0 {
+		return fmt.Errorf("couldn't restart kube-proxy: %v (code %v)", err, code)
+	}
+	return nil
+}
+
+func restartApiserver() error {
+	// TODO: Make it work for all providers.
+	if !providerIs("gce", "gke", "aws") {
+		return fmt.Errorf("unsupported provider: %s", testContext.Provider)
+	}
+	var command string
+	if providerIs("gce", "gke") {
+		command = "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
+	} else {
+		command = "sudo /etc/init.d/kube-apiserver restart"
+	}
+	_, _, code, err := SSH(command, getMasterHost()+":22", testContext.Provider)
+	if err != nil || code != 0 {
+		return fmt.Errorf("couldn't restart apiserver: %v (code %v)", err, code)
+	}
+	return nil
+}
+
+func waitForApiserverUp(c *client.Client) error {
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		body, err := c.Get().AbsPath("/healthz").Do().Raw()
+		if err == nil && string(body) == "ok" {
+			return nil
+		}
+	}
+	return fmt.Errorf("waiting for apiserver timed out")
 }

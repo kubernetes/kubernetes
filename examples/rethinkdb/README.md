@@ -116,7 +116,7 @@ kubectl create -f examples/rethinkdb/admin-service.yaml
 find the service
 
 ```sh
-$kubectl get se
+$kubectl get services
 NAME               LABELS        SELECTOR                  IP(S)            PORT(S)
 [...]
 rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080/TCP

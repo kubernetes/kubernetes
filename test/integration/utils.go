@@ -67,13 +67,13 @@ func deleteAllEtcdKeys() {
 }
 
 func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	m := master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,

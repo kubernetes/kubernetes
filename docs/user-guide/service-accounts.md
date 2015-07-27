@@ -82,13 +82,13 @@ metadata:
   name: build-robot
 EOF
 $ kubectl create -f /tmp/serviceaccount.json
-serviceacccounts/build-robot
+serviceaccounts/build-robot
 ```
 
 If you get a complete dump of the service account object, like this:
 
 ```console
-$ kubectl get serviceacccounts/build-robot -o yaml
+$ kubectl get serviceaccounts/build-robot -o yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:

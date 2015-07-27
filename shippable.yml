@@ -2,8 +2,6 @@ sudo: false
 
 language: go
 
-build_image: shipimg/ubuntu1204_go:latest
-
 matrix:
   include:
     - go: 1.4

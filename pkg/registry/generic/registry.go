@@ -141,7 +141,7 @@ type Registry interface {
 // provided that 'm' works with the concrete type of list. d is an optional
 // decorator for the returned functions. Only matching items are decorated.
 func FilterList(list runtime.Object, m Matcher, d DecoratorFunc) (filtered runtime.Object, err error) {
-	// TODO: push a matcher down into tools.EtcdHelper to avoid all this
+	// TODO: push a matcher down into tools.etcdHelper to avoid all this
 	// nonsense. This is a lot of unnecessary copies.
 	items, err := runtime.ExtractList(list)
 	if err != nil {

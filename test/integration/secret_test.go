@@ -47,7 +47,7 @@ func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
-	helper, err := framework.NewHelper()
+	etcdStorage, err := framework.NewEtcdStorage()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestSecrets(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:            helper,
+		DatabaseStorage:       etcdStorage,
 		KubeletClient:         client.FakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,

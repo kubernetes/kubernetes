@@ -33,15 +33,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 )
 
-func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
+func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, tools.StorageInterface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, helper
+	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
+	return fakeEtcdClient, etcdStorage
 }
 
 func newStorage(t *testing.T) (ipallocator.Interface, allocator.Interface, *tools.FakeEtcdClient) {
-	fakeEtcdClient, h := newHelper(t)
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func newStorage(t *testing.T) (ipallocator.Interface, allocator.Interface, *tool
 	storage := ipallocator.NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		backing = mem
-		etcd := allocator_etcd.NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", h)
+		etcd := allocator_etcd.NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", etcdStorage)
 		return etcd
 	})
 

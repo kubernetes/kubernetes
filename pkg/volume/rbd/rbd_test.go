@@ -47,8 +47,8 @@ type fakeDiskManager struct{}
 func (fake *fakeDiskManager) MakeGlobalPDName(disk rbd) string {
 	return "/tmp/fake_rbd_path"
 }
-func (fake *fakeDiskManager) AttachDisk(disk rbd) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) AttachDisk(b rbdBuilder) error {
+	globalPath := b.manager.MakeGlobalPDName(*b.rbd)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
@@ -56,8 +56,8 @@ func (fake *fakeDiskManager) AttachDisk(disk rbd) error {
 	return nil
 }
 
-func (fake *fakeDiskManager) DetachDisk(disk rbd, mntPath string) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) DetachDisk(c rbdCleaner, mntPath string) error {
+	globalPath := c.manager.MakeGlobalPDName(*c.rbd)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err

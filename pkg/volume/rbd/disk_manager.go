@@ -33,14 +33,14 @@ import (
 type diskManager interface {
 	MakeGlobalPDName(disk rbd) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(disk rbd) error
+	AttachDisk(disk rbdBuilder) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk rbd, mntPath string) error
+	DetachDisk(disk rbdCleaner, mntPath string) error
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, disk rbd, volPath string, mounter mount.Interface) error {
-	globalPDPath := manager.MakeGlobalPDName(disk)
+func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.Interface) error {
+	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
 	// TODO: handle failed mounts here.
 	mountpoint, err := mounter.IsMountPoint(volPath)
 
@@ -51,7 +51,7 @@ func diskSetUp(manager diskManager, disk rbd, volPath string, mounter mount.Inte
 	if mountpoint {
 		return nil
 	}
-	if err := manager.AttachDisk(disk); err != nil {
+	if err := manager.AttachDisk(b); err != nil {
 		glog.Errorf("failed to attach disk")
 		return err
 	}
@@ -62,7 +62,7 @@ func diskSetUp(manager diskManager, disk rbd, volPath string, mounter mount.Inte
 	}
 	// Perform a bind mount to the full path to allow duplicate mounts of the same disk.
 	options := []string{"bind"}
-	if disk.ReadOnly {
+	if b.ReadOnly {
 		options = append(options, "ro")
 	}
 	err = mounter.Mount(globalPDPath, volPath, "", options)
@@ -74,7 +74,7 @@ func diskSetUp(manager diskManager, disk rbd, volPath string, mounter mount.Inte
 }
 
 // utility to tear down a disk based filesystem
-func diskTearDown(manager diskManager, disk rbd, volPath string, mounter mount.Interface) error {
+func diskTearDown(manager diskManager, c rbdCleaner, volPath string, mounter mount.Interface) error {
 	mountpoint, err := mounter.IsMountPoint(volPath)
 	if err != nil {
 		glog.Errorf("cannot validate mountpoint %s", volPath)
@@ -97,7 +97,7 @@ func diskTearDown(manager diskManager, disk rbd, volPath string, mounter mount.I
 	// remaining reference is the global mount. It is safe to detach.
 	if len(refs) == 1 {
 		mntPath := refs[0]
-		if err := manager.DetachDisk(disk, mntPath); err != nil {
+		if err := manager.DetachDisk(c, mntPath); err != nil {
 			glog.Errorf("failed to detach disk from %s", mntPath)
 			return err
 		}

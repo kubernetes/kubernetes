@@ -87,10 +87,10 @@ const (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	EtcdHelper    tools.EtcdHelper
-	EventTTL      time.Duration
-	MinionRegexp  string
-	KubeletClient client.KubeletClient
+	DatabaseStorage tools.StorageInterface
+	EventTTL        time.Duration
+	MinionRegexp    string
+	KubeletClient   client.KubeletClient
 	// allow downstream consumers to disable the core controller loops
 	EnableCoreControllers bool
 	EnableLogsSupport     bool
@@ -223,17 +223,17 @@ type Master struct {
 	clock          util.Clock
 }
 
-// NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
+// NewEtcdStorage returns a StorageInterface for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdHelper(client tools.EtcdClient, version string, prefix string) (helper tools.EtcdHelper, err error) {
+func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etcdStorage tools.StorageInterface, err error) {
 	if version == "" {
 		version = latest.Version
 	}
 	versionInterfaces, err := latest.InterfacesFor(version)
 	if err != nil {
-		return helper, err
+		return etcdStorage, err
 	}
-	return tools.NewEtcdHelper(client, versionInterfaces.Codec, prefix), nil
+	return tools.NewEtcdStorage(client, versionInterfaces.Codec, prefix), nil
 }
 
 // setDefaults fills in any fields not set that are required to have valid data.
@@ -420,37 +420,37 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 func (m *Master) init(c *Config) {
 	healthzChecks := []healthz.HealthzChecker{}
 	m.clock = util.RealClock{}
-	podStorage := podetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
+	podStorage := podetcd.NewStorage(c.DatabaseStorage, c.KubeletClient)
 	podRegistry := pod.NewRegistry(podStorage.Pod)
 
-	podTemplateStorage := podtemplateetcd.NewREST(c.EtcdHelper)
+	podTemplateStorage := podtemplateetcd.NewREST(c.DatabaseStorage)
 
-	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
-	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
+	eventRegistry := event.NewEtcdRegistry(c.DatabaseStorage, uint64(c.EventTTL.Seconds()))
+	limitRangeRegistry := limitrange.NewEtcdRegistry(c.DatabaseStorage)
 
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.EtcdHelper)
-	secretStorage := secretetcd.NewStorage(c.EtcdHelper)
-	serviceAccountStorage := serviceaccountetcd.NewStorage(c.EtcdHelper)
-	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewStorage(c.EtcdHelper)
-	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewStorage(c.EtcdHelper)
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.DatabaseStorage)
+	secretStorage := secretetcd.NewStorage(c.DatabaseStorage)
+	serviceAccountStorage := serviceaccountetcd.NewStorage(c.DatabaseStorage)
+	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewStorage(c.DatabaseStorage)
+	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewStorage(c.DatabaseStorage)
 
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewStorage(c.EtcdHelper)
+	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewStorage(c.DatabaseStorage)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
-	endpointsStorage := endpointsetcd.NewStorage(c.EtcdHelper)
+	endpointsStorage := endpointsetcd.NewStorage(c.DatabaseStorage)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, nodeStatusStorage := nodeetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
+	nodeStorage, nodeStatusStorage := nodeetcd.NewStorage(c.DatabaseStorage, c.KubeletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
 	// TODO: split me up into distinct storage registries
-	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry, m.endpointRegistry)
+	registry := etcd.NewRegistry(c.DatabaseStorage, podRegistry, m.endpointRegistry)
 	m.serviceRegistry = registry
 
 	var serviceClusterIPRegistry service.RangeRegistry
 	serviceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(m.serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
-		etcd := etcdallocator.NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", c.EtcdHelper)
+		etcd := etcdallocator.NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", c.DatabaseStorage)
 		serviceClusterIPRegistry = etcd
 		return etcd
 	})
@@ -459,13 +459,13 @@ func (m *Master) init(c *Config) {
 	var serviceNodePortRegistry service.RangeRegistry
 	serviceNodePortAllocator := portallocator.NewPortAllocatorCustom(m.serviceNodePortRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
-		etcd := etcdallocator.NewEtcd(mem, "/ranges/servicenodeports", "servicenodeportallocation", c.EtcdHelper)
+		etcd := etcdallocator.NewEtcd(mem, "/ranges/servicenodeports", "servicenodeportallocation", c.DatabaseStorage)
 		serviceNodePortRegistry = etcd
 		return etcd
 	})
 	m.serviceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
+	controllerStorage := controlleretcd.NewREST(c.DatabaseStorage)
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]rest.Storage{
@@ -701,7 +701,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
 	}
-	for ix, machine := range c.EtcdHelper.Client.GetCluster() {
+	for ix, machine := range c.DatabaseStorage.Backends() {
 		etcdUrl, err := url.Parse(machine)
 		if err != nil {
 			glog.Errorf("Failed to parse etcd url for validation: %v", err)

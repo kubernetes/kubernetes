@@ -35,7 +35,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against PersistentVolume objects.
-func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
+func NewStorage(s tools.StorageInterface) (*REST, *StatusREST) {
 	prefix := "/persistentvolumes"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },
@@ -54,7 +54,7 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
 		},
 		EndpointName: "persistentvolume",
 
-		Helper: h,
+		Storage: s,
 	}
 
 	store.CreateStrategy = persistentvolume.Strategy

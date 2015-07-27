@@ -61,7 +61,7 @@ const (
 type MasterComponents struct {
 	// Raw http server in front of the master
 	ApiServer *httptest.Server
-	// Kubernetes master, contains an embedded etcd helper
+	// Kubernetes master, contains an embedded etcd storage
 	KubeMaster *master.Master
 	// Restclient used to talk to the kubernetes master
 	RestClient *client.Client
@@ -71,8 +71,8 @@ type MasterComponents struct {
 	rcStopCh chan struct{}
 	// Used to stop master components individually, and via MasterComponents.Stop
 	once sync.Once
-	// Kubernetes etcd helper, has embedded etcd client
-	EtcdHelper *tools.EtcdHelper
+	// Kubernetes etcd storage, has embedded etcd client
+	EtcdStorage tools.StorageInterface
 }
 
 // Config is a struct of configuration directives for NewMasterComponents.
@@ -91,7 +91,7 @@ type Config struct {
 
 // NewMasterComponents creates, initializes and starts master components based on the given config.
 func NewMasterComponents(c *Config) *MasterComponents {
-	m, s, h := startMasterOrDie(c.MasterConfig)
+	m, s, e := startMasterOrDie(c.MasterConfig)
 	// TODO: Allow callers to pipe through a different master url and create a client/start components using it.
 	glog.Infof("Master %+v", s.URL)
 	if c.DeleteEtcdKeys {
@@ -113,27 +113,27 @@ func NewMasterComponents(c *Config) *MasterComponents {
 		RestClient:        restClient,
 		ControllerManager: controllerManager,
 		rcStopCh:          rcStopCh,
-		EtcdHelper:        h,
+		EtcdStorage:       e,
 		once:              once,
 	}
 }
 
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
-func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Server, *tools.EtcdHelper) {
+func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Server, tools.StorageInterface) {
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
 
-	var helper tools.EtcdHelper
+	var etcdStorage tools.StorageInterface
 	var err error
 	if masterConfig == nil {
-		helper, err = master.NewEtcdHelper(NewEtcdClient(), "", etcdtest.PathPrefix())
+		etcdStorage, err = master.NewEtcdStorage(NewEtcdClient(), "", etcdtest.PathPrefix())
 		if err != nil {
-			glog.Fatalf("Failed to create etcd helper for master %v", err)
+			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
 		masterConfig = &master.Config{
-			EtcdHelper:        helper,
+			DatabaseStorage:   etcdStorage,
 			KubeletClient:     client.FakeKubeletClient{},
 			EnableLogsSupport: false,
 			EnableProfiling:   true,
@@ -143,10 +143,10 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 			AdmissionControl:  admit.NewAlwaysAdmit(),
 		}
 	} else {
-		helper = masterConfig.EtcdHelper
+		etcdStorage = masterConfig.DatabaseStorage
 	}
 	m = master.New(masterConfig)
-	return m, s, &helper
+	return m, s, etcdStorage
 }
 
 func (m *MasterComponents) stopRCManager() {
@@ -258,13 +258,13 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 
 // TODO: Merge this into startMasterOrDie.
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	helper, err := master.NewEtcdHelper(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	m := master.New(&master.Config{
-		EtcdHelper:        helper,
+		DatabaseStorage:   etcdStorage,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableProfiling:   true,

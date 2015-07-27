@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -140,6 +141,62 @@ func TestReadOnly(t *testing.T) {
 			t.Fatalf("Couldn't make request: %v", err)
 		}
 		http.DefaultClient.Do(req)
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	sendResponse := make(chan struct{}, 1)
+	writeErrors := make(chan error, 1)
+	timeout := make(chan time.Time, 1)
+	resp := "test response"
+	timeoutResp := "test timeout"
+
+	ts := httptest.NewServer(TimeoutHandler(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			<-sendResponse
+			_, err := w.Write([]byte(resp))
+			writeErrors <- err
+		}),
+		func(*http.Request) (<-chan time.Time, string) {
+			return timeout, timeoutResp
+		}))
+	defer ts.Close()
+
+	// No timeouts
+	sendResponse <- struct{}{}
+	res, err := http.Get(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusOK)
+	}
+	body, _ := ioutil.ReadAll(res.Body)
+	if string(body) != resp {
+		t.Errorf("got body %q; expected %q", string(body), resp)
+	}
+	if err := <-writeErrors; err != nil {
+		t.Errorf("got unexpected Write error on first request: %v", err)
+	}
+
+	// Times out
+	timeout <- time.Time{}
+	res, err = http.Get(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	body, _ = ioutil.ReadAll(res.Body)
+	if string(body) != timeoutResp {
+		t.Errorf("got body %q; expected %q", string(body), timeoutResp)
+	}
+
+	// Now try to send a response
+	sendResponse <- struct{}{}
+	if err := <-writeErrors; err != http.ErrHandlerTimeout {
+		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
 	}
 }
 

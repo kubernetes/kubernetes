@@ -69,7 +69,7 @@ func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.NewEtcdHelper(f, testapi.Codec(), etcdtest.PathPrefix())
+	s := tools.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 	podPrefix := "/pods"
 	return f, &Etcd{
@@ -85,7 +85,7 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
-		Helper:         h,
+		Storage:        s,
 	}
 }
 

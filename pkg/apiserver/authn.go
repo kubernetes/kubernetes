@@ -32,7 +32,7 @@ import (
 )
 
 // NewAuthenticator returns an authenticator.Request or an error
-func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyFile string, serviceAccountLookup bool, helper tools.EtcdHelper) (authenticator.Request, error) {
+func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyFile string, serviceAccountLookup bool, storage tools.StorageInterface) (authenticator.Request, error) {
 	var authenticators []authenticator.Request
 
 	if len(basicAuthFile) > 0 {
@@ -60,7 +60,7 @@ func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyF
 	}
 
 	if len(serviceAccountKeyFile) > 0 {
-		serviceAccountAuth, err := newServiceAccountAuthenticator(serviceAccountKeyFile, serviceAccountLookup, helper)
+		serviceAccountAuth, err := newServiceAccountAuthenticator(serviceAccountKeyFile, serviceAccountLookup, storage)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +104,7 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Request or an error
-func newServiceAccountAuthenticator(keyfile string, lookup bool, helper tools.EtcdHelper) (authenticator.Request, error) {
+func newServiceAccountAuthenticator(keyfile string, lookup bool, storage tools.StorageInterface) (authenticator.Request, error) {
 	publicKey, err := serviceaccount.ReadPublicKey(keyfile)
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func newServiceAccountAuthenticator(keyfile string, lookup bool, helper tools.Et
 	if lookup {
 		// If we need to look up service accounts and tokens,
 		// go directly to etcd to avoid recursive auth insanity
-		serviceAccountGetter = serviceaccount.NewGetterFromEtcdHelper(helper)
+		serviceAccountGetter = serviceaccount.NewGetterFromStorageInterface(storage)
 	}
 
 	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{publicKey}, lookup, serviceAccountGetter)

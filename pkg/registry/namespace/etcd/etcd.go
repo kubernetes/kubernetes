@@ -49,7 +49,7 @@ type FinalizeREST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against namespaces
-func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
+func NewStorage(s tools.StorageInterface) (*REST, *StatusREST, *FinalizeREST) {
 	prefix := "/namespaces"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
@@ -67,7 +67,7 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
 			return namespace.MatchNamespace(label, field)
 		},
 		EndpointName: "namespaces",
-		Helper:       h,
+		Storage:      s,
 	}
 	store.CreateStrategy = namespace.Strategy
 	store.UpdateStrategy = namespace.Strategy

@@ -54,7 +54,7 @@ done
 for doc in "${mdfiles[@]}"; do
   $SED -ri \
       -e '/<!-- BEGIN STRIP_FOR_RELEASE -->/,/<!-- END STRIP_FOR_RELEASE -->/d' \
-      -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|" \
+      -e "s|(releases.k8s.io)/[^/]+|\1/${NEW_VERSION}|g" \
       "${doc}"
 
   # Replace /HEAD in html preview links with /NEW_VERSION.

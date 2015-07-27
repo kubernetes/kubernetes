@@ -31,66 +31,57 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 )
 
-type stringCodec struct{}
-
-type fakeAPIObject string
-
-func (*fakeAPIObject) IsAnAPIObject() {}
-
-func (c stringCodec) Encode(obj runtime.Object) ([]byte, error) {
-	return []byte(*obj.(*fakeAPIObject)), nil
-}
-
-func (c stringCodec) Decode(data []byte) (runtime.Object, error) {
-	o := fakeAPIObject(data)
-	return &o, nil
-}
-
-func (c stringCodec) DecodeInto(data []byte, obj runtime.Object) error {
-	o := obj.(*fakeAPIObject)
-	*o = fakeAPIObject(data)
-	return nil
-}
-
 func TestSetObj(t *testing.T) {
 	client := framework.NewEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
+	etcdStorage := tools.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
-		fakeObject := fakeAPIObject("object")
-		if err := helper.SetObj(key, &fakeObject, nil, 0); err != nil {
+		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		if err := etcdStorage.SetObj(key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		resp, err := client.Get(key, false, false)
 		if err != nil || resp.Node == nil {
 			t.Fatalf("unexpected error: %v %v", err, resp)
 		}
-		if resp.Node.Value != "object" {
-			t.Errorf("unexpected response: %#v", resp.Node)
+		decoded, err := testapi.Codec().Decode([]byte(resp.Node.Value))
+		if err != nil {
+			t.Fatalf("unexpected response: %#v", resp.Node)
+		}
+		result := *decoded.(*api.ServiceAccount)
+		if !api.Semantic.DeepEqual(testObject, result) {
+			t.Errorf("expected: %#v got: %#v", testObject, result)
 		}
 	})
 }
 
 func TestExtractObj(t *testing.T) {
 	client := framework.NewEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
+	etcdStorage := tools.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
-		_, err := client.Set(key, "object", 0)
+		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		coded, err := testapi.Codec().Encode(&testObject)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		s := fakeAPIObject("")
-		if err := helper.ExtractObj(key, &s, false); err != nil {
+		_, err = client.Set(key, string(coded), 0)
+		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if s != "object" {
-			t.Errorf("unexpected response: %#v", s)
+		result := api.ServiceAccount{}
+		if err := etcdStorage.ExtractObj(key, &result, false); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Propagate ResourceVersion (it is set automatically).
+		testObject.ObjectMeta.ResourceVersion = result.ObjectMeta.ResourceVersion
+		if !api.Semantic.DeepEqual(testObject, result) {
+			t.Errorf("expected: %#v got: %#v", testObject, result)
 		}
 	})
 }
 
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
-	helper := tools.NewEtcdHelper(client, testapi.Codec(), etcdtest.PathPrefix())
+	etcdStorage := tools.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix())
 	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)
 		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
@@ -100,7 +91,7 @@ func TestWatch(t *testing.T) {
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w, err := helper.Watch(key, 0, tools.Everything)
+		w, err := etcdStorage.Watch(key, 0, tools.Everything)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}

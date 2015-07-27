@@ -16,6 +16,11 @@
 
 # Verifies that services and virtual IPs work.
 
+
+# TODO(wojtek-t): Remove this test once the following go tests are stable:
+# - "should work after restarting kube-proxy"
+# - "should work after restarting apiserver"
+
 set -o errexit
 set -o nounset
 set -o pipefail
