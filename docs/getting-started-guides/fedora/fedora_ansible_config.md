@@ -132,6 +132,14 @@ Although the default value of variables in `~/kubernetes/contrib/ansible/group_v
 
 edit: ~/kubernetes/contrib/ansible/group_vars/all.yml
 
+**Configure access to kubernetes packages**
+
+Modify `source_type` as below to access kubernetes packages through the package manager.
+
+```yaml
+source_type: packageManager
+```
+
 **Configure the IP addresses used for services**
 
 Each Kubernetes service gets its own IP address.  These are not real IPs.  You need only select a range of IPs which are not in use elsewhere in your environment.
