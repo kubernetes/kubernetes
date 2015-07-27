@@ -84,14 +84,14 @@ func verifyDeepCopyFunctionSignature(ft reflect.Type) error {
 }
 
 // RegisterGeneratedDeepCopyFunc registers a copying func with the Cloner.
-// deepCopyFunc must take two parameters: a type and a pointer to Cloner
-// and return an element of the same type and an error.
+// deepCopyFunc must take three parameters: a type input, a pointer to a
+// type output, and a pointer to Cloner. It should return an error.
 //
 // Example:
 // c.RegisterGeneratedDeepCopyFunc(
-//         func(in Pod, c *Cloner) (Pod, error) {
+//         func(in Pod, out *Pod, c *Cloner) error {
 //                 // deep copy logic...
-//                 return copy, nil
+//                 return nil
 //          })
 func (c *Cloner) RegisterDeepCopyFunc(deepCopyFunc interface{}) error {
 	fv := reflect.ValueOf(deepCopyFunc)
