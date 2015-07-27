@@ -134,7 +134,7 @@ Here are all the solutions mentioned above in table form.
 IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                              | Conforms | Support Level
 -------------------- | ------------ | ------ | ----------  | ---------------------------------------------     | ---------| ----------------------------
 GKE                  |              |        | GCE         | [docs](https://cloud.google.com/container-engine) |          | Commercial
-Vagrant              | Saltstack    | Fedora | OVS         | [docs](vagrant.md)                                |          | Project
+Vagrant              | Saltstack    | Fedora | OVS         | [docs](vagrant.md)                                | [✓][2]   | Project
 GCE                  | Saltstack    | Debian | GCE         | [docs](gce.md)                                    | [✓][1]   | Project
 Azure                | CoreOS       | CoreOS | Weave       | [docs](coreos/azure/README.md)                    |          | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin))
 Docker Single Node   | custom       | N/A    | local       | [docs](docker.md)                                 |          | Project (@brendandburns)
@@ -189,6 +189,8 @@ Definition of columns:
 <!-- reference style links below here -->
 <!-- GCE conformance test result -->
 [1]: https://gist.github.com/erictune/4cabc010906afbcc5061
+<!-- Vagrant conformance test result -->
+[2]: https://gist.github.com/derekwaynecarr/505e56036cdf010bf6b6
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
