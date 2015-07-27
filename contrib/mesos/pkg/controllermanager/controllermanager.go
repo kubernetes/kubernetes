@@ -128,7 +128,7 @@ func (s *CMServer) Run(_ []string) error {
 	nodeController.Run(s.NodeSyncPeriod)
 
 	serviceController := servicecontroller.New(cloud, kubeClient, s.ClusterName)
-	if err := serviceController.Run(s.NodeSyncPeriod); err != nil {
+	if err := serviceController.Run(s.ServiceSyncPeriod, s.NodeSyncPeriod); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}
 

@@ -100,12 +100,14 @@ func New(cloud cloudprovider.Interface, kubeClient client.Interface, clusterName
 // Run starts a background goroutine that watches for changes to services that
 // have (or had) externalLoadBalancers=true and ensures that they have external
 // load balancers created and deleted appropriately.
+// serviceSyncPeriod controls how often we check the cluster's services to
+// ensure that the correct external load balancers exist.
 // nodeSyncPeriod controls how often we check the cluster's nodes to determine
 // if external load balancers need to be updated to point to a new set.
 //
 // It's an error to call Run() more than once for a given ServiceController
 // object.
-func (s *ServiceController) Run(nodeSyncPeriod time.Duration) error {
+func (s *ServiceController) Run(serviceSyncPeriod, nodeSyncPeriod time.Duration) error {
 	if err := s.init(); err != nil {
 		return err
 	}
@@ -132,7 +134,7 @@ func (s *ServiceController) Run(nodeSyncPeriod time.Duration) error {
 		s.cache,
 	)
 	lw := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "services", api.NamespaceAll, fields.Everything())
-	cache.NewReflector(lw, &api.Service{}, serviceQueue, 0).Run()
+	cache.NewReflector(lw, &api.Service{}, serviceQueue, serviceSyncPeriod).Run()
 	for i := 0; i < workerGoroutines; i++ {
 		go s.watchServices(serviceQueue)
 	}
