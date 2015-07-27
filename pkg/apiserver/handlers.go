@@ -17,11 +17,16 @@ limitations under the License.
 package apiserver
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
 	"runtime/debug"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -135,6 +140,163 @@ func RecoverPanics(handler http.Handler) http.Handler {
 		// Dispatch to the internal handler
 		handler.ServeHTTP(w, req)
 	})
+}
+
+// TimeoutHandler returns an http.Handler that runs h with a timeout
+// determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
+// each request, but if a call runs for longer than its time limit, the
+// handler responds with a 503 Service Unavailable error and the message
+// provided. (If msg is empty, a suitable default message with be sent.) After
+// the handler times out, writes by h to its http.ResponseWriter will return
+// http.ErrHandlerTimeout. If timeoutFunc returns a nil timeout channel, no
+// timeout will be enforced.
+func TimeoutHandler(h http.Handler, timeoutFunc func(*http.Request) (timeout <-chan time.Time, msg string)) http.Handler {
+	return &timeoutHandler{h, timeoutFunc}
+}
+
+type timeoutHandler struct {
+	handler http.Handler
+	timeout func(*http.Request) (<-chan time.Time, string)
+}
+
+func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	after, msg := t.timeout(r)
+	if after == nil {
+		t.handler.ServeHTTP(w, r)
+		return
+	}
+
+	done := make(chan struct{}, 1)
+	tw := newTimeoutWriter(w)
+	go func() {
+		t.handler.ServeHTTP(tw, r)
+		done <- struct{}{}
+	}()
+	select {
+	case <-done:
+		return
+	case <-after:
+		tw.timeout(msg)
+	}
+}
+
+type timeoutWriter interface {
+	http.ResponseWriter
+	timeout(string)
+}
+
+func newTimeoutWriter(w http.ResponseWriter) timeoutWriter {
+	base := &baseTimeoutWriter{w: w}
+
+	_, notifiable := w.(http.CloseNotifier)
+	_, hijackable := w.(http.Hijacker)
+
+	switch {
+	case notifiable && hijackable:
+		return &closeHijackTimeoutWriter{base}
+	case notifiable:
+		return &closeTimeoutWriter{base}
+	case hijackable:
+		return &hijackTimeoutWriter{base}
+	default:
+		return base
+	}
+}
+
+type baseTimeoutWriter struct {
+	w http.ResponseWriter
+
+	mu          sync.Mutex
+	timedOut    bool
+	wroteHeader bool
+	hijacked    bool
+}
+
+func (tw *baseTimeoutWriter) Header() http.Header {
+	return tw.w.Header()
+}
+
+func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	tw.wroteHeader = true
+	if tw.hijacked {
+		return 0, http.ErrHijacked
+	}
+	if tw.timedOut {
+		return 0, http.ErrHandlerTimeout
+	}
+	return tw.w.Write(p)
+}
+
+func (tw *baseTimeoutWriter) WriteHeader(code int) {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	if tw.timedOut || tw.wroteHeader || tw.hijacked {
+		return
+	}
+	tw.wroteHeader = true
+	tw.w.WriteHeader(code)
+}
+
+func (tw *baseTimeoutWriter) timeout(msg string) {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	if !tw.wroteHeader && !tw.hijacked {
+		tw.w.WriteHeader(http.StatusGatewayTimeout)
+		if msg != "" {
+			tw.w.Write([]byte(msg))
+		} else {
+			enc := json.NewEncoder(tw.w)
+			enc.Encode(errors.NewServerTimeout("", "", 0))
+		}
+	}
+	tw.timedOut = true
+}
+
+func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
+	return tw.w.(http.CloseNotifier).CloseNotify()
+}
+
+func (tw *baseTimeoutWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	if tw.timedOut {
+		return nil, nil, http.ErrHandlerTimeout
+	}
+	conn, rw, err := tw.w.(http.Hijacker).Hijack()
+	if err == nil {
+		tw.hijacked = true
+	}
+	return conn, rw, err
+}
+
+type closeTimeoutWriter struct {
+	*baseTimeoutWriter
+}
+
+func (tw *closeTimeoutWriter) CloseNotify() <-chan bool {
+	return tw.closeNotify()
+}
+
+type hijackTimeoutWriter struct {
+	*baseTimeoutWriter
+}
+
+func (tw *hijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return tw.hijack()
+}
+
+type closeHijackTimeoutWriter struct {
+	*baseTimeoutWriter
+}
+
+func (tw *closeHijackTimeoutWriter) CloseNotify() <-chan bool {
+	return tw.closeNotify()
+}
+
+func (tw *closeHijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return tw.hijack()
 }
 
 // TODO: use restful.CrossOriginResourceSharing

@@ -401,13 +401,19 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	longRunningRE := regexp.MustCompile(s.LongRunningRequestRE)
+	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
+		// TODO unify this with apiserver.MaxInFlightLimit
+		if longRunningRE.MatchString(req.URL.Path) || req.URL.Query().Get("watch") == "true" {
+			return nil, ""
+		}
+		return time.After(time.Minute), ""
+	}
 
 	if secureLocation != "" {
+		handler := apiserver.TimeoutHandler(m.Handler, longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(m.Handler)),
-			ReadTimeout:    ReadWriteTimeout,
-			WriteTimeout:   ReadWriteTimeout,
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(handler)),
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
@@ -456,11 +462,10 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}()
 	}
+	handler := apiserver.TimeoutHandler(m.InsecureHandler, longRunningTimeout)
 	http := &http.Server{
 		Addr:           insecureLocation,
-		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
-		ReadTimeout:    ReadWriteTimeout,
-		WriteTimeout:   ReadWriteTimeout,
+		Handler:        apiserver.RecoverPanics(handler),
 		MaxHeaderBytes: 1 << 20,
 	}
 	if secureLocation == "" {
