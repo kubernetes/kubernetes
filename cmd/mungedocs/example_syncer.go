@@ -63,7 +63,9 @@ func exampleContent(filePath, linkPath, fileType string) (content string, err er
 	if err != nil {
 		return content, err
 	}
-	content = fmt.Sprintf("\n```%s\n%s\n```\n\n[Download example](%s)", fileType, string(dat), linkPath)
+	// remove leading and trailing spaces and newlines
+	trimmedFileContent := strings.TrimSpace(string(dat))
+	content = fmt.Sprintf("\n```%s\n%s\n```\n\n[Download example](%s)", fileType, trimmedFileContent, linkPath)
 	return
 }
 

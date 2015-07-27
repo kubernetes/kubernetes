@@ -80,6 +80,8 @@ environment variable they want.
 This is an example of a pod that consumes its name and namespace via the
 downward API:
 
+<!-- BEGIN MUNGE: EXAMPLE downward-api/dapi-pod.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -101,6 +103,9 @@ spec:
               fieldPath: metadata.namespace
   restartPolicy: Never
 ```
+
+[Download example](downward-api/dapi-pod.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Some more thorough examples:
    * [environment variables](environment-guide/)

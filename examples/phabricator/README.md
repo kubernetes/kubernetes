@@ -56,6 +56,8 @@ In the remaining part of this example we will assume that your instance is named
 
 To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](phabricator-controller.json) which describes a [replication controller](../../docs/user-guide/replication-controller.md) with a single [pod](../../docs/user-guide/pods.md) running an Apache server with Phabricator PHP source:
 
+<!-- BEGIN MUNGE: EXAMPLE phabricator-controller.json -->
+
 ```json
 {
   "kind": "ReplicationController",
@@ -95,6 +97,9 @@ To start Phabricator server use the file [`examples/phabricator/phabricator-cont
   }
 }
 ```
+
+[Download example](phabricator-controller.json)
+<!-- END MUNGE: EXAMPLE -->
 
 Create the phabricator pod in your Kubernetes cluster by running:
 
@@ -147,6 +152,8 @@ gcloud sql instances patch phabricator-db --authorized-networks 130.211.141.151
 
 To automate this process and make sure that a proper host is authorized even if pod is rescheduled to a new machine we need a separate pod that periodically lists pods and authorizes hosts. Use the file [`examples/phabricator/authenticator-controller.json`](authenticator-controller.json):
 
+<!-- BEGIN MUNGE: EXAMPLE authenticator-controller.json -->
+
 ```json
 {
   "kind": "ReplicationController",
@@ -172,7 +179,7 @@ To automate this process and make sure that a proper host is authorized even if 
         "containers": [
           {
             "name": "authenticator",
-            "image": "gcr.io.google_containers/cloudsql-authenticator:v1"
+            "image": "gcr.io/google_containers/cloudsql-authenticator:v1"
           }
         ]
       }
@@ -180,6 +187,9 @@ To automate this process and make sure that a proper host is authorized even if 
   }
 }
 ```
+
+[Download example](authenticator-controller.json)
+<!-- END MUNGE: EXAMPLE -->
 
 To create the pod run:
 
@@ -203,6 +213,8 @@ phabricator  us-central1 107.178.210.6  RESERVED
 
 Use the file [`examples/phabricator/phabricator-service.json`](phabricator-service.json):
 
+<!-- BEGIN MUNGE: EXAMPLE phabricator-service.json -->
+
 ```json
 {
   "kind": "Service",
@@ -224,6 +236,9 @@ Use the file [`examples/phabricator/phabricator-service.json`](phabricator-servi
   }
 }
 ```
+
+[Download example](phabricator-service.json)
+<!-- END MUNGE: EXAMPLE -->
 
 To create the service run:
 

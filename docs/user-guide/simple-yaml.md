@@ -47,6 +47,8 @@ $ kubectl create -f ./pod.yaml
 
 Where pod.yaml contains something like:
 
+<!-- BEGIN MUNGE: EXAMPLE pod.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -61,6 +63,9 @@ spec:
     ports:
     - containerPort: 80
 ```
+
+[Download example](pod.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 You can see your cluster's pods:
 
@@ -87,6 +92,8 @@ $ kubectl create -f ./replication.yaml
 
 Where `replication.yaml` contains:
 
+<!-- BEGIN MUNGE: EXAMPLE replication.yaml -->
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -108,6 +115,9 @@ spec:
         ports:
         - containerPort: 80
 ```
+
+[Download example](replication.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 To delete the replication controller (and the pods it created):
 

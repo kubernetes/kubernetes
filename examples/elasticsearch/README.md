@@ -46,8 +46,9 @@ server to get a list of matching Elasticsearch pods. To enable authenticated
 communication this image needs a [secret](../../docs/user-guide/secrets.md) to be mounted at `/etc/apiserver-secret`
 with the basic authentication username and password.
 
-Here is an example replication controller specification that creates 4 instances of Elasticsearch which is in the file
-[music-rc.yaml](music-rc.yaml).
+Here is an example replication controller specification that creates 4 instances of Elasticsearch.
+
+<!-- BEGIN MUNGE: EXAMPLE music-rc.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -91,6 +92,9 @@ spec:
           secretName: apiserver-secret
 ```
 
+[Download example](music-rc.yaml)
+<!-- END MUNGE: EXAMPLE -->
+
 The `CLUSTER_NAME` variable gives a name to the cluster and allows multiple separate clusters to
 exist in the same namespace.
 The `SELECTOR` variable should be set to a label query that identifies the Elasticsearch
@@ -101,7 +105,9 @@ to be used to search for Elasticsearch pods and this should be the same as the n
 for the replication controller (in this case `mytunes`). 
 
 Before creating pods with the replication controller a secret containing the bearer authentication token
-should be set up. A template is provided in the file [apiserver-secret.yaml](apiserver-secret.yaml):
+should be set up. 
+
+<!-- BEGIN MUNGE: EXAMPLE apiserver-secret.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -112,6 +118,9 @@ metadata:
 data:
   token: "TOKEN"
 ```
+
+[Download example](apiserver-secret.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Replace `NAMESPACE` with the actual namespace to be used and `TOKEN` with the basic64 encoded
 versions of the bearer token reported by `kubectl config view` e.g.
@@ -154,7 +163,9 @@ replicationcontrollers/music-db
 ```
 
 It's also useful to have a [service](../../docs/user-guide/services.md) with an load balancer for accessing the Elasticsearch
-cluster which can be found in the file [music-service.yaml](music-service.yaml).
+cluster. 
+
+<!-- BEGIN MUNGE: EXAMPLE music-service.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -173,6 +184,9 @@ spec:
     targetPort: es
   type: LoadBalancer
 ```
+
+[Download example](music-service.yaml)
+<!-- END MUNGE: EXAMPLE -->
 
 Let's create the service with an external load balancer:
 

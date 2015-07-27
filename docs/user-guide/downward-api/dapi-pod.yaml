@@ -8,11 +8,11 @@ spec:
       image: gcr.io/google_containers/busybox
       command: [ "/bin/sh", "-c", "env" ]
       env:
-        - name: POD_NAME
+        - name: MY_POD_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        - name: POD_NAMESPACE
+        - name: MY_POD_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
