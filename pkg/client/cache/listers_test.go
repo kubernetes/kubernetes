@@ -45,9 +45,9 @@ func TestStoreToMinionLister(t *testing.T) {
 	}
 }
 
-func TestStoreToControllerLister(t *testing.T) {
+func TestStoreToReplicationControllerLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
-	lister := StoreToControllerLister{store}
+	lister := StoreToReplicationControllerLister{store}
 	testCases := []struct {
 		inRCs      []*api.ReplicationController
 		list       func() ([]api.ReplicationController, error)

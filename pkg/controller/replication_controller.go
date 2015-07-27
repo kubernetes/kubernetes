@@ -91,8 +91,8 @@ type ReplicationManager struct {
 
 	// A TTLCache of pod creates/deletes each rc expects to see
 	expectations RCExpectationsManager
-	// A store of controllers, populated by the rcController
-	controllerStore cache.StoreToControllerLister
+	// A store of replication controllers, populated by the rcController
+	rcStore cache.StoreToReplicationControllerLister
 	// A store of pods, populated by the podController
 	podStore cache.StoreToPodLister
 	// Watches changes to all replication controllers
@@ -120,7 +120,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 		queue:         workqueue.New(),
 	}
 
-	rm.controllerStore.Store, rm.rcController = framework.NewInformer(
+	rm.rcStore.Store, rm.rcController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
 				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything())
@@ -204,7 +204,7 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 // getPodControllers returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
 func (rm *ReplicationManager) getPodControllers(pod *api.Pod) *api.ReplicationController {
-	controllers, err := rm.controllerStore.GetPodControllers(pod)
+	controllers, err := rm.rcStore.GetPodControllers(pod)
 	if err != nil {
 		glog.V(4).Infof("No controllers found for pod %v, replication manager will avoid syncing", pod.Name)
 		return nil
@@ -376,7 +376,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		glog.V(4).Infof("Finished syncing controller %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := rm.controllerStore.Store.GetByKey(key)
+	obj, exists, err := rm.rcStore.Store.GetByKey(key)
 	if !exists {
 		glog.Infof("Replication Controller has been deleted %v", key)
 		rm.expectations.DeleteExpectations(key)
