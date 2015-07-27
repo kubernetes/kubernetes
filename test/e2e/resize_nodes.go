@@ -38,6 +38,9 @@ import (
 
 const serveHostnameImage = "gcr.io/google_containers/serve_hostname:1.1"
 
+const resizeNodeReadyTimeout = 2 * time.Minute
+const resizeNodeNotReadyTimeout = 2 * time.Minute
+
 func resizeGroup(size int) error {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
@@ -101,7 +104,8 @@ func groupSize() (int, error) {
 }
 
 func waitForGroupSize(size int) error {
-	for start := time.Now(); time.Since(start) < 4*time.Minute; time.Sleep(5 * time.Second) {
+	timeout := 4 * time.Minute
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		currentSize, err := groupSize()
 		if err != nil {
 			Logf("Failed to get node instance group size: %v", err)
@@ -114,7 +118,7 @@ func waitForGroupSize(size int) error {
 		Logf("Node instance group has reached the desired size %d", size)
 		return nil
 	}
-	return fmt.Errorf("timeout waiting for node instance group size to be %d", size)
+	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
 }
 
 func waitForClusterSize(c *client.Client, size int) error {
@@ -136,7 +140,7 @@ func waitForClusterSize(c *client.Client, size int) error {
 		}
 		Logf("Waiting for cluster size %d, current size %d", size, len(nodes.Items))
 	}
-	return fmt.Errorf("timeout waiting for cluster size to be %d", size)
+	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
 }
 
 func svcByName(name string) *api.Service {
@@ -254,9 +258,10 @@ func resizeRC(c *client.Client, ns, name string, replicas int) error {
 }
 
 func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList, error) {
+	timeout := time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		pods, err := c.Pods(ns).List(label, fields.Everything())
 		if err != nil {
 			return nil, err
@@ -267,7 +272,7 @@ func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList,
 			return pods, nil
 		}
 	}
-	return nil, fmt.Errorf("Pod name %s: Gave up waiting for %d pods to come up", name, replicas)
+	return nil, fmt.Errorf("Pod name %s: Gave up waiting %v for %d pods to come up", name, timeout, replicas)
 }
 
 func podsRunning(c *client.Client, pods *api.PodList) []error {
@@ -375,9 +380,9 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 		}
 	}()
 
-	Logf("Waiting for node %s to be ready", node.Name)
-	if !waitForNodeToBe(c, node.Name, true, 2*time.Minute) {
-		Failf("Node did not become ready")
+	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
+	if !waitForNodeToBe(c, node.Name, true, resizeNodeReadyTimeout) {
+		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 
 	// The command will block all outgoing network traffic from the node to the master
@@ -391,9 +396,9 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 			dropCmd, node.Name, code, err)
 	}
 
-	Logf("Waiting for node %s to be not ready", node.Name)
-	if !waitForNodeToBe(c, node.Name, false, 2*time.Minute) {
-		Failf("Node did not become not-ready")
+	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
+	if !waitForNodeToBe(c, node.Name, false, resizeNodeNotReadyTimeout) {
+		Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 
 	Logf("Waiting for pod %s to be removed", podNameToDisappear)
@@ -543,9 +548,9 @@ var _ = Describe("Nodes", func() {
 
 				By(fmt.Sprintf("block network traffic from node %s", node.Name))
 				performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
-				Logf("Waiting for node %s to be ready", node.Name)
-				if !waitForNodeToBe(c, node.Name, true, 2*time.Minute) {
-					Failf("Node did not become ready")
+				Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+				if !waitForNodeToBe(c, node.Name, true, resizeNodeReadyTimeout) {
+					Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 				}
 
 				By("verify whether new pods can be created on the re-attached node")
