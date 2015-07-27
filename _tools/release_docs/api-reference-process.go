@@ -20,43 +20,19 @@ package main
 
 import (
 	"flag"
-	"golang.org/x/net/html"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
+
+	"golang.org/x/net/html"
 )
 
 var (
 	templateHTML = flag.String("templateHTML", "http://kubernetes.io/v1.0/index.html", "URL of the html file that has the k8s header")
 )
 
-func detachNode(n *html.Node) {
-	n.Parent = nil
-	n.NextSibling = nil
-	n.PrevSibling = nil
-}
-
-func addHeader(filename string) error {
-	//extract header from template URL
-	response, err := http.Get(*templateHTML)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	doc, err := html.Parse(response.Body)
-	if err != nil {
-		return err
-	}
-	//<head>
-	headNode := doc.FirstChild.NextSibling.FirstChild
-
-	bodyNode := headNode.NextSibling.NextSibling
-	//<header id="nav" class="mobile-menu-slide">
-	headerNode := bodyNode.FirstChild.NextSibling
-	//<div id="mobile-nav-container" class="visible-sm-block visible-xs-block mobile-menu-slide">
-	navContainerDivNode := headerNode.NextSibling.NextSibling
-
+//strip the <!DOCTYPE html> and <html> tag
+func stripHTML(filename string) error {
 	targetHTML, err := os.OpenFile(filename, os.O_RDWR, 0666)
 	if err != nil {
 		return err
@@ -66,43 +42,58 @@ func addHeader(filename string) error {
 	if err != nil {
 		return err
 	}
-	//<head>
-	htmlNode2 := target.FirstChild.NextSibling
+	//node for <head>
+	headNode := target.FirstChild.NextSibling.FirstChild
 
-	headNode2 := htmlNode2.FirstChild
-
-	//append source <head> after target <head>
-	detachNode(headNode)
-	htmlNode2.InsertBefore(headNode, headNode2)
-	bodyNode2 := headNode2.NextSibling.NextSibling
-	//insert nav header
-	detachNode(headerNode)
-	bodyNode2.InsertBefore(headerNode, bodyNode2.FirstChild)
-	//insert navContainerDivNode as target bodyNode's first child. Need to clean navContainerDivNode's Parent and Siblings first.
-	detachNode(navContainerDivNode)
-	bodyNode2.InsertBefore(navContainerDivNode, bodyNode2.FirstChild)
-
-	if err := targetHTML.Truncate(0); err != nil {
+	err = targetHTML.Truncate(0)
+	if err != nil {
 		return err
 	}
-	if _, err := targetHTML.Seek(0, 0); err != nil {
+	_, err = targetHTML.Seek(0, 0)
+	if err != nil {
 		return err
 	}
-	err = html.Render(targetHTML, target)
-	return err
+	for node := headNode; node != nil; node = node.NextSibling {
+		err = html.Render(targetHTML, node)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-//TODO: These really should be fixed when generating the original html files
-func fixHeadAlign(filename string) error {
+func nitFix(filename string) error {
 	file, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
 	}
-	newContents := strings.Replace(string(file), "h2 { font-size: 2.3125em; }", "h2 { font-size: 2.3125em; text-align: left;}", 1)
-	newContents = strings.Replace(newContents, "h4 { font-size: 1.4375em; } }", "h4 { font-size: 1.4375em; text-align: left;} }", 1)
-	newContents = strings.Replace(newContents, "<h2 id=\"_paths\">Paths</h2>", "<h2 id=\"_paths\">Operations</h2>", 1)
+	//TODO: This really should be fixed when generating the original html files
+	newContents := strings.Replace(string(file), "<h2 id=\"_paths\">Paths</h2>", "<h2 id=\"_paths\">Operations</h2>", 1)
+	//Adapt the color of headings to k8s style
+	newContents = strings.Replace(newContents, "color: #ba3925", "color: #428BCB", -1)
+	//remove the underline in hyperlinks
+	newContents = strings.Replace(newContents, "a { color: #005498; text-decoration: underline; line-height: inherit; }",
+		"a { color: #005498; line-height: inherit; }", -1)
 
 	if err = ioutil.WriteFile(filename, []byte(newContents), 0666); err != nil {
+		return err
+	}
+	return nil
+}
+
+//move the definitions.html and operations.html to _includes
+func moveHTML(filePath string, fileName string, outputDir string) error {
+	return os.Rename(filePath, outputDir+"/../_includes/"+fileName)
+}
+
+func processHTML(filePath string, fileName string, outputDir string) error {
+	if err := stripHTML(filePath); err != nil {
+		return err
+	}
+	if err := nitFix(filePath); err != nil {
+		return err
+	}
+	if err := moveHTML(filePath, fileName, outputDir); err != nil {
 		return err
 	}
 	return nil

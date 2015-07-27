@@ -270,11 +270,10 @@ func main() {
 
 		if *apiReference && !info.IsDir() && (info.Name() == "definitions.html" || info.Name() == "operations.html") {
 			fmt.Printf("Processing %s\n", path)
-			err := addHeader(path)
+			err := processHTML(path, info.Name(), *outputDir)
 			if err != nil {
 				return err
 			}
-			return fixHeadAlign(path)
 		}
 		return nil
 
