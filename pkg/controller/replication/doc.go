@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package controller contains logic for watching and synchronizing
 // replicationControllers.
-package controller
+package replication
