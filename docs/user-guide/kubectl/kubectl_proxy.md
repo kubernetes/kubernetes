@@ -65,6 +65,10 @@ kubectl proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-pref
 // Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 $ kubectl proxy --port=8011 --www=./local/www/
 
+// Run a proxy to kubernetes apiserver on an arbitrary local port.
+// The chosen port for the server will be output to stdout.
+$ kubectl proxy --port=0
+
 // Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
 // This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
 $ kubectl proxy --api-prefix=/k8s-api
@@ -78,7 +82,7 @@ $ kubectl proxy --api-prefix=/k8s-api
       --api-prefix="/api/": Prefix to serve the proxied API under.
       --disable-filter=false: If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks.  Use with caution.
   -h, --help=false: help for proxy
-  -p, --port=8001: The port on which to run the proxy.
+  -p, --port=8001: The port on which to run the proxy. Set to 0 to pick a random port.
       --reject-methods="POST,PUT,PATCH": Regular expression for HTTP methods that the proxy should reject.
       --reject-paths="^/api/.*/exec,^/api/.*/run": Regular expression for paths that the proxy should reject.
   -w, --www="": Also serve static files from the given directory under the specified prefix.

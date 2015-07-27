@@ -139,12 +139,13 @@ func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
 type ProxyServer struct {
 	handler http.Handler
+	port    int
 }
 
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
 // 'filter', if non-nil, protects requests to the api only.
-func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *client.Config) (*ProxyServer, error) {
+func NewProxyServer(port int, filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *client.Config) (*ProxyServer, error) {
 	host := cfg.Host
 	if !strings.HasSuffix(host, "/") {
 		host = host + "/"
@@ -173,16 +174,20 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 		// serving their working directory by default.
 		mux.Handle(staticPrefix, newFileHandler(staticPrefix, filebase))
 	}
-	return &ProxyServer{handler: mux}, nil
+	return &ProxyServer{handler: mux, port: port}, nil
 }
 
-// Serve starts the server (http.DefaultServeMux) on given port, loops forever.
-func (s *ProxyServer) Serve(port int) error {
+// Listen is a simple wrapper around net.Listen.
+func (s *ProxyServer) Listen() (net.Listener, error) {
+	return net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", s.port))
+}
+
+// Serve starts the server using given listener, loops forever.
+func (s *ProxyServer) ServeOnListener(l net.Listener) error {
 	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
 		Handler: s.handler,
 	}
-	return server.ListenAndServe()
+	return server.Serve(l)
 }
 
 func newProxy(target *url.URL) *httputil.ReverseProxy {

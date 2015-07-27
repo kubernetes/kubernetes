@@ -887,6 +887,13 @@ func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	return
 }
 
+// Rough equivalent of ctrl+c for cleaning up processes. Intended to be run in defer.
+func tryKill(cmd *exec.Cmd) {
+	if err := cmd.Process.Kill(); err != nil {
+		Logf("ERROR failed to kill command %v! The process may leak", cmd)
+	}
+}
+
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status.  It retrieves
 // the exact container log and searches for lines of expected output.
