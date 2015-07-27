@@ -24,7 +24,7 @@ import (
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/job"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for jobs against etcd
@@ -34,10 +34,10 @@ type REST struct {
 
 // jobPrefix is the location for jobs in etcd, only exposed
 // for testing
-var jobPrefix = "/registry/jobs"
+var jobPrefix = "/jobs"
 
 // NewREST returns a RESTStorage object that will work against jobs.
-func NewREST(s tools.StorageInterface) *REST {
+func NewREST(s storage.Interface) *REST {
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &api.Job{} },
 

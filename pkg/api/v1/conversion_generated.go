@@ -646,6 +646,88 @@ func convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolumeSo
 	return nil
 }
 
+func convert_api_Job_To_v1_Job(in *api.Job, out *Job, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.Job))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_api_JobStatus_To_v1_JobStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_JobList_To_v1_JobList(in *api.JobList, out *JobList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.JobList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Job, len(in.Items))
+		for i := range in.Items {
+			if err := convert_api_Job_To_v1_Job(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_api_JobSpec_To_v1_JobSpec(in *api.JobSpec, out *JobSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.JobSpec))(in)
+	}
+	out.Completions = in.Completions
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.TemplateRef != nil {
+		out.TemplateRef = new(ObjectReference)
+		if err := convert_api_ObjectReference_To_v1_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.TemplateRef = nil
+	}
+	if in.Template != nil {
+		out.Template = new(PodTemplateSpec)
+		if err := convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_api_JobStatus_To_v1_JobStatus(in *api.JobStatus, out *JobStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.JobStatus))(in)
+	}
+	out.Completions = in.Completions
+	return nil
+}
+
 func convert_api_Lifecycle_To_v1_Lifecycle(in *api.Lifecycle, out *Lifecycle, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Lifecycle))(in)
@@ -2896,6 +2978,88 @@ func convert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSource
 	return nil
 }
 
+func convert_v1_Job_To_api_Job(in *Job, out *api.Job, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Job))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_JobSpec_To_api_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_v1_JobStatus_To_api_JobStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_JobList_To_api_JobList(in *JobList, out *api.JobList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]api.Job, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_Job_To_api_Job(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_JobSpec_To_api_JobSpec(in *JobSpec, out *api.JobSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobSpec))(in)
+	}
+	out.Completions = in.Completions
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.TemplateRef != nil {
+		out.TemplateRef = new(api.ObjectReference)
+		if err := convert_v1_ObjectReference_To_api_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.TemplateRef = nil
+	}
+	if in.Template != nil {
+		out.Template = new(api.PodTemplateSpec)
+		if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_v1_JobStatus_To_api_JobStatus(in *JobStatus, out *api.JobStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*JobStatus))(in)
+	}
+	out.Completions = in.Completions
+	return nil
+}
+
 func convert_v1_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *api.Lifecycle, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Lifecycle))(in)
@@ -4559,6 +4723,10 @@ func init() {
 		convert_api_Handler_To_v1_Handler,
 		convert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource,
 		convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource,
+		convert_api_JobList_To_v1_JobList,
+		convert_api_JobSpec_To_v1_JobSpec,
+		convert_api_JobStatus_To_v1_JobStatus,
+		convert_api_Job_To_v1_Job,
 		convert_api_Lifecycle_To_v1_Lifecycle,
 		convert_api_LimitRangeItem_To_v1_LimitRangeItem,
 		convert_api_LimitRangeList_To_v1_LimitRangeList,
@@ -4671,6 +4839,10 @@ func init() {
 		convert_v1_Handler_To_api_Handler,
 		convert_v1_HostPathVolumeSource_To_api_HostPathVolumeSource,
 		convert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource,
+		convert_v1_JobList_To_api_JobList,
+		convert_v1_JobSpec_To_api_JobSpec,
+		convert_v1_JobStatus_To_api_JobStatus,
+		convert_v1_Job_To_api_Job,
 		convert_v1_Lifecycle_To_api_Lifecycle,
 		convert_v1_LimitRangeItem_To_api_LimitRangeItem,
 		convert_v1_LimitRangeList_To_api_LimitRangeList,

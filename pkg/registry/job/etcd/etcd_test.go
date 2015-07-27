@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	etcd_storage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/coreos/go-etcd/etcd"
@@ -44,7 +45,7 @@ const (
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	h := tools.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
+	h := etcd_storage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
 	storage := NewREST(h)
 	return storage, fakeEtcdClient
 }
@@ -108,6 +109,7 @@ func TestEtcdCreateJob(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	key, _ := makeJobKey(ctx, validJob.Name)
+	key = etcdtest.AddPrefix(key)
 	resp, err := fakeClient.Get(key, false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
@@ -127,6 +129,7 @@ func TestEtcdCreateJobAlreadyExisting(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	key, _ := makeJobKey(ctx, validJob.Name)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &validJob), 0)
 
 	_, err := storage.Create(ctx, &validJob)
@@ -200,6 +203,7 @@ func TestEtcdGetJob(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	key, _ := makeJobKey(ctx, validJob.Name)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &validJob), 0)
 	ctrl, err := storage.Get(ctx, validJob.Name)
 	if err != nil {
@@ -283,6 +287,9 @@ func TestEtcdGetJobDifferentNamespace(t *testing.T) {
 	key1, _ := makeJobKey(ctx1, validJob.Name)
 	key2, _ := makeJobKey(ctx2, validJob.Name)
 
+	key1 = etcdtest.AddPrefix(key1)
+	key2 = etcdtest.AddPrefix(key2)
+
 	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &validJob), 0)
 	otherNsJob := validJob
 	otherNsJob.Namespace = otherNs
@@ -318,6 +325,7 @@ func TestEtcdGetJobNotFound(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	key, _ := makeJobKey(ctx, validJob.Name)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -337,6 +345,7 @@ func TestEtcdUpdateJob(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	key, _ := makeJobKey(ctx, validJob.Name)
+	key = etcdtest.AddPrefix(key)
 
 	// set a key, then retrieve the current resource version and try updating it
 	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &validJob), 0)
@@ -361,6 +370,7 @@ func TestEtcdDeleteJob(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	key, _ := makeJobKey(ctx, validJob.Name)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &validJob), 0)
 	obj, err := storage.Delete(ctx, validJob.Name, nil)
 	if err != nil {
@@ -383,6 +393,7 @@ func TestEtcdListJobs(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
 	key := makeJobListKey(ctx)
+	key = etcdtest.AddPrefix(key)
 	controller := validJob
 	controller.Name = "bar"
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
@@ -414,6 +425,7 @@ func TestEtcdListJobsNotFound(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
 	key := makeJobListKey(ctx)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
@@ -432,6 +444,7 @@ func TestEtcdListJobsLabelsMatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
 	key := makeJobListKey(ctx)
+	key = etcdtest.AddPrefix(key)
 
 	controller := validJob
 	controller.Labels = map[string]string{"k": "v"}
@@ -495,7 +508,7 @@ func TestEtcdWatchJob(t *testing.T) {
 func TestEtcdWatchJobFields(t *testing.T) {
 	ctx := api.WithNamespace(api.NewDefaultContext(), validJob.Namespace)
 	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
+	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/pods"))
 
 	testFieldMap := map[int][]fields.Set{
 		PASS: {
@@ -512,11 +525,11 @@ func TestEtcdWatchJobFields(t *testing.T) {
 		},
 	}
 	testEtcdActions := []string{
-		tools.EtcdCreate,
-		tools.EtcdSet,
-		tools.EtcdCAS,
-		tools.EtcdDelete}
-
+		etcd_storage.EtcdCreate,
+		etcd_storage.EtcdSet,
+		etcd_storage.EtcdCAS,
+		etcd_storage.EtcdDelete,
+	}
 	controller := &api.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
@@ -541,7 +554,7 @@ func TestEtcdWatchJobFields(t *testing.T) {
 				node := &etcd.Node{
 					Value: string(controllerBytes),
 				}
-				if action == tools.EtcdDelete {
+				if action == etcd_storage.EtcdDelete {
 					prevNode = node
 				}
 				fakeClient.WaitForWatchCompletion()
@@ -576,7 +589,7 @@ func TestEtcdWatchJobFields(t *testing.T) {
 func TestEtcdWatchJobsMatch(t *testing.T) {
 	ctx := api.WithNamespace(api.NewDefaultContext(), validJob.Namespace)
 	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
+	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/pods"))
 
 	watching, err := storage.Watch(ctx,
 		labels.SelectorFromSet(validJob.Spec.Selector),
@@ -619,7 +632,7 @@ func TestEtcdWatchJobsMatch(t *testing.T) {
 func TestEtcdWatchJobsNotMatch(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
+	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/pods"))
 
 	watching, err := storage.Watch(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
@@ -682,10 +695,14 @@ func TestDelete(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
 
+	ctx := api.WithNamespace(api.NewDefaultContext(), validJob.Namespace)
+	key, _ := makeJobKey(ctx, validJob.Name)
+	key = etcdtest.AddPrefix(key)
+
 	createFn := func() runtime.Object {
 		rc := validJob
 		rc.ResourceVersion = "1"
-		fakeClient.Data["/registry/jobs/default/foo"] = tools.EtcdResponseWithError{
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
 					Value:         runtime.EncodeOrDie(latest.Codec, &rc),
@@ -698,7 +715,7 @@ func TestDelete(t *testing.T) {
 	gracefulSetFn := func() bool {
 		// If the controller is still around after trying to delete either the delete
 		// failed, or we're deleting it gracefully.
-		if fakeClient.Data["/registry/jobs/default/foo"].R.Node != nil {
+		if fakeClient.Data[key].R.Node != nil {
 			return true
 		}
 		return false
