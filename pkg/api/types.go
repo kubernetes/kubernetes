@@ -1049,6 +1049,56 @@ type ReplicationControllerList struct {
 	Items []ReplicationController `json:"items"`
 }
 
+// JobSpec is the specification of a job.
+// As the internal representation of a job, it may have either a TemplateRef or a Template set.
+type JobSpec struct {
+	// Completions is the number of desired successful completions of this job.
+	Completions int `json:"completions"`
+
+	// Selector is a label query over pods that should match the completed count.
+	Selector map[string]string `json:"selector"`
+
+	// TODO: Why is this needed?
+	// TemplateRef is a reference to an object that describes the pod that will be created if
+	// some fail to complete. This reference is ignored if a Template is set.
+	// Must be set before converting to a v1beta3 API object
+	TemplateRef *ObjectReference `json:"templateRef,omitempty"`
+
+	// Template is the object that describes the pod that will be created if
+	// some fail to complete. Internally, this takes precedence over a
+	// TemplateRef.
+	// Must be set before converting to a v1beta1 or v1beta2 API object.
+	Template *PodTemplateSpec `json:"template,omitempty"`
+}
+
+// JobStatus represents the current status of a replication
+// controller.
+type JobStatus struct {
+	// Completions is the number of actual successful completions of this job.
+	Completions int `json:"completions"`
+}
+
+// Job represents the configuration of a job.
+type Job struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the desired behavior of this job.
+	Spec JobSpec `json:"spec,omitempty"`
+
+	// Status is the current status of this job. This data may be
+	// out of date by some window of time.
+	Status JobStatus `json:"status,omitempty"`
+}
+
+// JobList is a collection of jobs.
+type JobList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []Job `json:"items"`
+}
+
 const (
 	// ClusterIPNone - do not assign a cluster IP
 	// no proxying required and no environment variables should be created for pods
