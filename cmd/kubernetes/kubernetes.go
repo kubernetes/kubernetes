@@ -65,6 +65,11 @@ var (
 	deletingPodsBurst      = flag.Int("deleting-pods-burst", 10, "")
 )
 
+const (
+	bindPodsQps   = 15
+	bindPodsBurst = 20
+)
+
 type delegateHandler struct {
 	delegate http.Handler
 }
@@ -118,7 +123,7 @@ func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServ
 // RunScheduler starts up a scheduler in it's own goroutine
 func runScheduler(cl *client.Client) {
 	// Scheduler
-	schedulerConfigFactory := factory.NewConfigFactory(cl)
+	schedulerConfigFactory := factory.NewConfigFactory(cl, util.NewTokenBucketRateLimiter(bindPodsQps, bindPodsBurst))
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		glog.Fatalf("Couldn't create scheduler config: %v", err)

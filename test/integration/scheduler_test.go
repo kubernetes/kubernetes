@@ -79,7 +79,7 @@ func TestUnschedulableNodes(t *testing.T) {
 
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
 
-	schedulerConfigFactory := factory.NewConfigFactory(restClient)
+	schedulerConfigFactory := factory.NewConfigFactory(restClient, nil)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)

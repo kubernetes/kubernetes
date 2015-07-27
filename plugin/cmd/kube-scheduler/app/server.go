@@ -54,6 +54,8 @@ type SchedulerServer struct {
 	EnableProfiling   bool
 	Master            string
 	Kubeconfig        string
+	BindPodsQPS       float32
+	BindPodsBurst     int
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -75,6 +77,8 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", 15.0, "Number of bindings per second scheduler is allowed to continuously make")
+	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", 20, "Number of bindings per second scheduler is allowed to make during bursts")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -116,7 +120,7 @@ func (s *SchedulerServer) Run(_ []string) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	configFactory := factory.NewConfigFactory(kubeClient)
+	configFactory := factory.NewConfigFactory(kubeClient, util.NewTokenBucketRateLimiter(s.BindPodsQPS, s.BindPodsBurst))
 	config, err := s.createConfig(configFactory)
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)
