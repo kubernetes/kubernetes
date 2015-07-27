@@ -69,6 +69,78 @@ func TestParseSELinuxOptions(t *testing.T) {
 	}
 }
 
+func TestProjectSELinuxOptions(t *testing.T) {
+	baseContext := func() *api.SELinuxOptions {
+		return &api.SELinuxOptions{
+			User:  "user",
+			Role:  "role",
+			Type:  "type",
+			Level: "level",
+		}
+	}
+
+	var (
+		userContext  = baseContext()
+		roleContext  = baseContext()
+		typeContext  = baseContext()
+		levelContext = baseContext()
+		allContext   = baseContext()
+	)
+
+	userContext.User = "user2"
+	roleContext.Role = "role2"
+	typeContext.Type = "type2"
+	levelContext.Level = "level2"
+	allContext.User = "user3"
+	allContext.Role = "role3"
+	allContext.Type = "type3"
+	allContext.Level = "level3"
+
+	cases := []struct {
+		name     string
+		source   *api.SELinuxOptions
+		target   *api.SELinuxOptions
+		expected *api.SELinuxOptions
+	}{
+		{
+			name:     "project user",
+			source:   userContext,
+			target:   baseContext(),
+			expected: userContext,
+		},
+		{
+			name:     "project role",
+			source:   roleContext,
+			target:   baseContext(),
+			expected: roleContext,
+		},
+		{
+			name:     "project type",
+			source:   typeContext,
+			target:   baseContext(),
+			expected: typeContext,
+		},
+		{
+			name:     "project level",
+			source:   levelContext,
+			target:   baseContext(),
+			expected: levelContext,
+		},
+		{
+			name:     "project all",
+			source:   allContext,
+			target:   baseContext(),
+			expected: allContext,
+		},
+	}
+
+	for _, tc := range cases {
+		result := ProjectSELinuxOptions(tc.source, tc.target)
+
+		compareContexts(tc.name, tc.expected, result, t)
+	}
+}
+
 func compareContexts(name string, ex, ac *api.SELinuxOptions, t *testing.T) {
 	if e, a := ex.User, ac.User; e != a {
 		t.Errorf("%v: expected user: %v, got: %v", name, e, a)

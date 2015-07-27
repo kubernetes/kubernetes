@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
@@ -166,7 +167,10 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	// Determine the effective SELinuxOptions to use for this volume.
 	securityContext := ""
 	if selinuxEnabled() {
-		securityContext = ed.rootContext
+		securityContext, err = ed.determineEffectiveSELinuxOptions()
+		if err != nil {
+			return err
+		}
 	}
 
 	switch ed.medium {
@@ -187,6 +191,45 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 
 func (ed *emptyDir) IsReadOnly() bool {
 	return false
+}
+
+// determineEffectiveSELinuxOptions determines the effective SELinux options
+// that should be used for a particular plugin.
+func (ed *emptyDir) determineEffectiveSELinuxOptions() (string, error) {
+	glog.V(4).Infof("Determining effective SELinux context for pod %v/%v", ed.pod.Namespace, ed.pod.Name)
+	var opts *api.SELinuxOptions
+	if ed.pod != nil {
+		// Use the security context, if defined, of the first
+		// container in the pod to mount this volume
+		for _, container := range ed.pod.Spec.Containers {
+			if !volumeutil.ContainerHasVolumeMountForName(&container, ed.volName) {
+				continue
+			}
+
+			if container.SecurityContext != nil &&
+				container.SecurityContext.SELinuxOptions != nil {
+				opts = container.SecurityContext.SELinuxOptions
+				break
+			}
+		}
+	}
+
+	if opts == nil {
+		return ed.rootContext, nil
+	}
+
+	glog.V(4).Infof("Specified security context for pod %v/%v: %v", ed.pod.Namespace, ed.pod.Name, securitycontext.SELinuxOptionsString(opts))
+
+	rootContextOpts, err := securitycontext.ParseSELinuxOptions(ed.rootContext)
+	if err != nil {
+		return "", err
+	}
+
+	effectiveOpts := securitycontext.ProjectSELinuxOptions(opts, rootContextOpts)
+
+	glog.V(4).Infof("Effective context for pod %v/%v: %v", ed.pod.Namespace, ed.pod.Name, securitycontext.SELinuxOptionsString(effectiveOpts))
+
+	return securitycontext.SELinuxOptionsString(effectiveOpts), nil
 }
 
 // setupTmpfs creates a tmpfs mount at the specified directory with the
