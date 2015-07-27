@@ -873,7 +873,7 @@ type PodSpec struct {
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
-	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node; see http://releases.k8s.io/HEAD/examples/node-selection/README.md"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node; see http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	ServiceAccountName string `json:"serviceAccountName,omitempty" description:"name of the ServiceAccount to use to run this pod; see http://releases.k8s.io/HEAD/docs/service_accounts.md"`
