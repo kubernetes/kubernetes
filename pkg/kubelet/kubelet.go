@@ -1177,9 +1177,10 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}()
 
 	// Kill pods we can't run.
-	err := canRunPod(pod)
-	if err != nil {
-		kl.killPod(pod, runningPod)
+	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {
+		if err := kl.killPod(pod, runningPod); err != nil {
+			util.HandleError(err)
+		}
 		return err
 	}
 

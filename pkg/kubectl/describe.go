@@ -419,7 +419,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
 		if pod.DeletionTimestamp != nil {
 			fmt.Fprintf(out, "Status:\tTerminating (expires %s)\n", pod.DeletionTimestamp.Time.Format(time.RFC1123Z))
-			fmt.Fprintf(out, "Termination Grace Period:\t%ss\n", pod.DeletionGracePeriodSeconds)
+			fmt.Fprintf(out, "Termination Grace Period:\t%ds\n", pod.DeletionGracePeriodSeconds)
 		} else {
 			fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Phase))
 		}

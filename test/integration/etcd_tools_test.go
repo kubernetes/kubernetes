@@ -82,49 +82,50 @@ func TestGet(t *testing.T) {
 
 func TestWriteTTL(t *testing.T) {
 	client := framework.NewEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
-		_, err := client.Set(key, "object", 0)
-		if err != nil {
+		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		s := fakeAPIObject("")
-		err = helper.GuaranteedUpdate(key, &s, false, func(obj runtime.Object, res tools.ResponseMeta) (runtime.Object, *uint64, error) {
-			if *(obj.(*fakeAPIObject)) != "object" {
+		result := &api.ServiceAccount{}
+		err := etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "foo" {
 				t.Fatalf("unexpected existing object: %v", obj)
 			}
 			if res.TTL != 0 {
 				t.Fatalf("unexpected TTL: %#v", res)
 			}
 			ttl := uint64(10)
-			out := fakeAPIObject("test")
-			return &out, &ttl, nil
+			out := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "out"}}
+			return out, &ttl, nil
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if s != "test" {
-			t.Errorf("unexpected response: %#v", s)
+		if result.Name != "out" {
+			t.Errorf("unexpected response: %#v", result)
 		}
 		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL != 10 {
 			t.Fatalf("unexpected get: %v %#v", err, res)
 		}
 
-		err = helper.GuaranteedUpdate(key, &s, false, func(obj runtime.Object, res tools.ResponseMeta) (runtime.Object, *uint64, error) {
-			if *(obj.(*fakeAPIObject)) != "test" {
+		result = &api.ServiceAccount{}
+		err = etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "out" {
 				t.Fatalf("unexpected existing object: %v", obj)
 			}
 			if res.TTL <= 1 {
 				t.Fatalf("unexpected TTL: %#v", res)
 			}
-			out := fakeAPIObject("test2")
-			return &out, nil, nil
+			out := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "out2"}}
+			return out, nil, nil
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if s != "test2" {
-			t.Errorf("unexpected response: %#v", s)
+		if result.Name != "out2" {
+			t.Errorf("unexpected response: %#v", result)
 		}
 		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL <= 1 {
 			t.Fatalf("unexpected get: %v %#v", err, res)

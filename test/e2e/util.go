@@ -841,7 +841,7 @@ func cleanup(filePath string, ns string, selectors ...string) {
 	runKubectl("stop", "--grace-period=0", "-f", filePath, nsArg)
 
 	for _, selector := range selectors {
-		resources := runKubectl("get", "rc,se", "-l", selector, "--no-headers", nsArg)
+		resources := runKubectl("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
 		if resources != "" {
 			Failf("Resources left running after stop:\n%s", resources)
 		}

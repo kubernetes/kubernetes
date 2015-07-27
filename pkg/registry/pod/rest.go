@@ -92,21 +92,37 @@ func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOp
 	if options == nil {
 		return false
 	}
+	pod := obj.(*api.Pod)
 	period := int64(0)
 	// user has specified a value
 	if options.GracePeriodSeconds != nil {
 		period = *options.GracePeriodSeconds
 	} else {
 		// use the default value if set, or deletes the pod immediately (0)
-		pod := obj.(*api.Pod)
 		if pod.Spec.TerminationGracePeriodSeconds != nil {
 			period = *pod.Spec.TerminationGracePeriodSeconds
 		}
+	}
+	// if the pod is not scheduled, delete immediately
+	if len(pod.Spec.NodeName) == 0 {
+		period = 0
 	}
 	// ensure the options and the pod are in sync
 	options.GracePeriodSeconds = &period
 	return true
 }
+
+type podStrategyWithoutGraceful struct {
+	podStrategy
+}
+
+// CheckGracefulDelete prohibits graceful deletion.
+func (podStrategyWithoutGraceful) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
+	return false
+}
+
+// StrategyWithoutGraceful implements the legacy instant delele behavior.
+var StrategyWithoutGraceful = podStrategyWithoutGraceful{Strategy}
 
 type podStatusStrategy struct {
 	podStrategy

@@ -114,17 +114,20 @@ func (t *Tester) TestUpdate(valid runtime.Object, existing, older runtime.Object
 
 // Test deleting an object.
 func (t *Tester) TestDelete(createFn func() runtime.Object, wasGracefulFn func() bool, invalid ...runtime.Object) {
-	t.testDeleteNonExist(createFn)
-	t.testDeleteNoGraceful(createFn, wasGracefulFn)
-	t.testDeleteInvokesValidation(invalid...)
+	t.TestDeleteNonExist(createFn)
+	t.TestDeleteNoGraceful(createFn, wasGracefulFn)
+	t.TestDeleteInvokesValidation(invalid...)
 	// TODO: Test delete namespace mismatch rejection
 	// once #5684 is fixed.
 }
 
 // Test graceful deletion.
 func (t *Tester) TestDeleteGraceful(createFn func() runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
-	t.testDeleteGracefulHasDefault(createFn(), expectedGrace, wasGracefulFn)
-	t.testDeleteGracefulUsesZeroOnNil(createFn(), 0)
+	t.TestDeleteGracefulHasDefault(createFn(), expectedGrace, wasGracefulFn)
+	t.TestDeleteGracefulWithValue(createFn(), expectedGrace, wasGracefulFn)
+	t.TestDeleteGracefulUsesZeroOnNil(createFn(), 0)
+	t.TestDeleteGracefulExtend(createFn(), expectedGrace, wasGracefulFn)
+	t.TestDeleteGracefulImmediate(createFn(), expectedGrace, wasGracefulFn)
 }
 
 // Test getting object.
@@ -298,6 +301,33 @@ func (t *Tester) testUpdateFailsOnVersion(older runtime.Object) {
 // =============================================================================
 // Deletion tests.
 
+func (t *Tester) TestDeleteInvokesValidation(invalid ...runtime.Object) {
+	for i, obj := range invalid {
+		objectMeta := t.getObjectMetaOrFail(obj)
+		ctx := t.TestContext()
+		_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, nil)
+		if !errors.IsInvalid(err) {
+			t.Errorf("%d: Expected to get an invalid resource error, got %v", i, err)
+		}
+	}
+}
+
+func (t *Tester) TestDeleteNonExist(createFn func() runtime.Object) {
+	existing := createFn()
+	objectMeta := t.getObjectMetaOrFail(existing)
+	context := t.TestContext()
+
+	t.withStorageError(&etcd.EtcdError{ErrorCode: tools.EtcdErrorCodeNotFound}, func() {
+		_, err := t.storage.(rest.GracefulDeleter).Delete(context, objectMeta.Name, nil)
+		if err == nil || !errors.IsNotFound(err) {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+	})
+}
+
+// =============================================================================
+// Graceful Deletion tests.
+
 func (t *Tester) TestDeleteNoGraceful(createFn func() runtime.Object, wasGracefulFn func() bool) {
 	existing := createFn()
 	objectMeta := t.getObjectMetaOrFail(existing)
@@ -314,41 +344,7 @@ func (t *Tester) TestDeleteNoGraceful(createFn func() runtime.Object, wasGracefu
 	}
 }
 
-func (t *Tester) testDeleteInvokesValidation(invalid ...runtime.Object) {
-	for i, obj := range invalid {
-		objectMeta := t.getObjectMetaOrFail(obj)
-		ctx := t.TestContext()
-		_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, nil)
-		if !errors.IsInvalid(err) {
-			t.Errorf("%d: Expected to get an invalid resource error, got %v", i, err)
-		}
-	}
-}
-
-func (t *Tester) testDeleteNonExist(createFn func() runtime.Object) {
-	existing := createFn()
-	objectMeta := t.getObjectMetaOrFail(existing)
-	context := t.TestContext()
-
-	t.withStorageError(&etcd.EtcdError{ErrorCode: tools.EtcdErrorCodeNotFound}, func() {
-		_, err := t.storage.(rest.GracefulDeleter).Delete(context, objectMeta.Name, nil)
-		if err == nil || !errors.IsNotFound(err) {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-	})
-}
-
-// =============================================================================
-// Graceful Deletion tests.
-
-func (t *Tester) TestDeleteGraceful(createFn func() runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
-	t.TestDeleteGracefulHasDefault(createFn(), expectedGrace, wasGracefulFn)
-	t.TestDeleteGracefulWithValue(createFn(), expectedGrace, wasGracefulFn)
-	t.TestDeleteGracefulUsesZeroOnNil(createFn(), 0)
-	t.TestDeleteGracefulExtend(createFn(), expectedGrace, wasGracefulFn)
-}
-
-func (t *Tester) testDeleteGracefulHasDefault(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
+func (t *Tester) TestDeleteGracefulHasDefault(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
 	objectMeta := t.getObjectMetaOrFail(existing)
 	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
 	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, &api.DeleteOptions{})
@@ -450,7 +446,40 @@ func (t *Tester) TestDeleteGracefulExtend(existing runtime.Object, expectedGrace
 	}
 }
 
-func (t *Tester) testDeleteGracefulUsesZeroOnNil(existing runtime.Object, expectedGrace int64) {
+func (t *Tester) TestDeleteGracefulImmediate(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
+	objectMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
+	}
+
+	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !wasGracefulFn() {
+		t.Errorf("did not gracefully delete resource")
+	}
+	// second delete is immediate, resource is deleted
+	out, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(0))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	_, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	if !errors.IsNotFound(err) {
+		t.Errorf("unexpected error, object should be deleted immediately: %v", err)
+	}
+	objectMeta, err = api.ObjectMetaFor(out)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	if objectMeta.DeletionTimestamp == nil || objectMeta.DeletionGracePeriodSeconds == nil || *objectMeta.DeletionGracePeriodSeconds != 0 {
+		t.Errorf("unexpected deleted meta: %#v", objectMeta)
+	}
+}
+
+func (t *Tester) TestDeleteGracefulUsesZeroOnNil(existing runtime.Object, expectedGrace int64) {
 	objectMeta := t.getObjectMetaOrFail(existing)
 	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
 	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, nil)

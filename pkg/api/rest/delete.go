@@ -17,8 +17,11 @@ limitations under the License.
 package rest
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
@@ -59,6 +62,8 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 			if period > *objectMeta.DeletionGracePeriodSeconds {
 				return false, true, nil
 			}
+			now := util.NewTime(util.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+			objectMeta.DeletionTimestamp = &now
 			objectMeta.DeletionGracePeriodSeconds = &period
 			options.GracePeriodSeconds = &period
 			return true, false, nil
@@ -71,6 +76,8 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 	if !strategy.CheckGracefulDelete(obj, options) {
 		return false, false, nil
 	}
+	now := util.NewTime(util.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+	objectMeta.DeletionTimestamp = &now
 	objectMeta.DeletionGracePeriodSeconds = options.GracePeriodSeconds
 	return true, false, nil
 }

@@ -568,7 +568,7 @@ func replaceProber(dm *DockerManager, result probe.Result, err error) {
 // Unknown or error.
 //
 // PLEASE READ THE PROBE DOCS BEFORE CHANGING THIS TEST IF YOU ARE UNSURE HOW PROBES ARE SUPPOSED TO WORK:
-// (See https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md#pod-conditions)
+// (See https://k8s.io/kubernetes/blob/master/docs/pod-states.md#pod-conditions)
 func TestProbeContainer(t *testing.T) {
 	manager, _ := newTestDockerManager()
 	dc := &docker.APIContainers{
@@ -1150,7 +1150,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill and restart the bad hash container.
-		"stop", "create", "start",
+		"stop", "create", "start", "inspect_container",
 	})
 
 	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {

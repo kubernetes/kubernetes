@@ -246,11 +246,6 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pod valid-pod "${kube_flags[@]}"
-  # Post-condition: pod is still there, in terminating
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
-  [[ "$(kubectl get pods "${kube_flags[@]}" | grep Terminating)" ]]
-  # Command
   kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''

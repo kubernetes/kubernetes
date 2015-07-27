@@ -123,7 +123,7 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	// Currently this routine is not called for the same pod from multiple
 	// workers and/or the kubelet but dropping the lock before sending the
 	// status down the channel feels like an easy way to get a bullet in foot.
-	if !found || !isStatusEqual(&oldStatus, &status) {
+	if !found || !isStatusEqual(&oldStatus, &status) || pod.DeletionTimestamp != nil {
 		s.podStatuses[podFullName] = status
 		s.podStatusChannel <- podStatusSyncRequest{pod, status}
 	} else {
@@ -173,11 +173,16 @@ func (s *statusManager) syncBatch() error {
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully", kubeletUtil.FormatPodName(pod))
 
-			if statusPod.DeletionTimestamp == nil || !allTerminated(statusPod.Status.ContainerStatuses) {
+			if pod.DeletionTimestamp == nil {
+				return nil
+			}
+			if !notRunning(pod.Status.ContainerStatuses) {
+				glog.V(3).Infof("Pod %q is terminated, but some pods are still running", pod.Name)
 				return nil
 			}
 			if err := s.kubeClient.Pods(statusPod.Namespace).Delete(statusPod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", statusPod.Name)
+				s.DeletePodStatus(podFullName)
 				return nil
 			}
 		}
@@ -194,11 +199,11 @@ func (s *statusManager) syncBatch() error {
 	return fmt.Errorf("error updating status for pod %q: %v", kubeletUtil.FormatPodName(pod), err)
 }
 
-// allTerminated returns true if every status is terminated, or the status list
+// notRunning returns true if every status is terminated or waiting, or the status list
 // is empty.
-func allTerminated(statuses []api.ContainerStatus) bool {
+func notRunning(statuses []api.ContainerStatus) bool {
 	for _, status := range statuses {
-		if status.State.Terminated == nil {
+		if status.State.Terminated == nil && status.State.Waiting == nil {
 			return false
 		}
 	}

@@ -1234,14 +1234,19 @@ func (dm *DockerManager) killContainer(containerID types.UID, container *api.Con
 	}
 
 	gracePeriod := int64(minimumGracePeriodInSeconds)
-	if pod != nil && pod.DeletionGracePeriodSeconds != nil {
-		gracePeriod = *pod.DeletionGracePeriodSeconds
+	if pod != nil {
+		switch {
+		case pod.DeletionGracePeriodSeconds != nil:
+			gracePeriod = *pod.DeletionGracePeriodSeconds
+		case pod.Spec.TerminationGracePeriodSeconds != nil:
+			gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+		}
 	}
 	glog.V(2).Infof("Killing container %q with %d second grace period", name, gracePeriod)
+	start := util.Now()
 
 	if pod != nil && container != nil && container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		glog.V(4).Infof("Running preStop hook for container %q", name)
-		start := util.Now()
 		// TODO: timebox PreStop execution to at most gracePeriod
 		if err := dm.runner.Run(ID, pod, container, container.Lifecycle.PreStop); err != nil {
 			glog.Errorf("preStop hook for container %q failed: %v", name, err)
@@ -1256,6 +1261,11 @@ func (dm *DockerManager) killContainer(containerID types.UID, container *api.Con
 		gracePeriod = minimumGracePeriodInSeconds
 	}
 	err := dm.client.StopContainer(ID, uint(gracePeriod))
+	if err == nil {
+		glog.V(2).Infof("Container %q exited after %s", name, util.Now().Sub(start.Time))
+	} else {
+		glog.V(2).Infof("Container %q termination failed after %s: %v", name, util.Now().Sub(start.Time), err)
+	}
 	ref, ok := dm.containerRefManager.GetRef(ID)
 	if !ok {
 		glog.Warningf("No ref for pod '%q'", name)
@@ -1498,11 +1508,6 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 	containersToKeep := make(map[kubeletTypes.DockerID]int)
 	createPodInfraContainer := false
 
-	if pod.DeletionTimestamp != nil {
-		glog.V(4).Infof("Pod is terminating %q", podFullName)
-		return PodContainerChangesSpec{}, nil
-	}
-
 	var err error
 	var podInfraContainerID kubeletTypes.DockerID
 	var changed bool
@@ -1624,10 +1629,10 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 	podFullName := kubecontainer.GetPodFullName(pod)
 	containerChanges, err := dm.computePodContainerChanges(pod, runningPod, podStatus)
-	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 	if err != nil {
 		return err
 	}
+	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 
 	if containerChanges.StartInfraContainer || (len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0) {
 		if len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0 {
