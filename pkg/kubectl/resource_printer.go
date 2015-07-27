@@ -259,6 +259,7 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
+var jobColumns = []string{"JOB", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "COMPLETIONS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP(S)", "PORT(S)"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
@@ -279,6 +280,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podColumns, printPodList)
 	h.Handler(podTemplateColumns, printPodTemplate)
 	h.Handler(podTemplateColumns, printPodTemplateList)
+	h.Handler(jobColumns, printJob)
+	h.Handler(jobColumns, printJobList)
 	h.Handler(replicationControllerColumns, printReplicationController)
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
 	h.Handler(serviceColumns, printService)
@@ -502,10 +505,43 @@ func printPodTemplateList(podList *api.PodTemplateList, w io.Writer, withNamespa
 	return nil
 }
 
+func printJob(job *api.Job, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	containers := job.Spec.Template.Spec.Containers
+	var firstContainer api.Container
+	if len(containers) > 0 {
+		firstContainer, containers = containers[0], containers[1:]
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n",
+		job.Name,
+		firstContainer.Name,
+		firstContainer.Image,
+		formatLabels(job.Spec.Selector),
+		job.Spec.Completions)
+	if err != nil {
+		return err
+	}
+	// Lay out all the other containers on separate lines.
+	for _, container := range containers {
+		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "", "")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printJobList(list *api.JobList, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	for _, job := range list.Items {
+		if err := printJob(&job, w, withNamespace, wide, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func printReplicationController(controller *api.ReplicationController, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
 	name := controller.Name
 	namespace := controller.Namespace
-
 	containers := controller.Spec.Template.Spec.Containers
 	var firstContainer api.Container
 	if len(containers) > 0 {
