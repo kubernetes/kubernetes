@@ -1,3 +1,17 @@
+// Copyright 2015 The appc Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package types
 
 import (
@@ -6,7 +20,7 @@ import (
 )
 
 func makeAnno(n, v string) Annotation {
-	name, err := NewACName(n)
+	name, err := NewACIdentifier(n)
 	if err != nil {
 		panic(err)
 	}
@@ -191,7 +205,7 @@ func TestAnnotationsSet(t *testing.T) {
 
 	a.Set("foo", "bar")
 	w := Annotations{
-		Annotation{ACName("foo"), "bar"},
+		Annotation{ACIdentifier("foo"), "bar"},
 	}
 	if !reflect.DeepEqual(w, a) {
 		t.Fatalf("want %v, got %v", w, a)
@@ -199,17 +213,19 @@ func TestAnnotationsSet(t *testing.T) {
 
 	a.Set("dog", "woof")
 	w = Annotations{
-		Annotation{ACName("foo"), "bar"},
-		Annotation{ACName("dog"), "woof"},
+		Annotation{ACIdentifier("foo"), "bar"},
+		Annotation{ACIdentifier("dog"), "woof"},
 	}
 	if !reflect.DeepEqual(w, a) {
 		t.Fatalf("want %v, got %v", w, a)
 	}
 
 	a.Set("foo", "baz")
+	a.Set("example.com/foo_bar", "quux")
 	w = Annotations{
-		Annotation{ACName("foo"), "baz"},
-		Annotation{ACName("dog"), "woof"},
+		Annotation{ACIdentifier("foo"), "baz"},
+		Annotation{ACIdentifier("dog"), "woof"},
+		Annotation{ACIdentifier("example.com/foo_bar"), "quux"},
 	}
 	if !reflect.DeepEqual(w, a) {
 		t.Fatalf("want %v, got %v", w, a)

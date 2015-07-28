@@ -1,3 +1,17 @@
+// Copyright 2015 The appc Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package types
 
 import (
@@ -150,14 +164,14 @@ func TestIsolatorsGetByName(t *testing.T) {
 				"value": {"set": ["CAP_KILL"]}
 			},
 			{
-				"name": "os/linux/capabilities-revoke-set",
+				"name": "os/linux/capabilities-remove-set",
 				"value": {"set": ["CAP_KILL"]}
 			}
 		]
 	`
 
 	tests := []struct {
-		name     ACName
+		name     ACIdentifier
 		wlimit   int64
 		wrequest int64
 		wset     []LinuxCapability
@@ -165,7 +179,7 @@ func TestIsolatorsGetByName(t *testing.T) {
 		{"resource/cpu", 1, 30, nil},
 		{"resource/memory", 2147483648, 1000000000, nil},
 		{"os/linux/capabilities-retain-set", 0, 0, []LinuxCapability{"CAP_KILL"}},
-		{"os/linux/capabilities-revoke-set", 0, 0, []LinuxCapability{"CAP_KILL"}},
+		{"os/linux/capabilities-remove-set", 0, 0, []LinuxCapability{"CAP_KILL"}},
 	}
 
 	var is Isolators
