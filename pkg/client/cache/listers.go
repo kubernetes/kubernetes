@@ -172,13 +172,13 @@ func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
 	return minion.(*api.Node), nil
 }
 
-// StoreToControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
-type StoreToControllerLister struct {
+// StoreToReplicationControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
+type StoreToReplicationControllerLister struct {
 	Store
 }
 
 // Exists checks if the given rc exists in the store.
-func (s *StoreToControllerLister) Exists(controller *api.ReplicationController) (bool, error) {
+func (s *StoreToReplicationControllerLister) Exists(controller *api.ReplicationController) (bool, error) {
 	_, exists, err := s.Store.Get(controller)
 	if err != nil {
 		return false, err
@@ -186,17 +186,17 @@ func (s *StoreToControllerLister) Exists(controller *api.ReplicationController) 
 	return exists, nil
 }
 
-// StoreToControllerLister lists all controllers in the store.
+// StoreToReplicationControllerLister lists all controllers in the store.
 // TODO: converge on the interface in pkg/client
-func (s *StoreToControllerLister) List() (controllers []api.ReplicationController, err error) {
+func (s *StoreToReplicationControllerLister) List() (controllers []api.ReplicationController, err error) {
 	for _, c := range s.Store.List() {
 		controllers = append(controllers, *(c.(*api.ReplicationController)))
 	}
 	return controllers, nil
 }
 
-// GetPodControllers returns a list of controllers managing a pod. Returns an error only if no matching controllers are found.
-func (s *StoreToControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+// GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
+func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
 	var selector labels.Selector
 	var rc api.ReplicationController
 
