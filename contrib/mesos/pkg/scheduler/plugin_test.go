@@ -370,6 +370,7 @@ func TestPlugin_New(t *testing.T) {
 // and play through the whole life cycle of the plugin while creating pods, deleting
 // and failing them.
 func TestPlugin_LifeCycle(t *testing.T) {
+	t.Skip("This test is flaky, see #11901")
 	assert := &EventAssertions{*assert.New(t)}
 
 	// create a fake pod watch. We use that below to submit new pods to the scheduler
