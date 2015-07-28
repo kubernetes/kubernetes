@@ -8,6 +8,15 @@ BRANCH=release-1.0
 set -e
 set -x
 
+SED=sed
+if which gsed &>/dev/null; then
+  SED=gsed
+fi
+if ! ($SED --version 2>&1 | grep -q GNU); then
+  echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
+  exit 1
+fi
+
 tmpdir=docs.$RANDOM
 
 echo fetching upstream
@@ -29,12 +38,11 @@ rmdir $tmpdir
 echo stripping
 for dir in docs examples; do
     find ${OUTDIR}/${dir} -type f -name \*.md | while read X; do
-        sed -i .import_docs_tmp \
+        $SED -i \
             -e '/<!-- BEGIN STRIP_FOR_RELEASE.*/,/<!-- END STRIP_FOR_RELEASE.*/d' \
             -e "s|releases.k8s.io/HEAD|releases.k8s.io/${REPORT_TAG}|g" \
             ${X}
     done
-    rm $(find ${OUTDIR}/${dir} -name \*.import_docs_tmp)
     git stage ${OUTDIR}/${dir}
 done
 
