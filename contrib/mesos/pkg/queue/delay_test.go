@@ -226,6 +226,7 @@ func TestDQ_ordered_add_pop(t *testing.T) {
 }
 
 func TestDQ_always_pop_earliest_deadline(t *testing.T) {
+	t.Skip("disabled due to flakiness; see #11857")
 	t.Parallel()
 
 	// add a testjob with delay of 2s
@@ -264,6 +265,7 @@ func TestDQ_always_pop_earliest_deadline(t *testing.T) {
 }
 
 func TestDQ_always_pop_earliest_deadline_multi(t *testing.T) {
+	t.Skip("disabled due to flakiness; see #11821")
 	t.Parallel()
 
 	dq := NewDelayQueue()
