@@ -90,7 +90,6 @@ var _ = Describe("Kubectl client", func() {
 			nautilusPath = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
 			kittenPath = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 		})
-
 		It("should create and stop a replication controller", func() {
 			defer cleanup(nautilusPath, ns, updateDemoSelector)
 
