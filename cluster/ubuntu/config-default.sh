@@ -39,6 +39,8 @@ export FLANNEL_OPTS=${FLANNEL_OPTS:-"Network": 172.16.0.0/16}
 # Admission Controllers to invoke prior to persisting objects in cluster
 export ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,ServiceAccount,ResourceQuota,SecurityContextDeny
 
+SERVICE_NODE_PORT_RANGE=${SERVICE_NODE_PORT_RANGE:-"30000-32767"}
+
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=${LOGGING_DESTINATION:-elasticsearch}

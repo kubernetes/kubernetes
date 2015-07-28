@@ -202,6 +202,7 @@ KUBE_APISERVER_OPTS="--insecure-bind-address=0.0.0.0 \
 --logtostderr=true \
 --service-cluster-ip-range=${1} \
 --admission-control=${2} \
+--service-node-port-range=${3} \
 --client-ca-file=/srv/kubernetes/ca.crt \
 --tls-cert-file=/srv/kubernetes/server.cert \
 --tls-private-key-file=/srv/kubernetes/server.key"
@@ -371,7 +372,7 @@ function provision-master() {
                             ~/kube/make-ca-cert ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}" "${SERVICE_NODE_PORT_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-flanneld-opts; \
@@ -413,7 +414,7 @@ function provision-masterandminion() {
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}" "${SERVICE_NODE_PORT_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
