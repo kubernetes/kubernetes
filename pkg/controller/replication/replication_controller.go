@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package replication
 
 import (
 	"reflect"
@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -34,10 +35,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/workqueue"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
-)
-
-var (
-	rcKeyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 const (
@@ -52,18 +49,6 @@ const (
 	// final resting state of the pod.
 	PodRelistPeriod = 5 * time.Minute
 
-	// If a watch drops a delete event for a pod, it'll take this long
-	// before a dormant rc waiting for those packets is woken up anyway. It is
-	// specifically targeted at the case where some problem prevents an update
-	// of expectations, without it the RC could stay asleep forever. This should
-	// be set based on the expected latency of watch events.
-	//
-	// Currently an rc can service (create *and* observe the watch events for said
-	// creation) about 10-20 pods a second, so it takes about 1 min to service
-	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
-	// latency/pod at the scale of 3000 pods over 100 nodes.
-	ExpectationsTimeout = 3 * time.Minute
-
 	// Realistic value of the burstReplica field for the replication manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
@@ -71,13 +56,16 @@ const (
 	// We must avoid counting pods until the pod store has synced. If it hasn't synced, to
 	// avoid a hot loop, we'll wait this long between checks.
 	PodStoreSyncedPollPeriod = 100 * time.Millisecond
+
+	// The number of times we retry updating a replication controller's status.
+	statusUpdateRetries = 1
 )
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
 type ReplicationManager struct {
 	kubeClient client.Interface
-	podControl PodControlInterface
+	podControl controller.PodControlInterface
 
 	// An rc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -90,9 +78,11 @@ type ReplicationManager struct {
 	podStoreSynced func() bool
 
 	// A TTLCache of pod creates/deletes each rc expects to see
-	expectations RCExpectationsManager
+	expectations controller.ControllerExpectationsInterface
+
 	// A store of replication controllers, populated by the rcController
 	rcStore cache.StoreToReplicationControllerLister
+
 	// A store of pods, populated by the podController
 	podStore cache.StoreToPodLister
 	// Watches changes to all replication controllers
@@ -111,12 +101,12 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
-		podControl: RealPodControl{
-			kubeClient: kubeClient,
-			recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "replication-controller"}),
+		podControl: controller.RealPodControl{
+			KubeClient: kubeClient,
+			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "replication-controller"}),
 		},
 		burstReplicas: burstReplicas,
-		expectations:  NewRCExpectations(),
+		expectations:  controller.NewControllerExpectations(),
 		queue:         workqueue.New(),
 	}
 
@@ -185,7 +175,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
 	// TODO: Hack. We can't cleanly shutdown the event recorder, so benchmarks
 	// need to pass in a fake.
-	rm.podControl = RealPodControl{rm.kubeClient, recorder}
+	rm.podControl = controller.RealPodControl{rm.kubeClient, recorder}
 }
 
 // Run begins watching and syncing.
@@ -222,7 +212,12 @@ func (rm *ReplicationManager) getPodControllers(pod *api.Pod) *api.ReplicationCo
 func (rm *ReplicationManager) addPod(obj interface{}) {
 	pod := obj.(*api.Pod)
 	if rc := rm.getPodControllers(pod); rc != nil {
-		rm.expectations.CreationObserved(rc)
+		rcKey, err := controller.KeyFunc(rc)
+		if err != nil {
+			glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
+			return
+		}
+		rm.expectations.CreationObserved(rcKey)
 		rm.enqueueController(rc)
 	}
 }
@@ -263,24 +258,29 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v, could take up to %v before a controller recreates a replica", obj, ExpectationsTimeout)
+			glog.Errorf("Couldn't get object from tombstone %+v, could take up to %v before a controller recreates a replica", obj, controller.ExpectationsTimeout)
 			return
 		}
 		pod, ok = tombstone.Obj.(*api.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %+v, could take up to %v before controller recreates a replica", obj, ExpectationsTimeout)
+			glog.Errorf("Tombstone contained object that is not a pod %+v, could take up to %v before controller recreates a replica", obj, controller.ExpectationsTimeout)
 			return
 		}
 	}
 	if rc := rm.getPodControllers(pod); rc != nil {
-		rm.expectations.DeletionObserved(rc)
+		rcKey, err := controller.KeyFunc(rc)
+		if err != nil {
+			glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
+			return
+		}
+		rm.expectations.DeletionObserved(rcKey)
 		rm.enqueueController(rc)
 	}
 }
 
 // obj could be an *api.ReplicationController, or a DeletionFinalStateUnknown marker item.
 func (rm *ReplicationManager) enqueueController(obj interface{}) {
-	key, err := rcKeyFunc(obj)
+	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
@@ -314,24 +314,29 @@ func (rm *ReplicationManager) worker() {
 }
 
 // manageReplicas checks and updates replicas for the given replication controller.
-func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, controller *api.ReplicationController) {
-	diff := len(filteredPods) - controller.Spec.Replicas
+func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.ReplicationController) {
+	diff := len(filteredPods) - rc.Spec.Replicas
+	rcKey, err := controller.KeyFunc(rc)
+	if err != nil {
+		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
+		return
+	}
 	if diff < 0 {
 		diff *= -1
 		if diff > rm.burstReplicas {
 			diff = rm.burstReplicas
 		}
-		rm.expectations.ExpectCreations(controller, diff)
+		rm.expectations.ExpectCreations(rcKey, diff)
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
-		glog.V(2).Infof("Too few %q/%q replicas, need %d, creating %d", controller.Namespace, controller.Name, controller.Spec.Replicas, diff)
+		glog.V(2).Infof("Too few %q/%q replicas, need %d, creating %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				if err := rm.podControl.createReplica(controller.Namespace, controller); err != nil {
+				if err := rm.podControl.CreateReplica(rc.Namespace, rc); err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
-					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", controller.Namespace, controller.Name)
-					rm.expectations.CreationObserved(controller)
+					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
+					rm.expectations.CreationObserved(rcKey)
 					util.HandleError(err)
 				}
 			}()
@@ -341,14 +346,14 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, controller
 		if diff > rm.burstReplicas {
 			diff = rm.burstReplicas
 		}
-		rm.expectations.ExpectDeletions(controller, diff)
-		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", controller.Namespace, controller.Name, controller.Spec.Replicas, diff)
+		rm.expectations.ExpectDeletions(rcKey, diff)
+		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
 		// No need to sort pods if we are about to delete all of them
-		if controller.Spec.Replicas != 0 {
+		if rc.Spec.Replicas != 0 {
 			// Sort the pods in the order such that not-ready < ready, unscheduled
 			// < scheduled, and pending < running. This ensures that we delete pods
 			// in the earlier stages whenever possible.
-			sort.Sort(activePods(filteredPods))
+			sort.Sort(controller.ActivePods(filteredPods))
 		}
 
 		wait := sync.WaitGroup{}
@@ -356,10 +361,10 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, controller
 		for i := 0; i < diff; i++ {
 			go func(ix int) {
 				defer wait.Done()
-				if err := rm.podControl.deletePod(controller.Namespace, filteredPods[ix].Name); err != nil {
+				if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
-					glog.V(2).Infof("Failed deletion, decrementing expectations for controller %q/%q", controller.Namespace, controller.Name)
-					rm.expectations.DeletionObserved(controller)
+					glog.V(2).Infof("Failed deletion, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
+					rm.expectations.DeletionObserved(rcKey)
 				}
 			}(i)
 		}
@@ -387,20 +392,25 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		rm.queue.Add(key)
 		return err
 	}
-	controller := *obj.(*api.ReplicationController)
+	rc := *obj.(*api.ReplicationController)
 	if !rm.podStoreSynced() {
 		// Sleep so we give the pod reflector goroutine a chance to run.
 		time.Sleep(PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", controller.Name)
-		rm.enqueueController(&controller)
+		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", rc.Name)
+		rm.enqueueController(&rc)
 		return nil
 	}
 
 	// Check the expectations of the rc before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the rc sync is just deferred till the next relist.
-	rcNeedsSync := rm.expectations.SatisfiedExpectations(&controller)
-	podList, err := rm.podStore.Pods(controller.Namespace).List(labels.Set(controller.Spec.Selector).AsSelector())
+	rcKey, err := controller.KeyFunc(&rc)
+	if err != nil {
+		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
+		return err
+	}
+	rcNeedsSync := rm.expectations.SatisfiedExpectations(rcKey)
+	podList, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector())
 	if err != nil {
 		glog.Errorf("Error getting pods for rc %q: %v", key, err)
 		rm.queue.Add(key)
@@ -408,17 +418,17 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 
 	// TODO: Do this in a single pass, or use an index.
-	filteredPods := filterActivePods(podList.Items)
+	filteredPods := controller.FilterActivePods(podList.Items)
 	if rcNeedsSync {
-		rm.manageReplicas(filteredPods, &controller)
+		rm.manageReplicas(filteredPods, &rc)
 	}
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(rm.kubeClient.ReplicationControllers(controller.Namespace), controller, len(filteredPods)); err != nil {
+	if err := updateReplicaCount(rm.kubeClient.ReplicationControllers(rc.Namespace), rc, len(filteredPods)); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the controller ensures
 		// we retry with some fairness.
-		glog.V(2).Infof("Failed to update replica count for controller %v, requeuing", controller.Name)
-		rm.enqueueController(&controller)
+		glog.V(2).Infof("Failed to update replica count for controller %v, requeuing", rc.Name)
+		rm.enqueueController(&rc)
 	}
 	return nil
 }

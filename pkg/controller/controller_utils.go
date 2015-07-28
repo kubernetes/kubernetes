@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -25,83 +26,99 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 	"sync/atomic"
 )
 
 const (
 	CreatedByAnnotation = "kubernetes.io/created-by"
-	updateRetries       = 1
+
+	// If a watch drops a delete event for a pod, it'll take this long
+	// before a dormant controller waiting for those packets is woken up anyway. It is
+	// specifically targeted at the case where some problem prevents an update
+	// of expectations, without it the controller could stay asleep forever. This should
+	// be set based on the expected latency of watch events.
+	//
+	// Currently an controller can service (create *and* observe the watch events for said
+	// creation) about 10-20 pods a second, so it takes about 1 min to service
+	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
+	// latency/pod at the scale of 3000 pods over 100 nodes.
+	ExpectationsTimeout = 3 * time.Minute
 )
 
-// Expectations are a way for replication controllers to tell the rc manager what they expect. eg:
-//	RCExpectations: {
-//		rc1: expects  2 adds in 2 minutes
-//		rc2: expects  2 dels in 2 minutes
-//		rc3: expects -1 adds in 2 minutes => rc3's expectations have already been met
+var (
+	KeyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
+)
+
+// Expectations are a way for controllers to tell the controller manager what they expect. eg:
+//	ControllerExpectations: {
+//		controller1: expects  2 adds in 2 minutes
+//		controller2: expects  2 dels in 2 minutes
+//		controller3: expects -1 adds in 2 minutes => controller3's expectations have already been met
 //	}
 //
 // Implementation:
 //	PodExpectation = pair of atomic counters to track pod creation/deletion
-//	RCExpectationsStore = TTLStore + a PodExpectation per rc
+//	ControllerExpectationsStore = TTLStore + a PodExpectation per controller
 //
 // * Once set expectations can only be lowered
-// * An RC isn't synced till its expectations are either fulfilled, or expire
-// * Rcs that don't set expectations will get woken up for every matching pod
+// * A controller isn't synced till its expectations are either fulfilled, or expire
+// * Controllers that don't set expectations will get woken up for every matching pod
 
-// expKeyFunc to parse out the key from a PodExpectation
-var expKeyFunc = func(obj interface{}) (string, error) {
+// ExpKeyFunc to parse out the key from a PodExpectation
+var ExpKeyFunc = func(obj interface{}) (string, error) {
 	if e, ok := obj.(*PodExpectations); ok {
 		return e.key, nil
 	}
 	return "", fmt.Errorf("Could not find key for obj %#v", obj)
 }
 
-// RCExpectationsManager is an interface that allows users to set and wait on expectations.
+// ControllerExpectationsInterface is an interface that allows users to set and wait on expectations.
 // Only abstracted out for testing.
-type RCExpectationsManager interface {
-	GetExpectations(rc *api.ReplicationController) (*PodExpectations, bool, error)
-	SatisfiedExpectations(rc *api.ReplicationController) bool
-	DeleteExpectations(rcKey string)
-	ExpectCreations(rc *api.ReplicationController, adds int) error
-	ExpectDeletions(rc *api.ReplicationController, dels int) error
-	CreationObserved(rc *api.ReplicationController)
-	DeletionObserved(rc *api.ReplicationController)
+// Warning: if using KeyFunc it is not safe to use a single ControllerExpectationsInterface with different
+// types of controllers, because the keys might conflict across types.
+type ControllerExpectationsInterface interface {
+	GetExpectations(controllerKey string) (*PodExpectations, bool, error)
+	SatisfiedExpectations(controllerKey string) bool
+	DeleteExpectations(controllerKey string)
+	SetExpectations(controllerKey string, add, del int) error
+	ExpectCreations(controllerKey string, adds int) error
+	ExpectDeletions(controllerKey string, dels int) error
+	CreationObserved(controllerKey string)
+	DeletionObserved(controllerKey string)
 }
 
-// RCExpectations is a ttl cache mapping rcs to what they expect to see before being woken up for a sync.
-type RCExpectations struct {
+// ControllerExpectations is a ttl cache mapping controllers to what they expect to see before being woken up for a sync.
+type ControllerExpectations struct {
 	cache.Store
 }
 
-// GetExpectations returns the PodExpectations of the given rc.
-func (r *RCExpectations) GetExpectations(rc *api.ReplicationController) (*PodExpectations, bool, error) {
-	rcKey, err := rcKeyFunc(rc)
-	if err != nil {
-		return nil, false, err
-	}
-	if podExp, exists, err := r.GetByKey(rcKey); err == nil && exists {
+// GetExpectations returns the PodExpectations of the given controller.
+func (r *ControllerExpectations) GetExpectations(controllerKey string) (*PodExpectations, bool, error) {
+	if podExp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
 		return podExp.(*PodExpectations), true, nil
 	} else {
 		return nil, false, err
 	}
 }
 
-// DeleteExpectations deletes the expectations of the given RC from the TTLStore.
-func (r *RCExpectations) DeleteExpectations(rcKey string) {
-	if podExp, exists, err := r.GetByKey(rcKey); err == nil && exists {
+// DeleteExpectations deletes the expectations of the given controller from the TTLStore.
+func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
+	if podExp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
 		if err := r.Delete(podExp); err != nil {
-			glog.V(2).Infof("Error deleting expectations for rc %v: %v", rcKey, err)
+			glog.V(2).Infof("Error deleting expectations for controller %v: %v", controllerKey, err)
 		}
 	}
 }
 
-// SatisfiedExpectations returns true if the replication manager has observed the required adds/dels
-// for the given rc. Add/del counts are established by the rc at sync time, and updated as pods
-// are observed by the replication manager's podController.
-func (r *RCExpectations) SatisfiedExpectations(rc *api.ReplicationController) bool {
-	if podExp, exists, err := r.GetExpectations(rc); exists {
+// SatisfiedExpectations returns true if the required adds/dels for the given controller have been observed.
+// Add/del counts are established by the controller at sync time, and updated as pods are observed by the controller
+// manager.
+func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
+	if podExp, exists, err := r.GetExpectations(controllerKey); exists {
 		if podExp.Fulfilled() {
 			return true
 		} else {
@@ -111,54 +128,50 @@ func (r *RCExpectations) SatisfiedExpectations(rc *api.ReplicationController) bo
 	} else if err != nil {
 		glog.V(2).Infof("Error encountered while checking expectations %#v, forcing sync", err)
 	} else {
-		// When a new rc is created, it doesn't have expectations.
+		// When a new controller is created, it doesn't have expectations.
 		// When it doesn't see expected watch events for > TTL, the expectations expire.
 		//	- In this case it wakes up, creates/deletes pods, and sets expectations again.
 		// When it has satisfied expectations and no pods need to be created/destroyed > TTL, the expectations expire.
 		//	- In this case it continues without setting expectations till it needs to create/delete pods.
-		glog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", rc.Name)
+		glog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", controllerKey)
 	}
 	// Trigger a sync if we either encountered and error (which shouldn't happen since we're
-	// getting from local store) or this rc hasn't established expectations.
+	// getting from local store) or this controller hasn't established expectations.
 	return true
 }
 
-// setExpectations registers new expectations for the given rc. Forgets existing expectations.
-func (r *RCExpectations) setExpectations(rc *api.ReplicationController, add, del int) error {
-	rcKey, err := rcKeyFunc(rc)
-	if err != nil {
-		return err
-	}
-	podExp := &PodExpectations{add: int64(add), del: int64(del), key: rcKey}
+// SetExpectations registers new expectations for the given controller. Forgets existing expectations.
+func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
+	podExp := &PodExpectations{add: int64(add), del: int64(del), key: controllerKey}
 	glog.V(4).Infof("Setting expectations %+v", podExp)
 	return r.Add(podExp)
 }
 
-func (r *RCExpectations) ExpectCreations(rc *api.ReplicationController, adds int) error {
-	return r.setExpectations(rc, adds, 0)
+func (r *ControllerExpectations) ExpectCreations(controllerKey string, adds int) error {
+	return r.SetExpectations(controllerKey, adds, 0)
 }
 
-func (r *RCExpectations) ExpectDeletions(rc *api.ReplicationController, dels int) error {
-	return r.setExpectations(rc, 0, dels)
+func (r *ControllerExpectations) ExpectDeletions(controllerKey string, dels int) error {
+	return r.SetExpectations(controllerKey, 0, dels)
 }
 
-// Decrements the expectation counts of the given rc.
-func (r *RCExpectations) lowerExpectations(rc *api.ReplicationController, add, del int) {
-	if podExp, exists, err := r.GetExpectations(rc); err == nil && exists {
+// Decrements the expectation counts of the given controller.
+func (r *ControllerExpectations) lowerExpectations(controllerKey string, add, del int) {
+	if podExp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		podExp.Seen(int64(add), int64(del))
 		// The expectations might've been modified since the update on the previous line.
 		glog.V(4).Infof("Lowering expectations %+v", podExp)
 	}
 }
 
-// CreationObserved atomically decrements the `add` expecation count of the given replication controller.
-func (r *RCExpectations) CreationObserved(rc *api.ReplicationController) {
-	r.lowerExpectations(rc, 1, 0)
+// CreationObserved atomically decrements the `add` expecation count of the given controller.
+func (r *ControllerExpectations) CreationObserved(controllerKey string) {
+	r.lowerExpectations(controllerKey, 1, 0)
 }
 
-// DeletionObserved atomically decrements the `del` expectation count of the given replication controller.
-func (r *RCExpectations) DeletionObserved(rc *api.ReplicationController) {
-	r.lowerExpectations(rc, 0, 1)
+// DeletionObserved atomically decrements the `del` expectation count of the given controller.
+func (r *ControllerExpectations) DeletionObserved(controllerKey string) {
+	r.lowerExpectations(controllerKey, 0, 1)
 }
 
 // Expectations are either fulfilled, or expire naturally.
@@ -185,59 +198,74 @@ func (e *PodExpectations) Fulfilled() bool {
 	return atomic.LoadInt64(&e.add) <= 0 && atomic.LoadInt64(&e.del) <= 0
 }
 
-// getExpectations returns the add and del expectations of the pod.
-func (e *PodExpectations) getExpectations() (int64, int64) {
+// GetExpectations returns the add and del expectations of the pod.
+func (e *PodExpectations) GetExpectations() (int64, int64) {
 	return atomic.LoadInt64(&e.add), atomic.LoadInt64(&e.del)
 }
 
-// NewRCExpectations returns a store for PodExpectations.
-func NewRCExpectations() *RCExpectations {
-	return &RCExpectations{cache.NewTTLStore(expKeyFunc, ExpectationsTimeout)}
+// NewControllerExpectations returns a store for PodExpectations.
+func NewControllerExpectations() *ControllerExpectations {
+	return &ControllerExpectations{cache.NewTTLStore(ExpKeyFunc, ExpectationsTimeout)}
 }
 
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
-	// createReplica creates new replicated pods according to the spec.
-	createReplica(namespace string, controller *api.ReplicationController) error
-	// deletePod deletes the pod identified by podID.
-	deletePod(namespace string, podID string) error
+	// CreateReplica creates new replicated pods according to the spec.
+	CreateReplica(namespace string, controller *api.ReplicationController) error
+	// DeletePod deletes the pod identified by podID.
+	DeletePod(namespace string, podID string) error
 }
 
 // RealPodControl is the default implementation of PodControllerInterface.
 type RealPodControl struct {
-	kubeClient client.Interface
-	recorder   record.EventRecorder
+	KubeClient client.Interface
+	Recorder   record.EventRecorder
 }
 
-func (r RealPodControl) createReplica(namespace string, controller *api.ReplicationController) error {
+func getReplicaLabelSet(template *api.PodTemplateSpec) labels.Set {
 	desiredLabels := make(labels.Set)
-	for k, v := range controller.Spec.Template.Labels {
+	for k, v := range template.Labels {
 		desiredLabels[k] = v
 	}
+	return desiredLabels
+}
+
+func getReplicaAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) (labels.Set, error) {
 	desiredAnnotations := make(labels.Set)
-	for k, v := range controller.Spec.Template.Annotations {
+	for k, v := range template.Annotations {
 		desiredAnnotations[k] = v
 	}
-
-	createdByRef, err := api.GetReference(controller)
+	createdByRef, err := api.GetReference(object)
 	if err != nil {
-		return fmt.Errorf("unable to get controller reference: %v", err)
+		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
 	}
 	createdByRefJson, err := latest.Codec.Encode(&api.SerializedReference{
 		Reference: *createdByRef,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to serialize controller reference: %v", err)
+		return desiredAnnotations, fmt.Errorf("unable to serialize controller reference: %v", err)
 	}
-
 	desiredAnnotations[CreatedByAnnotation] = string(createdByRefJson)
+	return desiredAnnotations, nil
+}
 
+func getReplicaPrefix(controllerName string) string {
 	// use the dash (if the name isn't too long) to make the pod name a bit prettier
-	prefix := fmt.Sprintf("%s-", controller.Name)
+	prefix := fmt.Sprintf("%s-", controllerName)
 	if ok, _ := validation.ValidatePodName(prefix, true); !ok {
-		prefix = controller.Name
+		prefix = controllerName
 	}
+	return prefix
+}
+
+func (r RealPodControl) CreateReplica(namespace string, controller *api.ReplicationController) error {
+	desiredLabels := getReplicaLabelSet(controller.Spec.Template)
+	desiredAnnotations, err := getReplicaAnnotationSet(controller.Spec.Template, controller)
+	if err != nil {
+		return err
+	}
+	prefix := getReplicaPrefix(controller.Name)
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -252,27 +280,27 @@ func (r RealPodControl) createReplica(namespace string, controller *api.Replicat
 	if labels.Set(pod.Labels).AsSelector().Empty() {
 		return fmt.Errorf("unable to create pod replica, no labels")
 	}
-	if newPod, err := r.kubeClient.Pods(namespace).Create(pod); err != nil {
-		r.recorder.Eventf(controller, "failedCreate", "Error creating: %v", err)
+	if newPod, err := r.KubeClient.Pods(namespace).Create(pod); err != nil {
+		r.Recorder.Eventf(controller, "failedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create pod replica: %v", err)
 	} else {
 		glog.V(4).Infof("Controller %v created pod %v", controller.Name, newPod.Name)
-		r.recorder.Eventf(controller, "successfulCreate", "Created pod: %v", newPod.Name)
+		r.Recorder.Eventf(controller, "successfulCreate", "Created pod: %v", newPod.Name)
 	}
 	return nil
 }
 
-func (r RealPodControl) deletePod(namespace, podID string) error {
-	return r.kubeClient.Pods(namespace).Delete(podID, nil)
+func (r RealPodControl) DeletePod(namespace, podID string) error {
+	return r.KubeClient.Pods(namespace).Delete(podID, nil)
 }
 
-// activePods type allows custom sorting of pods so an rc can pick the best ones to delete.
-type activePods []*api.Pod
+// ActivePods type allows custom sorting of pods so a controller can pick the best ones to delete.
+type ActivePods []*api.Pod
 
-func (s activePods) Len() int      { return len(s) }
-func (s activePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s ActivePods) Len() int      { return len(s) }
+func (s ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-func (s activePods) Less(i, j int) bool {
+func (s ActivePods) Less(i, j int) bool {
 	// Unassigned < assigned
 	if s[i].Spec.NodeName == "" && s[j].Spec.NodeName != "" {
 		return true
@@ -289,21 +317,8 @@ func (s activePods) Less(i, j int) bool {
 	return false
 }
 
-// overlappingControllers sorts a list of controllers by creation timestamp, using their names as a tie breaker.
-type overlappingControllers []api.ReplicationController
-
-func (o overlappingControllers) Len() int      { return len(o) }
-func (o overlappingControllers) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o overlappingControllers) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-}
-
-// filterActivePods returns pods that have not terminated.
-func filterActivePods(pods []api.Pod) []*api.Pod {
+// FilterActivePods returns pods that have not terminated.
+func FilterActivePods(pods []api.Pod) []*api.Pod {
 	var result []*api.Pod
 	for i := range pods {
 		if api.PodSucceeded != pods[i].Status.Phase &&
@@ -312,40 +327,4 @@ func filterActivePods(pods []api.Pod) []*api.Pod {
 		}
 	}
 	return result
-}
-
-// updateReplicaCount attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
-func updateReplicaCount(rcClient client.ReplicationControllerInterface, controller api.ReplicationController, numReplicas int) (updateErr error) {
-	// This is the steady state. It happens when the rc doesn't have any expectations, since
-	// we do a periodic relist every 30s. If the generations differ but the replicas are
-	// the same, a caller might've resized to the same replica count.
-	if controller.Status.Replicas == numReplicas &&
-		controller.Generation == controller.Status.ObservedGeneration {
-		return nil
-	}
-	// Save the generation number we acted on, otherwise we might wrongfully indicate
-	// that we've seen a spec update when we retry.
-	// TODO: This can clobber an update if we allow multiple agents to write to the
-	// same status.
-	generation := controller.Generation
-
-	var getErr error
-	for i, rc := 0, &controller; ; i++ {
-		glog.V(4).Infof("Updating replica count for rc: %v, %d->%d (need %d), sequence No: %v->%v",
-			controller.Name, controller.Status.Replicas, numReplicas, controller.Spec.Replicas, controller.Status.ObservedGeneration, generation)
-
-		rc.Status = api.ReplicationControllerStatus{Replicas: numReplicas, ObservedGeneration: generation}
-		_, updateErr = rcClient.Update(rc)
-		if updateErr == nil || i >= updateRetries {
-			return updateErr
-		}
-		// Update the controller with the latest resource version for the next poll
-		if rc, getErr = rcClient.Get(controller.Name); getErr != nil {
-			// If the GET fails we can't trust status.Replicas anymore. This error
-			// is bound to be more interesting than the update failure.
-			return getErr
-		}
-	}
-	// Failed 2 updates one of which was with the latest controller, return the update error
-	return
 }

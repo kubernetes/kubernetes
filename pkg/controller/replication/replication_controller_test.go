@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package replication
 
 import (
 	"fmt"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -31,8 +29,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
@@ -60,7 +58,7 @@ func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 }
 
-func (f *FakePodControl) createReplica(namespace string, spec *api.ReplicationController) error {
+func (f *FakePodControl) CreateReplica(namespace string, spec *api.ReplicationController) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.err != nil {
@@ -70,7 +68,7 @@ func (f *FakePodControl) createReplica(namespace string, spec *api.ReplicationCo
 	return nil
 }
 
-func (f *FakePodControl) deletePod(namespace string, podName string) error {
+func (f *FakePodControl) DeletePod(namespace string, podName string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.err != nil {
@@ -79,7 +77,6 @@ func (f *FakePodControl) deletePod(namespace string, podName string) error {
 	f.deletePodName = append(f.deletePodName, podName)
 	return nil
 }
-
 func (f *FakePodControl) clear() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -88,7 +85,7 @@ func (f *FakePodControl) clear() {
 }
 
 func getKey(rc *api.ReplicationController, t *testing.T) string {
-	if key, err := rcKeyFunc(rc); err != nil {
+	if key, err := controller.KeyFunc(rc); err != nil {
 		t.Errorf("Unexpected error getting key for rc %v: %v", rc.Name, err)
 		return ""
 	} else {
@@ -301,45 +298,6 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 	validateSyncReplication(t, &fakePodControl, 2, 0)
 }
 
-func TestCreateReplica(t *testing.T) {
-	ns := api.NamespaceDefault
-	body := runtime.EncodeOrDie(testapi.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "empty_pod"}})
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(body),
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-
-	podControl := RealPodControl{
-		kubeClient: client,
-		recorder:   &record.FakeRecorder{},
-	}
-
-	controllerSpec := newReplicationController(1)
-
-	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	podControl.createReplica(ns, controllerSpec)
-
-	expectedPod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Labels:       controllerSpec.Spec.Template.Labels,
-			GenerateName: fmt.Sprintf("%s-", controllerSpec.Name),
-		},
-		Spec: controllerSpec.Spec.Template.Spec,
-	}
-	fakeHandler.ValidateRequest(t, testapi.ResourcePath("pods", api.NamespaceDefault, ""), "POST", nil)
-	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
-		t.Logf("Body: %s", fakeHandler.RequestBody)
-		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
-	}
-}
-
 func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	// Setup a fake server to listen for requests, and run the rc manager in steady state
 	fakeHandler := util.FakeHandler{
@@ -420,156 +378,6 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	validateSyncReplication(t, &fakePodControl, 1, 0)
 }
 
-func TestActivePodFiltering(t *testing.T) {
-	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
-	rc := newReplicationController(0)
-	podList := newPodList(nil, 5, api.PodRunning, rc)
-	podList.Items[0].Status.Phase = api.PodSucceeded
-	podList.Items[1].Status.Phase = api.PodFailed
-	expectedNames := util.NewStringSet()
-	for _, pod := range podList.Items[2:] {
-		expectedNames.Insert(pod.Name)
-	}
-
-	got := filterActivePods(podList.Items)
-	gotNames := util.NewStringSet()
-	for _, pod := range got {
-		gotNames.Insert(pod.Name)
-	}
-	if expectedNames.Difference(gotNames).Len() != 0 || gotNames.Difference(expectedNames).Len() != 0 {
-		t.Errorf("expected %v, got %v", expectedNames.List(), gotNames.List())
-	}
-}
-
-func TestSortingActivePods(t *testing.T) {
-	numPods := 5
-	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
-	rc := newReplicationController(0)
-	podList := newPodList(nil, numPods, api.PodRunning, rc)
-
-	pods := make([]*api.Pod, len(podList.Items))
-	for i := range podList.Items {
-		pods[i] = &podList.Items[i]
-	}
-	// pods[0] is not scheduled yet.
-	pods[0].Spec.NodeName = ""
-	pods[0].Status.Phase = api.PodPending
-	// pods[1] is scheduled but pending.
-	pods[1].Spec.NodeName = "bar"
-	pods[1].Status.Phase = api.PodPending
-	// pods[2] is unknown.
-	pods[2].Spec.NodeName = "foo"
-	pods[2].Status.Phase = api.PodUnknown
-	// pods[3] is running but not ready.
-	pods[3].Spec.NodeName = "foo"
-	pods[3].Status.Phase = api.PodRunning
-	// pods[4] is running and ready.
-	pods[4].Spec.NodeName = "foo"
-	pods[4].Status.Phase = api.PodRunning
-	pods[4].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
-
-	getOrder := func(pods []*api.Pod) []string {
-		names := make([]string, len(pods))
-		for i := range pods {
-			names[i] = pods[i].Name
-		}
-		return names
-	}
-
-	expected := getOrder(pods)
-
-	for i := 0; i < 20; i++ {
-		idx := rand.Perm(numPods)
-		randomizedPods := make([]*api.Pod, numPods)
-		for j := 0; j < numPods; j++ {
-			randomizedPods[j] = pods[idx[j]]
-		}
-		sort.Sort(activePods(randomizedPods))
-		actual := getOrder(randomizedPods)
-
-		if !reflect.DeepEqual(actual, expected) {
-			t.Errorf("expected %v, got %v", expected, actual)
-		}
-	}
-}
-
-// NewFakeRCExpectationsLookup creates a fake store for PodExpectations.
-func NewFakeRCExpectationsLookup(ttl time.Duration) (*RCExpectations, *util.FakeClock) {
-	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{fakeTime}
-	ttlPolicy := &cache.TTLPolicy{ttl, fakeClock}
-	ttlStore := cache.NewFakeExpirationStore(
-		expKeyFunc, nil, ttlPolicy, fakeClock)
-	return &RCExpectations{ttlStore}, fakeClock
-}
-
-func TestRCExpectations(t *testing.T) {
-	ttl := 30 * time.Second
-	e, fakeClock := NewFakeRCExpectationsLookup(ttl)
-	// In practice we can't really have add and delete expectations since we only either create or
-	// delete replicas in one rc pass, and the rc goes to sleep soon after until the expectations are
-	// either fulfilled or timeout.
-	adds, dels := 10, 30
-	rc := newReplicationController(1)
-
-	// RC fires off adds and deletes at apiserver, then sets expectations
-	e.setExpectations(rc, adds, dels)
-	var wg sync.WaitGroup
-	for i := 0; i < adds+1; i++ {
-		wg.Add(1)
-		go func() {
-			// In prod this can happen either because of a failed create by the rc
-			// or after having observed a create via informer
-			e.CreationObserved(rc)
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-
-	// There are still delete expectations
-	if e.SatisfiedExpectations(rc) {
-		t.Errorf("Rc will sync before expectations are met")
-	}
-	for i := 0; i < dels+1; i++ {
-		wg.Add(1)
-		go func() {
-			e.DeletionObserved(rc)
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-
-	// Expectations have been surpassed
-	if podExp, exists, err := e.GetExpectations(rc); err == nil && exists {
-		add, del := podExp.getExpectations()
-		if add != -1 || del != -1 {
-			t.Errorf("Unexpected pod expectations %#v", podExp)
-		}
-	} else {
-		t.Errorf("Could not get expectations for rc, exists %v and err %v", exists, err)
-	}
-	if !e.SatisfiedExpectations(rc) {
-		t.Errorf("Expectations are met but the rc will not sync")
-	}
-
-	// Next round of rc sync, old expectations are cleared
-	e.setExpectations(rc, 1, 2)
-	if podExp, exists, err := e.GetExpectations(rc); err == nil && exists {
-		add, del := podExp.getExpectations()
-		if add != 1 || del != 2 {
-			t.Errorf("Unexpected pod expectations %#v", podExp)
-		}
-	} else {
-		t.Errorf("Could not get expectations for rc, exists %v and err %v", exists, err)
-	}
-
-	// Expectations have expired because of ttl
-	fakeClock.Time = fakeClock.Time.Add(ttl + 1)
-	if !e.SatisfiedExpectations(rc) {
-		t.Errorf("Expectations should have expired but didn't")
-	}
-}
-
 func TestSyncReplicationControllerDormancy(t *testing.T) {
 	// Setup a test server so we can lie about the current state of pods
 	fakeHandler := util.FakeHandler{
@@ -600,9 +408,15 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	manager.syncReplicationController(getKey(controllerSpec, t))
 	validateSyncReplication(t, &fakePodControl, 0, 0)
 
+	// Get the key for the controller
+	rcKey, err := controller.KeyFunc(controllerSpec)
+	if err != nil {
+		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
+	}
+
 	// Lowering expectations should lead to a sync that creates a replica, however the
 	// fakePodControl error will prevent this, leaving expectations at 0, 0
-	manager.expectations.CreationObserved(controllerSpec)
+	manager.expectations.CreationObserved(rcKey)
 	controllerSpec.Status.Replicas = 1
 	fakePodControl.clear()
 	fakePodControl.err = fmt.Errorf("Fake Error")
@@ -920,6 +734,11 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	expectedPods := 0
 	pods := newPodList(nil, numReplicas, api.PodPending, controllerSpec)
 
+	rcKey, err := controller.KeyFunc(controllerSpec)
+	if err != nil {
+		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
+	}
+
 	// Size up the controller, then size it down, and confirm the expected create/delete pattern
 	for _, replicas := range []int{numReplicas, 0} {
 
@@ -949,11 +768,11 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					manager.addPod(&pods.Items[i])
 				}
 
-				podExp, exists, err := manager.expectations.GetExpectations(controllerSpec)
+				podExp, exists, err := manager.expectations.GetExpectations(rcKey)
 				if !exists || err != nil {
 					t.Fatalf("Did not find expectations for rc.")
 				}
-				if add, _ := podExp.getExpectations(); add != 1 {
+				if add, _ := podExp.GetExpectations(); add != 1 {
 					t.Fatalf("Expectations are wrong %v", podExp)
 				}
 			} else {
@@ -966,11 +785,11 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					manager.podStore.Store.Delete(&pods.Items[i])
 					manager.deletePod(&pods.Items[i])
 				}
-				podExp, exists, err := manager.expectations.GetExpectations(controllerSpec)
+				podExp, exists, err := manager.expectations.GetExpectations(rcKey)
 				if !exists || err != nil {
 					t.Fatalf("Did not find expectations for rc.")
 				}
-				if _, del := podExp.getExpectations(); del != 1 {
+				if _, del := podExp.GetExpectations(); del != 1 {
 					t.Fatalf("Expectations are wrong %v", podExp)
 				}
 			}
@@ -1010,12 +829,12 @@ func TestControllerBurstReplicas(t *testing.T) {
 }
 
 type FakeRCExpectations struct {
-	*RCExpectations
+	*controller.ControllerExpectations
 	satisfied    bool
 	expSatisfied func()
 }
 
-func (fe FakeRCExpectations) SatisfiedExpectations(rc *api.ReplicationController) bool {
+func (fe FakeRCExpectations) SatisfiedExpectations(controllerKey string) bool {
 	fe.expSatisfied()
 	return fe.satisfied
 }
@@ -1036,7 +855,7 @@ func TestRCSyncExpectations(t *testing.T) {
 	postExpectationsPod := pods.Items[1]
 
 	manager.expectations = FakeRCExpectations{
-		NewRCExpectations(), true, func() {
+		controller.NewControllerExpectations(), true, func() {
 			// If we check active pods before checking expectataions, the rc
 			// will create a new replica because it doesn't see this pod, but
 			// has fulfilled its expectations.
@@ -1063,16 +882,22 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	validateSyncReplication(t, &fakePodControl, 1, 0)
 	fakePodControl.clear()
 
+	// Get the RC key
+	rcKey, err := controller.KeyFunc(rc)
+	if err != nil {
+		t.Errorf("Couldn't get key for object %+v: %v", rc, err)
+	}
+
 	// This is to simulate a concurrent addPod, that has a handle on the expectations
 	// as the controller deletes it.
-	podExp, exists, err := manager.expectations.GetExpectations(rc)
+	podExp, exists, err := manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil {
 		t.Errorf("No expectations found for rc")
 	}
 	manager.rcStore.Delete(rc)
 	manager.syncReplicationController(getKey(rc, t))
 
-	if _, exists, err = manager.expectations.GetExpectations(rc); exists {
+	if _, exists, err = manager.expectations.GetExpectations(rcKey); exists {
 		t.Errorf("Found expectaions, expected none since the rc has been deleted.")
 	}
 

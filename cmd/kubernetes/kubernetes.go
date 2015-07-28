@@ -35,7 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -134,7 +134,7 @@ func runControllerManager(cl *client.Client) {
 	endpoints := service.NewEndpointController(cl)
 	go endpoints.Run(5, util.NeverStop)
 
-	controllerManager := controller.NewReplicationManager(cl, controller.BurstReplicas)
+	controllerManager := replication.NewReplicationManager(cl, replication.BurstReplicas)
 	go controllerManager.Run(5, util.NeverStop)
 }
 
