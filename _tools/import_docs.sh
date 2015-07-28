@@ -8,6 +8,15 @@ BRANCH=release-1.0
 set -e
 set -x
 
+SED=sed
+if which gsed &>/dev/null; then
+  SED=gsed
+fi
+if ! ($SED --version 2>&1 | grep -q GNU); then
+  echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
+  exit 1
+fi
+
 tmpdir=docs.$RANDOM
 
 echo fetching upstream
