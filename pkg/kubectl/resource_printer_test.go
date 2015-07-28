@@ -414,8 +414,7 @@ func TestTemplateStrings(t *testing.T) {
 			"true",
 		},
 	}
-	// The point of this test is to verify that the below template works. If you change this
-	// template, you need to update hack/e2e-suite/update.sh.
+	// The point of this test is to verify that the below template works.
 	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
 	p, err := NewTemplatePrinter([]byte(tmpl))
 	if err != nil {
