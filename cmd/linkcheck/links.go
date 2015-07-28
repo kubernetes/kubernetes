@@ -14,6 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//This command checks if the hyperlinks in files are valid. It checks the files
+//with 'fileSuffix' in 'rootDir' for URLs that match 'prefix'. It trims the
+//'prefix' from the URL, uses what's left as the relative path to repoRoot to
+//verify if the link is valid. For example:
+//$ linkcheck --root-dir=${TYPEROOT} --repo-root=${KUBE_ROOT} \
+//  --file-suffix=types.go --prefix=http://releases.k8s.io/HEAD
+
 package main
 
 import (
