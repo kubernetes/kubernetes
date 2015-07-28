@@ -68,6 +68,29 @@ func Everything(runtime.Object) bool {
 // See the comment for GuaranteedUpdate for more details.
 type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
 
+
+// FIXME: Add Comment.
+// TODO: Find a better name for it
+// TODO: Maybe this should support or Get* operations too?
+// TODO: Use it in Interface.
+type ListerAndWatcher interface {
+	// Watch begins watching the specified key. Events are decoded into API objects,
+	// and any items passing 'filter' are sent down to returned watch.Interface.
+	// resourceVersion may be used to specify what version to begin watching
+	// (e.g. reconnecting without missing any updates).
+	Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+
+	// WatchList begins watching the specified key's items. Items are decoded into API
+	// objects and any item passing 'filter' are sent down to returned watch.Interface.
+	// resourceVersion may be used to specify what version to begin watching
+	// (e.g. reconnecting without missing any updates).
+	WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+
+	// List unmarshalls jsons found at directory defined by key and opaque them
+	// into *List api object (an object that satisfies runtime.IsList definition).
+	List(key string, listObj runtime.Object) error
+}
+
 // Interface offers a common interface for object marshaling/unmarshling operations and
 // hids all the storage-related operations behind it.
 type Interface interface {
