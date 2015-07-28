@@ -21,17 +21,18 @@
 ZONE="${ZONE:-us-central1-f}"
 NUM_MINIONS="${NUM_MINIONS:-2}"
 CLUSTER_API_VERSION="${CLUSTER_API_VERSION:-}"
-# TODO(mbforbes): Actually plumb this through; this currently only works
-#                 because we use the 'default' network by default.
 NETWORK="${NETWORK:-default}"
 NETWORK_RANGE="${NETWORK_RANGE:-10.240.0.0/16}"
 FIREWALL_SSH="${FIREWALL_SSH:-${NETWORK}-allow-ssh}"
 GCLOUD="${GCLOUD:-gcloud}"
-CMD_GROUP="${CMD_GROUP:-alpha}"
+CMD_GROUP="${CMD_GROUP:-beta}"
 GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
-ENABLE_CLUSTER_DNS=false
-ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 MINION_SCOPES="${MINION_SCOPES:-"compute-rw,storage-ro"}"
+
+# WARNING: any new vars added here must correspond to options that can be
+# passed to `gcloud {CMD_GROUP} container clusters create`, or they will
+# have no effect. If you change/add a var used to toggle a value in
+# cluster/gce/configure-vm.sh, please ping someone on GKE.
 
 # This is a hack, but I keep setting this when I run commands manually, and
 # then things grossly fail during normal runs because cluster/kubecfg.sh and
