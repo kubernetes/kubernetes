@@ -279,17 +279,11 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		Shell: proto.Bool(false),
 	}
 
-	//TODO(jdef) these should be shared constants with km
-	const (
-		KM_EXECUTOR = "executor"
-		KM_PROXY    = "proxy"
-	)
-
 	if s.ExecutorPath != "" {
 		uri, executorCmd := s.serveFrameworkArtifact(s.ExecutorPath)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
 		ci.Value = proto.String(fmt.Sprintf("./%s", executorCmd))
-	} else if !hks.FindServer(KM_EXECUTOR) {
+	} else if !hks.FindServer(hyperkube.KM_EXECUTOR) {
 		return nil, nil, fmt.Errorf("either run this scheduler via km or else --executor-path is required")
 	} else {
 		if strings.Index(s.KMPath, "://") > 0 {
@@ -307,14 +301,14 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
 			ci.Value = proto.String(fmt.Sprintf("./%s", kmCmd))
 		}
-		ci.Arguments = append(ci.Arguments, KM_EXECUTOR)
+		ci.Arguments = append(ci.Arguments, hyperkube.KM_MINION)
 	}
 
 	if s.ProxyPath != "" {
 		uri, proxyCmd := s.serveFrameworkArtifact(s.ProxyPath)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-exec=./%s", proxyCmd))
-	} else if !hks.FindServer(KM_PROXY) {
+	} else if !hks.FindServer(hyperkube.KM_PROXY) {
 		return nil, nil, fmt.Errorf("either run this scheduler via km or else --proxy-path is required")
 	} else if s.ExecutorPath != "" {
 		return nil, nil, fmt.Errorf("proxy can only use km binary if executor does the same")

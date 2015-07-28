@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/service"
 )
 
@@ -25,7 +26,7 @@ import (
 func NewKubeletExecutor() *Server {
 	s := service.NewHyperKubeletExecutorServer()
 	hks := Server{
-		SimpleUsage: "executor",
+		SimpleUsage: hyperkube.KM_EXECUTOR,
 		Long: `The kubelet-executor binary is responsible for maintaining a set of containers
 on a particular node. It syncs data from a specialized Mesos source that tracks
 task launches and kills. It then queries Docker to see what is currently

@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
 	kubeapiserver "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
 )
 
@@ -27,7 +28,7 @@ func NewKubeAPIServer() *Server {
 	s := kubeapiserver.NewAPIServer()
 
 	hks := Server{
-		SimpleUsage: "apiserver",
+		SimpleUsage: hyperkube.KM_APISERVER,
 		Long:        "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
 		Run: func(_ *Server, args []string) error {
 			return s.Run(args)

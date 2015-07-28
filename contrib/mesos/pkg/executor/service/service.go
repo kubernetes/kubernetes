@@ -502,14 +502,12 @@ func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions 
 // this function blocks as long as the proxy service is running; intended to be
 // executed asynchronously.
 func (kl *kubeletExecutor) runProxyService() {
-
 	log.Infof("Starting proxy process...")
 
-	const KM_PROXY = "proxy" //TODO(jdef) constant should be shared with km package
 	args := []string{}
 
-	if kl.hks.FindServer(KM_PROXY) {
-		args = append(args, KM_PROXY)
+	if kl.hks.FindServer(hyperkube.KM_PROXY) {
+		args = append(args, hyperkube.KM_PROXY)
 		log.V(1).Infof("attempting to using km proxy service")
 	} else if _, err := os.Stat(kl.proxyExec); os.IsNotExist(err) {
 		log.Errorf("failed to locate proxy executable at '%v' and km not present: %v", kl.proxyExec, err)

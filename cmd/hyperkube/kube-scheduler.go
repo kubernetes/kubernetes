@@ -19,6 +19,7 @@ limitations under the License.
 package main
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
 	scheduler "github.com/GoogleCloudPlatform/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
@@ -28,7 +29,7 @@ func NewScheduler() *Server {
 	s := scheduler.NewSchedulerServer()
 
 	hks := Server{
-		SimpleUsage: "scheduler",
+		SimpleUsage: hyperkube.KM_SCHEDULER,
 		Long:        "Implements a Kubernetes scheduler.  This will assign pods to kubelets based on capacity and constraints.",
 		Run: func(_ *Server, args []string) error {
 			return s.Run(args)
