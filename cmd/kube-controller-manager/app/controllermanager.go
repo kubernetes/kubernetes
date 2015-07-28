@@ -205,12 +205,14 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	if s.AllocateNodeCIDRs {
-		routes, ok := cloud.Routes()
-		if !ok {
-			glog.Fatal("Cloud provider must support routes if allocate-node-cidrs is set")
+		if cloud == nil {
+			glog.Warning("allocate-node-cidrs is set, but no cloud provider specified. Will not manage routes.")
+		} else if routes, ok := cloud.Routes(); !ok {
+			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
+		} else {
+			routeController := routecontroller.New(routes, kubeClient, s.ClusterName, (*net.IPNet)(&s.ClusterCIDR))
+			routeController.Run(s.NodeSyncPeriod)
 		}
-		routeController := routecontroller.New(routes, kubeClient, s.ClusterName, (*net.IPNet)(&s.ClusterCIDR))
-		routeController.Run(s.NodeSyncPeriod)
 	}
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
