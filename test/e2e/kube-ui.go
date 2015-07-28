@@ -36,7 +36,7 @@ var _ = Describe("kube-ui", func() {
 		serverStartTimeout = 1 * time.Minute
 	)
 
-	f := NewFramework("kube-ui")
+	f := NewFramework("kube-ui", false)
 
 	It("should check that the kube-ui instance is alive", func() {
 		By("Checking the kube-ui service exists.")

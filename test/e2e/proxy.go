@@ -49,7 +49,7 @@ const (
 )
 
 func proxyContext(version string) {
-	f := NewFramework("proxy")
+	f := NewFramework("proxy", false)
 	prefix := "/api/" + version
 
 	It("should proxy logs on node with explicit kubelet port", func() { nodeProxyTest(f, version, ":10250/logs/") })

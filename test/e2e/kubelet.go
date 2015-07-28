@@ -90,7 +90,7 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames util.StringSet, pod
 var _ = Describe("Clean up pods on node", func() {
 	var numNodes int
 	var nodeNames util.StringSet
-	framework := NewFramework("kubelet-delete")
+	framework := NewFramework("kubelet-delete", false)
 
 	BeforeEach(func() {
 		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything())

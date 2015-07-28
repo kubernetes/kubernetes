@@ -116,7 +116,7 @@ func testHostIP(c *client.Client, ns string, pod *api.Pod) {
 }
 
 var _ = Describe("Pods", func() {
-	framework := NewFramework("pods")
+	framework := NewFramework("pods", false)
 
 	PIt("should get a host IP", func() {
 		name := "pod-hostip-" + string(util.NewUUID())

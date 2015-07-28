@@ -31,7 +31,9 @@ import (
 var _ = Describe("Etcd failure", func() {
 
 	var skipped bool
-	framework := Framework{BaseName: "etcd-failure"}
+	framework := Framework{BaseName: "etcd-failure",
+		Reuse: false,
+	}
 
 	BeforeEach(func() {
 		// This test requires:

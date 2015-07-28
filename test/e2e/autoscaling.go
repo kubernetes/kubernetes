@@ -25,7 +25,7 @@ import (
 )
 
 var _ = Describe("Autoscaling", func() {
-	f := NewFramework("autoscaling")
+	f := NewFramework("autoscaling", false)
 
 	BeforeEach(func() {
 		// Ensure cluster size is equal to 1.

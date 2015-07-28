@@ -28,7 +28,7 @@ import (
 )
 
 var _ = Describe("EmptyDir volumes", func() {
-	f := NewFramework("emptydir")
+	f := NewFramework("emptydir", false)
 
 	It("should have the correct mode", func() {
 		volumePath := "/test-volume"

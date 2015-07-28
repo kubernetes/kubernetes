@@ -182,7 +182,7 @@ func validateDNSResults(f *Framework, pod *api.Pod, fileNames []string) {
 }
 
 var _ = Describe("DNS", func() {
-	f := NewFramework("dns")
+	f := NewFramework("dns", false)
 
 	It("should provide DNS for the cluster", func() {
 		// TODO: support DNS on vagrant #3580

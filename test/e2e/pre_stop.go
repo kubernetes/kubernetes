@@ -142,7 +142,7 @@ func testPreStop(c *client.Client, ns string) {
 }
 
 var _ = Describe("PreStop", func() {
-	f := NewFramework("prestop")
+	f := NewFramework("prestop", false)
 
 	It("should call prestop when killing a pod", func() {
 		testPreStop(f.Client, f.Namespace.Name)
