@@ -28,7 +28,7 @@ func NewControllerManager() *Server {
 	s := controllermanager.NewCMServer()
 
 	hks := Server{
-		SimpleUsage: hyperkube.KM_CONTROLLER_MANAGER,
+		SimpleUsage: hyperkube.CommandControllerManager,
 		Long:        "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
 		Run: func(_ *Server, args []string) error {
 			return s.Run(args)

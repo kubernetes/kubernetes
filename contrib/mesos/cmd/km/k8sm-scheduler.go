@@ -28,7 +28,7 @@ func NewScheduler() *Server {
 	s := service.NewSchedulerServer()
 
 	hks := Server{
-		SimpleUsage: hyperkube.KM_SCHEDULER,
+		SimpleUsage: hyperkube.CommandScheduler,
 		Long: `Implements the Kubernetes-Mesos scheduler. This will launch Mesos tasks which
 results in pods assigned to kubelets based on capacity and constraints.`,
 		Run: func(hks *Server, args []string) error {

@@ -14,13 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package hyperkube
+package config
+
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+)
 
 const (
-	CommandApiserver         = "apiserver"
-	CommandControllerManager = "controller-manager"
-	CommandExecutor          = "executor"
-	CommandMinion            = "minion"
-	CommandProxy             = "proxy"
-	CommandScheduler         = "scheduler"
+	DefaultLogMaxBackups   = 5 // how many backup to keep
+	DefaultLogMaxAgeInDays = 7 // after how many days to rotate at most
 )
+
+// DefaultLogMaxSize returns the maximal log file size before rotation
+func DefaultLogMaxSize() resource.Quantity {
+	return *resource.NewQuantity(10*1024*1024, resource.BinarySI)
+}

@@ -14,25 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// clone of the upstream cmd/hypercube/main.go
-package main
+package minion
 
 import (
-	"os"
+	"syscall"
+
+	log "github.com/golang/glog"
 )
 
-func main() {
-	hk := HyperKube{
-		Name: "km",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes-Mesos servers.",
+func enterPrivateMountNamespace() {
+	// enter a new mount NS, useful for isolating changes to the mount table
+	// that are made by the kubelet for storage volumes.
+	err := syscall.Unshare(syscall.CLONE_NEWNS)
+	if err != nil {
+		log.Fatalf("failed to enter private mount NS: %v", err)
 	}
 
-	hk.AddServer(NewKubeAPIServer())
-	hk.AddServer(NewControllerManager())
-	hk.AddServer(NewScheduler())
-	hk.AddServer(NewKubeletExecutor())
-	hk.AddServer(NewKubeProxy())
-	hk.AddServer(NewMinion())
-
-	hk.RunToExit(os.Args)
+	// make the rootfs / rslave to the parent mount NS so that we
+	// pick up on any changes made there
+	err = syscall.Mount("", "/", "dontcare", syscall.MS_REC|syscall.MS_SLAVE, "")
+	if err != nil {
+		log.Fatalf("failed to mark / rslave: %v", err)
+	}
 }

@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package hyperkube
+package minion
 
-const (
-	CommandApiserver         = "apiserver"
-	CommandControllerManager = "controller-manager"
-	CommandExecutor          = "executor"
-	CommandMinion            = "minion"
-	CommandProxy             = "proxy"
-	CommandScheduler         = "scheduler"
+import (
+	log "github.com/golang/glog"
 )
+
+func enterPrivateMountNamespace() {
+	log.Info("Skipping mount namespace, only available on Linux")
+}

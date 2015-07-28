@@ -14,13 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package hyperkube
-
-const (
-	CommandApiserver         = "apiserver"
-	CommandControllerManager = "controller-manager"
-	CommandExecutor          = "executor"
-	CommandMinion            = "minion"
-	CommandProxy             = "proxy"
-	CommandScheduler         = "scheduler"
-)
+// Package minion contains the executor and proxy bootstrap code for a Mesos slave
+package minion
