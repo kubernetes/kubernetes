@@ -971,6 +971,53 @@ type PodTemplateList struct {
 	Items []PodTemplate `json:"items" description:"list of pod templates"`
 }
 
+// JobSpec is the specification of a job.
+type JobSpec struct {
+	// Completions is the number of desired completions.
+	Completions int `json:"completions" description:"number of completions desired"`
+
+	// Selector is a label query over pods that should match the Completions count.
+	// If Selector is empty, it is defaulted to the labels present on the Pod template.
+	Selector map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to be controlled by this job, if empty defaulted to labels on Pod template"`
+
+	// TemplateRef is a reference to an object that describes the pod that will be created if
+	// insufficient completions are detected.
+	TemplateRef *ObjectReference `json:"templateRef,omitempty" description:"reference to an object that describes the pod that will be created if insufficient completions are detected"`
+
+	// Template is the object that describes the pod that will be created if
+	// insufficient completions are detected. This takes precedence over a
+	// TemplateRef.
+	Template *PodTemplateSpec `json:"template,omitempty" description:"object that describes the pod that will be created if insufficient completions are detected; takes precendence over templateRef"`
+}
+
+// JobStatus represents the current status of a job.
+type JobStatus struct {
+	// Completions is the number of actual completions.
+	Completions int `json:"completions" description:"most recently oberved number of completions"`
+}
+
+// Job represents the configuration of a job.
+type Job struct {
+	TypeMeta `json:",inline"`
+	// If the Labels of a Job are empty, they are defaulted to be the same as the Pod(s) that the job manages.
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+
+	// Spec defines the desired behavior of this job.
+	Spec JobSpec `json:"spec,omitempty" description:"specification of the desired behavior of the job; http://docs.k8s.io/api-conventions.md#spec-and-status"`
+
+	// Status is the current status of this job. This data may be
+	// out of date by some window of time.
+	Status JobStatus `json:"status,omitempty" description:"most recently observed status of the job; populated by the system, read-only; http://docs.k8s.io/api-conventions.md#spec-and-status"`
+}
+
+// JobList is a collection of jobs.
+type JobList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+
+	Items []Job `json:"items" description:"list of jobs"`
+}
+
 // ReplicationControllerSpec is the specification of a replication controller.
 type ReplicationControllerSpec struct {
 	// Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified.

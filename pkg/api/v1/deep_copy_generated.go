@@ -564,6 +564,76 @@ func deepCopy_v1_ISCSIVolumeSource(in ISCSIVolumeSource, out *ISCSIVolumeSource,
 	return nil
 }
 
+func deepCopy_v1_Job(in Job, out *Job, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_JobSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_JobStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_JobList(in JobList, out *JobList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Job, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_Job(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) error {
+	out.Completions = in.Completions
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.TemplateRef != nil {
+		out.TemplateRef = new(ObjectReference)
+		if err := deepCopy_v1_ObjectReference(*in.TemplateRef, out.TemplateRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.TemplateRef = nil
+	}
+	if in.Template != nil {
+		out.Template = new(PodTemplateSpec)
+		if err := deepCopy_v1_PodTemplateSpec(*in.Template, out.Template, c); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner) error {
+	out.Completions = in.Completions
+	return nil
+}
+
 func deepCopy_v1_Lifecycle(in Lifecycle, out *Lifecycle, c *conversion.Cloner) error {
 	if in.PostStart != nil {
 		out.PostStart = new(Handler)
@@ -2115,6 +2185,10 @@ func init() {
 		deepCopy_v1_Handler,
 		deepCopy_v1_HostPathVolumeSource,
 		deepCopy_v1_ISCSIVolumeSource,
+		deepCopy_v1_Job,
+		deepCopy_v1_JobList,
+		deepCopy_v1_JobSpec,
+		deepCopy_v1_JobStatus,
 		deepCopy_v1_Lifecycle,
 		deepCopy_v1_LimitRange,
 		deepCopy_v1_LimitRangeItem,

@@ -1,0 +1,34 @@
+{
+   "kind":"Job",
+   "apiVersion":"v1",
+   "metadata":{
+      "name":"test-job",
+      "labels":{
+         "name":"basic-job"
+      }
+   },
+   "spec":{
+      "completions": 1,
+      "selector":{
+         "name":"basic-pod"
+      },
+      "template":{
+         "metadata":{
+            "namespace": "test",
+            "labels":{
+               "name":"basic-pod"
+            }
+         },
+         "spec":{
+            "restartPolicy": "OnFailure",
+            "containers":[
+               {
+                  "name":"test-container",
+                  "image":"ubuntu:14.04",
+                  "command": ["bash", "-c", "exit 1;"]
+               }
+            ]
+         }
+      }
+   }
+}
