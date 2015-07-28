@@ -229,7 +229,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 
 	// 2 running pods, a controller with 2 replicas, sync is a no-op
 	controllerSpec := newReplicationController(2)
-	manager.controllerStore.Store.Add(controllerSpec)
+	manager.rcStore.Store.Add(controllerSpec)
 	newPodList(manager.podStore.Store, 2, api.PodRunning, controllerSpec)
 
 	manager.podControl = &fakePodControl
@@ -246,7 +246,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 
 	// 2 running pods and a controller with 1 replica, one pod delete expected
 	controllerSpec := newReplicationController(1)
-	manager.controllerStore.Store.Add(controllerSpec)
+	manager.rcStore.Store.Add(controllerSpec)
 	newPodList(manager.podStore.Store, 2, api.PodRunning, controllerSpec)
 
 	manager.syncReplicationController(getKey(controllerSpec, t))
@@ -269,7 +269,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	// The DeletedFinalStateUnknown object should cause the rc manager to insert
 	// the controller matching the selectors of the deleted pod into the work queue.
 	controllerSpec := newReplicationController(1)
-	manager.controllerStore.Store.Add(controllerSpec)
+	manager.rcStore.Store.Add(controllerSpec)
 	pods := newPodList(nil, 1, api.PodRunning, controllerSpec)
 	manager.deletePod(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
 
@@ -293,7 +293,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 
 	// A controller with 2 replicas and no pods in the store, 2 creates expected
 	controller := newReplicationController(2)
-	manager.controllerStore.Store.Add(controller)
+	manager.rcStore.Store.Add(controller)
 
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -355,7 +355,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	// Steady state for the replication controller, no Status.Replicas updates expected
 	activePods := 5
 	rc := newReplicationController(activePods)
-	manager.controllerStore.Store.Add(rc)
+	manager.rcStore.Store.Add(rc)
 	rc.Status = api.ReplicationControllerStatus{Replicas: activePods}
 	newPodList(manager.podStore.Store, activePods, api.PodRunning, rc)
 
@@ -397,7 +397,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	// Insufficient number of pods in the system, and Status.Replicas is wrong;
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	rc := newReplicationController(5)
-	manager.controllerStore.Store.Add(rc)
+	manager.rcStore.Store.Add(rc)
 	rc.Status = api.ReplicationControllerStatus{Replicas: 2, ObservedGeneration: 0}
 	rc.Generation = 1
 	newPodList(manager.podStore.Store, 4, api.PodRunning, rc)
@@ -586,7 +586,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	controllerSpec := newReplicationController(2)
-	manager.controllerStore.Store.Add(controllerSpec)
+	manager.rcStore.Store.Add(controllerSpec)
 	newPodList(manager.podStore.Store, 1, api.PodRunning, controllerSpec)
 
 	// Creates a replica and sets expectations
@@ -668,7 +668,7 @@ func TestPodControllerLookup(t *testing.T) {
 	}
 	for _, c := range testCases {
 		for _, r := range c.inRCs {
-			manager.controllerStore.Add(r)
+			manager.rcStore.Add(r)
 		}
 		if rc := manager.getPodControllers(c.pod); rc != nil {
 			if c.outRCName != rc.Name {
@@ -699,7 +699,7 @@ func TestWatchControllers(t *testing.T) {
 	// and closes the received channel to indicate that the test can finish.
 	manager.syncHandler = func(key string) error {
 
-		obj, exists, err := manager.controllerStore.Store.GetByKey(key)
+		obj, exists, err := manager.rcStore.Store.GetByKey(key)
 		if !exists || err != nil {
 			t.Errorf("Expected to find controller under key %v", key)
 		}
@@ -735,13 +735,13 @@ func TestWatchPods(t *testing.T) {
 
 	// Put one rc and one pod into the controller's stores
 	testControllerSpec := newReplicationController(1)
-	manager.controllerStore.Store.Add(testControllerSpec)
+	manager.rcStore.Store.Add(testControllerSpec)
 	received := make(chan string)
 	// The pod update sent through the fakeWatcher should figure out the managing rc and
 	// send it into the syncHandler.
 	manager.syncHandler = func(key string) error {
 
-		obj, exists, err := manager.controllerStore.Store.GetByKey(key)
+		obj, exists, err := manager.rcStore.Store.GetByKey(key)
 		if !exists || err != nil {
 			t.Errorf("Expected to find controller under key %v", key)
 		}
@@ -780,7 +780,7 @@ func TestUpdatePods(t *testing.T) {
 	received := make(chan string)
 
 	manager.syncHandler = func(key string) error {
-		obj, exists, err := manager.controllerStore.Store.GetByKey(key)
+		obj, exists, err := manager.rcStore.Store.GetByKey(key)
 		if !exists || err != nil {
 			t.Errorf("Expected to find controller under key %v", key)
 		}
@@ -794,11 +794,11 @@ func TestUpdatePods(t *testing.T) {
 
 	// Put 2 rcs and one pod into the controller's stores
 	testControllerSpec1 := newReplicationController(1)
-	manager.controllerStore.Store.Add(testControllerSpec1)
+	manager.rcStore.Store.Add(testControllerSpec1)
 	testControllerSpec2 := *testControllerSpec1
 	testControllerSpec2.Spec.Selector = map[string]string{"bar": "foo"}
 	testControllerSpec2.Name = "barfoo"
-	manager.controllerStore.Store.Add(&testControllerSpec2)
+	manager.rcStore.Store.Add(&testControllerSpec2)
 
 	// Put one pod in the podStore
 	pod1 := newPodList(manager.podStore.Store, 1, api.PodRunning, testControllerSpec1).Items[0]
@@ -837,7 +837,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 
 	rc := newReplicationController(1)
-	manager.controllerStore.Store.Add(rc)
+	manager.rcStore.Store.Add(rc)
 	rc.Status = api.ReplicationControllerStatus{Replicas: 2}
 	newPodList(manager.podStore.Store, 1, api.PodRunning, rc)
 
@@ -915,7 +915,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	manager.podControl = &fakePodControl
 
 	controllerSpec := newReplicationController(numReplicas)
-	manager.controllerStore.Store.Add(controllerSpec)
+	manager.rcStore.Store.Add(controllerSpec)
 
 	expectedPods := 0
 	pods := newPodList(nil, numReplicas, api.PodPending, controllerSpec)
@@ -924,7 +924,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	for _, replicas := range []int{numReplicas, 0} {
 
 		controllerSpec.Spec.Replicas = replicas
-		manager.controllerStore.Store.Add(controllerSpec)
+		manager.rcStore.Store.Add(controllerSpec)
 
 		for i := 0; i < numReplicas; i += burstReplicas {
 			manager.syncReplicationController(getKey(controllerSpec, t))
@@ -1030,7 +1030,7 @@ func TestRCSyncExpectations(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	controllerSpec := newReplicationController(2)
-	manager.controllerStore.Store.Add(controllerSpec)
+	manager.rcStore.Store.Add(controllerSpec)
 	pods := newPodList(nil, 2, api.PodPending, controllerSpec)
 	manager.podStore.Store.Add(&pods.Items[0])
 	postExpectationsPod := pods.Items[1]
@@ -1053,7 +1053,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 
 	rc := newReplicationController(1)
-	manager.controllerStore.Store.Add(rc)
+	manager.rcStore.Store.Add(rc)
 
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -1069,7 +1069,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	if !exists || err != nil {
 		t.Errorf("No expectations found for rc")
 	}
-	manager.controllerStore.Delete(rc)
+	manager.rcStore.Delete(rc)
 	manager.syncReplicationController(getKey(rc, t))
 
 	if _, exists, err = manager.expectations.GetExpectations(rc); exists {
@@ -1094,7 +1094,7 @@ func TestRCManagerNotReady(t *testing.T) {
 	// want to end up creating replicas in this case until the pod reflector
 	// has synced, so the rc manager should just requeue the rc.
 	controllerSpec := newReplicationController(1)
-	manager.controllerStore.Store.Add(controllerSpec)
+	manager.rcStore.Store.Add(controllerSpec)
 
 	rcKey := getKey(controllerSpec, t)
 	manager.syncReplicationController(rcKey)
@@ -1137,7 +1137,7 @@ func TestOverlappingRCs(t *testing.T) {
 		}
 		shuffledControllers := shuffle(controllers)
 		for j := range shuffledControllers {
-			manager.controllerStore.Store.Add(shuffledControllers[j])
+			manager.rcStore.Store.Add(shuffledControllers[j])
 		}
 		// Add a pod and make sure only the oldest rc is synced
 		pods := newPodList(nil, 1, api.PodPending, controllers[0])

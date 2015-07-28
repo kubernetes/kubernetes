@@ -264,6 +264,18 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 			}),
 		},
+		"invalid-accessmode": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{"fakemode"},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+				},
+			}),
+		},
 		"unexpected-namespace": {
 			isExpectedFailure: true,
 			volume: testVolume("foo", "unexpected-namespace", api.PersistentVolumeSpec{
@@ -358,6 +370,17 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+			}),
+		},
+		"invalid-accessmode": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+				AccessModes: []api.PersistentVolumeAccessMode{"fakemode"},
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),

@@ -119,6 +119,7 @@ func runScheduler(cl *client.Client) {
 
 // RunControllerManager starts a controller
 func runControllerManager(cl *client.Client) {
+	const serviceSyncPeriod = 5 * time.Minute
 	const nodeSyncPeriod = 10 * time.Second
 	nodeController := nodecontroller.NewNodeController(
 		nil, cl, 10, 5*time.Minute, nodecontroller.NewPodEvictor(util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst)),
@@ -126,7 +127,7 @@ func runControllerManager(cl *client.Client) {
 	nodeController.Run(nodeSyncPeriod)
 
 	serviceController := servicecontroller.New(nil, cl, "kubernetes")
-	if err := serviceController.Run(nodeSyncPeriod); err != nil {
+	if err := serviceController.Run(serviceSyncPeriod, nodeSyncPeriod); err != nil {
 		glog.Warningf("Running without a service controller: %v", err)
 	}
 

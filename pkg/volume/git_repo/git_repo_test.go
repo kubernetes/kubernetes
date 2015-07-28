@@ -78,7 +78,7 @@ func testSetUp(plug volume.VolumePlugin, builder volume.Builder, t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	g := builder.(*gitRepo)
+	g := builder.(*gitRepoVolumeBuilder)
 	g.exec = &fake
 
 	err := g.SetUp()
