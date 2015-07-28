@@ -1261,6 +1261,10 @@ func (dm *DockerManager) killContainer(containerID types.UID, container *api.Con
 		gracePeriod = minimumGracePeriodInSeconds
 	}
 	err := dm.client.StopContainer(ID, uint(gracePeriod))
+	if _, ok := err.(*docker.ContainerNotRunning); ok && err != nil {
+		glog.V(4).Infof("Container %q has already exited", name)
+		return nil
+	}
 	if err == nil {
 		glog.V(2).Infof("Container %q exited after %s", name, util.Now().Sub(start.Time))
 	} else {

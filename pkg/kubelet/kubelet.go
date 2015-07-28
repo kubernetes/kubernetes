@@ -1367,6 +1367,32 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 	return nil
 }
 
+// Delete any pods that are no longer running and are marked for deletion.
+func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+	var terminating []*api.Pod
+	for _, pod := range pods {
+		if pod.DeletionTimestamp != nil {
+			found := false
+			for _, runningPod := range runningPods {
+				if runningPod.ID == pod.UID {
+					found = true
+					break
+				}
+			}
+			if found {
+				podFullName := kubecontainer.GetPodFullName(pod)
+				glog.V(5).Infof("Keeping terminated pod %q and uid %q, still running", podFullName, pod.UID)
+				continue
+			}
+			terminating = append(terminating, pod)
+		}
+	}
+	if !kl.statusManager.TerminatePods(terminating) {
+		return errors.New("not all pods were successfully terminated")
+	}
+	return nil
+}
+
 // pastActiveDeadline returns true if the pod has been active for more than
 // ActiveDeadlineSeconds.
 func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
@@ -1528,6 +1554,10 @@ func (kl *Kubelet) cleanupPods(allPods []*api.Pod, admittedPods []*api.Pod) erro
 
 	// Remove any orphaned mirror pods.
 	kl.podManager.DeleteOrphanedMirrorPods()
+
+	if err := kl.cleanupTerminatedPods(allPods, runningPods); err != nil {
+		glog.Errorf("Failed to cleanup terminated pods: %v", err)
+	}
 
 	return err
 }

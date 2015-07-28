@@ -131,6 +131,29 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	}
 }
 
+// TerminatePods resets the container status for the provided pods to terminated and triggers
+// a status update. This function may not enqueue all the provided pods, in which case it will
+// return false
+func (s *statusManager) TerminatePods(pods []*api.Pod) bool {
+	sent := true
+	s.podStatusesLock.Lock()
+	defer s.podStatusesLock.Unlock()
+	for _, pod := range pods {
+		for i := range pod.Status.ContainerStatuses {
+			pod.Status.ContainerStatuses[i].State = api.ContainerState{
+				Terminated: &api.ContainerStateTerminated{},
+			}
+		}
+		select {
+		case s.podStatusChannel <- podStatusSyncRequest{pod, pod.Status}:
+		default:
+			sent = false
+			glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", kubeletUtil.FormatPodName(pod))
+		}
+	}
+	return sent
+}
+
 func (s *statusManager) DeletePodStatus(podFullName string) {
 	s.podStatusesLock.Lock()
 	defer s.podStatusesLock.Unlock()
@@ -167,6 +190,10 @@ func (s *statusManager) syncBatch() error {
 		return nil
 	}
 	if err == nil {
+		if len(pod.UID) > 0 && statusPod.UID != pod.UID {
+			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", kubeletUtil.FormatPodName(pod))
+			return nil
+		}
 		statusPod.Status = status
 		// TODO: handle conflict as a retry, make that easier too.
 		statusPod, err = s.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
