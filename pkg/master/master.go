@@ -758,12 +758,20 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	return version
 }
 
+// findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
 func findExternalAddress(node *api.Node) (string, error) {
+	var fallback string
 	for ix := range node.Status.Addresses {
 		addr := &node.Status.Addresses[ix]
 		if addr.Type == api.NodeExternalIP {
 			return addr.Address, nil
 		}
+		if fallback == "" && addr.Type == api.NodeLegacyHostIP {
+			fallback = addr.Address
+		}
+	}
+	if fallback != "" {
+		return fallback, nil
 	}
 	return "", fmt.Errorf("Couldn't find external address: %v", node)
 }
