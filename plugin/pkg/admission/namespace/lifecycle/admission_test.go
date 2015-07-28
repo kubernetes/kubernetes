@@ -36,7 +36,7 @@ func TestAdmission(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
-	store := cache.NewStore(cache.MetaNamespaceIndexFunc)
+	store := cache.NewStore(cache.IndexFuncToKeyFuncAdapter(cache.MetaNamespaceIndexFunc))
 	store.Add(namespaceObj)
 	mockClient := &testclient.Fake{}
 	lfhandler := NewLifecycle(mockClient).(*lifecycle)

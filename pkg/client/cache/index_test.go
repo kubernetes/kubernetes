@@ -17,13 +17,15 @@ limitations under the License.
 package cache
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"strings"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func testIndexFunc(obj interface{}) (string, error) {
+func testIndexFunc(obj interface{}) ([]string, error) {
 	pod := obj.(*api.Pod)
-	return pod.Labels["foo"], nil
+	return []string{pod.Labels["foo"]}, nil
 }
 
 func TestGetIndexFuncValues(t *testing.T) {
@@ -47,4 +49,87 @@ func TestGetIndexFuncValues(t *testing.T) {
 			t.Errorf("Expected only 'bar' or 'biz' but got %s", key)
 		}
 	}
+}
+
+func testUsersIndexFunc(obj interface{}) ([]string, error) {
+	pod := obj.(*api.Pod)
+	usersString := pod.Annotations["users"]
+
+	return strings.Split(usersString, ","), nil
+}
+
+func TestMultiIndexKeys(t *testing.T) {
+	index := NewIndexer(MetaNamespaceKeyFunc, Indexers{"byUser": testUsersIndexFunc})
+
+	pod1 := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "one", Annotations: map[string]string{"users": "ernie,bert"}}}
+	pod2 := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "two", Annotations: map[string]string{"users": "bert,oscar"}}}
+	pod3 := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "tre", Annotations: map[string]string{"users": "ernie,elmo"}}}
+
+	index.Add(pod1)
+	index.Add(pod2)
+	index.Add(pod3)
+
+	erniePods, err := index.ByIndex("byUser", "ernie")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(erniePods) != 2 {
+		t.Errorf("Expected 2 pods but got %v", len(erniePods))
+	}
+
+	bertPods, err := index.ByIndex("byUser", "bert")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(bertPods) != 2 {
+		t.Errorf("Expected 2 pods but got %v", len(bertPods))
+	}
+
+	oscarPods, err := index.ByIndex("byUser", "oscar")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(oscarPods) != 1 {
+		t.Errorf("Expected 1 pods but got %v", len(erniePods))
+	}
+
+	ernieAndBertKeys, err := index.Index("byUser", pod1)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(ernieAndBertKeys) != 3 {
+		t.Errorf("Expected 3 pods but got %v", len(ernieAndBertKeys))
+	}
+
+	index.Delete(pod3)
+	erniePods, err = index.ByIndex("byUser", "ernie")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(erniePods) != 1 {
+		t.Errorf("Expected 1 pods but got %v", len(erniePods))
+	}
+	elmoPods, err := index.ByIndex("byUser", "elmo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(elmoPods) != 0 {
+		t.Errorf("Expected 0 pods but got %v", len(elmoPods))
+	}
+
+	obj, err := api.Scheme.DeepCopy(pod2)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	copyOfPod2 := obj.(*api.Pod)
+	copyOfPod2.Annotations["users"] = "oscar"
+	index.Update(copyOfPod2)
+	bertPods, err = index.ByIndex("byUser", "bert")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(bertPods) != 1 {
+		t.Errorf("Expected 1 pods but got %v", len(bertPods))
+	}
+
 }

@@ -34,12 +34,12 @@ import (
 )
 
 // nameIndexFunc is an index function that indexes based on an object's name
-func nameIndexFunc(obj interface{}) (string, error) {
+func nameIndexFunc(obj interface{}) ([]string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
-		return "", fmt.Errorf("object has no meta: %v", err)
+		return []string{""}, fmt.Errorf("object has no meta: %v", err)
 	}
-	return meta.Name(), nil
+	return []string{meta.Name()}, nil
 }
 
 // ServiceAccountsControllerOptions contains options for running a ServiceAccountsController
