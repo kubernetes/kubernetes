@@ -1475,6 +1475,28 @@ type PodLogOptions struct {
 	Previous bool `json:"previous,omitempty" description:"return previous terminated container logs; defaults to false"`
 }
 
+// PodAttachOptions is the query options to a Pod's remote attach call
+// TODO: merge w/ PodExecOptions below for stdin, stdout, etc
+type PodAttachOptions struct {
+	TypeMeta `json:",inline"`
+
+	// Stdin if true indicates that stdin is to be redirected for the attach call
+	Stdin bool `json:"stdin,omitempty" description:"redirect the standard input stream of the pod for this call; defaults to false"`
+
+	// Stdout if true indicates that stdout is to be redirected for the attach call
+	Stdout bool `json:"stdout,omitempty" description:"redirect the standard output stream of the pod for this call; defaults to true"`
+
+	// Stderr if true indicates that stderr is to be redirected for the attach call
+	Stderr bool `json:"stderr,omitempty" description:"redirect the standard error stream of the pod for this call; defaults to true"`
+
+	// TTY if true indicates that a tty will be allocated for the attach call, this is passed through to the container runtime so the tty
+	// is allocated on the worker node by the container runtime.
+	TTY bool `json:"tty,omitempty" description:"allocate a terminal for this attach call; defaults to false"`
+
+	// Container to attach to.
+	Container string `json:"container,omitempty" description:"the container in which to execute the command. Defaults to only container if there is only one container in the pod."`
+}
+
 // PodExecOptions is the query options to a Pod's remote exec call
 type PodExecOptions struct {
 	TypeMeta `json:",inline"`
