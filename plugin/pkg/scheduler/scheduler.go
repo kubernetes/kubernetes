@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/metrics"
@@ -73,7 +74,7 @@ type Config struct {
 	// by MinionLister and Algorithm.
 	Modeler      SystemModeler
 	MinionLister algorithm.MinionLister
-	Algorithm    algorithm.ScheduleAlgorithm
+	AlgorithmMap map[string]algorithm.ScheduleAlgorithm
 	Binder       Binder
 
 	// Rate at which we can create pods
@@ -121,7 +122,9 @@ func (s *Scheduler) scheduleOne() {
 	defer func() {
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
-	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister)
+	// get providerName from Pod's Label, use default if not found
+	providerName := s.getProviderName(pod)
+	dest, err := s.config.AlgorithmMap[providerName].Schedule(pod, s.config.MinionLister)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)
@@ -155,4 +158,23 @@ func (s *Scheduler) scheduleOne() {
 		assumed.Spec.NodeName = dest
 		s.config.Modeler.AssumePod(&assumed)
 	})
+}
+
+// getProviderName returns the algorithm provider name specified in Pod's Label {"policy": <name>}.
+// If the Label is not present or <name> is not registered algorithm provider name, use default
+// algorithm provider
+func (s *Scheduler) getProviderName(pod *api.Pod) string {
+	// TODO : Harcoded "DefaultProvider" here is inapproriate, but it works for now, so maybe
+	// we should set a default provider in package scheduler
+	pname := "DefaultProvider"
+	podLabels := labels.Set(pod.Labels)
+	if podLabels.Has("policy") {
+		sname := podLabels.Get("policy")
+		for name := range s.config.AlgorithmMap {
+			if sname == name {
+				return sname
+			}
+		}
+	}
+	return pname
 }
