@@ -93,6 +93,7 @@ func init() {
 		"Status",
 		"PodLogOptions",
 		"PodExecOptions",
+		"PodAttachOptions",
 		"PodProxyOptions")
 
 	mapper := api.NewDefaultRESTMapper(versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)

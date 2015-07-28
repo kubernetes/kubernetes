@@ -1482,6 +1482,7 @@ type PodLogOptions struct {
 
 // PodAttachOptions is the query options to a Pod's remote attach call
 // TODO: merge w/ PodExecOptions below for stdin, stdout, etc
+// and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 type PodAttachOptions struct {
 	TypeMeta `json:",inline"`
 
@@ -1503,6 +1504,8 @@ type PodAttachOptions struct {
 }
 
 // PodExecOptions is the query options to a Pod's remote exec call
+// TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
+// and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 type PodExecOptions struct {
 	TypeMeta `json:",inline"`
 
