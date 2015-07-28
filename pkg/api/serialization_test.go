@@ -122,7 +122,7 @@ func TestList(t *testing.T) {
 }
 
 var nonRoundTrippableTypes = util.NewStringSet()
-var nonInternalRoundTrippableTypes = util.NewStringSet("List", "ListOptions", "PodExecOptions")
+var nonInternalRoundTrippableTypes = util.NewStringSet("List", "ListOptions", "PodExecOptions", "PodAttachOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
 
 func TestRoundTripTypes(t *testing.T) {
