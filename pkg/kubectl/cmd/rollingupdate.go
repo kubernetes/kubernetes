@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -141,8 +142,6 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return err
 	}
 
-	updaterClient := kubectl.NewRollingUpdaterClient(client)
-
 	var newRc *api.ReplicationController
 	// fetch rc
 	oldRc, err := client.ReplicationControllers(cmdNamespace).Get(oldName)
@@ -151,11 +150,11 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			return err
 		}
 		// We're in the middle of a rename, look for an RC with a source annotation of oldName
-		newRc, err := kubectl.FindSourceController(updaterClient, cmdNamespace, oldName)
+		newRc, err := kubectl.FindSourceController(client, cmdNamespace, oldName)
 		if err != nil {
 			return err
 		}
-		return kubectl.Rename(kubectl.NewRollingUpdaterClient(client), newRc, oldName)
+		return kubectl.Rename(client, newRc, oldName)
 	}
 
 	var keepOldName bool
@@ -235,7 +234,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			filename, oldName)
 	}
 
-	updater := kubectl.NewRollingUpdater(newRc.Namespace, updaterClient)
+	updater := kubectl.NewRollingUpdater(newRc.Namespace, client)
 
 	// To successfully pull off a rolling update the new and old rc have to differ
 	// by at least one selector. Every new pod should have the selector and every
@@ -279,7 +278,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		Interval:       interval,
 		Timeout:        timeout,
 		CleanupPolicy:  updateCleanupPolicy,
-		UpdateAcceptor: kubectl.DefaultUpdateAcceptor,
+		MaxUnavailable: util.NewIntOrStringFromInt(0),
+		MaxSurge:       util.NewIntOrStringFromInt(1),
 	}
 	if cmdutil.GetFlagBool(cmd, "rollback") {
 		kubectl.AbortRollingUpdate(config)

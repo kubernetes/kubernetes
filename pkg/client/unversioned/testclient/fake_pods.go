@@ -44,8 +44,13 @@ func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodL
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.PodList), err
+	list := &api.PodList{}
+	for _, pod := range obj.(*api.PodList).Items {
+		if label.Matches(labels.Set(pod.Labels)) {
+			list.Items = append(list.Items, pod)
+		}
+	}
+	return list, err
 }
 
 func (c *FakePods) Create(pod *api.Pod) (*api.Pod, error) {
