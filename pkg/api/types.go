@@ -1375,7 +1375,7 @@ type NodeAddress struct {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see http://docs.k8s.io/resources.md for more details.
+// see http://docs.k8s.io/design/resources.md for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `json:"capacity,omitempty"`

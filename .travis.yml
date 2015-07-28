@@ -19,6 +19,7 @@ script:
   - PATH=$GOPATH/bin:$PATH ./hack/verify-generated-deep-copies.sh
   - PATH=$GOPATH/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
   - PATH=$GOPATH/bin:./third_party/etcd:$PATH ./hack/verify-swagger-spec.sh
+  - PATH=$GOPATH/bin:./third_party/etcd:$PATH ./hack/verify-linkcheck.sh
   - godep go test ./cmd/mungedocs
 
 notifications:

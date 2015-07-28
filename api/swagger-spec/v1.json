@@ -10583,15 +10583,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "target": {
       "$ref": "v1.ObjectReference",
@@ -10604,15 +10604,15 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated; see http://releases.k8s.io/HEAD/docs/identifiers.md#names"
+      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated; see http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
      },
      "generateName": {
       "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified; see http://releases.k8s.io/HEAD/docs/api-conventions.md#idempotency"
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#idempotency"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace of the object; must be a DNS_LABEL; cannot be updated; see http://releases.k8s.io/HEAD/docs/namespaces.md"
+      "description": "namespace of the object; must be a DNS_LABEL; cannot be updated; see http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
      },
      "selfLink": {
       "type": "string",
@@ -10620,11 +10620,11 @@
      },
      "uid": {
       "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only; see http://releases.k8s.io/HEAD/docs/identifiers.md#uids"
+      "description": "unique UUID across space and time; populated by the system; read-only; see http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
      },
      "resourceVersion": {
       "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/HEAD/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
      },
      "generation": {
       "type": "integer",
@@ -10633,19 +10633,19 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "deletionTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "labels": {
       "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services; see http://releases.k8s.io/HEAD/docs/labels.md"
+      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
      },
      "annotations": {
       "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects; see http://releases.k8s.io/HEAD/docs/annotations.md"
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects; see http://releases.k8s.io/HEAD/docs/user-guide/annotations.md"
      }
     }
    },
@@ -10654,19 +10654,19 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of the referent; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of the referent; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace of the referent; see http://releases.k8s.io/HEAD/docs/namespaces.md"
+      "description": "namespace of the referent; see http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
      },
      "name": {
       "type": "string",
-      "description": "name of the referent; see http://releases.k8s.io/HEAD/docs/identifiers.md#names"
+      "description": "name of the referent; see http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
      },
      "uid": {
       "type": "string",
-      "description": "uid of the referent; see http://releases.k8s.io/HEAD/docs/identifiers.md#uids"
+      "description": "uid of the referent; see http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
      },
      "apiVersion": {
       "type": "string",
@@ -10674,7 +10674,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "specific resourceVersion to which this reference is made, if any: http://releases.k8s.io/HEAD/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "specific resourceVersion to which this reference is made, if any: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
      },
      "fieldPath": {
       "type": "string",
@@ -10690,15 +10690,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -10718,7 +10718,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/HEAD/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
      }
     }
    },
@@ -10727,15 +10727,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "conditions": {
       "type": "array",
@@ -10779,15 +10779,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -10806,15 +10806,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "subsets": {
       "type": "array",
@@ -10903,19 +10903,19 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "status": {
       "type": "string",
-      "description": "status of the operation; either Success, or Failure; see http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "status of the operation; either Success, or Failure; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "message": {
       "type": "string",
@@ -10945,7 +10945,7 @@
      },
      "kind": {
       "type": "string",
-      "description": "the kind attribute of the resource associated with the status StatusReason; on some operations may differ from the requested resource Kind; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "the kind attribute of the resource associated with the status StatusReason; on some operations may differ from the requested resource Kind; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "causes": {
       "type": "array",
@@ -10986,11 +10986,11 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "gracePeriodSeconds": {
       "type": "integer",
@@ -11007,15 +11007,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11035,15 +11035,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "involvedObject": {
       "$ref": "v1.ObjectReference",
@@ -11097,15 +11097,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11121,19 +11121,19 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.LimitRangeSpec",
-      "description": "spec defines the limits enforced; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "spec defines the limits enforced; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -11181,22 +11181,22 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.Namespace"
       },
-      "description": "items is the list of Namespace objects in the list; see http://releases.k8s.io/HEAD/docs/namespaces.md"
+      "description": "items is the list of Namespace objects in the list; see http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
      }
     }
    },
@@ -11205,23 +11205,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.NamespaceSpec",
-      "description": "spec defines the behavior of the Namespace; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "spec defines the behavior of the Namespace; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.NamespaceStatus",
-      "description": "status describes the current status of a Namespace; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "status describes the current status of a Namespace; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -11258,15 +11258,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -11282,23 +11282,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.NodeSpec",
-      "description": "specification of a node; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "specification of a node; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.NodeStatus",
-      "description": "most recently observed status of the node; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "most recently observed status of the node; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -11319,7 +11319,7 @@
      },
      "unschedulable": {
       "type": "boolean",
-      "description": "disable pod scheduling on the node; see http://releases.k8s.io/HEAD/docs/node.md#manual-node-administration"
+      "description": "disable pod scheduling on the node; see http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"
      }
     }
    },
@@ -11328,29 +11328,29 @@
     "properties": {
      "capacity": {
       "type": "any",
-      "description": "compute resource capacity of the node; see http://releases.k8s.io/HEAD/docs/compute_resources.md"
+      "description": "compute resource capacity of the node; see http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md"
      },
      "phase": {
       "type": "string",
-      "description": "most recently observed lifecycle phase of the node; see http://releases.k8s.io/HEAD/docs/node.md#node-phase"
+      "description": "most recently observed lifecycle phase of the node; see http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase"
      },
      "conditions": {
       "type": "array",
       "items": {
        "$ref": "v1.NodeCondition"
       },
-      "description": "list of node conditions observed; see http://releases.k8s.io/HEAD/docs/node.md#node-condition"
+      "description": "list of node conditions observed; see http://releases.k8s.io/HEAD/docs/admin/node.md#node-condition"
      },
      "addresses": {
       "type": "array",
       "items": {
        "$ref": "v1.NodeAddress"
       },
-      "description": "list of addresses reachable to the node; see http://releases.k8s.io/HEAD/docs/node.md#node-addresses"
+      "description": "list of addresses reachable to the node; see http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses"
      },
      "nodeInfo": {
       "$ref": "v1.NodeSystemInfo",
-      "description": "set of ids/uuids to uniquely identify the node; see http://releases.k8s.io/HEAD/docs/node.md#node-info"
+      "description": "set of ids/uuids to uniquely identify the node; see http://releases.k8s.io/HEAD/docs/admin/node.md#node-info"
      }
     }
    },
@@ -11456,22 +11456,22 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.PersistentVolumeClaim"
       },
-      "description": "a list of persistent volume claims; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#persistentvolumeclaims"
+      "description": "a list of persistent volume claims; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
      }
     }
    },
@@ -11480,23 +11480,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.PersistentVolumeClaimSpec",
-      "description": "the desired characteristics of a volume; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#persistentvolumeclaims"
+      "description": "the desired characteristics of a volume; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
      },
      "status": {
       "$ref": "v1.PersistentVolumeClaimStatus",
-      "description": "the current status of a persistent volume claim; read-only; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#persistentvolumeclaims"
+      "description": "the current status of a persistent volume claim; read-only; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
      }
     }
    },
@@ -11508,11 +11508,11 @@
       "items": {
        "$ref": "v1.PersistentVolumeAccessMode"
       },
-      "description": "the desired access modes the volume should have; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#access-modes-1"
+      "description": "the desired access modes the volume should have; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1"
      },
      "resources": {
       "$ref": "v1.ResourceRequirements",
-      "description": "the desired resources the volume should have; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#resources"
+      "description": "the desired resources the volume should have; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources"
      },
      "volumeName": {
       "type": "string",
@@ -11549,7 +11549,7 @@
       "items": {
        "$ref": "v1.PersistentVolumeAccessMode"
       },
-      "description": "the actual access modes the volume has; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#access-modes-1"
+      "description": "the actual access modes the volume has; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1"
      },
      "capacity": {
       "type": "any",
@@ -11562,22 +11562,22 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.PersistentVolume"
       },
-      "description": "list of persistent volumes; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md"
+      "description": "list of persistent volumes; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md"
      }
     }
    },
@@ -11586,23 +11586,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.PersistentVolumeSpec",
-      "description": "specification of a persistent volume as provisioned by an administrator; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#persistent-volumes"
+      "description": "specification of a persistent volume as provisioned by an administrator; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistent-volumes"
      },
      "status": {
       "$ref": "v1.PersistentVolumeStatus",
-      "description": "current status of a persistent volume; populated by the system, read-only; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#persistent-volumes"
+      "description": "current status of a persistent volume; populated by the system, read-only; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistent-volumes"
      }
     }
    },
@@ -11611,19 +11611,19 @@
     "properties": {
      "capacity": {
       "type": "any",
-      "description": "a description of the persistent volume's resources and capacityr; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#capacity"
+      "description": "a description of the persistent volume's resources and capacityr; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity"
      },
      "gcePersistentDisk": {
       "$ref": "v1.GCEPersistentDiskVolumeSource",
-      "description": "GCE disk resource provisioned by an admin; see http://releases.k8s.io/HEAD/docs/volumes.md#gcepersistentdisk"
+      "description": "GCE disk resource provisioned by an admin; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "awsElasticBlockStore": {
       "$ref": "v1.AWSElasticBlockStoreVolumeSource",
-      "description": "AWS disk resource provisioned by an admin; see http://releases.k8s.io/HEAD/docs/volumes.md#awselasticblockstore"
+      "description": "AWS disk resource provisioned by an admin; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "hostPath": {
       "$ref": "v1.HostPathVolumeSource",
-      "description": "a HostPath provisioned by a developer or tester; for develment use only; see http://releases.k8s.io/HEAD/docs/volumes.md#hostpath"
+      "description": "a HostPath provisioned by a developer or tester; for develment use only; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
      },
      "glusterfs": {
       "$ref": "v1.GlusterfsVolumeSource",
@@ -11631,7 +11631,7 @@
      },
      "nfs": {
       "$ref": "v1.NFSVolumeSource",
-      "description": "NFS volume resource provisioned by an admin; see http://releases.k8s.io/HEAD/docs/volumes.md#nfs"
+      "description": "NFS volume resource provisioned by an admin; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
      },
      "rbd": {
       "$ref": "v1.RBDVolumeSource",
@@ -11646,15 +11646,15 @@
       "items": {
        "$ref": "v1.PersistentVolumeAccessMode"
       },
-      "description": "all ways the volume can be mounted; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#access-modes"
+      "description": "all ways the volume can be mounted; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes"
      },
      "claimRef": {
       "$ref": "v1.ObjectReference",
-      "description": "when bound, a reference to the bound claim; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#binding"
+      "description": "when bound, a reference to the bound claim; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#binding"
      },
      "persistentVolumeReclaimPolicy": {
       "type": "string",
-      "description": "what happens to a volume when released from its claim; Valid options are Retain (default) and Recycle.  Recyling must be supported by the volume plugin underlying this persistent volume. See http://releases.k8s.io/HEAD/docs/persistent-volumes.md#recycling-policy"
+      "description": "what happens to a volume when released from its claim; Valid options are Retain (default) and Recycle.  Recyling must be supported by the volume plugin underlying this persistent volume. See http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#recycling-policy"
      }
     }
    },
@@ -11667,20 +11667,20 @@
     "properties": {
      "pdName": {
       "type": "string",
-      "description": "unique name of the PD resource in GCE; see http://releases.k8s.io/HEAD/docs/volumes.md#gcepersistentdisk"
+      "description": "unique name of the PD resource in GCE; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "fsType": {
       "type": "string",
-      "description": "file system type to mount, such as ext4, xfs, ntfs; see http://releases.k8s.io/HEAD/docs/volumes.md#gcepersistentdisk"
+      "description": "file system type to mount, such as ext4, xfs, ntfs; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "partition": {
       "type": "integer",
       "format": "int32",
-      "description": "partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted; see http://releases.k8s.io/HEAD/docs/volumes.md#gcepersistentdisk"
+      "description": "partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "read-only if true, read-write otherwise (false or unspecified); see http://releases.k8s.io/HEAD/docs/volumes.md#gcepersistentdisk"
+      "description": "read-only if true, read-write otherwise (false or unspecified); see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
      }
     }
    },
@@ -11693,20 +11693,20 @@
     "properties": {
      "volumeID": {
       "type": "string",
-      "description": "unique id of the PD resource in AWS; see http://releases.k8s.io/HEAD/docs/volumes.md#awselasticblockstore"
+      "description": "unique id of the PD resource in AWS; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "fsType": {
       "type": "string",
-      "description": "file system type to mount, such as ext4, xfs, ntfs; see http://releases.k8s.io/HEAD/docs/volumes.md#awselasticblockstore"
+      "description": "file system type to mount, such as ext4, xfs, ntfs; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "partition": {
       "type": "integer",
       "format": "int32",
-      "description": "partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted; see http://releases.k8s.io/HEAD/docs/volumes.md#awselasticblockstore"
+      "description": "partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "read-only if true, read-write otherwise (false or unspecified); see http://releases.k8s.io/HEAD/docs/volumes.md#awselasticblockstore"
+      "description": "read-only if true, read-write otherwise (false or unspecified); see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
      }
     }
    },
@@ -11718,7 +11718,7 @@
     "properties": {
      "path": {
       "type": "string",
-      "description": "path of the directory on the host; see http://releases.k8s.io/HEAD/docs/volumes.md#hostpath"
+      "description": "path of the directory on the host; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
      }
     }
    },
@@ -11752,15 +11752,15 @@
     "properties": {
      "server": {
       "type": "string",
-      "description": "the hostname or IP address of the NFS server; see http://releases.k8s.io/HEAD/docs/volumes.md#nfs"
+      "description": "the hostname or IP address of the NFS server; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
      },
      "path": {
       "type": "string",
-      "description": "the path that is exported by the NFS server; see http://releases.k8s.io/HEAD/docs/volumes.md#nfs"
+      "description": "the path that is exported by the NFS server; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
      },
      "readOnly": {
       "type": "boolean",
-      "description": "forces the NFS export to be mounted with read-only permissions; see http://releases.k8s.io/HEAD/docs/volumes.md#nfs"
+      "description": "forces the NFS export to be mounted with read-only permissions; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
      }
     }
    },
@@ -11817,7 +11817,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "name of the referent; see http://releases.k8s.io/HEAD/docs/identifiers.md#names"
+      "description": "name of the referent; see http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
      }
     }
    },
@@ -11858,7 +11858,7 @@
     "properties": {
      "phase": {
       "type": "string",
-      "description": "the current phase of a persistent volume; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#phase"
+      "description": "the current phase of a persistent volume; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#phase"
      },
      "message": {
       "type": "string",
@@ -11878,22 +11878,22 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.Pod"
       },
-      "description": "list of pods; see http://releases.k8s.io/HEAD/docs/pods.md"
+      "description": "list of pods; see http://releases.k8s.io/HEAD/docs/user-guide/pods.md"
      }
     }
    },
@@ -11902,23 +11902,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.PodSpec",
-      "description": "specification of the desired behavior of the pod; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the pod; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.PodStatus",
-      "description": "most recently observed status of the pod; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "most recently observed status of the pod; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -11933,18 +11933,18 @@
       "items": {
        "$ref": "v1.Volume"
       },
-      "description": "list of volumes that can be mounted by containers belonging to the pod; see http://releases.k8s.io/HEAD/docs/volumes.md"
+      "description": "list of volumes that can be mounted by containers belonging to the pod; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md"
      },
      "containers": {
       "type": "array",
       "items": {
        "$ref": "v1.Container"
       },
-      "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod; see http://releases.k8s.io/HEAD/docs/containers.md"
+      "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod; see http://releases.k8s.io/HEAD/docs/user-guide/containers.md"
      },
      "restartPolicy": {
       "type": "string",
-      "description": "restart policy for all containers within the pod; one of Always, OnFailure, Never; defaults to Always; see http://releases.k8s.io/HEAD/docs/pod-states.md#restartpolicy"
+      "description": "restart policy for all containers within the pod; one of Always, OnFailure, Never; defaults to Always; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#restartpolicy"
      },
      "terminationGracePeriodSeconds": {
       "type": "integer",
@@ -11965,7 +11965,7 @@
      },
      "serviceAccountName": {
       "type": "string",
-      "description": "name of the ServiceAccount to use to run this pod; see http://releases.k8s.io/HEAD/docs/service_accounts.md"
+      "description": "name of the ServiceAccount to use to run this pod; see http://releases.k8s.io/HEAD/docs/design/service_accounts.md"
      },
      "serviceAccount": {
       "type": "string",
@@ -11984,7 +11984,7 @@
       "items": {
        "$ref": "v1.LocalObjectReference"
       },
-      "description": "list of references to secrets in the same namespace available for pulling the container images; see http://releases.k8s.io/HEAD/docs/images.md#specifying-imagepullsecrets-on-a-pod"
+      "description": "list of references to secrets in the same namespace available for pulling the container images; see http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod"
      }
     }
    },
@@ -11996,23 +11996,23 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "volume name; must be a DNS_LABEL and unique within the pod; see http://releases.k8s.io/HEAD/docs/identifiers.md#names"
+      "description": "volume name; must be a DNS_LABEL and unique within the pod; see http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
      },
      "hostPath": {
       "$ref": "v1.HostPathVolumeSource",
-      "description": "pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host; see http://releases.k8s.io/HEAD/docs/volumes.md#hostpath"
+      "description": "pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
      },
      "emptyDir": {
       "$ref": "v1.EmptyDirVolumeSource",
-      "description": "temporary directory that shares a pod's lifetime; see http://releases.k8s.io/HEAD/docs/volumes.md#emptydir"
+      "description": "temporary directory that shares a pod's lifetime; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir"
      },
      "gcePersistentDisk": {
       "$ref": "v1.GCEPersistentDiskVolumeSource",
-      "description": "GCE disk resource attached to the host machine on demand; see http://releases.k8s.io/HEAD/docs/volumes.md#gcepersistentdisk"
+      "description": "GCE disk resource attached to the host machine on demand; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk"
      },
      "awsElasticBlockStore": {
       "$ref": "v1.AWSElasticBlockStoreVolumeSource",
-      "description": "AWS disk resource attached to the host machine on demand; see http://releases.k8s.io/HEAD/docs/volumes.md#awselasticblockstore"
+      "description": "AWS disk resource attached to the host machine on demand; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
      },
      "gitRepo": {
       "$ref": "v1.GitRepoVolumeSource",
@@ -12020,11 +12020,11 @@
      },
      "secret": {
       "$ref": "v1.SecretVolumeSource",
-      "description": "secret to populate volume; see http://releases.k8s.io/HEAD/docs/volumes.md#secrets"
+      "description": "secret to populate volume; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets"
      },
      "nfs": {
       "$ref": "v1.NFSVolumeSource",
-      "description": "NFS volume that will be mounted in the host machine; see http://releases.k8s.io/HEAD/docs/volumes.md#nfs"
+      "description": "NFS volume that will be mounted in the host machine; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
      },
      "iscsi": {
       "$ref": "v1.ISCSIVolumeSource",
@@ -12036,7 +12036,7 @@
      },
      "persistentVolumeClaim": {
       "$ref": "v1.PersistentVolumeClaimVolumeSource",
-      "description": "a reference to a PersistentVolumeClaim in the same namespace; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#persistentvolumeclaims"
+      "description": "a reference to a PersistentVolumeClaim in the same namespace; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
      },
      "rbd": {
       "$ref": "v1.RBDVolumeSource",
@@ -12049,7 +12049,7 @@
     "properties": {
      "medium": {
       "type": "string",
-      "description": "type of storage used to back the volume; must be an empty string (default) or Memory; see http://releases.k8s.io/HEAD/docs/volumes.md#emptydir"
+      "description": "type of storage used to back the volume; must be an empty string (default) or Memory; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir"
      }
     }
    },
@@ -12078,7 +12078,7 @@
     "properties": {
      "secretName": {
       "type": "string",
-      "description": "secretName is the name of a secret in the pod's namespace; see http://releases.k8s.io/HEAD/docs/volumes.md#secrets"
+      "description": "secretName is the name of a secret in the pod's namespace; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets"
      }
     }
    },
@@ -12090,7 +12090,7 @@
     "properties": {
      "claimName": {
       "type": "string",
-      "description": "the name of the claim in the same namespace to be mounted as a volume; see http://releases.k8s.io/HEAD/docs/persistent-volumes.md#persistentvolumeclaims"
+      "description": "the name of the claim in the same namespace to be mounted as a volume; see http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims"
      },
      "readOnly": {
       "type": "boolean",
@@ -12110,21 +12110,21 @@
      },
      "image": {
       "type": "string",
-      "description": "Docker image name; see http://releases.k8s.io/HEAD/docs/images.md"
+      "description": "Docker image name; see http://releases.k8s.io/HEAD/docs/user-guide/images.md"
      },
      "command": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "entrypoint array; not executed within a shell; the docker image's entrypoint is used if this is not provided; cannot be updated; variable references $(VAR_NAME) are expanded using the container's environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands"
+      "description": "entrypoint array; not executed within a shell; the docker image's entrypoint is used if this is not provided; cannot be updated; variable references $(VAR_NAME) are expanded using the container's environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands"
      },
      "args": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "command array; the docker image's cmd is used if this is not provided; arguments to the entrypoint; cannot be updated; variable references $(VAR_NAME) are expanded using the container's environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see http://releases.k8s.io/HEAD/docs/containers.md#containers-and-commands"
+      "description": "command array; the docker image's cmd is used if this is not provided; arguments to the entrypoint; cannot be updated; variable references $(VAR_NAME) are expanded using the container's environment variables; if a variable cannot be resolved, the reference in the input string will be unchanged; the $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME) ; escaped references will never be expanded, regardless of whether the variable exists or not; see http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands"
      },
      "workingDir": {
       "type": "string",
@@ -12146,7 +12146,7 @@
      },
      "resources": {
       "$ref": "v1.ResourceRequirements",
-      "description": "Compute Resources required by this container; cannot be updated; see http://releases.k8s.io/HEAD/docs/compute_resources.md"
+      "description": "Compute Resources required by this container; cannot be updated; see http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md"
      },
      "volumeMounts": {
       "type": "array",
@@ -12157,11 +12157,11 @@
      },
      "livenessProbe": {
       "$ref": "v1.Probe",
-      "description": "periodic probe of container liveness; container will be restarted if the probe fails; cannot be updated; see http://releases.k8s.io/HEAD/docs/pod-states.md#container-probes"
+      "description": "periodic probe of container liveness; container will be restarted if the probe fails; cannot be updated; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "readinessProbe": {
       "$ref": "v1.Probe",
-      "description": "periodic probe of container service readiness; container will be removed from service endpoints if the probe fails; cannot be updated; see http://releases.k8s.io/HEAD/docs/pod-states.md#container-probes"
+      "description": "periodic probe of container service readiness; container will be removed from service endpoints if the probe fails; cannot be updated; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "lifecycle": {
       "$ref": "v1.Lifecycle",
@@ -12173,11 +12173,11 @@
      },
      "imagePullPolicy": {
       "type": "string",
-      "description": "image pull policy; one of Always, Never, IfNotPresent; defaults to Always if :latest tag is specified, or IfNotPresent otherwise; cannot be updated; see http://releases.k8s.io/HEAD/docs/images.md#updating-images"
+      "description": "image pull policy; one of Always, Never, IfNotPresent; defaults to Always if :latest tag is specified, or IfNotPresent otherwise; cannot be updated; see http://releases.k8s.io/HEAD/docs/user-guide/images.md#updating-images"
      },
      "securityContext": {
       "$ref": "v1.SecurityContext",
-      "description": "security options the pod should run with; see http://releases.k8s.io/HEAD/docs/security_context.md"
+      "description": "security options the pod should run with; see http://releases.k8s.io/HEAD/docs/design/security_context.md"
      }
     }
    },
@@ -12298,12 +12298,12 @@
      "initialDelaySeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "number of seconds after the container has started before liveness probes are initiated; see http://releases.k8s.io/HEAD/docs/pod-states.md#container-probes"
+      "description": "number of seconds after the container has started before liveness probes are initiated; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "timeoutSeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "number of seconds after which liveness probes timeout; defaults to 1 second; see http://releases.k8s.io/HEAD/docs/pod-states.md#container-probes"
+      "description": "number of seconds after which liveness probes timeout; defaults to 1 second; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      }
     }
    },
@@ -12360,11 +12360,11 @@
     "properties": {
      "postStart": {
       "$ref": "v1.Handler",
-      "description": "called immediately after a container is started; if the handler fails, the container is terminated and restarted according to its restart policy; other management of the container blocks until the hook completes; see http://releases.k8s.io/HEAD/docs/container-environment.md#hook-details"
+      "description": "called immediately after a container is started; if the handler fails, the container is terminated and restarted according to its restart policy; other management of the container blocks until the hook completes; see http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details"
      },
      "preStop": {
       "$ref": "v1.Handler",
-      "description": "called before a container is terminated; the container is terminated after the handler completes; other management of the container blocks until the hook completes; see http://releases.k8s.io/HEAD/docs/container-environment.md#hook-details"
+      "description": "called before a container is terminated; the container is terminated after the handler completes; other management of the container blocks until the hook completes; see http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details"
      }
     }
    },
@@ -12435,19 +12435,19 @@
     "properties": {
      "user": {
       "type": "string",
-      "description": "the user label to apply to the container; see http://releases.k8s.io/HEAD/docs/labels.md"
+      "description": "the user label to apply to the container; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
      },
      "role": {
       "type": "string",
-      "description": "the role label to apply to the container; see http://releases.k8s.io/HEAD/docs/labels.md"
+      "description": "the role label to apply to the container; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
      },
      "type": {
       "type": "string",
-      "description": "the type label to apply to the container; see http://releases.k8s.io/HEAD/docs/labels.md"
+      "description": "the type label to apply to the container; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
      },
      "level": {
       "type": "string",
-      "description": "the level label to apply to the container; see http://releases.k8s.io/HEAD/docs/labels.md"
+      "description": "the level label to apply to the container; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
      }
     }
    },
@@ -12456,14 +12456,14 @@
     "properties": {
      "phase": {
       "type": "string",
-      "description": "current condition of the pod; see http://releases.k8s.io/HEAD/docs/pod-states.md#pod-phase"
+      "description": "current condition of the pod; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-phase"
      },
      "conditions": {
       "type": "array",
       "items": {
        "$ref": "v1.PodCondition"
       },
-      "description": "current service state of pod; see http://releases.k8s.io/HEAD/docs/pod-states.md#pod-conditions"
+      "description": "current service state of pod; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions"
      },
      "message": {
       "type": "string",
@@ -12490,7 +12490,7 @@
       "items": {
        "$ref": "v1.ContainerStatus"
       },
-      "description": "list of container statuses; see http://releases.k8s.io/HEAD/docs/pod-states.md#container-statuses"
+      "description": "list of container statuses; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses"
      }
     }
    },
@@ -12503,11 +12503,11 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "kind of the condition, currently only Ready; see http://releases.k8s.io/HEAD/docs/pod-states.md#pod-conditions"
+      "description": "kind of the condition, currently only Ready; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions"
      },
      "status": {
       "type": "string",
-      "description": "status of the condition, one of True, False, Unknown; see http://releases.k8s.io/HEAD/docs/pod-states.md#pod-conditions"
+      "description": "status of the condition, one of True, False, Unknown; see http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions"
      }
     }
    },
@@ -12544,7 +12544,7 @@
      },
      "image": {
       "type": "string",
-      "description": "image of the container; see http://releases.k8s.io/HEAD/docs/images.md"
+      "description": "image of the container; see http://releases.k8s.io/HEAD/docs/user-guide/images.md"
      },
      "imageID": {
       "type": "string",
@@ -12552,7 +12552,7 @@
      },
      "containerID": {
       "type": "string",
-      "description": "container's ID in the format 'docker://\u003ccontainer_id\u003e'; see http://releases.k8s.io/HEAD/docs/container-environment.md#container-information"
+      "description": "container's ID in the format 'docker://\u003ccontainer_id\u003e'; see http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information"
      }
     }
    },
@@ -12637,15 +12637,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -12661,19 +12661,19 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "the template of the desired behavior of the pod; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "the template of the desired behavior of the pod; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -12682,11 +12682,11 @@
     "properties": {
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.PodSpec",
-      "description": "specification of the desired behavior of the pod; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the pod; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -12698,22 +12698,22 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.ReplicationController"
       },
-      "description": "list of replication controllers; see http://releases.k8s.io/HEAD/docs/replication-controller.md"
+      "description": "list of replication controllers; see http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md"
      }
     }
    },
@@ -12722,23 +12722,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.ReplicationControllerSpec",
-      "description": "specification of the desired behavior of the replication controller; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the replication controller; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.ReplicationControllerStatus",
-      "description": "most recently observed status of the replication controller; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "most recently observed status of the replication controller; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -12748,15 +12748,15 @@
      "replicas": {
       "type": "integer",
       "format": "int32",
-      "description": "number of replicas desired; defaults to 1; see http://releases.k8s.io/HEAD/docs/replication-controller.md#what-is-a-replication-controller"
+      "description": "number of replicas desired; defaults to 1; see http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
      },
      "selector": {
       "type": "any",
-      "description": "label keys and values that must match in order to be controlled by this replication controller, if empty defaulted to labels on Pod template; see http://releases.k8s.io/HEAD/docs/labels.md#label-selectors"
+      "description": "label keys and values that must match in order to be controlled by this replication controller, if empty defaulted to labels on Pod template; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "object that describes the pod that will be created if insufficient replicas are detected; takes precendence over templateRef; see http://releases.k8s.io/HEAD/docs/replication-controller.md#pod-template"
+      "description": "object that describes the pod that will be created if insufficient replicas are detected; takes precendence over templateRef; see http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template"
      }
     }
    },
@@ -12769,7 +12769,7 @@
      "replicas": {
       "type": "integer",
       "format": "int32",
-      "description": "most recently oberved number of replicas; see http://releases.k8s.io/HEAD/docs/replication-controller.md#what-is-a-replication-controller"
+      "description": "most recently oberved number of replicas; see http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
      },
      "observedGeneration": {
       "type": "integer",
@@ -12786,15 +12786,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -12810,23 +12810,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.ResourceQuotaSpec",
-      "description": "spec defines the desired quota; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "spec defines the desired quota; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.ResourceQuotaStatus",
-      "description": "status defines the actual enforced quota and current usage; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "status defines the actual enforced quota and current usage; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -12860,22 +12860,22 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.Secret"
       },
-      "description": "items is a list of secret objects; see http://releases.k8s.io/HEAD/docs/secrets.md"
+      "description": "items is a list of secret objects; see http://releases.k8s.io/HEAD/docs/user-guide/secrets.md"
      }
     }
    },
@@ -12884,15 +12884,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "data": {
       "type": "any",
@@ -12912,22 +12912,22 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.ServiceAccount"
       },
-      "description": "list of ServiceAccounts; see http://releases.k8s.io/HEAD/docs/service_accounts.md#service-accounts"
+      "description": "list of ServiceAccounts; see http://releases.k8s.io/HEAD/docs/design/service_accounts.md#service-accounts"
      }
     }
    },
@@ -12936,29 +12936,29 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "secrets": {
       "type": "array",
       "items": {
        "$ref": "v1.ObjectReference"
       },
-      "description": "list of secrets that can be used by pods running as this service account; see http://releases.k8s.io/HEAD/docs/secrets.md"
+      "description": "list of secrets that can be used by pods running as this service account; see http://releases.k8s.io/HEAD/docs/user-guide/secrets.md"
      },
      "imagePullSecrets": {
       "type": "array",
       "items": {
        "$ref": "v1.LocalObjectReference"
       },
-      "description": "list of references to secrets in the same namespace available for pulling container images; see http://releases.k8s.io/HEAD/docs/secrets.md#manually-specifying-an-imagepullsecret"
+      "description": "list of references to secrets in the same namespace available for pulling container images; see http://releases.k8s.io/HEAD/docs/user-guide/secrets.md#manually-specifying-an-imagepullsecret"
      }
     }
    },
@@ -12970,15 +12970,15 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
@@ -12994,23 +12994,23 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/api-conventions.md#types-kinds"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/api-conventions.md#resources"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.ServiceSpec",
-      "description": "specification of the desired behavior of the service; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the service; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.ServiceStatus",
-      "description": "most recently observed status of the service; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/api-conventions.md#spec-and-status"
+      "description": "most recently observed status of the service; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -13025,19 +13025,19 @@
       "items": {
        "$ref": "v1.ServicePort"
       },
-      "description": "ports exposed by the service; see http://releases.k8s.io/HEAD/docs/services.md#virtual-ips-and-service-proxies"
+      "description": "ports exposed by the service; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies"
      },
      "selector": {
       "type": "any",
-      "description": "label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified; see http://releases.k8s.io/HEAD/docs/services.md#overview"
+      "description": "label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview"
      },
      "clusterIP": {
       "type": "string",
-      "description": "IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; cannot be updated; 'None' can be specified for a headless service when proxying is not required; see http://releases.k8s.io/HEAD/docs/services.md#virtual-ips-and-service-proxies"
+      "description": "IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; cannot be updated; 'None' can be specified for a headless service when proxying is not required; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies"
      },
      "type": {
       "type": "string",
-      "description": "type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP; see http://releases.k8s.io/HEAD/docs/services.md#external-services"
+      "description": "type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services"
      },
      "deprecatedPublicIPs": {
       "type": "array",
@@ -13048,7 +13048,7 @@
      },
      "sessionAffinity": {
       "type": "string",
-      "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None; see http://releases.k8s.io/HEAD/docs/services.md#virtual-ips-and-service-proxies"
+      "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies"
      }
     }
    },
@@ -13074,12 +13074,12 @@
      },
      "targetPort": {
       "type": "string",
-      "description": "number or name of the port to access on the pods targeted by the service; defaults to the service port; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME; see http://releases.k8s.io/HEAD/docs/services.md#defining-a-service"
+      "description": "number or name of the port to access on the pods targeted by the service; defaults to the service port; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service"
      },
      "nodePort": {
       "type": "integer",
       "format": "int32",
-      "description": "the port on each node on which this service is exposed when type=NodePort or LoadBalancer; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; see http://releases.k8s.io/HEAD/docs/services.md#type--nodeport"
+      "description": "the port on each node on which this service is exposed when type=NodePort or LoadBalancer; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#type--nodeport"
      }
     }
    },

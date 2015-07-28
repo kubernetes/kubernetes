@@ -97,6 +97,16 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for links in API descriptions... "
+if ! hack/verify-linkcheck.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Some links in pkg/api/.*types.go are outdated. They require a manual fix."
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 echo -ne "Checking for docs that need updating... "
 if ! hack/verify-gendocs.sh > /dev/null; then
   echo "${red}ERROR!"
