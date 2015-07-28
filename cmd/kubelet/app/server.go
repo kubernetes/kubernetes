@@ -123,6 +123,7 @@ type KubeletServer struct {
 	PodCIDR                        string
 	MaxPods                        int
 	DockerExecHandlerName          string
+	ResolverConfig                 string
 
 	// Flags intended for testing
 
@@ -253,6 +254,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.MaxPods, "max-pods", 40, "Number of Pods that can run on this Kubelet.")
 	fs.StringVar(&s.DockerExecHandlerName, "docker-exec-handler", s.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
 	fs.StringVar(&s.PodCIDR, "pod-cidr", "", "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.")
+	fs.StringVar(&s.ResolverConfig, "resolv-conf", kubelet.ResolvConfDefault, "Resolver configuration file used as the basis for the container DNS resolution configuration.")
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
@@ -359,6 +361,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 		PodCIDR:                   s.PodCIDR,
 		MaxPods:                   s.MaxPods,
 		DockerExecHandler:         dockerExecHandler,
+		ResolverConfig:            s.ResolverConfig,
 	}, nil
 }
 
@@ -600,6 +603,7 @@ func SimpleKubelet(client *client.Client,
 		SystemContainer:           "",
 		MaxPods:                   32,
 		DockerExecHandler:         &dockertools.NativeExecHandler{},
+		ResolverConfig:            kubelet.ResolvConfDefault,
 	}
 	return &kcfg
 }
@@ -769,6 +773,7 @@ type KubeletConfig struct {
 	PodCIDR                        string
 	MaxPods                        int
 	DockerExecHandler              dockertools.ExecHandler
+	ResolverConfig                 string
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -827,7 +832,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ConfigureCBR0,
 		kc.PodCIDR,
 		kc.MaxPods,
-		kc.DockerExecHandler)
+		kc.DockerExecHandler,
+		kc.ResolverConfig)
 
 	if err != nil {
 		return nil, nil, err
