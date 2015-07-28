@@ -18,6 +18,7 @@ package rkt
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -943,6 +944,10 @@ func (r *runtime) RunInContainer(containerID string, cmd []string) ([]byte, erro
 
 	result, err := r.runCommand(args...)
 	return []byte(strings.Join(result, "\n")), err
+}
+
+func (r *runtime) AttachContainer(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	return errors.New("unimplemented")
 }
 
 // Note: In rkt, the container ID is in the form of "UUID:appName:ImageID", where

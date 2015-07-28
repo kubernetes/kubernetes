@@ -77,6 +77,12 @@ type Runtime interface {
 	GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
 	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
 	ContainerCommandRunner
+	// ContainerAttach encapsulates the attaching to containers for testability
+	ContainerAttacher
+}
+
+type ContainerAttacher interface {
+	AttachContainer(id string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
 }
 
 // CommandRunner encapsulates the command runner interfaces for testability.

@@ -2348,6 +2348,19 @@ func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, contain
 	return kl.runner.ExecInContainer(string(container.ID), cmd, stdin, stdout, stderr, tty)
 }
 
+func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, containerName string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	podUID = kl.podManager.TranslatePodUID(podUID)
+
+	container, err := kl.findContainer(podFullName, podUID, containerName)
+	if err != nil {
+		return err
+	}
+	if container == nil {
+		return fmt.Errorf("container not found (%q)", containerName)
+	}
+	return kl.containerRuntime.AttachContainer(string(container.ID), stdin, stdout, stderr, tty)
+}
+
 // PortForward connects to the pod's port and copies data between the port
 // and the stream.
 func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {

@@ -298,6 +298,13 @@ func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error 
 	return nil
 }
 
+func (f *FakeDockerClient) AttachToContainer(opts docker.AttachToContainerOptions) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "attach")
+	return nil
+}
+
 func (f *FakeDockerClient) InspectExec(id string) (*docker.ExecInspect, error) {
 	return f.ExecInspect, f.popError("inspect_exec")
 }

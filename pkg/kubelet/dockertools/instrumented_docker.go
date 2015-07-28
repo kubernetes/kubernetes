@@ -189,3 +189,12 @@ func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspec
 	recordError(operation, err)
 	return out, err
 }
+
+func (in instrumentedDockerInterface) AttachToContainer(opts docker.AttachToContainerOptions) error {
+	const operation = "attach"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.AttachToContainer(opts)
+	recordError(operation, err)
+	return err
+}

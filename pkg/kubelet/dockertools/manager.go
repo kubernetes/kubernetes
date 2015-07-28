@@ -1006,6 +1006,21 @@ func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin
 	return dm.execHandler.ExecInContainer(dm.client, container, cmd, stdin, stdout, stderr, tty)
 }
 
+func (dm *DockerManager) AttachContainer(containerId string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	opts := docker.AttachToContainerOptions{
+		Container:    containerId,
+		InputStream:  stdin,
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		Logs:         true,
+		Stdin:        stdin != nil,
+		Stdout:       stdout != nil,
+		Stderr:       stderr != nil,
+		RawTerminal:  tty,
+	}
+	return dm.client.AttachToContainer(opts)
+}
+
 func noPodInfraContainerError(podName, podNamespace string) error {
 	return fmt.Errorf("cannot find pod infra container in pod %q", kubecontainer.BuildPodFullName(podName, podNamespace))
 }
