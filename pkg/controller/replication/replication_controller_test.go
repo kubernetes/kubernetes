@@ -484,7 +484,7 @@ func TestPodControllerLookup(t *testing.T) {
 		for _, r := range c.inRCs {
 			manager.rcStore.Add(r)
 		}
-		if rc := manager.getPodControllers(c.pod); rc != nil {
+		if rc := manager.getPodController(c.pod); rc != nil {
 			if c.outRCName != rc.Name {
 				t.Errorf("Got controller %+v expected %+v", rc.Name, c.outRCName)
 			}
