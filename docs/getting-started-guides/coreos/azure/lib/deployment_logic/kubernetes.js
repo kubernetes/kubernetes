@@ -35,7 +35,7 @@ etcd_initial_cluster_conf_kube = function (conf) {
   };
 
   return {
-    'name': 'apiserver.service',
+    'name': 'kube-apiserver.service',
     'drop-ins': [{
       'name': '50-etcd-initial-cluster.conf',
       'content': _.template("[Service]\nEnvironment=ETCD_SERVERS=--etcd_servers=<%= nodes.join(',') %>\n")(data),
@@ -68,8 +68,9 @@ exports.create_node_cloud_config = function (node_count, conf) {
     });
   };
 
+  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
   return cloud_config.process_template(input_file, output_file, function(data) {
-    data.write_files = data.write_files.concat(_(node_count).times(make_node_config));
+    data.write_files = data.write_files.concat(_(node_count).times(make_node_config), write_files_extra);
     data.coreos.units.push(etcd_initial_cluster_conf_kube(conf));
     return data;
   });

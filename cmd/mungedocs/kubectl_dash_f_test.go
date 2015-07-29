@@ -82,6 +82,10 @@ func TestKubectlDashF(t *testing.T) {
 			"Foo\n```\nkubectl -blah create -f/foobar\n```\nBar",
 			true,
 		},
+		{
+			"Foo\n```\nkubectl -blah create -f~/foobar\n```\nBar",
+			true,
+		},
 		// Real checks
 		{
 			"Foo\n```\nkubectl -blah create -f mungedocs.go\n```\nBar",

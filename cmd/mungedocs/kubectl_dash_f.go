@@ -102,6 +102,10 @@ func gotDashF(line int, fields []string, fieldNum int) error {
 		// Same-dir files are usually created in the same example
 		return nil
 	}
+	if strings.HasPrefix(target, "~/") {
+		// Home directory may also be created by the same example
+		return nil
+	}
 	if strings.HasPrefix(target, "/") {
 		// Absolute paths tend to be /tmp/* and created in the same example.
 		return nil
