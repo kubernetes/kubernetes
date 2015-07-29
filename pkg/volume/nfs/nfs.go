@@ -223,21 +223,15 @@ func (c *nfsCleaner) TearDownAt(dir string) error {
 }
 
 func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
-	if spec.VolumeSource.HostPath != nil {
-		return &nfsRecycler{
-			name:   spec.Name,
-			server: spec.VolumeSource.NFS.Server,
-			path:   spec.VolumeSource.NFS.Path,
-			host:   host,
-		}, nil
-	} else {
-		return &nfsRecycler{
-			name:   spec.Name,
-			server: spec.PersistentVolumeSource.NFS.Server,
-			path:   spec.PersistentVolumeSource.NFS.Path,
-			host:   host,
-		}, nil
+	if spec.PersistentVolumeSource.NFS == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.NFS is nil")
 	}
+	return &nfsRecycler{
+		name:   spec.Name,
+		server: spec.PersistentVolumeSource.NFS.Server,
+		path:   spec.PersistentVolumeSource.NFS.Path,
+		host:   host,
+	}, nil
 }
 
 // nfsRecycler scrubs an NFS volume by running "rm -rf" on the volume in a pod.

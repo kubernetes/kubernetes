@@ -86,11 +86,10 @@ func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, e
 }
 
 func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
-	if spec.VolumeSource.HostPath != nil {
-		return &hostPathRecycler{spec.Name, spec.VolumeSource.HostPath.Path, host}, nil
-	} else {
-		return &hostPathRecycler{spec.Name, spec.PersistentVolumeSource.HostPath.Path, host}, nil
+	if spec.PersistentVolumeSource.HostPath == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
+	return &hostPathRecycler{spec.Name, spec.PersistentVolumeSource.HostPath.Path, host}, nil
 }
 
 // HostPath volumes represent a bare host file or directory mount.
