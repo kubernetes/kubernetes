@@ -32,7 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/routecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
@@ -110,7 +110,7 @@ func (s *CMServer) Run(_ []string) error {
 	endpoints := s.createEndpointController(kubeClient)
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	controllerManager := controller.NewReplicationManager(kubeClient, controller.BurstReplicas)
+	controllerManager := replication.NewReplicationManager(kubeClient, replication.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	//TODO(jdef) should eventually support more cloud providers here
