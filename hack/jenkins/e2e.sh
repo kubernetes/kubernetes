@@ -95,9 +95,7 @@ GCE_DEFAULT_SKIP_TESTS=(
 
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TESTS=(
-    "PD\son\stwo\shosts.*remove\sboth"
-    )
+GCE_FLAKY_TESTS=()
 
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
