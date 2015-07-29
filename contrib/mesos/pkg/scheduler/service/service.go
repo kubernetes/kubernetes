@@ -94,6 +94,7 @@ type SchedulerServer struct {
 	ExecutorRunProxy              bool
 	ExecutorProxyBindall          bool
 	ExecutorLogV                  int
+	ExecutorProxyLogV             int
 	ExecutorSuicideTimeout        time.Duration
 	MesosAuthProvider             string
 	DriverPort                    uint
@@ -201,6 +202,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.ExecutorBindall, "executor-bindall", s.ExecutorBindall, "When true will set -address of the executor to 0.0.0.0.")
 	fs.IntVar(&s.ExecutorLogV, "executor-logv", s.ExecutorLogV, "Logging verbosity of spawned executor processes.")
+	fs.IntVar(&s.ExecutorProxyLogV, "executor-proxy-logv", s.ExecutorProxyLogV, "Logging verbosity of spawned executor proxy processes.")
 	fs.BoolVar(&s.ExecutorProxyBindall, "executor-proxy-bindall", s.ExecutorProxyBindall, "When true pass -proxy-bindall to the executor.")
 	fs.BoolVar(&s.ExecutorRunProxy, "executor-run-proxy", s.ExecutorRunProxy, "Run the kube-proxy as a child process of the executor.")
 	fs.DurationVar(&s.ExecutorSuicideTimeout, "executor-suicide-timeout", s.ExecutorSuicideTimeout, "Executor self-terminates after this period of inactivity. Zero disables suicide watch.")
@@ -326,6 +328,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--run-proxy=%v", s.ExecutorRunProxy))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.KubeletCadvisorPort))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.KubeletSyncFrequency))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-logv=%d", s.ExecutorProxyLogV))
 
 	if s.AuthPath != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file

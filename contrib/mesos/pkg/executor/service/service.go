@@ -77,7 +77,7 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 		KubeletServer:  app.NewKubeletServer(),
 		RunProxy:       true,
 		ProxyExec:      "./kube-proxy",
-		ProxyLogfile:   "./proxy-log",
+		ProxyLogfile:   "",
 		SuicideTimeout: config.DefaultSuicideTimeout,
 	}
 	if pwd, err := os.Getwd(); err != nil {
@@ -516,17 +516,10 @@ func (kl *kubeletExecutor) runProxyService() {
 		log.Fatal(err)
 	}
 
-	proxylogs, err := cmd.StderrPipe()
+	proxyStderr, err := cmd.StderrPipe()
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//TODO(jdef) append instead of truncate? what if the disk is full?
-	logfile, err := os.Create(kl.proxyLogfile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer logfile.Close()
 
 	ch := make(chan struct{})
 	go func() {
@@ -541,16 +534,37 @@ func (kl *kubeletExecutor) runProxyService() {
 			}
 		}()
 
-		writer := bufio.NewWriter(logfile)
-		defer writer.Flush()
-
 		<-ch
-		written, err := io.Copy(writer, proxylogs)
-		if err != nil {
-			log.Errorf("error writing data to proxy log: %v", err)
-		}
 
-		log.Infof("wrote %d bytes to proxy log", written)
+		if kl.proxyLogfile == "" {
+			// log via stderr
+			lineReader := bufio.NewReader(proxyStderr)
+			for {
+				line, err := lineReader.ReadString('\n')
+				if line != "" {
+					log.Infof("proxy: %v", line)
+				}
+				if err != nil {
+					log.Errorf("error logging kube-proxy output: %v", err)
+					break
+				}
+			}
+		} else {
+			// log to log file
+			logfile, err := os.OpenFile(kl.proxyLogfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer logfile.Close()
+
+			writer := bufio.NewWriter(logfile)
+			defer writer.Flush()
+			written, err := io.Copy(writer, proxyStderr)
+			if err != nil {
+				log.Errorf("error writing data to proxy log: %v", err)
+			}
+			log.Infof("wrote %d bytes to proxy log", written)
+		}
 	}()
 
 	// if the proxy fails to start then we exit the executor, otherwise
