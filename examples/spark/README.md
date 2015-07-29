@@ -152,6 +152,7 @@ The Spark driver is used to launch jobs into Spark cluster. You can read more ab
 ```shell
 $ kubectl create -f examples/spark/spark-driver.json
 ```
+
 The Spark driver needs the Master service to be running.
 
 ### Check to see if the driver is running
@@ -207,6 +208,7 @@ Make sure the Master Pod is running (use: ```kubectl get pods```).
 ```kubectl create -f spark-worker-controller.json```
 
 ```kubectl create -f spark-driver.json```
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.md?pixel)]()
