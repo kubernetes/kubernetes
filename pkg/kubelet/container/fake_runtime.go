@@ -234,6 +234,14 @@ func (f *FakeRuntime) ExecInContainer(containerID string, cmd []string, stdin io
 	return f.Err
 }
 
+func (f *FakeRuntime) AttachContainer(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "AttachContainer")
+	return f.Err
+}
+
 func (f *FakeRuntime) RunInContainer(containerID string, cmd []string) ([]byte, error) {
 	f.Lock()
 	defer f.Unlock()

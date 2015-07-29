@@ -101,6 +101,7 @@ type HostInterface interface {
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
+	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
@@ -140,6 +141,7 @@ func (s *Server) InstallDefaultHandlers() {
 func (s *Server) InstallDebuggingHandlers() {
 	s.mux.HandleFunc("/run/", s.handleRun)
 	s.mux.HandleFunc("/exec/", s.handleExec)
+	s.mux.HandleFunc("/attach/", s.handleAttach)
 	s.mux.HandleFunc("/portForward/", s.handlePortForward)
 
 	s.mux.HandleFunc("/logs/", s.handleLogs)
@@ -367,6 +369,42 @@ func parseContainerCoordinates(path string) (namespace, pod string, uid types.UI
 	return
 }
 
+const streamCreationTimeout = 30 * time.Second
+
+func (s *Server) handleAttach(w http.ResponseWriter, req *http.Request) {
+	u, err := url.ParseRequestURI(req.RequestURI)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	podNamespace, podID, uid, container, err := parseContainerCoordinates(u.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	pod, ok := s.host.GetPodByName(podNamespace, podID)
+	if !ok {
+		http.Error(w, "Pod does not exist", http.StatusNotFound)
+		return
+	}
+
+	stdinStream, stdoutStream, stderrStream, errorStream, conn, tty, ok := s.createStreams(w, req)
+	if conn != nil {
+		defer conn.Close()
+	}
+	if !ok {
+		// error is handled in the createStreams function
+		return
+	}
+
+	err = s.host.AttachContainer(kubecontainer.GetPodFullName(pod), uid, container, stdinStream, stdoutStream, stderrStream, tty)
+	if err != nil {
+		msg := fmt.Sprintf("Error executing command in container: %v", err)
+		glog.Error(msg)
+		errorStream.Write([]byte(msg))
+	}
+}
+
 // handleRun handles requests to run a command inside a container.
 func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
@@ -394,8 +432,6 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 	w.Write(data)
 }
 
-const streamCreationTimeout = 30 * time.Second
-
 // handleExec handles requests to run a command inside a container.
 func (s *Server) handleExec(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
@@ -413,7 +449,22 @@ func (s *Server) handleExec(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Pod does not exist", http.StatusNotFound)
 		return
 	}
+	stdinStream, stdoutStream, stderrStream, errorStream, conn, tty, ok := s.createStreams(w, req)
+	if conn != nil {
+		defer conn.Close()
+	}
+	if !ok {
+		return
+	}
+	err = s.host.ExecInContainer(kubecontainer.GetPodFullName(pod), uid, container, u.Query()[api.ExecCommandParamm], stdinStream, stdoutStream, stderrStream, tty)
+	if err != nil {
+		msg := fmt.Sprintf("Error executing command in container: %v", err)
+		glog.Error(msg)
+		errorStream.Write([]byte(msg))
+	}
+}
 
+func (s *Server) createStreams(w http.ResponseWriter, req *http.Request) (io.Reader, io.WriteCloser, io.WriteCloser, io.WriteCloser, httpstream.Connection, bool, bool) {
 	req.ParseForm()
 	// start at 1 for error stream
 	expectedStreams := 1
@@ -430,7 +481,7 @@ func (s *Server) handleExec(w http.ResponseWriter, req *http.Request) {
 
 	if expectedStreams == 1 {
 		http.Error(w, "You must specify at least 1 of stdin, stdout, stderr", http.StatusBadRequest)
-		return
+		return nil, nil, nil, nil, nil, false, false
 	}
 
 	streamCh := make(chan httpstream.Stream)
@@ -445,9 +496,8 @@ func (s *Server) handleExec(w http.ResponseWriter, req *http.Request) {
 		// The upgrader is responsible for notifying the client of any errors that
 		// occurred during upgrading. All we can do is return here at this point
 		// if we weren't successful in upgrading.
-		return
+		return nil, nil, nil, nil, nil, false, false
 	}
-	defer conn.Close()
 
 	conn.SetIdleTimeout(s.host.StreamingConnectionIdleTimeout())
 
@@ -485,7 +535,7 @@ WaitForStreams:
 			// TODO find a way to return the error to the user. Maybe use a separate
 			// stream to report errors?
 			glog.Error("Timed out waiting for client to create streams")
-			return
+			return nil, nil, nil, nil, nil, false, false
 		}
 	}
 
@@ -494,12 +544,7 @@ WaitForStreams:
 		stdinStream.Close()
 	}
 
-	err = s.host.ExecInContainer(kubecontainer.GetPodFullName(pod), uid, container, u.Query()[api.ExecCommandParamm], stdinStream, stdoutStream, stderrStream, tty)
-	if err != nil {
-		msg := fmt.Sprintf("Error executing command in container: %v", err)
-		glog.Error(msg)
-		errorStream.Write([]byte(msg))
-	}
+	return stdinStream, stdoutStream, stderrStream, errorStream, conn, tty, true
 }
 
 func parsePodCoordinates(path string) (namespace, pod string, uid types.UID, err error) {
