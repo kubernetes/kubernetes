@@ -170,7 +170,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 	defer e.lock.Unlock()
 
 	existing := &api.RangeAllocation{}
-	if err := e.storage.ExtractObj(e.baseKey, existing, false); err != nil {
+	if err := e.storage.Get(e.baseKey, existing, false); err != nil {
 		if tools.IsEtcdNotFound(err) {
 			return nil, nil
 		}
@@ -184,7 +184,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 // etcd. If the key does not exist, the object will have an empty ResourceVersion.
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
-	if err := e.storage.ExtractObj(e.baseKey, existing, true); err != nil {
+	if err := e.storage.Get(e.baseKey, existing, true); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.kind, "")
 	}
 	return existing, nil

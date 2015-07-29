@@ -133,7 +133,7 @@ func TestCreateSetsFields(t *testing.T) {
 
 	actual := &api.ResourceQuota{}
 	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
-	if err := etcdStorage.ExtractObj(key, actual, false); err != nil {
+	if err := etcdStorage.Get(key, actual, false); err != nil {
 		t.Fatalf("unexpected extraction error: %v", err)
 	}
 	if actual.Name != resourcequota.Name {
@@ -517,7 +517,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	}
 	var resourcequotaOut api.ResourceQuota
 	key, _ = registry.KeyFunc(ctx, "foo")
-	if err := etcdStorage.ExtractObj(key, &resourcequotaOut, false); err != nil {
+	if err := etcdStorage.Get(key, &resourcequotaOut, false); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if !api.Semantic.DeepEqual(expected, resourcequotaOut) {

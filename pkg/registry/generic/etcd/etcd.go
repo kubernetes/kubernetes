@@ -157,14 +157,14 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		err = e.Storage.ExtractObjToList(key, list)
+		err = e.Storage.GetToList(key, list)
 		trace.Step("Object extracted")
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		trace.Step("About to list directory")
-		err := e.Storage.ExtractToList(e.KeyRootFunc(ctx), list)
+		err := e.Storage.List(e.KeyRootFunc(ctx), list)
 		trace.Step("List extracted")
 		if err != nil {
 			return nil, err
@@ -190,7 +190,7 @@ func (e *Etcd) CreateWithName(ctx api.Context, name string, obj runtime.Object) 
 	if err != nil {
 		return err
 	}
-	err = e.Storage.CreateObj(key, obj, nil, ttl)
+	err = e.Storage.Create(key, obj, nil, ttl)
 	err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 	if err == nil && e.Decorator != nil {
 		err = e.Decorator(obj)
@@ -219,7 +219,7 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 	}
 	trace.Step("About to create object")
 	out := e.NewFunc()
-	if err := e.Storage.CreateObj(key, obj, out, ttl); err != nil {
+	if err := e.Storage.Create(key, obj, out, ttl); err != nil {
 		err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		return nil, err
@@ -249,7 +249,7 @@ func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) 
 	if err != nil {
 		return err
 	}
-	err = e.Storage.SetObj(key, obj, nil, ttl)
+	err = e.Storage.Set(key, obj, nil, ttl)
 	err = etcderr.InterpretUpdateError(err, e.EndpointName, name)
 	if err == nil && e.Decorator != nil {
 		err = e.Decorator(obj)
@@ -372,7 +372,7 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 		return nil, err
 	}
 	trace.Step("About to read object")
-	if err := e.Storage.ExtractObj(key, obj, false); err != nil {
+	if err := e.Storage.Get(key, obj, false); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.EndpointName, name)
 	}
 	trace.Step("Object read")
@@ -395,7 +395,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	trace := util.NewTrace("Delete " + reflect.TypeOf(obj).String())
 	defer trace.LogIfLong(time.Second)
 	trace.Step("About to read object")
-	if err := e.Storage.ExtractObj(key, obj, false); err != nil {
+	if err := e.Storage.Get(key, obj, false); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
 
@@ -413,7 +413,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	if graceful && *options.GracePeriodSeconds != 0 {
 		trace.Step("Graceful deletion")
 		out := e.NewFunc()
-		if err := e.Storage.SetObj(key, obj, out, uint64(*options.GracePeriodSeconds)); err != nil {
+		if err := e.Storage.Set(key, obj, out, uint64(*options.GracePeriodSeconds)); err != nil {
 			return nil, etcderr.InterpretUpdateError(err, e.EndpointName, name)
 		}
 		return e.finalizeDelete(out, true)
@@ -422,7 +422,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
 	trace.Step("About to delete object")
-	if err := e.Storage.DeleteObj(key, out); err != nil {
+	if err := e.Storage.Delete(key, out); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
 	return e.finalizeDelete(out, true)

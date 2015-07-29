@@ -31,12 +31,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 )
 
-func TestSetObj(t *testing.T) {
+func TestSet(t *testing.T) {
 	client := framework.NewEtcdClient()
 	etcdStorage := tools.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		if err := etcdStorage.SetObj(key, &testObject, nil, 0); err != nil {
+		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		resp, err := client.Get(key, false, false)
@@ -54,7 +54,7 @@ func TestSetObj(t *testing.T) {
 	})
 }
 
-func TestExtractObj(t *testing.T) {
+func TestGet(t *testing.T) {
 	client := framework.NewEtcdClient()
 	etcdStorage := tools.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
@@ -68,7 +68,7 @@ func TestExtractObj(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		result := api.ServiceAccount{}
-		if err := etcdStorage.ExtractObj(key, &result, false); err != nil {
+		if err := etcdStorage.Get(key, &result, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		// Propagate ResourceVersion (it is set automatically).

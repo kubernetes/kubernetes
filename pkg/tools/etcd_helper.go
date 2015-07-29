@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 
 	"github.com/golang/glog"
@@ -80,7 +81,7 @@ func (h *etcdHelper) Versioner() StorageVersioner {
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) error {
 	key = h.prefixEtcdKey(key)
 	data, err := h.codec.Encode(obj)
 	if err != nil {
@@ -108,7 +109,7 @@ func (h *etcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error {
 	var response *etcd.Response
 	data, err := h.codec.Encode(obj)
 	if err != nil {
@@ -149,7 +150,7 @@ func (h *etcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) DeleteObj(key string, out runtime.Object) error {
+func (h *etcdHelper) Delete(key string, out runtime.Object) error {
 	key = h.prefixEtcdKey(key)
 	if _, err := conversion.EnforcePtr(out); err != nil {
 		panic("unable to convert output object to pointer")
@@ -168,7 +169,7 @@ func (h *etcdHelper) DeleteObj(key string, out runtime.Object) error {
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) Delete(key string, recursive bool) error {
+func (h *etcdHelper) RecursiveDelete(key string, recursive bool) error {
 	key = h.prefixEtcdKey(key)
 	startTime := time.Now()
 	_, err := h.client.Delete(key, recursive)
@@ -177,7 +178,23 @@ func (h *etcdHelper) Delete(key string, recursive bool) error {
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) error {
+func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+	key = h.prefixEtcdKey(key)
+	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
+	go w.etcdWatch(h.client, key, resourceVersion)
+	return w, nil
+}
+
+// Implements StorageInterface.
+func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+	key = h.prefixEtcdKey(key)
+	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
+	go w.etcdWatch(h.client, key, resourceVersion)
+	return w, nil
+}
+
+// Implements StorageInterface.
+func (h *etcdHelper) Get(key string, objPtr runtime.Object, ignoreNotFound bool) error {
 	key = h.prefixEtcdKey(key)
 	_, _, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
 	return err
@@ -228,8 +245,8 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) ExtractObjToList(key string, listObj runtime.Object) error {
-	trace := util.NewTrace("ExtractObjToList " + getTypeName(listObj))
+func (h *etcdHelper) GetToList(key string, listObj runtime.Object) error {
+	trace := util.NewTrace("GetToList " + getTypeName(listObj))
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -302,8 +319,8 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) ExtractToList(key string, listObj runtime.Object) error {
-	trace := util.NewTrace("ExtractToList " + getTypeName(listObj))
+func (h *etcdHelper) List(key string, listObj runtime.Object) error {
+	trace := util.NewTrace("List " + getTypeName(listObj))
 	defer trace.LogIfLong(time.Second)
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {

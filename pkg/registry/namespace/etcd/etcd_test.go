@@ -108,7 +108,7 @@ func TestCreateSetsFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected key error: %v", err)
 	}
-	if err := etcdStorage.ExtractObj(key, actual, false); err != nil {
+	if err := etcdStorage.Get(key, actual, false); err != nil {
 		t.Fatalf("unexpected extraction error: %v", err)
 	}
 	if actual.Name != namespace.Name {

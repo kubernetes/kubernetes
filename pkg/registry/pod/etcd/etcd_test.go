@@ -169,7 +169,7 @@ func TestCreateSetsFields(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
 	actual := &api.Pod{}
-	if err := etcdStorage.ExtractObj(key, actual, false); err != nil {
+	if err := etcdStorage.Get(key, actual, false); err != nil {
 		t.Fatalf("unexpected extraction error: %v", err)
 	}
 	if actual.Name != pod.Name {
@@ -448,7 +448,7 @@ func TestCreatePod(t *testing.T) {
 		t.Fatalf("unexpected object: %#v", obj)
 	}
 	actual := &api.Pod{}
-	if err := etcdStorage.ExtractObj(key, actual, false); err != nil {
+	if err := etcdStorage.Get(key, actual, false); err != nil {
 		t.Fatalf("unexpected extraction error: %v", err)
 	}
 	if !api.HasObjectMetaSystemFieldValues(&actual.ObjectMeta) {
@@ -1222,7 +1222,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	}
 	var podOut api.Pod
 	key, _ = registry.KeyFunc(ctx, "foo")
-	if err := etcdStorage.ExtractObj(key, &podOut, false); err != nil {
+	if err := etcdStorage.Get(key, &podOut, false); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if !api.Semantic.DeepEqual(expected, podOut) {
