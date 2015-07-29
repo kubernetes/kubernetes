@@ -164,7 +164,7 @@ Local                |              |        | _none_      | [docs](locally.md) 
 libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.md)                         |          | Community (@lhuard1A)
 oVirt                |              |        |             | [docs](ovirt.md)                                  |          | Community (@simon3z)
 Rackspace            | CoreOS       | CoreOS | flannel     | [docs](rackspace.md)                              |          | Community (@doublerr)
-any                  | any          | any    | any         | [docs](scratch.md)                              |          | Community (@doublerr)
+any                  | any          | any    | any         | [docs](scratch.md)                              |          | Community (@erictune)
 
 
 *Note*: The above table is ordered by version test/used in notes followed by support level.
