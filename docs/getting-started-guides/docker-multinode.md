@@ -54,6 +54,9 @@ Please install Docker 1.6.2 or wait for Docker 1.7.1.
 
 1. You need a machine with docker installed.
 
+There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this guide from working correctly.
+Please install Docker 1.6.2 or wait for Docker 1.7.1.
+
 ## Overview
 
 This guide will set up a 2-node Kubernetes cluster, consisting of a _master_ node which hosts the API server and orchestrates work
@@ -77,13 +80,33 @@ it is still useful to use containers for deployment and management, so we create
 
 The first step in the process is to initialize the master node.
 
-See [here](docker-multinode/master.md) for detailed instructions.
+Clone the Kubernetes repo, and run [master.sh](docker-multinode/master.sh) on the master machine with root:
+
+```sh
+export K8S_VERSION=<your_k8s_version>
+cd kubernetes/cluster/docker-multinode
+./master.sh
+```
+
+`Master done!`
+
+See [here](docker-multinode/master.md) for detailed instructions explaination.
 
 ## Adding a worker node
 
 Once your master is up and running you can add one or more workers on different machines.
 
-See [here](docker-multinode/worker.md) for detailed instructions.
+Clone the Kubernetes repo, and run [worker.sh](docker-multinode/worker.sh) on the worker machine with root:
+
+```sh
+export K8S_VERSION=<your_k8s_version> MASTER_IP=<your_master_ip>
+cd kubernetes/cluster/docker-multinode
+./worker.sh
+```
+
+`Worker done!`
+
+See [here](docker-multinode/worker.md) for detailed instructions explaination.
 
 ## Testing your cluster
 
