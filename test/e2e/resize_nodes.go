@@ -290,14 +290,6 @@ func podsRunning(c *client.Client, pods *api.PodList) []error {
 	return e
 }
 
-func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
-	By("trying to dial each unique pod")
-	retryTimeout := 2 * time.Minute
-	retryInterval := 5 * time.Second
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	return wait.Poll(retryInterval, retryTimeout, podResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
-}
-
 func verifyPods(c *client.Client, ns, name string, wantName bool, replicas int) error {
 	pods, err := podsCreated(c, ns, name, replicas)
 	if err != nil {

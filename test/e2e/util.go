@@ -87,6 +87,9 @@ const (
 	// be "ready" before the test starts, so this is small.
 	podReadyBeforeTimeout = 20 * time.Second
 
+	podRespondingTimeout     = 2 * time.Minute
+	serviceRespondingTimeout = 2 * time.Minute
+
 	// How wide to print pod names, by default. Useful for aligning printing to
 	// quickly scan through output.
 	podPrintWidth = 55
@@ -700,6 +703,37 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 	return true, nil
 }
 
+func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
+	By("trying to dial each unique pod")
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	return wait.Poll(poll, podRespondingTimeout, podResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
+}
+
+func serviceResponding(c *client.Client, ns, name string) error {
+	By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
+
+	return wait.Poll(poll, serviceRespondingTimeout, func() (done bool, err error) {
+		body, err := c.Get().
+			Prefix("proxy").
+			Namespace(ns).
+			Resource("services").
+			Name(name).
+			Do().
+			Raw()
+		if err != nil {
+			Logf("Failed to GET from service %s: %v:", name, err)
+			return false, nil
+		}
+		got := string(body)
+		if len(got) == 0 {
+			Logf("Service %s: expected non-empty response", name)
+			return false, err // stop polling
+		}
+		Logf("Service %s: found nonempty answer: %s", name, got)
+		return true, nil
+	})
+}
+
 func loadConfig() (*client.Config, error) {
 	switch {
 	case testContext.KubeConfig != "":
@@ -861,12 +895,29 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	return cmd
 }
 
-func runKubectl(args ...string) string {
+// kubectlBuilder is used to build, custimize and execute a kubectl Command.
+// Add more functions to customize the builder as needed.
+type kubectlBuilder struct {
+	cmd *exec.Cmd
+}
+
+func newKubectlCommand(args ...string) *kubectlBuilder {
+	b := new(kubectlBuilder)
+	b.cmd = kubectlCmd(args...)
+	return b
+}
+
+func (b kubectlBuilder) withStdinData(data string) *kubectlBuilder {
+	b.cmd.Stdin = strings.NewReader(data)
+	return &b
+}
+
+func (b kubectlBuilder) exec() string {
 	var stdout, stderr bytes.Buffer
-	cmd := kubectlCmd(args...)
+	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Run(); err != nil {
 		Failf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 		return ""
@@ -874,6 +925,11 @@ func runKubectl(args ...string) string {
 	Logf(stdout.String())
 	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
 	return strings.TrimSpace(stdout.String())
+}
+
+// runKubectl is a convenience wrapper over kubectlBuilder
+func runKubectl(args ...string) string {
+	return newKubectlCommand(args...).exec()
 }
 
 func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
