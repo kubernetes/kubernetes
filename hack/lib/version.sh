@@ -99,6 +99,20 @@ kube::version::load_version_vars() {
   source "${version_file}"
 }
 
+# golang 1.5 wants `-X key=val`, but golang 1.4- REQUIRES `-X key val`
+kube::version::ldflag() {
+  local key=${1}
+  local val=${2}
+
+  GO_VERSION=($(go version))
+
+  if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.5') ]]; then
+    echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key} ${val}"
+  else
+    echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
+  fi
+}
+
 # Prints the value that needs to be passed to the -ldflags parameter of go build
 # in order to set the Kubernetes based on the git tree status.
 kube::version::ldflags() {
@@ -106,18 +120,18 @@ kube::version::ldflags() {
 
   local -a ldflags=()
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${KUBE_GIT_COMMIT}")
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${KUBE_GIT_TREE_STATE}")
+    ldflags+=($(kube::version::ldflag "gitCommit" "${KUBE_GIT_COMMIT}"))
+    ldflags+=($(kube::version::ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"))
   fi
 
   if [[ -n ${KUBE_GIT_VERSION-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${KUBE_GIT_VERSION}")
+    ldflags+=($(kube::version::ldflag "gitVersion" "${KUBE_GIT_VERSION}"))
   fi
 
   if [[ -n ${KUBE_GIT_MAJOR-} && -n ${KUBE_GIT_MINOR-} ]]; then
     ldflags+=(
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMajor" "${KUBE_GIT_MAJOR}"
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMinor" "${KUBE_GIT_MINOR}"
+      $(kube::version::ldflag "gitMajor" "${KUBE_GIT_MAJOR}")
+      $(kube::version::ldflag "gitMinor" "${KUBE_GIT_MINOR}")
     )
   fi
 
