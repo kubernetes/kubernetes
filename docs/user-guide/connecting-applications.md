@@ -391,7 +391,7 @@ $ kubectl get svc nginxsvc -o json | grep -i nodeport -C 5
                 "nodePort": 30645
             }
 
-$ kubectl get nodes -o json | grep ExternalIP
+$ kubectl get nodes -o json | grep ExternalIP -C 2
                     {
                         "type": "ExternalIP",
                         "address": "104.197.63.17"
