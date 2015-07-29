@@ -423,7 +423,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
             --address=0.0.0.0 \
             --port=8080 \
             --service-cluster-ip-range=10.100.0.0/16 \
-            --etcd_servers=http://127.0.0.1:4001 \
+            --etcd-servers=http://127.0.0.1:4001 \
             --logtostderr=true
             Restart=always
             RestartSec=10
@@ -586,7 +586,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
             ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/kube-proxy
             ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
             ExecStart=/opt/bin/kube-proxy \
-            --etcd_servers=http://<MASTER_SERVER_IP>:4001 \
+            --etcd-servers=http://<MASTER_SERVER_IP>:4001 \
             --logtostderr=true
             Restart=always
             RestartSec=10
@@ -605,10 +605,10 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
             ExecStart=/opt/bin/kubelet \
             --address=0.0.0.0 \
             --port=10250 \
-            --hostname_override=${DEFAULT_IPV4} \
-            --api_servers=<MASTER_SERVER_IP>:8080 \
-            --healthz_bind_address=0.0.0.0 \
-            --healthz_port=10248 \
+            --hostname-override=${DEFAULT_IPV4} \
+            --api-servers=<MASTER_SERVER_IP>:8080 \
+            --healthz-bind-address=0.0.0.0 \
+            --healthz-port=10248 \
             --logtostderr=true
             Restart=always
             RestartSec=10

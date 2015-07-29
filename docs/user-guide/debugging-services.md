@@ -295,8 +295,8 @@ Address: 10.0.1.175
 
 If you are able to do a fully-qualified name lookup but not a relative one, you
 need to check that your `kubelet` is running with the right flags.
-The `--cluster_dns` flag needs to point to your DNS `Service`'s IP and the
-`--cluster_domain` flag needs to be your cluster's domain - we assumed
+The `--cluster-dns` flag needs to point to your DNS `Service`'s IP and the
+`--cluster-domain` flag needs to be your cluster's domain - we assumed
 "cluster.local" in this document, but yours might be different, in which case
 you should change that in all of the commands above.
 

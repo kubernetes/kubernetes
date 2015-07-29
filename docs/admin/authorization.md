@@ -45,9 +45,9 @@ the request, (such as user, resource, and namespace) with access
 policies.  An API call must be allowed by some policy in order to proceed.
 
 The following implementations are available, and are selected by flag:
-  - `--authorization_mode=AlwaysDeny`
-  - `--authorization_mode=AlwaysAllow`
-  - `--authorization_mode=ABAC`
+  - `--authorization-mode=AlwaysDeny`
+  - `--authorization-mode=AlwaysAllow`
+  - `--authorization-mode=ABAC`
 
 `AlwaysDeny` blocks all requests (used in tests).
 `AlwaysAllow` allows all requests; use if you don't need authorization.
@@ -72,13 +72,13 @@ to assist in policy management.
 
 ### Policy File Format
 
-For mode `ABAC`, also specify `--authorization_policy_file=SOME_FILENAME`.
+For mode `ABAC`, also specify `--authorization-policy-file=SOME_FILENAME`.
 
 The file format is [one JSON object per line](http://jsonlines.org/).  There should be no enclosing list or map, just
 one map per line.
 
 Each line is a "policy object".  A policy object is a map with the following properties:
-  - `user`, type string; the user-string from `--token_auth_file`
+  - `user`, type string; the user-string from `--token-auth-file`
   - `readonly`, type boolean, when true, means that the policy only applies to GET
       operations.
   - `resource`, type string; a resource from an URL, such as `pods`.
