@@ -81,7 +81,7 @@ kind: ServiceAccount
 metadata:
   name: build-robot
 EOF
-$ kubectl create -f /tmp/serviceaccount.json
+$ kubectl create -f /tmp/serviceaccount.yaml
 serviceaccounts/build-robot
 ```
 
