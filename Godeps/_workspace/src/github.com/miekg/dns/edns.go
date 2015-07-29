@@ -1,29 +1,3 @@
-// EDNS0
-//
-// EDNS0 is an extension mechanism for the DNS defined in RFC 2671 and updated
-// by RFC 6891. It defines an new RR type, the OPT RR, which is then completely
-// abused.
-// Basic use pattern for creating an (empty) OPT RR:
-//
-//	o := new(dns.OPT)
-//	o.Hdr.Name = "." // MUST be the root zone, per definition.
-//	o.Hdr.Rrtype = dns.TypeOPT
-//
-// The rdata of an OPT RR consists out of a slice of EDNS0 (RFC 6891)
-// interfaces. Currently only a few have been standardized: EDNS0_NSID
-// (RFC 5001) and EDNS0_SUBNET (draft-vandergaast-edns-client-subnet-02). Note
-// that these options may be combined in an OPT RR.
-// Basic use pattern for a server to check if (and which) options are set:
-//
-//	// o is a dns.OPT
-//	for _, s := range o.Option {
-//		switch e := s.(type) {
-//		case *dns.EDNS0_NSID:
-//			// do stuff with e.Nsid
-//		case *dns.EDNS0_SUBNET:
-//			// access e.Family, e.Address, etc.
-//		}
-//	}
 package dns
 
 import (
@@ -44,9 +18,13 @@ const (
 	EDNS0SUBNET      = 0x8     // client-subnet (RFC6891)
 	EDNS0EXPIRE      = 0x9     // EDNS0 expire
 	EDNS0SUBNETDRAFT = 0x50fa  // Don't use! Use EDNS0SUBNET
+	EDNS0LOCALSTART  = 0xFDE9  // Beginning of range reserved for local/experimental use (RFC6891)
+	EDNS0LOCALEND    = 0xFFFE  // End of range reserved for local/experimental use (RFC6891)
 	_DO              = 1 << 15 // dnssec ok
 )
 
+// OPT is the EDNS0 RR appended to messages to convey extra (meta) information.
+// See RFC 6891.
 type OPT struct {
 	Hdr    RR_Header
 	Option []EDNS0 `dns:"opt"`
@@ -92,6 +70,8 @@ func (rr *OPT) String() string {
 			s += "\n; DS HASH UNDERSTOOD: " + o.String()
 		case *EDNS0_N3U:
 			s += "\n; NSEC3 HASH UNDERSTOOD: " + o.String()
+		case *EDNS0_LOCAL:
+			s += "\n; LOCAL OPT: " + o.String()
 		}
 	}
 	return s
@@ -100,8 +80,9 @@ func (rr *OPT) String() string {
 func (rr *OPT) len() int {
 	l := rr.Hdr.len()
 	for i := 0; i < len(rr.Option); i++ {
+		l += 4 // Account for 2-byte option code and 2-byte option length.
 		lo, _ := rr.Option[i].pack()
-		l += 2 + len(lo)
+		l += len(lo)
 	}
 	return l
 }
@@ -497,5 +478,46 @@ func (e *EDNS0_EXPIRE) unpack(b []byte) error {
 		return ErrBuf
 	}
 	e.Expire = uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
+	return nil
+}
+
+// The local EDNS0 option is used for local/experimental purposes.  The option
+// code is recommended to be within the range [EDNS0LOCALSTART, EDNS0LOCALEND]
+// (RFC6891), although any unassigned code can actually be used.  The content of
+// the option is made available in Data, unaltered.
+// Basic use pattern for creating a local option:
+//
+//	o := new(dns.OPT)
+//	o.Hdr.Name = "."
+//	o.Hdr.Rrtype = dns.TypeOPT
+//	e := new(dns.EDNS0_LOCAL)
+//	e.Code = dns.EDNS0LOCALSTART
+//	e.Data = []byte{72, 82, 74}
+//	o.Option = append(o.Option, e)
+type EDNS0_LOCAL struct {
+	Code uint16
+	Data []byte
+}
+
+func (e *EDNS0_LOCAL) Option() uint16 { return e.Code }
+func (e *EDNS0_LOCAL) String() string {
+	return strconv.FormatInt(int64(e.Code), 10) + ":0x" + hex.EncodeToString(e.Data)
+}
+
+func (e *EDNS0_LOCAL) pack() ([]byte, error) {
+	b := make([]byte, len(e.Data))
+	copied := copy(b, e.Data)
+	if copied != len(e.Data) {
+		return nil, ErrBuf
+	}
+	return b, nil
+}
+
+func (e *EDNS0_LOCAL) unpack(b []byte) error {
+	e.Data = make([]byte, len(b))
+	copied := copy(e.Data, b)
+	if copied != len(b) {
+		return ErrBuf
+	}
 	return nil
 }

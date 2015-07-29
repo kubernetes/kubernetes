@@ -34,6 +34,9 @@ A not-so-up-to-date-list-that-may-be-actually-current:
 * https://github.com/skynetservices/skydns
 * https://github.com/DevelopersPL/godnsagent
 * https://github.com/duedil-ltd/discodns
+* https://github.com/StalkR/dns-reverse-proxy
+* https://github.com/tianon/rawdns
+* https://mesosphere.github.io/mesos-dns/
 
 Send pull request if you want to be listed here.
 
@@ -67,7 +70,7 @@ correctly, the following should work:
 
 ## Examples
 
-A short "how to use the API" is at the beginning of dns.go (this also will show
+A short "how to use the API" is at the beginning of doc.go (this also will show
 when you call `godoc github.com/miekg/dns`).
 
 Example programs can be found in the `github.com/miekg/exdns` repository.
@@ -95,7 +98,8 @@ Example programs can be found in the `github.com/miekg/exdns` repository.
 * 3225 - DO bit (DNSSEC OK)
 * 340{1,2,3} - NAPTR record
 * 3445 - Limiting the scope of (DNS)KEY
-* 3597 - Unkown RRs
+* 3597 - Unknown RRs
+* 4025 - IPSECKEY
 * 403{3,4,5} - DNSSEC + validation functions
 * 4255 - SSHFP record
 * 4343 - Case insensitivity
@@ -132,9 +136,8 @@ Example programs can be found in the `github.com/miekg/exdns` repository.
 ## TODO
 
 * privatekey.Precompute() when signing?
-* Last remaining RRs: APL, ATMA, A6 and NXT;
+* Last remaining RRs: APL, ATMA, A6 and NXT and IPSECKEY;
 * Missing in parsing: ISDN, UNSPEC, ATMA;
 * CAA parsing is broken;
 * NSEC(3) cover/match/closest enclose;
 * Replies with TC bit are not parsed to the end;
-* Create IsMsg to validate a message before fully parsing it.

@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -24,13 +25,13 @@ func generate(l lex, c chan lex, t chan *Token, o string) string {
 		if i+1 == len(l.token) {
 			return "bad step in $GENERATE range"
 		}
-		if s, e := strconv.Atoi(l.token[i+1:]); e != nil {
-			return "bad step in $GENERATE range"
-		} else {
+		if s, e := strconv.Atoi(l.token[i+1:]); e == nil {
 			if s < 0 {
 				return "bad step in $GENERATE range"
 			}
 			step = s
+		} else {
+			return "bad step in $GENERATE range"
 		}
 		l.token = l.token[:i]
 	}
@@ -46,7 +47,7 @@ func generate(l lex, c chan lex, t chan *Token, o string) string {
 	if err != nil {
 		return "bad stop in $GENERATE range"
 	}
-	if end < 0 || start < 0 || end <= start {
+	if end < 0 || start < 0 || end < start {
 		return "bad range in $GENERATE range"
 	}
 
@@ -55,14 +56,14 @@ func generate(l lex, c chan lex, t chan *Token, o string) string {
 	s := ""
 BuildRR:
 	l = <-c
-	if l.value != _NEWLINE && l.value != _EOF {
+	if l.value != zNewline && l.value != zEOF {
 		s += l.token
 		goto BuildRR
 	}
 	for i := start; i <= end; i += step {
 		var (
 			escape bool
-			dom    string
+			dom    bytes.Buffer
 			mod    string
 			err    string
 			offset int
@@ -72,7 +73,7 @@ BuildRR:
 			switch s[j] {
 			case '\\':
 				if escape {
-					dom += "\\"
+					dom.WriteByte('\\')
 					escape = false
 					continue
 				}
@@ -81,17 +82,17 @@ BuildRR:
 				mod = "%d"
 				offset = 0
 				if escape {
-					dom += "$"
+					dom.WriteByte('$')
 					escape = false
 					continue
 				}
 				escape = false
 				if j+1 >= len(s) { // End of the string
-					dom += fmt.Sprintf(mod, i+offset)
+					dom.WriteString(fmt.Sprintf(mod, i+offset))
 					continue
 				} else {
 					if s[j+1] == '$' {
-						dom += "$"
+						dom.WriteByte('$')
 						j++
 						continue
 					}
@@ -108,17 +109,17 @@ BuildRR:
 					}
 					j += 2 + sep // Jump to it
 				}
-				dom += fmt.Sprintf(mod, i+offset)
+				dom.WriteString(fmt.Sprintf(mod, i+offset))
 			default:
 				if escape { // Pretty useless here
 					escape = false
 					continue
 				}
-				dom += string(s[j])
+				dom.WriteByte(s[j])
 			}
 		}
 		// Re-parse the RR and send it on the current channel t
-		rx, e := NewRR("$ORIGIN " + o + "\n" + dom)
+		rx, e := NewRR("$ORIGIN " + o + "\n" + dom.String())
 		if e != nil {
 			return e.(*ParseError).err
 		}

@@ -101,20 +101,62 @@ func doTestIndex(t *testing.T, indexer Indexer) {
 	indexer.Add(mkObj("c", "b"))
 	indexer.Add(mkObj("e", "f"))
 	indexer.Add(mkObj("g", "h"))
-	{
-		for k, v := range expected {
-			found := util.StringSet{}
-			indexResults, err := indexer.Index("by_val", mkObj("", k))
-			if err != nil {
-				t.Errorf("Unexpected error %v", err)
-			}
-			for _, item := range indexResults {
-				found.Insert(item.(testStoreObject).id)
-			}
-			items := v.List()
-			if !found.HasAll(items...) {
-				t.Errorf("missing items, index %s, expected %v but found %v", k, items, found.List())
-			}
+
+	checkExpected(t, indexer, expected)
+}
+
+// Test public interface
+func doTestBulkIndex(t *testing.T, indexer BulkIndexer) {
+	mkObj := func(id string, val string) testStoreObject {
+		return testStoreObject{id: id, val: val}
+	}
+
+	// Test Index
+	expected := map[string]util.StringSet{}
+	expected["b"] = util.NewStringSet("a", "c")
+	expected["f"] = util.NewStringSet("e")
+	expected["h"] = util.NewStringSet("g")
+
+	initialSet := make([]interface{}, 4)
+	initialSet[0] = mkObj("a", "b")
+	initialSet[1] = mkObj("c", "b")
+	initialSet[2] = mkObj("e", "f")
+	initialSet[3] = mkObj("g", "h")
+
+	// Test BulkAdd.
+	indexer.BulkAdd(initialSet)
+	checkExpected(t, indexer, expected)
+
+	// Test ReplaceByIndex.
+	replacementSet := make([]interface{}, 2)
+	replacementSet[0] = mkObj("x", "b")
+	replacementSet[1] = mkObj("y", "b")
+	expected["b"] = util.NewStringSet("x", "y")
+	indexer.ReplaceByIndex("by_val", mkObj("", "b"), replacementSet)
+	checkExpected(t, indexer, expected)
+
+	// Test DeleteByIndex.
+	delete(expected, "b")
+	indexer.DeleteByIndex("by_val", mkObj("", "b"))
+	checkExpected(t, indexer, expected)
+}
+
+func checkExpected(t *testing.T, indexer Indexer, expected map[string]util.StringSet) {
+	mkObj := func(id string, val string) testStoreObject {
+		return testStoreObject{id: id, val: val}
+	}
+	for k, v := range expected {
+		found := util.StringSet{}
+		indexResults, err := indexer.Index("by_val", mkObj("", k))
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		for _, item := range indexResults {
+			found.Insert(item.(testStoreObject).id)
+		}
+		items := v.List()
+		if !found.HasAll(items...) {
+			t.Errorf("missing items, index %s, expected %v but found %v", k, items, found.List())
 		}
 	}
 }
@@ -153,4 +195,8 @@ func TestUndeltaStore(t *testing.T) {
 
 func TestIndex(t *testing.T) {
 	doTestIndex(t, NewIndexer(testStoreKeyFunc, testStoreIndexers()))
+}
+
+func TestBulkIndex(t *testing.T) {
+	doTestBulkIndex(t, NewBulkIndexer(testStoreKeyFunc, testStoreIndexers()))
 }

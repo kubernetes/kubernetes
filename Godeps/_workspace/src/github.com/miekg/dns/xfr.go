@@ -13,9 +13,9 @@ type Envelope struct {
 // A Transfer defines parameters that are used during a zone transfer.
 type Transfer struct {
 	*Conn
-	DialTimeout    time.Duration     // net.DialTimeout (ns), defaults to 2 * 1e9
-	ReadTimeout    time.Duration     // net.Conn.SetReadTimeout value for connections (ns), defaults to 2 * 1e9
-	WriteTimeout   time.Duration     // net.Conn.SetWriteTimeout value for connections (ns), defaults to 2 * 1e9
+	DialTimeout    time.Duration     // net.DialTimeout, defaults to 2 seconds
+	ReadTimeout    time.Duration     // net.Conn.SetReadTimeout value for connections, defaults to 2 seconds
+	WriteTimeout   time.Duration     // net.Conn.SetWriteTimeout value for connections, defaults to 2 seconds
 	TsigSecret     map[string]string // Secret(s) for Tsig map[<zonename>]<base64 secret>, zonename must be fully qualified
 	tsigTimersOnly bool
 }
@@ -160,22 +160,18 @@ func (t *Transfer) inIxfr(id uint16, c chan *Envelope) {
 // The server is responsible for sending the correct sequence of RRs through the
 // channel ch.
 func (t *Transfer) Out(w ResponseWriter, q *Msg, ch chan *Envelope) error {
-	r := new(Msg)
-	// Compress?
-	r.SetReply(q)
-	r.Authoritative = true
-
-	go func() {
-		for x := range ch {
-			// assume it fits TODO(miek): fix
-			r.Answer = append(r.Answer, x.RR...)
-			if err := w.WriteMsg(r); err != nil {
-				return
-			}
+	for x := range ch {
+		r := new(Msg)
+		// Compress?
+		r.SetReply(q)
+		r.Authoritative = true
+		// assume it fits TODO(miek): fix
+		r.Answer = append(r.Answer, x.RR...)
+		if err := w.WriteMsg(r); err != nil {
+			return err
 		}
-		w.TsigTimersOnly(true)
-		r.Answer = nil
-	}()
+	}
+	w.TsigTimersOnly(true)
 	return nil
 }
 
@@ -197,6 +193,7 @@ func (t *Transfer) ReadMsg() (*Msg, error) {
 		}
 		// Need to work on the original message p, as that was used to calculate the tsig.
 		err = TsigVerify(p, t.TsigSecret[ts.Hdr.Name], t.tsigRequestMAC, t.tsigTimersOnly)
+		t.tsigRequestMAC = ts.MAC
 	}
 	return m, err
 }

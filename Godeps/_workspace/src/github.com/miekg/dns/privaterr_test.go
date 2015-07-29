@@ -1,9 +1,10 @@
 package dns_test
 
 import (
-	"github.com/miekg/dns"
 	"strings"
 	"testing"
+
+	"github.com/miekg/dns"
 )
 
 const TypeISBN uint16 = 0x0F01
@@ -75,7 +76,7 @@ func TestPrivateByteSlice(t *testing.T) {
 	buf := make([]byte, 100)
 	off, err := dns.PackRR(rr, buf, 0, nil, false)
 	if err != nil {
-		t.Errorf("got error packing ISBN: %s", err)
+		t.Errorf("got error packing ISBN: %v", err)
 	}
 
 	custrr := rr.(*dns.PrivateRR)
@@ -85,7 +86,7 @@ func TestPrivateByteSlice(t *testing.T) {
 
 	rr1, off1, err := dns.UnpackRR(buf[:off], 0)
 	if err != nil {
-		t.Errorf("got error unpacking ISBN: %s", err)
+		t.Errorf("got error unpacking ISBN: %v", err)
 	}
 
 	if off1 != off {
