@@ -74,7 +74,7 @@ You can customize your etcd version, flannel version, k8s version by changing va
 
 Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `kube-scheduler`, `kubelet`, `kube-proxy`, `etcd`, `etcdctl` and `flannel` in the binaries/master or binaries/minion directory.
 
-> We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
+> We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as an example.
 
 #### Configure and start the Kubernetes cluster
 
@@ -104,7 +104,7 @@ The first variable `nodes` defines all your cluster nodes, MASTER node comes fir
 
 Then the `roles ` variable defines the role of above machine in the same order, "ai" stands for machine acts as both master and node, "a" stands for master, "i" stands for node. So they are just defined the k8s cluster as the table above described.
 
-The `NUM_MINIONS` variable defines the total number of minion nodes.
+The `NUM_MINIONS` variable defines the total number of nodes.
 
 The `SERVICE_CLUSTER_IP_RANGE` variable defines the Kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range according to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
 
@@ -116,11 +116,11 @@ The `SERVICE_CLUSTER_IP_RANGE` variable defines the Kubernetes service IP range.
 
 The `FLANNEL_NET` variable defines the IP range used for flannel overlay network, should not conflict with above `SERVICE_CLUSTER_IP_RANGE`.
 
-After all the above variable being set correctly. We can use below command in cluster/ directory to bring up the whole cluster.
+After all the above variables being set correctly, we can use following command in cluster/ directory to bring up the whole cluster.
 
 `$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh` 
 
-The scripts is automatically scp binaries and config files to all the machines and start the k8s service on them. The only thing you need to do is to type the sudo password when promoted. The current machine name is shown below like. So you will not type in the wrong password.
+The scripts automatically scp binaries and config files to all the machines and start the k8s service on them. The only thing you need to do is to type the sudo password when promoted. The current machine name is shown below, so you will not type in the wrong password.
 
 ```console
 Deploying minion on machine 10.10.103.223

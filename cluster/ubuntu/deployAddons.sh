@@ -25,7 +25,10 @@ if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
   sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" > skydns-rc.yaml
   sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" > skydns-svc.yaml
   
+  # use kubectl to create kube-system namespace
+  "${KUBE_ROOT}/cluster/kubectl.sh" create -f namespace.yaml
   # use kubectl to create skydns rc and service
   "${KUBE_ROOT}/cluster/kubectl.sh" --namespace=kube-system create -f skydns-rc.yaml
   "${KUBE_ROOT}/cluster/kubectl.sh" --namespace=kube-system create -f skydns-svc.yaml
 fi
+

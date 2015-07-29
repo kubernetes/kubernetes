@@ -196,14 +196,14 @@ EOF
 
 function create-kube-apiserver-opts(){
   cat <<EOF > ~/kube/default/kube-apiserver
-KUBE_APISERVER_OPTS="--address=0.0.0.0 \
---port=8080 \
---etcd_servers=http://127.0.0.1:4001 \
+KUBE_APISERVER_OPTS="--insecure-bind-address=0.0.0.0 \
+--insecure-port=8080 \
+--etcd-servers=http://127.0.0.1:4001 \
 --logtostderr=true \
 --service-cluster-ip-range=${1} \
---admission_control=${2} \
---client-ca-file=/srv/kubernetes/ca.crt
---tls-cert-file=/srv/kubernetes/server.cert
+--admission-control=${2} \
+--client-ca-file=/srv/kubernetes/ca.crt \
+--tls-cert-file=/srv/kubernetes/server.cert \
 --tls-private-key-file=/srv/kubernetes/server.key"
 EOF
 }
@@ -211,7 +211,7 @@ EOF
 function create-kube-controller-manager-opts(){
   cat <<EOF > ~/kube/default/kube-controller-manager
 KUBE_CONTROLLER_MANAGER_OPTS="--master=127.0.0.1:8080 \
---root-ca-file=/srv/kubernetes/ca.crt
+--root-ca-file=/srv/kubernetes/ca.crt \
 --service-account-private-key-file=/srv/kubernetes/server.key \
 --logtostderr=true"
 EOF
@@ -230,11 +230,11 @@ function create-kubelet-opts(){
   cat <<EOF > ~/kube/default/kubelet
 KUBELET_OPTS="--address=0.0.0.0 \
 --port=10250 \
---hostname_override=$1 \
---api_servers=http://$2:8080 \
+--hostname-override=$1 \
+--api-servers=http://$2:8080 \
 --logtostderr=true \
---cluster_dns=$3 \
---cluster_domain=$4"
+--cluster-dns=$3 \
+--cluster-domain=$4"
 EOF
 
 }
