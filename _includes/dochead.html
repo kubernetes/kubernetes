@@ -31,7 +31,9 @@
   </script>
   <script type="text/javascript" src="{{site.url}}/js/script.js"></script>
   <script>
-    var trackOutboundLink=function(n){ga("send","event","outbound","click",n,{hitCallback:function(){document.location=n}})};
+	var trackOutboundLink=function(n){var f = function(){document.location=n};
+	setTimeout(f, 1000);
+	ga("send","event","outbound","click",n,{hitCallback:f})};
   </script>
  </head>
  <body>
