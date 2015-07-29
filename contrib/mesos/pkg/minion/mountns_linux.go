@@ -22,7 +22,23 @@ import (
 	log "github.com/golang/glog"
 )
 
+// enterPrivateMountNamespace does just that: the current mount ns is unshared (isolated)
+// and then made a slave to the root mount / of the parent mount ns (mount events from /
+// or its children that happen in the parent NS propagate to us).
+//
+// this is not yet compatible with volume plugins as implemented by the kubelet, which
+// depends on using host-volume args to 'docker run' to attach plugin volumes to CT's
+// at runtime. as such, docker needs to be able to see the volumes mounted by k8s plugins,
+// which is impossible if k8s volume plugins are running in an isolated mount ns.
+//
+// an alternative approach would be to always run the kubelet in the host's mount-ns and
+// rely upon mesos to forcibly umount bindings in the task sandbox before rmdir'ing it:
+// https://issues.apache.org/jira/browse/MESOS-349.
+//
+// use at your own risk.
 func enterPrivateMountNamespace() {
+	log.Warningln("EXPERIMENTAL FEATURE: entering private mount ns")
+
 	// enter a new mount NS, useful for isolating changes to the mount table
 	// that are made by the kubelet for storage volumes.
 	err := syscall.Unshare(syscall.CLONE_NEWNS)

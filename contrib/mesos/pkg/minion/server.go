@@ -62,7 +62,7 @@ type MinionServer struct {
 func NewMinionServer() *MinionServer {
 	s := &MinionServer{
 		KubeletExecutorServer: exservice.NewKubeletExecutorServer(),
-		privateMountNS:        true,
+		privateMountNS:        false, // disabled until Docker supports customization of the parent mount namespace
 		done:                  make(chan struct{}),
 		exit:                  make(chan error),
 
@@ -257,7 +257,7 @@ func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
 
 func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 	// general minion flags
-	fs.BoolVar(&ms.privateMountNS, "private-mountns", ms.privateMountNS, "Enter a private mount NS before spawning procs (linux only).")
+	fs.BoolVar(&ms.privateMountNS, "private-mountns", ms.privateMountNS, "Enter a private mount NS before spawning procs (linux only). Experimental, not yet compatible with k8s volumes.")
 
 	// log file flags
 	fs.Var(resource.NewQuantityFlagValue(&ms.logMaxSize), "max-log-size", "Maximum log file size for the executor and proxy before rotation")
