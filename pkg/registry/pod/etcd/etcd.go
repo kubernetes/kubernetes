@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -277,7 +278,7 @@ func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object) (re
 		return nil, err
 	}
 	location.Path = path.Join(location.Path, proxyOpts.Path)
-	return genericrest.NewUpgradeAwareProxyHandler(location, nil, false), nil
+	return newUpgradeAwareProxyHandler(location, nil, false), nil
 }
 
 // Support both GET and POST methods. Over time, we want to move all clients to start using POST and then stop supporting GET.
@@ -307,7 +308,7 @@ func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object) (r
 	if err != nil {
 		return nil, err
 	}
-	return genericrest.NewUpgradeAwareProxyHandler(location, transport, true), nil
+	return newUpgradeAwareProxyHandler(location, transport, true), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -350,5 +351,11 @@ func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Obj
 	if err != nil {
 		return nil, err
 	}
-	return genericrest.NewUpgradeAwareProxyHandler(location, transport, true), nil
+	return newUpgradeAwareProxyHandler(location, transport, true), nil
+}
+
+func newUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, upgradeRequired bool) *genericrest.UpgradeAwareProxyHandler {
+	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, upgradeRequired)
+	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
+	return handler
 }
