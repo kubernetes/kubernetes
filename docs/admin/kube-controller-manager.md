@@ -58,7 +58,7 @@ controller, and serviceaccounts controller.
       --cluster-cidr=<nil>: CIDR Range for Pods in cluster.
       --cluster-name="": The instance prefix for the cluster
       --concurrent-endpoint-syncs=0: The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load
-      --concurrent_rc_syncs=0: The number of replication controllers that are allowed to sync concurrently. Larger number = more responsive replica management, but more CPU (and network) load
+      --concurrent-rc-syncs=0: The number of replication controllers that are allowed to sync concurrently. Larger number = more responsive replica management, but more CPU (and network) load
       --deleting-pods-burst=10: Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.
       --deleting-pods-qps=0.1: Number of nodes per second on which pods are deleted in case of node failure.
   -h, --help=false: help for kube-controller-manager

@@ -95,7 +95,7 @@ KUBE_LOGTOSTDERR="--logtostderr=true"
 KUBE_LOG_LEVEL="--v=0"
 
 # Should this cluster be allowed to run privileged docker containers
-KUBE_ALLOW_PRIV="--allow_privileged=false"
+KUBE_ALLOW_PRIV="--allow-privileged=false"
 ```
 
 * Disable the firewall on both the master and node, as docker does not play well with other firewall rule managers.  Please note that iptables-services does not exist on default fedora server install.
@@ -114,7 +114,7 @@ systemctl stop iptables-services firewalld
 KUBE_API_ADDRESS="--address=0.0.0.0"
 
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
+KUBE_ETCD_SERVERS="--etcd-servers=http://127.0.0.1:4001"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
@@ -195,10 +195,10 @@ a Kubernetes node (fed-node) below.
 KUBELET_ADDRESS="--address=0.0.0.0"
 
 # You may leave this blank to use the actual hostname
-KUBELET_HOSTNAME="--hostname_override=fed-node"
+KUBELET_HOSTNAME="--hostname-override=fed-node"
 
 # location of the api-server
-KUBELET_API_SERVER="--api_servers=http://fed-master:8080"
+KUBELET_API_SERVER="--api-servers=http://fed-master:8080"
 
 # Add your own!
 #KUBELET_ARGS=""
