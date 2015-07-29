@@ -71,9 +71,15 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode 
 
 func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
 	if spec.VolumeSource.HostPath != nil {
-		return &hostPathBuilder{&hostPath{spec.VolumeSource.HostPath.Path}}, nil
+		return &hostPathBuilder{
+			hostPath: &hostPath{path: spec.VolumeSource.HostPath.Path},
+			readOnly: false,
+		}, nil
 	} else {
-		return &hostPathBuilder{&hostPath{spec.PersistentVolumeSource.HostPath.Path}}, nil
+		return &hostPathBuilder{
+			hostPath: &hostPath{path: spec.PersistentVolumeSource.HostPath.Path},
+			readOnly: spec.ReadOnly,
+		}, nil
 	}
 }
 
@@ -104,6 +110,7 @@ func (hp *hostPath) GetPath() string {
 
 type hostPathBuilder struct {
 	*hostPath
+	readOnly bool
 }
 
 var _ volume.Builder = &hostPathBuilder{}
@@ -116,6 +123,14 @@ func (b *hostPathBuilder) SetUp() error {
 // SetUpAt does not make sense for host paths - probably programmer error.
 func (b *hostPathBuilder) SetUpAt(dir string) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
+}
+
+func (b *hostPathBuilder) IsReadOnly() bool {
+	return b.readOnly
+}
+
+func (b *hostPathBuilder) GetPath() string {
+	return b.path
 }
 
 type hostPathCleaner struct {

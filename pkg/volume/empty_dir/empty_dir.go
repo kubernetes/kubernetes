@@ -143,6 +143,10 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	}
 }
 
+func (ed *emptyDir) IsReadOnly() bool {
+	return false
+}
+
 func (ed *emptyDir) setupDefault(dir string) error {
 	return os.MkdirAll(dir, 0750)
 }

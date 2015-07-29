@@ -134,6 +134,7 @@ type Spec struct {
 	Name                   string
 	VolumeSource           api.VolumeSource
 	PersistentVolumeSource api.PersistentVolumeSource
+	ReadOnly               bool
 }
 
 // NewSpecFromVolume creates an Spec from an api.Volume
@@ -145,10 +146,11 @@ func NewSpecFromVolume(vs *api.Volume) *Spec {
 }
 
 // NewSpecFromPersistentVolume creates an Spec from an api.PersistentVolume
-func NewSpecFromPersistentVolume(pv *api.PersistentVolume) *Spec {
+func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool) *Spec {
 	return &Spec{
 		Name: pv.Name,
 		PersistentVolumeSource: pv.Spec.PersistentVolumeSource,
+		ReadOnly:               readOnly,
 	}
 }
 

@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
@@ -199,5 +201,52 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+}
+
+func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pvA",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				NFS: &api.NFSVolumeSource{},
+			},
+			ClaimRef: &api.ObjectReference{
+				Name: "claimA",
+			},
+		},
+	}
+
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claimA",
+			Namespace: "nsA",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName: "pvA",
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+
+	o := testclient.NewObjects(api.Scheme, api.Scheme)
+	o.Add(pv)
+	o.Add(claim)
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plug, _ := plugMgr.FindPluginByName(nfsPluginName)
+
+	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
+	spec := volume.NewSpecFromPersistentVolume(pv, true)
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
+
+	if !builder.IsReadOnly() {
+		t.Errorf("Expected true for builder.IsReadOnly")
+	}
 }

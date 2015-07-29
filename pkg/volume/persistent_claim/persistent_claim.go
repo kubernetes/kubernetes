@@ -26,11 +26,12 @@ import (
 )
 
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&persistentClaimPlugin{nil}}
+	return []volume.VolumePlugin{&persistentClaimPlugin{host: nil}}
 }
 
 type persistentClaimPlugin struct {
-	host volume.VolumeHost
+	host     volume.VolumeHost
+	readOnly bool
 }
 
 var _ volume.VolumePlugin = &persistentClaimPlugin{}
@@ -78,13 +79,17 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 		return nil, err
 	}
 
-	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv), pod, opts, mounter)
+	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod, opts, mounter)
 	if err != nil {
 		glog.Errorf("Error creating builder for claim: %+v\n", claim.Name)
 		return nil, err
 	}
 
 	return builder, nil
+}
+
+func (plugin *persistentClaimPlugin) IsReadOnly() bool {
+	return plugin.readOnly
 }
 
 func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID, _ mount.Interface) (volume.Cleaner, error) {
