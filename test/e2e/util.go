@@ -49,6 +49,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/prometheus/client_golang/extraction"
+	"github.com/prometheus/client_golang/model"
 	"golang.org/x/crypto/ssh"
 
 	. "github.com/onsi/ginkgo"
@@ -1582,6 +1584,34 @@ type LatencyMetric struct {
 	Latency  time.Duration
 }
 
+// latencyMetricIngestor implements extraction.Ingester
+type latencyMetricIngester []LatencyMetric
+
+func (l *latencyMetricIngester) Ingest(samples model.Samples) error {
+	for _, sample := range samples {
+		// Example line:
+		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
+			continue
+		}
+
+		resource := string(sample.Metric["resource"])
+		verb := string(sample.Metric["verb"])
+		latency := sample.Value
+		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+		if err != nil {
+			return err
+		}
+		*l = append(*l, LatencyMetric{
+			verb,
+			resource,
+			quantile,
+			time.Duration(int64(latency)) * time.Microsecond,
+		})
+	}
+	return nil
+}
+
 // LatencyMetricByLatency implements sort.Interface for []LatencyMetric based on
 // the latency field.
 type LatencyMetricByLatency []LatencyMetric
@@ -1595,34 +1625,9 @@ func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
 	if err != nil {
 		return nil, err
 	}
-	metrics := make([]LatencyMetric, 0)
-	for _, line := range strings.Split(string(body), "\n") {
-		if strings.HasPrefix(line, "apiserver_request_latencies_summary{") {
-			// Example line:
-			// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-			// TODO: This parsing code is long and not readable. We should improve it.
-			keyVal := strings.Split(line, " ")
-			if len(keyVal) != 2 {
-				return nil, fmt.Errorf("Error parsing metric %q", line)
-			}
-			keyElems := strings.Split(line, "\"")
-			if len(keyElems) != 7 {
-				return nil, fmt.Errorf("Error parsing metric %q", line)
-			}
-			resource := keyElems[1]
-			verb := keyElems[3]
-			quantile, err := strconv.ParseFloat(keyElems[5], 64)
-			if err != nil {
-				return nil, fmt.Errorf("Error parsing metric %q", line)
-			}
-			latency, err := strconv.ParseFloat(keyVal[1], 64)
-			if err != nil {
-				return nil, fmt.Errorf("Error parsing metric %q", line)
-			}
-			metrics = append(metrics, LatencyMetric{verb, resource, quantile, time.Duration(int64(latency)) * time.Microsecond})
-		}
-	}
-	return metrics, nil
+	var ingester latencyMetricIngester
+	err = extraction.Processor004.ProcessSingle(strings.NewReader(body), &ingester, &extraction.ProcessOptions{})
+	return ingester, err
 }
 
 // Prints summary metrics for request types with latency above threshold

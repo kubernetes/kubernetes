@@ -137,7 +137,7 @@
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
 		},
 		{
-			"ImportPath": "github.com/cpuguy83/go-md2man",
+			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
 			"Comment": "v1.0.2-5-g2831f11",
 			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
 		},
@@ -434,6 +434,11 @@
 			"ImportPath": "github.com/onsi/gomega",
 			"Comment": "v1.0-28-g8adf9e1730c5",
 			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/extraction",
+			"Comment": "0.4.0-1-g692492e",
+			"Rev": "692492e54b553a81013254cc1fba4b6dd76fad30"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/model",
