@@ -5707,6 +5707,54 @@
       "nickname": "connectGetNamespacedPodExec",
       "parameters": [
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stdin",
+        "description": "redirect the standard input stream of the pod for this call; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stdout",
+        "description": "redirect the standard output stream of the pod for this call; defaults to true",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stderr",
+        "description": "redirect the standard error stream of the pod for this call; defaults to true",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "tty",
+        "description": "allocate a terminal for this exec call; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "container",
+        "description": "the container in which to execute the command. Defaults to only container if there is only one container in the pod.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "",
+        "paramType": "query",
+        "name": "command",
+        "description": "the command to execute; argv array; not executed within a shell",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -5736,6 +5784,54 @@
       "summary": "connect POST requests to exec of Pod",
       "nickname": "connectPostNamespacedPodExec",
       "parameters": [
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stdin",
+        "description": "redirect the standard input stream of the pod for this call; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stdout",
+        "description": "redirect the standard output stream of the pod for this call; defaults to true",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stderr",
+        "description": "redirect the standard error stream of the pod for this call; defaults to true",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "tty",
+        "description": "allocate a terminal for this exec call; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "container",
+        "description": "the container in which to execute the command. Defaults to only container if there is only one container in the pod.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "",
+        "paramType": "query",
+        "name": "command",
+        "description": "the command to execute; argv array; not executed within a shell",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -5777,6 +5873,30 @@
         "paramType": "query",
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "container",
+        "description": "the container for which to stream logs; defaults to only container if there is one container in the pod",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "follow",
+        "description": "follow the log stream of the pod; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "previous",
+        "description": "return previous terminated container logs; defaults to false",
         "required": false,
         "allowMultiple": false
        },
@@ -5891,6 +6011,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -5919,6 +6047,14 @@
       "summary": "connect POST requests to proxy of Pod",
       "nickname": "connectPostNamespacedPodProxy",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -5951,6 +6087,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -5979,6 +6123,14 @@
       "summary": "connect DELETE requests to proxy of Pod",
       "nickname": "connectDeleteNamespacedPodProxy",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -6011,6 +6163,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -6039,6 +6199,14 @@
       "summary": "connect OPTIONS requests to proxy of Pod",
       "nickname": "connectOptionsNamespacedPodProxy",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -6077,6 +6245,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -6113,6 +6289,14 @@
       "summary": "connect POST requests to proxy of Pod",
       "nickname": "connectPostNamespacedPodProxy",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -6153,6 +6337,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -6189,6 +6381,14 @@
       "summary": "connect DELETE requests to proxy of Pod",
       "nickname": "connectDeleteNamespacedPodProxy",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -6229,6 +6429,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -6265,6 +6473,14 @@
       "summary": "connect OPTIONS requests to proxy of Pod",
       "nickname": "connectOptionsNamespacedPodProxy",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "path",
+        "description": "URL path to use in proxy request to pod",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
