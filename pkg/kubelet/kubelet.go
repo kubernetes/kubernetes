@@ -65,7 +65,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/expansion"
 	"github.com/golang/glog"
-
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
@@ -274,6 +273,10 @@ func NewMainKubelet(
 		klet.networkPlugin = plug
 	}
 
+	machineInfo, err := klet.GetCachedMachineInfo()
+	if err != nil {
+		return nil, err
+	}
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -283,6 +286,7 @@ func NewMainKubelet(
 			recorder,
 			readinessManager,
 			containerRefManager,
+			machineInfo,
 			podInfraContainerImage,
 			pullQPS,
 			pullBurst,
@@ -1580,7 +1584,7 @@ func (kl *Kubelet) checkCapacityExceeded(pods []*api.Pod) (fitting []*api.Pod, n
 	sort.Sort(podsByCreationTime(pods))
 
 	capacity := CapacityFromMachineInfo(info)
-	return predicates.CheckPodsExceedingCapacity(pods, capacity)
+	return predicates.CheckPodsExceedingCapacity(pods, capacity, int64(kl.pods))
 }
 
 // handleOutOfDisk detects if pods can't fit due to lack of disk space.
