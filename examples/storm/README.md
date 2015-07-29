@@ -132,7 +132,8 @@ kubernetes          component=apiserver,provider=kubernetes   <none>            
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 nimbus              name=nimbus                               name=nimbus         10.254.115.208      6627
 
-$ sudo docker run -it -w /opt/apache-storm mattf/storm-base sh -c '/configure.sh 10.254.139.141 10.254.115.208; ./bin/storm list'
+$ sudo docker run -it -w /opt/apache-storm mattf/storm-base sh \
+-c '/configure.sh 10.254.139.141 10.254.115.208; ./bin/storm list'
 ...
 No topologies running.
 ```

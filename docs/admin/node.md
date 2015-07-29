@@ -221,7 +221,8 @@ preparatory step before a node reboot, etc.  For example, to mark a node
 unschedulable, run this command:
 
 ```sh
-kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
+$ kubectl replace nodes 10.1.2.3 --patch='{"apiVersion": "v1", \
+"unschedulable": true}'
 ```
 
 ### Node capacity

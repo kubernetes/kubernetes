@@ -526,7 +526,8 @@ The status object is encoded as JSON and provided as the body of the response.  
 **Example:**
 
 ```console
-$ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1/namespaces/default/pods/grafana
+$ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" \
+https://10.240.122.184:443/api/v1/namespaces/default/pods/grafana
 
 > GET /api/v1/namespaces/default/pods/grafana HTTP/1.1
 > User-Agent: curl/7.26.0

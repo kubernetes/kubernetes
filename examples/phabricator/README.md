@@ -250,7 +250,8 @@ phabricator
 To play with the service itself, find the external IP of the load balancer:
 
 ```sh
-$ kubectl get services phabricator -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}{{"\n"}}'
+$ kubectl get services phabricator -o template \
+--template='{{(index .status.loadBalancer.ingress 0).ip}}{{"\n"}}'
 ```
 
 and then visit port 80 of that IP address.
@@ -258,7 +259,8 @@ and then visit port 80 of that IP address.
 **Note**: You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```sh
-$ gcloud compute firewall-rules create phabricator-node-80 --allow=tcp:80 --target-tags kubernetes-minion
+$ gcloud compute firewall-rules create phabricator-node-80 \
+--allow=tcp:80 --target-tags kubernetes-minion
 ```
 
 ### Step Six: Cleanup

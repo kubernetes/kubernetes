@@ -66,8 +66,10 @@ production    name=production    Active
 For kubectl client to work with each namespace, we define two contexts:
 
 ```sh
-$ kubectl config set-context dev --namespace=development --cluster=${CLUSTER_NAME} --user=${USER_NAME}
-$ kubectl config set-context prod --namespace=production --cluster=${CLUSTER_NAME} --user=${USER_NAME}
+$ kubectl config set-context dev --namespace=development \
+--cluster=${CLUSTER_NAME} --user=${USER_NAME}
+$ kubectl config set-context prod --namespace=production \
+--cluster=${CLUSTER_NAME} --user=${USER_NAME}
 ```
 
 You can view your cluster name and user name in kubernetes config at ~/.kube/config.
@@ -184,8 +186,10 @@ kubectl create -f examples/cluster-dns/namespace-dev.yaml
 kubectl create -f examples/cluster-dns/namespace-prod.yaml
 
 # create two contexts
-kubectl config set-context dev --namespace=development --cluster=${CLUSTER_NAME} --user=${USER_NAME}
-kubectl config set-context prod --namespace=production --cluster=${CLUSTER_NAME} --user=${USER_NAME}
+kubectl config set-context dev --namespace=development \
+--cluster=${CLUSTER_NAME} --user=${USER_NAME}
+kubectl config set-context prod --namespace=production \
+--cluster=${CLUSTER_NAME} --user=${USER_NAME}
 
 # create two backend replication controllers
 kubectl config use-context dev

@@ -245,7 +245,8 @@ It is marked as external (LoadBalanced). However on many platforms you will have
 On GCE this can be done with:
 
 ```
- $ gcloud compute firewall-rules create --allow=tcp:5555 --target-tags=kubernetes-minion kubernetes-minion-5555
+ $ gcloud compute firewall-rules create --allow=tcp:5555 \
+ --target-tags=kubernetes-minion kubernetes-minion-5555
 ```
 
 Please remember to delete the rule after you are done with the example (on GCE: `$ gcloud compute firewall-rules delete kubernetes-minion-5555`)
