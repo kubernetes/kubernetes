@@ -105,18 +105,19 @@ type CloudConfig struct {
 }
 
 type TestContextType struct {
-	KubeConfig     string
-	KubeContext    string
-	CertDir        string
-	Host           string
-	RepoRoot       string
-	Provider       string
-	CloudConfig    CloudConfig
-	KubectlPath    string
-	OutputDir      string
-	prefix         string
-	MinStartupPods int
-	UpgradeTarget  string
+	KubeConfig            string
+	KubeContext           string
+	CertDir               string
+	Host                  string
+	RepoRoot              string
+	Provider              string
+	CloudConfig           CloudConfig
+	KubectlPath           string
+	OutputDir             string
+	prefix                string
+	MinStartupPods        int
+	UpgradeTarget         string
+	PrometheusPushGateway string
 }
 
 var testContext TestContextType
@@ -1150,6 +1151,9 @@ func RunRC(config RCConfig) error {
 
 		Logf("%v %v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d unknown ",
 			time.Now(), rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, unknown)
+
+		promPushRunningPending(running, pending)
+
 		if config.PodStatusFile != nil {
 			fmt.Fprintf(config.PodStatusFile, "%s, %d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown\n", time.Now(), running, pending, waiting, inactive, unknown)
 		}
