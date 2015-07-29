@@ -375,7 +375,7 @@ $ kubectl exec curlpod -- curl https://nginxsvc --cacert /etc/nginx/ssl/nginx.cr
 For some parts of your applications you may want to expose a Service onto an external IP address. Kubernetes supports two ways of doing this: NodePorts and LoadBalancers. The Service created in the last section already used `NodePort`, so your nginx https replica is ready to serve traffic on the internet if your node has a public IP.
 
 ```console
-$ kubeclt get svc nginxsvc -o json | grep -i nodeport -C 5
+$ kubectl get svc nginxsvc -o json | grep -i nodeport -C 5
             {
                 "name": "http",
                 "protocol": "TCP",
@@ -391,7 +391,7 @@ $ kubeclt get svc nginxsvc -o json | grep -i nodeport -C 5
                 "nodePort": 30645
             }
 
-$ kubectl get nodes -o json | grep ExternalIP
+$ kubectl get nodes -o json | grep ExternalIP -C 2
                     {
                         "type": "ExternalIP",
                         "address": "104.197.63.17"
