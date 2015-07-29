@@ -200,6 +200,11 @@ function start_apiserver {
     # Admission Controllers to invoke prior to persisting objects in cluster
     ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
+    # This is the default dir and filename where the apiserver will generate a self-signed cert
+    # which should be able to be used as the CA to verify itself
+    CERT_DIR=/var/run/kubernetes
+    ROOT_CA_FILE=$CERT_DIR/apiserver.crt
+
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
@@ -208,6 +213,7 @@ function start_apiserver {
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/kube-apiserver" ${priv_arg}\
       --v=${LOG_LEVEL} \
+      --cert_dir="${CERT_DIR}" \
       --service_account_key_file="${SERVICE_ACCOUNT_KEY}" \
       --service_account_lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission_control="${ADMISSION_CONTROL}" \
@@ -228,6 +234,7 @@ function start_controller_manager {
     sudo -E "${GO_OUT}/kube-controller-manager" \
       --v=${LOG_LEVEL} \
       --service_account_private_key_file="${SERVICE_ACCOUNT_KEY}" \
+      --root_ca_file="${ROOT_CA_FILE}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
