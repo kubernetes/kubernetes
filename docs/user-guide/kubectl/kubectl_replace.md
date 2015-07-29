@@ -67,6 +67,7 @@ kubectl replace --force -f ./pod.json
       --force=false: Delete and re-create the specified resource
       --grace-period=-1: Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
   -h, --help=false: help for replace
+  -o, --output="": Output mode. Use "-o name" for shorter output (resource/name).
       --timeout=0: Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object
 ```
 

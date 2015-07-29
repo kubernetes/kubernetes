@@ -47,6 +47,7 @@ func TestPatchObject(t *testing.T) {
 	cmd := NewCmdPatch(f, buf)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"services/frontend"})
 
 	// uses the name from the file, not the response

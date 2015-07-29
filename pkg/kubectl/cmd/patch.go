@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -43,16 +42,19 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    patch_long,
 		Example: patch_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunPatch(f, out, cmd, args)
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+			err := RunPatch(f, out, cmd, args, shortOutput)
 			cmdutil.CheckCustomErr("Patch failed", err)
 		},
 	}
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
+	cmdutil.AddOutputFlagsForMutation(cmd)
 	return cmd
 }
 
-func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool) error {
 	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -94,6 +96,6 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "%s\n", name)
+	cmdutil.PrintSuccess(mapper, shortOutput, out, "", name, "patched")
 	return nil
 }

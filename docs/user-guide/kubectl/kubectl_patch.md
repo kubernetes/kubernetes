@@ -58,6 +58,7 @@ kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 
 ```
   -h, --help=false: help for patch
+  -o, --output="": Output mode. Use "-o name" for shorter output (resource/name).
   -p, --patch="": The patch to be applied to the resource JSON file.
 ```
 

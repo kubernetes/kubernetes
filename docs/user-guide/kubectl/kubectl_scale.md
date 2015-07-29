@@ -64,6 +64,7 @@ $ kubectl scale --current-replicas=2 --replicas=3 replicationcontrollers foo
 ```
       --current-replicas=-1: Precondition for current size. Requires that the current size of the replication controller match this value in order to scale.
   -h, --help=false: help for scale
+  -o, --output="": Output mode. Use "-o name" for shorter output (resource/name).
       --replicas=-1: The new desired number of replicas. Required.
       --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to scale.
 ```

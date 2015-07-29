@@ -61,6 +61,7 @@ $ cat pod.json | kubectl create -f -
 ```
   -f, --filename=[]: Filename, directory, or URL to file to use to create the resource
   -h, --help=false: help for create
+  -o, --output="": Output mode. Use "-o name" for shorter output (resource/name).
 ```
 
 ### Options inherited from parent commands

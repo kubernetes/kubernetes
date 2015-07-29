@@ -51,7 +51,9 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(ValidateArgs(cmd, args))
-			cmdutil.CheckErr(RunCreate(f, out, filenames))
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+			cmdutil.CheckErr(RunCreate(f, out, filenames, shortOutput))
 		},
 	}
 
@@ -59,6 +61,7 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.MarkFlagRequired("filename")
 
+	cmdutil.AddOutputFlagsForMutation(cmd)
 	return cmd
 }
 
@@ -69,7 +72,7 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) error {
+func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList, shortOutput bool) error {
 	schema, err := f.Validator()
 	if err != nil {
 		return err
@@ -105,8 +108,10 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 		}
 		count++
 		info.Refresh(obj, true)
-		printObjectSpecificMessage(info.Object, out)
-		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
+		if !shortOutput {
+			printObjectSpecificMessage(info.Object, out)
+		}
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "created")
 		return nil
 	})
 	if err != nil {

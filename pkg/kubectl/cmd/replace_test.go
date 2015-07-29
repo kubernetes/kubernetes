@@ -49,19 +49,21 @@ func TestReplaceObject(t *testing.T) {
 
 	cmd := NewCmdReplace(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "replicationcontrollers/rc1\n" {
+	if buf.String() != "replicationcontroller/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
 	buf.Reset()
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/redis-master\nreplicationcontrollers/rc1\n" {
+	if buf.String() != "replicationcontroller/redis-master\nreplicationcontroller/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -95,18 +97,20 @@ func TestReplaceMultipleObject(t *testing.T) {
 	cmd := NewCmdReplace(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/rc1\nservices/baz\n" {
+	if buf.String() != "replicationcontroller/rc1\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
 	buf.Reset()
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/redis-master\nservices/frontend\nreplicationcontrollers/rc1\nservices/baz\n" {
+	if buf.String() != "replicationcontroller/redis-master\nservice/frontend\nreplicationcontroller/rc1\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -140,9 +144,10 @@ func TestReplaceDirectory(t *testing.T) {
 	cmd := NewCmdReplace(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\n" {
+	if buf.String() != "replicationcontroller/rc1\nservice/baz\nreplicationcontroller/rc1\nservice/baz\nreplicationcontroller/rc1\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
@@ -151,8 +156,8 @@ func TestReplaceDirectory(t *testing.T) {
 	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/frontend\nservices/frontend\nreplicationcontrollers/redis-master\nservices/redis-master\nreplicationcontrollers/redis-slave\nservices/redis-slave\n"+
-		"replicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\n" {
+	if buf.String() != "replicationcontroller/frontend\nservice/frontend\nreplicationcontroller/redis-master\nservice/redis-master\nreplicationcontroller/redis-slave\nservice/redis-slave\n"+
+		"replicationcontroller/rc1\nservice/baz\nreplicationcontroller/rc1\nservice/baz\nreplicationcontroller/rc1\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -183,9 +188,10 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")
+	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/rc1\n" {
+	if buf.String() != "replicationcontroller/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

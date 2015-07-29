@@ -17,6 +17,10 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"io"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 
 	"github.com/spf13/cobra"
@@ -28,6 +32,40 @@ func AddPrinterFlags(cmd *cobra.Command) {
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
 	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
 	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]")
+}
+
+// AddOutputFlagsForMutation adds output related flags to a command. Used by mutations only.
+func AddOutputFlagsForMutation(cmd *cobra.Command) {
+	cmd.Flags().StringP("output", "o", "", "Output mode. Use \"-o name\" for shorter output (resource/name).")
+}
+
+// PrintSuccess prints message after finishing mutating operations
+func PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource string, name string, operation string) {
+	resource, _ = mapper.ResourceSingularizer(resource)
+	if shortOutput {
+		// -o name: prints resource/name
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s/%s\n", resource, name)
+		} else {
+			fmt.Fprintf(out, "%s\n", name)
+		}
+	} else {
+		// understandable output by default
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s \"%s\" %s\n", resource, name, operation)
+		} else {
+			fmt.Fprintf(out, "\"%s\" %s\n", name, operation)
+		}
+	}
+}
+
+// ValidateOutputArgs validates -o flag args for mutations
+func ValidateOutputArgs(cmd *cobra.Command) error {
+	outputMode := GetFlagString(cmd, "output")
+	if outputMode != "" && outputMode != "name" {
+		return UsageError(cmd, "Unexpected -o output mode: %v. We only support '-o name'.", outputMode)
+	}
+	return nil
 }
 
 // OutputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
