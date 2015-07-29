@@ -425,6 +425,10 @@
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
 		},
+                {
+                        "ImportPath": "github.com/mxk/go-flowrate/flowrate",
+                        "Rev": "cca7078d478f8520f85629ad7c68962d31ed7682"
+                },
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
 			"Comment": "v1.2.0-6-gd981d36",

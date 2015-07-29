@@ -34,6 +34,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/netutil"
 	"github.com/golang/glog"
+	"github.com/mxk/go-flowrate/flowrate"
 )
 
 // UpgradeAwareProxyHandler is a handler for proxy requests that may require an upgrade
@@ -42,6 +43,7 @@ type UpgradeAwareProxyHandler struct {
 	Location        *url.URL
 	Transport       http.RoundTripper
 	FlushInterval   time.Duration
+	MaxBytesPerSec  int64
 	err             error
 }
 
@@ -152,7 +154,13 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	wg.Add(2)
 
 	go func() {
-		_, err := io.Copy(backendConn, requestHijackedConn)
+		var writer io.WriteCloser
+		if h.MaxBytesPerSec > 0 {
+			writer = flowrate.NewWriter(backendConn, h.MaxBytesPerSec)
+		} else {
+			writer = backendConn
+		}
+		_, err := io.Copy(writer, requestHijackedConn)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			glog.Errorf("Error proxying data from client to backend: %v", err)
 		}
@@ -160,7 +168,13 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	}()
 
 	go func() {
-		_, err := io.Copy(requestHijackedConn, backendConn)
+		var reader io.ReadCloser
+		if h.MaxBytesPerSec > 0 {
+			reader = flowrate.NewReader(backendConn, h.MaxBytesPerSec)
+		} else {
+			reader = backendConn
+		}
+		_, err := io.Copy(requestHijackedConn, reader)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			glog.Errorf("Error proxying data from backend to client: %v", err)
 		}
