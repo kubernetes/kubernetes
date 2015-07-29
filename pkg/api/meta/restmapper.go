@@ -83,8 +83,8 @@ type DefaultRESTMapper struct {
 }
 
 // VersionInterfacesFunc returns the appropriate codec, typer, and metadata accessor for a
-// given api version, or false if no such api version exists.
-type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, bool)
+// given api version, or an error if no such api version exists.
+type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
 
 // NewDefaultRESTMapper initializes a mapping between Kind and APIVersion
 // to a resource name and back based on the objects in a runtime.Scheme
@@ -226,8 +226,8 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", version, kind)
 	}
 
-	interfaces, ok := m.interfacesFunc(version)
-	if !ok {
+	interfaces, err := m.interfacesFunc(version)
+	if err != nil {
 		return nil, fmt.Errorf("the provided version %q has no relevant versions", version)
 	}
 

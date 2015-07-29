@@ -30,12 +30,14 @@ import (
 
 	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
+	explatest "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -79,14 +81,19 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
 	handler := delegateHandler{}
 
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, "", master.DefaultEtcdPathPrefix)
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, latest.Version, master.DefaultEtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage: %v", err)
+	}
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, master.DefaultEtcdPathPrefix)
+	if err != nil {
+		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
 	}
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		DatabaseStorage: etcdStorage,
+		DatabaseStorage:    etcdStorage,
+		ExpDatabaseStorage: expEtcdStorage,
 		KubeletClient: &client.HTTPKubeletClient{
 			Client: http.DefaultClient,
 			Config: &client.KubeletConfig{Port: 10250},
@@ -96,6 +103,7 @@ func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServ
 		EnableSwaggerSupport:  true,
 		EnableProfiling:       *enableProfiling,
 		APIPrefix:             "/api",
+		ExpAPIPrefix:          "/experimental",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 
 		ReadWritePort:          port,

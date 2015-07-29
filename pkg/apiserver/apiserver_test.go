@@ -88,16 +88,7 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 }
 
 func newMapper() *meta.DefaultRESTMapper {
-	return meta.NewDefaultRESTMapper(
-		versions,
-		func(version string) (*meta.VersionInterfaces, bool) {
-			interfaces, err := interfacesFor(version)
-			if err != nil {
-				return nil, false
-			}
-			return interfaces, true
-		},
-	)
+	return meta.NewDefaultRESTMapper(versions, interfacesFor)
 }
 
 func addTestTypes() {
