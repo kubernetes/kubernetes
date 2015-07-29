@@ -18,14 +18,14 @@ package api
 
 // AUTO-GENERATED FUNCTIONS START HERE
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"speter.net/go/exp/math/dec/inf"
-	"time"
+	resource "github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	conversion "github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	fields "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	labels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	util "github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	inf "speter.net/go/exp/math/dec/inf"
+	time "time"
 )
 
 func deepCopy_api_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, c *conversion.Cloner) error {
@@ -587,7 +587,7 @@ func deepCopy_api_LimitRange(in LimitRange, out *LimitRange, c *conversion.Clone
 func deepCopy_api_LimitRangeItem(in LimitRangeItem, out *LimitRangeItem, c *conversion.Cloner) error {
 	out.Type = in.Type
 	if in.Max != nil {
-		out.Max = make(map[ResourceName]resource.Quantity)
+		out.Max = make(ResourceList)
 		for key, val := range in.Max {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -599,7 +599,7 @@ func deepCopy_api_LimitRangeItem(in LimitRangeItem, out *LimitRangeItem, c *conv
 		out.Max = nil
 	}
 	if in.Min != nil {
-		out.Min = make(map[ResourceName]resource.Quantity)
+		out.Min = make(ResourceList)
 		for key, val := range in.Min {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -611,7 +611,7 @@ func deepCopy_api_LimitRangeItem(in LimitRangeItem, out *LimitRangeItem, c *conv
 		out.Min = nil
 	}
 	if in.Default != nil {
-		out.Default = make(map[ResourceName]resource.Quantity)
+		out.Default = make(ResourceList)
 		for key, val := range in.Default {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -857,7 +857,7 @@ func deepCopy_api_NodeSpec(in NodeSpec, out *NodeSpec, c *conversion.Cloner) err
 
 func deepCopy_api_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner) error {
 	if in.Capacity != nil {
-		out.Capacity = make(map[ResourceName]resource.Quantity)
+		out.Capacity = make(ResourceList)
 		for key, val := range in.Capacity {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -1041,7 +1041,7 @@ func deepCopy_api_PersistentVolumeClaimStatus(in PersistentVolumeClaimStatus, ou
 		out.AccessModes = nil
 	}
 	if in.Capacity != nil {
-		out.Capacity = make(map[ResourceName]resource.Quantity)
+		out.Capacity = make(ResourceList)
 		for key, val := range in.Capacity {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -1143,7 +1143,7 @@ func deepCopy_api_PersistentVolumeSource(in PersistentVolumeSource, out *Persist
 
 func deepCopy_api_PersistentVolumeSpec(in PersistentVolumeSpec, out *PersistentVolumeSpec, c *conversion.Cloner) error {
 	if in.Capacity != nil {
-		out.Capacity = make(map[ResourceName]resource.Quantity)
+		out.Capacity = make(ResourceList)
 		for key, val := range in.Capacity {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -1571,7 +1571,7 @@ func deepCopy_api_ResourceQuotaList(in ResourceQuotaList, out *ResourceQuotaList
 
 func deepCopy_api_ResourceQuotaSpec(in ResourceQuotaSpec, out *ResourceQuotaSpec, c *conversion.Cloner) error {
 	if in.Hard != nil {
-		out.Hard = make(map[ResourceName]resource.Quantity)
+		out.Hard = make(ResourceList)
 		for key, val := range in.Hard {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -1587,7 +1587,7 @@ func deepCopy_api_ResourceQuotaSpec(in ResourceQuotaSpec, out *ResourceQuotaSpec
 
 func deepCopy_api_ResourceQuotaStatus(in ResourceQuotaStatus, out *ResourceQuotaStatus, c *conversion.Cloner) error {
 	if in.Hard != nil {
-		out.Hard = make(map[ResourceName]resource.Quantity)
+		out.Hard = make(ResourceList)
 		for key, val := range in.Hard {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -1599,7 +1599,7 @@ func deepCopy_api_ResourceQuotaStatus(in ResourceQuotaStatus, out *ResourceQuota
 		out.Hard = nil
 	}
 	if in.Used != nil {
-		out.Used = make(map[ResourceName]resource.Quantity)
+		out.Used = make(ResourceList)
 		for key, val := range in.Used {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -1615,7 +1615,7 @@ func deepCopy_api_ResourceQuotaStatus(in ResourceQuotaStatus, out *ResourceQuota
 
 func deepCopy_api_ResourceRequirements(in ResourceRequirements, out *ResourceRequirements, c *conversion.Cloner) error {
 	if in.Limits != nil {
-		out.Limits = make(map[ResourceName]resource.Quantity)
+		out.Limits = make(ResourceList)
 		for key, val := range in.Limits {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
@@ -1627,7 +1627,7 @@ func deepCopy_api_ResourceRequirements(in ResourceRequirements, out *ResourceReq
 		out.Limits = nil
 	}
 	if in.Requests != nil {
-		out.Requests = make(map[ResourceName]resource.Quantity)
+		out.Requests = make(ResourceList)
 		for key, val := range in.Requests {
 			newVal := new(resource.Quantity)
 			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
