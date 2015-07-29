@@ -89,8 +89,8 @@ of this yourself.  First, each kubelet needs to run with the following flags
 set:
 
 ```
---cluster_dns=<DNS service ip>
---cluster_domain=<default local domain>
+--cluster-dns=<DNS service ip>
+--cluster-domain=<default local domain>
 ```
 
 Second, you need to start the DNS server ReplicationController and Service. See

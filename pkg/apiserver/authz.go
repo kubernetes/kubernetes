@@ -67,7 +67,7 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 // based on the authorizationMode xor an error.  authorizationMode should be one of AuthorizationModeChoices.
 func NewAuthorizerFromAuthorizationConfig(authorizationMode string, authorizationPolicyFile string) (authorizer.Authorizer, error) {
 	if authorizationPolicyFile != "" && authorizationMode != "ABAC" {
-		return nil, errors.New("Cannot specify --authorization_policy_file without mode ABAC")
+		return nil, errors.New("Cannot specify --authorization-policy-file without mode ABAC")
 	}
 	// Keep cases in sync with constant list above.
 	switch authorizationMode {

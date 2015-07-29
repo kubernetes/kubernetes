@@ -64,8 +64,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
       --allow-privileged=false: If true, allow containers to request privileged mode. [default=false]
       --api-servers=[]: List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.
       --cadvisor-port=0: The port of the localhost cAdvisor endpoint
-      --cert-dir="": The directory where the TLS certs are located (by default /var/run/kubernetes). If --tls_cert_file and --tls_private_key_file are provided, this flag will be ignored.
-      --cgroup_root="": Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.
+      --cert-dir="": The directory where the TLS certs are located (by default /var/run/kubernetes). If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.
+      --cgroup-root="": Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.
       --chaos-chance=0: If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]
       --cloud-config="": The path to the cloud provider configuration file.  Empty string for no configuration file.
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
@@ -73,7 +73,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
       --cluster-domain="": Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains
       --config="": Path to the config file or directory of files
       --configure-cbr0=false: If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.
-      --container_runtime="": The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.
+      --container-runtime="": The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.
       --containerized=false: Experimental support for running kubelet in a container.  Intended for testing. [default=false]
       --docker-endpoint="": If non-empty, use this for the docker endpoint to communicate with
       --docker-exec-handler="": Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.
@@ -105,16 +105,16 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
       --read-only-port=0: The read-only port for the Kubelet to serve on (set to 0 to disable)
       --really-crash-for-testing=false: If true, when panics occur crash. Intended for testing.
       --register-node=false: Register the node with the apiserver (defaults to true if --api-server is set)
-      --registry-burst=0: Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0
+      --registry-burst=0: Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry-qps > 0
       --registry-qps=0: If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]
       --resource-container="": Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).
       --root-dir="": Directory path for managing kubelet files (volume mounts,etc).
-      --runonce=false: If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api_servers, and --enable-server
+      --runonce=false: If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server
       --streaming-connection-idle-timeout=0: Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'
       --sync-frequency=0: Max period between synchronizing running containers and config
       --system-container="": Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: "").
-      --tls-cert-file="": File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). If --tls_cert_file and --tls_private_key_file are not provided, a self-signed certificate and key are generated for the public address and saved to the directory passed to --cert_dir.
-      --tls-private-key-file="": File containing x509 private key matching --tls_cert_file.
+      --tls-cert-file="": File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key are generated for the public address and saved to the directory passed to --cert-dir.
+      --tls-private-key-file="": File containing x509 private key matching --tls-cert-file.
 ```
 
 ###### Auto generated by spf13/cobra at 2015-07-06 18:03:36.451093085 +0000 UTC
