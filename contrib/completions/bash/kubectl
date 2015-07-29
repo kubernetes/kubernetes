@@ -505,6 +505,29 @@ _kubectl_scale()
     must_have_one_noun=()
 }
 
+_kubectl_attach()
+{
+    last_command="kubectl_attach"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--container=")
+    two_word_flags+=("-c")
+    flags+=("--help")
+    flags+=("-h")
+    flags+=("--stdin")
+    flags+=("-i")
+    flags+=("--tty")
+    flags+=("-t")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+}
+
 _kubectl_exec()
 {
     last_command="kubectl_exec"
@@ -946,6 +969,7 @@ _kubectl()
     commands+=("logs")
     commands+=("rolling-update")
     commands+=("scale")
+    commands+=("attach")
     commands+=("exec")
     commands+=("port-forward")
     commands+=("proxy")

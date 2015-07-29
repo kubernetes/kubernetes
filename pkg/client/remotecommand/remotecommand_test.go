@@ -190,3 +190,80 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		server.Close()
 	}
 }
+
+// TODO: this test is largely cut and paste, refactor to share code
+func TestRequestAttachRemoteCommand(t *testing.T) {
+	testCases := []struct {
+		Stdin  string
+		Stdout string
+		Stderr string
+		Error  string
+		Tty    bool
+	}{
+		{
+			Error: "bail",
+		},
+		{
+			Stdin:  "a",
+			Stdout: "b",
+			Stderr: "c",
+		},
+		{
+			Stdin:  "a",
+			Stdout: "b",
+			Tty:    true,
+		},
+	}
+
+	for i, testCase := range testCases {
+		localOut := &bytes.Buffer{}
+		localErr := &bytes.Buffer{}
+
+		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty))
+
+		url, _ := url.ParseRequestURI(server.URL)
+		c := client.NewRESTClient(url, "x", nil, -1, -1)
+		req := c.Post().Resource("testing")
+
+		conf := &client.Config{
+			Host: server.URL,
+		}
+		e := NewAttach(req, conf, strings.NewReader(testCase.Stdin), localOut, localErr, testCase.Tty)
+		//e.upgrader = testCase.Upgrader
+		err := e.Execute()
+		hasErr := err != nil
+
+		if len(testCase.Error) > 0 {
+			if !hasErr {
+				t.Errorf("%d: expected an error", i)
+			} else {
+				if e, a := testCase.Error, err.Error(); !strings.Contains(a, e) {
+					t.Errorf("%d: expected error stream read '%v', got '%v'", i, e, a)
+				}
+			}
+
+			server.Close()
+			continue
+		}
+
+		if hasErr {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			server.Close()
+			continue
+		}
+
+		if len(testCase.Stdout) > 0 {
+			if e, a := testCase.Stdout, localOut; e != a.String() {
+				t.Errorf("%d: expected stdout data '%s', got '%s'", i, e, a)
+			}
+		}
+
+		if testCase.Stderr != "" {
+			if e, a := testCase.Stderr, localErr; e != a.String() {
+				t.Errorf("%d: expected stderr data '%s', got '%s'", i, e, a)
+			}
+		}
+
+		server.Close()
+	}
+}

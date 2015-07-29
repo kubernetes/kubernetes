@@ -3,24 +3,38 @@
 
 .SH NAME
 .PP
-kubectl \- kubectl controls the Kubernetes cluster manager
+kubectl attach \- Attach to a running container.
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl\fP [OPTIONS]
+\fBkubectl attach\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-kubectl controls the Kubernetes cluster manager.
-
-.PP
-Find more information at 
-\[la]https://github.com/GoogleCloudPlatform/kubernetes\[ra].
+Attach to a a process that is already running inside an existing container.
 
 
 .SH OPTIONS
+.PP
+\fB\-c\fP, \fB\-\-container\fP=""
+    Container name
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for attach
+
+.PP
+\fB\-i\fP, \fB\-\-stdin\fP=false
+    Pass stdin to the container
+
+.PP
+\fB\-t\fP, \fB\-\-tty\fP=false
+    Stdin is a TTY
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
@@ -48,10 +62,6 @@ Find more information at
 .PP
 \fB\-\-context\fP=""
     The name of the kubeconfig context to use
-
-.PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for kubectl
 
 .PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
@@ -122,9 +132,28 @@ Find more information at
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+// get output from running pod 123456\-7890, using the first container by default
+$ kubectl attach 123456\-7890
+	
+// get output from ruby\-container from pod 123456\-7890
+$ kubectl attach 123456\-7890 \-c ruby\-container date
+
+// switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
+// and sends stdout/stderr from 'bash' back to the client
+$ kubectl attach 123456\-7890 \-c ruby\-container \-i \-t
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl\-get(1)\fP, \fBkubectl\-describe(1)\fP, \fBkubectl\-create(1)\fP, \fBkubectl\-replace(1)\fP, \fBkubectl\-patch(1)\fP, \fBkubectl\-delete(1)\fP, \fBkubectl\-namespace(1)\fP, \fBkubectl\-logs(1)\fP, \fBkubectl\-rolling\-update(1)\fP, \fBkubectl\-scale(1)\fP, \fBkubectl\-attach(1)\fP, \fBkubectl\-exec(1)\fP, \fBkubectl\-port\-forward(1)\fP, \fBkubectl\-proxy(1)\fP, \fBkubectl\-run(1)\fP, \fBkubectl\-stop(1)\fP, \fBkubectl\-expose(1)\fP, \fBkubectl\-label(1)\fP, \fBkubectl\-config(1)\fP, \fBkubectl\-cluster\-info(1)\fP, \fBkubectl\-api\-versions(1)\fP, \fBkubectl\-version(1)\fP,
+\fBkubectl(1)\fP,
 
 
 .SH HISTORY
