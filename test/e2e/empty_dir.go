@@ -27,51 +27,182 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
+const (
+	testImageRootUid    = "gcr.io/google_containers/mounttest:0.3"
+	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.1"
+)
+
 var _ = Describe("EmptyDir volumes", func() {
 	f := NewFramework("emptydir")
 
-	It("should have the correct mode", func() {
-		volumePath := "/test-volume"
-		source := &api.EmptyDirVolumeSource{
-			Medium: api.StorageMediumMemory,
-		}
-		pod := testPodWithVolume(volumePath, source)
-
-		pod.Spec.Containers[0].Args = []string{
-			fmt.Sprintf("--fs_type=%v", volumePath),
-			fmt.Sprintf("--file_mode=%v", volumePath),
-		}
-		f.TestContainerOutput("emptydir r/w on tmpfs", pod, 0, []string{
-			"mount type of \"/test-volume\": tmpfs",
-			"mode of file \"/test-volume\": dtrwxrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
-		})
+	It("volume on tmpfs should have the correct mode", func() {
+		doTestVolumeMode(f, testImageRootUid, api.StorageMediumMemory)
 	})
 
-	It("should support r/w", func() {
-		volumePath := "/test-volume"
-		filePath := path.Join(volumePath, "test-file")
-		source := &api.EmptyDirVolumeSource{
-			Medium: api.StorageMediumMemory,
-		}
-		pod := testPodWithVolume(volumePath, source)
+	It("should support (root,0644,tmpfs)", func() {
+		doTest0644(f, testImageRootUid, api.StorageMediumMemory)
+	})
 
-		pod.Spec.Containers[0].Args = []string{
-			fmt.Sprintf("--fs_type=%v", volumePath),
-			fmt.Sprintf("--rw_new_file=%v", filePath),
-			fmt.Sprintf("--file_mode=%v", filePath),
-		}
-		f.TestContainerOutput("emptydir r/w on tmpfs", pod, 0, []string{
-			"mount type of \"/test-volume\": tmpfs",
-			"mode of file \"/test-volume/test-file\": -rw-r--r--",
-			"content of file \"/test-volume/test-file\": mount-tester new file",
-		})
+	It("should support (root,0666,tmpfs)", func() {
+		doTest0666(f, testImageRootUid, api.StorageMediumMemory)
+	})
+
+	It("should support (root,0777,tmpfs)", func() {
+		doTest0777(f, testImageRootUid, api.StorageMediumMemory)
+	})
+
+	It("should support (non-root,0644,tmpfs)", func() {
+		doTest0644(f, testImageNonRootUid, api.StorageMediumMemory)
+	})
+
+	It("should support (non-root,0666,tmpfs)", func() {
+		doTest0666(f, testImageNonRootUid, api.StorageMediumMemory)
+	})
+
+	It("should support (non-root,0777,tmpfs)", func() {
+		doTest0777(f, testImageNonRootUid, api.StorageMediumMemory)
+	})
+
+	It("volume on default medium should have the correct mode", func() {
+		doTestVolumeMode(f, testImageRootUid, api.StorageMediumDefault)
+	})
+
+	It("should support (root,0644,default)", func() {
+		doTest0644(f, testImageRootUid, api.StorageMediumDefault)
+	})
+
+	It("should support (root,0666,default)", func() {
+		doTest0666(f, testImageRootUid, api.StorageMediumDefault)
+	})
+
+	It("should support (root,0777,default)", func() {
+		doTest0777(f, testImageRootUid, api.StorageMediumDefault)
+	})
+
+	It("should support (non-root,0644,default)", func() {
+		doTest0644(f, testImageNonRootUid, api.StorageMediumDefault)
+	})
+
+	It("should support (non-root,0666,default)", func() {
+		doTest0666(f, testImageNonRootUid, api.StorageMediumDefault)
+	})
+
+	It("should support (non-root,0777,default)", func() {
+		doTest0777(f, testImageNonRootUid, api.StorageMediumDefault)
 	})
 })
 
-const containerName = "test-container"
-const volumeName = "test-volume"
+const (
+	containerName = "test-container"
+	volumeName    = "test-volume"
+)
 
-func testPodWithVolume(path string, source *api.EmptyDirVolumeSource) *api.Pod {
+func doTestVolumeMode(f *Framework, image string, medium api.StorageMedium) {
+	var (
+		volumePath = "/test-volume"
+		source     = &api.EmptyDirVolumeSource{Medium: medium}
+		pod        = testPodWithVolume(testImageRootUid, volumePath, source)
+	)
+
+	pod.Spec.Containers[0].Args = []string{
+		fmt.Sprintf("--fs_type=%v", volumePath),
+		fmt.Sprintf("--file_perm=%v", volumePath),
+	}
+
+	msg := fmt.Sprintf("emptydir volume type on %v", formatMedium(medium))
+	out := []string{
+		"perms of file \"/test-volume\": -rwxrwxrwx",
+	}
+	if medium == api.StorageMediumMemory {
+		out = append(out, "mount type of \"/test-volume\": tmpfs")
+	}
+	f.TestContainerOutput(msg, pod, 0, out)
+}
+
+func doTest0644(f *Framework, image string, medium api.StorageMedium) {
+	var (
+		volumePath = "/test-volume"
+		filePath   = path.Join(volumePath, "test-file")
+		source     = &api.EmptyDirVolumeSource{Medium: medium}
+		pod        = testPodWithVolume(image, volumePath, source)
+	)
+
+	pod.Spec.Containers[0].Args = []string{
+		fmt.Sprintf("--fs_type=%v", volumePath),
+		fmt.Sprintf("--new_file_0644=%v", filePath),
+		fmt.Sprintf("--file_perm=%v", filePath),
+	}
+
+	msg := fmt.Sprintf("emptydir 0644 on %v", formatMedium(medium))
+	out := []string{
+		"perms of file \"/test-volume/test-file\": -rw-r--r--",
+		"content of file \"/test-volume/test-file\": mount-tester new file",
+	}
+	if medium == api.StorageMediumMemory {
+		out = append(out, "mount type of \"/test-volume\": tmpfs")
+	}
+	f.TestContainerOutput(msg, pod, 0, out)
+}
+
+func doTest0666(f *Framework, image string, medium api.StorageMedium) {
+	var (
+		volumePath = "/test-volume"
+		filePath   = path.Join(volumePath, "test-file")
+		source     = &api.EmptyDirVolumeSource{Medium: medium}
+		pod        = testPodWithVolume(image, volumePath, source)
+	)
+
+	pod.Spec.Containers[0].Args = []string{
+		fmt.Sprintf("--fs_type=%v", volumePath),
+		fmt.Sprintf("--new_file_0666=%v", filePath),
+		fmt.Sprintf("--file_perm=%v", filePath),
+	}
+
+	msg := fmt.Sprintf("emptydir 0666 on %v", formatMedium(medium))
+	out := []string{
+		"perms of file \"/test-volume/test-file\": -rw-rw-rw-",
+		"content of file \"/test-volume/test-file\": mount-tester new file",
+	}
+	if medium == api.StorageMediumMemory {
+		out = append(out, "mount type of \"/test-volume\": tmpfs")
+	}
+	f.TestContainerOutput(msg, pod, 0, out)
+}
+
+func doTest0777(f *Framework, image string, medium api.StorageMedium) {
+	var (
+		volumePath = "/test-volume"
+		filePath   = path.Join(volumePath, "test-file")
+		source     = &api.EmptyDirVolumeSource{Medium: medium}
+		pod        = testPodWithVolume(image, volumePath, source)
+	)
+
+	pod.Spec.Containers[0].Args = []string{
+		fmt.Sprintf("--fs_type=%v", volumePath),
+		fmt.Sprintf("--new_file_0777=%v", filePath),
+		fmt.Sprintf("--file_perm=%v", filePath),
+	}
+
+	msg := fmt.Sprintf("emptydir 0777 on %v", formatMedium(medium))
+	out := []string{
+		"perms of file \"/test-volume/test-file\": -rwxrwxrwx",
+		"content of file \"/test-volume/test-file\": mount-tester new file",
+	}
+	if medium == api.StorageMediumMemory {
+		out = append(out, "mount type of \"/test-volume\": tmpfs")
+	}
+	f.TestContainerOutput(msg, pod, 0, out)
+}
+
+func formatMedium(medium api.StorageMedium) string {
+	if medium == api.StorageMediumMemory {
+		return "tmpfs"
+	}
+
+	return "node default medium"
+}
+
+func testPodWithVolume(image, path string, source *api.EmptyDirVolumeSource) *api.Pod {
 	podName := "pod-" + string(util.NewUUID())
 
 	return &api.Pod{
@@ -86,7 +217,7 @@ func testPodWithVolume(path string, source *api.EmptyDirVolumeSource) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:  containerName,
-					Image: "gcr.io/google_containers/mounttest:0.2",
+					Image: image,
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,

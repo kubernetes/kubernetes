@@ -1,7 +1,5 @@
-// +build !linux
-
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,19 +16,12 @@ limitations under the License.
 
 package empty_dir
 
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-)
-
-// realMountDetector pretends to implement mediumer.
-type realMountDetector struct {
-	mounter mount.Interface
+// chconRunner knows how to chcon a directory.
+type chconRunner interface {
+	SetContext(dir, context string) error
 }
 
-func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
-	return mediumUnknown, false, nil
-}
-
-func selinuxEnabled() bool {
-	return false
+// newChconRunner returns a new chconRunner.
+func newChconRunner() chconRunner {
+	return &realChconRunner{}
 }

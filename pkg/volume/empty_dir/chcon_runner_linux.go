@@ -1,7 +1,7 @@
-// +build !linux
+// +build linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,18 +19,16 @@ limitations under the License.
 package empty_dir
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/docker/libcontainer/selinux"
 )
 
-// realMountDetector pretends to implement mediumer.
-type realMountDetector struct {
-	mounter mount.Interface
-}
+type realChconRunner struct{}
 
-func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
-	return mediumUnknown, false, nil
-}
+func (_ *realChconRunner) SetContext(dir, context string) error {
+	// If SELinux is not enabled, return an empty string
+	if !selinux.SelinuxEnabled() {
+		return nil
+	}
 
-func selinuxEnabled() bool {
-	return false
+	return selinux.Setfilecon(dir, context)
 }
