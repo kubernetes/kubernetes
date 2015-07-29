@@ -39,7 +39,7 @@ interested in just starting to explore Kubernetes, we recommend that you start t
 
 _Note_:
 There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
-Please install Docker 1.6.2 or wait for Docker 1.7.1.
+Please install Docker 1.6.2 or Docker 1.7.1.
 
 **Table of Contents**
 
@@ -83,7 +83,7 @@ The first step in the process is to initialize the master node.
 Clone the Kubernetes repo, and run [master.sh](docker-multinode/master.sh) on the master machine with root:
 
 ```sh
-export K8S_VERSION=<your_k8s_version>
+export K8S_VERSION=<your_k8s_version (e.g. 1.0.1)>
 cd kubernetes/cluster/docker-multinode
 ./master.sh
 ```
@@ -99,7 +99,8 @@ Once your master is up and running you can add one or more workers on different 
 Clone the Kubernetes repo, and run [worker.sh](docker-multinode/worker.sh) on the worker machine with root:
 
 ```sh
-export K8S_VERSION=<your_k8s_version> MASTER_IP=<your_master_ip>
+export K8S_VERSION=<your_k8s_version (e.g. 1.0.1)>
+export MASTER_IP=<your_master_ip (e.g. 1.2.3.4)>
 cd kubernetes/cluster/docker-multinode
 ./worker.sh
 ```
