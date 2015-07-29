@@ -40,12 +40,12 @@ func NewPersistentVolumeOrderedIndex() *persistentVolumeOrderedIndex {
 }
 
 // accessModesIndexFunc is an indexing function that returns a persistent volume's AccessModes as a string
-func accessModesIndexFunc(obj interface{}) (string, error) {
+func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*api.PersistentVolume); ok {
 		modes := volume.GetAccessModesAsString(pv.Spec.AccessModes)
-		return modes, nil
+		return []string{modes}, nil
 	}
-	return "", fmt.Errorf("object is not a persistent volume: %v", obj)
+	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
 }
 
 // ListByAccessModes returns all volumes with the given set of AccessModeTypes *in order* of their storage capacity (low to high)
