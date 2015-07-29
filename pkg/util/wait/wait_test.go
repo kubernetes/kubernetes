@@ -91,9 +91,10 @@ func TestPollForever(t *testing.T) {
 			}
 			return false, nil
 		})
-		if err := Poll(time.Microsecond, 0, f); err != nil {
+		if err := PollInfinite(time.Microsecond, f); err != nil {
 			t.Fatalf("unexpected error %v", err)
 		}
+
 		close(ch)
 		complete <- struct{}{}
 	}()
