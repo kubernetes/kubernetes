@@ -1997,7 +1997,27 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			} else if len(addrs) == 0 {
 				return fmt.Errorf("no ip address for node %v", node.Name)
 			} else {
-				node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: addrs[0].String()}}
+				// check all ip addresses for this node.Name and try to find the first non-loopback IPv4 address.
+				// If no match is found, it uses the IP of the interface with gateway on it.
+				for _, ip := range addrs {
+					if ip.IsLoopback() {
+						continue
+					}
+
+					if ip.To4() != nil {
+						node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}
+						break
+					}
+				}
+
+				if len(node.Status.Addresses) == 0 {
+					ip, err := util.ChooseHostInterface()
+					if err != nil {
+						return err
+					}
+
+					node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}
+				}
 			}
 		}
 	}
