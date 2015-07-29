@@ -118,7 +118,7 @@ func (b *gitRepoVolumeBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }
 
-func (gr *gitRepo) IsReadOnly() bool {
+func (b *gitRepoVolumeBuilder) IsReadOnly() bool {
 	return false
 }
 
