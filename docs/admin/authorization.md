@@ -57,10 +57,11 @@ The following implementations are available, and are selected by flag:
 
 ### Request Attributes
 
-A request has 4 attributes that can be considered for authorization:
+A request has 5 attributes that can be considered for authorization:
   - user (the user-string which a user was authenticated as).
-  - whether the request is readonly (GETs are readonly)
-  - what resource is being accessed
+  - group (the list of group names the authenticated user is a member of).
+  - whether the request is readonly (GETs are readonly).
+  - what resource is being accessed.
     - applies only to the API endpoints, such as
         `/api/v1/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
         resource is the empty string.
@@ -78,7 +79,8 @@ The file format is [one JSON object per line](http://jsonlines.org/).  There sho
 one map per line.
 
 Each line is a "policy object".  A policy object is a map with the following properties:
-  - `user`, type string; the user-string from `--token-auth-file`
+  - `user`, type string; the user-string from `--token-auth-file`. If you specify `user`, it must match the username of the authenticated user.
+  - `group`, type string; if you specify `group`, it must match one of the groups of the authenticated user.
   - `readonly`, type boolean, when true, means that the policy only applies to GET
       operations.
   - `resource`, type string; a resource from an URL, such as `pods`.
@@ -151,7 +153,7 @@ type Authorizer interface {
 to determine whether or not to allow each API action.
 
 An authorization plugin is a module that implements this interface.
-Authorization plugin code goes in `pkg/auth/authorization/$MODULENAME`.
+Authorization plugin code goes in `pkg/auth/authorizer/$MODULENAME`.
 
 An authorization module can be completely implemented in go, or can call out
 to a remote authorization service.  Authorization modules can implement
