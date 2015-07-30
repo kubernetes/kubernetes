@@ -247,7 +247,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 	// - both saved and current statuses have Ready Conditions, different LastProbeTimes and different Ready Condition State -
 	//   Ready Condition changed it state since we last seen it, so we update both probeTimestamp and readyTransitionTimestamp.
 	// TODO: things to consider:
-	//   - if 'LastProbeTime' have gone back in time its probably and error, currently we ignore it,
+	//   - if 'LastProbeTime' have gone back in time its probably an error, currently we ignore it,
 	//   - currently only correct Ready State transition outside of Node Controller is marking it ready by Kubelet, we don't check
 	//     if that's the case, but it does not seem necessary.
 	savedCondition := nc.getCondition(&savedNodeStatus.status, api.NodeReady)
@@ -374,18 +374,20 @@ func (nc *NodeController) monitorNodeStatus() error {
 			continue
 		}
 
+		decisionTimestamp := nc.now()
+
 		if readyCondition != nil {
-			// Check eviction timeout.
+			// Check eviction timeout against decisionTimestamp
 			if lastReadyCondition.Status == api.ConditionFalse &&
-				nc.now().After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
+				decisionTimestamp.After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
 				if nc.podEvictor.AddNodeToEvict(node.Name) {
-					glog.Infof("Adding pods to evict: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
+					glog.Infof("Adding pods to evict: %v is later than %v + %v", decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
 				}
 			}
 			if lastReadyCondition.Status == api.ConditionUnknown &&
-				nc.now().After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout-gracePeriod)) {
+				decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout-gracePeriod)) {
 				if nc.podEvictor.AddNodeToEvict(node.Name) {
-					glog.Infof("Adding pods to evict2: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
+					glog.Infof("Adding pods to evict2: %v is later than %v + %v", decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
 				}
 			}
 			if lastReadyCondition.Status == api.ConditionTrue {
