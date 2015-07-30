@@ -111,6 +111,10 @@ func (c *Fake) LimitRanges(namespace string) client.LimitRangeInterface {
 	return &FakeLimitRanges{Fake: c, Namespace: namespace}
 }
 
+func (c *Fake) Jobs(namespace string) client.JobInterface {
+	return &FakeJobs{Fake: c, Namespace: namespace}
+}
+
 func (c *Fake) ResourceQuotas(namespace string) client.ResourceQuotaInterface {
 	return &FakeResourceQuotas{Fake: c, Namespace: namespace}
 }
