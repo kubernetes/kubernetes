@@ -30,7 +30,7 @@ type registry struct {
 }
 
 // NewEtcdRegistry returns a registry which will store LimitRange in the given storage
-func NewEtcdRegistry(s storage.StorageInterface) generic.Registry {
+func NewEtcdRegistry(s storage.Interface) generic.Registry {
 	prefix := "/limitranges"
 	return registry{
 		Etcd: &etcdgeneric.Etcd{

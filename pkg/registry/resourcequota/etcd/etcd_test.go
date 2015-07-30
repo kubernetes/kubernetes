@@ -39,14 +39,14 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.StorageInterface) {
+func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
 	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
 	return fakeEtcdClient, etcdStorage
 }
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, storage.StorageInterface) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient, h := newEtcdStorage(t)
 	storage, statusStorage := NewStorage(h)
 	return storage, statusStorage, fakeEtcdClient, h

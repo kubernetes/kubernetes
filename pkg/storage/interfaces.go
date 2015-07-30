@@ -23,9 +23,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// StorageVersioner abstracts setting and retrieving metadata fields from database response
+// Versioner abstracts setting and retrieving metadata fields from database response
 // onto the object ot list.
-type StorageVersioner interface {
+type Versioner interface {
 	// UpdateObject sets storage metadata into an API object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from database.
@@ -63,21 +63,21 @@ func Everything(runtime.Object) bool {
 	return true
 }
 
-// Pass an StorageUpdateFunc to StorageInterface.GuaranteedUpdate to make an update
+// Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
 // that is guaranteed to succeed.
 // See the comment for GuaranteedUpdate for more details.
-type StorageUpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
+type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
 
-// StorageInterface offers a common interface for object marshaling/unmarshling operations and
+// Interface offers a common interface for object marshaling/unmarshling operations and
 // hids all the storage-related operations behind it.
-type StorageInterface interface {
+type Interface interface {
 	// Returns list of servers addresses of the underyling database.
 	// TODO: This method is used only in a single place. Consider refactoring and getting rid
 	// of this method from the interface.
 	Backends() []string
 
-	// Returns StorageVersioner associated with this interface.
-	Versioner() StorageVersioner
+	// Returns Versioner associated with this interface.
+	Versioner() Versioner
 
 	// Create adds a new object at a key unless it already exists. 'ttl' is time-to-live
 	// in seconds (0 means forever). If no error is returned and out is not nil, out will be
@@ -129,7 +129,7 @@ type StorageInterface interface {
 	//
 	// Exmaple:
 	//
-	// s := /* implementation of StorageInterface */
+	// s := /* implementation of Interface */
 	// err := s.GuaranteedUpdate(
 	//     "myKey", &MyType{}, true,
 	//     func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
@@ -145,5 +145,5 @@ type StorageInterface interface {
 	//       return cur, nil, nil
 	//    }
 	// })
-	GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate StorageUpdateFunc) error
+	GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error
 }

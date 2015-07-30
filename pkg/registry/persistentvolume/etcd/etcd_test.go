@@ -39,7 +39,7 @@ type testRegistry struct {
 	*registrytest.GenericRegistry
 }
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, storage.StorageInterface) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
 	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())

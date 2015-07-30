@@ -104,7 +104,7 @@ type Etcd struct {
 	ReturnDeletedObject bool
 
 	// Used for all etcd access functions
-	Storage storage.StorageInterface
+	Storage storage.Interface
 }
 
 // NamespaceKeyRootFunc is the default function for constructing etcd paths to resource directories enforcing namespace rules.

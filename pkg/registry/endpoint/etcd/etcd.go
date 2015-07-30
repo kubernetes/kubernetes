@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against endpoints.
-func NewStorage(s storage.StorageInterface) *REST {
+func NewStorage(s storage.Interface) *REST {
 	prefix := "/services/endpoints"
 	return &REST{
 		&etcdgeneric.Etcd{

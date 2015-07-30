@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewStorage returns a registry which will store Secret in the given etcdStorage
-func NewStorage(s storage.StorageInterface) *REST {
+func NewStorage(s storage.Interface) *REST {
 	prefix := "/secrets"
 
 	store := &etcdgeneric.Etcd{

@@ -36,7 +36,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func NewEtcdStorage(client EtcdClient, codec runtime.Codec, prefix string) storage.StorageInterface {
+func NewEtcdStorage(client EtcdClient, codec runtime.Codec, prefix string) storage.Interface {
 	return &etcdHelper{
 		client:     client,
 		codec:      codec,
@@ -47,13 +47,13 @@ func NewEtcdStorage(client EtcdClient, codec runtime.Codec, prefix string) stora
 	}
 }
 
-// etcdHelper is the reference implementation of StorageInterface.
+// etcdHelper is the reference implementation of storage.Interface.
 type etcdHelper struct {
 	client EtcdClient
 	codec  runtime.Codec
 	copier runtime.ObjectCopier
 	// optional, has to be set to perform any atomic operations
-	versioner storage.StorageVersioner
+	versioner storage.Versioner
 	// prefix for all etcd keys
 	pathPrefix string
 
@@ -71,17 +71,17 @@ func init() {
 	metrics.Register()
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) Backends() []string {
 	return h.client.GetCluster()
 }
 
-// Implements StorageInterface.
-func (h *etcdHelper) Versioner() storage.StorageVersioner {
+// Implements storage.Interface.
+func (h *etcdHelper) Versioner() storage.Versioner {
 	return h.versioner
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) error {
 	key = h.prefixEtcdKey(key)
 	data, err := h.codec.Encode(obj)
@@ -109,7 +109,7 @@ func (h *etcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) err
 	return err
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error {
 	var response *etcd.Response
 	data, err := h.codec.Encode(obj)
@@ -150,7 +150,7 @@ func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error 
 	return err
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) Delete(key string, out runtime.Object) error {
 	key = h.prefixEtcdKey(key)
 	if _, err := conversion.EnforcePtr(out); err != nil {
@@ -169,7 +169,7 @@ func (h *etcdHelper) Delete(key string, out runtime.Object) error {
 	return err
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) RecursiveDelete(key string, recursive bool) error {
 	key = h.prefixEtcdKey(key)
 	startTime := time.Now()
@@ -178,7 +178,7 @@ func (h *etcdHelper) RecursiveDelete(key string, recursive bool) error {
 	return err
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
@@ -186,7 +186,7 @@ func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter storage.Fi
 	return w, nil
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
@@ -194,7 +194,7 @@ func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter storag
 	return w, nil
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) Get(key string, objPtr runtime.Object, ignoreNotFound bool) error {
 	key = h.prefixEtcdKey(key)
 	_, _, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
@@ -245,7 +245,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 	return body, node, err
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) GetToList(key string, listObj runtime.Object) error {
 	trace := util.NewTrace("GetToList " + getTypeName(listObj))
 	listPtr, err := runtime.GetItemsPtr(listObj)
@@ -319,7 +319,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 	return nil
 }
 
-// Implements StorageInterface.
+// Implements storage.Interface.
 func (h *etcdHelper) List(key string, listObj runtime.Object) error {
 	trace := util.NewTrace("List " + getTypeName(listObj))
 	defer trace.LogIfLong(time.Second)
@@ -367,16 +367,16 @@ func (h *etcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
 
-// SimpleUpdateFunc converts SimpleUpdateFunc into StorageUpdateFunc
-func SimpleUpdate(fn SimpleUpdateFunc) storage.StorageUpdateFunc {
+// SimpleUpdateFunc converts SimpleUpdateFunc into UpdateFunc
+func SimpleUpdate(fn SimpleUpdateFunc) storage.UpdateFunc {
 	return func(input runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		out, err := fn(input)
 		return out, nil, err
 	}
 }
 
-// Implements StorageInterface.
-func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate storage.StorageUpdateFunc) error {
+// Implements storage.Interface.
+func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate storage.UpdateFunc) error {
 	v, err := conversion.EnforcePtr(ptrToType)
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.

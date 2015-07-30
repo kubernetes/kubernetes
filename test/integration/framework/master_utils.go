@@ -72,7 +72,7 @@ type MasterComponents struct {
 	// Used to stop master components individually, and via MasterComponents.Stop
 	once sync.Once
 	// Kubernetes etcd storage, has embedded etcd client
-	EtcdStorage storage.StorageInterface
+	EtcdStorage storage.Interface
 }
 
 // Config is a struct of configuration directives for NewMasterComponents.
@@ -119,13 +119,13 @@ func NewMasterComponents(c *Config) *MasterComponents {
 }
 
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
-func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Server, storage.StorageInterface) {
+func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Server, storage.Interface) {
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
 
-	var etcdStorage storage.StorageInterface
+	var etcdStorage storage.Interface
 	var err error
 	if masterConfig == nil {
 		etcdStorage, err = master.NewEtcdStorage(NewEtcdClient(), "", etcdtest.PathPrefix())

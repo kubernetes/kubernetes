@@ -31,7 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.StorageInterface) {
+func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
 	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())

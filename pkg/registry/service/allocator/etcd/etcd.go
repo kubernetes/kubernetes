@@ -43,7 +43,7 @@ type Etcd struct {
 	lock sync.Mutex
 
 	alloc   allocator.Snapshottable
-	storage storage.StorageInterface
+	storage storage.Interface
 	last    string
 
 	baseKey string
@@ -56,7 +56,7 @@ var _ service.RangeRegistry = &Etcd{}
 
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
-func NewEtcd(alloc allocator.Snapshottable, baseKey string, kind string, storage storage.StorageInterface) *Etcd {
+func NewEtcd(alloc allocator.Snapshottable, baseKey string, kind string, storage storage.Interface) *Etcd {
 	return &Etcd{
 		alloc:   alloc,
 		storage: storage,

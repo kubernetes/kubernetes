@@ -88,7 +88,7 @@ const (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	DatabaseStorage storage.StorageInterface
+	DatabaseStorage storage.Interface
 	EventTTL        time.Duration
 	MinionRegexp    string
 	KubeletClient   client.KubeletClient
@@ -224,9 +224,9 @@ type Master struct {
 	clock          util.Clock
 }
 
-// NewEtcdStorage returns a StorageInterface for the provided arguments or an error if the version
+// NewEtcdStorage returns a storage.Interface for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etcdStorage storage.StorageInterface, err error) {
+func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etcdStorage storage.Interface, err error) {
 	if version == "" {
 		version = latest.Version
 	}

@@ -41,7 +41,7 @@ func NewEtcdClient() *etcd.Client {
 	return etcd.NewClient([]string{})
 }
 
-func NewEtcdStorage() (storage.StorageInterface, error) {
+func NewEtcdStorage() (storage.Interface, error) {
 	return master.NewEtcdStorage(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 }
 

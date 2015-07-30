@@ -37,7 +37,7 @@ type REST struct {
 var controllerPrefix = "/controllers"
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(s storage.StorageInterface) *REST {
+func NewREST(s storage.Interface) *REST {
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &api.ReplicationController{} },
 

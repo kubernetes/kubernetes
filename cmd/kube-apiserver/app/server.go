@@ -217,7 +217,7 @@ func (s *APIServer) verifyClusterIPFlags() {
 	}
 }
 
-func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (etcdStorage storage.StorageInterface, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (etcdStorage storage.Interface, err error) {
 	var client tools.EtcdClient
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)

@@ -32,7 +32,7 @@ import (
 )
 
 // NewAuthenticator returns an authenticator.Request or an error
-func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyFile string, serviceAccountLookup bool, storage storage.StorageInterface) (authenticator.Request, error) {
+func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyFile string, serviceAccountLookup bool, storage storage.Interface) (authenticator.Request, error) {
 	var authenticators []authenticator.Request
 
 	if len(basicAuthFile) > 0 {
@@ -104,7 +104,7 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Request or an error
-func newServiceAccountAuthenticator(keyfile string, lookup bool, storage storage.StorageInterface) (authenticator.Request, error) {
+func newServiceAccountAuthenticator(keyfile string, lookup bool, storage storage.Interface) (authenticator.Request, error) {
 	publicKey, err := serviceaccount.ReadPublicKey(keyfile)
 	if err != nil {
 		return nil, err

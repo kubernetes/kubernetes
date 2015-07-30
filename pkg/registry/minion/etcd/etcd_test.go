@@ -48,7 +48,7 @@ func (fakeConnectionInfoGetter) GetConnectionInfo(host string) (string, uint, ht
 	return "http", 12345, nil, nil
 }
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.StorageInterface) {
+func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
 	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
