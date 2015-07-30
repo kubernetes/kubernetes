@@ -3,24 +3,44 @@
 	</div>
 <script type="text/javascript">
 	$(function() {
-			 	$('.nav-link').click( function() {
-		        	var href = $(this).attr('href');
-					var containertest = href.indexOf('#');
-					history.pushState({}, null, href);
-					if(containertest == -1){
-						$('#doccontent').animate({scrollTop: 0}, 500).load(href + ' #doccontent > *');
-					}
-		        return false; // don't actually follow the link
-		     	});
-			    (function() {
-			      var cx = '000109980045891363434:ylkdyqkassi';
-			      var gcse = document.createElement('script');
-			      gcse.type = 'text/javascript';
-			      gcse.async = true;
-			      gcse.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') +
-			          '//cse.google.com/cse.js?cx=' + cx;
-			      var s = document.getElementsByTagName('script')[0];
-			      s.parentNode.insertBefore(gcse, s);
-			    })();
+		/* Load only the doccontent div on click (in navigation menu only) and push state so back/forward browser buttons work */
+		/* Do not record or act on # only hrefs (they serve as menu open/close for empty navigation menu containers). */
+		$('.nav-link').click( function() {
+			var href = $(this).attr('href');
+			var containertest = href.indexOf('#');
+			if(containertest == -1){
+				history.pushState({}, null, href);
+				$('#doccontent').animate({scrollTop: 0}, 500).load(href + ' #doccontent > *');
+			}
+		    return false; // don't actually follow the link
+		});
+		/* Look for change in page state and load any changes */
+		function loadonstatechange(){
+			var popped = ('state' in window.history && window.history.state !== null), 
+					initialURL = location.href;
+
+		     $(window).bind('popstate', function (event) {
+		        // Ignore inital popstate that some browsers fire on page load
+		        var initialPop = !popped && location.href == initialURL
+		        popped = true
+		        if (initialPop) return;
+				$(window).unbind('popstate');
+		        window.location = window.location.href;
+		        return;
+
+		     });
+		}
+		loadonstatechange();
+		/* Google custom search engine */
+		(function() {
+			var cx = '000109980045891363434:ylkdyqkassi';
+			var gcse = document.createElement('script');
+			gcse.type = 'text/javascript';
+			gcse.async = true;
+			gcse.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') +
+				'//cse.google.com/cse.js?cx=' + cx;
+			var s = document.getElementsByTagName('script')[0];
+			s.parentNode.insertBefore(gcse, s);
+		})();
 	});
 </script>
