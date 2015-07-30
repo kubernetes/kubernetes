@@ -45,8 +45,8 @@ func (c *FakeNamespaces) Delete(name string) error {
 }
 
 func (c *FakeNamespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-namespace"})
-	return &api.Namespace{}, c.Fake.Err
+	c.Fake.Invokes(FakeAction{Action: "create-namespace"}, nil)
+	return &api.Namespace{}, c.Fake.Err()
 }
 
 func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error) {
@@ -55,7 +55,7 @@ func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error
 }
 
 func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-namespaces", Value: resourceVersion})
+	c.Fake.Invokes(FakeAction{Action: "watch-namespaces", Value: resourceVersion}, nil)
 	return c.Fake.Watch, nil
 }
 

@@ -45,10 +45,11 @@ func TestAdmission(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
-	if len(mockClient.Actions) != 1 {
+	actions := mockClient.Actions()
+	if len(actions) != 1 {
 		t.Errorf("Expected a create-namespace request")
 	}
-	if mockClient.Actions[0].Action != "create-namespace" {
+	if actions[0].Action != "create-namespace" {
 		t.Errorf("Expected a create-namespace request to be made via the client")
 	}
 }
@@ -76,7 +77,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
-	if len(mockClient.Actions) != 0 {
+	if len(mockClient.Actions()) != 0 {
 		t.Errorf("No client request should have been made")
 	}
 }
@@ -97,7 +98,7 @@ func TestIgnoreAdmission(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
-	if len(mockClient.Actions) != 0 {
+	if len(mockClient.Actions()) != 0 {
 		t.Errorf("No client request should have been made")
 	}
 }
@@ -105,9 +106,9 @@ func TestIgnoreAdmission(t *testing.T) {
 // TestAdmissionNamespaceExistsUnknownToHandler
 func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 	namespace := "test"
-	mockClient := &testclient.Fake{
-		Err: errors.NewAlreadyExists("namespaces", namespace),
-	}
+	mockClient := &testclient.Fake{}
+	mockClient.SetErr(errors.NewAlreadyExists("namespaces", namespace))
+
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	handler := &provision{
 		client: mockClient,

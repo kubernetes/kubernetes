@@ -2322,10 +2322,11 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(kubeClient.Actions) != 2 || kubeClient.Actions[1].Action != "update-status-node" {
-		t.Fatalf("unexpected actions: %v", kubeClient.Actions)
+	actions := kubeClient.Actions()
+	if len(actions) != 2 || actions[1].Action != "update-status-node" {
+		t.Fatalf("unexpected actions: %v", actions)
 	}
-	updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
+	updatedNode, ok := actions[1].Value.(*api.Node)
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
@@ -2419,10 +2420,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(kubeClient.Actions) != 2 {
-		t.Errorf("unexpected actions: %v", kubeClient.Actions)
+	actions := kubeClient.Actions()
+	if len(actions) != 2 {
+		t.Errorf("unexpected actions: %v", actions)
 	}
-	updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
+	updatedNode, ok := actions[1].Value.(*api.Node)
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
@@ -2506,10 +2508,11 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(kubeClient.Actions) != 2 || kubeClient.Actions[1].Action != "update-status-node" {
-		t.Fatalf("unexpected actions: %v", kubeClient.Actions)
+	actions := kubeClient.Actions()
+	if len(actions) != 2 || actions[1].Action != "update-status-node" {
+		t.Fatalf("unexpected actions: %v", actions)
 	}
-	updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
+	updatedNode, ok := actions[1].Value.(*api.Node)
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
@@ -2536,8 +2539,8 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	if err := kubelet.updateNodeStatus(); err == nil {
 		t.Errorf("unexpected non error: %v", err)
 	}
-	if len(testKubelet.fakeKubeClient.Actions) != nodeStatusUpdateRetry {
-		t.Errorf("unexpected actions: %v", testKubelet.fakeKubeClient.Actions)
+	if len(testKubelet.fakeKubeClient.Actions()) != nodeStatusUpdateRetry {
+		t.Errorf("unexpected actions: %v", testKubelet.fakeKubeClient.Actions())
 	}
 }
 

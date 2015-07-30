@@ -56,12 +56,12 @@ func (c *FakePods) Update(pod *api.Pod) (*api.Pod, error) {
 }
 
 func (c *FakePods) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-pods", Value: resourceVersion})
-	return c.Fake.Watch, c.Fake.Err
+	c.Fake.Invokes(FakeAction{Action: "watch-pods", Value: resourceVersion}, nil)
+	return c.Fake.Watch, c.Fake.Err()
 }
 
 func (c *FakePods) Bind(bind *api.Binding) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "bind-pod", Value: bind.Name})
+	c.Fake.Invokes(FakeAction{Action: "bind-pod", Value: bind.Name}, nil)
 	return nil
 }
 

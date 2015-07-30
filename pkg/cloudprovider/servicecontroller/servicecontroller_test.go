@@ -93,20 +93,21 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		client := &testclient.Fake{}
 		controller := New(cloud, client, "test-cluster")
 		controller.init()
-		cloud.Calls = nil    // ignore any cloud calls made in init()
-		client.Actions = nil // ignore any client calls made in init()
+		cloud.Calls = nil     // ignore any cloud calls made in init()
+		client.ClearActions() // ignore any client calls made in init()
 		err, _ := controller.createLoadBalancerIfNeeded(types.NamespacedName{"foo", "bar"}, item.service, nil)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if item.expectErr && err == nil {
 			t.Errorf("expected error creating %v, got nil", item.service)
 		}
+		actions := client.Actions()
 		if !item.expectCreateAttempt {
 			if len(cloud.Calls) > 0 {
 				t.Errorf("unexpected cloud provider calls: %v", cloud.Calls)
 			}
-			if len(client.Actions) > 0 {
-				t.Errorf("unexpected client actions: %v", client.Actions)
+			if len(actions) > 0 {
+				t.Errorf("unexpected client actions: %v", actions)
 			}
 		} else {
 			if len(cloud.Balancers) != 1 {
@@ -117,13 +118,13 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 				t.Errorf("created load balancer has incorrect parameters: %v", cloud.Balancers[0])
 			}
 			actionFound := false
-			for _, action := range client.Actions {
+			for _, action := range actions {
 				if action.Action == "update-service" {
 					actionFound = true
 				}
 			}
 			if !actionFound {
-				t.Errorf("expected updated service to be sent to client, got these actions instead: %v", client.Actions)
+				t.Errorf("expected updated service to be sent to client, got these actions instead: %v", actions)
 			}
 		}
 	}

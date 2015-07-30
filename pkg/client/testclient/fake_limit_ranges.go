@@ -56,6 +56,6 @@ func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (*api.LimitRange, e
 }
 
 func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-limitRange", Value: resourceVersion})
+	c.Fake.Invokes(FakeAction{Action: "watch-limitRange", Value: resourceVersion}, nil)
 	return c.Fake.Watch, nil
 }
