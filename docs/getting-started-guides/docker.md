@@ -55,6 +55,25 @@ Here's a diagram of what the final result will look like:
 ### Prerequisites
 
 1. You need to have docker installed on one machine.
+2. Your kernel should support memory and swap accounting. Ensure that the
+following configs are turned on in your linux kernel:
+CONFIG_RESOURCE_COUNTERS=y
+
+CONFIG_MEMCG=y
+
+CONFIG_MEMCG_SWAP=y
+
+CONFIG_MEMCG_SWAP_ENABLED=y
+
+CONFIG_MEMCG_KMEM=y
+3. Enable the memory and swap accounting in ther kernel at boot as command line
+parameters as follows:
+GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
+NOTE: The above is specifically for GRUB2. 
+
+You can check the command line parameters passed to your kenel by looking at the
+output of /proc/cmdline
+    
 
 ### Step One: Run etcd
 
