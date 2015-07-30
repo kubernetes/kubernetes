@@ -7,15 +7,6 @@ Upon further consideration it has been decided that a greater alignment between 
 Currently it is not possible to specify pod placement constraints for the kubernetes-mesos scheduler.
 This issue is being tracked here: https://github.com/mesosphere/kubernetes-mesos/issues/338
 
-### Resource Allocation
-
-Resource requirements (limits) specified on Kubernetes pods are currently ignored, both in the scheduler and on the node. Instead hardcoded values are used for the time being. This issue is being tracked here: https://github.com/mesosphere/kubernetes-mesos/issues/68.
-
-In general Mesos is designed to handle resource accounting and enforcement across the cluster. Part of that enforcement involves "growing" and "shrinking" the pool of resources allocated for executor containers.
-The current implementation of the kubelet-executor launches pods as Docker containers (just like the upstream kubelet) and makes no attempt to actually "contain" the pods that are launched.  Because the kubernetes-mesos scheduler cannot depend on the kubelet-executor to properly contain resources, it foregoes implementing accurate resource accounting.
-
-Recent changes to both the Docker and Kubernetes codebase have made it possible to implement the necessary changes in the kubelet-executor for proper pod containment. This is in the works and will be merged into a later version when ready.
-
 ### Ports
 
 Mesos typically defines `ports` resources for each slave and these ports are consumed by tasks, as they are launched, that require one or more host ports.
@@ -29,6 +20,13 @@ If slaves are configured to offer a `ports` resource range, for example [31000-3
 Ports declared outside that range (other than zero) will never match resource offers received by the k8sm scheduler, and so pod specifications that declare such ports will never be executed as tasks on the cluster.
 
 As opposed to Kubernetes proper, a missing pod container host port specification or a host port set to zero will allocate a host port from a resource offer.
+
+### Static Pods
+
+Static pods in general are supported by the k8sm-scheduler. The path of the pod definitions can be set via the `--static-pods-config` flag. There are two restrictions currently in that implementation:
+
+- static pods *must have resource limits* on cpu and memory in their container specs (compare the [k8sm architecture](architecture.md))
+- static pods *are read only once* by the k8sm-scheduler on startup. Only newly started executor will get the latest static pod specs from the defined static pod directory.
 
 ### Service Endpoints
 
