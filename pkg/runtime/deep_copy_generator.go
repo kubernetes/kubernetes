@@ -19,6 +19,7 @@ package runtime
 import (
 	"fmt"
 	"io"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -38,9 +39,20 @@ type DeepCopyGenerator interface {
 	// functions for this type and all nested types will be generated.
 	AddType(inType reflect.Type) error
 
+	// ReplaceType registers a type that should be used instead of the type
+	// with the provided pkgPath and name.
+	ReplaceType(pkgPath, name string, in interface{})
+
+	// AddImport registers a package name with the generator and returns its
+	// short name.
+	AddImport(pkgPath string) string
+
+	// RepackImports creates a stable ordering of import short names
+	RepackImports()
+
 	// Writes all imports that are necessary for deep-copy function and
 	// their registration.
-	WriteImports(w io.Writer, pkg string) error
+	WriteImports(w io.Writer) error
 
 	// Writes deel-copy functions for all types added via AddType() method
 	// and their nested types.
@@ -57,20 +69,80 @@ type DeepCopyGenerator interface {
 	OverwritePackage(pkg, overwrite string)
 }
 
-func NewDeepCopyGenerator(scheme *conversion.Scheme) DeepCopyGenerator {
-	return &deepCopyGenerator{
+func NewDeepCopyGenerator(scheme *conversion.Scheme, targetPkg string, include util.StringSet) DeepCopyGenerator {
+	g := &deepCopyGenerator{
 		scheme:        scheme,
+		targetPkg:     targetPkg,
 		copyables:     make(map[reflect.Type]bool),
-		imports:       util.StringSet{},
+		imports:       make(map[string]string),
+		shortImports:  make(map[string]string),
 		pkgOverwrites: make(map[string]string),
+		replace:       make(map[pkgPathNamePair]reflect.Type),
+		include:       include,
 	}
+	g.targetPackage(targetPkg)
+	g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/conversion")
+	return g
+}
+
+type pkgPathNamePair struct {
+	PkgPath string
+	Name    string
 }
 
 type deepCopyGenerator struct {
-	scheme        *conversion.Scheme
-	copyables     map[reflect.Type]bool
-	imports       util.StringSet
+	scheme    *conversion.Scheme
+	targetPkg string
+	copyables map[reflect.Type]bool
+	// map of package names to shortname
+	imports map[string]string
+	// map of short names to package names
+	shortImports  map[string]string
 	pkgOverwrites map[string]string
+	replace       map[pkgPathNamePair]reflect.Type
+	include       util.StringSet
+}
+
+func (g *deepCopyGenerator) addImportByPath(pkg string) string {
+	if name, ok := g.imports[pkg]; ok {
+		return name
+	}
+	name := path.Base(pkg)
+	if _, ok := g.shortImports[name]; !ok {
+		g.imports[pkg] = name
+		g.shortImports[name] = pkg
+		return name
+	}
+	if dirname := path.Base(path.Dir(pkg)); len(dirname) > 0 {
+		name = dirname + name
+		if _, ok := g.shortImports[name]; !ok {
+			g.imports[pkg] = name
+			g.shortImports[name] = pkg
+			return name
+		}
+		if subdirname := path.Base(path.Dir(path.Dir(pkg))); len(subdirname) > 0 {
+			name = subdirname + name
+			if _, ok := g.shortImports[name]; !ok {
+				g.imports[pkg] = name
+				g.shortImports[name] = pkg
+				return name
+			}
+		}
+	}
+	for i := 2; i < 100; i++ {
+		generatedName := fmt.Sprintf("%s%d", name, i)
+		if _, ok := g.shortImports[generatedName]; !ok {
+			g.imports[pkg] = generatedName
+			g.shortImports[generatedName] = pkg
+			return generatedName
+		}
+	}
+	panic(fmt.Sprintf("unable to find a unique name for the package path %q: %v", pkg, g.shortImports))
+}
+
+func (g *deepCopyGenerator) targetPackage(pkg string) {
+	g.imports[pkg] = ""
+	g.shortImports[""] = pkg
 }
 
 func (g *deepCopyGenerator) addAllRecursiveTypes(inType reflect.Type) error {
@@ -90,11 +162,18 @@ func (g *deepCopyGenerator) addAllRecursiveTypes(inType reflect.Type) error {
 			return err
 		}
 	case reflect.Interface:
-		g.imports.Insert(inType.PkgPath())
+		g.addImportByPath(inType.PkgPath())
 		return nil
 	case reflect.Struct:
-		g.imports.Insert(inType.PkgPath())
-		if !strings.HasPrefix(inType.PkgPath(), "github.com/GoogleCloudPlatform/kubernetes") {
+		g.addImportByPath(inType.PkgPath())
+		found := false
+		for s := range g.include {
+			if strings.HasPrefix(inType.PkgPath(), s) {
+				found = true
+				break
+			}
+		}
+		if !found {
 			return nil
 		}
 		for i := 0; i < inType.NumField(); i++ {
@@ -110,6 +189,15 @@ func (g *deepCopyGenerator) addAllRecursiveTypes(inType reflect.Type) error {
 	return nil
 }
 
+func (g *deepCopyGenerator) AddImport(pkg string) string {
+	return g.addImportByPath(pkg)
+}
+
+// ReplaceType registers a replacement type to be used instead of the named type
+func (g *deepCopyGenerator) ReplaceType(pkgPath, name string, t interface{}) {
+	g.replace[pkgPathNamePair{pkgPath, name}] = reflect.TypeOf(t)
+}
+
 func (g *deepCopyGenerator) AddType(inType reflect.Type) error {
 	if inType.Kind() != reflect.Struct {
 		return fmt.Errorf("non-struct copies are not supported")
@@ -117,10 +205,23 @@ func (g *deepCopyGenerator) AddType(inType reflect.Type) error {
 	return g.addAllRecursiveTypes(inType)
 }
 
-func (g *deepCopyGenerator) WriteImports(w io.Writer, pkg string) error {
+func (g *deepCopyGenerator) RepackImports() {
 	var packages []string
-	packages = append(packages, "github.com/GoogleCloudPlatform/kubernetes/pkg/api")
-	packages = append(packages, "github.com/GoogleCloudPlatform/kubernetes/pkg/conversion")
+	for key := range g.imports {
+		packages = append(packages, key)
+	}
+	sort.Strings(packages)
+	g.imports = make(map[string]string)
+	g.shortImports = make(map[string]string)
+
+	g.targetPackage(g.targetPkg)
+	for _, pkg := range packages {
+		g.addImportByPath(pkg)
+	}
+}
+
+func (g *deepCopyGenerator) WriteImports(w io.Writer) error {
+	var packages []string
 	for key := range g.imports {
 		packages = append(packages, key)
 	}
@@ -130,10 +231,13 @@ func (g *deepCopyGenerator) WriteImports(w io.Writer, pkg string) error {
 	indent := 0
 	buffer.addLine("import (\n", indent)
 	for _, importPkg := range packages {
-		if strings.HasSuffix(importPkg, pkg) {
+		if len(importPkg) == 0 {
 			continue
 		}
-		buffer.addLine(fmt.Sprintf("\"%s\"\n", importPkg), indent+1)
+		if len(g.imports[importPkg]) == 0 {
+			continue
+		}
+		buffer.addLine(fmt.Sprintf("%s \"%s\"\n", g.imports[importPkg], importPkg), indent+1)
 	}
 	buffer.addLine(")\n", indent)
 	buffer.addLine("\n", indent)
@@ -159,33 +263,45 @@ func (s byPkgAndName) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (g *deepCopyGenerator) typeName(inType reflect.Type) string {
+func (g *deepCopyGenerator) nameForType(inType reflect.Type) string {
 	switch inType.Kind() {
-	case reflect.Map:
-		return fmt.Sprintf("map[%s]%s", g.typeName(inType.Key()), g.typeName(inType.Elem()))
 	case reflect.Slice:
 		return fmt.Sprintf("[]%s", g.typeName(inType.Elem()))
 	case reflect.Ptr:
 		return fmt.Sprintf("*%s", g.typeName(inType.Elem()))
+	case reflect.Map:
+		if len(inType.Name()) == 0 {
+			return fmt.Sprintf("map[%s]%s", g.typeName(inType.Key()), g.typeName(inType.Elem()))
+		}
+		fallthrough
 	default:
-		typeWithPkg := fmt.Sprintf("%s", inType)
-		slices := strings.Split(typeWithPkg, ".")
-		if len(slices) == 1 {
+		pkg, name := inType.PkgPath(), inType.Name()
+		if len(name) == 0 && inType.Kind() == reflect.Struct {
+			return "struct{}"
+		}
+		if len(pkg) == 0 {
 			// Default package.
-			return slices[0]
+			return name
 		}
-		if len(slices) == 2 {
-			pkg := slices[0]
-			if val, found := g.pkgOverwrites[pkg]; found {
-				pkg = val
-			}
-			if pkg != "" {
-				pkg = pkg + "."
-			}
-			return pkg + slices[1]
+		if val, found := g.pkgOverwrites[pkg]; found {
+			pkg = val
 		}
-		panic("Incorrect type name: " + typeWithPkg)
+		if len(pkg) == 0 {
+			return name
+		}
+		short := g.addImportByPath(pkg)
+		if len(short) > 0 {
+			return fmt.Sprintf("%s.%s", short, name)
+		}
+		return name
 	}
+}
+
+func (g *deepCopyGenerator) typeName(inType reflect.Type) string {
+	if t, ok := g.replace[pkgPathNamePair{inType.PkgPath(), inType.Name()}]; ok {
+		return g.nameForType(t)
+	}
+	return g.nameForType(inType)
 }
 
 func (g *deepCopyGenerator) deepCopyFunctionName(inType reflect.Type) string {
@@ -442,12 +558,8 @@ func (g *deepCopyGenerator) writeDeepCopyForType(b *buffer, inType reflect.Type,
 
 func (g *deepCopyGenerator) writeRegisterHeader(b *buffer, pkg string, indent int) {
 	b.addLine("func init() {\n", indent)
-	registerFormat := "err := %sScheme.AddGeneratedDeepCopyFuncs(\n"
-	if pkg == "api" {
-		b.addLine(fmt.Sprintf(registerFormat, ""), indent+1)
-	} else {
-		b.addLine(fmt.Sprintf(registerFormat, "api."), indent+1)
-	}
+	registerFormat := "err := %s.AddGeneratedDeepCopyFuncs(\n"
+	b.addLine(fmt.Sprintf(registerFormat, pkg), indent+1)
 }
 
 func (g *deepCopyGenerator) writeRegisterFooter(b *buffer, indent int) {
