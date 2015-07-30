@@ -192,26 +192,19 @@ var _ = Describe("Addon update", func() {
 
 	var dir string
 	var sshClient *ssh.Client
-	var c *client.Client
-	var namespace *api.Namespace
+	f := NewFramework("addon-update-test")
 
 	BeforeEach(func() {
 		// This test requires:
-		// - SSH
-		// - master access
+		// - SSH master access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
 		if !providerIs("gce") {
 			return
 		}
+
 		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-
 		sshClient, err = getMasterSSHClient()
-		Expect(err).NotTo(HaveOccurred())
-
-		namespace, err = createTestingNS("addon-update-test", c)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Reduce the addon update intervals so that we have faster response
@@ -221,25 +214,11 @@ var _ = Describe("Addon update", func() {
 	})
 
 	AfterEach(func() {
-		// This test requires:
-		// - SSH
-		// - master access
-		// ... so the provider check should be identical to the intersection of
-		// providers that provide those capabilities.
-		if !providerIs("gce") {
-			return
-		}
 		if sshClient != nil {
 			// restart addon_update with the default options
 			sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
 			sshClient.Close()
 		}
-		if err := c.Namespaces().Delete(namespace.Name); err != nil {
-			Failf("Couldn't delete ns %q: %s", namespace, err)
-		}
-		// Paranoia-- prevent reuse!
-		namespace = nil
-		c = nil
 	})
 
 	// WARNING: the test is not parallel-friendly!
@@ -253,7 +232,7 @@ var _ = Describe("Addon update", func() {
 
 		//these tests are long, so I squeezed several cases in one scenario
 		Expect(sshClient).NotTo(BeNil())
-		dir = namespace.Name // we use it only to give a unique string for each test execution
+		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"
 		temporaryRemotePath := temporaryRemotePathPrefix + "/" + dir                  // in home directory on kubernetes-master
@@ -270,10 +249,10 @@ var _ = Describe("Addon update", func() {
 
 		var remoteFiles []stringPair = []stringPair{
 			{fmt.Sprintf(addon_controller_v1, defaultNsName), rcv1},
-			{fmt.Sprintf(addon_controller_v2, namespace.Name), rcv2},
-			{fmt.Sprintf(addon_service_v1, namespace.Name), svcv1},
-			{fmt.Sprintf(addon_service_v2, namespace.Name), svcv2},
-			{fmt.Sprintf(invalid_addon_controller_v1, namespace.Name), rcInvalid},
+			{fmt.Sprintf(addon_controller_v2, f.Namespace.Name), rcv2},
+			{fmt.Sprintf(addon_service_v1, f.Namespace.Name), svcv1},
+			{fmt.Sprintf(addon_service_v2, f.Namespace.Name), svcv2},
+			{fmt.Sprintf(invalid_addon_controller_v1, f.Namespace.Name), rcInvalid},
 			{fmt.Sprintf(invalid_addon_service_v1, defaultNsName), svcInvalid},
 		}
 
@@ -302,8 +281,8 @@ var _ = Describe("Addon update", func() {
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv1, destinationDir, rcv1))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcv1, destinationDir, svcv1))
 
-		waitForServiceInAddonTest(c, namespace.Name, "addon-test", true)
-		waitForReplicationControllerInAddonTest(c, defaultNsName, "addon-test-v1", true)
+		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test", true)
+		waitForReplicationControllerInAddonTest(f.Client, defaultNsName, "addon-test-v1", true)
 
 		By("update manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv2, destinationDir, rcv2))
@@ -316,27 +295,27 @@ var _ = Describe("Addon update", func() {
 		 * But it is ok - as long as we don't have rolling update, the result will be the same
 		 */
 
-		waitForServiceInAddonTest(c, namespace.Name, "addon-test-updated", true)
-		waitForReplicationControllerInAddonTest(c, namespace.Name, "addon-test-v2", true)
+		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test-updated", true)
+		waitForReplicationControllerInAddonTest(f.Client, f.Namespace.Name, "addon-test-v2", true)
 
-		waitForServiceInAddonTest(c, namespace.Name, "addon-test", false)
-		waitForReplicationControllerInAddonTest(c, defaultNsName, "addon-test-v1", false)
+		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test", false)
+		waitForReplicationControllerInAddonTest(f.Client, defaultNsName, "addon-test-v1", false)
 
 		By("remove manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, rcv2))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcv2))
 
-		waitForServiceInAddonTest(c, namespace.Name, "addon-test-updated", false)
-		waitForReplicationControllerInAddonTest(c, namespace.Name, "addon-test-v2", false)
+		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test-updated", false)
+		waitForReplicationControllerInAddonTest(f.Client, f.Namespace.Name, "addon-test-v2", false)
 
 		By("verify invalid API addons weren't created")
-		_, err = c.ReplicationControllers(namespace.Name).Get("invalid-addon-test-v1")
+		_, err = f.Client.ReplicationControllers(f.Namespace.Name).Get("invalid-addon-test-v1")
 		Expect(err).To(HaveOccurred())
-		_, err = c.ReplicationControllers(defaultNsName).Get("invalid-addon-test-v1")
+		_, err = f.Client.ReplicationControllers(defaultNsName).Get("invalid-addon-test-v1")
 		Expect(err).To(HaveOccurred())
-		_, err = c.Services(namespace.Name).Get("ivalid-addon-test")
+		_, err = f.Client.Services(f.Namespace.Name).Get("ivalid-addon-test")
 		Expect(err).To(HaveOccurred())
-		_, err = c.Services(defaultNsName).Get("ivalid-addon-test")
+		_, err = f.Client.Services(defaultNsName).Get("ivalid-addon-test")
 		Expect(err).To(HaveOccurred())
 
 		// invalid addons will be deleted by the deferred function
