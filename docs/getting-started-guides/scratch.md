@@ -225,9 +225,11 @@ we recommend that you run these as containers, so you need an image to be built.
 
 You have several choices for Kubernetes images:
 - Use images hosted on Google Container Registry (GCR):
-  - e.g `gcr.io/google_containers/kube-apiserver:$TAG`, where `TAG` is the latest
+  - e.g `gcr.io/google_containers/hyperkube:$TAG`, where `TAG` is the latest
     release tag, which can be found on the [latest releases page](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest).
   - Ensure $TAG is the same tag as the release tag you are using for kubelet and kube-proxy.
+  - The [hyperkube](../../cmd/hyperkube/) binary is an all in one binary
+    - `hyperkube kubelet ...` runs the kublet, `hyperkube apiserver ...` runs an apiserver, etc.
 - Build your own images.
   - Useful if you are using a private registry.
   - The release contains files such as `./kubernetes/server/bin/kube-apiserver.tar` which
@@ -248,9 +250,7 @@ were tested extensively with this version of etcd and not with any other version
 The recommended version number can also be found as the value of `ETCD_VERSION` in `kubernetes/cluster/images/etcd/Makefile`.
 
 The remainder of the document assumes that the image identifiers have been chosen and stored in corresponding env vars.  Examples (replace with latest tags and appropriate registry):
-  - `APISERVER_IMAGE=gcr.io/google_containers/kube-apiserver:$TAG`
-  - `SCHEDULER_IMAGE=gcr.io/google_containers/kube-scheduler:$TAG`
-  - `CNTRLMNGR_IMAGE=gcr.io/google_containers/kube-controller-manager:$TAG`
+  - `HYPERKUBE_IMAGE==gcr.io/google_containers/hyperkube:$TAG`
   - `ETCD_IMAGE=gcr.io/google_containers/etcd:$ETCD_VERSION`
 
 ### Security Models
@@ -546,9 +546,9 @@ The apiserver, controller manager, and scheduler will each run as a pod on the m
 For each of these components, the steps to start them running are similar:
 
 1. Start with a provided template for a pod.
-1. Set the `APISERVER_IMAGE`, `CNTRLMNGR_IMAGE`, and `SCHEDULER_IMAGE to the values chosen in [Selecting Images](#selecting-images).
+1. Set the `HYPERKUBE_IMAGE` to the values chosen in [Selecting Images](#selecting-images).
 1. Determine which flags are needed for your cluster, using the advice below each template.
-1. Set the `APISERVER_FLAGS`, `CNTRLMNGR_FLAGS, and `SCHEDULER_FLAGS` to the space-separated list of flags for that component.
+1. Set the flags to be individual strings in the command array (e.g. $ARGN below)
 1. Start the pod by putting the completed template into the kubelet manifest directory.
 1. Verify that the pod is started.
 
@@ -566,11 +566,14 @@ For each of these components, the steps to start them running are similar:
     "containers": [
       {
         "name": "kube-apiserver",
-        "image": "${APISERVER_IMAGE}",
+        "image": "${HYPERKUBE_IMAGE}",
         "command": [
-          "/bin/sh",
-          "-c",
-          "/usr/local/bin/kube-apiserver $APISERVER_FLAGS"
+          "/hyperkube",
+          "apiserver",
+          "$ARG1",
+          "$ARG2",
+          ...
+          "$ARGN"
         ],
         "ports": [
           {
@@ -695,11 +698,14 @@ Complete this template for the scheduler pod:
     "containers": [
       {
         "name": "kube-scheduler",
-        "image": "$SCHEDULER_IMAGE",
+        "image": "$HYBERKUBE_IMAGE",
         "command": [
-          "/bin/sh",
-          "-c",
-          "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080 $SCHEDULER_FLAGS"
+          "/hyperkube",
+          "scheduler",
+          "--master=127.0.0.1:8080",
+          "$SCHEDULER_FLAG1",
+          ...
+          "$SCHEDULER_FLAGN"
         ],
         "livenessProbe": {
           "httpGet": {
@@ -737,11 +743,13 @@ Template for controller manager pod:
     "containers": [
       {
         "name": "kube-controller-manager",
-        "image": "$CNTRLMNGR_IMAGE",
+        "image": "$HYPERKUBE_IMAGE",
         "command": [
-          "/bin/sh",
-          "-c",
-          "/usr/local/bin/kube-controller-manager $CNTRLMNGR_FLAGS"
+          "/hyperkube",
+          "controller-manager",
+          "$CNTRLMNGR_FLAG1",
+          ...
+          "$CNTRLMNGR_FLAGN"
         ],
         "volumeMounts": [
           {
