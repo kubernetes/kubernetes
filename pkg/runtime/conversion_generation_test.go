@@ -23,31 +23,37 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-
-	"github.com/golang/glog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func generateConversions(t *testing.T, version string) bytes.Buffer {
-	g := runtime.NewConversionGenerator(api.Scheme.Raw())
+	g := runtime.NewConversionGenerator(api.Scheme.Raw(), path.Join("github.com/GoogleCloudPlatform/kubernetes/pkg/api", version))
+	apiShort := g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
+	g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource")
+	// TODO(wojtek-t): Change the overwrites to a flag.
 	g.OverwritePackage(version, "")
 	for _, knownType := range api.Scheme.KnownTypes(version) {
 		if err := g.GenerateConversionsForType(version, knownType); err != nil {
-			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
+			t.Fatalf("error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}
-
+	g.RepackImports(util.NewStringSet())
 	var functions bytes.Buffer
 	functionsWriter := bufio.NewWriter(&functions)
+	if err := g.WriteImports(functionsWriter); err != nil {
+		t.Fatalf("error while writing imports: %v", err)
+	}
 	if err := g.WriteConversionFunctions(functionsWriter); err != nil {
 		t.Fatalf("couldn't generate conversion functions: %v", err)
 	}
-	if err := g.RegisterConversionFunctions(functionsWriter); err != nil {
+	if err := g.RegisterConversionFunctions(functionsWriter, fmt.Sprintf("%s.Scheme", apiShort)); err != nil {
 		t.Fatalf("couldn't generate conversion function names: %v", err)
 	}
 	if err := functionsWriter.Flush(); err != nil {

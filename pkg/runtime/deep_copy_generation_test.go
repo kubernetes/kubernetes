@@ -22,23 +22,30 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 )
 
 func generateDeepCopies(t *testing.T, version string) bytes.Buffer {
-	g := runtime.NewDeepCopyGenerator(api.Scheme.Raw())
-	g.OverwritePackage(version, "")
 	testedVersion := version
-	if version == "api" {
+	registerTo := "api.Scheme"
+	if testedVersion == "api" {
 		testedVersion = api.Scheme.Raw().InternalVersion
+		registerTo = "Scheme"
 	}
+
+	g := runtime.NewDeepCopyGenerator(api.Scheme.Raw(), path.Join("github.com/GoogleCloudPlatform/kubernetes/pkg/api", testedVersion), util.NewStringSet("github.com/GoogleCloudPlatform/kubernetes"))
+	g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
+	g.OverwritePackage(version, "")
+
 	for _, knownType := range api.Scheme.KnownTypes(testedVersion) {
 		if err := g.AddType(knownType); err != nil {
 			glog.Errorf("error while generating deep-copy functions for %v: %v", knownType, err)
@@ -47,13 +54,14 @@ func generateDeepCopies(t *testing.T, version string) bytes.Buffer {
 
 	var functions bytes.Buffer
 	functionsWriter := bufio.NewWriter(&functions)
-	if err := g.WriteImports(functionsWriter, version); err != nil {
+	g.RepackImports()
+	if err := g.WriteImports(functionsWriter); err != nil {
 		t.Fatalf("couldn't generate deep-copy function imports: %v", err)
 	}
 	if err := g.WriteDeepCopyFunctions(functionsWriter); err != nil {
 		t.Fatalf("couldn't generate deep-copy functions: %v", err)
 	}
-	if err := g.RegisterDeepCopyFunctions(functionsWriter, version); err != nil {
+	if err := g.RegisterDeepCopyFunctions(functionsWriter, registerTo); err != nil {
 		t.Fatalf("couldn't generate deep-copy function names: %v", err)
 	}
 	if err := functionsWriter.Flush(); err != nil {
