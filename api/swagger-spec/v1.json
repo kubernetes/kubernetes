@@ -11984,13 +11984,25 @@
    "v1.JobSpec": {
     "id": "v1.JobSpec",
     "required": [
-     "completions"
+     "maxParallelism",
+     "completions",
+     "activeDeadlineSeconds"
     ],
     "properties": {
+     "maxParallelism": {
+      "type": "integer",
+      "format": "int32",
+      "description": "maximum desired number of pods the job should run at any given time."
+     },
      "completions": {
       "type": "integer",
       "format": "int32",
       "description": "number of completions desired"
+     },
+     "activeDeadlineSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "optional duration in seconds relative to startime the job may be active before the system tries to terminate it."
      },
      "selector": {
       "type": "any",
@@ -12759,9 +12771,15 @@
    "v1.JobStatus": {
     "id": "v1.JobStatus",
     "required": [
+     "active",
      "completions"
     ],
     "properties": {
+     "active": {
+      "type": "integer",
+      "format": "int32",
+      "description": "number of pods currently running"
+     },
      "completions": {
       "type": "integer",
       "format": "int32",

@@ -973,15 +973,26 @@ type PodTemplateList struct {
 
 // JobSpec is the specification of a job.
 type JobSpec struct {
-	// Completions is the number of desired completions.
+	// MaxParallelism specifies the maximum desired number of pods the job should
+	// run at any given time. The actual number of pods running in steady state will
+	// be less than this number when ((.spec.completions - .status.successful) < .spec.maxParallelism),
+	// i.e. when the work left to do is less than max parallelism.
+	MaxParallelism int `json:"maxParallelism" description:"maximum desired number of pods the job should run at any given time."`
+
+	// Completions specifies the desired number of successfully finished pods the
+	// job should be run with.
 	Completions int `json:"completions" description:"number of completions desired"`
+
+	// Optional duration in seconds relative to the StartTime that the job may be active
+	// before the system actively tries to terminate it; value must be positive integer
+	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds" description:"optional duration in seconds relative to startime the job may be active before the system tries to terminate it."`
 
 	// Selector is a label query over pods that should match the Completions count.
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.
 	Selector map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to be controlled by this job, if empty defaulted to labels on Pod template"`
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
-	// insufficient completions are detected.
+	// some fail to complete. This reference is ignored if a Template is set.
 	TemplateRef *ObjectReference `json:"templateRef,omitempty" description:"reference to an object that describes the pod that will be created if insufficient completions are detected"`
 
 	// Template is the object that describes the pod that will be created if
@@ -992,6 +1003,8 @@ type JobSpec struct {
 
 // JobStatus represents the current status of a job.
 type JobStatus struct {
+	//Active is the number of actively running pods
+	Active int `json:"active" description:"number of pods currently running"`
 	// Completions is the number of actual completions.
 	Completions int `json:"completions" description:"most recently oberved number of completions"`
 }

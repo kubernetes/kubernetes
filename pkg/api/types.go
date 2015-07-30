@@ -1052,28 +1052,38 @@ type ReplicationControllerList struct {
 // JobSpec is the specification of a job.
 // As the internal representation of a job, it may have either a TemplateRef or a Template set.
 type JobSpec struct {
-	// Completions is the number of desired successful completions of this job.
+	// MaxParallelism specifies the maximum desired number of pods the job should
+	// run at any given time. The actual number of pods running in steady state will
+	// be less than this number when ((.spec.completions - .status.successful) < .spec.maxParallelism),
+	// i.e. when the work left to do is less than max parallelism.
+	MaxParallelism int `json:"maxParallelism"`
+
+	// Completions specifies the desired number of successfully finished pods the
+	// job should be run with.
 	Completions int `json:"completions"`
 
+	// Optional duration in seconds relative to the StartTime that the job may be active
+	// before the system actively tries to terminate it; value must be positive integer
+	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds"`
+
 	// Selector is a label query over pods that should match the completed count.
+	// If Selector is empty, it is defaulted to the labels present on the Pod template.
 	Selector map[string]string `json:"selector"`
 
-	// TODO: Why is this needed?
 	// TemplateRef is a reference to an object that describes the pod that will be created if
 	// some fail to complete. This reference is ignored if a Template is set.
-	// Must be set before converting to a v1beta3 API object
 	TemplateRef *ObjectReference `json:"templateRef,omitempty"`
 
 	// Template is the object that describes the pod that will be created if
 	// some fail to complete. Internally, this takes precedence over a
 	// TemplateRef.
-	// Must be set before converting to a v1beta1 or v1beta2 API object.
 	Template *PodTemplateSpec `json:"template,omitempty"`
 }
 
-// JobStatus represents the current status of a replication
-// controller.
+// JobStatus represents the current status of a job.
 type JobStatus struct {
+	//Active is the number of actively running pods
+	Active int `json:"active"`
 	// Completions is the number of actual successful completions of this job.
 	Completions int `json:"completions"`
 }

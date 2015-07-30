@@ -692,7 +692,9 @@ func convert_api_JobSpec_To_v1_JobSpec(in *api.JobSpec, out *JobSpec, s conversi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.JobSpec))(in)
 	}
+	out.MaxParallelism = in.MaxParallelism
 	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
@@ -724,6 +726,7 @@ func convert_api_JobStatus_To_v1_JobStatus(in *api.JobStatus, out *JobStatus, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.JobStatus))(in)
 	}
+	out.Active = in.Active
 	out.Completions = in.Completions
 	return nil
 }
@@ -3024,7 +3027,9 @@ func convert_v1_JobSpec_To_api_JobSpec(in *JobSpec, out *api.JobSpec, s conversi
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobSpec))(in)
 	}
+	out.MaxParallelism = in.MaxParallelism
 	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
@@ -3056,6 +3061,7 @@ func convert_v1_JobStatus_To_api_JobStatus(in *JobStatus, out *api.JobStatus, s 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*JobStatus))(in)
 	}
+	out.Active = in.Active
 	out.Completions = in.Completions
 	return nil
 }

@@ -588,7 +588,9 @@ func deepCopy_api_JobList(in JobList, out *JobList, c *conversion.Cloner) error 
 }
 
 func deepCopy_api_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) error {
+	out.MaxParallelism = in.MaxParallelism
 	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
@@ -617,6 +619,7 @@ func deepCopy_api_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) error 
 }
 
 func deepCopy_api_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner) error {
+	out.Active = in.Active
 	out.Completions = in.Completions
 	return nil
 }
