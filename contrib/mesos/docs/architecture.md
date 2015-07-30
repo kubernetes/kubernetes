@@ -24,6 +24,20 @@ Kubernetes-Mesos uses "normal" Docker IPv4, host-private networking, rather than
 
 ![Network Diagram](networking.png)
 
+## Resource Accounting
+
+Mesos is designed to handle resource accounting and enforcement across the cluster. Part of that enforcement involves "growing" and "shrinking" the pool of resources allocated for executor containers.
+
+The implementation of the k8sm-executor launches pods as Docker containers (just like the upstream kubelet). The containers are resource limited (cpu and memory) with the means of `docker run` by the kubelet code. Moreover, all containers launched by the kubelet code are children of the k8sm-executor cgroup. This parent cgroup is assigned to the k8sm-executor by the Mesos slave.
+
+To actually enforce the defined resource limit for the k8sm-executor and its pods, enable the cpu and memory isolator in your Mesos slaves.
+
+The described resource allocation also applies to static pods which are run on every Mesos slave which runs a  k8sm-executor.
+
+Kubernetes allows to define pods without resource limits for cpu and/or memory. The upstream kubelet will then run the containers without resource bounds. Because Mesos enforces resource accounting, it assign default container cpu and memory limits for those pods. By default these are 0.25 cpu shares and 64 MB of memory. These values can be customized via the `--default-container-cpu-limit` and `--default-container-mem-limit` of the k8sm-scheduler.
+
+Note that currently static pods without cpu and memory limit are not allowed and will make the k8sm-scheduler refuse to start (compare the [k8sm issues](issues.md)).
+
 [1]: http://mesos.apache.org/
 [2]: https://issues.apache.org/jira/browse/MESOS-1806
 [3]: issues.md#service-endpoints

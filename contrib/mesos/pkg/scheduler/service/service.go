@@ -18,6 +18,7 @@ package service
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -42,8 +43,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/uid"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -70,6 +72,9 @@ const (
 	defaultReconcileInterval = 300    // 5m default task reconciliation interval
 	defaultReconcileCooldown = 15 * time.Second
 	defaultFrameworkName     = "Kubernetes"
+
+	executorCPUs = mresource.CPUShares(0.25) // initial CPU allocated for executor
+	executorMem  = mresource.MegaBytes(64.0) // initial memory allocated for executor
 )
 
 type SchedulerServer struct {
@@ -95,11 +100,14 @@ type SchedulerServer struct {
 	ExecutorProxyBindall          bool
 	ExecutorLogV                  int
 	ExecutorSuicideTimeout        time.Duration
+	ExecutorCgroupPrefix          string
 	MesosAuthProvider             string
 	DriverPort                    uint
 	HostnameOverride              string
 	ReconcileInterval             int64
 	ReconcileCooldown             time.Duration
+	DefaultContainerCPULimit      mresource.CPUShares
+	DefaultContainerMemLimit      mresource.MegaBytes
 	SchedulerConfigFileName       string
 	Graceful                      bool
 	FrameworkName                 string
@@ -142,6 +150,7 @@ func NewSchedulerServer() *SchedulerServer {
 		FailoverTimeout:        time.Duration((1 << 62) - 1).Seconds(),
 		ExecutorRunProxy:       true,
 		ExecutorSuicideTimeout: execcfg.DefaultSuicideTimeout,
+		ExecutorCgroupPrefix:   execcfg.DefaultCgroupPrefix,
 		MesosAuthProvider:      sasl.ProviderName,
 		MesosMaster:            defaultMesosMaster,
 		MesosUser:              defaultMesosUser,
@@ -198,12 +207,15 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.FrameworkWebURI, "framework-weburi", s.FrameworkWebURI, "A URI that points to a web-based interface for interacting with the framework.")
 	fs.StringVar(&s.AdvertisedAddress, "advertised-address", s.AdvertisedAddress, "host:port address that is advertised to clients. May be used to construct artifact download URIs.")
 	fs.Var(&s.ServiceAddress, "service-address", "The service portal IP address that the scheduler should register with (if unset, chooses randomly)")
+	fs.Var(&s.DefaultContainerCPULimit, "default-container-cpu-limit", "Containers without a CPU resource limit are admitted this much CPU shares")
+	fs.Var(&s.DefaultContainerMemLimit, "default-container-mem-limit", "Containers without a memory resource limit are admitted this much amount of memory in MB")
 
 	fs.BoolVar(&s.ExecutorBindall, "executor-bindall", s.ExecutorBindall, "When true will set -address of the executor to 0.0.0.0.")
 	fs.IntVar(&s.ExecutorLogV, "executor-logv", s.ExecutorLogV, "Logging verbosity of spawned executor processes.")
 	fs.BoolVar(&s.ExecutorProxyBindall, "executor-proxy-bindall", s.ExecutorProxyBindall, "When true pass -proxy-bindall to the executor.")
 	fs.BoolVar(&s.ExecutorRunProxy, "executor-run-proxy", s.ExecutorRunProxy, "Run the kube-proxy as a child process of the executor.")
 	fs.DurationVar(&s.ExecutorSuicideTimeout, "executor-suicide-timeout", s.ExecutorSuicideTimeout, "Executor self-terminates after this period of inactivity. Zero disables suicide watch.")
+	fs.StringVar(&s.ExecutorCgroupPrefix, "executor-cgroup-prefix", s.ExecutorCgroupPrefix, "The cgroup prefix concatenated with MESOS_DIRECTORY must give the executor cgroup set by Mesos")
 
 	fs.StringVar(&s.KubeletRootDirectory, "kubelet-root-dir", s.KubeletRootDirectory, "Directory path for managing kubelet files (volume mounts,etc). Defaults to executor sandbox.")
 	fs.StringVar(&s.KubeletDockerEndpoint, "kubelet-docker-endpoint", s.KubeletDockerEndpoint, "If non-empty, kubelet will use this for the docker endpoint to communicate with.")
@@ -322,6 +334,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Arguments = append(ci.Arguments, "--address=0.0.0.0")
 	}
 
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cgroup-prefix=%v", s.ExecutorCgroupPrefix))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-bindall=%v", s.ExecutorProxyBindall))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--run-proxy=%v", s.ExecutorRunProxy))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.KubeletCadvisorPort))
@@ -351,38 +364,69 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	log.V(1).Infof("prepared executor command %q with args '%+v'", ci.GetValue(), ci.Arguments)
 
 	// Create mesos scheduler driver.
-	info := &mesos.ExecutorInfo{
+	execInfo := &mesos.ExecutorInfo{
 		Command: ci,
 		Name:    proto.String(execcfg.DefaultInfoName),
 		Source:  proto.String(execcfg.DefaultInfoSource),
 	}
 
 	// Check for staticPods
+	var staticPodCPUs, staticPodMem float64
 	if s.StaticPodsConfigPath != "" {
-		bs, numberStaticPods, err := archive.ZipDir(s.StaticPodsConfigPath)
+		bs, paths, err := archive.ZipDir(s.StaticPodsConfigPath)
 		if err != nil {
 			return nil, nil, err
 		}
-		info.Data = bs
 
-		// Adjust the resource accounting for the executor.
-		// Currently each podTask accounts the default amount of resources.
-		// TODO(joerg84) adapt to actual resources specified by pods.
-		log.Infof("Detected %d staticPods in Configuration.", numberStaticPods)
+		// try to read pod files and sum resources
+		// TODO(sttts): don't terminate when static pods are broken, but skip them
+		// TODO(sttts): add a directory watch and tell running executors about updates
+		for _, podPath := range paths {
+			podJson, err := ioutil.ReadFile(podPath)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error reading static pod spec: %v", err)
+			}
 
-		info.Resources = []*mesos.Resource{
-			mutil.NewScalarResource("cpus", float64(numberStaticPods)*podtask.DefaultContainerCpus),
-			mutil.NewScalarResource("mem", float64(numberStaticPods)*podtask.DefaultContainerMem),
+			pod := api.Pod{}
+			err = json.Unmarshal(podJson, &pod)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error parsing static pod spec at %v: %v", podPath, err)
+			}
+
+			// TODO(sttts): allow unlimited static pods as well and patch in the default resource limits
+			unlimitedCPU := mresource.LimitPodCPU(&pod, s.DefaultContainerCPULimit)
+			unlimitedMem := mresource.LimitPodMem(&pod, s.DefaultContainerMemLimit)
+			if unlimitedCPU {
+				return nil, nil, fmt.Errorf("found static pod without limit on cpu resources: %v", podPath)
+			}
+			if unlimitedMem {
+				return nil, nil, fmt.Errorf("found static pod without limit on memory resources: %v", podPath)
+			}
+
+			cpu := mresource.PodCPULimit(&pod)
+			mem := mresource.PodMemLimit(&pod)
+			log.V(2).Infof("reserving %.2f cpu shares and %.2f MB of memory to static pod %s", cpu, mem, pod.Name)
+
+			staticPodCPUs += float64(cpu)
+			staticPodMem += float64(mem)
 		}
+
+		// pass zipped pod spec to executor
+		execInfo.Data = bs
+	}
+
+	execInfo.Resources = []*mesos.Resource{
+		mutil.NewScalarResource("cpus", float64(executorCPUs)+staticPodCPUs),
+		mutil.NewScalarResource("mem", float64(executorMem)+staticPodMem),
 	}
 
 	// calculate ExecutorInfo hash to be used for validating compatibility
 	// of ExecutorInfo's generated by other HA schedulers.
-	ehash := hashExecutorInfo(info)
+	ehash := hashExecutorInfo(execInfo)
 	eid := uid.New(ehash, execcfg.DefaultInfoID)
-	info.ExecutorId = &mesos.ExecutorID{Value: proto.String(eid.String())}
+	execInfo.ExecutorId = &mesos.ExecutorID{Value: proto.String(eid.String())}
 
-	return info, eid, nil
+	return execInfo, eid, nil
 }
 
 // TODO(jdef): hacked from kubelet/server/server.go
@@ -580,14 +624,16 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 
 	mesosPodScheduler := scheduler.New(scheduler.Config{
-		Schedcfg:          *sc,
-		Executor:          executor,
-		ScheduleFunc:      scheduler.FCFSScheduleFunc,
-		Client:            client,
-		EtcdClient:        etcdClient,
-		FailoverTimeout:   s.FailoverTimeout,
-		ReconcileInterval: s.ReconcileInterval,
-		ReconcileCooldown: s.ReconcileCooldown,
+		Schedcfg:                 *sc,
+		Executor:                 executor,
+		ScheduleFunc:             scheduler.FCFSScheduleFunc,
+		Client:                   client,
+		EtcdClient:               etcdClient,
+		FailoverTimeout:          s.FailoverTimeout,
+		ReconcileInterval:        s.ReconcileInterval,
+		ReconcileCooldown:        s.ReconcileCooldown,
+		DefaultContainerCPULimit: s.DefaultContainerCPULimit,
+		DefaultContainerMemLimit: s.DefaultContainerMemLimit,
 	})
 
 	masterUri := s.MesosMaster

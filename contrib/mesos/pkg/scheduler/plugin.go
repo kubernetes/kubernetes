@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
 	annotation "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -166,8 +167,8 @@ func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 	}
 
 	if err = b.prepareTaskForLaunch(ctx, binding.Target.Name, task, offerId); err == nil {
-		log.V(2).Infof("launching task: %q on target %q slave %q for pod \"%v/%v\"",
-			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name)
+		log.V(2).Infof("launching task: %q on target %q slave %q for pod \"%v/%v\", cpu %.2f, mem %.2f MB",
+			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name, task.Spec.CPU, task.Spec.Memory)
 		if err = b.api.launchTask(task); err == nil {
 			b.api.offers().Invalidate(offerId)
 			task.Set(podtask.Launched)
@@ -230,8 +231,10 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 }
 
 type kubeScheduler struct {
-	api        schedulerInterface
-	podUpdates queue.FIFO
+	api                      schedulerInterface
+	podUpdates               queue.FIFO
+	defaultContainerCPULimit mresource.CPUShares
+	defaultContainerMemLimit mresource.MegaBytes
 }
 
 // Schedule implements the Scheduler interface of Kubernetes.
@@ -325,12 +328,20 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		if task.Offer != nil && task.Offer != offer {
 			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
 		}
+
+		// write resource limits into the pod spec which is transfered to the executor. From here
+		// on we can expect that the pod spec of a task has proper limits for CPU and memory.
+		// TODO(sttts): For a later separation of the kubelet and the executor also patch the pod on the apiserver
+		if unlimitedCPU := mresource.LimitPodCPU(&task.Pod, k.defaultContainerCPULimit); unlimitedCPU {
+			log.Warningf("Pod %s/%s without cpu limits is admitted %.2f cpu shares", task.Pod.Namespace, task.Pod.Name, mresource.PodCPULimit(&task.Pod))
+		}
+		if unlimitedMem := mresource.LimitPodMem(&task.Pod, k.defaultContainerMemLimit); unlimitedMem {
+			log.Warningf("Pod %s/%s without memory limits is admitted %.2f MB", task.Pod.Namespace, task.Pod.Name, mresource.PodMemLimit(&task.Pod))
+		}
+
 		task.Offer = offer
-		//TODO(jdef) FillFromDetails currently allocates fixed (hardwired) cpu and memory resources for all
-		//tasks. This will be fixed once we properly integrate parent-cgroup support into the kublet-executor.
-		//For now we are completely ignoring the resources specified in the pod.
-		//see: https://github.com/mesosphere/kubernetes-mesos/issues/68
 		task.FillFromDetails(details)
+
 		if err := k.api.tasks().Update(task); err != nil {
 			offer.Release()
 			return "", err
@@ -678,8 +689,10 @@ func (k *KubernetesScheduler) NewPluginConfig(terminate <-chan struct{}, mux *ht
 		Config: &plugin.Config{
 			MinionLister: nil,
 			Algorithm: &kubeScheduler{
-				api:        kapi,
-				podUpdates: podUpdates,
+				api:                      kapi,
+				podUpdates:               podUpdates,
+				defaultContainerCPULimit: k.defaultContainerCPULimit,
+				defaultContainerMemLimit: k.defaultContainerMemLimit,
 			},
 			Binder:   &binder{api: kapi},
 			NextPod:  q.yield,

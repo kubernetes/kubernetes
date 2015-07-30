@@ -38,6 +38,7 @@ import (
 	schedcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	util "github.com/mesos/mesos-go/mesosutil"
@@ -389,10 +390,12 @@ func TestPlugin_LifeCycle(t *testing.T) {
 
 	// create scheduler
 	testScheduler := New(Config{
-		Executor:     executor,
-		Client:       client.NewOrDie(&client.Config{Host: testApiServer.server.URL, Version: testapi.Version()}),
-		ScheduleFunc: FCFSScheduleFunc,
-		Schedcfg:     *schedcfg.CreateDefaultConfig(),
+		Executor:                 executor,
+		Client:                   client.NewOrDie(&client.Config{Host: testApiServer.server.URL, Version: testapi.Version()}),
+		ScheduleFunc:             FCFSScheduleFunc,
+		Schedcfg:                 *schedcfg.CreateDefaultConfig(),
+		DefaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
+		DefaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
 	})
 
 	assert.NotNil(testScheduler.client, "client is nil")
