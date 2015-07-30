@@ -70,6 +70,7 @@ import (
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -234,7 +235,7 @@ func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etc
 	if err != nil {
 		return etcdStorage, err
 	}
-	return tools.NewEtcdStorage(client, versionInterfaces.Codec, prefix), nil
+	return etcdstorage.NewEtcdStorage(client, versionInterfaces.Codec, prefix), nil
 }
 
 // setDefaults fills in any fields not set that are required to have valid data.
@@ -722,7 +723,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 			addr = etcdUrl.Host
 			port = 4001
 		}
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: tools.EtcdHealthCheck}
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: etcdstorage.EtcdHealthCheck}
 	}
 	return serversToValidate
 }

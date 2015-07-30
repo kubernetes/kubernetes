@@ -37,7 +37,7 @@ import (
 	kclientcmd "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	kframework "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	kSelector "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	etcd "github.com/coreos/go-etcd/etcd"
@@ -354,7 +354,7 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 		err    error
 	)
 	for attempt := 1; attempt <= maxConnectAttempts; attempt++ {
-		if _, err = tools.GetEtcdVersion(etcdServer); err == nil {
+		if _, err = etcdstorage.GetEtcdVersion(etcdServer); err == nil {
 			break
 		}
 		if attempt == maxConnectAttempts {

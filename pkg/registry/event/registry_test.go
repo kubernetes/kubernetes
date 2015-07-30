@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -39,7 +40,7 @@ func NewTestEventEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Regi
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
 
-	s := tools.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
+	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
 	return f, NewEtcdRegistry(s, testTTL)
 }
 

@@ -25,7 +25,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
@@ -33,7 +34,7 @@ import (
 
 func TestSet(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := tools.NewEtcdStorage(client, testapi.Codec(), "")
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
@@ -56,7 +57,7 @@ func TestSet(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := tools.NewEtcdStorage(client, testapi.Codec(), "")
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		coded, err := testapi.Codec().Encode(&testObject)
@@ -81,7 +82,7 @@ func TestGet(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
-	etcdStorage := tools.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix())
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix())
 	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)
 		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
@@ -91,7 +92,7 @@ func TestWatch(t *testing.T) {
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w, err := etcdStorage.Watch(key, 0, tools.Everything)
+		w, err := etcdStorage.Watch(key, 0, storage.Everything)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}

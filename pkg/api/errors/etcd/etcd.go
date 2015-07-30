@@ -18,14 +18,14 @@ package etcd
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 )
 
 // InterpretGetError converts a generic etcd error on a retrieval
 // operation into the appropriate API error.
 func InterpretGetError(err error, kind, name string) error {
 	switch {
-	case tools.IsEtcdNotFound(err):
+	case etcdstorage.IsEtcdNotFound(err):
 		return errors.NewNotFound(kind, name)
 	default:
 		return err
@@ -36,7 +36,7 @@ func InterpretGetError(err error, kind, name string) error {
 // operation into the appropriate API error.
 func InterpretCreateError(err error, kind, name string) error {
 	switch {
-	case tools.IsEtcdNodeExist(err):
+	case etcdstorage.IsEtcdNodeExist(err):
 		return errors.NewAlreadyExists(kind, name)
 	default:
 		return err
@@ -47,7 +47,7 @@ func InterpretCreateError(err error, kind, name string) error {
 // operation into the appropriate API error.
 func InterpretUpdateError(err error, kind, name string) error {
 	switch {
-	case tools.IsEtcdTestFailed(err), tools.IsEtcdNodeExist(err):
+	case etcdstorage.IsEtcdTestFailed(err), etcdstorage.IsEtcdNodeExist(err):
 		return errors.NewConflict(kind, name, err)
 	default:
 		return err
@@ -58,7 +58,7 @@ func InterpretUpdateError(err error, kind, name string) error {
 // operation into the appropriate API error.
 func InterpretDeleteError(err error, kind, name string) error {
 	switch {
-	case tools.IsEtcdNotFound(err):
+	case etcdstorage.IsEtcdNotFound(err):
 		return errors.NewNotFound(kind, name)
 	default:
 		return err

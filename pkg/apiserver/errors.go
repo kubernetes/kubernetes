@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -52,7 +52,7 @@ func errToAPIStatus(err error) *api.Status {
 		status := http.StatusInternalServerError
 		switch {
 		//TODO: replace me with NewConflictErr
-		case tools.IsEtcdTestFailed(err):
+		case etcdstorage.IsEtcdTestFailed(err):
 			status = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status

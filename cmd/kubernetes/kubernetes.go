@@ -41,6 +41,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -167,7 +168,7 @@ func main() {
 	defer util.FlushLogs()
 
 	glog.Infof("Creating etcd client pointing to %v", *etcdServer)
-	etcdClient, err := tools.NewEtcdClientStartServerIfNecessary(*etcdServer)
+	etcdClient, err := etcdstorage.NewEtcdClientStartServerIfNecessary(*etcdServer)
 	if err != nil {
 		glog.Fatalf("Failed to connect to etcd: %v", err)
 	}

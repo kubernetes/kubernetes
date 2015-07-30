@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tools
+package etcd
 
 import (
 	"errors"
@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -36,7 +37,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func NewEtcdStorage(client EtcdClient, codec runtime.Codec, prefix string) storage.Interface {
+func NewEtcdStorage(client tools.EtcdClient, codec runtime.Codec, prefix string) storage.Interface {
 	return &etcdHelper{
 		client:     client,
 		codec:      codec,
@@ -49,7 +50,7 @@ func NewEtcdStorage(client EtcdClient, codec runtime.Codec, prefix string) stora
 
 // etcdHelper is the reference implementation of storage.Interface.
 type etcdHelper struct {
-	client EtcdClient
+	client tools.EtcdClient
 	codec  runtime.Codec
 	copier runtime.ObjectCopier
 	// optional, has to be set to perform any atomic operations
@@ -363,16 +364,6 @@ func (h *etcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 		}
 	}
 	return result.Node.Nodes, result.EtcdIndex, nil
-}
-
-type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
-
-// SimpleUpdateFunc converts SimpleUpdateFunc into UpdateFunc
-func SimpleUpdate(fn SimpleUpdateFunc) storage.UpdateFunc {
-	return func(input runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		out, err := fn(input)
-		return out, nil, err
-	}
 }
 
 // Implements storage.Interface.

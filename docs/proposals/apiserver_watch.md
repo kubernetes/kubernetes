@@ -163,7 +163,7 @@ resource type. However, this watch can potentially expire at any time and
 reconnecting can return "too old resource version". In that case relisting is
 necessary. In such case, to avoid LIST requests coming from all watchers at
 the same time, we can introduce an additional etcd event type:
-[EtcdResync](../../pkg/tools/etcd_watcher.go#L36)
+[EtcdResync](../../pkg/storage/etcd/etcd_watcher.go#L36)
 
   Whenever reslisting will be done to refresh the internal watch to etcd,
   EtcdResync event will be send to all the watchers. It will contain the

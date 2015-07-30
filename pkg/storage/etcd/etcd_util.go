@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tools
+package etcd
 
 import (
 	"encoding/json"
@@ -23,41 +23,42 @@ import (
 	"net/http"
 	"os/exec"
 
-	"github.com/coreos/go-etcd/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 
+	goetcd "github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
 
 // IsEtcdNotFound returns true iff err is an etcd not found error.
 func IsEtcdNotFound(err error) bool {
-	return isEtcdErrorNum(err, EtcdErrorCodeNotFound)
+	return isEtcdErrorNum(err, tools.EtcdErrorCodeNotFound)
 }
 
 // IsEtcdNodeExist returns true iff err is an etcd node aleady exist error.
 func IsEtcdNodeExist(err error) bool {
-	return isEtcdErrorNum(err, EtcdErrorCodeNodeExist)
+	return isEtcdErrorNum(err, tools.EtcdErrorCodeNodeExist)
 }
 
 // IsEtcdTestFailed returns true iff err is an etcd write conflict.
 func IsEtcdTestFailed(err error) bool {
-	return isEtcdErrorNum(err, EtcdErrorCodeTestFailed)
+	return isEtcdErrorNum(err, tools.EtcdErrorCodeTestFailed)
 }
 
 // IsEtcdWatchStoppedByUser returns true iff err is a client triggered stop.
 func IsEtcdWatchStoppedByUser(err error) bool {
-	return etcd.ErrWatchStoppedByUser == err
+	return goetcd.ErrWatchStoppedByUser == err
 }
 
 // isEtcdErrorNum returns true iff err is an etcd error, whose errorCode matches errorCode
 func isEtcdErrorNum(err error, errorCode int) bool {
-	etcdError, ok := err.(*etcd.EtcdError)
+	etcdError, ok := err.(*goetcd.EtcdError)
 	return ok && etcdError != nil && etcdError.ErrorCode == errorCode
 }
 
 // etcdErrorIndex returns the index associated with the error message and whether the
 // index was available.
 func etcdErrorIndex(err error) (uint64, bool) {
-	if etcdError, ok := err.(*etcd.EtcdError); ok {
+	if etcdError, ok := err.(*goetcd.EtcdError); ok {
 		return etcdError.Index, true
 	}
 	return 0, false
@@ -90,7 +91,7 @@ func startEtcd() (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-func NewEtcdClientStartServerIfNecessary(server string) (EtcdClient, error) {
+func NewEtcdClientStartServerIfNecessary(server string) (tools.EtcdClient, error) {
 	_, err := GetEtcdVersion(server)
 	if err != nil {
 		glog.Infof("Failed to find etcd, attempting to start.")
@@ -101,7 +102,7 @@ func NewEtcdClientStartServerIfNecessary(server string) (EtcdClient, error) {
 	}
 
 	servers := []string{server}
-	return etcd.NewClient(servers), nil
+	return goetcd.NewClient(servers), nil
 }
 
 type etcdHealth struct {

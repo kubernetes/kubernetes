@@ -30,7 +30,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
@@ -456,7 +455,7 @@ func (e *Etcd) Watch(ctx api.Context, label labels.Selector, field fields.Select
 
 // WatchPredicate starts a watch for the items that m matches.
 func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
-	version, err := tools.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
+	version, err := storage.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
 	if err != nil {
 		return nil, err
 	}

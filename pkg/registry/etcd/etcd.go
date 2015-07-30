@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -159,7 +158,7 @@ func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) (*api.Servic
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
 func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	version, err := tools.ParseWatchResourceVersion(resourceVersion, "service")
+	version, err := storage.ParseWatchResourceVersion(resourceVersion, "service")
 	if err != nil {
 		return nil, err
 	}
