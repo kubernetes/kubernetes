@@ -167,8 +167,6 @@ func (proxier *Proxier) SyncLoop() {
 
 // Ensure that portals exist for all services.
 func (proxier *Proxier) ensurePortals() {
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
 	// NB: This does not remove rules that should not be present.
 	for name, info := range proxier.serviceMap {
 		err := proxier.openPortal(name, info)
