@@ -167,7 +167,7 @@ func libcontainerConfigToContainerSpec(config *libcontainerConfigs.Config, mi *i
 	}
 	spec.Cpu.Mask = utils.FixCpuMask(config.Cgroups.CpusetCpus, mi.NumCores)
 
-	spec.HasNetwork = true
+	spec.HasNetwork = len(config.Networks) > 0
 	spec.HasDiskIo = true
 
 	return spec
@@ -276,7 +276,7 @@ func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 }
 
 func convertInterfaceStats(stats *info.InterfaceStats) {
-	net := stats
+	net := *stats
 
 	// Ingress for host veth is from the container.
 	// Hence tx_bytes stat on the host veth is actually number of bytes received by the container.
@@ -330,6 +330,10 @@ func (self *dockerContainerHandler) GetCgroupPath(resource string) (string, erro
 func (self *dockerContainerHandler) ListThreads(listType container.ListType) ([]int, error) {
 	// TODO(vmarmol): Implement.
 	return nil, nil
+}
+
+func (self *dockerContainerHandler) GetContainerLabels() map[string]string {
+	return self.labels
 }
 
 func (self *dockerContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {

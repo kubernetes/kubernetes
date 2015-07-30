@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package manager
+package machine
 
 import (
 	"io/ioutil"
@@ -38,7 +38,7 @@ func TestTopology(t *testing.T) {
 		Cpus:  2,
 	}
 	sysFs.SetCacheInfo(c)
-	topology, numCores, err := getTopology(sysFs, string(testcpuinfo))
+	topology, numCores, err := GetTopology(sysFs, string(testcpuinfo))
 	if err != nil {
 		t.Errorf("failed to get topology for sample cpuinfo %s", string(testcpuinfo))
 	}
@@ -84,7 +84,7 @@ func TestTopologyWithSimpleCpuinfo(t *testing.T) {
 		Cpus:  1,
 	}
 	sysFs.SetCacheInfo(c)
-	topology, numCores, err := getTopology(sysFs, "processor\t: 0\n")
+	topology, numCores, err := GetTopology(sysFs, "processor\t: 0\n")
 	if err != nil {
 		t.Errorf("Expected cpuinfo with no topology data to succeed.")
 	}
@@ -110,7 +110,7 @@ func TestTopologyWithSimpleCpuinfo(t *testing.T) {
 }
 
 func TestTopologyEmptyCpuinfo(t *testing.T) {
-	_, _, err := getTopology(&fakesysfs.FakeSysFs{}, "")
+	_, _, err := GetTopology(&fakesysfs.FakeSysFs{}, "")
 	if err == nil {
 		t.Errorf("Expected empty cpuinfo to fail.")
 	}

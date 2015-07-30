@@ -12,26 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector
+package cloudinfo
 
 import (
-	"time"
+	"strings"
 
-	"github.com/google/cadvisor/info/v1"
+	"github.com/GoogleCloudPlatform/gcloud-golang/compute/metadata"
+	info "github.com/google/cadvisor/info/v1"
 )
 
-type FakeCollectorManager struct {
+func onGCE() bool {
+	return metadata.OnGCE()
 }
 
-func (fkm *FakeCollectorManager) RegisterCollector(collector Collector) error {
-	return nil
-}
+func getGceInstanceType() info.InstanceType {
+	machineType, err := metadata.Get("instance/machine-type")
+	if err != nil {
+		return info.UnknownInstance
+	}
 
-func (fkm *FakeCollectorManager) GetSpec() ([]v1.MetricSpec, error) {
-	return []v1.MetricSpec{}, nil
-}
-
-func (fkm *FakeCollectorManager) Collect(metric map[string]v1.MetricVal) (time.Time, map[string]v1.MetricVal, error) {
-	var zero time.Time
-	return zero, metric, nil
+	responseParts := strings.Split(machineType, "/") // Extract the instance name from the machine type.
+	return info.InstanceType(responseParts[len(responseParts)-1])
 }
