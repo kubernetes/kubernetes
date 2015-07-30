@@ -1,0 +1,23 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "spark-driver",
+    "labels": {
+      "name": "spark-driver"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "spark-driver",
+        "image": "gurvin/spark-driver",
+        "resources": {
+          "limits": {
+            "cpu": "100m"
+          }
+        }
+      }
+    ]
+  }
+}

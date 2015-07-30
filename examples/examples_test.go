@@ -317,6 +317,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"spark-master-service":    &api.Service{},
 			"spark-master":            &api.Pod{},
 			"spark-worker-controller": &api.ReplicationController{},
+			"spark-driver":            &api.Pod{},
 		},
 		"../examples/storm": {
 			"storm-nimbus-service":    &api.Service{},
