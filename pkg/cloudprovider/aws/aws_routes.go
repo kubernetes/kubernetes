@@ -62,8 +62,13 @@ func (s *AWSCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error
 			continue
 		}
 
+		instance, err := s.getInstanceById(instanceID)
+		if err != nil {
+			return nil, err
+		}
+		instanceName := orEmpty(instance.PrivateDNSName)
 		routeName := clusterName + "-" + destinationCIDR
-		routes = append(routes, &cloudprovider.Route{routeName, instanceID, destinationCIDR})
+		routes = append(routes, &cloudprovider.Route{routeName, instanceName, destinationCIDR})
 	}
 
 	return routes, nil
