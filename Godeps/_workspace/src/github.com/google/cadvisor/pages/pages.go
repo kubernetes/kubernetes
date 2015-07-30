@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strings"
 
 	auth "github.com/abbot/go-http-auth"
@@ -158,4 +159,13 @@ func getContainerDisplayName(cont info.ContainerReference) string {
 	}
 
 	return displayName
+}
+
+// Escape the non-path characters on a container name.
+func escapeContainerName(containerName string) string {
+	parts := strings.Split(containerName, "/")
+	for i := range parts {
+		parts[i] = url.QueryEscape(parts[i])
+	}
+	return strings.Join(parts, "/")
 }

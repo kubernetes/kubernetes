@@ -93,7 +93,7 @@ func GetStats(cgroupManager cgroups.Manager, networkInterfaces []string) (*info.
 		}
 		stats.Network.Interfaces[i] = interfaceStats
 	}
-	// For backwards compatability.
+	// For backwards compatibility.
 	if len(networkInterfaces) > 0 {
 		stats.Network.InterfaceStats = stats.Network.Interfaces[0]
 	}
@@ -233,7 +233,7 @@ func toContainerStats3(libcontainerStats *libcontainer.Stats, ret *info.Containe
 		}
 	}
 
-	// Add to base struct for backwards compatability.
+	// Add to base struct for backwards compatibility.
 	if len(ret.Network.Interfaces) > 0 {
 		ret.Network.InterfaceStats = ret.Network.Interfaces[0]
 	}
