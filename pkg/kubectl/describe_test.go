@@ -336,3 +336,78 @@ func TestDefaultDescribers(t *testing.T) {
 		t.Errorf("unexpected output: %s", out)
 	}
 }
+
+func TestGetPodsTotalRequests(t *testing.T) {
+	testCases := []struct {
+		pods         []*api.Pod
+		expectedReqs map[api.ResourceName]resource.Quantity
+	}{
+		{
+			pods: []*api.Pod{
+				{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("1"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("300Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+									},
+								},
+							},
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("90m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("120Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("200M"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("60m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("43Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("500M"),
+									},
+								},
+							},
+							{
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										api.ResourceName(api.ResourceCPU):     resource.MustParse("34m"),
+										api.ResourceName(api.ResourceMemory):  resource.MustParse("83Mi"),
+										api.ResourceName(api.ResourceStorage): resource.MustParse("700M"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedReqs: map[api.ResourceName]resource.Quantity{
+				api.ResourceName(api.ResourceCPU):     resource.MustParse("1.184"),
+				api.ResourceName(api.ResourceMemory):  resource.MustParse("546Mi"),
+				api.ResourceName(api.ResourceStorage): resource.MustParse("2.4G"),
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		reqs, err := getPodsTotalRequests(testCase.pods)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if !reflect.DeepEqual(reqs, testCase.expectedReqs) {
+			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
+		}
+	}
+}

@@ -870,6 +870,17 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 			}
 		}
 
+		runningPods := filterNonRunningPods(pods)
+		reqs, err := getPodsTotalRequests(runningPods)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "Allocated resources (total requests):\n")
+		for reqResource, reqValue := range reqs {
+			fmt.Fprintf(out, " %s:\t%s\n", reqResource, reqValue.String())
+		}
+		fmt.Fprintf(out, " pods:\t%d\n", len(runningPods))
+
 		fmt.Fprintf(out, "Version:\n")
 		fmt.Fprintf(out, " Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
 		fmt.Fprintf(out, " OS Image:\t%s\n", node.Status.NodeInfo.OsImage)
@@ -916,6 +927,52 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 		}
 		return nil
 	})
+}
+
+func filterNonRunningPods(pods []*api.Pod) []*api.Pod {
+	if len(pods) == 0 {
+		return pods
+	}
+	result := []*api.Pod{}
+	for _, pod := range pods {
+		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+			continue
+		}
+		result = append(result, pod)
+	}
+	return result
+}
+
+func getPodsTotalRequests(pods []*api.Pod) (map[api.ResourceName]resource.Quantity, error) {
+	reqs := map[api.ResourceName]resource.Quantity{}
+	for _, pod := range pods {
+		podReqs, err := getSinglePodTotalRequests(pod)
+		if err != nil {
+			return nil, err
+		}
+		for podReqName, podReqValue := range podReqs {
+			if value, ok := reqs[podReqName]; !ok {
+				reqs[podReqName] = podReqValue
+			} else if err = value.Add(podReqValue); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return reqs, nil
+}
+
+func getSinglePodTotalRequests(pod *api.Pod) (map[api.ResourceName]resource.Quantity, error) {
+	reqs := map[api.ResourceName]resource.Quantity{}
+	for _, container := range pod.Spec.Containers {
+		for name, quantity := range container.Resources.Requests {
+			if value, ok := reqs[name]; !ok {
+				reqs[name] = quantity
+			} else if err := value.Add(quantity); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return reqs, nil
 }
 
 func DescribeEvents(el *api.EventList, w io.Writer) {
