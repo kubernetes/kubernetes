@@ -27,21 +27,19 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 )
 
 var (
-	// Finds markdown links of the form [foo](bar "alt-text").
-	linkRE = regexp.MustCompile(`\[([^]]*)\]\(([^)]*)\)`)
-	// Splits the link target into link target and alt-text.
-	altTextRE = regexp.MustCompile(`(.*)( ".*")`)
-
 	branch       = flag.String("branch", "", "The git branch from which to pull docs. (e.g. release-1.0, master).")
 	outputDir    = flag.String("output-dir", "", "The directory in which to save results.")
 	remote       = flag.String("remote", "upstream", "The name of the remote repo from which to pull docs.")
 	apiReference = flag.Bool("apiReference", true, "Whether update api reference")
+
+	subdirs = []string{"docs", "examples"}
 )
 
 func fixURL(u *url.URL) bool {
@@ -53,10 +51,15 @@ func fixURL(u *url.URL) bool {
 	return false
 }
 
-func processFile(filename string) error {
+func processFile(prefix, filename string) error {
 	fileBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
+	}
+
+	title := getTitle(fileBytes)
+	if len(title) == 0 {
+		title = filename[len(prefix)+1 : len(filename)-len(".md")]
 	}
 
 	output := rewriteLinks(fileBytes)
@@ -67,7 +70,7 @@ func processFile(filename string) error {
 		return err
 	}
 
-	_, err = f.WriteString("---\nlayout: docwithnav\n---\n")
+	_, err = f.WriteString(fmt.Sprintf("---\nlayout: docwithnav\ntitle: %s\n---\n", title))
 	if err != nil {
 		return err
 	}
@@ -75,6 +78,13 @@ func processFile(filename string) error {
 	_, err = f.Write(output)
 	return err
 }
+
+var (
+	// Finds markdown links of the form [foo](bar "alt-text").
+	linkRE = regexp.MustCompile(`\[([^]]*)\]\(([^)]*)\)`)
+	// Splits the link target into link target and alt-text.
+	altTextRE = regexp.MustCompile(`(.*)( ".*")`)
+)
 
 func rewriteLinks(fileBytes []byte) []byte {
 	return linkRE.ReplaceAllFunc(fileBytes, func(in []byte) (out []byte) {
@@ -101,12 +111,14 @@ func rewriteLinks(fileBytes []byte) []byte {
 	})
 }
 
-// Allow more than 3 tick because people write this stuff.
-var ticticticRE = regexp.MustCompile("^`{3,}\\s*(.*)$")
-var notTicticticRE = regexp.MustCompile("^```(.*)```")
-var languageFixups = map[string]string{
-	"shell": "sh",
-}
+var (
+	// Allow more than 3 tick because people write this stuff.
+	ticticticRE    = regexp.MustCompile("^`{3,}\\s*(.*)$")
+	notTicticticRE = regexp.MustCompile("^```(.*)```")
+	languageFixups = map[string]string{
+		"shell": "sh",
+	}
+)
 
 func rewriteCodeBlocks(fileBytes []byte) []byte {
 	lines := strings.Split(string(fileBytes), "\n")
@@ -151,6 +163,87 @@ func rewriteCodeBlocks(fileBytes []byte) []byte {
 	return []byte(strings.Join(output, "\n") + "\n")
 }
 
+var (
+	// matches "# headers" and "## headers"
+	atxTitleRE = regexp.MustCompile(`(?m)^\s*##?\s+(?P<title>.*)$`)
+	// matches
+	//  Headers
+	//  =======
+	// and
+	//  Headers
+	//  --
+	setextTitleRE = regexp.MustCompile("(?m)^(?P<title>.+)\n((=+)|(-+))$")
+	ignoredRE     = regexp.MustCompile(`[*_\\]`)
+)
+
+// removeLinks removes markdown links from the input leaving only the
+// display text.
+func removeLinks(input []byte) []byte {
+	indices := linkRE.FindAllSubmatchIndex(input, -1)
+	if len(indices) == 0 {
+		return input
+	}
+
+	out := make([]byte, 0, len(input))
+	cur := 0
+	for _, index := range indices {
+		linkStart, linkEnd, textStart, textEnd := index[0], index[1], index[2], index[3]
+		// append bytes between previous match and this one
+		out = append(out, input[cur:linkStart]...)
+		// extract and append link text
+		out = append(out, input[textStart:textEnd]...)
+		// update cur
+		cur = linkEnd
+	}
+	// pick up the remaining and return it
+	return append(out, input[cur:len(input)]...)
+}
+
+// findTitleMatch returns the start of the match and the "title" subgroup of
+// bytes. If the regexp doesn't match, it will return -1 and nil.
+func findTitleMatch(titleRE *regexp.Regexp, input []byte) (start int, title []byte) {
+	indices := titleRE.FindSubmatchIndex(input)
+	if len(indices) == 0 {
+		return -1, nil
+	}
+
+	for i, name := range titleRE.SubexpNames() {
+		if name == "title" {
+			start, end := indices[2*i], indices[2*i+1]
+			return indices[0], input[start:end]
+		}
+	}
+
+	// there was no grouped named title
+	return -1, nil
+}
+
+func getTitle(fileBytes []byte) string {
+	atxStart, atxMatch := findTitleMatch(atxTitleRE, fileBytes)
+	setextStart, setextMatch := findTitleMatch(setextTitleRE, fileBytes)
+
+	var title []byte
+
+	switch {
+	case atxStart == -1 && setextStart == -1:
+		return ""
+	case atxStart == -1:
+		title = setextMatch
+	case setextStart == -1:
+		title = atxMatch
+	case setextStart < atxStart:
+		title = setextMatch
+	default:
+		title = atxMatch
+	}
+
+	// Handle the case where there's a link in the header.
+	title = removeLinks(title)
+
+	// Take out all markdown stylings.
+	return string(ignoredRE.ReplaceAll(title, nil))
+}
+
 func runGitUpdate(remote string) error {
 	cmd := exec.Command("git", "fetch", remote)
 	out, err := cmd.CombinedOutput()
@@ -170,7 +263,8 @@ func copyFiles(remoteRepo, directory, branch string) error {
 	}
 	prefix := fmt.Sprintf("--prefix=%s", directory)
 	tagRef := fmt.Sprintf("%s/%s", remoteRepo, branch)
-	gitCmd := exec.Command("git", "archive", "--format=tar", prefix, tagRef, "docs", "examples")
+	gitArgs := append([]string{"archive", "--format=tar", prefix, tagRef}, subdirs...)
+	gitCmd := exec.Command("git", gitArgs...)
 	tarCmd := exec.Command("tar", "-x")
 
 	var err error
@@ -248,40 +342,43 @@ func main() {
 		os.Exit(1)
 	}
 
-	err := filepath.Walk(*outputDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".md") {
-			fmt.Printf("Processing %s\n", path)
-			if err = processFile(path); err != nil {
-				return err
-			}
-
-			if strings.ToLower(info.Name()) == "readme.md" {
-				newpath := path[0:len(path)-len("readme.md")] + "index.md"
-				fmt.Printf("Copying %s to %s\n", path, newpath)
-				if err = copySingleFile(path, newpath); err != nil {
-					return err
-				}
-			}
-		}
-
-		if *apiReference && !info.IsDir() && (info.Name() == "definitions.html" || info.Name() == "operations.html") {
-			fmt.Printf("Processing %s\n", path)
-			err := processHTML(path, info.Name(), *outputDir)
+	for _, subDir := range subdirs {
+		prefix := path.Join(*outputDir, subDir)
+		err := filepath.Walk(prefix, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
+
+			if !info.IsDir() && strings.HasSuffix(info.Name(), ".md") {
+				fmt.Printf("Processing %s\n", path)
+				if err = processFile(prefix, path); err != nil {
+					return err
+				}
+
+				if strings.ToLower(info.Name()) == "readme.md" {
+					newpath := path[0:len(path)-len("readme.md")] + "index.md"
+					fmt.Printf("Copying %s to %s\n", path, newpath)
+					if err = copySingleFile(path, newpath); err != nil {
+						return err
+					}
+				}
+			}
+
+			if *apiReference && !info.IsDir() && (info.Name() == "definitions.html" || info.Name() == "operations.html") {
+				fmt.Printf("Processing %s\n", path)
+				err := processHTML(path, info.Name(), *outputDir)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+
+		})
+
+		if err != nil {
+			fmt.Printf("Error while processing markdown and html files: %v\n", err)
+			os.Exit(1)
 		}
-		return nil
-
-	})
-
-	if err != nil {
-		fmt.Printf("Error while processing markdown and html files: %v\n", err)
-		os.Exit(1)
 	}
 }
 
