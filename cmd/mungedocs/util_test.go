@@ -112,17 +112,26 @@ func TestHasMacroBlock(t *testing.T) {
 
 func TestReplaceNonPreformatted(t *testing.T) {
 	cases := []struct {
-		in  string
-		out string
+		in        string
+		out       string
+		expectErr bool
 	}{
-		{"aoeu", ""},
-		{"aoeu\n```\naoeu\n```\naoeu", "```\naoeu\n```\n"},
-		{"ao\neu\n```\naoeu\n\n\n", "```\naoeu\n\n\n"},
-		{"aoeu ```aoeu``` aoeu", ""},
+		{"aoeu", "", false},
+		{"aoeu\n```\naoeu\n```\naoeu", "```\naoeu\n```\n", false},
+		{"ao\neu\n```\naoeu```\n\n\n", "```\naoeu```\n\n\n", false},
+		{"aoeu ```aoeu``` aoeu", "", false},
+		{"aoeu ```aoeu aoeu", "", true},
 	}
 
 	for i, c := range cases {
-		out := string(replaceNonPreformatted([]byte(c.in), func([]byte) []byte { return nil }))
+		data, err := replaceNonPreformatted([]byte(c.in), func([]byte) []byte { return nil })
+		if c.expectErr && err == nil {
+			t.Error("unexpected non-error")
+		}
+		if !c.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		out := string(data)
 		if out != c.out {
 			t.Errorf("%v: got %q, wanted %q", i, out, c.out)
 		}
@@ -136,7 +145,7 @@ func TestReplaceNonPreformattedNoChange(t *testing.T) {
 		{"aoeu"},
 		{"aoeu\n```\naoeu\n```\naoeu"},
 		{"aoeu\n\n```\n\naoeu\n\n```\n\naoeu"},
-		{"ao\neu\n```\naoeu\n\n\n"},
+		{"ao\neu\n```\naoeu```\n\n\n"},
 		{"aoeu ```aoeu``` aoeu"},
 		{"aoeu\n```\naoeu\n```"},
 		{"aoeu\n```\naoeu\n```\n"},
@@ -144,7 +153,11 @@ func TestReplaceNonPreformattedNoChange(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		out := string(replaceNonPreformatted([]byte(c.in), func(in []byte) []byte { return in }))
+		data, err := replaceNonPreformatted([]byte(c.in), func(in []byte) []byte { return in })
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		out := string(data)
 		if out != c.in {
 			t.Errorf("%v: got %q, wanted %q", i, out, c.in)
 		}
@@ -159,7 +172,7 @@ func TestReplaceNonPreformattedCallOrder(t *testing.T) {
 		{"aoeu", []string{"aoeu"}},
 		{"aoeu\n```\naoeu\n```\naoeu", []string{"aoeu\n", "aoeu"}},
 		{"aoeu\n\n```\n\naoeu\n\n```\n\naoeu", []string{"aoeu\n\n", "\naoeu"}},
-		{"ao\neu\n```\naoeu\n\n\n", []string{"ao\neu\n"}},
+		{"ao\neu\n```\naoeu```\n\n\n", []string{"ao\neu\n"}},
 		{"aoeu ```aoeu``` aoeu", []string{"aoeu ```aoeu``` aoeu"}},
 		{"aoeu\n```\naoeu\n```", []string{"aoeu\n"}},
 		{"aoeu\n```\naoeu\n```\n", []string{"aoeu\n"}},

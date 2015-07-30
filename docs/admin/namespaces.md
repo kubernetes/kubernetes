@@ -122,7 +122,7 @@ See [Admission control: Limit Range](../design/admission_control_limit_range.md)
 
 A namespace can be in one of two phases:
    * `Active` the namespace is in use
-   * ```Terminating`` the namespace is being deleted, and can not be used for new objects
+   * `Terminating` the namespace is being deleted, and can not be used for new objects
 
 See the [design doc](../design/namespaces.md#phases) for more details.
 

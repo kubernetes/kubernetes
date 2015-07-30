@@ -38,7 +38,7 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 	dir := path.Dir(filePath)
 	errors := []string{}
 
-	output := replaceNonPreformattedRegexp(fileBytes, linkRE, func(in []byte) (out []byte) {
+	output, err := replaceNonPreformattedRegexp(fileBytes, linkRE, func(in []byte) (out []byte) {
 		match := linkRE.FindSubmatch(in)
 		// match[0] is the entire expression; [1] is the visible text and [2] is the link text.
 		visibleText := string(match[1])
@@ -109,7 +109,9 @@ func checkLinks(filePath string, fileBytes []byte) ([]byte, error) {
 
 		return []byte(fmt.Sprintf("[%s](%s)", visibleText, linkText+altText))
 	})
-	err := error(nil)
+	if err != nil {
+		return fileBytes, err
+	}
 	if len(errors) != 0 {
 		err = fmt.Errorf("%s", strings.Join(errors, "\n"))
 	}

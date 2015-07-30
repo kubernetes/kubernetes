@@ -21,7 +21,10 @@ import "bytes"
 // Blocks of ``` need to have blank lines on both sides or they don't look
 // right in HTML.
 func checkPreformatted(filePath string, fileBytes []byte) ([]byte, error) {
-	f := splitByPreformatted(fileBytes)
+	f, err := splitByPreformatted(fileBytes)
+	if err != nil {
+		return fileBytes, err
+	}
 	f = append(fileBlocks{{false, []byte{}}}, f...)
 	f = append(f, fileBlock{false, []byte{}})
 
