@@ -1307,6 +1307,18 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.AntiAffinitySelectors != nil {
+		out.AntiAffinitySelectors = make([]labels.LabelSelector, len(in.AntiAffinitySelectors))
+		for i := range in.AntiAffinitySelectors {
+			if newVal, err := c.DeepCopy(in.AntiAffinitySelectors[i]); err != nil {
+				return err
+			} else {
+				out.AntiAffinitySelectors[i] = newVal.(labels.LabelSelector)
+			}
+		}
+	} else {
+		out.AntiAffinitySelectors = nil
+	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
@@ -2056,6 +2068,28 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	return nil
 }
 
+func deepCopy_labels_Requirement(in labels.Requirement, out *labels.Requirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.StrValues != nil {
+		out.StrValues = make(map[string]util.Empty)
+		for key, val := range in.StrValues {
+			newVal := new(util.Empty)
+			if err := deepCopy_util_Empty(val, newVal, c); err != nil {
+				return err
+			}
+			out.StrValues[key] = *newVal
+		}
+	} else {
+		out.StrValues = nil
+	}
+	return nil
+}
+
+func deepCopy_util_Empty(in util.Empty, out *util.Empty, c *conversion.Cloner) error {
+	return nil
+}
+
 func deepCopy_util_IntOrString(in util.IntOrString, out *util.IntOrString, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.IntVal = in.IntVal
@@ -2189,6 +2223,8 @@ func init() {
 		deepCopy_api_VolumeMount,
 		deepCopy_api_VolumeSource,
 		deepCopy_resource_Quantity,
+		deepCopy_labels_Requirement,
+		deepCopy_util_Empty,
 		deepCopy_util_IntOrString,
 		deepCopy_util_Time,
 	)

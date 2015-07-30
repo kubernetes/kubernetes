@@ -39,6 +39,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+EOF
+	if [ ${version} = 'v1' ]; then
+	    cat >> $TMPFILE <<EOF
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+EOF
+	fi
+	cat >> $TMPFILE <<EOF
 )
 
 // AUTO-GENERATED FUNCTIONS START HERE

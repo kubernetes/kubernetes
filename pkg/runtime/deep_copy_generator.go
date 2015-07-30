@@ -160,19 +160,22 @@ func (s byPkgAndName) Swap(i, j int) {
 }
 
 func (g *deepCopyGenerator) typeName(inType reflect.Type) string {
+	prefix := ""
 	switch inType.Kind() {
 	case reflect.Map:
 		return fmt.Sprintf("map[%s]%s", g.typeName(inType.Key()), g.typeName(inType.Elem()))
-	case reflect.Slice:
-		return fmt.Sprintf("[]%s", g.typeName(inType.Elem()))
 	case reflect.Ptr:
 		return fmt.Sprintf("*%s", g.typeName(inType.Elem()))
+	case reflect.Slice:
+		prefix = "[]"
+		inType = inType.Elem()
+		fallthrough
 	default:
 		typeWithPkg := fmt.Sprintf("%s", inType)
 		slices := strings.Split(typeWithPkg, ".")
 		if len(slices) == 1 {
 			// Default package.
-			return slices[0]
+			return prefix + slices[0]
 		}
 		if len(slices) == 2 {
 			pkg := slices[0]
@@ -182,7 +185,7 @@ func (g *deepCopyGenerator) typeName(inType reflect.Type) string {
 			if pkg != "" {
 				pkg = pkg + "."
 			}
-			return pkg + slices[1]
+			return prefix + pkg + slices[1]
 		}
 		panic("Incorrect type name: " + typeWithPkg)
 	}
@@ -353,7 +356,7 @@ func (g *deepCopyGenerator) writeDeepCopyForSlice(b *buffer, inField reflect.Str
 			b.addLine("return err\n", indent+3)
 			b.addLine("} else {\n", indent+2)
 			assignFormat := "out.%s[i] = newVal.(%s)\n"
-			assignStmt := fmt.Sprintf(assignFormat, inField.Name, g.typeName(inField.Type.Elem()))
+			assignStmt := fmt.Sprintf(assignFormat, inField.Name, inField.Type.Elem())
 			b.addLine(assignStmt, indent+3)
 			b.addLine("}\n", indent+2)
 		}
