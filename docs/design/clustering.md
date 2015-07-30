@@ -66,7 +66,9 @@ This flow has the admin manually approving the kubelet signing requests.  This i
 ![Dynamic Sequence Diagram](clustering/dynamic.png)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

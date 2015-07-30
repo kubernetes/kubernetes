@@ -151,7 +151,9 @@ Details of the design of namespaces in Kubernetes, including a [detailed example
 can be found in the [namespaces design doc](../design/namespaces.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

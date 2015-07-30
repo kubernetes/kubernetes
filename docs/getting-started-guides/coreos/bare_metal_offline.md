@@ -674,7 +674,9 @@ Kill all pods:
     for i in `kubectl get pods | awk '{print $1}'`; do kubectl stop pod $i; done
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

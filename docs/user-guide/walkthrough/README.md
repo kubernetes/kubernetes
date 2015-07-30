@@ -192,7 +192,9 @@ Continue on to [Kubernetes 201](k8s201.md) or
 for a complete application see the [guestbook example](../../../examples/guestbook/README.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

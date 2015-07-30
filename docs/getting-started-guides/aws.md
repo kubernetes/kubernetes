@@ -111,7 +111,9 @@ Please see the [Kubernetes docs](../../docs/) for more details on administering
 and using a Kubernetes cluster.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

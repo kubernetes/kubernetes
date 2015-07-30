@@ -261,7 +261,9 @@ temporarily disable negative decrement thresholds until the deployment process i
 an auto-scaler to be able to grow capacity during a deployment than to shrink the number of instances precisely.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

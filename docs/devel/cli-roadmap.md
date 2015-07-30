@@ -11,7 +11,9 @@ See github issues with the following labels:
 * [component/client](https://github.com/GoogleCloudPlatform/kubernetes/labels/component/client)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

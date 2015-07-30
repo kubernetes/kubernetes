@@ -580,7 +580,9 @@ source.  Both containers will have the following files present on their filesyst
     /etc/secret-volume/password
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

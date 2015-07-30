@@ -171,7 +171,9 @@ If all else fails, ask questions on IRC at [#google-containers](http://webchat.f
 Move on to [adding one or more workers](worker.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -136,7 +136,9 @@ One or more of the KUbernetes daemons might've crashed. Tail the logs of each in
 The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/issues/6667). You can start a manually. Related documents can be found [here](../../cluster/addons/dns/#how-do-i-configure-it)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

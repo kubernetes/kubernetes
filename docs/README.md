@@ -32,7 +32,9 @@ You should also check the [known issues](user-guide/known-issues.md) for the rel
 * To report a security issue, see [Reporting a Security Issue](reporting-security-issues.md).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

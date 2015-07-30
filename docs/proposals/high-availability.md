@@ -57,7 +57,9 @@ There is a short window after a new master acquires the lease, during which data
 * Is there a desire to keep track of all nodes for a specific component type?
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

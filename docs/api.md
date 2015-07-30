@@ -77,7 +77,9 @@ Some important differences between v1beta1/2 and v1beta3:
 * Host volumes have been changed from `hostDir` to `hostPath` to better reflect that they can be files or directories.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

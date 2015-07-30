@@ -224,7 +224,9 @@ cores.  We plan to revise the definition of the cpu resource to allow for more c
 across providers and platforms.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

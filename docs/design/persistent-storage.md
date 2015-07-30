@@ -209,7 +209,9 @@ The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim 
 Admins can script the recycling of released volumes.  Future dynamic provisioners will understand how a volume should be recycled.  
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

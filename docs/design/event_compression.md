@@ -88,7 +88,9 @@ This demonstrates what would have been 20 separate entries (indicating schedulin
  * PR [#4444](https://github.com/GoogleCloudPlatform/kubernetes/pull/4444): Switch events history to use LRU cache instead of map
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

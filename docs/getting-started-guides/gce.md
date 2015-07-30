@@ -220,7 +220,9 @@ field values:
 * Allowed Protocols and Port: `tcp:1-65535;udp:1-65535;icmp`
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

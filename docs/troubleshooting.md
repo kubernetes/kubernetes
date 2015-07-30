@@ -43,7 +43,9 @@ The Kubernetes team hangs out on IRC at [`#google-containers`](https://botbot.me
 The Kubernetes mailing list is [google-containers@googlegroups.com](https://groups.google.com/forum/#!forum/google-containers)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

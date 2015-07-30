@@ -77,7 +77,9 @@ services/my-nginx
 [Learn about how to configure common container parameters, such as commands and environment variables.](configuring-containers.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

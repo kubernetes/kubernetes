@@ -12,7 +12,9 @@ Available in dockerhub as
 [jsafrane/nfs-data](https://registry.hub.docker.com/u/jsafrane/nfs-data/).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

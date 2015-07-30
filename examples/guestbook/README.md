@@ -548,7 +548,9 @@ If you are having trouble bringing up your guestbook app, double check that your
 Then, see the [troubleshooting documentation](../../docs/troubleshooting.md) for a further list of common issues and how you can diagnose them.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
