@@ -326,22 +326,8 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
-
-	// TODO marekbiskup 2015-06-19 #10085
-	// The use of MasterName will cause iptables to do a DNS lookup to
-	// resolve the name to an IP address, which will slow down the test
-	// and cause it to fail if DNS is absent or broken.
-	// Use the IP address instead.
-
-	destination := testContext.CloudConfig.MasterName
-	if providerIs("aws") {
-		// This is the (internal) IP address used on AWS for the master
-		// TODO: Use IP address for all clouds?
-		// TODO: Avoid hard-coding this
-		destination = "172.20.0.9"
-	}
-
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", destination)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP",
+		strings.TrimPrefix(testContext.Host, "https://"))
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
