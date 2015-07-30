@@ -1694,10 +1694,9 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 		createResponse, err := s.ec2.CreateSecurityGroup(createRequest)
 		if err != nil {
 			ignore := false
-			switch err.(type) {
+			switch err := err.(type) {
 			case awserr.Error:
-				awsError := err.(awserr.Error)
-				if awsError.Code() == "InvalidGroup.Duplicate" && attempt < MaxReadThenCreateRetries {
+				if err.Code() == "InvalidGroup.Duplicate" && attempt < MaxReadThenCreateRetries {
 					glog.V(2).Infof("Got InvalidGroup.Duplicate while creating security group (race?); will retry")
 					ignore = true
 				}

@@ -41,6 +41,9 @@ type Builder interface {
 	// directory path, which may or may not exist yet.  This may be called
 	// more than once, so implementations must be idempotent.
 	SetUpAt(dir string) error
+	// IsReadOnly is a flag that gives the builder's ReadOnly attribute.
+	// All persistent volumes have a private readOnly flag in their builders.
+	IsReadOnly() bool
 }
 
 // Cleaner interface provides methods to cleanup/unmount the volumes.

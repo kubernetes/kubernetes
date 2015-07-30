@@ -59,6 +59,6 @@ func (c *FakePersistentVolumeClaims) UpdateStatus(claim *api.PersistentVolumeCla
 }
 
 func (c *FakePersistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-persistentVolumeClaims", Value: resourceVersion})
-	return c.Fake.Watch, c.Fake.Err
+	c.Fake.Invokes(FakeAction{Action: "watch-persistentVolumeClaims", Value: resourceVersion}, nil)
+	return c.Fake.Watch, c.Fake.Err()
 }

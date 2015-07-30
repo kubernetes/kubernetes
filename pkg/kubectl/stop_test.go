@@ -47,12 +47,13 @@ func TestReplicationControllerStop(t *testing.T) {
 	if s != expected {
 		t.Errorf("expected %s, got %s", expected, s)
 	}
-	if len(fake.Actions) != 7 {
+	actions := fake.Actions()
+	if len(actions) != 7 {
 		t.Errorf("unexpected actions: %v, expected 6 actions (get, list, get, update, get, get, delete)", fake.Actions)
 	}
 	for i, action := range []string{"get", "list", "get", "update", "get", "get", "delete"} {
-		if fake.Actions[i].Action != action+"-replicationController" {
-			t.Errorf("unexpected action: %+v, expected %s-replicationController", fake.Actions[i], action)
+		if actions[i].Action != action+"-replicationController" {
+			t.Errorf("unexpected action: %+v, expected %s-replicationController", actions[i], action)
 		}
 	}
 }
@@ -159,10 +160,11 @@ func TestSimpleStop(t *testing.T) {
 				t.Errorf("unexpected return: %s (%s)", s, test.test)
 			}
 		}
-		if len(test.actions) != len(fake.Actions) {
+		actions := fake.Actions()
+		if len(test.actions) != len(actions) {
 			t.Errorf("unexpected actions: %v; expected %v (%s)", fake.Actions, test.actions, test.test)
 		}
-		for i, action := range fake.Actions {
+		for i, action := range actions {
 			testAction := test.actions[i]
 			if action.Action != testAction {
 				t.Errorf("unexpected action: %v; expected %v (%s)", action, testAction, test.test)

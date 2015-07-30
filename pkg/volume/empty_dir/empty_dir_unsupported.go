@@ -18,7 +18,9 @@ limitations under the License.
 
 package empty_dir
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+)
 
 // realMountDetector pretends to implement mediumer.
 type realMountDetector struct {
@@ -27,4 +29,8 @@ type realMountDetector struct {
 
 func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
 	return mediumUnknown, false, nil
+}
+
+func selinuxEnabled() bool {
+	return false
 }

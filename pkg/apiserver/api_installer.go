@@ -204,10 +204,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var (
-		getOptions     runtime.Object
-		getOptionsKind string
-		getSubpath     bool
-		getSubpathKey  string
+		getOptions          runtime.Object
+		versionedGetOptions runtime.Object
+		getOptionsKind      string
+		getSubpath          bool
+		getSubpathKey       string
 	)
 	if isGetterWithOptions {
 		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
@@ -215,14 +216,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return err
 		}
+		versionedGetOptions, err = a.group.Creater.New(serverVersion, getOptionsKind)
+		if err != nil {
+			return err
+		}
 		isGetter = true
 	}
 
 	var (
-		connectOptions     runtime.Object
-		connectOptionsKind string
-		connectSubpath     bool
-		connectSubpathKey  string
+		connectOptions          runtime.Object
+		versionedConnectOptions runtime.Object
+		connectOptionsKind      string
+		connectSubpath          bool
+		connectSubpathKey       string
 	)
 	if isConnecter {
 		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
@@ -231,6 +237,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if err != nil {
 				return err
 			}
+			versionedConnectOptions, err = a.group.Creater.New(serverVersion, connectOptionsKind)
 		}
 	}
 
@@ -390,7 +397,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", versionedObject).
 				Writes(versionedObject)
 			if isGetterWithOptions {
-				if err := addObjectParams(ws, route, getOptions); err != nil {
+				if err := addObjectParams(ws, route, versionedGetOptions); err != nil {
 					return err
 				}
 			}
@@ -561,8 +568,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					Produces("*/*").
 					Consumes("*/*").
 					Writes("string")
-				if connectOptions != nil {
-					if err := addObjectParams(ws, route, connectOptions); err != nil {
+				if versionedConnectOptions != nil {
+					if err := addObjectParams(ws, route, versionedConnectOptions); err != nil {
 						return err
 					}
 				}

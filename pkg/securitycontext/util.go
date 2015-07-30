@@ -16,7 +16,12 @@ limitations under the License.
 
 package securitycontext
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+)
 
 // HasPrivilegedRequest returns the value of SecurityContext.Privileged, taking into account
 // the possibility of nils
@@ -40,4 +45,24 @@ func HasCapabilitiesRequest(container *api.Container) bool {
 		return false
 	}
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
+}
+
+const expectedSELinuxContextFields = 4
+
+// ParseSELinuxOptions parses a string containing a full SELinux context
+// (user, role, type, and level) into an SELinuxOptions object.  If the
+// context is malformed, an error is returned.
+func ParseSELinuxOptions(context string) (*api.SELinuxOptions, error) {
+	fields := strings.SplitN(context, ":", expectedSELinuxContextFields)
+
+	if len(fields) != expectedSELinuxContextFields {
+		return nil, fmt.Errorf("expected %v fields in selinuxcontext; got %v (context: %v)", expectedSELinuxContextFields, len(fields), context)
+	}
+
+	return &api.SELinuxOptions{
+		User:  fields[0],
+		Role:  fields[1],
+		Type:  fields[2],
+		Level: fields[3],
+	}, nil
 }

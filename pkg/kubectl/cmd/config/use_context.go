@@ -66,7 +66,7 @@ func (o useContextOptions) run() error {
 
 	config.CurrentContext = o.contextName
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 

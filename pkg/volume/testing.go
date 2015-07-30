@@ -127,6 +127,10 @@ func (fv *FakeVolume) SetUpAt(dir string) error {
 	return os.MkdirAll(dir, 0750)
 }
 
+func (fv *FakeVolume) IsReadOnly() bool {
+	return false
+}
+
 func (fv *FakeVolume) GetPath() string {
 	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, util.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
 }

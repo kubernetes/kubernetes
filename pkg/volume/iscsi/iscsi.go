@@ -39,6 +39,7 @@ type iscsiPlugin struct {
 }
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
+var _ volume.PersistentVolumePlugin = &iscsiPlugin{}
 
 const (
 	iscsiPluginName = "kubernetes.io/iscsi"
@@ -80,11 +81,16 @@ func (plugin *iscsiPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.
 }
 
 func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
+	// iscsi volumes used directly in a pod have a ReadOnly flag set by the pod author.
+	// iscsi volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
+	var readOnly bool
 	var iscsi *api.ISCSIVolumeSource
 	if spec.VolumeSource.ISCSI != nil {
 		iscsi = spec.VolumeSource.ISCSI
+		readOnly = iscsi.ReadOnly
 	} else {
 		iscsi = spec.PersistentVolumeSource.ISCSI
+		readOnly = spec.ReadOnly
 	}
 
 	lun := strconv.Itoa(iscsi.Lun)
@@ -99,9 +105,8 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 			manager: manager,
 			mounter: mounter,
 			plugin:  plugin},
-
 		fsType:   iscsi.FSType,
-		readOnly: iscsi.ReadOnly,
+		readOnly: readOnly,
 	}, nil
 }
 
@@ -177,6 +182,10 @@ type iscsiDiskCleaner struct {
 }
 
 var _ volume.Cleaner = &iscsiDiskCleaner{}
+
+func (b *iscsiDiskBuilder) IsReadOnly() bool {
+	return b.readOnly
+}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.

@@ -33,14 +33,6 @@ function generate_version() {
 	cat >> $TMPFILE <<EOF
 package ${version}
 
-import (
-	"reflect"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-)
-
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 

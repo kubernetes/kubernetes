@@ -65,6 +65,6 @@ func (c *FakeReplicationControllers) Delete(name string) error {
 }
 
 func (c *FakeReplicationControllers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: WatchControllerAction, Value: resourceVersion})
+	c.Fake.Invokes(FakeAction{Action: WatchControllerAction, Value: resourceVersion}, nil)
 	return c.Fake.Watch, nil
 }

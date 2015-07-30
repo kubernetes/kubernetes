@@ -462,9 +462,10 @@ func TestTokenCreation(t *testing.T) {
 			controller.secretDeleted(tc.DeletedSecret)
 		}
 
-		for i, action := range client.Actions {
+		actions := client.Actions()
+		for i, action := range actions {
 			if len(tc.ExpectedActions) < i+1 {
-				t.Errorf("%s: %d unexpected actions: %+v", k, len(client.Actions)-len(tc.ExpectedActions), client.Actions[i:])
+				t.Errorf("%s: %d unexpected actions: %+v", k, len(actions)-len(tc.ExpectedActions), actions[i:])
 				break
 			}
 
@@ -479,8 +480,8 @@ func TestTokenCreation(t *testing.T) {
 			}
 		}
 
-		if len(tc.ExpectedActions) > len(client.Actions) {
-			t.Errorf("%s: %d additional expected actions:%+v", k, len(tc.ExpectedActions)-len(client.Actions), tc.ExpectedActions[len(client.Actions):])
+		if len(tc.ExpectedActions) > len(actions) {
+			t.Errorf("%s: %d additional expected actions:%+v", k, len(tc.ExpectedActions)-len(actions), tc.ExpectedActions[len(actions):])
 		}
 	}
 }

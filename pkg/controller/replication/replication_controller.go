@@ -191,9 +191,9 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	rm.queue.ShutDown()
 }
 
-// getPodControllers returns the controller managing the given pod.
+// getPodController returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
-func (rm *ReplicationManager) getPodControllers(pod *api.Pod) *api.ReplicationController {
+func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationController {
 	controllers, err := rm.rcStore.GetPodControllers(pod)
 	if err != nil {
 		glog.V(4).Infof("No controllers found for pod %v, replication manager will avoid syncing", pod.Name)
@@ -211,7 +211,7 @@ func (rm *ReplicationManager) getPodControllers(pod *api.Pod) *api.ReplicationCo
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
 func (rm *ReplicationManager) addPod(obj interface{}) {
 	pod := obj.(*api.Pod)
-	if rc := rm.getPodControllers(pod); rc != nil {
+	if rc := rm.getPodController(pod); rc != nil {
 		rcKey, err := controller.KeyFunc(rc)
 		if err != nil {
 			glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
@@ -232,7 +232,7 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 	}
 	// TODO: Write a unittest for this case
 	curPod := cur.(*api.Pod)
-	if rc := rm.getPodControllers(curPod); rc != nil {
+	if rc := rm.getPodController(curPod); rc != nil {
 		rm.enqueueController(rc)
 	}
 	oldPod := old.(*api.Pod)
@@ -240,7 +240,7 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
 		// If the old and new rc are the same, the first one that syncs
 		// will set expectations preventing any damage from the second.
-		if oldRC := rm.getPodControllers(oldPod); oldRC != nil {
+		if oldRC := rm.getPodController(oldPod); oldRC != nil {
 			rm.enqueueController(oldRC)
 		}
 	}
@@ -267,7 +267,7 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 			return
 		}
 	}
-	if rc := rm.getPodControllers(pod); rc != nil {
+	if rc := rm.getPodController(pod); rc != nil {
 		rcKey, err := controller.KeyFunc(rc)
 		if err != nil {
 			glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)

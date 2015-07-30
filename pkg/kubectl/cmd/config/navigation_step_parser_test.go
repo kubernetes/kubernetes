@@ -36,7 +36,7 @@ func TestParseWithDots(t *testing.T) {
 		path: "clusters.my.dot.delimited.name.server",
 		expectedNavigationSteps: navigationSteps{
 			steps: []navigationStep{
-				{"clusters", reflect.TypeOf(make(map[string]clientcmdapi.Cluster))},
+				{"clusters", reflect.TypeOf(make(map[string]*clientcmdapi.Cluster))},
 				{"my.dot.delimited.name", reflect.TypeOf(clientcmdapi.Cluster{})},
 				{"server", reflect.TypeOf("")},
 			},
@@ -51,7 +51,7 @@ func TestParseWithDotsEndingWithName(t *testing.T) {
 		path: "contexts.10.12.12.12",
 		expectedNavigationSteps: navigationSteps{
 			steps: []navigationStep{
-				{"contexts", reflect.TypeOf(make(map[string]clientcmdapi.Context))},
+				{"contexts", reflect.TypeOf(make(map[string]*clientcmdapi.Context))},
 				{"10.12.12.12", reflect.TypeOf(clientcmdapi.Context{})},
 			},
 		},
@@ -91,5 +91,6 @@ func (test stepParserTest) run(t *testing.T) {
 
 	if !reflect.DeepEqual(test.expectedNavigationSteps, *actualSteps) {
 		t.Errorf("diff: %v", util.ObjectDiff(test.expectedNavigationSteps, *actualSteps))
+		t.Errorf("expected: %#v\n actual:   %#v", test.expectedNavigationSteps, *actualSteps)
 	}
 }

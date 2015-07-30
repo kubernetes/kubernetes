@@ -192,12 +192,13 @@ func TestServiceAccountCreation(t *testing.T) {
 			controller.serviceAccountDeleted(tc.DeletedServiceAccount)
 		}
 
-		if len(tc.ExpectCreatedServiceAccounts) != len(client.Actions) {
-			t.Errorf("%s: Expected to create accounts %#v. Actual actions were: %#v", k, tc.ExpectCreatedServiceAccounts, client.Actions)
+		actions := client.Actions()
+		if len(tc.ExpectCreatedServiceAccounts) != len(actions) {
+			t.Errorf("%s: Expected to create accounts %#v. Actual actions were: %#v", k, tc.ExpectCreatedServiceAccounts, actions)
 			continue
 		}
 		for i, expectedName := range tc.ExpectCreatedServiceAccounts {
-			action := client.Actions[i]
+			action := actions[i]
 			if action.Action != "create-serviceaccount" {
 				t.Errorf("%s: Unexpected action %s", k, action.Action)
 				break

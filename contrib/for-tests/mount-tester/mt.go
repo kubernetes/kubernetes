@@ -25,17 +25,23 @@ import (
 )
 
 var (
-	fsTypePath           = ""
-	fileModePath         = ""
-	readFileContentPath  = ""
-	readWriteNewFilePath = ""
+	fsTypePath          = ""
+	fileModePath        = ""
+	filePermPath        = ""
+	readFileContentPath = ""
+	newFilePath0644     = ""
+	newFilePath0666     = ""
+	newFilePath0777     = ""
 )
 
 func init() {
 	flag.StringVar(&fsTypePath, "fs_type", "", "Path to print the fs type for")
-	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the filemode of")
+	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
+	flag.StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
 	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
-	flag.StringVar(&readWriteNewFilePath, "rw_new_file", "", "Path to write to and read from")
+	flag.StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
+	flag.StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
+	flag.StringVar(&newFilePath0777, "new_file_0777", "", "Path to write to and read from with perm 0777")
 }
 
 // This program performs some tests on the filesystem as dictated by the
@@ -47,6 +53,9 @@ func main() {
 		err  error
 		errs = []error{}
 	)
+
+	// Clear the umask so we can set any mode bits we want.
+	syscall.Umask(0000)
 
 	// NOTE: the ordering of execution of the various command line
 	// flags is intentional and allows a single command to:
@@ -62,12 +71,27 @@ func main() {
 		errs = append(errs, err)
 	}
 
-	err = readWriteNewFile(readWriteNewFilePath)
+	err = readWriteNewFile(newFilePath0644, 0644)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = readWriteNewFile(newFilePath0666, 0666)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = readWriteNewFile(newFilePath0777, 0777)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
 	err = fileMode(fileModePath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = filePerm(filePermPath)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -94,7 +118,7 @@ func fsType(path string) error {
 
 	buf := syscall.Statfs_t{}
 	if err := syscall.Statfs(path, &buf); err != nil {
-		fmt.Printf("error from statfs(%q): %v", path, err)
+		fmt.Printf("error from statfs(%q): %v\n", path, err)
 		return err
 	}
 
@@ -122,6 +146,21 @@ func fileMode(path string) error {
 	return nil
 }
 
+func filePerm(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	fileinfo, err := os.Lstat(path)
+	if err != nil {
+		fmt.Printf("error from Lstat(%q): %v\n", path, err)
+		return err
+	}
+
+	fmt.Printf("perms of file %q: %v\n", path, fileinfo.Mode().Perm())
+	return nil
+}
+
 func readFileContent(path string) error {
 	if path == "" {
 		return nil
@@ -138,13 +177,13 @@ func readFileContent(path string) error {
 	return nil
 }
 
-func readWriteNewFile(path string) error {
+func readWriteNewFile(path string, perm os.FileMode) error {
 	if path == "" {
 		return nil
 	}
 
 	content := "mount-tester new file\n"
-	err := ioutil.WriteFile(path, []byte(content), 0644)
+	err := ioutil.WriteFile(path, []byte(content), perm)
 	if err != nil {
 		fmt.Printf("error writing new file %q: %v\n", path, err)
 		return err

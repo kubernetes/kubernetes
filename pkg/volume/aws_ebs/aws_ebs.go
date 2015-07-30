@@ -45,6 +45,7 @@ type awsElasticBlockStorePlugin struct {
 }
 
 var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.PersistentVolumePlugin = &awsElasticBlockStorePlugin{}
 
 const (
 	awsElasticBlockStorePluginName = "kubernetes.io/aws-ebs"
@@ -74,11 +75,16 @@ func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api
 }
 
 func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Builder, error) {
+	// EBSs used directly in a pod have a ReadOnly flag set by the pod author.
+	// EBSs used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
+	var readOnly bool
 	var ebs *api.AWSElasticBlockStoreVolumeSource
 	if spec.VolumeSource.AWSElasticBlockStore != nil {
 		ebs = spec.VolumeSource.AWSElasticBlockStore
+		readOnly = ebs.ReadOnly
 	} else {
 		ebs = spec.PersistentVolumeSource.AWSElasticBlockStore
+		readOnly = spec.ReadOnly
 	}
 
 	volumeID := ebs.VolumeID
@@ -87,7 +93,6 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, 
 	if ebs.Partition != 0 {
 		partition = strconv.Itoa(ebs.Partition)
 	}
-	readOnly := ebs.ReadOnly
 
 	return &awsElasticBlockStore{
 		podUID:      podUID,
@@ -233,6 +238,10 @@ func (ebs *awsElasticBlockStore) SetUpAt(dir string) error {
 	}
 
 	return nil
+}
+
+func (pd *awsElasticBlockStore) IsReadOnly() bool {
+	return pd.readOnly
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {

@@ -87,7 +87,6 @@ readonly KUBE_TEST_PORTABLE=(
   contrib/for-tests/network-tester/rc.json
   contrib/for-tests/network-tester/service.json
   hack/e2e.go
-  hack/e2e-suite
   hack/e2e-internal
   hack/ginkgo-e2e.sh
   hack/lib
@@ -104,10 +103,16 @@ readonly KUBE_CLIENT_PLATFORMS=(
   windows/amd64
 )
 
-# Gigabytes desired for parallel platform builds. 8 is fairly
+# Gigabytes desired for parallel platform builds. 11 is fairly
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
-readonly KUBE_PARALLEL_BUILD_MEMORY=8
+#
+# If you are using boot2docker, the following seems to work (note 
+# that 12000 rounds to 11G):
+#   boot2docker down
+#   VBoxManage modifyvm boot2docker-vm --memory 12000
+#   boot2docker up
+readonly KUBE_PARALLEL_BUILD_MEMORY=11
 
 readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"

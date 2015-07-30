@@ -34,43 +34,43 @@ import (
 
 var (
 	testConfigAlfa = clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"red-user": {Token: "red-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			"cow-cluster": {Server: "http://cow.org:8080"}},
-		Contexts: map[string]clientcmdapi.Context{
+		Contexts: map[string]*clientcmdapi.Context{
 			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster", Namespace: "hammer-ns"}},
 	}
 	testConfigBravo = clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"black-user": {Token: "black-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			"pig-cluster": {Server: "http://pig.org:8080"}},
-		Contexts: map[string]clientcmdapi.Context{
+		Contexts: map[string]*clientcmdapi.Context{
 			"queen-anne-context": {AuthInfo: "black-user", Cluster: "pig-cluster", Namespace: "saw-ns"}},
 	}
 	testConfigCharlie = clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"green-user": {Token: "green-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			"horse-cluster": {Server: "http://horse.org:8080"}},
-		Contexts: map[string]clientcmdapi.Context{
+		Contexts: map[string]*clientcmdapi.Context{
 			"shaker-context": {AuthInfo: "green-user", Cluster: "horse-cluster", Namespace: "chisel-ns"}},
 	}
 	testConfigDelta = clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"blue-user": {Token: "blue-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			"chicken-cluster": {Server: "http://chicken.org:8080"}},
-		Contexts: map[string]clientcmdapi.Context{
+		Contexts: map[string]*clientcmdapi.Context{
 			"gothic-context": {AuthInfo: "blue-user", Cluster: "chicken-cluster", Namespace: "plane-ns"}},
 	}
 
 	testConfigConflictAlfa = clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"red-user":    {Token: "a-different-red-token"},
 			"yellow-user": {Token: "yellow-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			"cow-cluster":    {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true},
 			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true}},
 		CurrentContext: "federal-context",
@@ -176,21 +176,21 @@ func TestConflictingCurrentContext(t *testing.T) {
 
 func TestResolveRelativePaths(t *testing.T) {
 	pathResolutionConfig1 := clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"relative-user-1": {ClientCertificate: "relative/client/cert", ClientKey: "../relative/client/key"},
 			"absolute-user-1": {ClientCertificate: "/absolute/client/cert", ClientKey: "/absolute/client/key"},
 		},
-		Clusters: map[string]clientcmdapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			"relative-server-1": {CertificateAuthority: "../relative/ca"},
 			"absolute-server-1": {CertificateAuthority: "/absolute/ca"},
 		},
 	}
 	pathResolutionConfig2 := clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"relative-user-2": {ClientCertificate: "relative/client/cert2", ClientKey: "../relative/client/key2"},
 			"absolute-user-2": {ClientCertificate: "/absolute/client/cert2", ClientKey: "/absolute/client/key2"},
 		},
-		Clusters: map[string]clientcmdapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			"relative-server-2": {CertificateAuthority: "../relative/ca2"},
 			"absolute-server-2": {CertificateAuthority: "/absolute/ca2"},
 		},

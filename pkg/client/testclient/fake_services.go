@@ -56,6 +56,6 @@ func (c *FakeServices) Delete(name string) error {
 }
 
 func (c *FakeServices) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-services", Value: resourceVersion})
-	return c.Fake.Watch, c.Fake.Err
+	c.Fake.Invokes(FakeAction{Action: "watch-services", Value: resourceVersion}, nil)
+	return c.Fake.Watch, c.Fake.Err()
 }

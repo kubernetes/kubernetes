@@ -12,7 +12,7 @@ the system will bring them back to the original state, in particular:
 
 On the cluster, the add-ons are kept in ```/etc/kubernetes/addons``` on the master node, in yaml files
 (json is not supported at the moment). A system daemon periodically checks if
-the contents of this directory is consistent with the add-one objects on the API
+the contents of this directory is consistent with the add-on objects on the API
 server. If any difference is spotted, the system updates the API objects
 accordingly. (Limitation: for now, the system compares only the names of objects
 in the directory and on the API server. So changes in parameters may not be

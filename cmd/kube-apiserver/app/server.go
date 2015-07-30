@@ -101,6 +101,7 @@ type APIServer struct {
 	LongRunningRequestRE       string
 	SSHUser                    string
 	SSHKeyfile                 string
+	MaxConnectionBytesPerSec   int64
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -205,6 +206,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.LongRunningRequestRE, "long-running-request-regexp", defaultLongRunningRequestRE, "A regular expression matching long running requests which should be excluded from maximum inflight request handling.")
 	fs.StringVar(&s.SSHUser, "ssh-user", "", "If non-empty, use secure SSH proxy to the nodes, using this user name")
 	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", "", "If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
+	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", 0, "If non-zero, throttle each user connection to this number of bytes/sec.  Currently only applies to long-running requests")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -255,7 +257,8 @@ func (s *APIServer) Run(_ []string) error {
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
 		// TODO(vmarmol): Implement support for HostNetworkSources.
-		HostNetworkSources: []string{},
+		HostNetworkSources:                     []string{},
+		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)

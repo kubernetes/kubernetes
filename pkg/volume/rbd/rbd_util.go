@@ -161,7 +161,7 @@ func (util *RBDUtil) loadRBD(rbd *rbd, mnt string) error {
 
 func (util *RBDUtil) fencing(b rbdBuilder) error {
 	// no need to fence readOnly
-	if b.ReadOnly {
+	if b.IsReadOnly() {
 		return nil
 	}
 	return util.rbdLock(b, true)

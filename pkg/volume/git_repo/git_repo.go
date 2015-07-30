@@ -118,6 +118,10 @@ func (b *gitRepoVolumeBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
 }
 
+func (b *gitRepoVolumeBuilder) IsReadOnly() bool {
+	return false
+}
+
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = &volume.Spec{
 	Name:         "not-used",

@@ -484,7 +484,7 @@ func TestPodControllerLookup(t *testing.T) {
 		for _, r := range c.inRCs {
 			manager.rcStore.Add(r)
 		}
-		if rc := manager.getPodControllers(c.pod); rc != nil {
+		if rc := manager.getPodController(c.pod); rc != nil {
 			if c.outRCName != rc.Name {
 				t.Errorf("Got controller %+v expected %+v", rc.Name, c.outRCName)
 			}
@@ -693,7 +693,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	numReplicas := 10
 	updateReplicaCount(fakeRCClient, *rc, numReplicas)
 	updates, gets := 0, 0
-	for _, a := range fakeClient.Actions {
+	for _, a := range fakeClient.Actions() {
 		switch a.Action {
 		case testclient.GetControllerAction:
 			gets++

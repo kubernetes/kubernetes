@@ -144,45 +144,36 @@ $ kubectl logs spark-master
 15/06/26 14:15:55 INFO Master: Registering worker 10.244.0.19:60970 with 1 cores, 2.6 GB RAM
 ```
 
-## Step Three: Do something with the cluster
+## Step Three: Start your Spark driver to launch jobs on your Spark cluster
 
-Get the address and port of the Master service.
+The Spark driver is used to launch jobs into Spark cluster. You can read more about it in
+[Spark architecture](http://spark.apache.org/docs/latest/cluster-overview.html).
 
-```sh
-$ kubectl get service spark-master
-NAME           LABELS              SELECTOR            IP(S)          PORT(S)
-spark-master   name=spark-master   name=spark-master   10.0.204.187   7077/TCP
+```shell
+$ kubectl create -f examples/spark/spark-driver.json
 ```
 
-SSH to one of your cluster nodes. On GCE/GKE you can either use [Developers Console](https://console.developers.google.com)
-(more details [here](https://cloud.google.com/compute/docs/ssh-in-browser))
-or run  `gcloud compute ssh <name>` where the name can be taken from `kubectl get nodes`
-(more details [here](https://cloud.google.com/compute/docs/gcloud-compute/#connecting)).
+The Spark driver needs the Master service to be running.
 
-```
-$ kubectl get nodes
-NAME                     LABELS                                          STATUS
-kubernetes-minion-5jvu   kubernetes.io/hostname=kubernetes-minion-5jvu   Ready
-kubernetes-minion-6fbi   kubernetes.io/hostname=kubernetes-minion-6fbi   Ready
-kubernetes-minion-8y2v   kubernetes.io/hostname=kubernetes-minion-8y2v   Ready
-kubernetes-minion-h0tr   kubernetes.io/hostname=kubernetes-minion-h0tr   Ready
+### Check to see if the driver is running
 
-$ gcloud compute ssh kubernetes-minion-5jvu --zone=us-central1-b
-Linux kubernetes-minion-5jvu 3.16.0-0.bpo.4-amd64 #1 SMP Debian 3.16.7-ckt9-3~deb8u1~bpo70+1 (2015-04-27) x86_64
-
-=== GCE Kubernetes node setup complete ===
-
-me@kubernetes-minion-5jvu:~$
+```shell
+$ kubectl get pods
+NAME                                           READY     REASON    RESTARTS   AGE
+[...]
+spark-master                                    1/1       Running   0          14m
+spark-driver                                    1/1       Running   0          10m
 ```
 
-Once logged in run spark-base image. Inside of the image there is a script
-that sets up the environment based on the provided IP and port of the Master.
+## Step Four: Do something with the cluster
+
+Use the kubectl exec to connect to Spark driver
 
 ```
-cluster-node $ sudo docker run -it gcr.io/google_containers/spark-base
-root@f12a6fec45ce:/# . /setup_client.sh 10.0.204.187 7077
-root@f12a6fec45ce:/# pyspark
-Python 2.7.9 (default, Mar  1 2015, 12:57:24) 
+$ kubectl exec spark-driver -it bash
+root@spark-driver:/#
+root@spark-driver:/# pyspark
+Python 2.7.9 (default, Mar  1 2015, 12:57:24)
 [GCC 4.9.2] on linux2
 Type "help", "copyright", "credits" or "license" for more information.
 15/06/26 14:25:28 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
@@ -201,9 +192,9 @@ SparkContext available as sc, HiveContext available as sqlContext.
 
 ## Result
 
-You now have services, replication controllers, and pods for the Spark master and Spark workers.
-You can take this example to the next step and start using the Apache Spark cluster 
-you just created, see [Spark documentation](https://spark.apache.org/documentation.html) 
+You now have services, replication controllers, and pods for the Spark master , Spark driver and Spark workers.
+You can take this example to the next step and start using the Apache Spark cluster
+you just created, see [Spark documentation](https://spark.apache.org/documentation.html)
 for more information.
 
 ## tl;dr
@@ -215,6 +206,8 @@ for more information.
 Make sure the Master Pod is running (use: ```kubectl get pods```).
 
 ```kubectl create -f spark-worker-controller.json```
+
+```kubectl create -f spark-driver.json```
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -95,15 +95,15 @@ func Validate(config clientcmdapi.Config) error {
 	}
 
 	for contextName, context := range config.Contexts {
-		validationErrors = append(validationErrors, validateContext(contextName, context, config)...)
+		validationErrors = append(validationErrors, validateContext(contextName, *context, config)...)
 	}
 
 	for authInfoName, authInfo := range config.AuthInfos {
-		validationErrors = append(validationErrors, validateAuthInfo(authInfoName, authInfo)...)
+		validationErrors = append(validationErrors, validateAuthInfo(authInfoName, *authInfo)...)
 	}
 
 	for clusterName, clusterInfo := range config.Clusters {
-		validationErrors = append(validationErrors, validateClusterInfo(clusterName, clusterInfo)...)
+		validationErrors = append(validationErrors, validateClusterInfo(clusterName, *clusterInfo)...)
 	}
 
 	return newErrConfigurationInvalid(validationErrors)
@@ -131,9 +131,9 @@ func ConfirmUsable(config clientcmdapi.Config, passedContextName string) error {
 	}
 
 	if exists {
-		validationErrors = append(validationErrors, validateContext(contextName, context, config)...)
-		validationErrors = append(validationErrors, validateAuthInfo(context.AuthInfo, config.AuthInfos[context.AuthInfo])...)
-		validationErrors = append(validationErrors, validateClusterInfo(context.Cluster, config.Clusters[context.Cluster])...)
+		validationErrors = append(validationErrors, validateContext(contextName, *context, config)...)
+		validationErrors = append(validationErrors, validateAuthInfo(context.AuthInfo, *config.AuthInfos[context.AuthInfo])...)
+		validationErrors = append(validationErrors, validateClusterInfo(context.Cluster, *config.Clusters[context.Cluster])...)
 	}
 
 	return newErrConfigurationInvalid(validationErrors)

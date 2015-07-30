@@ -28,25 +28,25 @@ import (
 
 func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.Clusters["missing ca"] = clientcmdapi.Cluster{
+	config.Clusters["missing ca"] = &clientcmdapi.Cluster{
 		Server:               "anything",
 		CertificateAuthority: "missing",
 	}
-	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["error"] = &clientcmdapi.AuthInfo{
 		Username: "anything",
 		Token:    "here",
 	}
-	config.Contexts["dirty"] = clientcmdapi.Context{
+	config.Contexts["dirty"] = &clientcmdapi.Context{
 		Cluster:  "missing ca",
 		AuthInfo: "error",
 	}
-	config.Clusters["clean"] = clientcmdapi.Cluster{
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server: "anything",
 	}
-	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Token: "here",
 	}
-	config.Contexts["clean"] = clientcmdapi.Context{
+	config.Contexts["clean"] = &clientcmdapi.Context{
 		Cluster:  "clean",
 		AuthInfo: "clean",
 	}
@@ -64,15 +64,15 @@ func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
 }
 func TestConfirmUsableBadInfoConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.Clusters["missing ca"] = clientcmdapi.Cluster{
+	config.Clusters["missing ca"] = &clientcmdapi.Cluster{
 		Server:               "anything",
 		CertificateAuthority: "missing",
 	}
-	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["error"] = &clientcmdapi.AuthInfo{
 		Username: "anything",
 		Token:    "here",
 	}
-	config.Contexts["first"] = clientcmdapi.Context{
+	config.Contexts["first"] = &clientcmdapi.Context{
 		Cluster:  "missing ca",
 		AuthInfo: "error",
 	}
@@ -150,7 +150,7 @@ func TestIsConfigurationInvalid(t *testing.T) {
 func TestValidateMissingReferencesConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.CurrentContext = "anything"
-	config.Contexts["anything"] = clientcmdapi.Context{Cluster: "missing", AuthInfo: "missing"}
+	config.Contexts["anything"] = &clientcmdapi.Context{Cluster: "missing", AuthInfo: "missing"}
 	test := configValidationTest{
 		config:                 config,
 		expectedErrorSubstring: []string{"user \"missing\" was not found for context \"anything\"", "cluster \"missing\" was not found for context \"anything\""},
@@ -162,7 +162,7 @@ func TestValidateMissingReferencesConfig(t *testing.T) {
 func TestValidateEmptyContext(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.CurrentContext = "anything"
-	config.Contexts["anything"] = clientcmdapi.Context{}
+	config.Contexts["anything"] = &clientcmdapi.Context{}
 	test := configValidationTest{
 		config:                 config,
 		expectedErrorSubstring: []string{"user was not specified for context \"anything\"", "cluster was not specified for context \"anything\""},
@@ -174,7 +174,7 @@ func TestValidateEmptyContext(t *testing.T) {
 
 func TestValidateEmptyClusterInfo(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.Clusters["empty"] = clientcmdapi.Cluster{}
+	config.Clusters["empty"] = &clientcmdapi.Cluster{}
 	test := configValidationTest{
 		config:                 config,
 		expectedErrorSubstring: []string{"no server found for"},
@@ -185,7 +185,7 @@ func TestValidateEmptyClusterInfo(t *testing.T) {
 }
 func TestValidateMissingCAFileClusterInfo(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.Clusters["missing ca"] = clientcmdapi.Cluster{
+	config.Clusters["missing ca"] = &clientcmdapi.Cluster{
 		Server:               "anything",
 		CertificateAuthority: "missing",
 	}
@@ -199,7 +199,7 @@ func TestValidateMissingCAFileClusterInfo(t *testing.T) {
 }
 func TestValidateCleanClusterInfo(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.Clusters["clean"] = clientcmdapi.Cluster{
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server: "anything",
 	}
 	test := configValidationTest{
@@ -214,7 +214,7 @@ func TestValidateCleanWithCAClusterInfo(t *testing.T) {
 	defer os.Remove(tempFile.Name())
 
 	config := clientcmdapi.NewConfig()
-	config.Clusters["clean"] = clientcmdapi.Cluster{
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server:               "anything",
 		CertificateAuthority: tempFile.Name(),
 	}
@@ -228,7 +228,7 @@ func TestValidateCleanWithCAClusterInfo(t *testing.T) {
 
 func TestValidateEmptyAuthInfo(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.AuthInfos["error"] = clientcmdapi.AuthInfo{}
+	config.AuthInfos["error"] = &clientcmdapi.AuthInfo{}
 	test := configValidationTest{
 		config: config,
 	}
@@ -238,7 +238,7 @@ func TestValidateEmptyAuthInfo(t *testing.T) {
 }
 func TestValidateCertFilesNotFoundAuthInfo(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["error"] = &clientcmdapi.AuthInfo{
 		ClientCertificate: "missing",
 		ClientKey:         "missing",
 	}
@@ -255,7 +255,7 @@ func TestValidateCertDataOverridesFiles(t *testing.T) {
 	defer os.Remove(tempFile.Name())
 
 	config := clientcmdapi.NewConfig()
-	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		ClientCertificate:     tempFile.Name(),
 		ClientCertificateData: []byte("certdata"),
 		ClientKey:             tempFile.Name(),
@@ -274,7 +274,7 @@ func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
 	defer os.Remove(tempFile.Name())
 
 	config := clientcmdapi.NewConfig()
-	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		ClientCertificate: tempFile.Name(),
 		ClientKey:         tempFile.Name(),
 	}
@@ -287,7 +287,7 @@ func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
 }
 func TestValidateCleanTokenAuthInfo(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Token: "any-value",
 	}
 	test := configValidationTest{
@@ -300,7 +300,7 @@ func TestValidateCleanTokenAuthInfo(t *testing.T) {
 
 func TestValidateMultipleMethodsAuthInfo(t *testing.T) {
 	config := clientcmdapi.NewConfig()
-	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["error"] = &clientcmdapi.AuthInfo{
 		Token:    "token",
 		Username: "username",
 	}
@@ -319,7 +319,7 @@ type configValidationTest struct {
 }
 
 func (c configValidationTest) testContext(contextName string, t *testing.T) {
-	errs := validateContext(contextName, c.config.Contexts[contextName], *c.config)
+	errs := validateContext(contextName, *c.config.Contexts[contextName], *c.config)
 
 	if len(c.expectedErrorSubstring) != 0 {
 		if len(errs) == 0 {
@@ -379,7 +379,7 @@ func (c configValidationTest) testConfig(t *testing.T) {
 	}
 }
 func (c configValidationTest) testCluster(clusterName string, t *testing.T) {
-	errs := validateClusterInfo(clusterName, c.config.Clusters[clusterName])
+	errs := validateClusterInfo(clusterName, *c.config.Clusters[clusterName])
 
 	if len(c.expectedErrorSubstring) != 0 {
 		if len(errs) == 0 {
@@ -399,7 +399,7 @@ func (c configValidationTest) testCluster(clusterName string, t *testing.T) {
 }
 
 func (c configValidationTest) testAuthInfo(authInfoName string, t *testing.T) {
-	errs := validateAuthInfo(authInfoName, c.config.AuthInfos[authInfoName])
+	errs := validateAuthInfo(authInfoName, *c.config.AuthInfos[authInfoName])
 
 	if len(c.expectedErrorSubstring) != 0 {
 		if len(errs) == 0 {

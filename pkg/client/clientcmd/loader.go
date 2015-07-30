@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
@@ -120,11 +121,6 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		if err := mergeConfigWithFile(mapConfig, file); err != nil {
 			errlist = append(errlist, err)
 		}
-		if rules.ResolvePaths() {
-			if err := ResolveLocalPaths(file, mapConfig); err != nil {
-				errlist = append(errlist, err)
-			}
-		}
 	}
 
 	// merge all of the struct values in the reverse order so that priority is given correctly
@@ -133,9 +129,6 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	for i := len(kubeConfigFiles) - 1; i >= 0; i-- {
 		file := kubeConfigFiles[i]
 		mergeConfigWithFile(nonMapConfig, file)
-		if rules.ResolvePaths() {
-			ResolveLocalPaths(file, nonMapConfig)
-		}
 	}
 
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
@@ -143,6 +136,12 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	config := clientcmdapi.NewConfig()
 	mergo.Merge(config, mapConfig)
 	mergo.Merge(config, nonMapConfig)
+
+	if rules.ResolvePaths() {
+		if err := ResolveLocalPaths(config); err != nil {
+			errlist = append(errlist, err)
+		}
+	}
 
 	return config, errors.NewAggregate(errlist)
 }
@@ -211,49 +210,6 @@ func mergeConfigWithFile(startingConfig *clientcmdapi.Config, filename string) e
 	mergo.Merge(startingConfig, config)
 
 	return nil
-}
-
-// ResolveLocalPaths resolves all relative paths in the config object with respect to the parent directory of the filename
-// this cannot be done directly inside of LoadFromFile because doing so there would make it impossible to load a file without
-// modification of its contents.
-func ResolveLocalPaths(filename string, config *clientcmdapi.Config) error {
-	if len(filename) == 0 {
-		return nil
-	}
-
-	configDir, err := filepath.Abs(filepath.Dir(filename))
-	if err != nil {
-		return fmt.Errorf("Could not determine the absolute path of config file %s: %v", filename, err)
-	}
-
-	resolvedClusters := make(map[string]clientcmdapi.Cluster)
-	for key, cluster := range config.Clusters {
-		cluster.CertificateAuthority = resolveLocalPath(configDir, cluster.CertificateAuthority)
-		resolvedClusters[key] = cluster
-	}
-	config.Clusters = resolvedClusters
-
-	resolvedAuthInfos := make(map[string]clientcmdapi.AuthInfo)
-	for key, authInfo := range config.AuthInfos {
-		authInfo.ClientCertificate = resolveLocalPath(configDir, authInfo.ClientCertificate)
-		authInfo.ClientKey = resolveLocalPath(configDir, authInfo.ClientKey)
-		resolvedAuthInfos[key] = authInfo
-	}
-	config.AuthInfos = resolvedAuthInfos
-
-	return nil
-}
-
-// resolveLocalPath makes the path absolute with respect to the startingDir
-func resolveLocalPath(startingDir, path string) string {
-	if len(path) == 0 {
-		return path
-	}
-	if filepath.IsAbs(path) {
-		return path
-	}
-
-	return filepath.Join(startingDir, path)
 }
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
@@ -334,4 +290,160 @@ func Write(config clientcmdapi.Config) ([]byte, error) {
 
 func (rules ClientConfigLoadingRules) ResolvePaths() bool {
 	return !rules.DoNotResolvePaths
+}
+
+// ResolveLocalPaths resolves all relative paths in the config object with respect to the stanza's LocationOfOrigin
+// this cannot be done directly inside of LoadFromFile because doing so there would make it impossible to load a file without
+// modification of its contents.
+func ResolveLocalPaths(config *clientcmdapi.Config) error {
+	for _, cluster := range config.Clusters {
+		if len(cluster.LocationOfOrigin) == 0 {
+			continue
+		}
+		base, err := filepath.Abs(filepath.Dir(cluster.LocationOfOrigin))
+		if err != nil {
+			return fmt.Errorf("Could not determine the absolute path of config file %s: %v", cluster.LocationOfOrigin, err)
+		}
+
+		if err := ResolvePaths(GetClusterFileReferences(cluster), base); err != nil {
+			return err
+		}
+	}
+	for _, authInfo := range config.AuthInfos {
+		if len(authInfo.LocationOfOrigin) == 0 {
+			continue
+		}
+		base, err := filepath.Abs(filepath.Dir(authInfo.LocationOfOrigin))
+		if err != nil {
+			return fmt.Errorf("Could not determine the absolute path of config file %s: %v", authInfo.LocationOfOrigin, err)
+		}
+
+		if err := ResolvePaths(GetAuthInfoFileReferences(authInfo), base); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RelativizeClusterLocalPaths first absolutizes the paths by calling ResolveLocalPaths.  This assumes that any NEW path is already
+// absolute, but any existing path will be resolved relative to LocationOfOrigin
+func RelativizeClusterLocalPaths(cluster *clientcmdapi.Cluster) error {
+	if len(cluster.LocationOfOrigin) == 0 {
+		return fmt.Errorf("no location of origin for %s", cluster.Server)
+	}
+	base, err := filepath.Abs(filepath.Dir(cluster.LocationOfOrigin))
+	if err != nil {
+		return fmt.Errorf("could not determine the absolute path of config file %s: %v", cluster.LocationOfOrigin, err)
+	}
+
+	if err := ResolvePaths(GetClusterFileReferences(cluster), base); err != nil {
+		return err
+	}
+	if err := RelativizePathWithNoBacksteps(GetClusterFileReferences(cluster), base); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RelativizeAuthInfoLocalPaths first absolutizes the paths by calling ResolveLocalPaths.  This assumes that any NEW path is already
+// absolute, but any existing path will be resolved relative to LocationOfOrigin
+func RelativizeAuthInfoLocalPaths(authInfo *clientcmdapi.AuthInfo) error {
+	if len(authInfo.LocationOfOrigin) == 0 {
+		return fmt.Errorf("no location of origin for %v", authInfo)
+	}
+	base, err := filepath.Abs(filepath.Dir(authInfo.LocationOfOrigin))
+	if err != nil {
+		return fmt.Errorf("could not determine the absolute path of config file %s: %v", authInfo.LocationOfOrigin, err)
+	}
+
+	if err := ResolvePaths(GetAuthInfoFileReferences(authInfo), base); err != nil {
+		return err
+	}
+	if err := RelativizePathWithNoBacksteps(GetAuthInfoFileReferences(authInfo), base); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func RelativizeConfigPaths(config *clientcmdapi.Config, base string) error {
+	return RelativizePathWithNoBacksteps(GetConfigFileReferences(config), base)
+}
+
+func ResolveConfigPaths(config *clientcmdapi.Config, base string) error {
+	return ResolvePaths(GetConfigFileReferences(config), base)
+}
+
+func GetConfigFileReferences(config *clientcmdapi.Config) []*string {
+	refs := []*string{}
+
+	for _, cluster := range config.Clusters {
+		refs = append(refs, GetClusterFileReferences(cluster)...)
+	}
+	for _, authInfo := range config.AuthInfos {
+		refs = append(refs, GetAuthInfoFileReferences(authInfo)...)
+	}
+
+	return refs
+}
+
+func GetClusterFileReferences(cluster *clientcmdapi.Cluster) []*string {
+	return []*string{&cluster.CertificateAuthority}
+}
+
+func GetAuthInfoFileReferences(authInfo *clientcmdapi.AuthInfo) []*string {
+	return []*string{&authInfo.ClientCertificate, &authInfo.ClientKey}
+}
+
+// ResolvePaths updates the given refs to be absolute paths, relative to the given base directory
+func ResolvePaths(refs []*string, base string) error {
+	for _, ref := range refs {
+		// Don't resolve empty paths
+		if len(*ref) > 0 {
+			// Don't resolve absolute paths
+			if !filepath.IsAbs(*ref) {
+				*ref = filepath.Join(base, *ref)
+			}
+		}
+	}
+	return nil
+}
+
+// RelativizePathWithNoBacksteps updates the given refs to be relative paths, relative to the given base directory as long as they do not require backsteps.
+// Any path requiring a backstep is left as-is as long it is absolute.  Any non-absolute path that can't be relativized produces an error
+func RelativizePathWithNoBacksteps(refs []*string, base string) error {
+	for _, ref := range refs {
+		// Don't relativize empty paths
+		if len(*ref) > 0 {
+			rel, err := MakeRelative(*ref, base)
+			if err != nil {
+				return err
+			}
+
+			// if we have a backstep, don't mess with the path
+			if strings.HasPrefix(rel, "../") {
+				if filepath.IsAbs(*ref) {
+					continue
+				}
+
+				return fmt.Errorf("%v requires backsteps and is not absolute", *ref)
+			}
+
+			*ref = rel
+		}
+	}
+	return nil
+}
+
+func MakeRelative(path, base string) (string, error) {
+	if len(path) > 0 {
+		rel, err := filepath.Rel(base, path)
+		if err != nil {
+			return path, err
+		}
+		return rel, nil
+	}
+	return path, nil
 }

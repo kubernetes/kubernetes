@@ -43,7 +43,7 @@ func TestSpecSourceConverters(t *testing.T) {
 		},
 	}
 
-	converted = NewSpecFromPersistentVolume(pv)
+	converted = NewSpecFromPersistentVolume(pv, false)
 	if converted.PersistentVolumeSource.AWSElasticBlockStore == nil {
 		t.Errorf("Unexpected nil AWSElasticBlockStore: %+v", converted)
 	}
