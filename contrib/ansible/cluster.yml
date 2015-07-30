@@ -1,4 +1,7 @@
 ---
+# This playbook deploys a kubernetes cluster 
+# with the default addons.
+
 - hosts: all
   gather_facts: false
   sudo: yes
