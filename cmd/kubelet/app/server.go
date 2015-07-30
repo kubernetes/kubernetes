@@ -69,6 +69,7 @@ type KubeletServer struct {
 	FileCheckFrequency             time.Duration
 	HTTPCheckFrequency             time.Duration
 	ManifestURL                    string
+	ManifestURLHeader              string
 	EnableServer                   bool
 	Address                        util.IP
 	Port                           uint
@@ -193,6 +194,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.FileCheckFrequency, "file-check-frequency", s.FileCheckFrequency, "Duration between checking config files for new data")
 	fs.DurationVar(&s.HTTPCheckFrequency, "http-check-frequency", s.HTTPCheckFrequency, "Duration between checking http for new data")
 	fs.StringVar(&s.ManifestURL, "manifest-url", s.ManifestURL, "URL for accessing the container manifest")
+	fs.StringVar(&s.ManifestURLHeader, "manifest-url-header", s.ManifestURLHeader, "HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'")
 	fs.BoolVar(&s.EnableServer, "enable-server", s.EnableServer, "Enable the Kubelet's server")
 	fs.Var(&s.Address, "address", "The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.UintVar(&s.Port, "port", s.Port, "The port for the Kubelet to serve on. Note that \"kubectl logs\" will not work if you set this flag.") // see #9325
@@ -295,6 +297,15 @@ func (s *KubeletServer) Run(_ []string) error {
 	}
 	glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 
+	manifestURLHeader := make(http.Header)
+	if s.ManifestURLHeader != "" {
+		pieces := strings.Split(s.ManifestURLHeader, ":")
+		if len(pieces) != 2 {
+			return fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", s.ManifestURLHeader)
+		}
+		manifestURLHeader.Set(pieces[0], pieces[1])
+	}
+
 	hostNetworkSources, err := kubelet.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
 	if err != nil {
 		return err
@@ -330,6 +341,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		RootDirectory:                  s.RootDirectory,
 		ConfigFile:                     s.Config,
 		ManifestURL:                    s.ManifestURL,
+		ManifestURLHeader:              manifestURLHeader,
 		FileCheckFrequency:             s.FileCheckFrequency,
 		HTTPCheckFrequency:             s.HTTPCheckFrequency,
 		PodInfraContainerImage:         s.PodInfraContainerImage,
@@ -660,8 +672,8 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 
 	// define url config source
 	if kc.ManifestURL != "" {
-		glog.Infof("Adding manifest url: %v", kc.ManifestURL)
-		config.NewSourceURL(kc.ManifestURL, kc.NodeName, kc.HTTPCheckFrequency, cfg.Channel(kubelet.HTTPSource))
+		glog.Infof("Adding manifest url %q with HTTP header %v", kc.ManifestURL, kc.ManifestURLHeader)
+		config.NewSourceURL(kc.ManifestURL, kc.ManifestURLHeader, kc.NodeName, kc.HTTPCheckFrequency, cfg.Channel(kubelet.HTTPSource))
 	}
 	if kc.KubeClient != nil {
 		glog.Infof("Watching apiserver")
@@ -683,6 +695,7 @@ type KubeletConfig struct {
 	RootDirectory                  string
 	ConfigFile                     string
 	ManifestURL                    string
+	ManifestURLHeader              http.Header
 	FileCheckFrequency             time.Duration
 	HTTPCheckFrequency             time.Duration
 	Hostname                       string
