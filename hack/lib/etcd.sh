@@ -39,7 +39,7 @@ kube::etcd::start() {
   fi
 
   # Start etcd
-  ETCD_DIR=$(mktemp -d -t test-etcd.XXXXXX)
+  ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
   kube::log::info "etcd -data-dir ${ETCD_DIR} --bind-addr ${host}:${port} >/dev/null 2>/dev/null"
   etcd -data-dir ${ETCD_DIR} --bind-addr ${host}:${port} >/dev/null 2>/dev/null &
   ETCD_PID=$!

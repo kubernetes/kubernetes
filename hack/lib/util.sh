@@ -54,7 +54,7 @@ kube::util::wait_for_url() {
 #   KUBE_TEMP
 kube::util::ensure-temp-dir() {
   if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+    KUBE_TEMP=$(mktemp -d 2>/dev/null || mktemp -d -t kubernetes.XXXXXX)
   fi
 }
 
