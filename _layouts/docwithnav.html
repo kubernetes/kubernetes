@@ -1,18 +1,27 @@
 {% include dochead.html %}
+<!-- Search box for Google Custom Search Engine -->
 <div id="gcse-wrapper">
 	<gcse:search></gcse:search>
 </div>
-	<div id="wrapper">
-		{% include nav_v1.0.html %}
-	</div>
-	<div class="bodywrapper">
-		{% include documentation.html %}
-	</div>
+<!-- Navigation menu -->
+<div id="wrapper">
+	{% include nav_v1.0.html %}
+</div>
+<!-- Content body -->
+<div class="bodywrapper">
+	{% include documentation.html %}
+</div>
 <script type="text/javascript">
+	$(document).ready(function() {
+		/* Find and set target="_blank" for all external URLs (in navigation menu and content body) so that they open in a new tab/window */
+        $('a').filter(function() {
+			return this.hostname && this.hostname !== location.hostname;
+		}).attr('target', '_blank');
+	});
 	$(function() {
+		/* Animate navigation menu to open/close and highlight on click */
 	    var menu_ul = $('.menu > li > ul'),
 	           menu_a  = $('.menu > li > a');
-	    
 	    menu_a.click(function(e) {
 	        e.preventDefault();
 	        if(!$(this).hasClass('active')) {
