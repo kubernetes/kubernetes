@@ -33,14 +33,16 @@ import (
 
 type sourceURL struct {
 	url      string
+	header   http.Header
 	nodeName string
 	updates  chan<- interface{}
 	data     []byte
 }
 
-func NewSourceURL(url, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(url string, header http.Header, nodeName string, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
+		header:   header,
 		nodeName: nodeName,
 		updates:  updates,
 		data:     nil,
@@ -60,7 +62,13 @@ func (s *sourceURL) applyDefaults(pod *api.Pod) error {
 }
 
 func (s *sourceURL) extractFromURL() error {
-	resp, err := http.Get(s.url)
+	req, err := http.NewRequest("GET", s.url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header = s.header
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
