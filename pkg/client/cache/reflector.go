@@ -224,7 +224,7 @@ func (r *Reflector) listAndWatch(stopCh <-chan struct{}) {
 		}
 		if err := r.watchHandler(w, &resourceVersion, resyncCh, stopCh); err != nil {
 			if err != errorResyncRequested && err != errorStopRequested {
-				util.HandleError(fmt.Errorf("%s: watch of %v ended with: %v", r.name, r.expectedType, err))
+				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
 			return
 		}
