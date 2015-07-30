@@ -19,14 +19,12 @@ package main
 import (
 	"io"
 	"os"
-	"path"
 	"runtime"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	pkg_runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -55,14 +53,10 @@ func main() {
 	}
 
 	knownVersion := *version
-	registerTo := "api.Scheme"
 	if knownVersion == "api" {
 		knownVersion = api.Scheme.Raw().InternalVersion
-		registerTo = "Scheme"
 	}
-	pkgPath := path.Join("github.com/GoogleCloudPlatform/kubernetes/pkg/api", knownVersion)
-	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), pkgPath, util.NewStringSet("github.com/GoogleCloudPlatform/kubernetes"))
-	generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
+	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw())
 
 	for _, overwrite := range strings.Split(*overwrites, ",") {
 		vals := strings.Split(overwrite, "=")
@@ -73,14 +67,13 @@ func main() {
 			glog.Errorf("error while generating deep copy functions for %v: %v", knownType, err)
 		}
 	}
-	generator.RepackImports()
-	if err := generator.WriteImports(funcOut); err != nil {
+	if err := generator.WriteImports(funcOut, *version); err != nil {
 		glog.Fatalf("error while writing imports: %v", err)
 	}
 	if err := generator.WriteDeepCopyFunctions(funcOut); err != nil {
 		glog.Fatalf("error while writing deep copy functions: %v", err)
 	}
-	if err := generator.RegisterDeepCopyFunctions(funcOut, registerTo); err != nil {
+	if err := generator.RegisterDeepCopyFunctions(funcOut, *version); err != nil {
 		glog.Fatalf("error while registering deep copy functions: %v", err)
 	}
 }

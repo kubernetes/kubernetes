@@ -17,16 +17,13 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
 	"io"
 	"os"
-	"path"
 	"runtime"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	pkg_runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -53,9 +50,7 @@ func main() {
 		funcOut = file
 	}
 
-	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), path.Join("github.com/GoogleCloudPlatform/kubernetes/pkg/api", *version))
-	apiShort := generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
-	generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource")
+	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw())
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	generator.OverwritePackage(*version, "")
 	for _, knownType := range api.Scheme.KnownTypes(*version) {
@@ -63,14 +58,10 @@ func main() {
 			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}
-	generator.RepackImports(util.NewStringSet())
-	if err := generator.WriteImports(funcOut); err != nil {
-		glog.Fatalf("error while writing imports: %v", err)
-	}
 	if err := generator.WriteConversionFunctions(funcOut); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
 	}
-	if err := generator.RegisterConversionFunctions(funcOut, fmt.Sprintf("%s.Scheme", apiShort)); err != nil {
+	if err := generator.RegisterConversionFunctions(funcOut); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
 	}
 }
