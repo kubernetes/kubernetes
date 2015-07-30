@@ -69,6 +69,8 @@ import (
 	etcdallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -87,7 +89,7 @@ const (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	DatabaseStorage tools.StorageInterface
+	DatabaseStorage storage.Interface
 	EventTTL        time.Duration
 	MinionRegexp    string
 	KubeletClient   client.KubeletClient
@@ -223,9 +225,9 @@ type Master struct {
 	clock          util.Clock
 }
 
-// NewEtcdStorage returns a StorageInterface for the provided arguments or an error if the version
+// NewEtcdStorage returns a storage.Interface for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etcdStorage tools.StorageInterface, err error) {
+func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etcdStorage storage.Interface, err error) {
 	if version == "" {
 		version = latest.Version
 	}
@@ -233,7 +235,7 @@ func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etc
 	if err != nil {
 		return etcdStorage, err
 	}
-	return tools.NewEtcdStorage(client, versionInterfaces.Codec, prefix), nil
+	return etcdstorage.NewEtcdStorage(client, versionInterfaces.Codec, prefix), nil
 }
 
 // setDefaults fills in any fields not set that are required to have valid data.
@@ -721,7 +723,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 			addr = etcdUrl.Host
 			port = 4001
 		}
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: tools.EtcdHealthCheck}
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: etcdstorage.EtcdHealthCheck}
 	}
 	return serversToValidate
 }

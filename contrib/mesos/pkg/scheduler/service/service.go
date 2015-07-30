@@ -49,6 +49,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -786,7 +787,7 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdClient) (*mesos.FrameworkID, error) {
 	if s.FailoverTimeout > 0 {
 		if response, err := client.Get(meta.FrameworkIDKey, false, false); err != nil {
-			if !tools.IsEtcdNotFound(err) {
+			if !etcdstorage.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("unexpected failure attempting to load framework ID from etcd: %v", err)
 			}
 			log.V(1).Infof("did not find framework ID in etcd")
@@ -797,7 +798,7 @@ func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdClient) (*mesos.Fram
 	} else {
 		//TODO(jdef) this seems like a totally hackish way to clean up the framework ID
 		if _, err := client.Delete(meta.FrameworkIDKey, true); err != nil {
-			if !tools.IsEtcdNotFound(err) {
+			if !etcdstorage.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("failed to delete framework ID from etcd: %v", err)
 			}
 			log.V(1).Infof("nothing to delete: did not find framework ID in etcd")

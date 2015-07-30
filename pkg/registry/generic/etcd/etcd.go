@@ -29,7 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
@@ -103,7 +103,7 @@ type Etcd struct {
 	ReturnDeletedObject bool
 
 	// Used for all etcd access functions
-	Storage tools.StorageInterface
+	Storage storage.Interface
 }
 
 // NamespaceKeyRootFunc is the default function for constructing etcd paths to resource directories enforcing namespace rules.
@@ -282,7 +282,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
-	err = e.Storage.GuaranteedUpdate(key, out, true, func(existing runtime.Object, res tools.ResponseMeta) (runtime.Object, *uint64, error) {
+	err = e.Storage.GuaranteedUpdate(key, out, true, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, nil, err
@@ -455,7 +455,7 @@ func (e *Etcd) Watch(ctx api.Context, label labels.Selector, field fields.Select
 
 // WatchPredicate starts a watch for the items that m matches.
 func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
-	version, err := tools.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
+	version, err := storage.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
 	if err != nil {
 		return nil, err
 	}

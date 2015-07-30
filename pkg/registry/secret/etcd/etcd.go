@@ -24,7 +24,7 @@ import (
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for secrets against etcd
@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewStorage returns a registry which will store Secret in the given etcdStorage
-func NewStorage(s tools.StorageInterface) *REST {
+func NewStorage(s storage.Interface) *REST {
 	prefix := "/secrets"
 
 	store := &etcdgeneric.Etcd{

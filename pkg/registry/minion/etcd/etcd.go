@@ -26,7 +26,7 @@ import (
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 )
 
 type REST struct {
@@ -49,7 +49,7 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 }
 
 // NewStorage returns a RESTStorage object that will work against nodes.
-func NewStorage(s tools.StorageInterface, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
+func NewStorage(s storage.Interface, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
 	prefix := "/minions"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },

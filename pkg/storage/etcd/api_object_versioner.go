@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tools
+package etcd
 
 import (
 	"strconv"
@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -29,7 +30,7 @@ import (
 // for objects that have an embedded ObjectMeta or ListMeta field.
 type APIObjectVersioner struct{}
 
-// UpdateObject implements StorageVersioner
+// UpdateObject implements Versioner
 func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error {
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
@@ -46,7 +47,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Ti
 	return nil
 }
 
-// UpdateList implements StorageVersioner
+// UpdateList implements Versioner
 func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64) error {
 	listMeta, err := api.ListMetaFor(obj)
 	if err != nil || listMeta == nil {
@@ -60,7 +61,7 @@ func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint6
 	return nil
 }
 
-// ObjectResourceVersion implements StorageVersioner
+// ObjectResourceVersion implements Versioner
 func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
 	meta, err := api.ObjectMetaFor(obj)
 	if err != nil {
@@ -73,5 +74,5 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 	return strconv.ParseUint(version, 10, 64)
 }
 
-// APIObjectVersioner implements StorageVersioner
-var _ StorageVersioner = APIObjectVersioner{}
+// APIObjectVersioner implements Versioner
+var _ storage.Versioner = APIObjectVersioner{}

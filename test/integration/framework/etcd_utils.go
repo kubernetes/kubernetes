@@ -24,7 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -41,7 +41,7 @@ func NewEtcdClient() *etcd.Client {
 	return etcd.NewClient([]string{})
 }
 
-func NewEtcdStorage() (tools.StorageInterface, error) {
+func NewEtcdStorage() (storage.Interface, error) {
 	return master.NewEtcdStorage(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 }
 

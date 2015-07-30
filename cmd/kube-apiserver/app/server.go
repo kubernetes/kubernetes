@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	forked "github.com/GoogleCloudPlatform/kubernetes/third_party/forked/coreos/go-etcd/etcd"
@@ -216,7 +217,7 @@ func (s *APIServer) verifyClusterIPFlags() {
 	}
 }
 
-func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (etcdStorage tools.StorageInterface, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (etcdStorage storage.Interface, err error) {
 	var client tools.EtcdClient
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)

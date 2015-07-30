@@ -28,7 +28,7 @@ import (
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -49,7 +49,7 @@ type FinalizeREST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against namespaces
-func NewStorage(s tools.StorageInterface) (*REST, *StatusREST, *FinalizeREST) {
+func NewStorage(s storage.Interface) (*REST, *StatusREST, *FinalizeREST) {
 	prefix := "/namespaces"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },

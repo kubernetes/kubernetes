@@ -29,6 +29,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 
@@ -47,10 +49,10 @@ func (fakeConnectionInfoGetter) GetConnectionInfo(host string) (string, uint, ht
 	return "http", 12345, nil, nil
 }
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, tools.StorageInterface) {
+func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	etcdStorage := tools.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
 	return fakeEtcdClient, etcdStorage
 }
 

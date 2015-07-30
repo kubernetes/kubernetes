@@ -281,7 +281,8 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 			Index:     f.ChangeIndex,
 		}
 	}
-	if IsEtcdNotFound(existing.E) {
+	etcdError, ok := existing.E.(*etcd.EtcdError)
+	if ok && etcdError != nil && etcdError.ErrorCode == EtcdErrorCodeNotFound {
 		f.DeletedKeys = append(f.DeletedKeys, key)
 		return existing.R, existing.E
 	}

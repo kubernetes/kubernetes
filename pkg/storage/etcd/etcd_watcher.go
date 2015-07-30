@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tools
+package etcd
 
 import (
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -40,31 +39,6 @@ const (
 	EtcdCAS    = "compareAndSwap"
 	EtcdDelete = "delete"
 )
-
-// FilterFunc is a predicate which takes an API object and returns true
-// iff the object should remain in the set.
-type FilterFunc func(obj runtime.Object) bool
-
-// Everything is a FilterFunc which accepts all objects.
-func Everything(runtime.Object) bool {
-	return true
-}
-
-// ParseWatchResourceVersion takes a resource version argument and converts it to
-// the etcd version we should pass to helper.Watch(). Because resourceVersion is
-// an opaque value, the default watch behavior for non-zero watch is to watch
-// the next value (if you pass "1", you will see updates from "2" onwards).
-func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
-	if resourceVersion == "" || resourceVersion == "0" {
-		return 0, nil
-	}
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
-	if err != nil {
-		// TODO: Does this need to be a ValidationErrorList?  I can't convince myself it does.
-		return 0, errors.NewInvalid(kind, "", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("resourceVersion", resourceVersion, err.Error())})
-	}
-	return version + 1, nil
-}
 
 // TransformFunc attempts to convert an object to another object for use with a watcher.
 type TransformFunc func(runtime.Object) (runtime.Object, error)
@@ -82,12 +56,12 @@ func exceptKey(except string) includeFunc {
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
 	encoding  runtime.Codec
-	versioner StorageVersioner
+	versioner storage.Versioner
 	transform TransformFunc
 
 	list    bool // If we're doing a recursive watch, should be true.
 	include includeFunc
-	filter  FilterFunc
+	filter  storage.FilterFunc
 
 	etcdIncoming  chan *etcd.Response
 	etcdError     chan error
@@ -110,7 +84,7 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding runtime.Codec, versioner StorageVersioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
+func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:  encoding,
 		versioner: versioner,
@@ -142,7 +116,7 @@ func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding 
 
 // etcdWatch calls etcd's Watch function, and handles any errors. Meant to be called
 // as a goroutine.
-func (w *etcdWatcher) etcdWatch(client EtcdClient, key string, resourceVersion uint64) {
+func (w *etcdWatcher) etcdWatch(client tools.EtcdClient, key string, resourceVersion uint64) {
 	defer util.HandleCrash()
 	defer close(w.etcdError)
 	if resourceVersion == 0 {
@@ -160,7 +134,7 @@ func (w *etcdWatcher) etcdWatch(client EtcdClient, key string, resourceVersion u
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
-func etcdGetInitialWatchState(client EtcdClient, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
+func etcdGetInitialWatchState(client tools.EtcdClient, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
 	resp, err := client.Get(key, false, recursive)
 	if err != nil {
 		if !IsEtcdNotFound(err) {
