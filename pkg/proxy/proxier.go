@@ -167,11 +167,36 @@ func (proxier *Proxier) SyncLoop() {
 
 // Ensure that portals exist for all services.
 func (proxier *Proxier) ensurePortals() {
+	// Lock proxier to copy it's content to local arrays
+	// opentPortal is slow to process iptables actions
+	// it result on a freeze in network flow processed by all proxysocket functions
+	// until it return.
+	// By copying proxier.serviceMap outside of the main loop we unlock as soon as
+	// possible the network treatment.
+	// Global network flow is a top priority to ensure performance.
 	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	// NB: This does not remove rules that should not be present.
+	// Copy serviceMap key to localServiceName[]
+	// Copy serviceMap value to localServiceInfo[]
+	// keep them sync by local counter
+
+	index := 0
+	serviceMapLen := len(proxier.serviceMap)
+	localServiceName := make([]ServicePortName, serviceMapLen)
+	localServiceInfo := make([]*serviceInfo , serviceMapLen)
+
 	for name, info := range proxier.serviceMap {
-		err := proxier.openPortal(name, info)
+		localServiceName[index] = name
+		localServiceInfo[index] = info
+		index++
+	}
+	// free the lock and let the network flow to process
+	proxier.mu.Unlock()
+
+	// NB: This does not remove rules that should not be present.
+	// get the current index and service name
+	for index, name := range localServiceName {
+		// localServiceInfo[index] is sync to localServiceName[index]
+		err := proxier.openPortal(name, localServiceInfo[index])
 		if err != nil {
 			glog.Errorf("Failed to ensure portal for %q: %v", name, err)
 		}
