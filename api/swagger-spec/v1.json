@@ -11895,7 +11895,7 @@
      },
      "requests": {
       "type": "any",
-      "description": "Minimum amount of resources requested; requests are honored only for persistent volumes as of now; see http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications"
+      "description": "Minimum amount of resources requested; if Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value; see http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications"
      }
     }
    },

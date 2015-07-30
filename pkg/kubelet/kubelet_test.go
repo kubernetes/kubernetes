@@ -2100,7 +2100,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 
 	spec := api.PodSpec{Containers: []api.Container{{Resources: api.ResourceRequirements{
-		Limits: api.ResourceList{
+		Requests: api.ResourceList{
 			"memory": resource.MustParse("90"),
 		},
 	}}}}
