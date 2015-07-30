@@ -276,13 +276,19 @@ func (gce *GCECloud) targetPoolURL(name, region string) string {
 
 func waitForOp(op *compute.Operation, getOperation func() (*compute.Operation, error)) error {
 	pollOp := op
+	consecPollFails := 0
 	for pollOp.Status != "DONE" {
 		var err error
-		// TODO: add some backoff here.
-		time.Sleep(time.Second)
+		time.Sleep(3 * time.Second)
 		pollOp, err = getOperation()
 		if err != nil {
-			return err
+			if consecPollFails == 2 {
+				// Only bail if we've seen 3 consecutive polling errors.
+				return err
+			}
+			consecPollFails++
+		} else {
+			consecPollFails = 0
 		}
 	}
 	if pollOp.Error != nil && len(pollOp.Error.Errors) > 0 {
