@@ -43,9 +43,9 @@ will first check for an exact match on RESOURCE and NAME_PREFIX. If no such reso
 exists, it will output details for every resource that has a name prefixed with NAME_PREFIX
 
 Possible resources include (case insensitive): pods (po), services (svc),
-replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
-limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota) or secrets.`
+replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
+persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota),
+namespaces (ns) or secrets.`
 	describe_example = `// Describe a node
 $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 

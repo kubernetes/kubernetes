@@ -95,13 +95,14 @@ __custom_func() {
    * pods (aka 'po')
    * replicationcontrollers (aka 'rc')
    * services (aka 'svc')
-   * nodes (aka 'no')
    * events (aka 'ev')
+   * nodes (aka 'no')
+   * namespaces (aka 'ns')
    * secrets
-   * limits
-   * persistentVolumes (aka 'pv')
-   * persistentVolumeClaims (aka 'pvc')
-   * quota
+   * persistentvolumes (aka 'pv')
+   * persistentvolumeclaims (aka 'pvc')
+   * limitranges (aka 'limits')
+   * resourcequotas (aka 'quota')
 `
 )
 
