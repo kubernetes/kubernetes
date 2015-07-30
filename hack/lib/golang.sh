@@ -87,7 +87,6 @@ readonly KUBE_TEST_PORTABLE=(
   contrib/for-tests/network-tester/rc.json
   contrib/for-tests/network-tester/service.json
   hack/e2e.go
-  hack/e2e-suite
   hack/e2e-internal
   hack/ginkgo-e2e.sh
   hack/lib
