@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -35,7 +36,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func NewEtcdStorage(client EtcdClient, codec runtime.Codec, prefix string) StorageInterface {
+func NewEtcdStorage(client EtcdClient, codec runtime.Codec, prefix string) storage.StorageInterface {
 	return &etcdHelper{
 		client:     client,
 		codec:      codec,
@@ -52,7 +53,7 @@ type etcdHelper struct {
 	codec  runtime.Codec
 	copier runtime.ObjectCopier
 	// optional, has to be set to perform any atomic operations
-	versioner StorageVersioner
+	versioner storage.StorageVersioner
 	// prefix for all etcd keys
 	pathPrefix string
 
@@ -76,7 +77,7 @@ func (h *etcdHelper) Backends() []string {
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) Versioner() StorageVersioner {
+func (h *etcdHelper) Versioner() storage.StorageVersioner {
 	return h.versioner
 }
 
@@ -178,7 +179,7 @@ func (h *etcdHelper) RecursiveDelete(key string, recursive bool) error {
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
 	go w.etcdWatch(h.client, key, resourceVersion)
@@ -186,7 +187,7 @@ func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+func (h *etcdHelper) WatchList(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(true, exceptKey(key), filter, h.codec, h.versioner, nil, h)
 	go w.etcdWatch(h.client, key, resourceVersion)
@@ -364,18 +365,18 @@ func (h *etcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 	return result.Node.Nodes, result.EtcdIndex, nil
 }
 
-type SimpleEtcdUpdateFunc func(runtime.Object) (runtime.Object, error)
+type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
 
-// SimpleUpdateFunc converts SimpleEtcdUpdateFunc into EtcdUpdateFunc
-func SimpleUpdate(fn SimpleEtcdUpdateFunc) StorageUpdateFunc {
-	return func(input runtime.Object, _ ResponseMeta) (runtime.Object, *uint64, error) {
+// SimpleUpdateFunc converts SimpleUpdateFunc into StorageUpdateFunc
+func SimpleUpdate(fn SimpleUpdateFunc) storage.StorageUpdateFunc {
+	return func(input runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		out, err := fn(input)
 		return out, nil, err
 	}
 }
 
 // Implements StorageInterface.
-func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate StorageUpdateFunc) error {
+func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate storage.StorageUpdateFunc) error {
 	v, err := conversion.EnforcePtr(ptrToType)
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.
@@ -388,7 +389,7 @@ func (h *etcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		if err != nil {
 			return err
 		}
-		meta := ResponseMeta{}
+		meta := storage.ResponseMeta{}
 		if node != nil {
 			meta.TTL = node.TTL
 			if node.Expiration != nil {

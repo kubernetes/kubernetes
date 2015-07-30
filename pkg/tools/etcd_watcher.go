@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -40,15 +41,6 @@ const (
 	EtcdCAS    = "compareAndSwap"
 	EtcdDelete = "delete"
 )
-
-// FilterFunc is a predicate which takes an API object and returns true
-// iff the object should remain in the set.
-type FilterFunc func(obj runtime.Object) bool
-
-// Everything is a FilterFunc which accepts all objects.
-func Everything(runtime.Object) bool {
-	return true
-}
 
 // ParseWatchResourceVersion takes a resource version argument and converts it to
 // the etcd version we should pass to helper.Watch(). Because resourceVersion is
@@ -82,12 +74,12 @@ func exceptKey(except string) includeFunc {
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
 	encoding  runtime.Codec
-	versioner StorageVersioner
+	versioner storage.StorageVersioner
 	transform TransformFunc
 
 	list    bool // If we're doing a recursive watch, should be true.
 	include includeFunc
-	filter  FilterFunc
+	filter  storage.FilterFunc
 
 	etcdIncoming  chan *etcd.Response
 	etcdError     chan error
@@ -110,7 +102,7 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding runtime.Codec, versioner StorageVersioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
+func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, encoding runtime.Codec, versioner storage.StorageVersioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:  encoding,
 		versioner: versioner,

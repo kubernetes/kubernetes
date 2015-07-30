@@ -69,6 +69,7 @@ import (
 	etcdallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -87,7 +88,7 @@ const (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	DatabaseStorage tools.StorageInterface
+	DatabaseStorage storage.StorageInterface
 	EventTTL        time.Duration
 	MinionRegexp    string
 	KubeletClient   client.KubeletClient
@@ -225,7 +226,7 @@ type Master struct {
 
 // NewEtcdStorage returns a StorageInterface for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etcdStorage tools.StorageInterface, err error) {
+func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etcdStorage storage.StorageInterface, err error) {
 	if version == "" {
 		version = latest.Version
 	}

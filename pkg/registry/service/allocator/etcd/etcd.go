@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 )
 
@@ -42,7 +43,7 @@ type Etcd struct {
 	lock sync.Mutex
 
 	alloc   allocator.Snapshottable
-	storage tools.StorageInterface
+	storage storage.StorageInterface
 	last    string
 
 	baseKey string
@@ -55,7 +56,7 @@ var _ service.RangeRegistry = &Etcd{}
 
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
-func NewEtcd(alloc allocator.Snapshottable, baseKey string, kind string, storage tools.StorageInterface) *Etcd {
+func NewEtcd(alloc allocator.Snapshottable, baseKey string, kind string, storage storage.StorageInterface) *Etcd {
 	return &Etcd{
 		alloc:   alloc,
 		storage: storage,

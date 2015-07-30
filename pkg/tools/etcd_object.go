@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -74,4 +75,4 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 }
 
 // APIObjectVersioner implements StorageVersioner
-var _ StorageVersioner = APIObjectVersioner{}
+var _ storage.StorageVersioner = APIObjectVersioner{}

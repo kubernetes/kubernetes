@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -44,13 +45,13 @@ const (
 // Registry implements BindingRegistry, ControllerRegistry, EndpointRegistry,
 // MinionRegistry, PodRegistry and ServiceRegistry, backed by etcd.
 type Registry struct {
-	tools.StorageInterface
+	storage.StorageInterface
 	pods      pod.Registry
 	endpoints endpoint.Registry
 }
 
 // NewRegistry creates an etcd registry.
-func NewRegistry(storage tools.StorageInterface, pods pod.Registry, endpoints endpoint.Registry) *Registry {
+func NewRegistry(storage storage.StorageInterface, pods pod.Registry, endpoints endpoint.Registry) *Registry {
 	registry := &Registry{
 		StorageInterface: storage,
 		pods:             pods,
@@ -171,10 +172,10 @@ func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field f
 			return nil, err
 		}
 		// TODO: use generic.SelectionPredicate
-		return r.Watch(key, version, tools.Everything)
+		return r.Watch(key, version, storage.Everything)
 	}
 	if field.Empty() {
-		return r.WatchList(makeServiceListKey(ctx), version, tools.Everything)
+		return r.WatchList(makeServiceListKey(ctx), version, storage.Everything)
 	}
 	return nil, fmt.Errorf("only the 'name' and default (everything) field selectors are supported")
 }
