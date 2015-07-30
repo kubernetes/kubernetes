@@ -43,10 +43,10 @@ func MinifyConfig(config *Config) error {
 		return fmt.Errorf("cannot locate context %v", config.CurrentContext)
 	}
 
-	newContexts := map[string]Context{}
+	newContexts := map[string]*Context{}
 	newContexts[config.CurrentContext] = currContext
 
-	newClusters := map[string]Cluster{}
+	newClusters := map[string]*Cluster{}
 	if len(currContext.Cluster) > 0 {
 		if _, exists := config.Clusters[currContext.Cluster]; !exists {
 			return fmt.Errorf("cannot locate cluster %v", currContext.Cluster)
@@ -55,7 +55,7 @@ func MinifyConfig(config *Config) error {
 		newClusters[currContext.Cluster] = config.Clusters[currContext.Cluster]
 	}
 
-	newAuthInfos := map[string]AuthInfo{}
+	newAuthInfos := map[string]*AuthInfo{}
 	if len(currContext.AuthInfo) > 0 {
 		if _, exists := config.AuthInfos[currContext.AuthInfo]; !exists {
 			return fmt.Errorf("cannot locate user %v", currContext.AuthInfo)

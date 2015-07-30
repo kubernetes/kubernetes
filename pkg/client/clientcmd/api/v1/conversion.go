@@ -57,19 +57,19 @@ func init() {
 				return err
 			}
 
-			out.Clusters = make(map[string]api.Cluster)
+			out.Clusters = make(map[string]*api.Cluster)
 			if err := s.Convert(&in.Clusters, &out.Clusters, 0); err != nil {
 				return err
 			}
-			out.AuthInfos = make(map[string]api.AuthInfo)
+			out.AuthInfos = make(map[string]*api.AuthInfo)
 			if err := s.Convert(&in.AuthInfos, &out.AuthInfos, 0); err != nil {
 				return err
 			}
-			out.Contexts = make(map[string]api.Context)
+			out.Contexts = make(map[string]*api.Context)
 			if err := s.Convert(&in.Contexts, &out.Contexts, 0); err != nil {
 				return err
 			}
-			out.Extensions = make(map[string]runtime.EmbeddedObject)
+			out.Extensions = make(map[string]*runtime.EmbeddedObject)
 			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
 				return err
 			}
@@ -99,18 +99,18 @@ func init() {
 			}
 			return nil
 		},
-		func(in *[]NamedCluster, out *map[string]api.Cluster, s conversion.Scope) error {
+		func(in *[]NamedCluster, out *map[string]*api.Cluster, s conversion.Scope) error {
 			for _, curr := range *in {
 				newCluster := api.NewCluster()
 				if err := s.Convert(&curr.Cluster, newCluster, 0); err != nil {
 					return err
 				}
-				(*out)[curr.Name] = *newCluster
+				(*out)[curr.Name] = newCluster
 			}
 
 			return nil
 		},
-		func(in *map[string]api.Cluster, out *[]NamedCluster, s conversion.Scope) error {
+		func(in *map[string]*api.Cluster, out *[]NamedCluster, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)
@@ -120,7 +120,7 @@ func init() {
 			for _, key := range allKeys {
 				newCluster := (*in)[key]
 				oldCluster := &Cluster{}
-				if err := s.Convert(&newCluster, oldCluster, 0); err != nil {
+				if err := s.Convert(newCluster, oldCluster, 0); err != nil {
 					return err
 				}
 
@@ -130,18 +130,18 @@ func init() {
 
 			return nil
 		},
-		func(in *[]NamedAuthInfo, out *map[string]api.AuthInfo, s conversion.Scope) error {
+		func(in *[]NamedAuthInfo, out *map[string]*api.AuthInfo, s conversion.Scope) error {
 			for _, curr := range *in {
 				newAuthInfo := api.NewAuthInfo()
 				if err := s.Convert(&curr.AuthInfo, newAuthInfo, 0); err != nil {
 					return err
 				}
-				(*out)[curr.Name] = *newAuthInfo
+				(*out)[curr.Name] = newAuthInfo
 			}
 
 			return nil
 		},
-		func(in *map[string]api.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
+		func(in *map[string]*api.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)
@@ -151,7 +151,7 @@ func init() {
 			for _, key := range allKeys {
 				newAuthInfo := (*in)[key]
 				oldAuthInfo := &AuthInfo{}
-				if err := s.Convert(&newAuthInfo, oldAuthInfo, 0); err != nil {
+				if err := s.Convert(newAuthInfo, oldAuthInfo, 0); err != nil {
 					return err
 				}
 
@@ -161,18 +161,18 @@ func init() {
 
 			return nil
 		},
-		func(in *[]NamedContext, out *map[string]api.Context, s conversion.Scope) error {
+		func(in *[]NamedContext, out *map[string]*api.Context, s conversion.Scope) error {
 			for _, curr := range *in {
 				newContext := api.NewContext()
 				if err := s.Convert(&curr.Context, newContext, 0); err != nil {
 					return err
 				}
-				(*out)[curr.Name] = *newContext
+				(*out)[curr.Name] = newContext
 			}
 
 			return nil
 		},
-		func(in *map[string]api.Context, out *[]NamedContext, s conversion.Scope) error {
+		func(in *map[string]*api.Context, out *[]NamedContext, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)
@@ -182,7 +182,7 @@ func init() {
 			for _, key := range allKeys {
 				newContext := (*in)[key]
 				oldContext := &Context{}
-				if err := s.Convert(&newContext, oldContext, 0); err != nil {
+				if err := s.Convert(newContext, oldContext, 0); err != nil {
 					return err
 				}
 
@@ -192,18 +192,18 @@ func init() {
 
 			return nil
 		},
-		func(in *[]NamedExtension, out *map[string]runtime.EmbeddedObject, s conversion.Scope) error {
+		func(in *[]NamedExtension, out *map[string]*runtime.EmbeddedObject, s conversion.Scope) error {
 			for _, curr := range *in {
 				newExtension := &runtime.EmbeddedObject{}
 				if err := s.Convert(&curr.Extension, newExtension, 0); err != nil {
 					return err
 				}
-				(*out)[curr.Name] = *newExtension
+				(*out)[curr.Name] = newExtension
 			}
 
 			return nil
 		},
-		func(in *map[string]runtime.EmbeddedObject, out *[]NamedExtension, s conversion.Scope) error {
+		func(in *map[string]*runtime.EmbeddedObject, out *[]NamedExtension, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)
@@ -213,7 +213,7 @@ func init() {
 			for _, key := range allKeys {
 				newExtension := (*in)[key]
 				oldExtension := &runtime.RawExtension{}
-				if err := s.Convert(&newExtension, oldExtension, 0); err != nil {
+				if err := s.Convert(newExtension, oldExtension, 0); err != nil {
 					return err
 				}
 

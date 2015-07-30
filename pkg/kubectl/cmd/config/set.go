@@ -82,7 +82,7 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config, false); err != nil {
 		return err
 	}
 
@@ -139,26 +139,15 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 		needToSetNewMapValue := currMapValue.Kind() == reflect.Invalid
 		if needToSetNewMapValue {
-			currMapValue = reflect.New(mapValueType).Elem()
+			currMapValue = reflect.New(mapValueType.Elem()).Elem().Addr()
 			actualCurrValue.SetMapIndex(mapKey, currMapValue)
 		}
 
-		// our maps do not hold pointers to structs, they hold the structs themselves.  This means that MapIndex returns the struct itself
-		// That in turn means that they have kinds of type.Struct, which is not a settable type.  Because of this, we need to make new struct of that type
-		// copy all the data from the old value into the new value, then take the .addr of the new value to modify it in the next recursion.
-		// clear as mud
-		modifiableMapValue := reflect.New(currMapValue.Type()).Elem()
-		modifiableMapValue.Set(currMapValue)
-
-		if modifiableMapValue.Kind() == reflect.Struct {
-			modifiableMapValue = modifiableMapValue.Addr()
-		}
-		err := modifyConfig(modifiableMapValue, steps, propertyValue, unset)
+		err := modifyConfig(currMapValue, steps, propertyValue, unset)
 		if err != nil {
 			return err
 		}
 
-		actualCurrValue.SetMapIndex(mapKey, reflect.Indirect(modifiableMapValue))
 		return nil
 
 	case reflect.String:
@@ -213,5 +202,6 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 	}
 
-	return fmt.Errorf("Unrecognized type: %v", actualCurrValue)
+	panic(fmt.Errorf("Unrecognized type: %v", actualCurrValue))
+	return nil
 }

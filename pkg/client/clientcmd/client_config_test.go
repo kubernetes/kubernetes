@@ -32,14 +32,14 @@ func createValidTestConfig() *clientcmdapi.Config {
 	)
 
 	config := clientcmdapi.NewConfig()
-	config.Clusters["clean"] = clientcmdapi.Cluster{
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server:     server,
 		APIVersion: latest.Version,
 	}
-	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Token: token,
 	}
-	config.Contexts["clean"] = clientcmdapi.Context{
+	config.Contexts["clean"] = &clientcmdapi.Context{
 		Cluster:  "clean",
 		AuthInfo: "clean",
 	}
@@ -87,16 +87,16 @@ func TestCertificateData(t *testing.T) {
 	keyData := []byte("key-data")
 
 	config := clientcmdapi.NewConfig()
-	config.Clusters["clean"] = clientcmdapi.Cluster{
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server:                   "https://localhost:8443",
 		APIVersion:               latest.Version,
 		CertificateAuthorityData: caData,
 	}
-	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		ClientCertificateData: certData,
 		ClientKeyData:         keyData,
 	}
-	config.Contexts["clean"] = clientcmdapi.Context{
+	config.Contexts["clean"] = &clientcmdapi.Context{
 		Cluster:  "clean",
 		AuthInfo: "clean",
 	}
@@ -120,15 +120,15 @@ func TestBasicAuthData(t *testing.T) {
 	password := "mypass"
 
 	config := clientcmdapi.NewConfig()
-	config.Clusters["clean"] = clientcmdapi.Cluster{
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
 		Server:     "https://localhost:8443",
 		APIVersion: latest.Version,
 	}
-	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
 		Username: username,
 		Password: password,
 	}
-	config.Contexts["clean"] = clientcmdapi.Context{
+	config.Contexts["clean"] = &clientcmdapi.Context{
 		Cluster:  "clean",
 		AuthInfo: "clean",
 	}

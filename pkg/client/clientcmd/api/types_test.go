@@ -42,35 +42,35 @@ func ExampleEmptyConfig() {
 func ExampleOfOptionsConfig() {
 	defaultConfig := NewConfig()
 	defaultConfig.Preferences.Colors = true
-	defaultConfig.Clusters["alfa"] = Cluster{
+	defaultConfig.Clusters["alfa"] = &Cluster{
 		Server:                "https://alfa.org:8080",
 		APIVersion:            "v1beta2",
 		InsecureSkipTLSVerify: true,
 		CertificateAuthority:  "path/to/my/cert-ca-filename",
 	}
-	defaultConfig.Clusters["bravo"] = Cluster{
+	defaultConfig.Clusters["bravo"] = &Cluster{
 		Server:                "https://bravo.org:8080",
 		APIVersion:            "v1beta1",
 		InsecureSkipTLSVerify: false,
 	}
-	defaultConfig.AuthInfos["white-mage-via-cert"] = AuthInfo{
+	defaultConfig.AuthInfos["white-mage-via-cert"] = &AuthInfo{
 		ClientCertificate: "path/to/my/client-cert-filename",
 		ClientKey:         "path/to/my/client-key-filename",
 	}
-	defaultConfig.AuthInfos["red-mage-via-token"] = AuthInfo{
+	defaultConfig.AuthInfos["red-mage-via-token"] = &AuthInfo{
 		Token: "my-secret-token",
 	}
-	defaultConfig.Contexts["bravo-as-black-mage"] = Context{
+	defaultConfig.Contexts["bravo-as-black-mage"] = &Context{
 		Cluster:   "bravo",
 		AuthInfo:  "black-mage-via-file",
 		Namespace: "yankee",
 	}
-	defaultConfig.Contexts["alfa-as-black-mage"] = Context{
+	defaultConfig.Contexts["alfa-as-black-mage"] = &Context{
 		Cluster:   "alfa",
 		AuthInfo:  "black-mage-via-file",
 		Namespace: "zulu",
 	}
-	defaultConfig.Contexts["alfa-as-white-mage"] = Context{
+	defaultConfig.Contexts["alfa-as-white-mage"] = &Context{
 		Cluster:  "alfa",
 		AuthInfo: "white-mage-via-cert",
 	}
