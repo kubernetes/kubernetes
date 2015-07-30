@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -1312,17 +1313,19 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	var pods []*api.Pod
-	allPods, err := d.Pods(namespace).List(unversioned.ListOptions{})
+	fieldSelector, err := fields.ParseSelector("spec.nodeName=" + name + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
 	if err != nil {
 		return "", err
 	}
-	for i := range allPods.Items {
-		pod := &allPods.Items[i]
-		if pod.Spec.NodeName != name {
-			continue
+	// in a policy aware setting, users may have access to a node, but not all pods
+	// in that case, we note that the user does not have access to the pods
+	canViewPods := true
+	nodeNonTerminatedPodsList, err := d.Pods(namespace).List(unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{fieldSelector}})
+	if err != nil {
+		if !errors.IsForbidden(err) {
+			return "", err
 		}
-		pods = append(pods, pod)
+		canViewPods = false
 	}
 
 	var events *api.EventList
@@ -1334,10 +1337,10 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 		events, _ = d.Events("").Search(ref)
 	}
 
-	return describeNode(node, pods, events)
+	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods)
 }
 
-func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (string, error) {
+func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events *api.EventList, canViewPods bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(node.Labels))
@@ -1384,10 +1387,13 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 		if len(node.Spec.ExternalID) > 0 {
 			fmt.Fprintf(out, "ExternalID:\t%s\n", node.Spec.ExternalID)
 		}
-		if err := describeNodeResource(pods, node, out); err != nil {
-			return err
+		if canViewPods && nodeNonTerminatedPodsList != nil {
+			if err := describeNodeResource(nodeNonTerminatedPodsList, node, out); err != nil {
+				return err
+			}
+		} else {
+			fmt.Fprintf(out, "Pods:\tnot authorized\n")
 		}
-
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1444,13 +1450,12 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string) (str
 	})
 }
 
-func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error {
-	nonTerminatedPods := filterTerminatedPods(pods)
-	fmt.Fprintf(out, "Non-terminated Pods:\t(%d in total)\n", len(nonTerminatedPods))
+func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node, out io.Writer) error {
+	fmt.Fprintf(out, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
 	fmt.Fprint(out, "  Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ---------\t----\t\t------------\t----------\t---------------\t-------------\n")
-	for _, pod := range nonTerminatedPods {
-		req, limit, err := api.PodRequestsAndLimits(pod)
+	for _, pod := range nodeNonTerminatedPodsList.Items {
+		req, limit, err := api.PodRequestsAndLimits(&pod)
 		if err != nil {
 			return err
 		}
@@ -1466,7 +1471,7 @@ func describeNodeResource(pods []*api.Pod, node *api.Node, out io.Writer) error 
 
 	fmt.Fprint(out, "Allocated resources:\n  (Total limits may be over 100%, i.e., overcommitted. More info: http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ------------\t----------\t---------------\t-------------\n")
-	reqs, limits, err := getPodsTotalRequestsAndLimits(nonTerminatedPods)
+	reqs, limits, err := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	if err != nil {
 		return err
 	}
@@ -1495,10 +1500,10 @@ func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
 	return result
 }
 
-func getPodsTotalRequestsAndLimits(pods []*api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
+func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
 	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
-	for _, pod := range pods {
-		podReqs, podLimits, err := api.PodRequestsAndLimits(pod)
+	for _, pod := range podList.Items {
+		podReqs, podLimits, err := api.PodRequestsAndLimits(&pod)
 		if err != nil {
 			return nil, nil, err
 		}
