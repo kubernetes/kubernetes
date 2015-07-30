@@ -41,6 +41,12 @@
 {% endif -%}
 
 {% set config = "--config=/etc/kubernetes/manifests" -%}
+
+{% set manifest_url = "" -%}
+{% if grains['roles'][0] == 'kubernetes-master' and grains.cloud in ['gce'] -%}
+  {% set manifest_url = "--manifest-url=http://metadata.google.internal/computeMetadata/v1/instance/attributes/google-container-manifest --manifest-url-header=Metadata-Flavor:Google" -%}
+{% endif -%}
+
 {% set hostname_override = "" -%}
 {% if grains.hostname_override is defined -%}
   {% set hostname_override = " --hostname_override=" + grains.hostname_override -%}
@@ -84,4 +90,4 @@
   {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
 {% endif %} 
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}}"
