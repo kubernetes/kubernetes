@@ -10,5 +10,6 @@ hero:
     img: /img/desktop/logo.png
 ---
 
-&nbsp;
+<div id="docbanner">
 {% include hero.html %}
+</div>
