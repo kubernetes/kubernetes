@@ -118,7 +118,9 @@ Hook handlers are the way that hooks are surfaced to containers.  Containers ca
 [1]: http://man7.org/linux/man-pages/man2/gethostname.2.html
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

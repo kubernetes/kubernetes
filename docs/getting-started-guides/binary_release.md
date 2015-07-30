@@ -28,7 +28,9 @@ make release
 For more details on the release process see the [`build/` directory](http://releases.k8s.io/v1.0.1/build/)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

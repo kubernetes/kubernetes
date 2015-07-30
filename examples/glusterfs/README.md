@@ -95,7 +95,9 @@ $ mount | grep kube_vol
 You may also run `docker ps` on the host to see the actual container.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

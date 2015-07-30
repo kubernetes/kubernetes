@@ -146,7 +146,9 @@ See a [detailed example for how to use resource quota](../user-guide/resourcequo
 See [ResourceQuota design doc](../design/admission_control_resource_quota.md) for more information.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

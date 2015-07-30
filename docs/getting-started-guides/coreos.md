@@ -16,7 +16,9 @@ There are multiple guides on running Kubernetes with [CoreOS](http://coreos.com)
 * [Resizable multi-node cluster on Azure with Weave](coreos/azure/README.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

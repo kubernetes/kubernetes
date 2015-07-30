@@ -50,7 +50,9 @@ All other cluster-level functions are currently performed by the Controller Mana
 The [`replicationcontroller`](../user-guide/replication-controller.md) is a mechanism that is layered on top of the simple [`pod`](../user-guide/pods.md) API. We eventually plan to port it to a generic plug-in mechanism, once one is implemented.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

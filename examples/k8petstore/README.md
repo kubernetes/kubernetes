@@ -114,7 +114,9 @@ For questions on running this app, you can ask on the google containers group (f
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

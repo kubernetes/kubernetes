@@ -122,7 +122,9 @@ $ export $KUBECONFIG=path/to/other/.kube/config
 Detailed examples and explanation of `kubeconfig` loading/merging rules can be found in [kubeconfig-file.md](kubeconfig-file.md).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

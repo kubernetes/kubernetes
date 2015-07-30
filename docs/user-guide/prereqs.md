@@ -66,7 +66,9 @@ If you see a url response, you are ready to go.
 [Learn how to launch and expose your application.](quick-start.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

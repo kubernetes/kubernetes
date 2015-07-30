@@ -190,7 +190,9 @@ Please try:
 4. You can also customize your own settings in `/etc/default/{component_name}` after configured success. 
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

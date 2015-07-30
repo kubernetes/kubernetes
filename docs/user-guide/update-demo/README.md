@@ -128,7 +128,9 @@ Note that the images included here are public domain.
 * [nautilus](http://commons.wikimedia.org/wiki/File:Nautilus_pompilius.jpg)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -354,7 +354,9 @@ $ kubectl get pods/pod-w-message -o template -t "{{range .status.containerStatus
 [Learn more about managing deployments.](managing-deployments.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -88,7 +88,9 @@ SSH to it using the key that was created and using the _core_ user and you can l
     e9af8293...	<node #2 IP>   role=node
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

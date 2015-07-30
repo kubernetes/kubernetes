@@ -26,7 +26,9 @@ This document is meant to highlight and consolidate in one place configuration b
 1. Put an object description in an annotation to allow better introspection.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

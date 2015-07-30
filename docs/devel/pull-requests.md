@@ -33,7 +33,9 @@ Once those requirements are met, they will be labeled [ok-to-merge](https://gith
 These restrictions will be relaxed after v1.0 is released.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

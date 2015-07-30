@@ -20,7 +20,9 @@ then, cd to bigtop-bigpetstore/bigpetstore-transaction-queue, and run the docker
 `Docker build -t -i jayunit100/bps-transaction-queue`.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

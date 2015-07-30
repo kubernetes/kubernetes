@@ -180,7 +180,9 @@ On the other hand, containers and their logs are eventually deleted automaticall
 [Learn about deploying continuously running applications.](deploying-applications.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

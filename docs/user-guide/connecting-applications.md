@@ -401,7 +401,9 @@ $ curl https://104.197.68.43 -k
 [Learn about more Kubernetes features that will help you run containers reliably in production.](production-pods.md)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
