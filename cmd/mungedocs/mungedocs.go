@@ -46,10 +46,10 @@ Examples:
 	// TODO: allow selection from command line. (e.g., just check links in the examples directory.)
 	allMunges = []munge{
 		{"table-of-contents", updateTOC},
+		{"unversioned-warning", updateUnversionedWarning},
 		{"check-links", checkLinks},
 		{"blank-lines-surround-preformatted", checkPreformatted},
 		{"header-lines", checkHeaderLines},
-		{"unversioned-warning", updateUnversionedWarning},
 		{"analytics", checkAnalytics},
 		{"kubectl-dash-f", checkKubectlFileTargets},
 	}
