@@ -90,6 +90,9 @@ CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 PROXY_PORT=${PROXY_PORT:-8001}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
+# ensure ~/.kube/config isn't loaded by tests
+HOME="${KUBE_TEMP}"
+
 # Check kubectl
 kube::log::status "Running kubectl with no options"
 "${KUBE_OUTPUT_HOSTBIN}/kubectl"
