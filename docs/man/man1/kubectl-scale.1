@@ -43,6 +43,10 @@ scale is sent to the server.
 \fB\-\-resource\-version\fP=""
     Precondition for resource version. Requires that the current resource version match this value in order to scale.
 
+.PP
+\fB\-\-timeout\fP=0
+    The length of time to wait before giving up on a scale operation, zero means don't wait.
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
@@ -152,6 +156,9 @@ $ kubectl scale \-\-replicas=3 replicationcontrollers foo
 
 // If the replication controller named foo's current size is 2, scale foo to 3.
 $ kubectl scale \-\-current\-replicas=2 \-\-replicas=3 replicationcontrollers foo
+
+// Scale multiple replication controllers.
+$ kubectl scale \-\-replicas=5 rc/foo rc/bar
 
 .fi
 .RE

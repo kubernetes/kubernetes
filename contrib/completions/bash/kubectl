@@ -499,6 +499,7 @@ _kubectl_scale()
     two_word_flags+=("-o")
     flags+=("--replicas=")
     flags+=("--resource-version=")
+    flags+=("--timeout=")
 
     must_have_one_flag=()
     must_have_one_flag+=("--replicas=")
