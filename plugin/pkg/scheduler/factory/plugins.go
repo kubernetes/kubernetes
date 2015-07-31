@@ -35,6 +35,7 @@ import (
 type PluginFactoryArgs struct {
 	algorithm.PodLister
 	algorithm.ServiceLister
+	algorithm.ControllerLister
 	NodeLister algorithm.MinionLister
 	NodeInfo   predicates.NodeInfo
 }

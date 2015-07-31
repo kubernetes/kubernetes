@@ -25,7 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
-func TestServiceSpreadPriority(t *testing.T) {
+func TestSelectorSpreadPriority(t *testing.T) {
 	labels1 := map[string]string{
 		"foo": "bar",
 		"baz": "blah",
@@ -44,6 +44,7 @@ func TestServiceSpreadPriority(t *testing.T) {
 		pod          *api.Pod
 		pods         []*api.Pod
 		nodes        []string
+		rcs          []api.ReplicationController
 		services     []api.Service
 		expectedList algorithm.HostPriorityList
 		test         string
@@ -158,11 +159,65 @@ func TestServiceSpreadPriority(t *testing.T) {
 			expectedList: []algorithm.HostPriority{{"machine1", 0}, {"machine2", 5}},
 			test:         "service with partial pod label matches",
 		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    []string{"machine1", "machine2"},
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			// "baz=blah" matches both labels1 and labels2, and "foo=bar" matches only labels 1. This means that we assume that we want to
+			// do spreading between all pods. The result should be exactly as above.
+			expectedList: []algorithm.HostPriority{{"machine1", 0}, {"machine2", 5}},
+			test:         "service with partial pod label matches with service and replication controller",
+		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}}},
+			pods: []*api.Pod{
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    []string{"machine1", "machine2"},
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
+			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			// Taken together Service and Replication Controller should match all Pods, hence result should be equal to one above.
+			expectedList: []algorithm.HostPriority{{"machine1", 0}, {"machine2", 5}},
+			test:         "disjoined service and replication controller should be treated equally",
+		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes: []string{"machine1", "machine2"},
+			rcs:   []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			// Both Nodes have one pod from the given RC, hence both get 0 score.
+			expectedList: []algorithm.HostPriority{{"machine1", 0}, {"machine2", 0}},
+			test:         "Replication controller with partial pod label matches",
+		},
+		{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			rcs:          []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
+			expectedList: []algorithm.HostPriority{{"machine1", 0}, {"machine2", 5}},
+			test:         "Replication controller with partial pod label matches",
+		},
 	}
 
 	for _, test := range tests {
-		serviceSpread := ServiceSpread{serviceLister: algorithm.FakeServiceLister(test.services)}
-		list, err := serviceSpread.CalculateSpreadPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeMinionLister(makeNodeList(test.nodes)))
+		selectorSpread := SelectorSpread{serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs)}
+		list, err := selectorSpread.CalculateSpreadPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeMinionLister(makeNodeList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
