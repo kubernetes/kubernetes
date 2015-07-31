@@ -102,6 +102,10 @@ Creates a replication controller to manage the created container(s).
     The name of the kubeconfig context to use
 
 .PP
+\fB\-\-in\fP=""
+    Path to file to be processed
+
+.PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
     If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
@@ -132,6 +136,10 @@ Creates a replication controller to manage the created container(s).
 .PP
 \fB\-\-namespace\fP=""
     If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-out\fP=""
+    Path to output processed file
 
 .PP
 \fB\-\-password\fP=""
@@ -185,7 +193,7 @@ $ kubectl run nginx \-\-image=nginx \-\-replicas=5
 $ kubectl run nginx \-\-image=nginx \-\-dry\-run
 
 // Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
-$ kubectl run nginx \-\-image=nginx \-\-overrides='\{ "apiVersion": "v1", "spec": \{ ... \} \}'
+$ kubectl run nginx \-\-image=nginx \-\-overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 .fi
 .RE
