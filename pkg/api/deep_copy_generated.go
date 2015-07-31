@@ -1200,6 +1200,18 @@ func deepCopy_api_Pod(in Pod, out *Pod, c *conversion.Cloner) error {
 	return nil
 }
 
+func deepCopy_api_PodAttachOptions(in PodAttachOptions, out *PodAttachOptions, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Stdin = in.Stdin
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
+	out.TTY = in.TTY
+	out.Container = in.Container
+	return nil
+}
+
 func deepCopy_api_PodCondition(in PodCondition, out *PodCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
@@ -2144,6 +2156,7 @@ func init() {
 		deepCopy_api_PersistentVolumeSpec,
 		deepCopy_api_PersistentVolumeStatus,
 		deepCopy_api_Pod,
+		deepCopy_api_PodAttachOptions,
 		deepCopy_api_PodCondition,
 		deepCopy_api_PodExecOptions,
 		deepCopy_api_PodList,

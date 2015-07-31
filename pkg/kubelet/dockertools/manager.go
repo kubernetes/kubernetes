@@ -1012,6 +1012,7 @@ func (dm *DockerManager) AttachContainer(containerId string, stdin io.Reader, st
 		InputStream:  stdin,
 		OutputStream: stdout,
 		ErrorStream:  stderr,
+		Stream:       true,
 		Logs:         true,
 		Stdin:        stdin != nil,
 		Stdout:       stdout != nil,

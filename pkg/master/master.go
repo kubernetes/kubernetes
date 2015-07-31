@@ -478,6 +478,7 @@ func (m *Master) init(c *Config) {
 	// TODO: Factor out the core API registration
 	m.storage = map[string]rest.Storage{
 		"pods":             podStorage.Pod,
+		"pods/attach":      podStorage.Attach,
 		"pods/status":      podStorage.Status,
 		"pods/log":         podStorage.Log,
 		"pods/exec":        podStorage.Exec,

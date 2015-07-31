@@ -5638,6 +5638,152 @@
     ]
    },
    {
+    "path": "/api/v1/namespaces/{namespace}/pods/{name}/attach",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to attach of Pod",
+      "nickname": "connectGetNamespacedPodAttach",
+      "parameters": [
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stdin",
+        "description": "redirect the standard input stream of the pod for this call; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stdout",
+        "description": "redirect the standard output stream of the pod for this call; defaults to true",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stderr",
+        "description": "redirect the standard error stream of the pod for this call; defaults to true",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "tty",
+        "description": "allocate a terminal for this attach call; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "container",
+        "description": "the container in which to execute the command. Defaults to only container if there is only one container in the pod.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to attach of Pod",
+      "nickname": "connectPostNamespacedPodAttach",
+      "parameters": [
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stdin",
+        "description": "redirect the standard input stream of the pod for this call; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stdout",
+        "description": "redirect the standard output stream of the pod for this call; defaults to true",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "stderr",
+        "description": "redirect the standard error stream of the pod for this call; defaults to true",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "tty",
+        "description": "allocate a terminal for this attach call; defaults to false",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "container",
+        "description": "the container in which to execute the command. Defaults to only container if there is only one container in the pod.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/binding",
     "description": "API at /api/v1 version v1",
     "operations": [
