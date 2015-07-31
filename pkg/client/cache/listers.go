@@ -266,4 +266,16 @@ func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Serv
 	return
 }
 
+// StoreToJobLister
+type StoreToJobLister struct {
+	Store
+}
+
+func (s *StoreToJobLister) List() (jobs api.JobList, err error) {
+	for _, m := range s.Store.List() {
+		jobs.Items = append(jobs.Items, *(m.(*api.Job)))
+	}
+	return jobs, nil
+}
+
 // TODO: add StoreToEndpointsLister for use in kube-proxy.

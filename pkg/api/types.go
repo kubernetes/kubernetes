@@ -1049,6 +1049,66 @@ type ReplicationControllerList struct {
 	Items []ReplicationController `json:"items"`
 }
 
+// JobSpec is the specification of a job.
+// As the internal representation of a job, it may have either a TemplateRef or a Template set.
+type JobSpec struct {
+	// MaxParallelism specifies the maximum desired number of pods the job should
+	// run at any given time. The actual number of pods running in steady state will
+	// be less than this number when ((.spec.completions - .status.successful) < .spec.maxParallelism),
+	// i.e. when the work left to do is less than max parallelism.
+	MaxParallelism int `json:"maxParallelism"`
+
+	// Completions specifies the desired number of successfully finished pods the
+	// job should be run with.
+	Completions int `json:"completions"`
+
+	// Optional duration in seconds relative to the StartTime that the job may be active
+	// before the system actively tries to terminate it; value must be positive integer
+	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds"`
+
+	// Selector is a label query over pods that should match the completed count.
+	// If Selector is empty, it is defaulted to the labels present on the Pod template.
+	Selector map[string]string `json:"selector"`
+
+	// TemplateRef is a reference to an object that describes the pod that will be created if
+	// some fail to complete. This reference is ignored if a Template is set.
+	TemplateRef *ObjectReference `json:"templateRef,omitempty"`
+
+	// Template is the object that describes the pod that will be created if
+	// some fail to complete. Internally, this takes precedence over a
+	// TemplateRef.
+	Template *PodTemplateSpec `json:"template,omitempty"`
+}
+
+// JobStatus represents the current status of a job.
+type JobStatus struct {
+	//Active is the number of actively running pods
+	Active int `json:"active"`
+	// Completions is the number of actual successful completions of this job.
+	Completions int `json:"completions"`
+}
+
+// Job represents the configuration of a job.
+type Job struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the desired behavior of this job.
+	Spec JobSpec `json:"spec,omitempty"`
+
+	// Status is the current status of this job. This data may be
+	// out of date by some window of time.
+	Status JobStatus `json:"status,omitempty"`
+}
+
+// JobList is a collection of jobs.
+type JobList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []Job `json:"items"`
+}
+
 const (
 	// ClusterIPNone - do not assign a cluster IP
 	// no proxying required and no environment variables should be created for pods

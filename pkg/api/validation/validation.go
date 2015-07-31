@@ -1222,6 +1222,48 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 	return allErrs
 }
 
+// ValidateJobSpec tests if required fields in the job spec are set.
+func ValidateJobSpec(spec *api.JobSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	selector := labels.Set(spec.Selector).AsSelector()
+	if selector.Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
+	}
+	if spec.Completions < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("completions", spec.Completions, isNegativeErrorMsg))
+	}
+
+	if spec.Template == nil {
+		allErrs = append(allErrs, errs.NewFieldRequired("template"))
+	} else {
+		labels := labels.Set(spec.Template.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels, "selector does not match template"))
+		}
+		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template, spec.Completions).Prefix("template")...)
+		if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
+			allErrs = append(allErrs, errs.NewFieldValueNotSupported("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure)}))
+		}
+	}
+	return allErrs
+}
+
+func ValidateJob(job *api.Job) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	// Jobs and rcs have the same name validation
+	allErrs = append(allErrs, ValidateObjectMeta(&job.ObjectMeta, true, ValidateReplicationControllerName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateJobSpec(&job.Spec).Prefix("spec")...)
+	return allErrs
+}
+
+func ValidateJobUpdate(oldJob, job *api.Job) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateJobSpec(&job.Spec).Prefix("spec")...)
+	return allErrs
+}
+
 // ValidatePodTemplateSpec validates the spec of a pod template
 func ValidatePodTemplateSpec(spec *api.PodTemplateSpec, replicas int) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
