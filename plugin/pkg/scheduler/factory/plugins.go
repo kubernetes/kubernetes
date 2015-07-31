@@ -57,11 +57,12 @@ var (
 	// maps that hold registered algorithm types
 	fitPredicateMap      = make(map[string]FitPredicateFactory)
 	priorityFunctionMap  = make(map[string]PriorityConfigFactory)
-	algorithmProviderMap = make(map[string]AlgorithmProviderConfig)
+	AlgorithmProviderMap = make(map[string]AlgorithmProviderConfig)
 )
 
 const (
 	DefaultProvider = "DefaultProvider"
+	MyScheduler     = "MyScheduler"
 )
 
 type AlgorithmProviderConfig struct {
@@ -212,7 +213,7 @@ func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys util.Str
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	algorithmProviderMap[name] = AlgorithmProviderConfig{
+	AlgorithmProviderMap[name] = AlgorithmProviderConfig{
 		FitPredicateKeys:     predicateKeys,
 		PriorityFunctionKeys: priorityKeys,
 	}
@@ -225,7 +226,7 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	defer schedulerFactoryMutex.Unlock()
 
 	var provider AlgorithmProviderConfig
-	provider, ok := algorithmProviderMap[name]
+	provider, ok := AlgorithmProviderMap[name]
 	if !ok {
 		return nil, fmt.Errorf("plugin %q has not been registered", name)
 	}
@@ -307,7 +308,7 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 // ListAlgorithmProviders is called when listing all available algortihm providers in `kube-scheduler --help`
 func ListAlgorithmProviders() string {
 	var availableAlgorithmProviders []string
-	for name := range algorithmProviderMap {
+	for name := range AlgorithmProviderMap {
 		availableAlgorithmProviders = append(availableAlgorithmProviders, name)
 	}
 	return strings.Join(availableAlgorithmProviders, " | ")

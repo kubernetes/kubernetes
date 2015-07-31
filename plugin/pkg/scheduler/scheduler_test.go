@@ -73,7 +73,7 @@ func TestScheduler(t *testing.T) {
 	table := []struct {
 		injectBindError  error
 		sendPod          *api.Pod
-		algo             algorithm.ScheduleAlgorithm
+		algo             map[string]algorithm.ScheduleAlgorithm
 		expectErrorPod   *api.Pod
 		expectAssumedPod *api.Pod
 		expectError      error
@@ -81,20 +81,26 @@ func TestScheduler(t *testing.T) {
 		eventReason      string
 	}{
 		{
-			sendPod:          podWithID("foo", ""),
-			algo:             mockScheduler{"machine1", nil},
+			sendPod: podWithID("foo", ""),
+			// TODO (dingh): Harcoded "DefaultProvider" here is inapproriate, but it works for now, so maybe
+			// we should set a default provider in package scheduler
+			algo:             map[string]algorithm.ScheduleAlgorithm{"DefaultProvider": mockScheduler{"machine1", nil}},
 			expectBind:       &api.Binding{ObjectMeta: api.ObjectMeta{Name: "foo"}, Target: api.ObjectReference{Kind: "Node", Name: "machine1"}},
 			expectAssumedPod: podWithID("foo", "machine1"),
 			eventReason:      "scheduled",
 		}, {
-			sendPod:        podWithID("foo", ""),
-			algo:           mockScheduler{"machine1", errS},
+			sendPod: podWithID("foo", ""),
+			// TODO (dingh): Harcoded "DefaultProvider" here is inapproriate, but it works for now, so maybe
+			// we should set a default provider in package scheduler
+			algo:           map[string]algorithm.ScheduleAlgorithm{"DefaultProvider": mockScheduler{"machine1", errS}},
 			expectError:    errS,
 			expectErrorPod: podWithID("foo", ""),
 			eventReason:    "failedScheduling",
 		}, {
-			sendPod:         podWithID("foo", ""),
-			algo:            mockScheduler{"machine1", nil},
+			sendPod: podWithID("foo", ""),
+			// TODO (dingh): Harcoded "DefaultProvider" here is inapproriate, but it works for now, so maybe
+			// we should set a default provider in package scheduler
+			algo:            map[string]algorithm.ScheduleAlgorithm{"DefaultProvider": mockScheduler{"machine1", nil}},
 			expectBind:      &api.Binding{ObjectMeta: api.ObjectMeta{Name: "foo"}, Target: api.ObjectReference{Kind: "Node", Name: "machine1"}},
 			injectBindError: errB,
 			expectError:     errB,
@@ -117,7 +123,7 @@ func TestScheduler(t *testing.T) {
 			MinionLister: algorithm.FakeMinionLister(
 				api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 			),
-			Algorithm: item.algo,
+			AlgorithmMap: item.algo,
 			Binder: fakeBinder{func(b *api.Binding) error {
 				gotBinding = b
 				return item.injectBindError
@@ -186,12 +192,14 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	podPort := 8080
 	firstPod := podWithPort("foo", "", podPort)
 
+	// TODO (dingh): Harcoded "DefaultProvider" here is inapproriate, but it works for now, so maybe
+	// we should set a default provider in package scheduler
 	// Create the scheduler config
-	algo := NewGenericScheduler(
+	algo := map[string]algorithm.ScheduleAlgorithm{"DefaultProvider": NewGenericScheduler(
 		map[string]algorithm.FitPredicate{"PodFitsPorts": predicates.PodFitsPorts},
 		[]algorithm.PriorityConfig{},
 		modeler.PodLister(),
-		rand.New(rand.NewSource(time.Now().UnixNano())))
+		rand.New(rand.NewSource(time.Now().UnixNano())))}
 
 	var gotBinding *api.Binding
 	c := &Config{
@@ -199,7 +207,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 		MinionLister: algorithm.FakeMinionLister(
 			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 		),
-		Algorithm: algo,
+		AlgorithmMap: algo,
 		Binder: fakeBinder{func(b *api.Binding) error {
 			scheduledPodStore.Add(podWithPort(b.Name, b.Target.Name, podPort))
 			gotBinding = b
@@ -319,11 +327,13 @@ func TestSchedulerRateLimitsBinding(t *testing.T) {
 	queuedPodLister := &cache.StoreToPodLister{queuedPodStore}
 	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
 
-	algo := NewGenericScheduler(
+	// TODO (dingh): Harcoded "DefaultProvider" here is inapproriate, but it works for now, so maybe
+	// we should set a default provider in package scheduler
+	algo := map[string]algorithm.ScheduleAlgorithm{"DefaultProvider": NewGenericScheduler(
 		map[string]algorithm.FitPredicate{},
 		[]algorithm.PriorityConfig{},
 		modeler.PodLister(),
-		rand.New(rand.NewSource(time.Now().UnixNano())))
+		rand.New(rand.NewSource(time.Now().UnixNano())))}
 
 	// Rate limit to 1 pod
 	fr := FakeRateLimiter{util.NewTokenBucketRateLimiter(0.02, 1), []bool{}}
@@ -332,7 +342,7 @@ func TestSchedulerRateLimitsBinding(t *testing.T) {
 		MinionLister: algorithm.FakeMinionLister(
 			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 		),
-		Algorithm: algo,
+		AlgorithmMap: algo,
 		Binder: fakeBinder{func(b *api.Binding) error {
 			return nil
 		}},
