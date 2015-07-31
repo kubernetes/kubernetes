@@ -27,9 +27,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -193,23 +193,23 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 	// handle memory/cpu constraints, and any diff of usage based on memory/cpu on updates
 	if a.GetResource() == "pods" && (set[api.ResourceMemory] || set[api.ResourceCPU]) {
 		pod := obj.(*api.Pod)
-		deltaCPU := resourcequota.PodCPU(pod)
-		deltaMemory := resourcequota.PodMemory(pod)
+		deltaCPU := resourcequotacontroller.PodCPU(pod)
+		deltaMemory := resourcequotacontroller.PodMemory(pod)
 		// if this is an update, we need to find the delta cpu/memory usage from previous state
 		if a.GetOperation() == admission.Update {
 			oldPod, err := client.Pods(a.GetNamespace()).Get(pod.Name)
 			if err != nil {
 				return false, err
 			}
-			oldCPU := resourcequota.PodCPU(oldPod)
-			oldMemory := resourcequota.PodMemory(oldPod)
+			oldCPU := resourcequotacontroller.PodCPU(oldPod)
+			oldMemory := resourcequotacontroller.PodMemory(oldPod)
 			deltaCPU = resource.NewMilliQuantity(deltaCPU.MilliValue()-oldCPU.MilliValue(), resource.DecimalSI)
 			deltaMemory = resource.NewQuantity(deltaMemory.Value()-oldMemory.Value(), resource.DecimalSI)
 		}
 
 		hardMem, hardMemFound := status.Hard[api.ResourceMemory]
 		if hardMemFound {
-			if set[api.ResourceMemory] && resourcequota.IsPodMemoryUnbounded(pod) {
+			if set[api.ResourceMemory] && resourcequotacontroller.IsPodMemoryUnbounded(pod) {
 				return false, fmt.Errorf("Limited to %s memory, but pod has no specified memory limit", hardMem.String())
 			}
 			used, usedFound := status.Used[api.ResourceMemory]
@@ -225,7 +225,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 		}
 		hardCPU, hardCPUFound := status.Hard[api.ResourceCPU]
 		if hardCPUFound {
-			if set[api.ResourceCPU] && resourcequota.IsPodCPUUnbounded(pod) {
+			if set[api.ResourceCPU] && resourcequotacontroller.IsPodCPUUnbounded(pod) {
 				return false, fmt.Errorf("Limited to %s CPU, but pod has no specified cpu limit", hardCPU.String())
 			}
 			used, usedFound := status.Used[api.ResourceCPU]

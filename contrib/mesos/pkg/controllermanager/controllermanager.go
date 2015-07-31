@@ -29,15 +29,15 @@ import (
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/mesos"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/routecontroller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
+	kendpoint "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/endpoint"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/namespace"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/node"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/resourcequota"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/route"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/service"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/serviceaccount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/namespace"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
-	kendpoint "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/serviceaccount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volumeclaimbinder"
 
@@ -110,7 +110,7 @@ func (s *CMServer) Run(_ []string) error {
 	endpoints := s.createEndpointController(kubeClient)
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	controllerManager := replication.NewReplicationManager(kubeClient, replication.BurstReplicas)
+	controllerManager := replicationcontroller.NewReplicationManager(kubeClient, replicationcontroller.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	//TODO(jdef) should eventually support more cloud providers here
@@ -141,11 +141,11 @@ func (s *CMServer) Run(_ []string) error {
 		routeController.Run(s.NodeSyncPeriod)
 	}
 
-	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
-	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)
+	resourceQuotaController := resourcequotacontroller.NewResourceQuotaController(kubeClient)
+	resourceQuotaController.Run(s.ResourceQuotaSyncPeriod)
 
-	namespaceManager := namespace.NewNamespaceManager(kubeClient, s.NamespaceSyncPeriod)
-	namespaceManager.Run()
+	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, s.NamespaceSyncPeriod)
+	namespaceController.Run()
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
 	pvclaimBinder.Run()

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication
+package replicationcontroller
 
 import (
 	"reflect"
@@ -63,6 +63,8 @@ const (
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
+// TODO: this really should be called ReplicationController. The only reason why it's a Manager
+// is to distinguish this type from API object "ReplicationController". We should fix this.
 type ReplicationManager struct {
 	kubeClient client.Interface
 	podControl controller.PodControlInterface

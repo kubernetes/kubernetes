@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// resourcequota contains a controller that makes resource quota usage observations
-package resourcequota
+// Package service provides EndpointController implementation
+// to manage and sync service endpoints.
+package endpointcontroller

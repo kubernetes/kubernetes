@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourcequota
+package resourcequotacontroller
 
 import (
 	"testing"
@@ -152,8 +152,8 @@ func TestSyncResourceQuota(t *testing.T) {
 
 	kubeClient := testclient.NewSimpleFake(&podList, &quota)
 
-	resourceQuotaManager := NewResourceQuotaManager(kubeClient)
-	err := resourceQuotaManager.syncResourceQuota(quota)
+	ResourceQuotaController := NewResourceQuotaController(kubeClient)
+	err := ResourceQuotaController.syncResourceQuota(quota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -210,8 +210,8 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 
 	kubeClient := testclient.NewSimpleFake(&quota)
 
-	resourceQuotaManager := NewResourceQuotaManager(kubeClient)
-	err := resourceQuotaManager.syncResourceQuota(quota)
+	ResourceQuotaController := NewResourceQuotaController(kubeClient)
+	err := ResourceQuotaController.syncResourceQuota(quota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -257,8 +257,8 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 
 	kubeClient := testclient.NewSimpleFake(&api.PodList{}, &quota)
 
-	resourceQuotaManager := NewResourceQuotaManager(kubeClient)
-	err := resourceQuotaManager.syncResourceQuota(quota)
+	ResourceQuotaController := NewResourceQuotaController(kubeClient)
+	err := ResourceQuotaController.syncResourceQuota(quota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

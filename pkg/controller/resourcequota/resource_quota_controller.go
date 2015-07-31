@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourcequota
+package resourcequotacontroller
 
 import (
 	"time"
@@ -28,8 +28,8 @@ import (
 	"github.com/golang/glog"
 )
 
-// ResourceQuotaManager is responsible for tracking quota usage status in the system
-type ResourceQuotaManager struct {
+// ResourceQuotaController is responsible for tracking quota usage status in the system
+type ResourceQuotaController struct {
 	kubeClient client.Interface
 	syncTime   <-chan time.Time
 
@@ -37,10 +37,10 @@ type ResourceQuotaManager struct {
 	syncHandler func(quota api.ResourceQuota) error
 }
 
-// NewResourceQuotaManager creates a new ResourceQuotaManager
-func NewResourceQuotaManager(kubeClient client.Interface) *ResourceQuotaManager {
+// NewResourceQuotaController creates a new ResourceQuotaController
+func NewResourceQuotaController(kubeClient client.Interface) *ResourceQuotaController {
 
-	rm := &ResourceQuotaManager{
+	rm := &ResourceQuotaController{
 		kubeClient: kubeClient,
 	}
 
@@ -50,12 +50,12 @@ func NewResourceQuotaManager(kubeClient client.Interface) *ResourceQuotaManager 
 }
 
 // Run begins watching and syncing.
-func (rm *ResourceQuotaManager) Run(period time.Duration) {
+func (rm *ResourceQuotaController) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
 	go util.Forever(func() { rm.synchronize() }, period)
 }
 
-func (rm *ResourceQuotaManager) synchronize() {
+func (rm *ResourceQuotaController) synchronize() {
 	var resourceQuotas []api.ResourceQuota
 	list, err := rm.kubeClient.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
@@ -101,7 +101,7 @@ func FilterQuotaPods(pods []api.Pod) []*api.Pod {
 }
 
 // syncResourceQuota runs a complete sync of current status
-func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err error) {
+func (rm *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (err error) {
 
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
 	dirty := !api.Semantic.DeepEqual(quota.Spec.Hard, quota.Status.Hard)
