@@ -58,6 +58,7 @@ type GCECloud struct {
 	projectID        string
 	zone             string
 	instanceID       string
+	externalID       string
 	networkName      string
 
 	// Used for accessing the metadata server
@@ -124,6 +125,14 @@ func getInstanceID() (string, error) {
 	return parts[0], nil
 }
 
+func getCurrentExternalID() (string, error) {
+	externalID, err := metadata.Get("instance/id")
+	if err != nil {
+		return "", fmt.Errorf("couldn't get external ID: %v", err)
+	}
+	return externalID, nil
+}
+
 func getNetworkName() (string, error) {
 	result, err := metadata.Get("instance/network-interfaces/0/network")
 	if err != nil {
@@ -146,6 +155,10 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	// e.g. on a user's machine (not VM) somewhere, we need to have an alternative for
 	// instance id lookup.
 	instanceID, err := getInstanceID()
+	if err != nil {
+		return nil, err
+	}
+	externalID, err := getCurrentExternalID()
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +198,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		projectID:        projectID,
 		zone:             zone,
 		instanceID:       instanceID,
+		externalID:       externalID,
 		networkName:      networkName,
 		metadataAccess:   getMetadata,
 	}, nil
@@ -634,8 +648,16 @@ func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
 	}, nil
 }
 
+func (gce *GCECloud) isCurrentInstance(instance string) bool {
+	return gce.instanceID == canonicalizeInstanceName(instance)
+}
+
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (gce *GCECloud) ExternalID(instance string) (string, error) {
+	// if we are asking about the current instance, just go to metadata
+	if gce.isCurrentInstance(instance) {
+		return gce.externalID, nil
+	}
 	inst, err := gce.getInstanceByName(instance)
 	if err != nil {
 		return "", err
