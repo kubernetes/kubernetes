@@ -32,7 +32,6 @@ func main() {
 	hk.AddServer(NewScheduler())
 	hk.AddServer(NewKubeletExecutor())
 	hk.AddServer(NewKubeProxy())
-	hk.AddServer(NewMinion())
 
 	hk.RunToExit(os.Args)
 }

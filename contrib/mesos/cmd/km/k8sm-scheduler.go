@@ -18,7 +18,6 @@ limitations under the License.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/service"
 )
 
@@ -28,7 +27,7 @@ func NewScheduler() *Server {
 	s := service.NewSchedulerServer()
 
 	hks := Server{
-		SimpleUsage: hyperkube.CommandScheduler,
+		SimpleUsage: "scheduler",
 		Long: `Implements the Kubernetes-Mesos scheduler. This will launch Mesos tasks which
 results in pods assigned to kubelets based on capacity and constraints.`,
 		Run: func(hks *Server, args []string) error {
