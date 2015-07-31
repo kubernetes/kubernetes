@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/oom"
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/cgroups/fs"
 	"github.com/docker/libcontainer/configs"
@@ -229,7 +230,7 @@ func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manag
 		}
 
 		// Also apply oom_score_adj to processes
-		if err := util.ApplyOomScoreAdj(pid, oomScoreAdj); err != nil {
+		if err := oom.ApplyOomScoreAdj(pid, oomScoreAdj); err != nil {
 			errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d", oomScoreAdj, pid))
 		}
 	}

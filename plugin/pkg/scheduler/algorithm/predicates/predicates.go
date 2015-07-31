@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/qos"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 
@@ -108,31 +109,44 @@ type resourceRequest struct {
 func getResourceRequest(pod *api.Pod) resourceRequest {
 	result := resourceRequest{}
 	for ix := range pod.Spec.Containers {
-		limits := pod.Spec.Containers[ix].Resources.Limits
-		result.memory += limits.Memory().Value()
-		result.milliCPU += limits.Cpu().MilliValue()
+		requests := pod.Spec.Containers[ix].Resources.Requests
+		result.memory += requests.Memory().Value()
+		result.milliCPU += requests.Cpu().MilliValue()
 	}
 	return result
 }
 
-func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList) (fitting []*api.Pod, notFitting []*api.Pod) {
+func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList, maxPods int64) (fitting []*api.Pod, notFitting []*api.Pod) {
 	totalMilliCPU := capacity.Cpu().MilliValue()
 	totalMemory := capacity.Memory().Value()
 	milliCPURequested := int64(0)
 	memoryRequested := int64(0)
+	// Decide which pods can fit based on CPU/memory requests.
+	var bestEffortPods []*api.Pod
 	for _, pod := range pods {
-		podRequest := getResourceRequest(pod)
-		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
-		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
-		if !fitsCPU || !fitsMemory {
-			// the pod doesn't fit
-			notFitting = append(notFitting, pod)
-			continue
+		if qos.IsBestEffort(&pod.Spec) {
+			bestEffortPods = append(bestEffortPods, pod)
+		} else {
+			podRequest := getResourceRequest(pod)
+			fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
+			fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
+			if !fitsCPU || !fitsMemory {
+				// the pod doesn't fit
+				notFitting = append(notFitting, pod)
+				continue
+			}
+			// the pod fits
+			milliCPURequested += podRequest.milliCPU
+			memoryRequested += podRequest.memory
+			fitting = append(fitting, pod)
 		}
-		// the pod fits
-		milliCPURequested += podRequest.milliCPU
-		memoryRequested += podRequest.memory
-		fitting = append(fitting, pod)
+	}
+	fitting = append(fitting, bestEffortPods...)
+	if int64(len(fitting)) <= maxPods {
+		return
+	} else {
+		notFitting = append(notFitting, fitting[maxPods:]...)
+		fitting = fitting[:maxPods]
 	}
 	return
 }
@@ -150,13 +164,19 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	pods := []*api.Pod{}
 	copy(pods, existingPods)
 	pods = append(existingPods, pod)
-	_, exceeding := CheckPodsExceedingCapacity(pods, info.Status.Capacity)
-	if len(exceeding) > 0 || int64(len(pods)) > info.Status.Capacity.Pods().Value() {
-		glog.V(4).Infof("Cannot schedule Pod %v, because Node %v is full, running %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
-		return false, nil
+	fitting, _ := CheckPodsExceedingCapacity(pods, info.Status.Capacity, info.Status.Capacity.Pods().Value())
+	for _, fittingPod := range fitting {
+		if pod.Name == fittingPod.Name {
+			if int64(len(existingPods)) >= info.Status.Capacity.Pods().Value() {
+				glog.V(4).Infof("Schedule Pod %v on Node %v is allowed, Node is full, running %v out of %v Pods, but a lower priority pod will be evicted to make room.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
+			} else {
+				glog.V(4).Infof("Schedule Pod %v on Node %v is allowed, Node is running only %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
+			}
+			return true, nil
+		}
 	}
-	glog.V(4).Infof("Schedule Pod %v on Node %v is allowed, Node is running only %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
-	return true, nil
+	glog.V(4).Infof("Cannot schedule Pod %v, because Node %v is full, running %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
+	return false, nil
 }
 
 func NewResourceFitPredicate(info NodeInfo) algorithm.FitPredicate {

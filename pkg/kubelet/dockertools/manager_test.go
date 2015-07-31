@@ -41,6 +41,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	uexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	docker "github.com/fsouza/go-dockerclient"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 type fakeHTTP struct {
@@ -114,6 +115,7 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 		fakeRecorder,
 		readinessManager,
 		containerRefManager,
+		&cadvisorApi.MachineInfo{},
 		PodInfraContainerImage,
 		0, 0, "",
 		kubecontainer.FakeOS{},

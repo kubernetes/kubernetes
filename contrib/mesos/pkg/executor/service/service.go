@@ -45,6 +45,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/oom"
 	log "github.com/golang/glog"
 	bindings "github.com/mesos/mesos-go/executor"
 
@@ -125,7 +126,7 @@ func (s *KubeletExecutorServer) syncExternalShutdownWatcher() (io.Closer, error)
 func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	if err := oom.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		log.Info(err)
 	}
 

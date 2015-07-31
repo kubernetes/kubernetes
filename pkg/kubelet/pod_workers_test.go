@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	docker "github.com/fsouza/go-dockerclient"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 func newPod(uid, name string) *api.Pod {
@@ -44,7 +45,7 @@ func newPod(uid, name string) *api.Pod {
 func createFakeRuntimeCache(fakeRecorder *record.FakeRecorder) kubecontainer.RuntimeCache {
 	fakeDocker := &dockertools.FakeDockerClient{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, newKubeletRuntimeHooks(fakeRecorder))
+	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, &cadvisorApi.MachineInfo{}, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, newKubeletRuntimeHooks(fakeRecorder))
 	return kubecontainer.NewFakeRuntimeCache(dockerManager)
 }
 
@@ -224,7 +225,7 @@ func TestFakePodWorkers(t *testing.T) {
 	fakeDocker := &dockertools.FakeDockerClient{}
 	fakeRecorder := &record.FakeRecorder{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, newKubeletRuntimeHooks(fakeRecorder))
+	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, &cadvisorApi.MachineInfo{}, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, newKubeletRuntimeHooks(fakeRecorder))
 	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockerManager)
 
 	kubeletForRealWorkers := &simpleFakeKubelet{}
