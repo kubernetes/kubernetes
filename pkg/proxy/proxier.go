@@ -178,7 +178,6 @@ func (proxier *Proxier) SyncLoop() {
 		localServiceName := make([]ServicePortName, serviceMapLen)
 		localServiceInfo := make([]*serviceInfo, serviceMapLen)
 
-		// NB: This does not remove rules that should not be present.
 		for name, info := range proxier.serviceMap {
 			localServiceName[index] = name
 			localServiceInfo[index] = info
