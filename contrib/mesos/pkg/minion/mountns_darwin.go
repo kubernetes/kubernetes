@@ -14,25 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// clone of the upstream cmd/hypercube/main.go
-package main
+package minion
 
 import (
-	"os"
+	log "github.com/golang/glog"
 )
 
-func main() {
-	hk := HyperKube{
-		Name: "km",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes-Mesos servers.",
-	}
-
-	hk.AddServer(NewKubeAPIServer())
-	hk.AddServer(NewControllerManager())
-	hk.AddServer(NewScheduler())
-	hk.AddServer(NewKubeletExecutor())
-	hk.AddServer(NewKubeProxy())
-	hk.AddServer(NewMinion())
-
-	hk.RunToExit(os.Args)
+func enterPrivateMountNamespace() {
+	log.Info("Skipping mount namespace, only available on Linux")
 }

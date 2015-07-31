@@ -14,25 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// clone of the upstream cmd/hypercube/main.go
-package main
-
-import (
-	"os"
-)
-
-func main() {
-	hk := HyperKube{
-		Name: "km",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes-Mesos servers.",
-	}
-
-	hk.AddServer(NewKubeAPIServer())
-	hk.AddServer(NewControllerManager())
-	hk.AddServer(NewScheduler())
-	hk.AddServer(NewKubeletExecutor())
-	hk.AddServer(NewKubeProxy())
-	hk.AddServer(NewMinion())
-
-	hk.RunToExit(os.Args)
-}
+// Package minion contains the executor and proxy bootstrap code for a Mesos slave
+package minion

@@ -14,25 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// clone of the upstream cmd/hypercube/main.go
-package main
+package hyperkube
 
-import (
-	"os"
+const (
+	CommandApiserver         = "apiserver"
+	CommandControllerManager = "controller-manager"
+	CommandExecutor          = "executor"
+	CommandMinion            = "minion"
+	CommandProxy             = "proxy"
+	CommandScheduler         = "scheduler"
 )
-
-func main() {
-	hk := HyperKube{
-		Name: "km",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes-Mesos servers.",
-	}
-
-	hk.AddServer(NewKubeAPIServer())
-	hk.AddServer(NewControllerManager())
-	hk.AddServer(NewScheduler())
-	hk.AddServer(NewKubeletExecutor())
-	hk.AddServer(NewKubeProxy())
-	hk.AddServer(NewMinion())
-
-	hk.RunToExit(os.Args)
-}
