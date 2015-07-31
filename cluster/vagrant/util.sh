@@ -48,8 +48,8 @@ function verify-prereqs {
       # either provider_ctl_executable or vagrant_provider_plugin_re can
       # be blank (i.e., '') if none is needed by Vagrant (see, e.g.,
       # virtualbox entry)
-      vmrun vmware_fusion vagrant-vmware-fusion
-      vmrun vmware_workstation vagrant-vmware-workstation
+      '' vmware_fusion vagrant-vmware-fusion
+      '' vmware_workstation vagrant-vmware-workstation
       prlctl parallels vagrant-parallels
       VBoxManage virtualbox ''
       virsh libvirt vagrant-libvirt
