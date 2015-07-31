@@ -19,7 +19,6 @@ package main
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/controllermanager"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
 )
 
 // NewHyperkubeServer creates a new hyperkube Server object that includes the
@@ -28,7 +27,7 @@ func NewControllerManager() *Server {
 	s := controllermanager.NewCMServer()
 
 	hks := Server{
-		SimpleUsage: hyperkube.CommandControllerManager,
+		SimpleUsage: "controller-manager",
 		Long:        "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
 		Run: func(_ *Server, args []string) error {
 			return s.Run(args)
