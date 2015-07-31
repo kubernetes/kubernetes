@@ -54,7 +54,7 @@ var _ = Interface(&NsenterMounter{})
 const (
 	hostRootFsPath     = "/rootfs"
 	hostProcMountsPath = "/rootfs/proc/mounts"
-	nsenterPath        = "/nsenter"
+	nsenterPath        = "/usr/bin/nsenter"
 )
 
 // Mount runs mount(8) in the host's root mount namespace.  Aside from this
@@ -150,4 +150,7 @@ func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (*NsenterMounter) SetRunner(executor ContainerExecutor) {
 }

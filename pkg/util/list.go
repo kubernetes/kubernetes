@@ -21,6 +21,11 @@ import (
 	"strings"
 )
 
+/* StringList is list of strings, used e.g. to keep command line arguments.
+ * It splits the values by comma ','.
+ * After this code, the list contains {'a', 'b', 'c'}:
+ * list StringList; list.Set('a,b'); list.Set('c')
+ */
 type StringList []string
 
 func (sl *StringList) String() string {

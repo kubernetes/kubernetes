@@ -141,6 +141,9 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return listProcMounts(procMountsPath)
 }
 
+func (f *Mounter) SetRunner(executor ContainerExecutor) {
+}
+
 // IsMountPoint determines if a directory is a mountpoint, by comparing the device for the
 // directory with the device for it's parent.  If they are the same, it's not a mountpoint,
 // if they're different, it is.
