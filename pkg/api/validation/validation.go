@@ -280,10 +280,11 @@ func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList
 	return allErrs
 }
 
-func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationErrorList) {
+func validateVolumes(volumes []api.Volume) ([]api.Volume, errs.ValidationErrorList) {
 	allErrs := errs.ValidationErrorList{}
+	validatedVolumes := []api.Volume{}
+	allNames := util.NewStringSet()
 
-	allNames := util.StringSet{}
 	for i, vol := range volumes {
 		el := validateSource(&vol.VolumeSource).Prefix("source")
 		if len(vol.Name) == 0 {
@@ -294,12 +295,13 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationError
 			el = append(el, errs.NewFieldDuplicate("name", vol.Name))
 		}
 		if len(el) == 0 {
+			validatedVolumes = append(validatedVolumes, vol)
 			allNames.Insert(vol.Name)
 		} else {
 			allErrs = append(allErrs, el.PrefixIndex(i)...)
 		}
 	}
-	return allNames, allErrs
+	return validatedVolumes, allErrs
 }
 
 func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
@@ -691,19 +693,29 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector) errs.ValidationErr
 	return allErrs
 }
 
-func validateVolumeMounts(mounts []api.VolumeMount, volumes util.StringSet) errs.ValidationErrorList {
+func validateVolumeMounts(mounts []api.VolumeMount, volumes []api.Volume) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
+	volumeMap := map[string]api.Volume{}
+	for _, vol := range volumes {
+		volumeMap[vol.Name] = vol
+	}
 
 	for i, mnt := range mounts {
 		mErrs := errs.ValidationErrorList{}
 		if len(mnt.Name) == 0 {
 			mErrs = append(mErrs, errs.NewFieldRequired("name"))
-		} else if !volumes.Has(mnt.Name) {
-			mErrs = append(mErrs, errs.NewFieldNotFound("name", mnt.Name))
+		} else {
+			vol, ok := volumeMap[mnt.Name]
+			if !ok {
+				mErrs = append(mErrs, errs.NewFieldNotFound("name", mnt.Name))
+			} else if vol.Secret != nil && !mnt.ReadOnly {
+				mErrs = append(mErrs, errs.NewFieldInvalid("readOnly", mnt.ReadOnly, "VolumeMounts for secret volumes must be readOnly"))
+			}
 		}
 		if len(mnt.MountPath) == 0 {
 			mErrs = append(mErrs, errs.NewFieldRequired("mountPath"))
 		}
+
 		allErrs = append(allErrs, mErrs.PrefixIndex(i)...)
 	}
 	return allErrs
@@ -839,7 +851,7 @@ func validatePullPolicy(ctr *api.Container) errs.ValidationErrorList {
 	return allErrors
 }
 
-func validateContainers(containers []api.Container, volumes util.StringSet) errs.ValidationErrorList {
+func validateContainers(containers []api.Container, volumes []api.Volume) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	if len(containers) == 0 {
@@ -953,9 +965,9 @@ func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	allVolumes, vErrs := validateVolumes(spec.Volumes)
+	validatedVolumes, vErrs := validateVolumes(spec.Volumes)
 	allErrs = append(allErrs, vErrs.Prefix("volumes")...)
-	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes).Prefix("containers")...)
+	allErrs = append(allErrs, validateContainers(spec.Containers, validatedVolumes).Prefix("containers")...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy).Prefix("restartPolicy")...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
 	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
