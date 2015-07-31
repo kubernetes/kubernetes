@@ -1523,19 +1523,19 @@ type PodAttachOptions struct {
 	TypeMeta `json:",inline"`
 
 	// Stdin if true indicates that stdin is to be redirected for the attach call
-	Stdin bool `json:"stdin,omitempty" description:"redirect the standard input stream of the pod for this call; defaults to false"`
+	Stdin bool `json:"stdin,omitempty"`
 
 	// Stdout if true indicates that stdout is to be redirected for the attach call
-	Stdout bool `json:"stdout,omitempty" description:"redirect the standard output stream of the pod for this call; defaults to true"`
+	Stdout bool `json:"stdout,omitempty"`
 
 	// Stderr if true indicates that stderr is to be redirected for the attach call
-	Stderr bool `json:"stderr,omitempty" description:"redirect the standard error stream of the pod for this call; defaults to true"`
+	Stderr bool `json:"stderr,omitempty"`
 
 	// TTY if true indicates that a tty will be allocated for the attach call
-	TTY bool `json:"tty,omitempty" description:"allocate a terminal for this attach call; defaults to false"`
+	TTY bool `json:"tty,omitempty"`
 
 	// Container to attach to.
-	Container string `json:"container,omitempty" description:"the container in which to execute the command. Defaults to only container if there is only one container in the pod."`
+	Container string `json:"container,omitempty"`
 }
 
 // PodExecOptions is the query options to a Pod's remote exec call
