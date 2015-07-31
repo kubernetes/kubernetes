@@ -167,13 +167,13 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 		if node.Spec.PodCIDR == "" {
 			podCIDR, found := availableCIDRs.PopAny()
 			if !found {
-				nc.recordNodeEvent(&node, "No available CIDR")
+				nc.recordNodeStatusChange(&node, "No available CIDR")
 				continue
 			}
 			glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
 			node.Spec.PodCIDR = podCIDR
 			if _, err := nc.kubeClient.Nodes().Update(&node); err != nil {
-				nc.recordNodeEvent(&node, "CIDR assignment failed")
+				nc.recordNodeStatusChange(&node, "CIDR assignment failed")
 			}
 		}
 	}
@@ -193,17 +193,28 @@ func (nc *NodeController) Run(period time.Duration) {
 	}, nodeEvictionPeriod)
 }
 
-func (nc *NodeController) recordNodeEvent(node *api.Node, event string) {
+func (nc *NodeController) recordNodeStatusChange(node *api.Node, new_status string) {
 	ref := &api.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,
 		UID:       types.UID(node.Name),
 		Namespace: "",
 	}
-	glog.V(2).Infof("Recording %s event message for node %s", event, node.Name)
+	glog.V(2).Infof("Recording status change %s event message for node %s", new_status, node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	nc.recorder.Eventf(ref, event, "Node %s status is now: %s", node.Name, event)
+	nc.recorder.Eventf(ref, new_status, "Node %s status is now: %s", node.Name, new_status)
+}
+
+func (nc *NodeController) recordNodeEvent(nodeName string, event string) {
+	ref := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      nodeName,
+		UID:       types.UID(nodeName),
+		Namespace: "",
+	}
+	glog.V(2).Infof("Recording %s event message for node %s", event, nodeName)
+	nc.recorder.Eventf(ref, event, "Node %s event: %s", nodeName, event)
 }
 
 // For a given node checks its conditions and tries to update it. Returns grace period to which given node
@@ -398,7 +409,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 
 			// Report node event.
 			if readyCondition.Status != api.ConditionTrue && lastReadyCondition.Status == api.ConditionTrue {
-				nc.recordNodeEvent(node, "NodeNotReady")
+				nc.recordNodeStatusChange(node, "NodeNotReady")
 			}
 
 			// Check with the cloud provider to see if the node still exists. If it
@@ -411,6 +422,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				}
 				if _, err := instances.ExternalID(node.Name); err != nil && err == cloudprovider.InstanceNotFound {
 					glog.Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
+					nc.recordNodeEvent(node.Name, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
 					if err := nc.kubeClient.Nodes().Delete(node.Name); err != nil {
 						glog.Errorf("Unable to delete node %s: %v", node.Name, err)
 						continue
@@ -433,12 +445,14 @@ func (nc *NodeController) deletePods(nodeID string) error {
 	if err != nil {
 		return err
 	}
+	nc.recordNodeEvent(nodeID, fmt.Sprintf("Deleting all Pods from Node %v.", nodeID))
 	for _, pod := range pods.Items {
 		// Defensive check, also needed for tests.
 		if pod.Spec.NodeName != nodeID {
 			continue
 		}
 		glog.V(2).Infof("Delete pod %v", pod.Name)
+		nc.recorder.Eventf(&pod, "NodeControllerEviction", "Deleting Pod %s from Node %s", pod.Name, nodeID)
 		if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			glog.Errorf("Error deleting pod %v: %v", pod.Name, err)
 		}
