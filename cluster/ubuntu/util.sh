@@ -37,6 +37,12 @@ function test-build-release {
 
 # From user input set the necessary k8s and etcd configuration infomation
 function setClusterInfo() {
+  # Initialize MINION_IPS in setClusterInfo function
+  # MINION_IPS is defined as a global variable, and is concatenated with other nodeIP
+  # When setClusterInfo is called for many times, this could cause potential problems
+  # Such as, you will have MINION_IPS=192.168.0.2,192.168.0.3,192.168.0.2,192.168.0.3 which is obviously wrong
+  MINION_IPS=""
+  
   ii=0
   for i in $nodes
   do
