@@ -104,9 +104,9 @@ will ensure the following:
 1. Incoming request
 2. Authenticate user
 3. Authorize user
-4. If operation=create|update, then validate(object)
-5. If operation=create|update|delete, then admission.Admit(requestAttributes)
-  a. invoke each admission.Interface object in sequence
+4. If operation=create|update|delete, then admission.Admit(requestAttributes)
+   a. invoke each admission.Interface object in sequence
+5. If operation=create|update, then validate(object)
 6. Object is persisted
 
 If at any step, there is an error, the request is canceled.
