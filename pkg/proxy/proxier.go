@@ -160,38 +160,40 @@ func (proxier *Proxier) SyncLoop() {
 		if err := iptablesInit(proxier.iptables); err != nil {
 			glog.Errorf("Failed to ensure iptables: %v", err)
 		}
-		proxier.ensurePortals()
-		proxier.cleanupStaleStickySessions()
+
+		// Lock proxier to copy it's content to local arrays
+		// opentPortal is slow to process iptables actions
+		// it result on a freeze in network flow processed by all proxysocket functions
+		// until it return.
+		// By copying proxier.serviceMap outside of the main loop we unlock as soon as
+		// possible the network treatment.
+		// Global network flow is a top priority to ensure performance.
+		proxier.mu.Lock()
+		// Copy serviceMap key to localServiceName[]
+		// Copy serviceMap value to localServiceInfo[]
+		// keep them sync by local counter
+
+		index := 0
+		serviceMapLen := len(proxier.serviceMap)
+		localServiceName := make([]ServicePortName, serviceMapLen)
+		localServiceInfo := make([]*serviceInfo, serviceMapLen)
+
+		// NB: This does not remove rules that should not be present.
+		for name, info := range proxier.serviceMap {
+			localServiceName[index] = name
+			localServiceInfo[index] = info
+			index++
+		}
+		// release the lock and let the network flow to process
+		proxier.mu.Unlock()
+
+		proxier.ensurePortals(localServiceName, localServiceInfo)
+		proxier.cleanupStaleStickySessions(localServiceName)
 	}
 }
 
 // Ensure that portals exist for all services.
-func (proxier *Proxier) ensurePortals() {
-	// Lock proxier to copy it's content to local arrays
-	// opentPortal is slow to process iptables actions
-	// it result on a freeze in network flow processed by all proxysocket functions
-	// until it return.
-	// By copying proxier.serviceMap outside of the main loop we unlock as soon as
-	// possible the network treatment.
-	// Global network flow is a top priority to ensure performance.
-	proxier.mu.Lock()
-	// Copy serviceMap key to localServiceName[]
-	// Copy serviceMap value to localServiceInfo[]
-	// keep them sync by local counter
-
-	index := 0
-	serviceMapLen := len(proxier.serviceMap)
-	localServiceName := make([]ServicePortName, serviceMapLen)
-	localServiceInfo := make([]*serviceInfo , serviceMapLen)
-
-	for name, info := range proxier.serviceMap {
-		localServiceName[index] = name
-		localServiceInfo[index] = info
-		index++
-	}
-	// free the lock and let the network flow to process
-	proxier.mu.Unlock()
-
+func (proxier *Proxier) ensurePortals(localServiceName []ServicePortName, localServiceInfo []*serviceInfo) {
 	// NB: This does not remove rules that should not be present.
 	// get the current index and service name
 	for index, name := range localServiceName {
@@ -204,10 +206,8 @@ func (proxier *Proxier) ensurePortals() {
 }
 
 // clean up any stale sticky session records in the hash map.
-func (proxier *Proxier) cleanupStaleStickySessions() {
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	for name := range proxier.serviceMap {
+func (proxier *Proxier) cleanupStaleStickySessions(localServiceName []ServicePortName) {
+	for _, name := range localServiceName {
 		proxier.loadBalancer.CleanupStaleStickySessions(name)
 	}
 }
