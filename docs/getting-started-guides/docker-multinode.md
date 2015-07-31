@@ -52,10 +52,7 @@ Please install Docker 1.6.2 or Docker 1.7.1.
 
 ## Prerequisites
 
-1. You need a machine with docker installed.
-
-There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this guide from working correctly.
-Please install Docker 1.6.2 or wait for Docker 1.7.1.
+1. You need a machine with docker of right version installed.
 
 ## Overview
 
