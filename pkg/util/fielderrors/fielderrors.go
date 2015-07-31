@@ -102,7 +102,7 @@ func (v *ValidationError) ErrorBody() string {
 		s = spew.Sprintf("%s '%+v'", v.Type, v.BadValue)
 	}
 	if len(v.Detail) != 0 {
-		s += fmt.Sprintf(": %s", v.Detail)
+		s += fmt.Sprintf(", Details: %s", v.Detail)
 	}
 	return s
 }

@@ -274,11 +274,11 @@ func TestCheckInvalidErr(t *testing.T) {
 	}{
 		{
 			errors.NewInvalid("Invalid1", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "single", "details")}),
-			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single': details`,
+			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single', Details: details`,
 		},
 		{
 			errors.NewInvalid("Invalid2", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "multi1", "details"), fielderrors.NewFieldInvalid("Cause", "multi2", "details")}),
-			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1': details, Cause: invalid value 'multi2': details]`,
+			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1', Details: details, Cause: invalid value 'multi2', Details: details]`,
 		},
 		{
 			errors.NewInvalid("Invalid3", "invalidation", fielderrors.ValidationErrorList{}),
