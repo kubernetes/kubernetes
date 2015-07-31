@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: User Guide to Accessing the Cluster
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -305,7 +306,9 @@ Kubernetes users will typically not need to worry about anything other than the 
 will typically ensure that the latter types are setup correctly.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

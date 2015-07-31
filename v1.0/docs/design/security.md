@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Security in Kubernetes
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -125,7 +126,9 @@ The controller manager for Replication Controllers and other future controllers 
 The Kubernetes pod scheduler is responsible for reading data from the pod to fit it onto a node in the cluster.  At a minimum, it needs access to view the ID of a pod (to craft the binding), its current state, any resource information necessary to identify placement, and other data relevant to concerns like anti-affinity, zone or region preference, or custom logic.  It does not need the ability to modify pods or see other resources, only to create bindings.  It should not need the ability to delete bindings unless the scheduler takes control of relocating components on failed hosts (which could be implemented by a separate component that can delete bindings but not create them).  The scheduler may need read access to user or project-container information to determine preferential location (underspecified at this time).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

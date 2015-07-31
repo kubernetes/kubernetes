@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Admission Controllers
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -140,7 +141,9 @@ For Kubernetes 1.0, we strongly recommend running the following set of admission
 ```
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

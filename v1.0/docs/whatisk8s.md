@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: What is Kubernetes? 
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -51,6 +52,10 @@ Here are some key points:
     Predictable application performance.
 * **Resource utilization**:  
     High efficiency and density.
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

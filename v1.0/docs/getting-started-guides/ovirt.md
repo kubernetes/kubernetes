@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Getting started on oVirt
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -61,7 +62,9 @@ This short screencast demonstrates how the oVirt Cloud Provider can be used to d
 [![Screencast](http://img.youtube.com/vi/JyyST4ZKne8/0.jpg)](http://www.youtube.com/watch?v=JyyST4ZKne8)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

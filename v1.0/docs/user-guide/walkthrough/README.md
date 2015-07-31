@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes 101 - Kubectl CLI and Pods
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -213,7 +214,9 @@ Continue on to [Kubernetes 201](k8s201.html) or
 for a complete application see the [guestbook example](../../../examples/guestbook/README.html)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

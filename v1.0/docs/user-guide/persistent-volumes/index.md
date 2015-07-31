@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: How To Use Persistent Volumes
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -113,7 +114,9 @@ Hopefully this simple guide is enough to get you started with PersistentVolumes.
 Enjoy!
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

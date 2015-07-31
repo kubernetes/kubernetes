@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes Large Cluster
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -72,7 +73,9 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
 For directions on how to detect if addon containers are hitting resource limits, see the [Troubleshooting section of Compute Resources](../user-guide/compute-resources.html#troubleshooting).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

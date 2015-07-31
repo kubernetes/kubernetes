@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: kubectl for docker users
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -287,7 +288,9 @@ InfluxDB is running at https://108.59.85.141/api/v1/proxy/namespaces/kube-system
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

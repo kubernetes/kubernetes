@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes User Guide: Managing Applications: Deploying continuously running applications
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -146,7 +147,9 @@ You could also specify the `selector` explicitly, such as if you wanted to speci
 [Learn about exposing applications to users and clients, and connecting tiers of your application together.](connecting-applications.html)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

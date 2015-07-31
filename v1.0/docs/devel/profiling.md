@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Profiling Kubernetes
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -55,7 +56,9 @@ to get 30 sec. CPU profile.
 To enable contention profiling you need to add line `rt.SetBlockProfileRate(1)` in addition to `m.mux.HandleFunc(...)` added before (`rt` stands for `runtime` in `master.go`). This enables 'debug/pprof/block' subpage, which can be used as an input to `go tool pprof`.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

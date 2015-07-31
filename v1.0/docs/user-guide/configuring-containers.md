@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes User Guide: Managing Applications: Configuring and launching containers
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -209,7 +210,9 @@ On the other hand, containers and their logs are eventually deleted automaticall
 [Learn about deploying continuously running applications.](deploying-applications.html)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

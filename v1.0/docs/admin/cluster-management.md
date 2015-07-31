@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Cluster Management
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -173,7 +174,9 @@ $ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o myPod.v1.yam
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

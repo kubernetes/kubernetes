@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Cloud Native Deployments of Cassandra using Kubernetes
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -314,7 +315,9 @@ kubectl scale rc cassandra --replicas=4
 See [here](java/src/io/k8s/cassandra/KubernetesSeedProvider.java).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

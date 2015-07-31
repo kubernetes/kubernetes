@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Cluster Level Logging to Google Cloud Logging
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -157,7 +158,11 @@ metadata:
 spec:
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.6
+    image: gcr.io/google_containers/fluentd-gcp:1.10
+    resources:
+      limits:
+        cpu: 100m
+        memory: 200Mi
     env:
     - name: FLUENTD_ARGS
       value: -qq
@@ -231,7 +236,9 @@ This page has touched briefly on the underlying mechanisms that support gatherin
 Some of the material in this section also appears in the blog article [Cluster Level Logging with Kubernetes](http://blog.kubernetes.io/2015/06/cluster-level-logging-with-kubernetes.html).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

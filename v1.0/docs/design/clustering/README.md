@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Building with Docker
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -38,7 +39,9 @@ If you are using boot2docker and get warnings about clock skew (or if things are
 If you have the fswatch utility installed, you can have it monitor the file system and automatically rebuild when files have changed.  Just do a `make watch`.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes API and Release Versioning
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -53,7 +54,9 @@ It may seem a bit strange to complete the v2 API before v2.0 is released, but *a
 There is a separate question of how to track the capabilities of a kubelet to facilitate rolling upgrades. That is not addressed here.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes Cluster Admin Guide
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -82,7 +83,9 @@ project](salt.html).
 * **Admission Controllers** [admission_controllers](admission-controllers.html)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

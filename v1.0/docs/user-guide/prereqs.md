@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes User Guide: Managing Applications: Prerequisites
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -75,7 +76,9 @@ If you see a url response, you are ready to go.
 [Learn how to launch and expose your application.](quick-start.html)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

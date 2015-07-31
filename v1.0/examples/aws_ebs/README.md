@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: aws_ebs/README
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -36,7 +37,9 @@ You should now be able to query your web server:
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

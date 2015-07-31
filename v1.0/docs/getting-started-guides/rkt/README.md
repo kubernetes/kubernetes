@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Run Kubernetes with rkt
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -129,7 +130,9 @@ See [a simple nginx example](../../../docs/user-guide/simple-nginx.html) to try 
 For more complete applications, please look in the [examples directory](../../../examples/).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

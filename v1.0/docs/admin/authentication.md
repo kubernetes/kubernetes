@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Authentication Plugins
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -48,7 +49,9 @@ that interface between Kubernetes and a bedrock authentication provider (e.g.
 github.com, google.com, enterprise directory, kerberos, etc.)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

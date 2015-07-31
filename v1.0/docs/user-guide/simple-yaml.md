@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Getting started with config files.
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -105,7 +106,9 @@ $ kubectl delete rc nginx
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

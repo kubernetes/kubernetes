@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Getting started on Fedora
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -234,7 +235,9 @@ kubectl delete -f ./node.json
 You should have a functional cluster, check out [101](../../../docs/user-guide/walkthrough/README.html)!
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Example of NFS volume
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -61,7 +62,9 @@ Now the pod serves `index.html` from the NFS server:
     Hello World!
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

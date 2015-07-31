@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Getting started with vSphere
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -107,7 +108,9 @@ going on (find yourself authorized with your SSH key, or use the password
 `kube` otherwise).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

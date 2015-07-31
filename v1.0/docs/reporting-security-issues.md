@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Security
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -25,6 +26,10 @@ To report an issue, please:
   - Environment setup (e.g.  which "Getting Started Guide" you followed, if any; what node operating system used; what service or software creates your virtual machines, if any) 
 
 An online submission will have the fastest response; however, if you prefer email, please send mail to security@google.com. If you feel the need, please use the [PGP public key](https://services.google.com/corporate/publickey.txt) to encrypt communications.
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

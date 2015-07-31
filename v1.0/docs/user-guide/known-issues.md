@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Known Issues
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -29,7 +30,9 @@ Please consult this document before filing new bugs.
       * A workaround is to ensure there is no other Ceph client using the RBD volume before mapping RBD image in read-write mode. For example, `rados -p poolname listwatchers image_name.rbd` can list RBD clients that are mapping the image.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

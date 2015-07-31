@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: CoreOS Multinode Cluster
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -162,7 +163,9 @@ hdiutil makehybrid -iso -joliet -joliet-volume-name "config-2" -joliet -o node.i
 Boot one or more the [vmware image](https://coreos.com/docs/running-coreos/platforms/vmware) using `node.iso` as a config drive.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

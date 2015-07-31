@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes User Guide: Managing Applications
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -105,7 +106,9 @@ If you don't have much familiarity with Kubernetes, we recommend you read the fo
   * [Perform a rolling update on a running group of pods](update-demo/)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

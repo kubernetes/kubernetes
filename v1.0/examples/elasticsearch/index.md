@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Elasticsearch for Kubernetes
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -356,7 +357,9 @@ $ curl 104.197.12.157:9200/_nodes?pretty=true | grep name
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes Cluster Federation   
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -441,7 +442,9 @@ their primary zookeeper replica? And now how do I do a shared, highly
 available redis database?
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

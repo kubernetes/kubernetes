@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Namespaces
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -357,7 +358,9 @@ to remove that Namespace from the storage.
 At this point, all content associated with that Namespace, and the Namespace itself are gone.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

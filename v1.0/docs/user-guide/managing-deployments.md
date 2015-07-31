@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes User Guide: Managing Applications: Managing deployments
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -486,7 +487,9 @@ replicationcontrollers/my-nginx-v4
 - [Tips and tricks when working with config](config-best-practices.html)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
