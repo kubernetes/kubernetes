@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -138,7 +137,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 
 func TestRunStop(t *testing.T) {
 	o := testclient.NewObjects(api.Scheme, api.Scheme)
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
 	nsMgr := NewNamespaceManager(client, 1*time.Second)
 
 	if nsMgr.StopEverything != nil {

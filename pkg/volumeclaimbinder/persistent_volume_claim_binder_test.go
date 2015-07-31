@@ -23,7 +23,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
@@ -32,7 +31,7 @@ import (
 
 func TestRunStop(t *testing.T) {
 	o := testclient.NewObjects(api.Scheme, api.Scheme)
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
 	binder := NewPersistentVolumeClaimBinder(client, 1*time.Second)
 
 	if len(binder.stopChannels) != 0 {
@@ -119,7 +118,7 @@ func TestExampleObjects(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+		client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolumeClaim{}) {
 			pvc, err := client.PersistentVolumeClaims("ns").Get("doesntmatter")
@@ -179,7 +178,7 @@ func TestBindingWithExamples(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
 
 	pv, err := client.PersistentVolumes().Get("any")
 	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimRecycle
@@ -282,7 +281,7 @@ func TestMissingFromIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
 
 	pv, err := client.PersistentVolumes().Get("any")
 	if err != nil {

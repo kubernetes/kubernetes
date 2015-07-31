@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
@@ -42,7 +43,7 @@ func NewEtcdClient() *etcd.Client {
 }
 
 func NewEtcdStorage() (storage.Interface, error) {
-	return master.NewEtcdStorage(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	return master.NewEtcdStorage(NewEtcdClient(), latest.InterfacesFor, testapi.Version(), etcdtest.PathPrefix())
 }
 
 func RequireEtcd() {

@@ -17,6 +17,7 @@ limitations under the License.
 package meta
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -54,12 +55,14 @@ var validCodec = fakeCodec{}
 var validAccessor = resourceAccessor{}
 var validConvertor = fakeConvertor{}
 
-func fakeInterfaces(version string) (*VersionInterfaces, bool) {
-	return &VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, true
+func fakeInterfaces(version string) (*VersionInterfaces, error) {
+	return &VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
 }
 
-func unmatchedVersionInterfaces(version string) (*VersionInterfaces, bool) {
-	return nil, false
+var unmatchedErr = errors.New("no version")
+
+func unmatchedVersionInterfaces(version string) (*VersionInterfaces, error) {
+	return nil, unmatchedErr
 }
 
 func TestRESTMapperVersionAndKindForResource(t *testing.T) {

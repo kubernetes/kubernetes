@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -64,6 +65,15 @@ func (*internalType) IsAnAPIObject()  {}
 func (*externalType) IsAnAPIObject()  {}
 func (*ExternalType2) IsAnAPIObject() {}
 
+var versionErr = errors.New("not a version")
+
+func versionErrIfFalse(b bool) error {
+	if b {
+		return nil
+	}
+	return versionErr
+}
+
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName("", "Type", &internalType{})
@@ -73,12 +83,12 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 
 	codec := runtime.CodecFor(scheme, "unlikelyversion")
 	validVersion := testapi.Version()
-	mapper := meta.NewDefaultRESTMapper([]string{"unlikelyversion", validVersion}, func(version string) (*meta.VersionInterfaces, bool) {
+	mapper := meta.NewDefaultRESTMapper([]string{"unlikelyversion", validVersion}, func(version string) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
 			Codec:            runtime.CodecFor(scheme, version),
 			ObjectConvertor:  scheme,
 			MetadataAccessor: meta.NewAccessor(),
-		}, (version == validVersion || version == "unlikelyversion")
+		}, versionErrIfFalse(version == validVersion || version == "unlikelyversion")
 	})
 	for _, version := range []string{"unlikelyversion", validVersion} {
 		for kind := range scheme.KnownTypes(version) {

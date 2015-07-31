@@ -42,6 +42,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
+	explatest "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
@@ -132,9 +133,13 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: apiVersion})
 
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, "", etcdtest.PathPrefix())
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
 	if err != nil {
 		glog.Fatalf("Unable to get etcd storage: %v", err)
+	}
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+	if err != nil {
+		glog.Fatalf("Unable to get etcd storage for experimental: %v", err)
 	}
 
 	// Master
@@ -155,11 +160,13 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
 		DatabaseStorage:       etcdStorage,
+		ExpDatabaseStorage:    expEtcdStorage,
 		KubeletClient:         fakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableProfiling:       true,
 		APIPrefix:             "/api",
+		ExpAPIPrefix:          "/experimental",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,
