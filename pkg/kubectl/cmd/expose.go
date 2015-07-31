@@ -70,6 +70,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("public-ip", "", "Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("name", "", "The name for the newly created object.")
+	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
 	return cmd
 }
 

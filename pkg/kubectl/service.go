@@ -61,6 +61,7 @@ func paramNames() []GeneratorParam {
 		{"container-port", false}, // alias of target-port
 		{"target-port", false},
 		{"port-name", false},
+		{"session-affinity", false},
 	}
 }
 
@@ -140,6 +141,16 @@ func generate(params map[string]string) (runtime.Object, error) {
 	}
 	if len(params["type"]) != 0 {
 		service.Spec.Type = api.ServiceType(params["type"])
+	}
+	if len(params["session-affinity"]) != 0 {
+		switch api.ServiceAffinity(params["session-affinity"]) {
+		case api.ServiceAffinityNone:
+			service.Spec.SessionAffinity = api.ServiceAffinityNone
+		case api.ServiceAffinityClientIP:
+			service.Spec.SessionAffinity = api.ServiceAffinityClientIP
+		default:
+			return nil, fmt.Errorf("unknown session affinity: %s", params["session-affinity"])
+		}
 	}
 	return &service, nil
 }

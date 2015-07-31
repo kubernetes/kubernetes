@@ -139,6 +139,41 @@ func TestRunExposeService(t *testing.T) {
 			},
 			status: 200,
 		},
+		{
+			name: "expose-external-affinity-service",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "create-external-load-balancer": "true", "session-affinity": "ClientIP"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "12", Labels: map[string]string{"svc": "test"}},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Protocol:   api.Protocol("UDP"),
+							Port:       14,
+							TargetPort: util.NewIntOrStringFromInt(14),
+						},
+					},
+					Selector:        map[string]string{"func": "stream"},
+					Type:            api.ServiceTypeLoadBalancer,
+					SessionAffinity: api.ServiceAffinityClientIP,
+				},
+			},
+			status: 200,
+		},
 	}
 
 	for _, test := range tests {
