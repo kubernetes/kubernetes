@@ -105,7 +105,7 @@ spec:
 ```
 
 [Download example](downward-api/dapi-pod.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE downward-api/dapi-pod.yaml -->
 
 Some more thorough examples:
    * [environment variables](environment-guide/)

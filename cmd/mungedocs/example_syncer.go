@@ -17,15 +17,17 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
-	"path"
 	"regexp"
 	"strings"
 )
 
-const exampleMungeTag = "EXAMPLE"
+const exampleToken = "EXAMPLE"
+
+const exampleLineStart = "<!-- BEGIN MUNGE: EXAMPLE"
+
+var exampleMungeTagRE = regexp.MustCompile(beginMungeTag(fmt.Sprintf("%s %s", exampleToken, `(([^ ])*.(yaml|json))`)))
 
 // syncExamples updates all examples in markdown file.
 //
@@ -43,75 +45,70 @@ const exampleMungeTag = "EXAMPLE"
 //
 // [Download example](../../examples/guestbook/frontend-controller.yaml)
 // <!-- END MUNGE: EXAMPLE -->
-func syncExamples(filePath string, markdown []byte) ([]byte, error) {
-	// find the example syncer begin tag
-	header := beginMungeTag(fmt.Sprintf("%s %s", exampleMungeTag, `(([^ ])*.(yaml|json))`))
-	exampleLinkRE := regexp.MustCompile(header)
-	lines := splitLines(markdown)
-	updatedMarkdown, err := updateExampleMacroBlock(filePath, lines, exampleLinkRE, endMungeTag(exampleMungeTag))
-	if err != nil {
-		return updatedMarkdown, err
+func syncExamples(filePath string, mlines mungeLines) (mungeLines, error) {
+	var err error
+	type exampleTag struct {
+		token    string
+		linkText string
+		fileType string
 	}
-	return updatedMarkdown, nil
+	exampleTags := []exampleTag{}
+
+	// collect all example Tags
+	for _, mline := range mlines {
+		if mline.preformatted || !mline.beginTag {
+			continue
+		}
+		line := mline.data
+		if !strings.HasPrefix(line, exampleLineStart) {
+			continue
+		}
+		match := exampleMungeTagRE.FindStringSubmatch(line)
+		if len(match) < 4 {
+			err = fmt.Errorf("Found unparsable EXAMPLE munge line %v", line)
+			return mlines, err
+		}
+		tag := exampleTag{
+			token:    exampleToken + " " + match[1],
+			linkText: match[1],
+			fileType: match[3],
+		}
+		exampleTags = append(exampleTags, tag)
+	}
+	// update all example Tags
+	for _, tag := range exampleTags {
+		example, err := exampleContent(filePath, tag.linkText, tag.fileType)
+		if err != nil {
+			return mlines, err
+		}
+		mlines, err = updateMacroBlock(mlines, tag.token, example)
+		if err != nil {
+			return mlines, err
+		}
+	}
+	return mlines, nil
 }
 
 // exampleContent retrieves the content of the file at linkPath
-func exampleContent(filePath, linkPath, fileType string) (content string, err error) {
-	realRoot := path.Join(*rootDir, *repoRoot) + "/"
-	path := path.Join(realRoot, path.Dir(filePath), linkPath)
-	dat, err := ioutil.ReadFile(path)
+func exampleContent(filePath, linkPath, fileType string) (mungeLines, error) {
+	repoRel, err := makeRepoRelative(linkPath, filePath)
 	if err != nil {
-		return content, err
+		return nil, err
 	}
+
+	fileRel, err := makeFileRelative(linkPath, filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	dat, err := ioutil.ReadFile(repoRel)
+	if err != nil {
+		return nil, err
+	}
+
 	// remove leading and trailing spaces and newlines
 	trimmedFileContent := strings.TrimSpace(string(dat))
-	content = fmt.Sprintf("\n```%s\n%s\n```\n\n[Download example](%s)", fileType, trimmedFileContent, linkPath)
-	return
-}
-
-// updateExampleMacroBlock sync the yaml/json example between begin tag and end tag
-func updateExampleMacroBlock(filePath string, lines []string, beginMarkExp *regexp.Regexp, endMark string) ([]byte, error) {
-	var buffer bytes.Buffer
-	betweenBeginAndEnd := false
-	for _, line := range lines {
-		trimmedLine := strings.Trim(line, " \n")
-		if beginMarkExp.Match([]byte(trimmedLine)) {
-			if betweenBeginAndEnd {
-				return nil, fmt.Errorf("found second begin mark while updating macro blocks")
-			}
-			betweenBeginAndEnd = true
-			buffer.WriteString(line)
-			buffer.WriteString("\n")
-			match := beginMarkExp.FindStringSubmatch(line)
-			if len(match) < 4 {
-				return nil, fmt.Errorf("failed to parse the link in example header")
-			}
-			// match[0] is the entire expression; [1] is the link text and [3] is the file type (yaml or json).
-			linkText := match[1]
-			fileType := match[3]
-			example, err := exampleContent(filePath, linkText, fileType)
-			if err != nil {
-				return nil, err
-			}
-			buffer.WriteString(example)
-		} else if trimmedLine == endMark {
-			if !betweenBeginAndEnd {
-				return nil, fmt.Errorf("found end mark without being mark while updating macro blocks")
-			}
-			// Extra newline avoids github markdown bug where comment ends up on same line as last bullet.
-			buffer.WriteString("\n")
-			buffer.WriteString(line)
-			buffer.WriteString("\n")
-			betweenBeginAndEnd = false
-		} else {
-			if !betweenBeginAndEnd {
-				buffer.WriteString(line)
-				buffer.WriteString("\n")
-			}
-		}
-	}
-	if betweenBeginAndEnd {
-		return nil, fmt.Errorf("never found closing end mark while updating macro blocks")
-	}
-	return buffer.Bytes(), nil
+	content := fmt.Sprintf("\n```%s\n%s\n```\n\n[Download example](%s)", fileType, trimmedFileContent, fileRel)
+	out := getMungeLines(content)
+	return out, nil
 }

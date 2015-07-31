@@ -74,7 +74,7 @@ spec:
 ```
 
 [Download example](../../examples/blog-logging/counter-pod.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE ../../examples/blog-logging/counter-pod.yaml -->
 
 This pod specification has one container which runs a bash script when the container is born. This script simply writes out the value of a counter and the date once per second and runs indefinitely. Let’s create the pod in the default
 namespace.
@@ -92,7 +92,7 @@ NAME                                           READY     STATUS    RESTARTS   AG
 counter                                        1/1       Running   0          5m
 ```
 
-This step may take a few minutes to download the ubuntu:14.04 image during which the pod status will be shown as `Pending`. 
+This step may take a few minutes to download the ubuntu:14.04 image during which the pod status will be shown as `Pending`.
 
 One of the nodes is now running the counter pod:
 
@@ -192,7 +192,7 @@ spec:
 ```
 
 [Download example](../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE ../../cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml -->
 
 This pod specification maps the directory on the host containing the Docker log files, `/var/lib/docker/containers`, to a directory inside the container which has the same path. The pod runs one image, `gcr.io/google_containers/fluentd-gcp:1.6`, which is configured to collect the Docker log files from the logs directory and ingest them into Google Cloud Logging. One instance of this pod runs on each node of the cluster. Kubernetes will notice if this pod fails and automatically restart it.
 

@@ -36,16 +36,16 @@ Documentation for other releases can be found at
 Install Ceph on the Kubernetes host. For example, on Fedora 21
 
     # yum -y install ceph
-   
+
 If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](https://github.com/rootfs/docker-ceph)
-   
+
 Then get the keyring from the Ceph cluster and copy it to */etc/ceph/keyring*.
 
 Once you have installed Ceph and new Kubernetes, you can create a pod based on my examples [rbd.json](rbd.json)  [rbd-with-secret.json](rbd-with-secret.json). In the pod JSON, you need to provide the following information.
 
 - *monitors*:  Ceph monitors.
 - *pool*: The name of the RADOS pool, if not provided, default *rbd* pool is used.
-- *image*: The image name that rbd has created. 
+- *image*: The image name that rbd has created.
 - *user*: The RADOS user name. If not provided, default *admin* is used.
 - *keyring*: The path to the keyring file. If not provided, default */etc/ceph/keyring* is used.
 - *secretName*: The name of the authentication secrets. If provided, *secretName* overrides *keyring*. Note, see below about how to create a secret.
@@ -58,7 +58,7 @@ If Ceph authentication secret is provided, the secret should be first be base64 
 
 ```console
     # kubectl create -f examples/rbd/secret/ceph-secret.yaml
-```	
+```
 
 # Get started
 

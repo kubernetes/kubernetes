@@ -49,7 +49,7 @@ Event compression should be best effort (not guaranteed). Meaning, in the worst 
 ## Design
 
 Instead of a single Timestamp, each event object [contains](http://releases.k8s.io/HEAD/pkg/api/types.go#L1111) the following fields:
- * `FirstTimestamp util.Time` 
+ * `FirstTimestamp util.Time`
    * The date/time of the first occurrence of the event.
  * `LastTimestamp util.Time`
    * The date/time of the most recent occurrence of the event.

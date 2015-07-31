@@ -52,7 +52,7 @@ Each user community has its own:
 
 A cluster operator may create a Namespace for each unique user community.
 
-The Namespace provides a unique scope for: 
+The Namespace provides a unique scope for:
 
 1. named resources (to avoid basic naming collisions)
 2. delegated management authority to trusted users

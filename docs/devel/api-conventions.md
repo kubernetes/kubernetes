@@ -173,11 +173,11 @@ Objects that contain both spec and status should not contain additional top-leve
 ##### Typical status properties
 
 * **phase**: The phase is a simple, high-level summary of the phase of the lifecycle of an object. The phase should progress monotonically. Typical phase values are `Pending` (not yet fully physically realized), `Running` or `Active` (fully realized and active, but not necessarily operating correctly), and `Terminated` (no longer active), but may vary slightly for different types of objects. New phase values should not be added to existing objects in the future. Like other status fields, it must be possible to ascertain the lifecycle phase by observation. Additional details regarding the current phase may be contained in other fields.
-* **conditions**: Conditions represent orthogonal observations of an object's current state. Objects may report multiple conditions, and new types of conditions may be added in the future. Condition status values may be `True`, `False`, or `Unknown`. Unlike the phase, conditions are not expected to be monotonic -- their values may change back and forth. A typical condition type is `Ready`, which indicates the object was believed to be fully operational at the time it was last probed. Conditions may carry additional information, such as the last probe time or last transition time. 
+* **conditions**: Conditions represent orthogonal observations of an object's current state. Objects may report multiple conditions, and new types of conditions may be added in the future. Condition status values may be `True`, `False`, or `Unknown`. Unlike the phase, conditions are not expected to be monotonic -- their values may change back and forth. A typical condition type is `Ready`, which indicates the object was believed to be fully operational at the time it was last probed. Conditions may carry additional information, such as the last probe time or last transition time.
 
 TODO(@vishh): Reason and Message.
 
-Phases and conditions are observations and not, themselves, state machines, nor do we define comprehensive state machines for objects with behaviors associated with state transitions. The system is level-based and should assume an Open World. Additionally, new observations and details about these observations may be added over time. 
+Phases and conditions are observations and not, themselves, state machines, nor do we define comprehensive state machines for objects with behaviors associated with state transitions. The system is level-based and should assume an Open World. Additionally, new observations and details about these observations may be added over time.
 
 In order to preserve extensibility, in the future, we intend to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from observations.
 
@@ -376,7 +376,7 @@ Late-initializers should only make the following types of modifications:
  - Adding keys to maps
  - Adding values to arrays which have mergeable semantics (`patchStrategy:"merge"` attribute in
   the type definition).
-  
+
 These conventions:
  1. allow a user (with sufficient privilege) to override any system-default behaviors by setting
     the fields that would otherwise have been defaulted.

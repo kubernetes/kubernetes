@@ -68,8 +68,8 @@ Or create a `~/.cloudstack.ini` file:
 
     [cloudstack]
     endpoint = <your cloudstack api endpoint>
-    key = <your api access key> 
-    secret = <your api secret key> 
+    key = <your api access key>
+    secret = <your api secret key>
     method = post
 
 We need to use the http POST method to pass the _large_ userdata to the coreOS instances.
@@ -104,7 +104,7 @@ Check the tasks and templates in `roles/k8s` if you want to modify anything.
 
 Once the playbook as finished, it will print out the IP of the Kubernetes master:
 
-    TASK: [k8s | debug msg='k8s master IP is {{ k8s_master.default_ip }}'] ******** 
+    TASK: [k8s | debug msg='k8s master IP is {{ k8s_master.default_ip }}'] ********
 
 SSH to it using the key that was created and using the _core_ user and you can list the machines in your cluster:
 

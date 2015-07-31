@@ -36,7 +36,7 @@ Documentation for other releases can be found at
 Objects of type `secret` are intended to hold sensitive information, such as
 passwords, OAuth tokens, and ssh keys.  Putting this information in a `secret`
 is safer and more flexible than putting it verbatim in a `pod` definition or in
-a docker image. See [Secrets design document](../design/secrets.md) for more information. 
+a docker image. See [Secrets design document](../design/secrets.md) for more information.
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->

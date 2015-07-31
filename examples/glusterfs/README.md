@@ -59,7 +59,7 @@ Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
 
 ```
 
-The "IP" field should be filled with the address of a node in the Glusterfs server cluster. In this example, it is fine to give any valid value (from 1 to 65535) to the "port" field. 
+The "IP" field should be filled with the address of a node in the Glusterfs server cluster. In this example, it is fine to give any valid value (from 1 to 65535) to the "port" field.
 
 Create the endpoints,
 
@@ -90,11 +90,11 @@ The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustra
 }
 ```
 
-The parameters are explained as the followings. 
+The parameters are explained as the followings.
 
-- **endpoints** is endpoints name that represents a Gluster cluster configuration. *kubelet* is optimized to avoid mount storm, it will randomly pick one from the endpoints to mount. If this host is unresponsive, the next Gluster host in the endpoints is automatically selected. 
-- **path** is the Glusterfs volume name. 
-- **readOnly** is the boolean that sets the mountpoint readOnly or readWrite. 
+- **endpoints** is endpoints name that represents a Gluster cluster configuration. *kubelet* is optimized to avoid mount storm, it will randomly pick one from the endpoints to mount. If this host is unresponsive, the next Gluster host in the endpoints is automatically selected.
+- **path** is the Glusterfs volume name.
+- **readOnly** is the boolean that sets the mountpoint readOnly or readWrite.
 
 Create a pod that has a container using Glusterfs volume,
 

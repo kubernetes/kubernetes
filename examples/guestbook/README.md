@@ -101,7 +101,7 @@ spec:
 ```
 
 [Download example](redis-master-controller.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE redis-master-controller.yaml -->
 
 Change to the `<kubernetes>/examples/guestbook` directory if you're not already there. Create the redis master pod in your Kubernetes cluster by running:
 
@@ -222,7 +222,7 @@ spec:
 ```
 
 [Download example](redis-master-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE redis-master-service.yaml -->
 
 Create the service by running:
 
@@ -296,7 +296,7 @@ spec:
 ```
 
 [Download example](redis-slave-controller.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE redis-slave-controller.yaml -->
 
 and create the replication controller by running:
 
@@ -347,7 +347,7 @@ spec:
 ```
 
 [Download example](redis-slave-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE redis-slave-service.yaml -->
 
 This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "label=value"` command.
 
@@ -398,7 +398,7 @@ spec:
 ```
 
 [Download example](frontend-controller.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE frontend-controller.yaml -->
 
 Using this file, you can turn up your frontend with:
 
@@ -501,7 +501,7 @@ spec:
 ```
 
 [Download example](frontend-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE frontend-service.yaml -->
 
 #### Using 'type: LoadBalancer' for the frontend service (cloud-provider-specific)
 

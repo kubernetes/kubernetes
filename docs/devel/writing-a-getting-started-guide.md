@@ -70,7 +70,7 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
  - Setup a cluster and run the [conformance test](development.md#conformance-testing) against it, and report the
    results in your PR.
  - Versioned distros should typically not modify or add code in `cluster/`.  That is just scripts for developer
-   distros.  
+   distros.
  - When a new major or minor release of Kubernetes comes out, we may also release a new
    conformance test, and require a new conformance test run to earn a conformance checkmark.
 
@@ -82,20 +82,20 @@ Just file an issue or chat us on IRC and one of the committers will link to it f
 
 These guidelines say *what* to do.  See the Rationale section for *why*.
   - the main reason to add a new development distro is to support a new IaaS provider (VM and
-    network management).  This means implementing a new `pkg/cloudprovider/$IAAS_NAME`.  
+    network management).  This means implementing a new `pkg/cloudprovider/$IAAS_NAME`.
   - Development distros should use Saltstack for Configuration Management.
   - development distros need to support automated cluster creation, deletion, upgrading, etc.
     This mean writing scripts in `cluster/$IAAS_NAME`.
   - all commits to the tip of this repo need to not break any of the development distros
     - the author of the change is responsible for making changes necessary on all the cloud-providers if the
       change affects any of them, and reverting the change if it breaks any of the CIs.
-  - a development distro needs to have an organization which owns it.  This organization needs to: 
+  - a development distro needs to have an organization which owns it.  This organization needs to:
     - Setting up and maintaining Continuous Integration that runs e2e frequently (multiple times per day) against the
       Distro at head,  and which notifies all devs of breakage.
     - being reasonably available for questions and assisting with
       refactoring and feature additions that affect code for their IaaS.
 
-## Rationale 
+## Rationale
 
  - We want people to create Kubernetes clusters with whatever IaaS, Node OS,
    configuration management tools, and so on, which they are familiar with.  The
@@ -114,19 +114,19 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
    learning curve to understand our automated testing scripts.  And it is considerable effort
    to fully automate setup and teardown of a cluster, which is needed for CI.  And, not everyone
    has the time and money to run CI.  We do not want to
-   discourage people from writing and sharing guides because of this.  
+   discourage people from writing and sharing guides because of this.
  - Versioned distro authors are free to run their own CI and let us know if there is breakage, but we
    will not include them as commit hooks -- there cannot be so many commit checks that it is impossible
    to pass them all.
  - We prefer a single Configuration Management tool for development distros.  If there were more
    than one, the core developers would have to learn multiple tools and update config in multiple
    places.  **Saltstack** happens to be the one we picked when we started the project.  We
-   welcome versioned distros that use any tool; there are already examples of 
+   welcome versioned distros that use any tool; there are already examples of
    CoreOS Fleet, Ansible, and others.
  - You can still run code from head or your own branch
    if you use another Configuration Management tool -- you just have to do some manual steps
    during testing and deployment.
-      
+
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

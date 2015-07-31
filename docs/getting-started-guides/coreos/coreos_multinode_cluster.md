@@ -44,7 +44,7 @@ Use the [master.yaml](cloud-configs/master.yaml) and [node.yaml](cloud-configs/n
 * Provision the master node
 * Capture the master node private IP address
 * Edit node.yaml
-* Provision one or more worker nodes 
+* Provision one or more worker nodes
 
 ### AWS
 

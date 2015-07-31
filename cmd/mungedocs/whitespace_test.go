@@ -22,52 +22,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHeaderLines(t *testing.T) {
+func Test_updateWhiteSpace(t *testing.T) {
 	var cases = []struct {
 		in       string
 		expected string
 	}{
 		{"", ""},
-		{
-			"# ok",
-			"# ok",
-		},
-		{
-			"## ok",
-			"## ok",
-		},
-		{
-			"##### ok",
-			"##### ok",
-		},
-		{
-			"##fix",
-			"## fix",
-		},
-		{
-			"foo\n\n##fix\n\nbar",
-			"foo\n\n## fix\n\nbar",
-		},
-		{
-			"foo\n##fix\nbar",
-			"foo\n\n## fix\n\nbar",
-		},
-		{
-			"foo\n```\n##fix\n```\nbar",
-			"foo\n```\n##fix\n```\nbar",
-		},
-		{
-			"foo\n#fix1\n##fix2\nbar",
-			"foo\n\n# fix1\n\n## fix2\n\nbar",
-		},
+		{"\n", "\n"},
+		{"  \t   \t \n", "\n"},
+		{"bob  \t", "bob"},
+		{"```\n   \n```\n", "```\n   \n```\n"},
 	}
 	for i, c := range cases {
 		in := getMungeLines(c.in)
 		expected := getMungeLines(c.expected)
-		actual, err := updateHeaderLines("filename.md", in)
+		actual, err := updateWhitespace("filename.md", in)
 		assert.NoError(t, err)
-		if !actual.Equal(expected) {
-			t.Errorf("case[%d]: expected %q got %q", i, c.expected, actual.String())
+		if !expected.Equal(actual) {
+			t.Errorf("Case[%d] Expected Whitespace '%v' but got '%v'", i, string(expected.Bytes()), string(actual.Bytes()))
 		}
 	}
 }

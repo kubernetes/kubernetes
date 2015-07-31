@@ -87,7 +87,7 @@ there are insufficient resources of one type or another that prevent scheduling.
 your pod.  Reasons include:
 
 * **You don't have enough resources**:  You may have exhausted the supply of CPU or Memory in your cluster, in this case
-you need to delete Pods, adjust resource requests, or add new nodes to your cluster. See [Compute Resources document](compute-resources.md#my-pods-are-pending-with-event-message-failedscheduling) for more information. 
+you need to delete Pods, adjust resource requests, or add new nodes to your cluster. See [Compute Resources document](compute-resources.md#my-pods-are-pending-with-event-message-failedscheduling) for more information.
 
 * **You are using `hostPort`**:  When you bind a Pod to a `hostPort` there are a limited number of places that pod can be
 scheduled.  In most cases, `hostPort` is unnecessary, try using a Service object to expose your Pod.  If you do require
@@ -100,7 +100,7 @@ If a Pod is stuck in the `Waiting` state, then it has been scheduled to a worker
 Again, the information from `kubectl describe ...` should be informative.  The most common cause of `Waiting` pods is a failure to pull the image.  There are three things to check:
 * Make sure that you have the name of the image correct
 * Have you pushed the image to the repository?
-* Run a manual `docker pull <image>` on your machine to see if the image can be pulled. 
+* Run a manual `docker pull <image>` on your machine to see if the image can be pulled.
 
 #### My pod is crashing or otherwise unhealthy
 
@@ -139,7 +139,7 @@ feature request on GitHub describing your use case and why these tools are insuf
 ### Debugging Replication Controllers
 
 Replication controllers are fairly straightforward.  They can either create Pods or they can't.  If they can't
-create pods, then please refer to the [instructions above](#debugging-pods) to debug your pods. 
+create pods, then please refer to the [instructions above](#debugging-pods) to debug your pods.
 
 You can also use `kubectl describe rc ${CONTROLLER_NAME}` to introspect events related to the replication
 controller.
@@ -199,11 +199,11 @@ check:
    * Can you connect to your pods directly?  Get the IP address for the Pod, and try to connect directly to that IP
    * Is your application serving on the port that you configured?  Kubernetes doesn't do port remapping, so if your application serves on 8080, the `containerPort` field needs to be 8080.
 
-#### More information 
+#### More information
 
-If none of the above solves your problem, follow the instructions in [Debugging Service document](debugging-services.md) to make sure that your `Service` is running, has `Endpoints`, and your `Pods` are actually serving; you have DNS working, iptables rules installed, and kube-proxy does not seem to be misbehaving. 
+If none of the above solves your problem, follow the instructions in [Debugging Service document](debugging-services.md) to make sure that your `Service` is running, has `Endpoints`, and your `Pods` are actually serving; you have DNS working, iptables rules installed, and kube-proxy does not seem to be misbehaving.
 
-You may also visit [troubleshooting document](../troubleshooting.md) for more information. 
+You may also visit [troubleshooting document](../troubleshooting.md) for more information.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -49,7 +49,7 @@ On the Master:
 On each Node:
 - `kube-proxy`
 - `kube-kubelet`
-- `calico-node` 
+- `calico-node`
 
 ## Prerequisites
 
@@ -191,7 +191,7 @@ node-X  | 192.168.X.1/24
 
 #### Start docker on cbr0
 
-The Docker daemon must be started and told to use the already configured cbr0 instead of using the usual docker0, as well as disabling ip-masquerading and modification of the ip-tables. 
+The Docker daemon must be started and told to use the already configured cbr0 instead of using the usual docker0, as well as disabling ip-masquerading and modification of the ip-tables.
 
 1.) Edit the ubuntu-15.04 docker.service for systemd at: `/lib/systemd/system/docker.service`
 

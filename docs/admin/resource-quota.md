@@ -160,14 +160,14 @@ Sometimes more complex policies may be desired, such as:
 
 Such policies could be implemented using ResourceQuota as a building-block, by
 writing a 'controller' which watches the quota usage and adjusts the quota
-hard limits of each namespace according to other signals. 
+hard limits of each namespace according to other signals.
 
 Note that resource quota divides up aggregate cluster resources, but it creates no
 restrictions around nodes: pods from several namespaces may run on the same node.
 
 ## Example
 
-See a [detailed example for how to use resource quota](../user-guide/resourcequota/). 
+See a [detailed example for how to use resource quota](../user-guide/resourcequota/).
 
 ## Read More
 

@@ -44,7 +44,7 @@ The purpose of filtering the nodes is to filter out the nodes that do not meet c
 - `PodFitsPorts`: Check if any HostPort required by the Pod is already occupied on the node.
 - `PodFitsHost`: Filter out all nodes except the one specified in the PodSpec's NodeName field.
 - `PodSelectorMatches`: Check if the labels of the node match the labels specified in the Pod's `nodeSelector` field ([Here](../user-guide/node-selection/) is an example of how to use `nodeSelector` field).
-- `CheckNodeLabelPresence`: Check if all the specified labels exist on a node or not, regardless of the value. 
+- `CheckNodeLabelPresence`: Check if all the specified labels exist on a node or not, regardless of the value.
 
 The details of the above predicates can be found in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithm/predicates/predicates.go). All predicates mentioned above can be used in combination to perform a sophisticated filtering policy. Kubernetes uses some, but not all, of these predicates by default. You can see which ones are used by default in [plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go).
 
@@ -53,7 +53,7 @@ The details of the above predicates can be found in [plugin/pkg/scheduler/algori
 The filtered nodes are considered suitable to host the Pod, and it is often that there are more than one nodes remaining. Kubernetes prioritizes the remaining nodes to find the "best" one for the Pod. The prioritization is performed by a set of priority functions. For each remaining node, a priority function gives a score which scales from 0-10 with 10 representing for "most preferred" and 0 for "least preferred". Each priority function is weighted by a positive number and the final score of each node is calculated by adding up all the weighted scores. For example, suppose there are two priority functions, `priorityFunc1` and `priorityFunc2` with weighting factors `weight1` and `weight2` respectively, the final score of some NodeA is:
 
     finalScoreNodeA = (weight1 * priorityFunc1) + (weight2 * priorityFunc2)
-    
+
 After the scores of all nodes are calculated, the node with highest score is chosen as the host of the Pod. If there are more than one nodes with equal highest scores, a random one among them is chosen.
 
 Currently, Kubernetes scheduler provides some practical priority functions, including:

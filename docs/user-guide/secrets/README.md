@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 
 # Secrets example
 
-Following this example, you will create a [secret](../secrets.md) and a [pod](../pods.md) that consumes that secret in a [volume](../volumes.md). See [Secrets design document](../../design/secrets.md) for more information. 
+Following this example, you will create a [secret](../secrets.md) and a [pod](../pods.md) that consumes that secret in a [volume](../volumes.md). See [Secrets design document](../../design/secrets.md) for more information.
 
 ## Step Zero: Prerequisites
 
@@ -83,7 +83,7 @@ $ kubectl create -f docs/user-guide/secrets/secret-pod.yaml
 ```
 
 This pod runs a binary that displays the content of one of the pieces of secret data in the secret
-volume: 
+volume:
 
 ```console
 $ kubectl logs secret-test-pod

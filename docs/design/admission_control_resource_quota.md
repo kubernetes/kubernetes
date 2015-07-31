@@ -104,7 +104,7 @@ type ResourceQuotaList struct {
 
 ## AdmissionControl plugin: ResourceQuota
 
-The **ResourceQuota** plug-in introspects all incoming admission requests. 
+The **ResourceQuota** plug-in introspects all incoming admission requests.
 
 It makes decisions by evaluating the incoming object against all defined **ResourceQuota.Status.Hard** resource limits in the request
 namespace.  If acceptance of the resource would cause the total usage of a named resource to exceed its hard limit, the request is denied.
@@ -125,7 +125,7 @@ Any resource that is not part of core Kubernetes must follow the resource naming
 This means the resource must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
 
 If the incoming request does not cause the total usage to exceed any of the enumerated hard resource limits, the plug-in will post a
-**ResourceQuotaUsage** document to the server to atomically update the observed usage based on the previously read 
+**ResourceQuotaUsage** document to the server to atomically update the observed usage based on the previously read
 **ResourceQuota.ResourceVersion**.  This keeps incremental usage atomically consistent, but does introduce a bottleneck (intentionally)
 into the system.
 
@@ -184,7 +184,7 @@ resourcequotas          1       1
 services                3       5
 ```
 
-## More information 
+## More information
 
 See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more information.
 

@@ -92,7 +92,7 @@ steps that existing cluster setup scripts are making.
 
 ## Designing and Preparing
 
-### Learning 
+### Learning
 
   1. You should be familiar with using Kubernetes already.  We suggest you set
     up a temporary cluster by following one of the other Getting Started Guides.
@@ -108,7 +108,7 @@ an interface for managing TCP Load Balancers, Nodes (Instances) and Networking R
 The interface is defined in `pkg/cloudprovider/cloud.go`.  It is possible to
 create a custom cluster without implementing a cloud provider (for example if using
 bare-metal), and not all parts of the interface need to be implemented, depending
-on how flags are set on various components. 
+on how flags are set on various components.
 
 ### Nodes
 
@@ -220,13 +220,13 @@ all the necessary binaries.
 #### Selecting Images
 
 You will run docker, kubelet, and kube-proxy outside of a container, the same way you would run any system daemon, so
-you just need the bare binaries.  For etcd, kube-apiserver, kube-controller-manager, and kube-scheduler, 
+you just need the bare binaries.  For etcd, kube-apiserver, kube-controller-manager, and kube-scheduler,
 we recommend that you run these as containers, so you need an image to be built.
 
 You have several choices for Kubernetes images:
 - Use images hosted on Google Container Registry (GCR):
   - e.g `gcr.io/google_containers/kube-apiserver:$TAG`, where `TAG` is the latest
-    release tag, which can be found on the [latest releases page](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest). 
+    release tag, which can be found on the [latest releases page](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest).
   - Ensure $TAG is the same tag as the release tag you are using for kubelet and kube-proxy.
 - Build your own images.
   - Useful if you are using a private registry.
@@ -294,7 +294,7 @@ You will end up with the following files (we will use these variables later on)
 #### Preparing Credentials
 
 The admin user (and any users) need:
-  - a token or a password to identify them. 
+  - a token or a password to identify them.
   - tokens are just long alphanumeric strings, e.g. 32 chars.  See
     - `TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)`
 
@@ -318,7 +318,7 @@ The kubeconfig file for the administrator can be created as follows:
       - `kubectl config set-context $CONTEXT_NAME --cluster=$CLUSTER_NAME --user=$USER`
       - `kubectl config use-context $CONTEXT_NAME`
 
-Next, make a kubeconfig file for the kubelets and kube-proxy.  There are a couple of options for how 
+Next, make a kubeconfig file for the kubelets and kube-proxy.  There are a couple of options for how
 many distinct files to make:
   1. Use the same credential as the admin
     - This is simplest to setup.
@@ -355,7 +355,7 @@ guide assume that there are kubeconfigs in `/var/lib/kube-proxy/kubeconfig` and
 
 ## Configuring and Installing Base Software on Nodes
 
-This section discusses how to configure machines to be Kubernetes nodes. 
+This section discusses how to configure machines to be Kubernetes nodes.
 
 You should run three daemons on every node:
   - docker or rkt
@@ -395,7 +395,7 @@ so that kube-proxy can manage iptables instead of docker.
     - if you are using an overlay network, consult those instructions.
   - `--mtu=`
     - may be required when using Flannel, because of the extra packet size due to udp encapsulation
-  - `--insecure-registry $CLUSTER_SUBNET` 
+  - `--insecure-registry $CLUSTER_SUBNET`
     - to connect to a private registry, if you set one up, without using SSL.
 
 You may want to increase the number of open files for docker:
@@ -412,7 +412,7 @@ installation, by following examples given in the Docker documentation.
 The minimum version required is [v0.5.6](https://github.com/coreos/rkt/releases/tag/v0.5.6).
 
 [systemd](http://www.freedesktop.org/wiki/Software/systemd/) is required on your node to run rkt.  The
-minimum version required to match rkt v0.5.6 is 
+minimum version required to match rkt v0.5.6 is
 [systemd 215](http://lists.freedesktop.org/archives/systemd-devel/2014-July/020903.html).
 
 [rkt metadata service](https://github.com/coreos/rkt/blob/master/Documentation/networking.md) is also required
@@ -444,7 +444,7 @@ Arguments to consider:
 
 All nodes should run kube-proxy.  (Running kube-proxy on a "master" node is not
 strictly required, but being consistent is easier.)   Obtain a binary as described for
-kubelet. 
+kubelet.
 
 Arguments to consider:
   - If following the HTTPS security approach:
@@ -456,7 +456,7 @@ Arguments to consider:
 ### Networking
 
 Each node needs to be allocated its own CIDR range for pod networking.
-Call this `NODE_X_POD_CIDR`. 
+Call this `NODE_X_POD_CIDR`.
 
 A bridge called `cbr0` needs to be created on each node.  The bridge is explained
 further in the [networking documentation](../admin/networking.md).  The bridge itself
@@ -498,7 +498,7 @@ NOTE: This is environment specific.  Some environments will not need
 any masquerading at all.  Others, such as GCE, will not allow pod IPs to send
 traffic to the internet, but have no problem with them inside your GCE Project.
 
-### Other 
+### Other
 
 - Enable auto-upgrades for your OS package manager, if desired.
 - Configure log rotation for all node components (e.g. using [logrotate](http://linux.die.net/man/8/logrotate)).
@@ -529,7 +529,7 @@ You will need to run one or more instances of etcd.
   - Recommended approach: run one etcd instance, with its log written to a directory backed
     by durable storage (RAID, GCE PD)
   - Alternative: run 3 or 5 etcd instances.
-    - Log can be written to non-durable storage because storage is replicated. 
+    - Log can be written to non-durable storage because storage is replicated.
     - run a single apiserver which connects to one of the etc nodes.
  See [cluster-troubleshooting](../admin/cluster-troubleshooting.md) for more discussion on factors affecting cluster
 availability.

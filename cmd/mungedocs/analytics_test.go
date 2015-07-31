@@ -23,67 +23,71 @@ import (
 )
 
 func TestAnalytics(t *testing.T) {
+	b := beginMungeTag("GENERATED_ANALYTICS")
+	e := endMungeTag("GENERATED_ANALYTICS")
 	var cases = []struct {
-		in  string
-		out string
+		in       string
+		expected string
 	}{
 		{
 			"aoeu",
-			"aoeu" + "\n" + "\n" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+			"aoeu" + "\n" + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+				e + "\n"},
 		{
 			"aoeu" + "\n" + "\n" + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()",
 			"aoeu" + "\n" + "\n" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+				e + "\n"},
 		{
 			"aoeu" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n",
-			"aoeu" + "\n" + "\n" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				e + "\n",
+			"aoeu" + "\n" + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+				e + "\n"},
 		{
 			"aoeu" + "\n" + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" + "\n" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n",
-			"aoeu" + "\n" + "\n" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				e + "\n",
+			"aoeu" + "\n" + "\n" + "\n" + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+				e + "\n"},
 		{
 			"prefix" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") +
+				e +
 				"\n" + "suffix",
-			"prefix" + "\n" + "suffix" + "\n" + "\n" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+			"prefix" + "\n" + "suffix" + "\n" + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+				e + "\n"},
 		{
 			"aoeu" + "\n" + "\n" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n",
+				e + "\n",
 			"aoeu" + "\n" + "\n" + "\n" +
-				beginMungeTag("GENERATED_ANALYTICS") + "\n" +
+				b + "\n" +
 				"[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/path/to/file-name.md?pixel)]()" + "\n" +
-				endMungeTag("GENERATED_ANALYTICS") + "\n"},
+				e + "\n"},
 	}
-	for _, c := range cases {
-		out, err := checkAnalytics("path/to/file-name.md", []byte(c.in))
+	for i, c := range cases {
+		in := getMungeLines(c.in)
+		expected := getMungeLines(c.expected)
+		out, err := updateAnalytics("path/to/file-name.md", in)
 		assert.NoError(t, err)
-		if string(out) != c.out {
-			t.Errorf("Expected \n\n%v\n\n but got \n\n%v\n\n", c.out, string(out))
+		if !expected.Equal(out) {
+			t.Errorf("Case %d Expected \n\n%v\n\n but got \n\n%v\n\n", i, expected.String(), out.String())
 		}
 	}
 }

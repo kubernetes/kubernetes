@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 [etcd](https://coreos.com/etcd/docs/2.0.12/) is a highly-available key value
 store which Kubernetes uses for persistent storage of all of its REST API
-objects. 
+objects.
 
 ## Configuration: high-level goals
 

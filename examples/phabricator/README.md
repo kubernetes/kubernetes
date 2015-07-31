@@ -99,7 +99,7 @@ To start Phabricator server use the file [`examples/phabricator/phabricator-cont
 ```
 
 [Download example](phabricator-controller.json)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE phabricator-controller.json -->
 
 Create the phabricator pod in your Kubernetes cluster by running:
 
@@ -189,7 +189,7 @@ To automate this process and make sure that a proper host is authorized even if 
 ```
 
 [Download example](authenticator-controller.json)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE authenticator-controller.json -->
 
 To create the pod run:
 
@@ -238,7 +238,7 @@ Use the file [`examples/phabricator/phabricator-service.json`](phabricator-servi
 ```
 
 [Download example](phabricator-service.json)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE phabricator-service.json -->
 
 To create the service run:
 

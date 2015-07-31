@@ -31,11 +31,11 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# What is Kubernetes? 
+# What is Kubernetes?
 
-Kubernetes is an open-source platform for automating deployment, scaling, and operations of application containers across clusters of hosts. 
+Kubernetes is an open-source platform for automating deployment, scaling, and operations of application containers across clusters of hosts.
 
-With Kubernetes, you are able to quickly and efficiently respond to customer demand: 
+With Kubernetes, you are able to quickly and efficiently respond to customer demand:
 
  - Scale your applications on the fly.
  - Seamlessly roll out new features.
@@ -54,27 +54,27 @@ The Kubernetes project was started by Google in 2014. Kubernetes builds upon a [
 
 <hr>
 
-Looking for reasons why you should be using [containers](http://aucouranton.com/2014/06/13/linux-containers-parallels-lxc-openvz-docker-and-more/)? 
+Looking for reasons why you should be using [containers](http://aucouranton.com/2014/06/13/linux-containers-parallels-lxc-openvz-docker-and-more/)?
 
 Here are some key points:
 
-* **Application-centric management**:  
+* **Application-centric management**:
     Raises the level of abstraction from running an OS on virtual hardware to running an application on an OS using logical resources. This provides the simplicity of PaaS with the flexibility of IaaS and enables you to run much more than just [12-factor apps](http://12factor.net/).
-* **Dev and Ops separation of concerns**:  
+* **Dev and Ops separation of concerns**:
     Provides separatation of build and deployment; therefore, decoupling applications from infrastructure.
-* **Agile application creation and deployment**:  
+* **Agile application creation and deployment**:
     Increased ease and efficiency of container image creation compared to VM image use.
-* **Continuous development, integration, and deployment**:  
+* **Continuous development, integration, and deployment**:
     Provides for reliable and frequent container image build and deployment with quick and easy rollbacks (due to image immutability).
-* **Loosely coupled, distributed, elastic, liberated [micro-services](http://martinfowler.com/articles/microservices.html)**:  
+* **Loosely coupled, distributed, elastic, liberated [micro-services](http://martinfowler.com/articles/microservices.html)**:
 	Applications are broken into smaller, independent pieces and can be deployed and managed dynamically -- not a fat monolithic stack running on one big single-purpose machine.
-* **Environmental consistency across development, testing, and production**:  
+* **Environmental consistency across development, testing, and production**:
     Runs the same on a laptop as it does in the cloud.
-* **Cloud and OS distribution portability**:  
+* **Cloud and OS distribution portability**:
     Runs on Ubuntu, RHEL, on-prem, or Google Container Engine, which makes sense for all environments: build, test, and production.
-* **Resource isolation**:  
+* **Resource isolation**:
     Predictable application performance.
-* **Resource utilization**:  
+* **Resource utilization**:
     High efficiency and density.
 
 

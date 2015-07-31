@@ -309,7 +309,7 @@ a panic from the `serialization_test`.  If so, look at the diff it produces (or
 the backtrace in case of a panic) and figure out what you forgot.  Encode that
 into the fuzzer's custom fuzz functions.  Hint: if you added defaults for a field,
 that field will need to have a custom fuzz function that ensures that the field is
-fuzzed to a non-empty value. 
+fuzzed to a non-empty value.
 
 The fuzzer can be found in `pkg/api/testing/fuzzer.go`.
 

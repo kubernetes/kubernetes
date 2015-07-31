@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 
 In Kubernetes, authorization happens as a separate step from authentication.
-See the [authentication documentation](authentication.md) for an 
+See the [authentication documentation](authentication.md) for an
 overview of authentication.
 
 Authorization applies to all HTTP accesses on the main (secure) apiserver port.
@@ -60,8 +60,8 @@ The following implementations are available, and are selected by flag:
 A request has 4 attributes that can be considered for authorization:
   - user (the user-string which a user was authenticated as).
   - whether the request is readonly (GETs are readonly)
-  - what resource is being accessed 
-    - applies only to the API endpoints, such as 
+  - what resource is being accessed
+    - applies only to the API endpoints, such as
         `/api/v1/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
         resource is the empty string.
   - the namespace of the object being access, or the empty string if the
@@ -95,7 +95,7 @@ interface.
 A request has attributes which correspond to the properties of a policy object.
 
 When a request is received, the attributes are determined.  Unknown attributes
-are set to the zero value of its type (e.g. empty string, 0, false). 
+are set to the zero value of its type (e.g. empty string, 0, false).
 
 An unset property will match any value of the corresponding
 attribute.  An unset attribute will match any value of the corresponding property.

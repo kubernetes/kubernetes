@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 # Elasticsearch for Kubernetes
 
 This directory contains the source for a Docker image that creates an instance
-of [Elasticsearch](https://www.elastic.co/products/elasticsearch) 1.5.2 which can 
+of [Elasticsearch](https://www.elastic.co/products/elasticsearch) 1.5.2 which can
 be used to automatically form clusters when used
 with [replication controllers](../../docs/user-guide/replication-controller.md). This will not work with the library Elasticsearch image
 because multicast discovery will not find the other pod IPs needed to form a cluster. This
@@ -93,7 +93,7 @@ spec:
 ```
 
 [Download example](music-rc.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE music-rc.yaml -->
 
 The `CLUSTER_NAME` variable gives a name to the cluster and allows multiple separate clusters to
 exist in the same namespace.
@@ -102,10 +102,10 @@ nodes that should participate in this cluster. For our example we specify `name=
 match all pods that have the label `name` set to the value `music-db`.
 The `NAMESPACE` variable identifies the namespace
 to be used to search for Elasticsearch pods and this should be the same as the namespace specified
-for the replication controller (in this case `mytunes`). 
+for the replication controller (in this case `mytunes`).
 
 Before creating pods with the replication controller a secret containing the bearer authentication token
-should be set up. 
+should be set up.
 
 <!-- BEGIN MUNGE: EXAMPLE apiserver-secret.yaml -->
 
@@ -120,7 +120,7 @@ data:
 ```
 
 [Download example](apiserver-secret.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE apiserver-secret.yaml -->
 
 Replace `NAMESPACE` with the actual namespace to be used and `TOKEN` with the basic64 encoded
 versions of the bearer token reported by `kubectl config view` e.g.
@@ -163,7 +163,7 @@ replicationcontrollers/music-db
 ```
 
 It's also useful to have a [service](../../docs/user-guide/services.md) with an load balancer for accessing the Elasticsearch
-cluster. 
+cluster.
 
 <!-- BEGIN MUNGE: EXAMPLE music-service.yaml -->
 
@@ -186,7 +186,7 @@ spec:
 ```
 
 [Download example](music-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE music-service.yaml -->
 
 Let's create the service with an external load balancer:
 

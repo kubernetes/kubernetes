@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 A service account provides an identity for processes that run in a Pod.
 
-*This is a user introduction to Service Accounts.  See also the 
+*This is a user introduction to Service Accounts.  See also the
 [Cluster Admin Guide to Service Accounts](../admin/service-accounts-admin.md).*
 
 *Note: This document describes how service accounts behave in a cluster set up
@@ -111,7 +111,7 @@ field of a pod to the name of the service account you wish to use.
 
 The service account has to exist at the time the pod is created, or it will be rejected.
 
-You cannot update the service account of an already created pod.  
+You cannot update the service account of an already created pod.
 
 You can clean up the service account from this example like this:
 

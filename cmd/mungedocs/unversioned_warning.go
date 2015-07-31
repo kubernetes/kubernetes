@@ -20,10 +20,7 @@ import "fmt"
 
 const unversionedWarningTag = "UNVERSIONED_WARNING"
 
-var beginUnversionedWarning = beginMungeTag(unversionedWarningTag)
-var endUnversionedWarning = endMungeTag(unversionedWarningTag)
-
-const unversionedWarningFmt = `
+const unversionedWarningPre = `
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
 <img src="http://kubernetes.io/img/warning.png" alt="WARNING"
@@ -44,7 +41,11 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/%s).
+`
+
+const unversionedWarningFmt = `[here](http://releases.k8s.io/release-1.0/%s).`
+
+const unversionedWarningPost = `
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -52,21 +53,31 @@ Documentation for other releases can be found at
 --
 
 <!-- END STRIP_FOR_RELEASE -->
+
 `
 
-func makeUnversionedWarning(fileName string) string {
-	return fmt.Sprintf(unversionedWarningFmt, fileName)
+func makeUnversionedWarning(fileName string) mungeLines {
+	insert := unversionedWarningPre + fmt.Sprintf(unversionedWarningFmt, fileName) + unversionedWarningPost
+	return getMungeLines(insert)
 }
 
 // inserts/updates a warning for unversioned docs
-func updateUnversionedWarning(file string, markdown []byte) ([]byte, error) {
-	lines := splitLines(markdown)
-	if hasLine(lines, "<!-- TAG IS_VERSIONED -->") {
+func updateUnversionedWarning(file string, mlines mungeLines) (mungeLines, error) {
+	file, err := makeRepoRelative(file, file)
+	if err != nil {
+		return mlines, err
+	}
+	if hasLine(mlines, "<!-- TAG IS_VERSIONED -->") {
 		// No warnings on release branches
-		return markdown, nil
+		return mlines, nil
 	}
-	if !hasMacroBlock(lines, beginUnversionedWarning, endUnversionedWarning) {
-		lines = append([]string{beginUnversionedWarning, endUnversionedWarning}, lines...)
+	if !hasMacroBlock(mlines, unversionedWarningTag) {
+		mlines = prependMacroBlock(unversionedWarningTag, mlines)
 	}
-	return updateMacroBlock(lines, beginUnversionedWarning, endUnversionedWarning, makeUnversionedWarning(file))
+
+	mlines, err = updateMacroBlock(mlines, unversionedWarningTag, makeUnversionedWarning(file))
+	if err != nil {
+		return mlines, err
+	}
+	return mlines, nil
 }

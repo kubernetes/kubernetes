@@ -133,7 +133,7 @@ When using Docker:
 **TODO: document behavior for rkt**
 
 If a container exceeds its memory limit, it may be terminated.  If it is restartable, it will be
-restarted by kubelet, as will any other type of runtime failure.  
+restarted by kubelet, as will any other type of runtime failure.
 
 A container may or may not be allowed to exceed its CPU limit for extended periods of time.
 However, it will not be killed for excessive CPU usage.
@@ -178,7 +178,7 @@ The [resource quota](../admin/resource-quota.md) feature can be configured
 to limit the total amount of resources that can be consumed.  If used in conjunction
 with namespaces, it can prevent one team from hogging all the resources.
 
-### My container is terminated 
+### My container is terminated
 
 Your container may be terminated because it's resource-starved. To check if a container is being killed because it is hitting a resource limit, call `kubectl describe pod`
 on the pod you are interested in:

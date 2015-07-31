@@ -22,49 +22,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHeaderLines(t *testing.T) {
+func TestPreformatted(t *testing.T) {
 	var cases = []struct {
 		in       string
 		expected string
 	}{
 		{"", ""},
 		{
-			"# ok",
-			"# ok",
+			"```\nbob\n```",
+			"\n```\nbob\n```\n\n",
 		},
 		{
-			"## ok",
-			"## ok",
+			"```\nbob\n```\n```\nnotbob\n```\n",
+			"\n```\nbob\n```\n\n```\nnotbob\n```\n\n",
 		},
 		{
-			"##### ok",
-			"##### ok",
+			"```bob```\n",
+			"```bob```\n",
 		},
 		{
-			"##fix",
-			"## fix",
-		},
-		{
-			"foo\n\n##fix\n\nbar",
-			"foo\n\n## fix\n\nbar",
-		},
-		{
-			"foo\n##fix\nbar",
-			"foo\n\n## fix\n\nbar",
-		},
-		{
-			"foo\n```\n##fix\n```\nbar",
-			"foo\n```\n##fix\n```\nbar",
-		},
-		{
-			"foo\n#fix1\n##fix2\nbar",
-			"foo\n\n# fix1\n\n## fix2\n\nbar",
+			"    ```\n    bob\n    ```",
+			"\n    ```\n    bob\n    ```\n\n",
 		},
 	}
 	for i, c := range cases {
 		in := getMungeLines(c.in)
 		expected := getMungeLines(c.expected)
-		actual, err := updateHeaderLines("filename.md", in)
+		actual, err := updatePreformatted("filename.md", in)
 		assert.NoError(t, err)
 		if !actual.Equal(expected) {
 			t.Errorf("case[%d]: expected %q got %q", i, c.expected, actual.String())
