@@ -44,8 +44,8 @@ func (self *redisStorage) defaultReadyToFlush() bool {
 	return time.Since(self.lastWrite) >= self.bufferDuration
 }
 
-//We must add some defaut params (for example: MachineName,ContainerName...)because containerStats do not include them
-func (self *redisStorage) containerStatsAndDefautValues(ref info.ContainerReference, stats *info.ContainerStats) *detailSpec {
+//We must add some default params (for example: MachineName,ContainerName...)because containerStats do not include them
+func (self *redisStorage) containerStatsAndDefaultValues(ref info.ContainerReference, stats *info.ContainerStats) *detailSpec {
 	timestamp := stats.Timestamp.UnixNano() / 1E3
 	var containerName string
 	if len(ref.Aliases) > 0 {
@@ -72,8 +72,8 @@ func (self *redisStorage) AddStats(ref info.ContainerReference, stats *info.Cont
 		// AddStats will be invoked simultaneously from multiple threads and only one of them will perform a write.
 		self.lock.Lock()
 		defer self.lock.Unlock()
-		// Add some defaut params based on containerStats
-		detail := self.containerStatsAndDefautValues(ref, stats)
+		// Add some default params based on containerStats
+		detail := self.containerStatsAndDefaultValues(ref, stats)
 		//To json
 		b, _ := json.Marshal(detail)
 		if self.readyToFlush() {

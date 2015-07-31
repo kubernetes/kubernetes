@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v2
+package v1
 
 import (
 	"time"
@@ -32,38 +32,35 @@ const (
 	MetricDelta = "delta"
 )
 
-// An exported metric.
-type Metric struct {
+// DataType for metric being exported.
+type DataType string
+
+const (
+	IntType   DataType = "int"
+	FloatType          = "float"
+)
+
+// Spec for custom metric.
+type MetricSpec struct {
 	// The name of the metric.
 	Name string `json:"name"`
 
 	// Type of the metric.
 	Type MetricType `json:"type"`
 
-	// Metadata associated with this metric.
-	Labels map[string]string
+	// Data Type for the stats.
+	Format DataType `json:"format"`
 
-	// Value of the metric. Only one of these values will be
-	// available according to the output type of the metric.
-	// If no values are available, there are no data points.
-	IntPoints   []IntPoint   `json:"int_points,omitempty"`
-	FloatPoints []FloatPoint `json:"float_points,omitempty"`
+	// Display Units for the stats.
+	Units string `json:"units"`
 }
 
-// An integer metric data point.
-type IntPoint struct {
+// An exported metric.
+type MetricVal struct {
 	// Time at which the metric was queried
 	Timestamp time.Time `json:"timestamp"`
 
 	// The value of the metric at this point.
-	Value int64 `json:"value"`
-}
-
-// A float metric data point.
-type FloatPoint struct {
-	// Time at which the metric was queried
-	Timestamp time.Time `json:"timestamp"`
-
-	// The value of the metric at this point.
-	Value float64 `json:"value"`
+	IntValue   int64   `json:"int_value,omitempty"`
+	FloatValue float64 `json:"float_value,omitempty"`
 }
