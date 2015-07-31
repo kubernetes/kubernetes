@@ -14,25 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// clone of the upstream cmd/hypercube/main.go
-package main
+package config
 
 import (
-	"os"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
-func main() {
-	hk := HyperKube{
-		Name: "km",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes-Mesos servers.",
-	}
+const (
+	DefaultLogMaxBackups   = 5 // how many backup to keep
+	DefaultLogMaxAgeInDays = 7 // after how many days to rotate at most
+)
 
-	hk.AddServer(NewKubeAPIServer())
-	hk.AddServer(NewControllerManager())
-	hk.AddServer(NewScheduler())
-	hk.AddServer(NewKubeletExecutor())
-	hk.AddServer(NewKubeProxy())
-	hk.AddServer(NewMinion())
-
-	hk.RunToExit(os.Args)
+// DefaultLogMaxSize returns the maximal log file size before rotation
+func DefaultLogMaxSize() resource.Quantity {
+	return *resource.NewQuantity(10*1024*1024, resource.BinarySI)
 }

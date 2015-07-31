@@ -17,31 +17,23 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
-	"os"
-	"runtime"
-
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/service"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
-	"github.com/spf13/pflag"
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/minion"
 )
 
-func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	s := service.NewKubeletExecutorServer()
-	s.AddFlags(pflag.CommandLine)
-
-	util.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
-
-	verflag.PrintAndExitIfRequested()
-
-	if err := s.Run(hyperkube.Nil(), pflag.CommandLine.Args()); err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
-		os.Exit(1)
+// NewMinion creates a new hyperkube Server object that includes the
+// description and flags.
+func NewMinion() *Server {
+	s := minion.NewMinionServer()
+	hks := Server{
+		SimpleUsage: hyperkube.CommandMinion,
+		Long:        `Implements a Kubernetes minion. This will launch the proxy and executor.`,
+		Run: func(hks *Server, args []string) error {
+			return s.Run(hks, args)
+		},
 	}
+	s.AddMinionFlags(hks.Flags())
+	s.AddExecutorFlags(hks.Flags())
+
+	return &hks
 }
