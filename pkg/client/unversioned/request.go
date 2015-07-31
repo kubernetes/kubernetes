@@ -261,6 +261,7 @@ const (
 	NodeUnschedulable = "spec.unschedulable"
 	ObjectNameField   = "metadata.name"
 	PodHost           = "spec.nodeName"
+	PodStatus         = "status.phase"
 	SecretType        = "type"
 
 	EventReason                  = "reason"
@@ -318,7 +319,8 @@ var fieldMappings = versionToResourceToFieldMapping{
 			NodeUnschedulable: "spec.unschedulable",
 		},
 		"pods": clientFieldNameToAPIVersionFieldName{
-			PodHost: "spec.nodeName",
+			PodHost:   "spec.nodeName",
+			PodStatus: "status.phase",
 		},
 		"secrets": clientFieldNameToAPIVersionFieldName{
 			SecretType: "type",

@@ -58,7 +58,7 @@ $ kubectl delete pods --all`
 )
 
 func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	p := kubectl.NewHumanReadablePrinter(false, false, false, []string{})
+	p := kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
 	validArgs := p.HandledResources()
 
 	cmd := &cobra.Command{

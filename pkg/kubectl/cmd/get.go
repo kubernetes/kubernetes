@@ -65,11 +65,11 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7`
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	p := kubectl.NewHumanReadablePrinter(false, false, false, []string{})
+	p := kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
 	validArgs := p.HandledResources()
 
 	cmd := &cobra.Command{
-		Use:     "get [(-o|--output=)json|yaml|template|wide|...] (TYPE [(NAME | -l label] | TYPE/NAME ...)",
+		Use:     "get [(-o|--output=)json|yaml|template|wide|...] (TYPE [(NAME | -l label] | TYPE/NAME ...) [flags]",
 		Short:   "Display one or many resources",
 		Long:    get_long,
 		Example: get_example,
