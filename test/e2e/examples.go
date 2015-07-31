@@ -189,7 +189,7 @@ var _ = Describe("Examples e2e", func() {
 			Expect(err).NotTo(HaveOccurred())
 			_, err = lookForStringInLog(ns, "spark-master", "spark-master", "Starting Spark master at", serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
-			_, err = lookForStringInLog(ns, "spark-driver", "spark-driver", "Starting Spark driver at", serverStartTimeout)
+			_, err = lookForStringInLog(ns, "spark-driver", "spark-driver", "Use kubectl exec", serverStartTimeout)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("starting workers")
