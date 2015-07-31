@@ -52,7 +52,10 @@ func fixHeaderLines(fileBytes []byte) []byte {
 
 // Header lines need whitespace around them and after the #s.
 func checkHeaderLines(filePath string, fileBytes []byte) ([]byte, error) {
-	fbs := splitByPreformatted(fileBytes)
+	fbs, err := splitByPreformatted(fileBytes)
+	if err != nil {
+		return fileBytes, err
+	}
 	fbs = append([]fileBlock{{false, []byte{}}}, fbs...)
 	fbs = append(fbs, fileBlock{false, []byte{}})
 

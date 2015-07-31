@@ -17,7 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -114,8 +116,11 @@ func endMungeTag(desc string) string {
 
 // Calls 'replace' for all sections of the document not in ``` / ``` blocks. So
 // that you don't have false positives inside those blocks.
-func replaceNonPreformatted(input []byte, replace func([]byte) []byte) []byte {
-	f := splitByPreformatted(input)
+func replaceNonPreformatted(input []byte, replace func([]byte) []byte) ([]byte, error) {
+	f, err := splitByPreformatted(input)
+	if err != nil {
+		return nil, err
+	}
 	output := []byte(nil)
 	for _, block := range f {
 		if block.preformatted {
@@ -124,7 +129,7 @@ func replaceNonPreformatted(input []byte, replace func([]byte) []byte) []byte {
 			output = append(output, replace(block.data)...)
 		}
 	}
-	return output
+	return output, nil
 }
 
 type fileBlock struct {
@@ -140,7 +145,24 @@ var (
 	notPreformatRE = regexp.MustCompile("^\\s*```.*```")
 )
 
-func splitByPreformatted(input []byte) fileBlocks {
+func validatePreformatted(input []byte) error {
+	scanner := bufio.NewScanner(bytes.NewBuffer(input))
+	count := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		count += strings.Count(line, "```")
+	}
+	if count > 0 && count%2 != 0 {
+		return errors.New("unbalanced preformatted blocks")
+	}
+	return nil
+}
+
+func splitByPreformatted(input []byte) (fileBlocks, error) {
+	if err := validatePreformatted(input); err != nil {
+		return fileBlocks{}, err
+	}
+
 	f := fileBlocks{}
 
 	cur := []byte(nil)
@@ -172,11 +194,11 @@ func splitByPreformatted(input []byte) fileBlocks {
 	if len(cur) > 0 {
 		f = append(f, fileBlock{preformatted, cur})
 	}
-	return f
+	return f, nil
 }
 
 // As above, but further uses exp to parse the non-preformatted sections.
-func replaceNonPreformattedRegexp(input []byte, exp *regexp.Regexp, replace func([]byte) []byte) []byte {
+func replaceNonPreformattedRegexp(input []byte, exp *regexp.Regexp, replace func([]byte) []byte) ([]byte, error) {
 	return replaceNonPreformatted(input, func(in []byte) []byte {
 		return exp.ReplaceAllFunc(in, replace)
 	})
