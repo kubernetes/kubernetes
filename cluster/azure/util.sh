@@ -350,7 +350,7 @@ function kube-up {
         -n $MASTER_NAME \
         -l "$AZ_LOCATION" \
         -t $AZ_SSH_CERT \
-        -e 22000  \
+        -e 22000 -P \
         -d ${KUBE_TEMP}/master-start.sh \
         -b $AZ_SUBNET \
         $AZ_CS $AZ_IMAGE $USER
@@ -377,7 +377,7 @@ function kube-up {
             -n ${MINION_NAMES[$i]} \
             -l "$AZ_LOCATION" \
             -t $AZ_SSH_CERT \
-            -e ${ssh_ports[$i]} \
+            -e ${ssh_ports[$i]} -P \
             -d ${KUBE_TEMP}/minion-start-${i}.sh \
             -b $AZ_SUBNET \
             $AZ_CS $AZ_IMAGE $USER
