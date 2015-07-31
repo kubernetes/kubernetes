@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/queue"
 	schedcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/config"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/ha"
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	log "github.com/golang/glog"
@@ -189,8 +190,11 @@ func (lw *MockPodsListWatch) Delete(pod *api.Pod, notify bool) {
 }
 
 // Create a pod with a given index, requiring one port
-func NewTestPod(i int) *api.Pod {
-	name := fmt.Sprintf("pod%d", i)
+var currentPodNum int = 0
+
+func NewTestPod() (*api.Pod, int) {
+	currentPodNum = currentPodNum + 1
+	name := fmt.Sprintf("pod%d", currentPodNum)
 	return &api.Pod{
 		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
 		ObjectMeta: api.ObjectMeta{
@@ -203,7 +207,7 @@ func NewTestPod(i int) *api.Pod {
 				{
 					Ports: []api.ContainerPort{
 						{
-							ContainerPort: 8000 + i,
+							ContainerPort: 8000 + currentPodNum,
 							Protocol:      api.ProtocolTCP,
 						},
 					},
@@ -211,7 +215,7 @@ func NewTestPod(i int) *api.Pod {
 			},
 		},
 		Status: api.PodStatus{
-			PodIP: fmt.Sprintf("1.2.3.%d", 4+i),
+			PodIP: fmt.Sprintf("1.2.3.%d", 4+currentPodNum),
 			Conditions: []api.PodCondition{
 				{
 					Type:   api.PodReady,
@@ -219,12 +223,12 @@ func NewTestPod(i int) *api.Pod {
 				},
 			},
 		},
-	}
+	}, currentPodNum
 }
 
 // Offering some cpus and memory and the 8000-9000 port range
-func NewTestOffer(i int) *mesos.Offer {
-	hostname := fmt.Sprintf("h%d", i)
+func NewTestOffer(id string) *mesos.Offer {
+	hostname := "some_hostname"
 	cpus := util.NewScalarResource("cpus", 3.75)
 	mem := util.NewScalarResource("mem", 940)
 	var port8000 uint64 = 8000
@@ -232,7 +236,7 @@ func NewTestOffer(i int) *mesos.Offer {
 	ports8000to9000 := mesos.Value_Range{Begin: &port8000, End: &port9000}
 	ports := util.NewRangesResource("ports", []*mesos.Value_Range{&ports8000to9000})
 	return &mesos.Offer{
-		Id:        util.NewOfferID(fmt.Sprintf("offer%d", i)),
+		Id:        util.NewOfferID(id),
 		Hostname:  &hostname,
 		SlaveId:   util.NewSlaveID(hostname),
 		Resources: []*mesos.Resource{cpus, mem, ports},
@@ -435,11 +439,20 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	mockDriver.On("SendFrameworkMessage", mAny("*mesosproto.ExecutorID"), mAny("*mesosproto.SlaveID"), mAny("string")).
 		Return(mesos.Status_DRIVER_RUNNING, nil)
 
-	launchedTasks := make(chan *mesos.TaskInfo, 1)
+	type LaunchedTask struct {
+		offerId  mesos.OfferID
+		taskInfo *mesos.TaskInfo
+	}
+	launchedTasks := make(chan LaunchedTask, 1)
 	launchTasksCalledFunc := func(args mock.Arguments) {
+		offerIDs := args.Get(0).([]*mesos.OfferID)
 		taskInfos := args.Get(1).([]*mesos.TaskInfo)
+		assert.Equal(1, len(offerIDs))
 		assert.Equal(1, len(taskInfos))
-		launchedTasks <- taskInfos[0]
+		launchedTasks <- LaunchedTask{
+			offerId:  *offerIDs[0],
+			taskInfo: taskInfos[0],
+		}
 	}
 	mockDriver.On("LaunchTasks", mAny("[]*mesosproto.OfferID"), mAny("[]*mesosproto.TaskInfo"), mAny("*mesosproto.Filters")).
 		Return(mesos.Status_DRIVER_RUNNING, nil).Run(launchTasksCalledFunc)
@@ -469,30 +482,30 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	//TODO(jdef) refactor things above here into a test suite setup of some sort
 
 	// fake new, unscheduled pod
-	pod1 := NewTestPod(1)
-	podListWatch.Add(pod1, true) // notify watchers
+	pod, i := NewTestPod()
+	podListWatch.Add(pod, true) // notify watchers
 
 	// wait for failedScheduling event because there is no offer
 	assert.EventWithReason(eventObserver, "failedScheduling", "failedScheduling event not received")
 
 	// add some matching offer
-	offers1 := []*mesos.Offer{NewTestOffer(1)}
-	testScheduler.ResourceOffers(nil, offers1)
+	offers := []*mesos.Offer{NewTestOffer(fmt.Sprintf("offer%d", i))}
+	testScheduler.ResourceOffers(nil, offers)
 
 	// and wait for scheduled pod
 	assert.EventWithReason(eventObserver, "scheduled")
 	select {
 	case launchedTask := <-launchedTasks:
 		// report back that the task has been staged, and then started by mesos
-		testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_STAGING))
-		testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_RUNNING))
+		testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_STAGING))
+		testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_RUNNING))
 
 		// check that ExecutorInfo.data has the static pod data
-		assert.Len(launchedTask.Executor.Data, 3)
+		assert.Len(launchedTask.taskInfo.Executor.Data, 3)
 
 		// report back that the task has been lost
 		mockDriver.AssertNumberOfCalls(t, "SendFrameworkMessage", 0)
-		testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_LOST))
+		testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_LOST))
 
 		// and wait that framework message is sent to executor
 		mockDriver.AssertNumberOfCalls(t, "SendFrameworkMessage", 1)
@@ -501,20 +514,15 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		t.Fatalf("timed out waiting for launchTasks call")
 	}
 
-	// start another pod
-	podNum := 2
-	startPod := func() (*api.Pod, *mesos.TaskInfo, *mesos.Offer) {
-		podNum = podNum + 1
-
-		// create pod
-		pod := NewTestPod(podNum)
-		podListWatch.Add(pod, true) // notify watchers
+	// define generic pod startup
+	startPodWithOffers := func(pod *api.Pod, offers []*mesos.Offer) (*api.Pod, *LaunchedTask, *mesos.Offer) {
+		// notify watchers of new pod
+		podListWatch.Add(pod, true)
 
 		// wait for failedScheduling event because there is no offer
 		assert.EventWithReason(eventObserver, "failedScheduling", "failedScheduling event not received")
 
 		// supply a matching offer
-		offers := []*mesos.Offer{NewTestOffer(podNum)}
 		testScheduler.ResourceOffers(mockDriver, offers)
 
 		// and wait to get scheduled
@@ -523,9 +531,15 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		// wait for driver.launchTasks call
 		select {
 		case launchedTask := <-launchedTasks:
-			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_STAGING))
-			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_RUNNING))
-			return pod, launchedTask, offers[0]
+			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_STAGING))
+			testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_RUNNING))
+			for _, offer := range offers {
+				if offer.Id.GetValue() == launchedTask.offerId.GetValue() {
+					return pod, &launchedTask, offer
+				}
+			}
+			t.Fatalf("unknown offer used to start a pod")
+			return nil, nil, nil
 
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for launchTasks")
@@ -533,12 +547,19 @@ func TestPlugin_LifeCycle(t *testing.T) {
 		}
 	}
 
-	pod, launchedTask, _ := startPod()
+	startTestPod := func() (*api.Pod, *LaunchedTask, *mesos.Offer) {
+		pod, i := NewTestPod()
+		offers := []*mesos.Offer{NewTestOffer(fmt.Sprintf("offer%d", i))}
+		return startPodWithOffers(pod, offers)
+	}
+
+	// start another pod
+	pod, launchedTask, _ := startTestPod()
 
 	// mock drvier.KillTask, should be invoked when a pod is deleted
 	mockDriver.On("KillTask", mAny("*mesosproto.TaskID")).Return(mesos.Status_DRIVER_RUNNING, nil).Run(func(args mock.Arguments) {
 		killedTaskId := *(args.Get(0).(*mesos.TaskID))
-		assert.Equal(*launchedTask.TaskId, killedTaskId, "expected same TaskID as during launch")
+		assert.Equal(*launchedTask.taskInfo.TaskId, killedTaskId, "expected same TaskID as during launch")
 	})
 	killTaskCalled := mockDriver.Upon()
 
@@ -549,11 +570,30 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	select {
 	case <-killTaskCalled:
 		// report back that the task is finished
-		testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask, mesos.TaskState_TASK_FINISHED))
+		testScheduler.StatusUpdate(mockDriver, newTaskStatusForTask(launchedTask.taskInfo, mesos.TaskState_TASK_FINISHED))
 
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for KillTask")
 	}
+
+	// start a pod with on a given NodeName and check that it is scheduled to the right host
+	pod, i = NewTestPod()
+	pod.Spec.NodeName = "hostname1"
+	offers = []*mesos.Offer{}
+	for j := 0; j < 3; j++ {
+		offer := NewTestOffer(fmt.Sprintf("offer%d_%d", i, j))
+		hostname := fmt.Sprintf("hostname%d", j)
+		offer.Hostname = &hostname
+		offers = append(offers, offer)
+	}
+
+	_, _, usedOffer := startPodWithOffers(pod, offers)
+
+	assert.Equal(offers[1].Id.GetValue(), usedOffer.Id.GetValue())
+	assert.Equal(pod.Spec.NodeName, *usedOffer.Hostname)
+
+	testScheduler.OfferRescinded(mockDriver, offers[0].Id)
+	testScheduler.OfferRescinded(mockDriver, offers[2].Id)
 
 	// start pods:
 	// - which are failing while binding,
@@ -574,26 +614,30 @@ func TestPlugin_LifeCycle(t *testing.T) {
 	}
 
 	// 1. with pod deleted from the apiserver
-	pod, launchedTask, _ = startPod()
+	pod, launchedTask, _ = startTestPod()
 	podListWatch.Delete(pod, false) // not notifying the watchers
-	failPodFromExecutor(launchedTask)
+	failPodFromExecutor(launchedTask.taskInfo)
 
 	// 2. with pod still on the apiserver, not bound
-	pod, launchedTask, _ = startPod()
-	failPodFromExecutor(launchedTask)
+	pod, launchedTask, _ = startTestPod()
+	failPodFromExecutor(launchedTask.taskInfo)
 
 	// 3. with pod still on the apiserver, bound i.e. host!=""
-	pod, launchedTask, usedOffer := startPod()
-	pod.Spec.NodeName = *usedOffer.Hostname
+	pod, launchedTask, usedOffer = startTestPod()
+	pod.Annotations = map[string]string{
+		meta.BindingHostKey: *usedOffer.Hostname,
+	}
 	podListWatch.Modify(pod, false) // not notifying the watchers
-	failPodFromExecutor(launchedTask)
+	failPodFromExecutor(launchedTask.taskInfo)
 
 	// 4. with pod still on the apiserver, bound i.e. host!="", notified via ListWatch
-	pod, launchedTask, usedOffer = startPod()
-	pod.Spec.NodeName = *usedOffer.Hostname
+	pod, launchedTask, usedOffer = startTestPod()
+	pod.Annotations = map[string]string{
+		meta.BindingHostKey: *usedOffer.Hostname,
+	}
 	podListWatch.Modify(pod, true) // notifying the watchers
 	time.Sleep(time.Second / 2)
-	failPodFromExecutor(launchedTask)
+	failPodFromExecutor(launchedTask.taskInfo)
 }
 
 func TestDeleteOne_NonexistentPod(t *testing.T) {
