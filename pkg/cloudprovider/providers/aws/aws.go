@@ -117,6 +117,8 @@ type ELB interface {
 	DeleteLoadBalancerListeners(*elb.DeleteLoadBalancerListenersInput) (*elb.DeleteLoadBalancerListenersOutput, error)
 
 	ApplySecurityGroupsToLoadBalancer(*elb.ApplySecurityGroupsToLoadBalancerInput) (*elb.ApplySecurityGroupsToLoadBalancerOutput, error)
+
+	ConfigureHealthCheck(*elb.ConfigureHealthCheckInput) (*elb.ConfigureHealthCheckOutput, error)
 }
 
 // This is a simple pass-through of the Autoscaling client interface, which allows for testing
@@ -1702,6 +1704,11 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 	// Build the load balancer itself
 	loadBalancer, err := s.ensureLoadBalancer(region, name, listeners, subnetIDs, securityGroupIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.ensureLoadBalancerHealthCheck(region, loadBalancer, listeners)
 	if err != nil {
 		return nil, err
 	}

@@ -18,6 +18,8 @@ package aws_cloud
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -191,6 +193,64 @@ func (s *AWSCloud) ensureLoadBalancer(region, name string, listeners []*elb.List
 	}
 
 	return loadBalancer, nil
+}
+
+// Makes sure that the health check for an ELB matches the configured listeners
+func (s *AWSCloud) ensureLoadBalancerHealthCheck(region string, loadBalancer *elb.LoadBalancerDescription, listeners []*elb.Listener) error {
+	elbClient, err := s.getELBClient(region)
+	if err != nil {
+		return err
+	}
+
+	actual := loadBalancer.HealthCheck
+
+	// Default AWS settings
+	expectedHealthyThreshold := int64(10)
+	expectedUnhealthyThreshold := int64(2)
+	expectedTimeout := int64(5)
+	expectedInterval := int64(30)
+
+	// We only a TCP health-check on the first port
+	expectedTarget := ""
+	for _, listener := range listeners {
+		if listener.InstancePort == nil {
+			continue
+		}
+		expectedTarget = "TCP:" + strconv.FormatInt(*listener.InstancePort, 10)
+		break
+	}
+
+	if expectedTarget == "" {
+		return fmt.Errorf("unable to determine health check port (no valid listeners)")
+	}
+
+	if expectedTarget == orEmpty(actual.Target) &&
+		expectedHealthyThreshold == orZero(actual.HealthyThreshold) &&
+		expectedUnhealthyThreshold == orZero(actual.UnhealthyThreshold) &&
+		expectedTimeout == orZero(actual.Timeout) &&
+		expectedInterval == orZero(actual.Interval) {
+		return nil
+	}
+
+	glog.V(2).Info("Updating load-balancer health-check")
+
+	healthCheck := &elb.HealthCheck{}
+	healthCheck.HealthyThreshold = &expectedHealthyThreshold
+	healthCheck.UnhealthyThreshold = &expectedUnhealthyThreshold
+	healthCheck.Timeout = &expectedTimeout
+	healthCheck.Interval = &expectedInterval
+	healthCheck.Target = &expectedTarget
+
+	request := &elb.ConfigureHealthCheckInput{}
+	request.HealthCheck = healthCheck
+	request.LoadBalancerName = loadBalancer.LoadBalancerName
+
+	_, err = elbClient.ConfigureHealthCheck(request)
+	if err != nil {
+		return fmt.Errorf("error configuring load-balancer health-check: %v", err)
+	}
+
+	return nil
 }
 
 // Makes sure that exactly the specified hosts are registered as instances with the load balancer
