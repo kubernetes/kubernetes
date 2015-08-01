@@ -3,7 +3,7 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Kubernetes Documentation: releases.k8s.io/v1.0.1
+# Kubernetes Documentation: releases.k8s.io/v1.0.2
 
 * The [User's guide](user-guide/README.md) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
