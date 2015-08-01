@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // TODO(wojtek-t): Cleanup this file.
@@ -243,7 +244,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		"invalid selector": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
-				Selector:        labels.Selector{{"ThisSeThisSelectorFailsValidation", labels.EqualsOperator, util.NewStringSet("ok")}},
+				Selector:        labels.Selector{{"ThisSeThisSelectorFailsValidation", labels.EqualsOperator, sets.NewString("ok")}},
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{

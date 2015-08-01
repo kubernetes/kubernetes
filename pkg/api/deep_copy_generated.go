@@ -28,6 +28,7 @@ import (
 	labels "k8s.io/kubernetes/pkg/labels"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	util "k8s.io/kubernetes/pkg/util"
+	sets "k8s.io/kubernetes/pkg/util/sets"
 	inf "speter.net/go/exp/math/dec/inf"
 )
 
@@ -809,8 +810,8 @@ func deepCopy_api_ListOptions(in ListOptions, out *ListOptions, c *conversion.Cl
 		for i := range in.LabelSelector {
 			if err := deepCopy_labels_Requirement(in.LabelSelector[i], &out.LabelSelector[i], c); err != nil {
 				return err
-	} else if newVal == nil {
-		out.LabelSelector = nil
+			}
+		}
 	} else {
 		out.LabelSelector = nil
 	}
@@ -1692,11 +1693,9 @@ func deepCopy_api_ReplicationControllerList(in ReplicationControllerList, out *R
 func deepCopy_api_ReplicationControllerSpec(in ReplicationControllerSpec, out *ReplicationControllerSpec, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
 	if in.Selector != nil {
-		out.Selector = make([]labels.Requirement, len(in.Selector))
-		for i := range in.Selector {
-			if err := deepCopy_labels_Requirement(in.Selector[i], &out.Selector[i], c); err != nil {
-				return err
-			}
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
 		}
 	} else {
 		out.Selector = nil
@@ -2230,47 +2229,6 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.ListMeta, c *conversion.Cloner) error {
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
-	if in.StrValues != nil {
-		out.StrValues = make(map[string]util.Empty)
-		for key, val := range in.StrValues {
-			newVal := new(util.Empty)
-			if err := deepCopy_util_Empty(val, newVal, c); err != nil {
-				return err
-			}
-			out.StrValues[key] = *newVal
-		}
-	} else {
-		out.StrValues = nil
-	}
-	return nil
-}
-
-func deepCopy_util_Empty(in util.Empty, out *util.Empty, c *conversion.Cloner) error {
-	return nil
-}
-
-	return nil
-}
-
-func deepCopy_labels_Requirement(in labels.Requirement, out *labels.Requirement, c *conversion.Cloner) error {
-	out.Key = in.Key
-	out.Operator = in.Operator
-	if in.StrValues != nil {
-		out.StrValues = make(map[string]util.Empty)
-		for key, val := range in.StrValues {
-			newVal := new(util.Empty)
-			if err := deepCopy_util_Empty(val, newVal, c); err != nil {
-				return err
-			}
-			out.StrValues[key] = *newVal
-		}
-	} else {
-		out.StrValues = nil
-	}
-	return nil
-}
-
-func deepCopy_util_Empty(in util.Empty, out *util.Empty, c *conversion.Cloner) error {
 	return nil
 }
 
@@ -2289,10 +2247,32 @@ func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.Typ
 	return nil
 }
 
+func deepCopy_labels_Requirement(in labels.Requirement, out *labels.Requirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.StrValues != nil {
+		out.StrValues = make(sets.String)
+		for key, val := range in.StrValues {
+			newVal := new(sets.Empty)
+			if err := deepCopy_sets_Empty(val, newVal, c); err != nil {
+				return err
+			}
+			out.StrValues[key] = *newVal
+		}
+	} else {
+		out.StrValues = nil
+	}
+	return nil
+}
+
 func deepCopy_util_IntOrString(in util.IntOrString, out *util.IntOrString, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.IntVal = in.IntVal
 	out.StrVal = in.StrVal
+	return nil
+}
+
+func deepCopy_sets_Empty(in sets.Empty, out *sets.Empty, c *conversion.Cloner) error {
 	return nil
 }
 
@@ -2419,9 +2399,9 @@ func init() {
 		deepCopy_unversioned_ListMeta,
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
-		deepCopy_util_IntOrString,
 		deepCopy_labels_Requirement,
-		deepCopy_util_Empty,
+		deepCopy_util_IntOrString,
+		deepCopy_sets_Empty,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

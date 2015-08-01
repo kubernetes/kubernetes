@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -88,7 +89,7 @@ func newDaemonSet(name string) *experimental.DaemonSet {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: experimental.DaemonSetSpec{
-			Selector: simpleDaemonSetLabel,
+			Selector: labels.SelectorFromSet(simpleDaemonSetLabel),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: simpleDaemonSetLabel,
@@ -228,7 +229,7 @@ func TestSelectorDaemonLaunchesPods(t *testing.T) {
 	addNodes(manager.nodeStore.Store, 0, 4, nil)
 	addNodes(manager.nodeStore.Store, 4, 3, simpleNodeLabel)
 	daemon := newDaemonSet("foo")
-	daemon.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	daemon.Spec.Template.Spec.NodeSelector = labels.SelectorFromSet(simpleNodeLabel)
 	manager.dsStore.Add(daemon)
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 3, 0)
 }
@@ -243,7 +244,7 @@ func TestSelectorDaemonDeletesUnselectedPods(t *testing.T) {
 	addPods(manager.podStore.Store, "node-1", simpleDaemonSetLabel2, 1)
 	addPods(manager.podStore.Store, "node-4", simpleDaemonSetLabel, 1)
 	daemon := newDaemonSet("foo")
-	daemon.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	daemon.Spec.Template.Spec.NodeSelector = labels.SelectorFromSet(simpleNodeLabel)
 	manager.dsStore.Add(daemon)
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 5, 4)
 }
@@ -262,7 +263,7 @@ func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
 	addPods(manager.podStore.Store, "node-9", simpleDaemonSetLabel, 1)
 	addPods(manager.podStore.Store, "node-9", simpleDaemonSetLabel2, 1)
 	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	ds.Spec.Template.Spec.NodeSelector = labels.SelectorFromSet(simpleNodeLabel)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 3, 20)
 }
@@ -273,7 +274,7 @@ func TestBadSelectorDaemonDoesNothing(t *testing.T) {
 	addNodes(manager.nodeStore.Store, 0, 4, nil)
 	addNodes(manager.nodeStore.Store, 4, 3, simpleNodeLabel)
 	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel2
+	ds.Spec.Template.Spec.NodeSelector = labels.SelectorFromSet(simpleNodeLabel2)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
@@ -304,7 +305,7 @@ func TestNameAndSelectorDaemonSetLaunchesPods(t *testing.T) {
 	addNodes(manager.nodeStore.Store, 0, 4, nil)
 	addNodes(manager.nodeStore.Store, 4, 3, simpleNodeLabel)
 	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	ds.Spec.Template.Spec.NodeSelector = labels.SelectorFromSet(simpleNodeLabel)
 	ds.Spec.Template.Spec.NodeName = "node-6"
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
@@ -316,7 +317,7 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 	addNodes(manager.nodeStore.Store, 0, 4, nil)
 	addNodes(manager.nodeStore.Store, 4, 3, simpleNodeLabel)
 	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	ds.Spec.Template.Spec.NodeSelector = labels.SelectorFromSet(simpleNodeLabel)
 	ds.Spec.Template.Spec.NodeName = "node-0"
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)

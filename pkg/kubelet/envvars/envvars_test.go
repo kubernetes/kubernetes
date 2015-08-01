@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestFromServices(t *testing.T) {

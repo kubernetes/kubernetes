@@ -571,7 +571,7 @@ func TestNodeLabelPresence(t *testing.T) {
 
 func TestServiceAffinity(t *testing.T) {
 	labels0 := map[string]string{"foo": "bar"}
-	selector := labels.Set(labels0).AsSelector()
+	selector := labels.SelectorFromSet(labels0)
 	labels1 := map[string]string{
 		"region": "r1",
 		"zone":   "z11",

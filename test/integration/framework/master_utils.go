@@ -255,7 +255,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 	controller.Spec.Replicas = numPods
 	controller.Spec.Template.Spec.NodeName = host
 	controller.Name = controller.Name + host
-	controller.Spec.Selector.Add("host", labels.EqualsOperator, []string{host})
+	controller.Spec.Selector["host"] = host
 	controller.Spec.Template.Labels["host"] = host
 
 	if rc, err := StartRC(controller, restClient); err != nil {

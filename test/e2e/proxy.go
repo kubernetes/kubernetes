@@ -66,7 +66,7 @@ func proxyContext(version string) {
 				GenerateName: "proxy-service-",
 			},
 			Spec: api.ServiceSpec{
-				Selector: labels.NewSelectorOrDie("proxy-service-target=true"),
+				Selector: labels.SelectorFromSet(l),
 				Ports: []api.ServicePort{
 					{
 						Name:       "portname1",

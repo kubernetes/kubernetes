@@ -47,7 +47,7 @@ func oldRc(replicas int, original int) *api.ReplicationController {
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
-			Selector: labels.NewSelectorOrDie("version=v1"),
+			Selector: map[string]string{"version": "v1"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Name:   "foo-v1",
@@ -69,7 +69,7 @@ func newRc(replicas int, desired int) *api.ReplicationController {
 			Labels: map[string]string{"version": "v2"},
 		},
 	}
-	rc.Spec.Selector = labels.NewSelectorOrDie("version=v2")
+	rc.Spec.Selector = map[string]string{"version": "v2"}
 	rc.ObjectMeta = api.ObjectMeta{
 		Name: "foo-v2",
 		Annotations: map[string]string{
@@ -940,7 +940,9 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 					},
 				},
 				Spec: api.ReplicationControllerSpec{
-					Selector: labels.NewSelectorOrDie("dk=some-hash"),
+					Selector: map[string]string{
+						"dk": "some-hash",
+					},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{
@@ -961,7 +963,9 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 							},
 						},
 					},
-					Selector: labels.NewSelectorOrDie("dk=some-other-hash"),
+					Selector: map[string]string{
+						"dk": "some-other-hash",
+					},
 				},
 			},
 			name:            "foo",
@@ -975,7 +979,9 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 					},
 				},
 				Spec: api.ReplicationControllerSpec{
-					Selector: labels.NewSelectorOrDie("dk=some-other-hash"),
+					Selector: map[string]string{
+						"dk": "some-other-hash",
+					},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{
@@ -1013,7 +1019,9 @@ func TestUpdateWithRetries(t *testing.T) {
 			},
 		},
 		Spec: api.ReplicationControllerSpec{
-			Selector: labels.NewSelectorOrDie("foo=bar"),
+			Selector: map[string]string{
+				"foo": "bar",
+			},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
@@ -1035,7 +1043,7 @@ func TestUpdateWithRetries(t *testing.T) {
 	// will fail cryptically.
 	newRc := *rc
 	newRc.ResourceVersion = "2"
-	newRc.Spec.Selector = newRc.Spec.Selector.ResetRequirementsByKey("baz", labels.EqualsOperator, []string{"foobar"})
+	newRc.Spec.Selector["baz"] = "foobar"
 	updates := []*http.Response{
 		{StatusCode: 500, Body: objBody(codec, &api.ReplicationController{})},
 		{StatusCode: 500, Body: objBody(codec, &api.ReplicationController{})},
@@ -1056,11 +1064,10 @@ func TestUpdateWithRetries(t *testing.T) {
 				// contain the update.
 				if c, ok := readOrDie(t, req, codec).(*api.ReplicationController); !ok || !reflect.DeepEqual(rc, c) {
 					t.Errorf("Unexpected update body, got %+v expected %+v", c, rc)
-					//				} else if sel, ok := c.Spec.Selector["baz"]; !ok || sel != "foobar" {
-				} else if r, ok := c.Spec.Selector.FindRequirementByKey("baz"); !ok || !r.StrValues.Has("foobar") {
-					t.Errorf("Expected selector label update, got %#v", c.Spec.Selector)
+				} else if sel, ok := c.Spec.Selector["baz"]; !ok || sel != "foobar" {
+					t.Errorf("Expected selector label update, got %+v", c.Spec.Selector)
 				} else {
-					c.Spec.Selector = c.Spec.Selector.DeleteRequirementsByKey("baz")
+					delete(c.Spec.Selector, "baz")
 				}
 				return update, nil
 			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "GET":
@@ -1079,10 +1086,10 @@ func TestUpdateWithRetries(t *testing.T) {
 
 	if rc, err := updateWithRetries(
 		client.ReplicationControllers("default"), rc, func(c *api.ReplicationController) {
-			c.Spec.Selector = c.Spec.Selector.ResetRequirementsByKey("baz", labels.EqualsOperator, []string{"foobar"})
+			c.Spec.Selector["baz"] = "foobar"
 		}); err != nil {
 		t.Errorf("unexpected error: %v", err)
-	} else if req, ok := rc.Spec.Selector.FindRequirementByKey("baz"); !ok || !req.StrValues.Has("foobar") || rc.ResourceVersion != "2" {
+	} else if sel, ok := rc.Spec.Selector["baz"]; !ok || sel != "foobar" || rc.ResourceVersion != "2" {
 		t.Errorf("Expected updated rc, got %+v", rc)
 	}
 	if len(updates) != 0 || len(gets) != 0 {
@@ -1114,7 +1121,9 @@ func TestAddDeploymentHash(t *testing.T) {
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "rc"},
 		Spec: api.ReplicationControllerSpec{
-			Selector: labels.NewSelectorOrDie("foo=bar"),
+			Selector: map[string]string{
+				"foo": "bar",
+			},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{

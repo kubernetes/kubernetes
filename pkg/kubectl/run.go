@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -208,7 +207,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: count,
-			Selector: labels.Set(labelsMap).AsSelector(),
+			Selector: labelsMap,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: labelsMap,

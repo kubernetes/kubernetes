@@ -556,9 +556,9 @@ func CreateNewControllerFromCurrentController(c *client.Client, namespace, oldNa
 		newName = fmt.Sprintf("%s-%s", newRc.Name, newHash)
 	}
 	newRc.Name = newName
-	newRc.Spec.Selector = newRc.Spec.Selector.ResetRequirementsByKey(deploymentKey, labels.EqualsOperator, []string{newHash})
-	newRc.Spec.Template.Labels[deploymentKey] = newHash
 
+	newRc.Spec.Selector[deploymentKey] = newHash
+	newRc.Spec.Template.Labels[deploymentKey] = newHash
 	// Clear resource version after hashing so that identical updates get different hashes.
 	newRc.ResourceVersion = ""
 	return newRc, nil
@@ -596,7 +596,7 @@ func SetNextControllerAnnotation(rc *api.ReplicationController, name string) {
 
 func UpdateExistingReplicationController(c client.Interface, oldRc *api.ReplicationController, namespace, newName, deploymentKey, deploymentValue string, out io.Writer) (*api.ReplicationController, error) {
 	SetNextControllerAnnotation(oldRc, newName)
-	if _, found := oldRc.Spec.Selector.FindRequirementByKey(deploymentKey); !found {
+	if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
 		return AddDeploymentKeyToReplicationController(oldRc, c, deploymentKey, deploymentValue, namespace, out)
 	} else {
 		// If we didn't need to update the controller for the deployment key, we still need to write
@@ -621,7 +621,7 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 
 	// Update all pods managed by the rc to have the new hash label, so they are correctly adopted
 	// TODO: extract the code from the label command and re-use it here.
-	podList, err := client.Pods(namespace).List(oldRc.Spec.Selector, fields.Everything())
+	podList, err := client.Pods(namespace).List(labels.SelectorFromSet(oldRc.Spec.Selector), fields.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -652,22 +652,26 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	}
 
 	if oldRc.Spec.Selector == nil {
-		oldRc.Spec.Selector = labels.Selector{}
+		oldRc.Spec.Selector = map[string]string{}
 	}
 	// Copy the old selector, so that we can scrub out any orphaned pods
-	selectorCopy := oldRc.Spec.Selector.Copy()
+	selectorCopy := map[string]string{}
+	for k, v := range oldRc.Spec.Selector {
+		selectorCopy[k] = v
+	}
+	oldRc.Spec.Selector[deploymentKey] = deploymentValue
+
 	// Update the selector of the rc so it manages all the pods we updated above
-	if oldRc, err = updateWithRetries(client.ReplicationControllers(namespace), oldRc,
-		func(rc *api.ReplicationController) {
-			rc.Spec.Selector = rc.Spec.Selector.ResetRequirementsByKey(deploymentKey, labels.EqualsOperator, []string{deploymentValue})
-		}); err != nil {
+	if oldRc, err = updateWithRetries(client.ReplicationControllers(namespace), oldRc, func(rc *api.ReplicationController) {
+		rc.Spec.Selector[deploymentKey] = deploymentValue
+	}); err != nil {
 		return nil, err
 	}
 
 	// Clean up any orphaned pods that don't have the new label, this can happen if the rc manager
 	// doesn't see the update to its pod template and creates a new pod with the old labels after
 	// we've finished re-adopting existing pods to the rc.
-	podList, err = client.Pods(namespace).List(selectorCopy, fields.Everything())
+	podList, err = client.Pods(namespace).List(labels.SelectorFromSet(selectorCopy), fields.Everything())
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
 		if value, found := pod.Labels[deploymentKey]; !found || value != deploymentValue {

@@ -31,7 +31,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		"foo": "bar",
 		"baz": "blah",
 	}
-	selector1 := labels.Set(labels1).AsSelector()
+	selector1 := labels.SelectorFromSet(labels1)
 	labels2 := map[string]string{
 		"bar": "foo",
 		"baz": "blah",
@@ -169,7 +169,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels.NewSelectorOrDie("baz=blah")}}},
 			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// "baz=blah" matches both labels1 and labels2, and "foo=bar" matches only labels 1. This means that we assume that we want to
 			// do spreading between all pods. The result should be exactly as above.
@@ -184,7 +184,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels.NewSelectorOrDie("bar=foo")}}},
 			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// Taken together Service and Replication Controller should match all Pods, hence result should be equal to one above.
 			expectedList: []algorithm.HostPriority{{"machine1", 0}, {"machine2", 5}},
@@ -234,7 +234,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 		"foo": "bar",
 		"baz": "blah",
 	}
-	selector1 := labels.Set(labels1).AsSelector()
+	selector1 := labels.SelectorFromSet(labels1)
 	labels2 := map[string]string{
 		"bar": "foo",
 		"baz": "blah",

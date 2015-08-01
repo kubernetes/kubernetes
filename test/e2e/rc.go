@@ -63,7 +63,9 @@ func ServeImageOrFail(f *Framework, test string, image string) {
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
-			Selector: labels.NewSelectorOrDie("name=" + name),
+			Selector: map[string]string{
+				"name": name,
+			},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"name": name},

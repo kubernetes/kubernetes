@@ -24,6 +24,7 @@ import (
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/labels"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
@@ -270,11 +271,11 @@ func TestGeneratePodName(t *testing.T) {
 func TestNodeSelector(t *testing.T) {
 	t.Parallel()
 
-	sel1 := map[string]string{"rack": "a"}
-	sel2 := map[string]string{"rack": "a", "gen": "2014"}
+	sel1 := labels.NewSelectorOrDie("rack=a")
+	sel2 := labels.NewSelectorOrDie("rack=a,gen=2014")
 
 	tests := []struct {
-		selector map[string]string
+		selector labels.Selector
 		attrs    []*mesos.Attribute
 		ok       bool
 	}{

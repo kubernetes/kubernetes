@@ -179,25 +179,25 @@ func TestValidateLabels(t *testing.T) {
 
 func TestValidateLabelsSelector(t *testing.T) {
 	successCases := []labels.Selector{
-		{labels.Requirement{"simple", labels.InOperator, util.NewStringSet("bar")}},
+		{labels.Requirement{Key: "simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")}},
 		{
-			labels.Requirement{"now-with-dashes", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"1-starts-with-num", labels.InOperator, util.NewStringSet("bar")}},
+			labels.Requirement{Key: "now-with-dashes", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "1-starts-with-num", Operator: labels.InOperator, StrValues: sets.NewString("bar")}},
 
 		{
-			labels.Requirement{"simple", labels.InOperator, util.NewStringSet("bar")},
+			labels.Requirement{Key: "simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
 		},
 		{
-			labels.Requirement{"1234", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"simple/simple", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"now-with-dashes/simple", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"now-with-dashes/now-with-dashes", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"now.with.dots/simple", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"now-with.dashes-and.dots/simple", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"1-num.2-num/3-num", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"1234/5678", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"1.2.3.4/5678", labels.InOperator, util.NewStringSet("bar")},
-			labels.Requirement{"UpperCase123", labels.InOperator, util.NewStringSet("bar")},
+			labels.Requirement{Key: "1234", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "simple/simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "now-with-dashes/simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "now-with-dashes/now-with-dashes", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "now.with.dots/simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "now-with.dashes-and.dots/simple", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "1-num.2-num/3-num", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "1234/5678", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "1.2.3.4/5678", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
+			labels.Requirement{Key: "UpperCase123", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
 		},
 	}
 	for i, l := range successCases {
@@ -209,16 +209,16 @@ func TestValidateLabelsSelector(t *testing.T) {
 
 	errorCases := []labels.Selector{
 		{
-			labels.Requirement{"nospecialchars^=@", labels.InOperator, util.NewStringSet("bar")},
+			labels.Requirement{Key: "nospecialchars^=@", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
 		},
 		{
-			labels.Requirement{"cantendwithadash-", labels.InOperator, util.NewStringSet("bar")},
+			labels.Requirement{Key: "cantendwithadash-", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
 		},
 		{
-			labels.Requirement{"only/one/slash", labels.InOperator, util.NewStringSet("bar")},
+			labels.Requirement{Key: "only/one/slash", Operator: labels.InOperator, StrValues: sets.NewString("bar")},
 		},
 		{
-			labels.Requirement{strings.Repeat("a", 254), labels.InOperator, util.NewStringSet("bar")},
+			labels.Requirement{Key: strings.Repeat("a", 254), Operator: labels.InOperator, StrValues: sets.NewString("bar")},
 		},
 	}
 	for i, l := range errorCases {
@@ -1690,7 +1690,7 @@ func TestValidatePodUpdate(t *testing.T) {
 	}
 }
 
-func makeValidService(t *testing.T) api.Service {
+func makeValidService() api.Service {
 	return api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "valid",
@@ -1787,7 +1787,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid selector",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Selector = append(s.Spec.Selector, labels.Requirement{"NoSpecialCharsLike=Equals", labels.EqualsOperator, util.NewStringSet("bar")})
+				s.Spec.Selector = append(s.Spec.Selector, labels.Requirement{Key: "NoSpecialCharsLike=Equals", Operator: labels.EqualsOperator, StrValues: sets.NewString("bar")})
 			},
 			numErrs: 1,
 		},
@@ -2112,7 +2112,7 @@ func TestValidateService(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		svc := makeValidService(t)
+		svc := makeValidService()
 		tc.tweakSvc(&svc)
 		errs := ValidateService(&svc)
 		if len(errs) != tc.numErrs {
@@ -2122,12 +2122,11 @@ func TestValidateService(t *testing.T) {
 }
 
 func TestValidateReplicationControllerUpdate(t *testing.T) {
-	validLabels := map[string]string{"a": "b"}
-	validSelector := labels.Set(validLabels).AsSelector()
+	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validLabels,
+				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
@@ -2139,7 +2138,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validLabels,
+				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
@@ -2149,8 +2148,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			},
 		},
 	}
-	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-	invalidSelector := labels.Set(invalidLabels).AsSelector()
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			Spec: api.PodSpec{
@@ -2158,7 +2156,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 			ObjectMeta: api.ObjectMeta{
-				Labels: invalidLabels,
+				Labels: invalidSelector,
 			},
 		},
 	}
@@ -2287,12 +2285,11 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 }
 
 func TestValidateReplicationController(t *testing.T) {
-	validLabels := map[string]string{"a": "b"}
-	validSelector := labels.Set(validLabels).AsSelector()
+	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validLabels,
+				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
@@ -2304,7 +2301,7 @@ func TestValidateReplicationController(t *testing.T) {
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
-				Labels: validLabels,
+				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
 				Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}},
@@ -2314,7 +2311,7 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 		},
 	}
-	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			Spec: api.PodSpec{
@@ -2322,7 +2319,7 @@ func TestValidateReplicationController(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 			ObjectMeta: api.ObjectMeta{
-				Labels: invalidLabels,
+				Labels: invalidSelector,
 			},
 		},
 	}
@@ -2380,7 +2377,7 @@ func TestValidateReplicationController(t *testing.T) {
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
-				Selector: labels.NewSelectorOrDie("foo=bar"),
+				Selector: map[string]string{"foo": "bar"},
 				Template: &validPodTemplate.Template,
 			},
 		},
@@ -2457,7 +2454,7 @@ func TestValidateReplicationController(t *testing.T) {
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
 					ObjectMeta: api.ObjectMeta{
-						Labels: validLabels,
+						Labels: validSelector,
 					},
 				},
 			},
@@ -2476,7 +2473,7 @@ func TestValidateReplicationController(t *testing.T) {
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
 					ObjectMeta: api.ObjectMeta{
-						Labels: validLabels,
+						Labels: validSelector,
 					},
 				},
 			},
@@ -2506,13 +2503,13 @@ func TestValidateReplicationController(t *testing.T) {
 }
 
 func TestValidateNode(t *testing.T) {
-	validLabels := map[string]string{"a": "b"}
-	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	validSelector := map[string]string{"a": "b"}
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "abc",
-				Labels: validLabels,
+				Labels: validSelector,
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -2556,7 +2553,7 @@ func TestValidateNode(t *testing.T) {
 		"zero-length Name": {
 			ObjectMeta: api.ObjectMeta{
 				Name:   "",
-				Labels: validLabels,
+				Labels: validSelector,
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{},
@@ -2572,7 +2569,7 @@ func TestValidateNode(t *testing.T) {
 		"invalid-labels": {
 			ObjectMeta: api.ObjectMeta{
 				Name:   "abc-123",
-				Labels: invalidLabels,
+				Labels: invalidSelector,
 			},
 			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
@@ -2587,7 +2584,7 @@ func TestValidateNode(t *testing.T) {
 		"missing-external-id": {
 			ObjectMeta: api.ObjectMeta{
 				Name:   "abc-123",
-				Labels: validLabels,
+				Labels: validSelector,
 			},
 			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
@@ -2896,8 +2893,8 @@ func TestValidateServiceUpdate(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		oldSvc := makeValidService(t)
-		newSvc := makeValidService(t)
+		oldSvc := makeValidService()
+		newSvc := makeValidService()
 		tc.tweakSvc(&oldSvc, &newSvc)
 		errs := ValidateServiceUpdate(&oldSvc, &newSvc)
 		if len(errs) != tc.numErrs {

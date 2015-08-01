@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -290,7 +290,7 @@ func ExamplePrintReplicationControllerWithNamespace() {
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
-			Selector: labels.NewSelectorOrDie("foo=bar"),
+			Selector: map[string]string{"foo": "bar"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},

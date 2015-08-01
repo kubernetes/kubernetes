@@ -118,7 +118,7 @@ func (d *DeploymentController) reconcileRollingUpdateDeployment(deployment exper
 func (d *DeploymentController) getOldRCs(deployment experimental.Deployment) ([]*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	// 1. Find all pods whose labels match deployment.Spec.Selector
-	podList, err := d.client.Pods(namespace).List(labels.SelectorFromSet(deployment.Spec.Selector), fields.Everything())
+	podList, err := d.client.Pods(namespace).List(deployment.Spec.Selector, fields.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("error listing pods: %v", err)
 	}

@@ -65,7 +65,7 @@ func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 type Requirement struct {
 	Key       string
 	Operator  Operator
-	strValues sets.String
+	StrValues sets.String
 }
 
 // NewRequirement is the constructor for a Requirement.
@@ -185,54 +185,7 @@ func (lsel Selector) Add(key string, Operator Operator, values []string) Selecto
 	for _, item := range lsel {
 		reqs = append(reqs, item)
 	}
-	if r, err := NewRequirement(key, operator, sets.NewString(values...)); err == nil {
-		reqs = append(reqs, *r)
-	}
-	sort.Sort(ByKey(reqs))
-	return Selector(reqs)
-}
-
-func (lsel Selector) Copy() Selector {
-	var reqs []Requirement
-	for _, item := range lsel {
-		r, _ := NewRequirement(item.Key, item.Operator, item.StrValues)
-		reqs = append(reqs, *r)
-	}
-	return Selector(reqs)
-}
-
-// FindRequirementByKey search for the first Requirement with Key equals to input parameter key
-func (lsel Selector) FindRequirementByKey(key string) (*Requirement, bool) {
-	for i := range lsel {
-		if lsel[i].Key == key {
-			return &lsel[i], true
-		}
-	}
-	return &Requirement{}, false
-}
-
-// DeleteRequirementByKey  deletes all requirements with Key equals to key input parameter
-func (lsel Selector) DeleteRequirementsByKey(key string) Selector {
-	var reqs []Requirement
-	for _, item := range lsel {
-		if item.Key != key {
-			reqs = append(reqs, item)
-		}
-	}
-	sort.Sort(ByKey(reqs))
-	return Selector(reqs)
-}
-
-// ResetRequirementsByKey removes all requirements with key a Key Requirement and it creates
-// a new Requirement.
-func (lsel Selector) ResetRequirementsByKey(key string, Operator Operator, values []string) Selector {
-	var reqs []Requirement
-	for _, item := range lsel {
-		if item.Key != key {
-			reqs = append(reqs, item)
-		}
-	}
-	if r, err := NewRequirement(key, Operator, util.NewStringSet(values...)); err == nil {
+	if r, err := NewRequirement(key, Operator, sets.NewString(values...)); err == nil {
 		reqs = append(reqs, *r)
 	}
 	sort.Sort(ByKey(reqs))

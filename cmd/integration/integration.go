@@ -460,7 +460,7 @@ func runReplicationControllerTest(c *client.Client) {
 	//	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
 	//  - We need to be able to query the kubelet on that minion for information about the pod
 	if err := wait.Poll(
-		time.Second, time.Second*30, podsOnMinions(c, "test", updated.Spec.Selector)); err != nil {
+		time.Second, time.Second*30, podsOnMinions(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 

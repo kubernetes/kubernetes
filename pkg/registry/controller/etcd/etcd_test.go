@@ -19,7 +19,6 @@ package etcd
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -70,7 +69,6 @@ func validNewController() *api.ReplicationController {
 			},
 		},
 	}
-	Selector: labels.Selector{{"a", labels.EqualsOperator, util.NewStringSet("b")}},
 }
 
 var validController = validNewController()
@@ -87,7 +85,7 @@ func TestCreate(t *testing.T) {
 		&api.ReplicationController{
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 2,
-			Selector: labels.NewSelectorOrDie("a=b"),
+				Selector: map[string]string{},
 				Template: validController.Spec.Template,
 			},
 		},
@@ -113,7 +111,7 @@ func TestUpdate(t *testing.T) {
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			rc.Spec.Selector = labels.Selector{}
+			object := obj.(*api.ReplicationController)
 			object.Name = ""
 			return object
 		},
@@ -197,10 +195,9 @@ func TestWatch(t *testing.T) {
 	test := registrytest.New(t, fakeClient, storage.Etcd)
 	test.TestWatch(
 		validController,
-		validController.Spec.Selector,
+		// matching labels
 		[]labels.Set{
 			{"a": "b"},
-			Labels:    labels.MakeMapFromSelectorOrDie(validController.Spec.Selector),
 		},
 		// not matching labels
 		[]labels.Set{
@@ -221,9 +218,5 @@ func TestWatch(t *testing.T) {
 			{"status.replicas": "10", "metadata.name": "foo"},
 			{"status.replicas": "0", "metadata.name": "bar"},
 		},
-			Labels:    labels.MakeMapFromSelectorOrDie(validController.Spec.Selector),
 	)
 }
-
-				Selector: labels.NewSelectorOrDie("a=b"),
-				Selector: labels.Selector{},

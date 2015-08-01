@@ -264,10 +264,7 @@ func TestGenerateService(t *testing.T) {
 					Name: "test",
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("foo=bar,baz=blah"),
 					Ports: []api.ServicePort{
 						{
 							Name:       "default",

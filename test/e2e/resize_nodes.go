@@ -191,7 +191,9 @@ func rcByNameContainer(name string, replicas int, image string, l map[string]str
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
-			Selector: labels.NewSelectorOrDie("name=" + name),
+			Selector: map[string]string{
+				"name": name,
+			},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: l,

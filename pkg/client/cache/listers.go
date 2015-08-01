@@ -198,6 +198,7 @@ func (s *StoreToReplicationControllerLister) List() (controllers []api.Replicati
 
 // GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
 func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	var selector labels.Selector
 	var rc api.ReplicationController
 
 	if len(pod.Labels) == 0 {
@@ -210,9 +211,11 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 		if rc.Namespace != pod.Namespace {
 			continue
 		}
+		labelSet := labels.Set(rc.Spec.Selector)
+		selector = labels.Set(rc.Spec.Selector).AsSelector()
 
 		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
-		if rc.Spec.Selector.Empty() || !rc.Spec.Selector.Matches(labels.Set(pod.Labels)) {
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
 		controllers = append(controllers, rc)
@@ -262,7 +265,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector = labels.Set(daemonSet.Spec.Selector).AsSelector()
+		selector = daemonSet.Spec.Selector
 
 		// If a daemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {

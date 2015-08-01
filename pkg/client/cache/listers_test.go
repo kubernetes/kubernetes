@@ -71,7 +71,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: api.ReplicationControllerSpec{
-						Selector: labels.NewSelectorOrDie("foo=baz"),
+						Selector: map[string]string{"foo": "baz"},
 					},
 				},
 			},
@@ -110,13 +110,13 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: api.ReplicationControllerSpec{
-						Selector: labels.NewSelectorOrDie("foo=bar"),
+						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: api.ReplicationControllerSpec{
-						Selector: labels.NewSelectorOrDie("foo=bar"),
+						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 			},
@@ -193,7 +193,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: experimental.DaemonSetSpec{
-						Selector: map[string]string{"foo": "baz"},
+						Selector: labels.NewSelectorOrDie("foo=baz"),
 					},
 				},
 			},
@@ -232,13 +232,13 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: experimental.DaemonSetSpec{
-						Selector: map[string]string{"foo": "bar"},
+						Selector: labels.NewSelectorOrDie("foo=bar"),
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: experimental.DaemonSetSpec{
-						Selector: map[string]string{"foo": "bar"},
+						Selector: labels.NewSelectorOrDie("foo=bar"),
 					},
 				},
 			},

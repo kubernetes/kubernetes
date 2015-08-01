@@ -87,7 +87,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 				rcLabel, len(rcList.Items))
 		}
 		for _, rc := range rcList.Items {
-			podList, err := c.Pods(api.NamespaceSystem).List(rc.Spec.Selector, fields.Everything())
+			podList, err := c.Pods(api.NamespaceSystem).List(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything())
 			if err != nil {
 				return nil, err
 			}

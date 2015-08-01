@@ -120,7 +120,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 			Labels: labelsMap,
 		},
 		Spec: api.ServiceSpec{
-			Selector: labels.Set(selector).AsSelector(),
+			Selector: labels.SelectorFromSet(selector),
 			Ports: []api.ServicePort{
 				{
 					Name:     servicePortName,

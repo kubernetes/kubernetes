@@ -278,16 +278,14 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 	return affinity.CheckServiceAffinity
 }
 
-// TODO:@sdminonne: remove it once checked with @agupta
 func copyValueIfKeyEquals(key string, affinityLabels map[string]string, nodeSelector labels.Selector) bool {
 	for _, r := range nodeSelector {
 		if key == r.Key {
 			switch r.Operator {
 			case labels.EqualsOperator, labels.DoubleEqualsOperator, labels.InOperator:
-				affinityLabels[key] = r.StrValues.List()[0] // TODO: @sdminonne what about other values?
+				affinityLabels[key] = r.StrValues.List()[0] // TODO: @sdminonne (handle other operator)
 				return true
 				// requirement to be added as https://github.com/GoogleCloudPlatform/kubernetes/pull/7053#discussion_r28839286
-
 			default:
 				continue
 			}
@@ -297,23 +295,6 @@ func copyValueIfKeyEquals(key string, affinityLabels map[string]string, nodeSele
 }
 
 // CheckServiceAffinity ensures that only the nodes that match the specified labels are considered for scheduling.
-func copyValueIfKeyEquals(key string, affinityLabels map[string]string, nodeSelector labels.Selector) bool {
-	for _, r := range nodeSelector {
-		if key == r.Key {
-			switch r.Operator {
-			case labels.EqualsOperator, labels.DoubleEqualsOperator, labels.InOperator:
-				affinityLabels[key] = r.StrValues.List()[0] // TODO: @sdminonne what about other values?
-				return true
-				// requirement to be added as https://github.com/GoogleCloudPlatform/kubernetes/pull/7053#discussion_r28839286
-
-			default:
-				continue
-			}
-		}
-	}
-	return false
-}
-
 // The set of labels to be considered are provided to the struct (ServiceAffinity).
 // The pod is checked for the labels and any missing labels are then checked in the node
 // that hosts the service pods (peers) for the given pod.
@@ -330,7 +311,6 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 	nodeSelector := pod.Spec.NodeSelector
 	labelsExist := true
 	for _, l := range s.labels {
-		//TODO: @sdminonne check with @agupta if there's a better way...
 		if copied := copyValueIfKeyEquals(l, affinityLabels, nodeSelector); !copied {
 			// the current pod does not specify all the labels, look in the existing service pods
 			labelsExist = false

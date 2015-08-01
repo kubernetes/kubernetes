@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -216,9 +217,7 @@ func runServiceAndRCForResourceConsumer(c *client.Client, ns, name string, repli
 				TargetPort: util.NewIntOrStringFromInt(targetPort),
 			}},
 
-			Selector: map[string]string{
-				"name": name,
-			},
+			Selector: labels.NewSelectorOrDie("name=" + name),
 		},
 	})
 	expectNoError(err)

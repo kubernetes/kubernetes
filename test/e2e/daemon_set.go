@@ -92,7 +92,7 @@ func clearNodeLabels(c *client.Client) error {
 
 func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := f.Client.Pods(f.Namespace.Name).List(labels.Set(selector).AsSelector(), fields.Everything())
+		podList, err := f.Client.Pods(f.Namespace.Name).List(labels.SelectorFromSet(selector), fields.Everything())
 		if err != nil {
 			return false, nil
 		}
@@ -185,7 +185,7 @@ func testDaemonSets(f *Framework) {
 	By("Stop a daemon pod, check that the daemon pod is revived.")
 	podClient := c.Pods(ns)
 
-	podList, err := podClient.List(labels.Set(label).AsSelector(), fields.Everything())
+	podList, err := podClient.List(labels.SelectorFromSet(label), fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(podList.Items)).To(BeNumerically(">", 0))
 	pod := podList.Items[0]
@@ -203,13 +203,13 @@ func testDaemonSets(f *Framework) {
 			Name: complexDSName,
 		},
 		Spec: experimental.DaemonSetSpec{
-			Selector: complexLabel,
+			Selector: labels.SelectorFromSet(complexLabel),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: complexLabel,
 				},
 				Spec: api.PodSpec{
-					NodeSelector: nodeSelector,
+					NodeSelector: labels.SelectorFromSet(nodeSelector),
 					Containers: []api.Container{
 						{
 							Name:  complexDSName,

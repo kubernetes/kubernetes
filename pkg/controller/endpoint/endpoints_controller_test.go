@@ -344,7 +344,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{},
+			Selector: labels.Selector{},
 			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
 		},
 	})
@@ -381,7 +381,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{},
+			Selector: labels.Selector{},
 			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
 		},
 	})

@@ -63,7 +63,7 @@ func NodeSelectorPredicate(t *T, offer *mesos.Offer) bool {
 				slaveLabels[a.GetName()] = a.GetText().GetValue()
 			}
 		}
-		selector := labels.SelectorFromSet(t.Pod.Spec.NodeSelector)
+		selector := t.Pod.Spec.NodeSelector
 		if !selector.Matches(labels.Set(slaveLabels)) {
 			return false
 		}

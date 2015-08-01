@@ -79,11 +79,11 @@ func ValidateLabels(labels map[string]string, field string) errs.ValidationError
 func ValidateLabelsSelector(selector labels.Selector, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	for _, r := range selector {
-		if !util.IsQualifiedName(r.Key) {
+		if !validation.IsQualifiedName(r.Key) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(field, r.Key, qualifiedNameErrorMsg))
 		}
 		for v := range r.StrValues {
-			if !util.IsValidLabelValue(v) {
+			if !validation.IsValidLabelValue(v) {
 				allErrs = append(allErrs, errs.NewFieldInvalid(field, v, labelValueErrorMsg))
 			}
 		}
@@ -1330,9 +1330,8 @@ func ValidateReplicationControllerUpdate(oldController, controller *api.Replicat
 }
 
 // Validates that the given selector is non-empty.
-func ValidateNonEmptySelector(selectorMap map[string]string, fieldName string) errs.ValidationErrorList {
+func ValidateNonEmptySelector(selector labels.Selector, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	selector := labels.Set(selectorMap).AsSelector()
 	if selector.Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired(fieldName))
 	}
@@ -1340,12 +1339,11 @@ func ValidateNonEmptySelector(selectorMap map[string]string, fieldName string) e
 }
 
 // Validates the given template and ensures that it is in accordance with the desrired selector and replicas.
-func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map[string]string, replicas int, fieldName string) errs.ValidationErrorList {
+func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selector labels.Selector, replicas int, fieldName string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, errs.NewFieldRequired(fieldName))
 	} else {
-		selector := labels.Set(selectorMap).AsSelector()
 		if !selector.Empty() {
 			// Verify that the RC selector matches the labels in template.
 			labels := labels.Set(template.Labels)
@@ -1369,9 +1367,9 @@ func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map
 func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, "selector")...)
+	allErrs = append(allErrs, ValidateNonEmptySelector(labels.Set(spec.Selector).AsSelector(), "selector")...)
 	allErrs = append(allErrs, ValidatePositiveField(int64(spec.Replicas), "replicas")...)
-	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, "template")...)
+	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, labels.Set(spec.Selector).AsSelector(), spec.Replicas, "template")...)
 	return allErrs
 }
 

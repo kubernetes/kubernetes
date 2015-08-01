@@ -168,7 +168,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
 			switch t := object.(type) {
 			case *api.ReplicationController:
-				return t.Spec.Selector.String(), nil
+				return kubectl.MakeLabels(t.Spec.Selector), nil
 			case *api.Pod:
 				if len(t.Labels) == 0 {
 					return "", fmt.Errorf("the pod has no labels and cannot be exposed")

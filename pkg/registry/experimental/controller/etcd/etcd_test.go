@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
@@ -73,7 +74,7 @@ var validScale = experimental.Scale{
 	},
 	Status: experimental.ScaleStatus{
 		Replicas: 0,
-		Selector: validPodTemplate.Template.Labels,
+		Selector: labels.SelectorFromSet(validPodTemplate.Template.Labels),
 	},
 }
 

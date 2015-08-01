@@ -1069,7 +1069,7 @@ type ReplicationControllerSpec struct {
 	Replicas int `json:"replicas"`
 
 	// Selector is a label query over pods that should match the Replicas count.
-	Selector labels.Selector `json:"selector"`
+	Selector map[string]string `json:"selector"`
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
 	// insufficient replicas are detected. This reference is ignored if a Template is set.

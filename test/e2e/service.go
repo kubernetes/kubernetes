@@ -84,7 +84,6 @@ var _ = Describe("Services", func() {
 			"foo": "bar",
 			"baz": "blah",
 		}
-		selector := labels.Set(labelsMap).AsSelector()
 
 		defer func() {
 			err := c.Services(ns).Delete(serviceName)
@@ -96,7 +95,7 @@ var _ = Describe("Services", func() {
 				Name: serviceName,
 			},
 			Spec: api.ServiceSpec{
-				Selector: selector,
+				Selector: labels.SelectorFromSet(labelsMap),
 				Ports: []api.ServicePort{{
 					Port:       80,
 					TargetPort: util.NewIntOrStringFromInt(80),
@@ -1367,9 +1366,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 				TargetPort: util.NewIntOrStringFromInt(9376),
 				Protocol:   "TCP",
 			}},
-			Selector: map[string]string{
-				"name": name,
-			},
+			Selector: labels.NewSelectorOrDie("name=" + name),
 		},
 	})
 	if err != nil {

@@ -676,7 +676,7 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
-		controller.Spec.Selector.String(),
+		labels.FormatLabels(controller.Spec.Selector),
 		controller.Spec.Replicas,
 		translateTimestamp(controller.CreationTimestamp),
 	); err != nil {
@@ -832,8 +832,8 @@ func printDaemonSet(ds *experimental.DaemonSet, w io.Writer, withNamespace bool,
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
-		labels.FormatLabels(ds.Spec.Selector),
-		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
+		ds.Spec.Selector.String(),
+		ds.Spec.Template.Spec.NodeSelector.String(),
 	); err != nil {
 		return err
 	}

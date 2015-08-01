@@ -480,10 +480,10 @@ func TestAdd(t *testing.T) {
 			"key",
 			InOperator,
 			[]string{"value"},
-			Selector{Requirement{"key", InOperator, util.NewStringSet("value")}},
+			Selector{Requirement{"key", InOperator, sets.NewString("value")}},
 		},
 		{
-			Selector{Requirement{"key", InOperator, util.NewStringSet("value")}},
+			Selector{Requirement{"key", InOperator, sets.NewString("value")}},
 			"key2",
 			EqualsOperator,
 			[]string{"value2"},
@@ -497,94 +497,6 @@ func TestAdd(t *testing.T) {
 		ts.sel = ts.sel.Add(ts.key, ts.operator, ts.values)
 		if !reflect.DeepEqual(ts.sel, ts.refSelector) {
 			t.Errorf("Expected %v found %v", ts.refSelector, ts.sel)
-		}
-	}
-}
-
-func TestCopy(t *testing.T) {
-	testCases := []Selector{
-		{Requirement{"key", InOperator, util.NewStringSet("value")}},
-		{
-			Requirement{"key", InOperator, util.NewStringSet("value")},
-			Requirement{"key2", EqualsOperator, util.NewStringSet("value2")},
-		},
-	}
-	for _, ts := range testCases {
-		newSelector := ts.Copy()
-		if !reflect.DeepEqual(newSelector, ts) {
-			t.Errorf("Expected %t found %t", ts, newSelector)
-		}
-	}
-}
-
-func TestDeleteRequirementByKey(t *testing.T) {
-	testCases := []struct {
-		sel         Selector
-		key         string
-		refSelector Selector
-	}{
-		{
-			Selector{
-				Requirement{"key", InOperator, util.NewStringSet("value")},
-				Requirement{"key2", EqualsOperator, util.NewStringSet("value2")},
-			},
-			"key2",
-			Selector{
-				Requirement{"key", InOperator, util.NewStringSet("value")},
-			},
-		},
-		{
-			Selector{
-				Requirement{"key", ExistsOperator, util.NewStringSet()},
-				Requirement{"key", NotInOperator, util.NewStringSet("value")},
-				Requirement{"key2", EqualsOperator, util.NewStringSet("value2")},
-			},
-			"key",
-			Selector{
-				Requirement{"key2", EqualsOperator, util.NewStringSet("value2")},
-			},
-		},
-	}
-	for _, ts := range testCases {
-		ts.sel = ts.sel.DeleteRequirementsByKey(ts.key)
-		if !reflect.DeepEqual(ts.sel, ts.refSelector) {
-			t.Errorf("Expected %t found %t", ts.refSelector, ts.sel)
-		}
-	}
-}
-
-func TestResetRequirementsByKey(t *testing.T) {
-	testCases := []struct {
-		sel         Selector
-		key         string
-		operator    Operator
-		values      []string
-		refSelector Selector
-	}{
-		{
-			Selector{},
-			"key",
-			InOperator,
-			[]string{"value"},
-			Selector{Requirement{"key", InOperator, util.NewStringSet("value")}},
-		},
-		{
-			Selector{
-				Requirement{"key2", NotInOperator, util.NewStringSet("value")},
-				Requirement{"key2", ExistsOperator, util.NewStringSet()},
-			},
-			"key2",
-			EqualsOperator,
-			[]string{"newValue"},
-			Selector{
-				Requirement{"key2", EqualsOperator, util.NewStringSet("newValue")},
-			},
-		},
-	}
-	for _, ts := range testCases {
-		ts.sel = ts.sel.ResetRequirementsByKey(ts.key, ts.operator, ts.values)
-		if !reflect.DeepEqual(ts.sel, ts.refSelector) {
-			t.Errorf("Expected %t found %t", ts.refSelector, ts.sel)
 		}
 	}
 }

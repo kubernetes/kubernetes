@@ -40,7 +40,7 @@ func validService() *api.Service {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			ClusterIP:       "None",
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
@@ -68,7 +68,7 @@ func TestCreate(t *testing.T) {
 		// invalid
 		&api.Service{
 			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
+				Selector:        labels.NewSelectorOrDie("bar=baz"),
 				ClusterIP:       "invalid",
 				SessionAffinity: "None",
 				Type:            api.ServiceTypeClusterIP,
@@ -92,7 +92,7 @@ func TestUpdate(t *testing.T) {
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Service)
 			object.Spec = api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz2"},
+				Selector:        labels.NewSelectorOrDie("bar=baz2"),
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{

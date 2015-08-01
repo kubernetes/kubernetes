@@ -53,7 +53,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorit
 	controllers, err := s.controllerLister.GetPodControllers(pod)
 	if err == nil {
 		for _, controller := range controllers {
-			selectors = append(selectors, controller.Spec.Selector)
+			selectors = append(selectors, labels.SelectorFromSet(controller.Spec.Selector))
 		}
 	}
 
