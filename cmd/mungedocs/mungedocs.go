@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -30,28 +29,31 @@ import (
 )
 
 var (
-	verify   = flag.Bool("verify", false, "Exit with status 1 if files would have needed changes but do not change.")
-	rootDir  = flag.String("root-dir", "", "Root directory containing documents to be processed.")
-	repoRoot = flag.String("repo-root", "..", `Appended to --root-dir to get the repository root.
+	verify  = flag.Bool("verify", false, "Exit with status 1 if files would have needed changes but do not change.")
+	rootDir = flag.String("root-dir", "", "Root directory containing documents to be processed.")
+	// "repo-root" seems like a dumb name, this is the relative path (from rootDir) to get to the repoRoot
+	relRoot = flag.String("repo-root", "..", `Appended to --root-dir to get the repository root.
 It's done this way so that generally you just have to set --root-dir.
 Examples:
  * --root-dir=docs/ --repo-root=.. means the repository root is ./
  * --root-dir=/usr/local/long/path/repo/docs/ --repo-root=.. means the repository root is /usr/local/long/path/repo/
  * --root-dir=/usr/local/long/path/repo/docs/admin --repo-root=../.. means the repository root is /usr/local/long/path/repo/`)
 	skipMunges = flag.String("skip-munges", "", "Comma-separated list of munges to *not* run. Available munges are: "+availableMungeList)
+	repoRoot   string
 
 	ErrChangesNeeded = errors.New("mungedocs: changes required")
 
 	// All of the munge operations to perform.
 	// TODO: allow selection from command line. (e.g., just check links in the examples directory.)
 	allMunges = []munge{
+		{"remove-whitespace", updateWhitespace},
 		{"table-of-contents", updateTOC},
 		{"unversioned-warning", updateUnversionedWarning},
-		{"check-links", checkLinks},
-		{"blank-lines-surround-preformatted", checkPreformatted},
-		{"header-lines", checkHeaderLines},
-		{"analytics", checkAnalytics},
-		{"kubectl-dash-f", checkKubectlFileTargets},
+		{"md-links", updateLinks},
+		{"blank-lines-surround-preformatted", updatePreformatted},
+		{"header-lines", updateHeaderLines},
+		{"analytics", updateAnalytics},
+		{"kubectl-dash-f", updateKubectlFileTargets},
 		{"sync-examples", syncExamples},
 	}
 	availableMungeList = func() string {
@@ -68,7 +70,7 @@ Examples:
 // data into a new byte array and return that.
 type munge struct {
 	name string
-	fn   func(filePath string, before []byte) (after []byte, err error)
+	fn   func(filePath string, mlines mungeLines) (after mungeLines, err error)
 }
 
 type fileProcessor struct {
@@ -90,12 +92,14 @@ func (f fileProcessor) visit(path string) error {
 		return err
 	}
 
+	mungeLines := getMungeLines(string(fileBytes))
+
 	modificationsMade := false
 	errFound := false
 	filePrinted := false
 	for _, munge := range f.munges {
-		after, err := munge.fn(path, fileBytes)
-		if err != nil || !bytes.Equal(after, fileBytes) {
+		after, err := munge.fn(path, mungeLines)
+		if err != nil || !after.Equal(mungeLines) {
 			if !filePrinted {
 				fmt.Printf("%s\n----\n", path)
 				filePrinted = true
@@ -110,7 +114,7 @@ func (f fileProcessor) visit(path string) error {
 			}
 			fmt.Println("")
 		}
-		fileBytes = after
+		mungeLines = after
 	}
 
 	// Write out new file with any changes.
@@ -119,7 +123,7 @@ func (f fileProcessor) visit(path string) error {
 			// We're not allowed to make changes.
 			return ErrChangesNeeded
 		}
-		ioutil.WriteFile(path, fileBytes, 0644)
+		ioutil.WriteFile(path, mungeLines.Bytes(), 0644)
 	}
 	if errFound {
 		return ErrChangesNeeded
@@ -165,6 +169,7 @@ func wantedMunges() (filtered []munge) {
 }
 
 func main() {
+	var err error
 	flag.Parse()
 
 	if *rootDir == "" {
@@ -172,11 +177,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Split the root dir of "foo/docs" into "foo" and "docs". We
-	// chdir into "foo" and walk "docs" so the walk is always at a
-	// relative path.
-	stem, leaf := path.Split(strings.TrimRight(*rootDir, "/"))
-	if err := os.Chdir(stem); err != nil {
+	repoRoot = path.Join(*rootDir, *relRoot)
+	repoRoot, err = filepath.Abs(repoRoot)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(2)
 	}
@@ -194,7 +197,7 @@ func main() {
 	//   changes needed, exit 1 if manual changes are needed.
 	var changesNeeded bool
 
-	err := filepath.Walk(leaf, newWalkFunc(&fp, &changesNeeded))
+	err = filepath.Walk(*rootDir, newWalkFunc(&fp, &changesNeeded))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(2)

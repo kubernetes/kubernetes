@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 ## Introduction
 
-Celery is an asynchronous task queue based on distributed message passing. It is used to create execution units (i.e. tasks) which are then executed on one or more worker nodes, either synchronously or asynchronously. 
+Celery is an asynchronous task queue based on distributed message passing. It is used to create execution units (i.e. tasks) which are then executed on one or more worker nodes, either synchronously or asynchronously.
 
 Celery is implemented in Python.
 
@@ -82,7 +82,7 @@ spec:
 ```
 
 [Download example](rabbitmq-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE rabbitmq-service.yaml -->
 
 To start the service, run:
 
@@ -127,7 +127,7 @@ spec:
 ```
 
 [Download example](rabbitmq-controller.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE rabbitmq-controller.yaml -->
 
 Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.yaml` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
 
@@ -168,7 +168,7 @@ spec:
 ```
 
 [Download example](celery-controller.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE celery-controller.yaml -->
 
 There are several things to point out here...
 
@@ -239,7 +239,7 @@ spec:
 ```
 
 [Download example](flower-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE flower-service.yaml -->
 
 It is marked as external (LoadBalanced). However on many platforms you will have to add an explicit firewall rule to open port 5555.
 On GCE this can be done with:
@@ -249,7 +249,7 @@ On GCE this can be done with:
 ```
 
 Please remember to delete the rule after you are done with the example (on GCE: `$ gcloud compute firewall-rules delete kubernetes-minion-5555`)
- 
+
 To bring up the pods, run this command `$ kubectl create -f examples/celery-rabbitmq/flower-controller.yaml`. This controller is defined as so:
 
 <!-- BEGIN MUNGE: EXAMPLE flower-controller.yaml -->
@@ -280,7 +280,7 @@ spec:
 ```
 
 [Download example](flower-controller.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE flower-controller.yaml -->
 
 This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed through the service endpoint. This image uses the following command to start Flower:
 

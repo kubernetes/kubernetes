@@ -90,7 +90,7 @@ project](salt.md).
 
 ## Multi-tenant support
 
-* **Resource Quota** ([resource-quota.md](resource-quota.md)) 
+* **Resource Quota** ([resource-quota.md](resource-quota.md))
 
 ## Security
 

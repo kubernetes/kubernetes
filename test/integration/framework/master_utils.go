@@ -26,16 +26,18 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
+	explatest "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	"github.com/golang/glog"
@@ -72,7 +74,7 @@ type MasterComponents struct {
 	// Used to stop master components individually, and via MasterComponents.Stop
 	once sync.Once
 	// Kubernetes etcd storage, has embedded etcd client
-	EtcdStorage tools.StorageInterface
+	EtcdStorage storage.Interface
 }
 
 // Config is a struct of configuration directives for NewMasterComponents.
@@ -119,28 +121,36 @@ func NewMasterComponents(c *Config) *MasterComponents {
 }
 
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
-func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Server, tools.StorageInterface) {
+func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Server, storage.Interface) {
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
 
-	var etcdStorage tools.StorageInterface
+	var etcdStorage storage.Interface
 	var err error
 	if masterConfig == nil {
-		etcdStorage, err = master.NewEtcdStorage(NewEtcdClient(), "", etcdtest.PathPrefix())
+		etcdClient := NewEtcdClient()
+		etcdStorage, err = master.NewEtcdStorage(etcdClient, latest.InterfacesFor, latest.Version, etcdtest.PathPrefix())
 		if err != nil {
 			glog.Fatalf("Failed to create etcd storage for master %v", err)
 		}
+		expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
+		if err != nil {
+			glog.Fatalf("Failed to create etcd storage for master %v", err)
+		}
+
 		masterConfig = &master.Config{
-			DatabaseStorage:   etcdStorage,
-			KubeletClient:     client.FakeKubeletClient{},
-			EnableLogsSupport: false,
-			EnableProfiling:   true,
-			EnableUISupport:   false,
-			APIPrefix:         "/api",
-			Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-			AdmissionControl:  admit.NewAlwaysAdmit(),
+			DatabaseStorage:    etcdStorage,
+			ExpDatabaseStorage: expEtcdStorage,
+			KubeletClient:      client.FakeKubeletClient{},
+			EnableLogsSupport:  false,
+			EnableProfiling:    true,
+			EnableUISupport:    false,
+			APIPrefix:          "/api",
+			ExpAPIPrefix:       "/experimental",
+			Authorizer:         apiserver.NewAlwaysAllowAuthorizer(),
+			AdmissionControl:   admit.NewAlwaysAdmit(),
 		}
 	} else {
 		etcdStorage = masterConfig.DatabaseStorage
@@ -258,20 +268,28 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 
 // TODO: Merge this into startMasterOrDie.
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	etcdStorage, err := master.NewEtcdStorage(NewEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	etcdClient := NewEtcdClient()
+	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.InterfacesFor, testapi.Version(), etcdtest.PathPrefix())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expEtcdStorage, err := master.NewEtcdStorage(etcdClient, explatest.InterfacesFor, explatest.Version, etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	m := master.New(&master.Config{
-		DatabaseStorage:   etcdStorage,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableProfiling:   true,
-		EnableUISupport:   false,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		DatabaseStorage:    etcdStorage,
+		ExpDatabaseStorage: expEtcdStorage,
+		KubeletClient:      client.FakeKubeletClient{},
+		EnableLogsSupport:  false,
+		EnableProfiling:    true,
+		EnableUISupport:    false,
+		APIPrefix:          "/api",
+		ExpAPIPrefix:       "/experimental",
+		EnableExp:          true,
+		Authorizer:         apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:   admit.NewAlwaysAdmit(),
 	})
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

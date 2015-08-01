@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
 	annotation "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -150,6 +151,11 @@ func (b *binder) rollback(task *podtask.T, err error) error {
 }
 
 // assumes that: caller has acquired scheduler lock and that the task is still pending
+//
+// bind does not actually do the binding itself, but launches the pod as a Mesos task. The
+// kubernetes executor on the slave will finally do the binding. This is different from the
+// upstream scheduler in the sense that the upstream scheduler does the binding and the
+// kubelet will notice that and launches the pod.
 func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (err error) {
 	// sanity check: ensure that the task hasAcceptedOffer(), it's possible that between
 	// Schedule() and now that the offer for this task was rescinded or invalidated.
@@ -166,8 +172,8 @@ func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 	}
 
 	if err = b.prepareTaskForLaunch(ctx, binding.Target.Name, task, offerId); err == nil {
-		log.V(2).Infof("launching task: %q on target %q slave %q for pod \"%v/%v\"",
-			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name)
+		log.V(2).Infof("launching task: %q on target %q slave %q for pod \"%v/%v\", cpu %.2f, mem %.2f MB",
+			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name, task.Spec.CPU, task.Spec.Memory)
 		if err = b.api.launchTask(task); err == nil {
 			b.api.offers().Invalidate(offerId)
 			task.Set(podtask.Launched)
@@ -192,16 +198,7 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 	oemCt := pod.Spec.Containers
 	pod.Spec.Containers = append([]api.Container{}, oemCt...) // (shallow) clone before mod
 
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	} else {
-		oemAnn := pod.Annotations
-		pod.Annotations = make(map[string]string)
-		for k, v := range oemAnn {
-			pod.Annotations[k] = v
-		}
-	}
-	pod.Annotations[annotation.BindingHostKey] = machine
+	annotateForExecutorOnSlave(&pod, machine)
 	task.SaveRecoveryInfo(pod.Annotations)
 
 	for _, entry := range task.Spec.PortMap {
@@ -230,8 +227,35 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 }
 
 type kubeScheduler struct {
-	api        schedulerInterface
-	podUpdates queue.FIFO
+	api                      schedulerInterface
+	podUpdates               queue.FIFO
+	defaultContainerCPULimit mresource.CPUShares
+	defaultContainerMemLimit mresource.MegaBytes
+}
+
+// annotatedForExecutor checks whether a pod is assigned to a Mesos slave, and
+// possibly already launched. It can, but doesn't have to be scheduled already
+// in the sense of kubernetes, i.e. the NodeName field might still be empty.
+func annotatedForExecutor(pod *api.Pod) bool {
+	_, ok := pod.ObjectMeta.Annotations[annotation.BindingHostKey]
+	return ok
+}
+
+// annotateForExecutorOnSlave sets the BindingHostKey annotation which
+// marks the pod to be processed by the scheduler and launched as a Mesos
+// task. The executor on the slave will to the final binding to finish the
+// scheduling in the kubernetes sense.
+func annotateForExecutorOnSlave(pod *api.Pod, slave string) {
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	} else {
+		oemAnn := pod.Annotations
+		pod.Annotations = make(map[string]string)
+		for k, v := range oemAnn {
+			pod.Annotations[k] = v
+		}
+	}
+	pod.Annotations[annotation.BindingHostKey] = slave
 }
 
 // Schedule implements the Scheduler interface of Kubernetes.
@@ -325,12 +349,20 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 		if task.Offer != nil && task.Offer != offer {
 			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
 		}
+
+		// write resource limits into the pod spec which is transfered to the executor. From here
+		// on we can expect that the pod spec of a task has proper limits for CPU and memory.
+		// TODO(sttts): For a later separation of the kubelet and the executor also patch the pod on the apiserver
+		if unlimitedCPU := mresource.LimitPodCPU(&task.Pod, k.defaultContainerCPULimit); unlimitedCPU {
+			log.Warningf("Pod %s/%s without cpu limits is admitted %.2f cpu shares", task.Pod.Namespace, task.Pod.Name, mresource.PodCPULimit(&task.Pod))
+		}
+		if unlimitedMem := mresource.LimitPodMem(&task.Pod, k.defaultContainerMemLimit); unlimitedMem {
+			log.Warningf("Pod %s/%s without memory limits is admitted %.2f MB", task.Pod.Namespace, task.Pod.Name, mresource.PodMemLimit(&task.Pod))
+		}
+
 		task.Offer = offer
-		//TODO(jdef) FillFromDetails currently allocates fixed (hardwired) cpu and memory resources for all
-		//tasks. This will be fixed once we properly integrate parent-cgroup support into the kublet-executor.
-		//For now we are completely ignoring the resources specified in the pod.
-		//see: https://github.com/mesosphere/kubernetes-mesos/issues/68
 		task.FillFromDetails(details)
+
 		if err := k.api.tasks().Update(task); err != nil {
 			offer.Release()
 			return "", err
@@ -430,7 +462,7 @@ func (q *queuer) Run(done <-chan struct{}) {
 			}
 
 			pod := p.(*Pod)
-			if pod.Spec.NodeName != "" {
+			if annotatedForExecutor(pod.Pod) {
 				log.V(3).Infof("dequeuing pod for scheduling: %v", pod.Pod.Name)
 				q.dequeue(pod.GetUID())
 			} else {
@@ -479,7 +511,7 @@ func (q *queuer) yield() *api.Pod {
 			log.Warningf("yield unable to understand pod object %+v, will skip: %v", pod, err)
 		} else if !q.podUpdates.Poll(podName, queue.POP_EVENT) {
 			log.V(1).Infof("yield popped a transitioning pod, skipping: %+v", pod)
-		} else if pod.Spec.NodeName != "" {
+		} else if annotatedForExecutor(pod) {
 			// should never happen if enqueuePods is filtering properly
 			log.Warningf("yield popped an already-scheduled pod, skipping: %+v", pod)
 		} else {
@@ -678,8 +710,10 @@ func (k *KubernetesScheduler) NewPluginConfig(terminate <-chan struct{}, mux *ht
 		Config: &plugin.Config{
 			MinionLister: nil,
 			Algorithm: &kubeScheduler{
-				api:        kapi,
-				podUpdates: podUpdates,
+				api:                      kapi,
+				podUpdates:               podUpdates,
+				defaultContainerCPULimit: k.defaultContainerCPULimit,
+				defaultContainerMemLimit: k.defaultContainerMemLimit,
 			},
 			Binder:   &binder{api: kapi},
 			NextPod:  q.yield,
@@ -785,7 +819,7 @@ func (s *schedulingPlugin) reconcilePod(oldPod api.Pod) {
 		return
 	}
 	if oldPod.Spec.NodeName != pod.Spec.NodeName {
-		if pod.Spec.NodeName == "" {
+		if annotatedForExecutor(pod) {
 			// pod is unscheduled.
 			// it's possible that we dropped the pod in the scheduler error handler
 			// because of task misalignment with the pod (task.Has(podtask.Launched) == true)

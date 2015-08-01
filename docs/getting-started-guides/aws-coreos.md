@@ -215,7 +215,7 @@ kubectl get pods
 
 Record the **Host** of the pod, which should be the private IP address.
 
-Gather the public IP address for the worker node. 
+Gather the public IP address for the worker node.
 
 ```bash
 aws ec2 describe-instances --filters 'Name=private-ip-address,Values=<host>'

@@ -17,43 +17,42 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"regexp"
+	"strings"
 )
 
-var (
-	beginMungeExp = regexp.QuoteMeta(beginMungeTag("GENERATED_ANALYTICS"))
-	endMungeExp   = regexp.QuoteMeta(endMungeTag("GENERATED_ANALYTICS"))
-	analyticsExp  = regexp.QuoteMeta("[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/") +
-		"[^?]*" +
-		regexp.QuoteMeta("?pixel)]()")
+const analyticsMungeTag = "GENERATED_ANALYTICS"
+const analyticsLinePrefix = "[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/"
 
-	// Matches the analytics blurb, with or without the munge headers.
-	analyticsRE = regexp.MustCompile(`[\n]*` + analyticsExp + `[\n]?` +
-		`|` + `[\n]*` + beginMungeExp + `[^<]*` + endMungeExp)
-)
-
-// This adds the analytics link to every .md file.
-func checkAnalytics(fileName string, fileBytes []byte) (output []byte, err error) {
-	fileName = makeRepoRelative(fileName)
-	desired := fmt.Sprintf(`
-
-
-`+beginMungeTag("GENERATED_ANALYTICS")+`
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/%s?pixel)]()
-`+endMungeTag("GENERATED_ANALYTICS")+`
-`, fileName)
-	if !analyticsRE.MatchString(desired) {
-		fmt.Printf("%q does not match %q", analyticsRE.String(), desired)
-		os.Exit(1)
+func updateAnalytics(fileName string, mlines mungeLines) (mungeLines, error) {
+	var out mungeLines
+	fileName, err := makeRepoRelative(fileName, fileName)
+	if err != nil {
+		return mlines, err
 	}
-	//output = replaceNonPreformattedRegexp(fileBytes, analyticsRE, func(in []byte) []byte {
-	output = analyticsRE.ReplaceAllFunc(fileBytes, func(in []byte) []byte {
-		return []byte{}
-	})
-	output = bytes.TrimRight(output, "\n")
-	output = append(output, []byte(desired)...)
-	return output, nil
+
+	link := fmt.Sprintf(analyticsLinePrefix+"%s?pixel)]()", fileName)
+	insertLines := getMungeLines(link)
+	mlines, err = removeMacroBlock(analyticsMungeTag, mlines)
+	if err != nil {
+		return mlines, err
+	}
+
+	// Remove floating analytics links not surrounded by the munge tags.
+	for _, mline := range mlines {
+		if mline.preformatted || mline.header || mline.beginTag || mline.endTag {
+			out = append(out, mline)
+			continue
+		}
+		if strings.HasPrefix(mline.data, analyticsLinePrefix) {
+			continue
+		}
+		out = append(out, mline)
+	}
+	out = appendMacroBlock(out, analyticsMungeTag)
+	out, err = updateMacroBlock(out, analyticsMungeTag, insertLines)
+	if err != nil {
+		return mlines, err
+	}
+	return out, nil
 }

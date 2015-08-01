@@ -22,7 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
@@ -48,11 +47,11 @@ type provision struct {
 }
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
-	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
+	defaultVersion, kind, err := api.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
-	mapping, err := latest.RESTMapper.RESTMapping(kind, defaultVersion)
+	mapping, err := api.RESTMapper.RESTMapping(kind, defaultVersion)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}

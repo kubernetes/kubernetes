@@ -53,7 +53,7 @@ NAME                 READY     REASON       RESTARTS   AGE
 redis-master-ft9ex   1/1       Running      0          12s
 ```
 
-then we can check the environment variables of the pod, 
+then we can check the environment variables of the pod,
 
 ```console
 $ kubectl exec redis-master-ft9ex env

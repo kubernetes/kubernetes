@@ -95,13 +95,14 @@ __custom_func() {
    * pods (aka 'po')
    * replicationcontrollers (aka 'rc')
    * services (aka 'svc')
-   * nodes (aka 'no')
    * events (aka 'ev')
+   * nodes (aka 'no')
+   * namespaces (aka 'ns')
    * secrets
-   * limits
-   * persistentVolumes (aka 'pv')
-   * persistentVolumeClaims (aka 'pvc')
-   * quota
+   * persistentvolumes (aka 'pv')
+   * persistentvolumeclaims (aka 'pvc')
+   * limitranges (aka 'limits')
+   * resourcequotas (aka 'quota')
 `
 )
 
@@ -135,6 +136,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdRollingUpdate(f, out))
 	cmds.AddCommand(NewCmdScale(f, out))
 
+	cmds.AddCommand(NewCmdAttach(f, in, out, err))
 	cmds.AddCommand(NewCmdExec(f, in, out, err))
 	cmds.AddCommand(NewCmdPortForward(f))
 	cmds.AddCommand(NewCmdProxy(f, out))

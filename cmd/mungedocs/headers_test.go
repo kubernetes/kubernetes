@@ -24,8 +24,8 @@ import (
 
 func TestHeaderLines(t *testing.T) {
 	var cases = []struct {
-		in  string
-		out string
+		in       string
+		expected string
 	}{
 		{"", ""},
 		{
@@ -62,10 +62,12 @@ func TestHeaderLines(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
-		actual, err := checkHeaderLines("filename.md", []byte(c.in))
+		in := getMungeLines(c.in)
+		expected := getMungeLines(c.expected)
+		actual, err := updateHeaderLines("filename.md", in)
 		assert.NoError(t, err)
-		if string(actual) != c.out {
-			t.Errorf("case[%d]: expected %q got %q", i, c.out, string(actual))
+		if !actual.Equal(expected) {
+			t.Errorf("case[%d]: expected %q got %q", i, c.expected, actual.String())
 		}
 	}
 }

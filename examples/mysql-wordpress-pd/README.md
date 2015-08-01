@@ -132,7 +132,7 @@ spec:
 ```
 
 [Download example](mysql.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE mysql.yaml -->
 
 Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
 Once you've edited the file to set your database password, create the pod as follows, where `<kubernetes>` is the path to your Kubernetes installation:
@@ -187,7 +187,7 @@ spec:
 ```
 
 [Download example](mysql-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE mysql-service.yaml -->
 
 Start the service like this:
 
@@ -242,7 +242,7 @@ spec:
 ```
 
 [Download example](wordpress.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE wordpress.yaml -->
 
 Create the pod:
 
@@ -283,7 +283,7 @@ spec:
 ```
 
 [Download example](wordpress-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE wordpress-service.yaml -->
 
 Note the `type: LoadBalancer` setting.  This will set up the wordpress service behind an external IP.
 Note also that we've set the service port to 80.  We'll return to that shortly.

@@ -79,7 +79,7 @@ curl <insert-ip-from-above-here>
 
 Note that you will need run this curl command on your boot2docker VM if you are running on OS X.
 
-### Scaling 
+### Scaling
 
 Now try to scale up the nginx you created before:
 

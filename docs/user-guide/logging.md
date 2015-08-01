@@ -59,7 +59,7 @@ spec:
 ```
 
 [Download example](../../examples/blog-logging/counter-pod.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE ../../examples/blog-logging/counter-pod.yaml -->
 
 we can run the pod:
 

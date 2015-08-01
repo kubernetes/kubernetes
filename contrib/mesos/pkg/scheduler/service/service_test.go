@@ -137,9 +137,9 @@ func Test_StaticPods(t *testing.T) {
 	assert.NoError(err)
 
 	// archive config files
-	data, fileNum, err := archive.ZipDir(staticPodsConfigPath)
+	data, paths, err := archive.ZipDir(staticPodsConfigPath)
 	assert.NoError(err)
-	assert.Equal(2, fileNum)
+	assert.Equal(2, len(paths))
 
 	// unarchive config files
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))

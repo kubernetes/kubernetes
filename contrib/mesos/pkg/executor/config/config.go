@@ -26,4 +26,5 @@ const (
 	DefaultInfoSource     = "kubernetes"
 	DefaultInfoName       = "Kubelet-Executor"
 	DefaultSuicideTimeout = 20 * time.Minute
+	DefaultCgroupPrefix   = "mesos"
 )

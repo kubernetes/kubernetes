@@ -35,7 +35,7 @@ const (
 Possible resources include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota) or secrets.
+resourcequotas (quota), namespaces (ns), endpoints (ep) or secrets.
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).`
@@ -100,7 +100,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	if len(args) == 0 {
-		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources)
+		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources, `   * componentstatuses (aka 'cs')
+   * endpoints (aka 'ep')
+`)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 

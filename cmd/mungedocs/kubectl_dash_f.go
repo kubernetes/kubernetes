@@ -25,29 +25,25 @@ import (
 
 // Looks for lines that have kubectl commands with -f flags and files that
 // don't exist.
-func checkKubectlFileTargets(file string, markdown []byte) ([]byte, error) {
-	inside := false
-	lines := splitLines(markdown)
-	errors := []string{}
-	for i := range lines {
-		if strings.HasPrefix(lines[i], "```") {
-			inside = !inside
+func updateKubectlFileTargets(file string, mlines mungeLines) (mungeLines, error) {
+	var errors []string
+	for i, mline := range mlines {
+		if !mline.preformatted {
+			continue
 		}
-		if inside {
-			if err := lookForKubectl(lines, i); err != nil {
-				errors = append(errors, err.Error())
-			}
+		if err := lookForKubectl(mline.data, i); err != nil {
+			errors = append(errors, err.Error())
 		}
 	}
 	err := error(nil)
 	if len(errors) != 0 {
 		err = fmt.Errorf("%s", strings.Join(errors, "\n"))
 	}
-	return markdown, err
+	return mlines, err
 }
 
-func lookForKubectl(lines []string, lineNum int) error {
-	fields := strings.Fields(lines[lineNum])
+func lookForKubectl(line string, lineNum int) error {
+	fields := strings.Fields(line)
 	for i := range fields {
 		if fields[i] == "kubectl" {
 			return gotKubectl(lineNum, fields, i)
@@ -56,26 +52,26 @@ func lookForKubectl(lines []string, lineNum int) error {
 	return nil
 }
 
-func gotKubectl(line int, fields []string, fieldNum int) error {
+func gotKubectl(lineNum int, fields []string, fieldNum int) error {
 	for i := fieldNum + 1; i < len(fields); i++ {
 		switch fields[i] {
 		case "create", "update", "replace", "delete":
-			return gotCommand(line, fields, i)
+			return gotCommand(lineNum, fields, i)
 		}
 	}
 	return nil
 }
 
-func gotCommand(line int, fields []string, fieldNum int) error {
+func gotCommand(lineNum int, fields []string, fieldNum int) error {
 	for i := fieldNum + 1; i < len(fields); i++ {
 		if strings.HasPrefix(fields[i], "-f") {
-			return gotDashF(line, fields, i)
+			return gotDashF(lineNum, fields, i)
 		}
 	}
 	return nil
 }
 
-func gotDashF(line int, fields []string, fieldNum int) error {
+func gotDashF(lineNum int, fields []string, fieldNum int) error {
 	target := ""
 	if fields[fieldNum] == "-f" {
 		if fieldNum+1 == len(fields) {
@@ -112,9 +108,9 @@ func gotDashF(line int, fields []string, fieldNum int) error {
 	}
 
 	// If we got here we expect the file to exist.
-	_, err := os.Stat(path.Join(*rootDir, *repoRoot, target))
+	_, err := os.Stat(path.Join(repoRoot, target))
 	if os.IsNotExist(err) {
-		return fmt.Errorf("%d: target file %q does not exist", line, target)
+		return fmt.Errorf("%d: target file %q does not exist", lineNum, target)
 	}
 	return err
 }

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -72,7 +72,7 @@ func (c *Config) leaseAndUpdateLoop(etcdClient *etcd.Client) {
 func (c *Config) acquireOrRenewLease(etcdClient *etcd.Client) (bool, error) {
 	result, err := etcdClient.Get(c.key, false, false)
 	if err != nil {
-		if tools.IsEtcdNotFound(err) {
+		if etcdstorage.IsEtcdNotFound(err) {
 			// there is no current master, try to become master, create will fail if the key already exists
 			_, err := etcdClient.Create(c.key, c.whoami, c.ttl)
 			if err != nil {

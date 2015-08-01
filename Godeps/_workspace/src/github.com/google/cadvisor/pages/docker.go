@@ -130,7 +130,7 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 		}
 		data = &pageData{
 			DisplayName:        displayName,
-			ContainerName:      cont.Name,
+			ContainerName:      escapeContainerName(cont.Name),
 			ParentContainers:   parentContainers,
 			Spec:               cont.Spec,
 			Stats:              cont.Stats,

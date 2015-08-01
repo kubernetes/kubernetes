@@ -56,7 +56,7 @@ for a number of reasons:
   - Auditing considerations for humans and service accounts may differ.
   - A config bundle for a complex system may include definition of various service
     accounts for components of that system.  Because service accounts can be created
-    ad-hoc and have namespaced names, such config is portable. 
+    ad-hoc and have namespaced names, such config is portable.
 
 ## Service account automation
 

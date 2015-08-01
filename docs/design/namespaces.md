@@ -52,7 +52,7 @@ Each user community has its own:
 
 A cluster operator may create a Namespace for each unique user community.
 
-The Namespace provides a unique scope for: 
+The Namespace provides a unique scope for:
 
 1. named resources (to avoid basic naming collisions)
 2. delegated management authority to trusted users
@@ -142,7 +142,7 @@ type NamespaceSpec struct {
 
 A *FinalizerName* is a qualified name.
 
-The API Server enforces that a *Namespace* can only be deleted from storage if and only if 
+The API Server enforces that a *Namespace* can only be deleted from storage if and only if
 it's *Namespace.Spec.Finalizers* is empty.
 
 A *finalize* operation is the only mechanism to modify the *Namespace.Spec.Finalizers* field post creation.
@@ -189,12 +189,12 @@ are known to the cluster.
 The *namespace controller* enumerates each known resource type in that namespace and deletes it one by one.
 
 Admission control blocks creation of new resources in that namespace in order to prevent a race-condition
-where the controller could believe all of a given resource type had been deleted from the namespace, 
+where the controller could believe all of a given resource type had been deleted from the namespace,
 when in fact some other rogue client agent had created new objects.  Using admission control in this
 scenario allows each of registry implementations for the individual objects to not need to take into account Namespace life-cycle.
 
 Once all objects known to the *namespace controller* have been deleted, the *namespace controller*
-executes a *finalize* operation on the namespace that removes the *kubernetes* value from 
+executes a *finalize* operation on the namespace that removes the *kubernetes* value from
 the *Namespace.Spec.Finalizers* list.
 
 If the *namespace controller* sees a *Namespace* whose *ObjectMeta.DeletionTimestamp* is set, and
@@ -245,13 +245,13 @@ In etcd, we want to continue to still support efficient WATCH across namespaces.
 
 Resources that persist content in etcd will have storage paths as follows:
 
-/{k8s_storage_prefix}/{resourceType}/{resource.Namespace}/{resource.Name} 
+/{k8s_storage_prefix}/{resourceType}/{resource.Namespace}/{resource.Name}
 
 This enables consumers to WATCH /registry/{resourceType} for changes across namespace of a particular {resourceType}.
 
 ### Kubelet
 
-The kubelet will register pod's it sources from a file or http source with a namespace associated with the 
+The kubelet will register pod's it sources from a file or http source with a namespace associated with the
 *cluster-id*
 
 ### Example: OpenShift Origin managing a Kubernetes Namespace
@@ -362,7 +362,7 @@ This results in the following state:
 
 At this point, the Kubernetes *namespace controller* in its sync loop will see that the namespace
 has a deletion timestamp and that its list of finalizers is empty.  As a result, it knows all
-content associated from that namespace has been purged.  It performs a final DELETE action 
+content associated from that namespace has been purged.  It performs a final DELETE action
 to remove that Namespace from the storage.
 
 At this point, all content associated with that Namespace, and the Namespace itself are gone.

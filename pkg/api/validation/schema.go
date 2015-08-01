@@ -114,7 +114,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 	if len(fieldName) > 0 {
 		fieldName = fieldName + "."
 	}
-	//handle required fields
+	// handle required fields
 	for _, requiredKey := range model.Required {
 		if _, ok := fields[requiredKey]; !ok {
 			allErrs = append(allErrs, fmt.Errorf("field %s: is required", requiredKey))
@@ -123,10 +123,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 	for key, value := range fields {
 		details, ok := properties.At(key)
 		if !ok {
-			glog.Infof("unknown field: %s", key)
-			// Some properties can be missing because of
-			// https://github.com/GoogleCloudPlatform/kubernetes/issues/6842.
-			glog.Info("this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842")
+			allErrs = append(allErrs, fmt.Errorf("found invalid field %s for %s", key, typeName))
 			continue
 		}
 		if details.Type == nil && details.Ref == nil {

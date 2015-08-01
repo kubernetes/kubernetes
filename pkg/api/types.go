@@ -1517,6 +1517,27 @@ type PodLogOptions struct {
 	Previous bool
 }
 
+// PodAttachOptions is the query options to a Pod's remote attach call
+// TODO: merge w/ PodExecOptions below for stdin, stdout, etc
+type PodAttachOptions struct {
+	TypeMeta `json:",inline"`
+
+	// Stdin if true indicates that stdin is to be redirected for the attach call
+	Stdin bool `json:"stdin,omitempty"`
+
+	// Stdout if true indicates that stdout is to be redirected for the attach call
+	Stdout bool `json:"stdout,omitempty"`
+
+	// Stderr if true indicates that stderr is to be redirected for the attach call
+	Stderr bool `json:"stderr,omitempty"`
+
+	// TTY if true indicates that a tty will be allocated for the attach call
+	TTY bool `json:"tty,omitempty"`
+
+	// Container to attach to.
+	Container string `json:"container,omitempty"`
+}
+
 // PodExecOptions is the query options to a Pod's remote exec call
 type PodExecOptions struct {
 	TypeMeta

@@ -51,7 +51,7 @@ The resource model aims to be:
 
 A Kubernetes _resource_ is something that can be requested by, allocated to, or consumed by a pod or container.  Examples include memory (RAM), CPU, disk-time, and network bandwidth.
 
-Once resources on a node have been allocated to one pod, they should not be allocated to another until that pod is removed or exits. This means that Kubernetes schedulers should ensure that the sum of the resources allocated (requested and granted) to its pods never exceeds the usable capacity of the node. Testing whether a pod will fit on a node is called _feasibility checking_. 
+Once resources on a node have been allocated to one pod, they should not be allocated to another until that pod is removed or exits. This means that Kubernetes schedulers should ensure that the sum of the resources allocated (requested and granted) to its pods never exceeds the usable capacity of the node. Testing whether a pod will fit on a node is called _feasibility checking_.
 
 Note that the resource model currently prohibits over-committing resources; we will want to relax that restriction later.
 
@@ -70,7 +70,7 @@ For future reference, note that some resources, such as CPU and network bandwidt
 
 ### Resource quantities
 
-Initially, all Kubernetes resource types are _quantitative_, and have an associated _unit_ for quantities of the associated resource (e.g., bytes for memory, bytes per seconds for bandwidth, instances for software licences). The units will always be a resource type's natural base units (e.g., bytes, not MB), to avoid confusion between binary and decimal multipliers and the underlying unit multiplier (e.g., is memory measured in MiB, MB, or GB?).  
+Initially, all Kubernetes resource types are _quantitative_, and have an associated _unit_ for quantities of the associated resource (e.g., bytes for memory, bytes per seconds for bandwidth, instances for software licences). The units will always be a resource type's natural base units (e.g., bytes, not MB), to avoid confusion between binary and decimal multipliers and the underlying unit multiplier (e.g., is memory measured in MiB, MB, or GB?).
 
 Resource quantities can be added and subtracted: for example, a node has a fixed quantity of each resource type that can be allocated to pods/containers; once such an allocation has been made, the allocated resources cannot be made available to other pods/containers without over-committing the resources.
 
@@ -110,7 +110,7 @@ resourceCapacitySpec: [
 ```
 
 Where:
-* _total_: the total allocatable resources of a node.  Initially, the resources at a given scope will bound the resources of the sum of inner scopes. 
+* _total_: the total allocatable resources of a node.  Initially, the resources at a given scope will bound the resources of the sum of inner scopes.
 
 #### Notes
 
@@ -194,7 +194,7 @@ The following are planned future extensions to the resource model, included here
 
 Because resource usage and related metrics change continuously, need to be tracked over time (i.e., historically), can be characterized in a variety of ways, and are fairly voluminous, we will not include usage in core API objects, such as [Pods](../user-guide/pods.md) and Nodes, but will provide separate APIs for accessing and managing that data. See the Appendix for possible representations of usage data, but the representation we'll use is TBD.
 
-Singleton values for observed and predicted future usage will rapidly prove inadequate, so we will support the following structure for extended usage information: 
+Singleton values for observed and predicted future usage will rapidly prove inadequate, so we will support the following structure for extended usage information:
 
 ```yaml
 resourceStatus: [
@@ -223,7 +223,7 @@ where a `<CPU-info>` or `<memory-info>` structure looks like this:
 ```
 
 All parts of this structure are optional, although we strongly encourage including quantities for 50, 90, 95, 99, 99.5, and 99.9 percentiles.  _[In practice, it will be important to include additional info such as the length of the time window over which the averages are calculated, the confidence level, and information-quality metrics such as the number of dropped or discarded data points.]_
-and predicted 
+and predicted
 
 ## Future resource types
 

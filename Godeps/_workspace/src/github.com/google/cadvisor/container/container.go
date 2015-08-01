@@ -73,6 +73,9 @@ type ContainerHandler interface {
 	// Returns absolute cgroup path for the requested resource.
 	GetCgroupPath(resource string) (string, error)
 
+	// Returns container labels, if available.
+	GetContainerLabels() map[string]string
+
 	// Returns whether the container still exists.
 	Exists() bool
 }

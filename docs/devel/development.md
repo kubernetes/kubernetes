@@ -99,6 +99,17 @@ git push -f origin myfeature
 1. Visit http://github.com/$YOUR_GITHUB_USERNAME/kubernetes
 2. Click the "Compare and pull request" button next to your "myfeature" branch.
 
+### When to retain commits and when to squash
+
+Upon merge, all git commits should represent meaningful milestones or units of
+work.  Use commits to add clarity to the development and review process.
+
+Before merging a PR, squash any "fix review feedback", "typo", and "rebased"
+sorts of commits.  It is not imperative that every commit in a PR compile and
+pass tests independently, but it is worth striving for.  For mass automated
+fixups (e.g. automated doc formatting), use one or more commits for the
+changes to tooling and a final commit to apply the fixup en masse.  This makes
+reviews much easier.
 
 ## godep and dependency management
 

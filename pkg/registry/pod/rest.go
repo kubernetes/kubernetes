@@ -188,7 +188,6 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.U
 // LogLocation returns a the log URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
 func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodLogOptions) (*url.URL, http.RoundTripper, error) {
-
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
@@ -228,17 +227,62 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 	return loc, nodeTransport, nil
 }
 
+func streamParams(params url.Values, opts runtime.Object) error {
+	switch opts := opts.(type) {
+	case *api.PodExecOptions:
+		if opts.Stdin {
+			params.Add(api.ExecStdinParam, "1")
+		}
+		if opts.Stdout {
+			params.Add(api.ExecStdoutParam, "1")
+		}
+		if opts.Stderr {
+			params.Add(api.ExecStderrParam, "1")
+		}
+		if opts.TTY {
+			params.Add(api.ExecTTYParam, "1")
+		}
+		for _, c := range opts.Command {
+			params.Add("command", c)
+		}
+	case *api.PodAttachOptions:
+		if opts.Stdin {
+			params.Add(api.ExecStdinParam, "1")
+		}
+		if opts.Stdout {
+			params.Add(api.ExecStdoutParam, "1")
+		}
+		if opts.Stderr {
+			params.Add(api.ExecStderrParam, "1")
+		}
+		if opts.TTY {
+			params.Add(api.ExecTTYParam, "1")
+		}
+	default:
+		return fmt.Errorf("Unknown object for streaming: %v", opts)
+	}
+	return nil
+}
+
+// AttachLocation returns the attach URL for a pod container. If opts.Container is blank
+// and only one container is present in the pod, that container is used.
+func AttachLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodAttachOptions) (*url.URL, http.RoundTripper, error) {
+	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "attach")
+}
+
 // ExecLocation returns the exec URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
 func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodExecOptions) (*url.URL, http.RoundTripper, error) {
+	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
+}
 
+func streamLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts runtime.Object, container, path string) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Try to figure out a container
-	container := opts.Container
 	if container == "" {
 		if len(pod.Spec.Containers) == 1 {
 			container = pod.Spec.Containers[0].Name
@@ -256,25 +300,13 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 		return nil, nil, err
 	}
 	params := url.Values{}
-	if opts.Stdin {
-		params.Add(api.ExecStdinParam, "1")
-	}
-	if opts.Stdout {
-		params.Add(api.ExecStdoutParam, "1")
-	}
-	if opts.Stderr {
-		params.Add(api.ExecStderrParam, "1")
-	}
-	if opts.TTY {
-		params.Add(api.ExecTTYParam, "1")
-	}
-	for _, c := range opts.Command {
-		params.Add("command", c)
+	if err := streamParams(params, opts); err != nil {
+		return nil, nil, err
 	}
 	loc := &url.URL{
 		Scheme:   nodeScheme,
 		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
-		Path:     fmt.Sprintf("/exec/%s/%s/%s", pod.Namespace, name, container),
+		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, name, container),
 		RawQuery: params.Encode(),
 	}
 	return loc, nodeTransport, nil
@@ -282,7 +314,6 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 
 // PortForwardLocation returns a the port-forward URL for a pod.
 func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
-
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err

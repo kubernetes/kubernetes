@@ -1392,6 +1392,21 @@ func convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 	return nil
 }
 
+func convert_api_PodAttachOptions_To_v1_PodAttachOptions(in *api.PodAttachOptions, out *PodAttachOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PodAttachOptions))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Stdin = in.Stdin
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
+	out.TTY = in.TTY
+	out.Container = in.Container
+	return nil
+}
+
 func convert_api_PodCondition_To_v1_PodCondition(in *api.PodCondition, out *PodCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PodCondition))(in)
@@ -3642,6 +3657,21 @@ func convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 	return nil
 }
 
+func convert_v1_PodAttachOptions_To_api_PodAttachOptions(in *PodAttachOptions, out *api.PodAttachOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PodAttachOptions))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Stdin = in.Stdin
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
+	out.TTY = in.TTY
+	out.Container = in.Container
+	return nil
+}
+
 func convert_v1_PodCondition_To_api_PodCondition(in *PodCondition, out *api.PodCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodCondition))(in)
@@ -4595,6 +4625,7 @@ func init() {
 		convert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec,
 		convert_api_PersistentVolumeStatus_To_v1_PersistentVolumeStatus,
 		convert_api_PersistentVolume_To_v1_PersistentVolume,
+		convert_api_PodAttachOptions_To_v1_PodAttachOptions,
 		convert_api_PodCondition_To_v1_PodCondition,
 		convert_api_PodExecOptions_To_v1_PodExecOptions,
 		convert_api_PodList_To_v1_PodList,
@@ -4707,6 +4738,7 @@ func init() {
 		convert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec,
 		convert_v1_PersistentVolumeStatus_To_api_PersistentVolumeStatus,
 		convert_v1_PersistentVolume_To_api_PersistentVolume,
+		convert_v1_PodAttachOptions_To_api_PodAttachOptions,
 		convert_v1_PodCondition_To_api_PodCondition,
 		convert_v1_PodExecOptions_To_api_PodExecOptions,
 		convert_v1_PodList_To_api_PodList,

@@ -102,7 +102,7 @@ to make sure that each automatically restarts when it fails.  To achieve this, w
 the `kubelet` that we run on each of the worker nodes.  This is convenient, since we can use containers to distribute our binaries, we can
 establish resource limits, and introspect the resource usage of each daemon.  Of course, we also need something to monitor the kubelet
 itself (insert who watches the watcher jokes here).  For Debian systems, we choose monit, but there are a number of alternate
-choices. For example, on systemd-based systems (e.g. RHEL, CentOS), you can run 'systemctl enable kubelet'. 
+choices. For example, on systemd-based systems (e.g. RHEL, CentOS), you can run 'systemctl enable kubelet'.
 
 If you are extending from a standard Kubernetes installation, the `kubelet` binary should already be present on your system.  You can run
 `which kubelet` to determine if the binary is in fact installed.  If it is not installed,

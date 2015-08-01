@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 ## Abstract
 
 Auto-scaling is a data-driven feature that allows users to increase or decrease capacity as needed by controlling the
-number of pods deployed within the system automatically.  
+number of pods deployed within the system automatically.
 
 ## Motivation
 
@@ -49,7 +49,7 @@ done automatically based on statistical analysis and thresholds.
     * Scale verb - [1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629)
     * Config conflicts - [Config](https://github.com/GoogleCloudPlatform/kubernetes/blob/c7cb991987193d4ca33544137a5cb7d0292cf7df/docs/config.md#automated-re-configuration-processes)
     * Rolling updates - [1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)
-    * Multiple scalable types - [1624](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624)  
+    * Multiple scalable types - [1624](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624)
 
 ## Constraints and Assumptions
 
@@ -77,7 +77,7 @@ balanced or situated behind a proxy - the data from those proxies and load balan
 server traffic for applications. This is the primary, but not sole, source of data for making decisions.
 
 Within Kubernetes a [kube proxy](../user-guide/services.md#ips-and-vips)
-running on each node directs service requests to the underlying implementation.  
+running on each node directs service requests to the underlying implementation.
 
 While the proxy provides internal inter-pod connections, there will be L3 and L7 proxies and load balancers that manage
 traffic to backends. OpenShift, for instance, adds a "route" resource for defining external to internal traffic flow.
@@ -87,7 +87,7 @@ data source for the number of backends.
 ### Scaling based on predictive analysis
 
 Scaling may also occur based on predictions of system state like anticipated load, historical data, etc.  Hand in hand
-with scaling based on traffic, predictive analysis may be used to determine anticipated system load and scale the application automatically.  
+with scaling based on traffic, predictive analysis may be used to determine anticipated system load and scale the application automatically.
 
 ### Scaling based on arbitrary data
 
@@ -113,7 +113,7 @@ use a client/cache implementation to receive watch data from the data aggregator
 scaling the application.  Auto-scalers are created and defined like other resources via REST endpoints and belong to the
 namespace just as a `ReplicationController` or `Service`.
 
-Since an auto-scaler is a durable object it is best represented as a resource.  
+Since an auto-scaler is a durable object it is best represented as a resource.
 
 ```go
     //The auto scaler interface
@@ -241,7 +241,7 @@ be specified as "when requests per second fall below 25 for 30 seconds scale the
 ### Data Aggregator
 
 This section has intentionally been left empty.  I will defer to folks who have more experience gathering and analyzing
-time series statistics.  
+time series statistics.
 
 Data aggregation is opaque to the auto-scaler resource.  The auto-scaler is configured to use `AutoScaleThresholds`
 that know how to work with the underlying data in order to know if an application must be scaled up or down.   Data aggregation
@@ -257,7 +257,7 @@ potentially piggyback on this registry.
 
 If multiple scalable targets satisfy the `TargetSelector` criteria the auto-scaler should be configurable as to which
 target(s) are scaled.  To begin with, if multiple targets are found the auto-scaler will scale the largest target up
-or down as appropriate.  In the future this may be more configurable.  
+or down as appropriate.  In the future this may be more configurable.
 
 ### Interactions with a deployment
 
@@ -266,12 +266,12 @@ there will be multiple replication controllers, with one scaling up and another 
 auto-scaler must be aware of the entire set of capacity that backs a service so it does not fight with the deployer.  `AutoScalerSpec.MonitorSelector`
 is what provides this ability.  By using a selector that spans the entire service the auto-scaler can monitor capacity
 of multiple replication controllers and check that capacity against the `AutoScalerSpec.MaxAutoScaleCount` and
-`AutoScalerSpec.MinAutoScaleCount` while still only targeting a specific set of `ReplicationController`s with `TargetSelector`.  
+`AutoScalerSpec.MinAutoScaleCount` while still only targeting a specific set of `ReplicationController`s with `TargetSelector`.
 
 In the course of a deployment it is up to the deployment orchestration to decide how to manage the labels
 on the replication controllers if it needs to ensure that only specific replication controllers are targeted by
 the auto-scaler.  By default, the auto-scaler will scale the largest replication controller that meets the target label
-selector criteria.  
+selector criteria.
 
 During deployment orchestration the auto-scaler may be making decisions to scale its target up or down.  In order to prevent
 the scaler from fighting with a deployment process that is scaling one replication controller up and scaling another one

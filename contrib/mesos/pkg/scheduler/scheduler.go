@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -120,14 +121,16 @@ type KubernetesScheduler struct {
 
 	// Config related, write-once
 
-	schedcfg          *schedcfg.Config
-	executor          *mesos.ExecutorInfo
-	executorGroup     uint64
-	scheduleFunc      PodScheduleFunc
-	client            *client.Client
-	etcdClient        tools.EtcdClient
-	failoverTimeout   float64 // in seconds
-	reconcileInterval int64
+	schedcfg                 *schedcfg.Config
+	executor                 *mesos.ExecutorInfo
+	executorGroup            uint64
+	scheduleFunc             PodScheduleFunc
+	client                   *client.Client
+	etcdClient               tools.EtcdClient
+	failoverTimeout          float64 // in seconds
+	reconcileInterval        int64
+	defaultContainerCPULimit mresource.CPUShares
+	defaultContainerMemLimit mresource.MegaBytes
 
 	// Mesos context.
 
@@ -154,29 +157,33 @@ type KubernetesScheduler struct {
 }
 
 type Config struct {
-	Schedcfg          schedcfg.Config
-	Executor          *mesos.ExecutorInfo
-	ScheduleFunc      PodScheduleFunc
-	Client            *client.Client
-	EtcdClient        tools.EtcdClient
-	FailoverTimeout   float64
-	ReconcileInterval int64
-	ReconcileCooldown time.Duration
+	Schedcfg                 schedcfg.Config
+	Executor                 *mesos.ExecutorInfo
+	ScheduleFunc             PodScheduleFunc
+	Client                   *client.Client
+	EtcdClient               tools.EtcdClient
+	FailoverTimeout          float64
+	ReconcileInterval        int64
+	ReconcileCooldown        time.Duration
+	DefaultContainerCPULimit mresource.CPUShares
+	DefaultContainerMemLimit mresource.MegaBytes
 }
 
 // New creates a new KubernetesScheduler
 func New(config Config) *KubernetesScheduler {
 	var k *KubernetesScheduler
 	k = &KubernetesScheduler{
-		schedcfg:          &config.Schedcfg,
-		RWMutex:           new(sync.RWMutex),
-		executor:          config.Executor,
-		executorGroup:     uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
-		scheduleFunc:      config.ScheduleFunc,
-		client:            config.Client,
-		etcdClient:        config.EtcdClient,
-		failoverTimeout:   config.FailoverTimeout,
-		reconcileInterval: config.ReconcileInterval,
+		schedcfg:                 &config.Schedcfg,
+		RWMutex:                  new(sync.RWMutex),
+		executor:                 config.Executor,
+		executorGroup:            uid.Parse(config.Executor.ExecutorId.GetValue()).Group(),
+		scheduleFunc:             config.ScheduleFunc,
+		client:                   config.Client,
+		etcdClient:               config.EtcdClient,
+		failoverTimeout:          config.FailoverTimeout,
+		reconcileInterval:        config.ReconcileInterval,
+		defaultContainerCPULimit: config.DefaultContainerCPULimit,
+		defaultContainerMemLimit: config.DefaultContainerMemLimit,
 		offers: offers.CreateRegistry(offers.RegistryConfig{
 			Compat: func(o *mesos.Offer) bool {
 				// filter the offers: the executor IDs must not identify a kubelet-

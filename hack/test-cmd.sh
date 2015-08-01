@@ -90,6 +90,9 @@ CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 PROXY_PORT=${PROXY_PORT:-8001}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
+# ensure ~/.kube/config isn't loaded by tests
+HOME="${KUBE_TEMP}"
+
 # Check kubectl
 kube::log::status "Running kubectl with no options"
 "${KUBE_OUTPUT_HOSTBIN}/kubectl"
@@ -613,6 +616,17 @@ __EOF__
   kubectl scale  --replicas=3 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+
+  ### Scale multiple replication controllers
+  kubectl create -f examples/guestbook/redis-master-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
+  # Command
+  kubectl scale rc/redis-master rc/redis-slave --replicas=4
+  # Post-condition: 4 replicas each
+  kube::test::get_object_assert 'rc redis-master' "{{$rc_replicas_field}}" '4'
+  kube::test::get_object_assert 'rc redis-slave' "{{$rc_replicas_field}}" '4'
+  # Clean-up
+  kubectl delete rc redis-{master,slave} "${kube_flags[@]}"
 
   ### Expose replication controller as service
   # Pre-condition: 3 replicas

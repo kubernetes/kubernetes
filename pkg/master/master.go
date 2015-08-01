@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -43,6 +44,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	explatest "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -69,6 +71,8 @@ import (
 	etcdallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -87,22 +91,25 @@ const (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	DatabaseStorage tools.StorageInterface
-	EventTTL        time.Duration
-	MinionRegexp    string
-	KubeletClient   client.KubeletClient
+	DatabaseStorage    storage.Interface
+	ExpDatabaseStorage storage.Interface
+	EventTTL           time.Duration
+	MinionRegexp       string
+	KubeletClient      client.KubeletClient
 	// allow downstream consumers to disable the core controller loops
 	EnableCoreControllers bool
 	EnableLogsSupport     bool
 	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow v1 to be conditionally disabled
+	// allow api versions to be conditionally disabled
 	DisableV1 bool
+	EnableExp bool
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
 	APIPrefix             string
+	ExpAPIPrefix          string
 	CorsAllowedOriginList util.StringList
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
@@ -179,12 +186,14 @@ type Master struct {
 	enableSwaggerSupport  bool
 	enableProfiling       bool
 	apiPrefix             string
+	expAPIPrefix          string
 	corsAllowedOriginList util.StringList
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
 	admissionControl      admission.Interface
 	masterCount           int
 	v1                    bool
+	exp                   bool
 	requestContextMapper  api.RequestContextMapper
 
 	// External host is the name that should be used in external (public internet) URLs for this master
@@ -223,17 +232,14 @@ type Master struct {
 	clock          util.Clock
 }
 
-// NewEtcdStorage returns a StorageInterface for the provided arguments or an error if the version
+// NewEtcdStorage returns a storage.Interface for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdStorage(client tools.EtcdClient, version string, prefix string) (etcdStorage tools.StorageInterface, err error) {
-	if version == "" {
-		version = latest.Version
-	}
-	versionInterfaces, err := latest.InterfacesFor(version)
+func NewEtcdStorage(client tools.EtcdClient, interfacesFunc meta.VersionInterfacesFunc, version, prefix string) (etcdStorage storage.Interface, err error) {
+	versionInterfaces, err := interfacesFunc(version)
 	if err != nil {
 		return etcdStorage, err
 	}
-	return tools.NewEtcdStorage(client, versionInterfaces.Codec, prefix), nil
+	return etcdstorage.NewEtcdStorage(client, versionInterfaces.Codec, prefix), nil
 }
 
 // setDefaults fills in any fields not set that are required to have valid data.
@@ -335,11 +341,13 @@ func New(c *Config) *Master {
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
 		enableProfiling:       c.EnableProfiling,
 		apiPrefix:             c.APIPrefix,
+		expAPIPrefix:          c.ExpAPIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
 		v1:                    !c.DisableV1,
+		exp:                   c.EnableExp,
 		requestContextMapper:  c.RequestContextMapper,
 
 		cacheTimeout:      c.CacheTimeout,
@@ -470,6 +478,7 @@ func (m *Master) init(c *Config) {
 	// TODO: Factor out the core API registration
 	m.storage = map[string]rest.Storage{
 		"pods":             podStorage.Pod,
+		"pods/attach":      podStorage.Attach,
 		"pods/status":      podStorage.Status,
 		"pods/log":         podStorage.Log,
 		"pods/exec":        podStorage.Exec,
@@ -563,6 +572,16 @@ func (m *Master) init(c *Config) {
 	defaultVersion := m.defaultAPIGroupVersion()
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
+
+	if m.exp {
+		expVersion := m.expapi(c)
+		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
+			glog.Fatalf("Unable to setup experimental api: %v", err)
+		}
+		apiserver.AddApiWebService(m.handlerContainer, c.ExpAPIPrefix, []string{expVersion.Version})
+		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), expVersion.Mapper}
+		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
+	}
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
@@ -721,7 +740,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 			addr = etcdUrl.Host
 			port = 4001
 		}
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: tools.EtcdHealthCheck}
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: etcdstorage.EtcdHealthCheck}
 	}
 	return serversToValidate
 }
@@ -756,6 +775,30 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	version.Version = "v1"
 	version.Codec = v1.Codec
 	return version
+}
+
+// expapi returns the resources and codec for the experimental api
+func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
+	storage := map[string]rest.Storage{}
+	return &apiserver.APIGroupVersion{
+		Root: m.expAPIPrefix,
+
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+
+		Mapper:  explatest.RESTMapper,
+		Codec:   explatest.Codec,
+		Linker:  explatest.SelfLinker,
+		Storage: storage,
+		Version: explatest.Version,
+
+		Admit:   m.admissionControl,
+		Context: m.requestContextMapper,
+
+		ProxyDialerFn:     m.dialer,
+		MinRequestTimeout: m.minRequestTimeout,
+	}
 }
 
 // findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.

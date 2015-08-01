@@ -24,7 +24,7 @@ import (
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for service accounts against etcd
@@ -35,7 +35,7 @@ type REST struct {
 const Prefix = "/serviceaccounts"
 
 // NewStorage returns a RESTStorage object that will work against service accounts objects.
-func NewStorage(s tools.StorageInterface) *REST {
+func NewStorage(s storage.Interface) *REST {
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ServiceAccount{} },
 		NewListFunc: func() runtime.Object { return &api.ServiceAccountList{} },

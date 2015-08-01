@@ -68,7 +68,7 @@ Credentials can be provided in several ways:
     - Per-cluster
     - automatically configured on Google Compute Engine or Google Container Engine
     - all pods can read the project's private registry
-  - Configuring Nodes to Authenticate to a Private Registry 
+  - Configuring Nodes to Authenticate to a Private Registry
     - all pods can read any configured private registries
     - requires node configuration by cluster administrator
   - Pre-pulling Images
@@ -77,7 +77,7 @@ Credentials can be provided in several ways:
   - Specifying ImagePullSecrets on a Pod
     - only pods which provide own keys can access the private registry
 Each option is described in more detail below.
-  
+
 
 ### Using Google Container Registry
 
@@ -101,7 +101,7 @@ with credentials for Google Container Registry.  You cannot use this approach.
 **Note:** this approach is suitable if you can control node configuration.  It
 will not work reliably on GCE, and any other cloud provider that does automatic
 node replacement.
- 
+
 Docker stores keys for private registries in the `$HOME/.dockercfg` file.  If you put this
 in the `$HOME` of `root` on a kubelet, then docker will use it.
 
@@ -109,7 +109,7 @@ Here are the recommended steps to configuring your nodes to use a private regist
 example, run these on your desktop/laptop:
    1. run `docker login [server]` for each set of credentials you want to use.
    1. view `$HOME/.dockercfg` in an editor to ensure it contains just the credentials you want to use.
-   1. get a list of your nodes 
+   1. get a list of your nodes
       - for example: `nodes=$(kubectl get nodes -o template --template='{{range.items}}{{.metadata.name}} {{end}}')`
    1. copy your local `.dockercfg` to the home directory of root on each node.
       - for example: `for n in $nodes; do scp ~/.dockercfg root@$n:/root/.dockercfg; done`
@@ -218,7 +218,7 @@ secrets/myregistrykey
 $
 ```
 
-If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid. 
+If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid.
 If you get an error message like `Secret "myregistrykey" is invalid: data[.dockercfg]: invalid value ...` it means
 the data was successfully un-base64 encoded, but could not be parsed as a dockercfg file.
 

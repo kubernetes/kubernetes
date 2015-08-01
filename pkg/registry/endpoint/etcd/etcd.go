@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for endpoints against etcd
@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against endpoints.
-func NewStorage(s tools.StorageInterface) *REST {
+func NewStorage(s storage.Interface) *REST {
 	prefix := "/services/endpoints"
 	return &REST{
 		&etcdgeneric.Etcd{

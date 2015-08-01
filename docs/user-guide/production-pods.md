@@ -90,7 +90,7 @@ In addition to the local disk storage provided by `emptyDir`, Kubernetes support
 
 ## Distributing credentials
 
-Many applications need credentials, such as passwords, OAuth tokens, and TLS keys, to authenticate with other applications, databases, and services. Storing these credentials in container images or environment variables is less than ideal, since the credentials can then be copied by anyone with access to the image, pod/container specification, host file system, or host Docker daemon. 
+Many applications need credentials, such as passwords, OAuth tokens, and TLS keys, to authenticate with other applications, databases, and services. Storing these credentials in container images or environment variables is less than ideal, since the credentials can then be copied by anyone with access to the image, pod/container specification, host file system, or host Docker daemon.
 
 Kubernetes provides a mechanism, called [*secrets*](secrets.md), that facilitates delivery of sensitive credentials to applications. A `Secret` is a simple resource containing a map of data. For instance, a simple secret with a username and password might look as follows:
 
@@ -245,7 +245,7 @@ More examples can be found in our [blog article](http://blog.kubernetes.io/2015/
 
 ## Resource management
 
-Kubernetes’s scheduler will place applications only where they have adequate CPU and memory, but it can only do so if it knows how much [resources they require](compute-resources.md). The consequence of specifying too little CPU is that the containers could be starved of CPU if too many other containers were scheduled onto the same node. Similarly, containers could die unpredictably due to running out of memory if no memory were requested, which can be especially likely for large-memory applications. 
+Kubernetes’s scheduler will place applications only where they have adequate CPU and memory, but it can only do so if it knows how much [resources they require](compute-resources.md). The consequence of specifying too little CPU is that the containers could be starved of CPU if too many other containers were scheduled onto the same node. Similarly, containers could die unpredictably due to running out of memory if no memory were requested, which can be especially likely for large-memory applications.
 
 If no resource requirements are specified, a nominal amount of resources is assumed. (This default is applied via a [LimitRange](limitrange/) for the default [Namespace](namespaces.md). It can be viewed with `kubectl describe limitrange limits`.) You may explicitly specify the amount of resources required as follows:
 
@@ -318,7 +318,7 @@ For more details (e.g., how to specify command-based probes), see the [example i
 
 Of course, nodes and applications may fail at any time, but many applications benefit from clean shutdown, such as to complete in-flight requests, when the termination of the application is deliberate. To support such cases, Kubernetes supports two kinds of notifications:
 Kubernetes will send SIGTERM to applications, which can be handled in order to effect graceful termination. SIGKILL is sent 10 seconds later if the application does not terminate sooner.
-Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*](container-environment.md#container-hooks), which will execute prior to sending SIGTERM. 
+Kubernetes supports the (optional) specification of a [*pre-stop lifecycle hook*](container-environment.md#container-hooks), which will execute prior to sending SIGTERM.
 
 The specification of a pre-stop hook is similar to that of probes, but without the timing-related parameters. For example:
 

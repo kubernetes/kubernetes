@@ -65,7 +65,7 @@ spec:
 ```
 
 [Download example](pod.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE pod.yaml -->
 
 You can see your cluster's pods:
 
@@ -117,7 +117,7 @@ spec:
 ```
 
 [Download example](replication.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE replication.yaml -->
 
 To delete the replication controller (and the pods it created):
 

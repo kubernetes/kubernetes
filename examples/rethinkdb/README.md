@@ -130,7 +130,7 @@ We request for an external load balancer in the [admin-service.yaml](admin-servi
 type: LoadBalancer
 ```
 
-The external load balancer allows us to access the service from outside via an external IP, which is 104.197.19.120 in this case. 
+The external load balancer allows us to access the service from outside via an external IP, which is 104.197.19.120 in this case.
 
 Note that you may need to create a firewall rule to allow the traffic, assuming you are using Google Compute Engine:
 

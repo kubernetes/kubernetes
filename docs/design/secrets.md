@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 ## Abstract
 
 A proposal for the distribution of [secrets](../user-guide/secrets.md) (passwords, keys, etc) to the Kubelet and to
-containers inside Kubernetes using a custom [volume](../user-guide/volumes.md#secrets) type. See the [secrets example](../user-guide/secrets/) for more information. 
+containers inside Kubernetes using a custom [volume](../user-guide/volumes.md#secrets) type. See the [secrets example](../user-guide/secrets/) for more information.
 
 ## Motivation
 
@@ -117,7 +117,7 @@ which consumes this type of secret, the Kubelet may take a number of actions:
 
 1.  Expose the secret in a `.kubernetes_auth` file in a well-known location in the container's
     file system
-2.  Configure that node's `kube-proxy` to decorate HTTP requests from that pod to the 
+2.  Configure that node's `kube-proxy` to decorate HTTP requests from that pod to the
     `kubernetes-master` service with the auth token, e. g. by adding a header to the request
     (see the [LOAS Daemon](https://github.com/GoogleCloudPlatform/kubernetes/issues/2209) proposal)
 
@@ -146,7 +146,7 @@ We should consider what the best way to allow this is; there are a few different
         export MY_SECRET_ENV=MY_SECRET_VALUE
 
     The user could `source` the file at `/etc/secrets/my-secret` prior to executing the command for
-    the image either inline in the command or in an init script, 
+    the image either inline in the command or in an init script,
 
 2.  Give secrets an attribute that allows users to express the intent that the platform should
     generate the above syntax in the file used to present a secret.  The user could consume these

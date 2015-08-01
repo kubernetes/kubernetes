@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -238,7 +237,7 @@ func TestNewBuilder(t *testing.T) {
 		o := testclient.NewObjects(api.Scheme, api.Scheme)
 		o.Add(item.pv)
 		o.Add(item.claim)
-		client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+		client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
 
 		plugMgr := volume.VolumePluginMgr{}
 		plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))
@@ -295,7 +294,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 	o := testclient.NewObjects(api.Scheme, api.Scheme)
 	o.Add(pv)
 	o.Add(claim)
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))

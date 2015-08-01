@@ -58,6 +58,8 @@ type ConfigFactory struct {
 	NodeLister *cache.StoreToNodeLister
 	// a means to list all services
 	ServiceLister *cache.StoreToServiceLister
+	// a means to list all controllers
+	ControllerLister *cache.StoreToReplicationControllerLister
 
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
@@ -75,9 +77,10 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
 		ScheduledPodLister: &cache.StoreToPodLister{},
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
-		NodeLister:     &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ServiceLister:  &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		StopEverything: make(chan struct{}),
+		NodeLister:       &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ServiceLister:    &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ControllerLister: &cache.StoreToReplicationControllerLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		StopEverything:   make(chan struct{}),
 	}
 	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{c.PodQueue}, c.ScheduledPodLister)
 	c.modeler = modeler
@@ -160,8 +163,9 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 	pluginArgs := PluginFactoryArgs{
-		PodLister:     f.PodLister,
-		ServiceLister: f.ServiceLister,
+		PodLister:        f.PodLister,
+		ServiceLister:    f.ServiceLister,
+		ControllerLister: f.ControllerLister,
 		// All fit predicates only need to consider schedulable nodes.
 		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
 		NodeInfo:   f.NodeLister,
@@ -187,9 +191,14 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
-	// created by the same service, so that it can spread them correctly.
+	// created by the same services or ReplicationControllers, so that it can spread them correctly.
 	// Cache this locally.
 	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).RunUntil(f.StopEverything)
+
+	// Watch and cache all ReplicationController objects. Scheduler needs to find all pods
+	// created by the same services or ReplicationControllers, so that it can spread them correctly.
+	// Cache this locally.
+	cache.NewReflector(f.createControllerLW(), &api.ReplicationController{}, f.ControllerLister.Store, 0).RunUntil(f.StopEverything)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -252,6 +261,11 @@ func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
 // Returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, parseSelectorOrDie(""))
+}
+
+// Returns a cache.ListWatch that gets all changes to controllers.
+func (factory *ConfigFactory) createControllerLW() *cache.ListWatch {
+	return cache.NewListWatchFromClient(factory.Client, "replicationControllers", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {

@@ -36,7 +36,7 @@ Documentation for other releases can be found at
 *This document is aimed at users who have worked through some of the examples,
 and who want to learn more about using kubectl to manage resources such
 as pods and services.  Users who want to access the REST API directly,
-and developers who want to extend the Kubernetes API should 
+and developers who want to extend the Kubernetes API should
 refer to the [api conventions](../devel/api-conventions.md) and
 the [api document](../api.md).*
 
@@ -68,7 +68,7 @@ $ wc -l /tmp/original.yaml /tmp/current.yaml
       60 total
 ```
 
-The resource we posted had only 9 lines, but the one we got back had 51 lines. 
+The resource we posted had only 9 lines, but the one we got back had 51 lines.
 If you `diff -u /tmp/original.yaml /tmp/current.yaml`, you can see the fields added to the pod.
 The system adds fields in several ways:
   - Some fields are added synchronously with creation of the resource and some are set asynchronously.

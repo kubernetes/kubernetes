@@ -26,7 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -44,17 +44,17 @@ const (
 // Registry implements BindingRegistry, ControllerRegistry, EndpointRegistry,
 // MinionRegistry, PodRegistry and ServiceRegistry, backed by etcd.
 type Registry struct {
-	tools.StorageInterface
+	storage.Interface
 	pods      pod.Registry
 	endpoints endpoint.Registry
 }
 
 // NewRegistry creates an etcd registry.
-func NewRegistry(storage tools.StorageInterface, pods pod.Registry, endpoints endpoint.Registry) *Registry {
+func NewRegistry(storage storage.Interface, pods pod.Registry, endpoints endpoint.Registry) *Registry {
 	registry := &Registry{
-		StorageInterface: storage,
-		pods:             pods,
-		endpoints:        endpoints,
+		Interface: storage,
+		pods:      pods,
+		endpoints: endpoints,
 	}
 	return registry
 }
@@ -158,7 +158,7 @@ func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) (*api.Servic
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
 func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	version, err := tools.ParseWatchResourceVersion(resourceVersion, "service")
+	version, err := storage.ParseWatchResourceVersion(resourceVersion, "service")
 	if err != nil {
 		return nil, err
 	}
@@ -171,10 +171,10 @@ func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field f
 			return nil, err
 		}
 		// TODO: use generic.SelectionPredicate
-		return r.Watch(key, version, tools.Everything)
+		return r.Watch(key, version, storage.Everything)
 	}
 	if field.Empty() {
-		return r.WatchList(makeServiceListKey(ctx), version, tools.Everything)
+		return r.WatchList(makeServiceListKey(ctx), version, storage.Everything)
 	}
 	return nil, fmt.Errorf("only the 'name' and default (everything) field selectors are supported")
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 )
 
 // registry implements custom changes to generic.Etcd.
@@ -31,7 +31,7 @@ type registry struct {
 
 // NewEtcdRegistry returns a registry which will store Events in the given
 // EtcdStorage. ttl is the time that Events will be retained by the system.
-func NewEtcdRegistry(s tools.StorageInterface, ttl uint64) generic.Registry {
+func NewEtcdRegistry(s storage.Interface, ttl uint64) generic.Registry {
 	prefix := "/events"
 	return registry{
 		Etcd: &etcdgeneric.Etcd{

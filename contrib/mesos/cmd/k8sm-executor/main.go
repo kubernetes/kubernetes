@@ -32,7 +32,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	s := service.NewKubeletExecutorServer()
-	s.AddStandaloneFlags(pflag.CommandLine)
+	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
 	util.InitLogs()

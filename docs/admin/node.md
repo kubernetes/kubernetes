@@ -234,7 +234,7 @@ capacity when adding a node.
 The Kubernetes scheduler ensures that there are enough resources for all the pods on a node.  It
 checks that the sum of the limits of containers on the node is no greater than than the node capacity.  It
 includes all containers started by kubelet, but not containers started directly by docker, nor
-processes not in containers.  
+processes not in containers.
 
 If you want to explicitly reserve resources for non-Pod processes, you can create a placeholder
 pod.  Use the following template:

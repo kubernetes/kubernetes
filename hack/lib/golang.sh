@@ -125,7 +125,6 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-apiserver
   kube-controller-manager
   kube-scheduler
-  hyperkube
 )
 
 kube::golang::is_statically_linked_library() {

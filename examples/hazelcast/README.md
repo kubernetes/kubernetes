@@ -56,7 +56,7 @@ Source is freely available at:
 
 ### Simple Single Pod Hazelcast Node
 
-In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes. 
+In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
 
 In this case, we shall not run a single Hazelcast pod, because the discovery mechanism now relies on a service definition.
 
@@ -84,7 +84,7 @@ spec:
 ```
 
 [Download example](hazelcast-service.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE hazelcast-service.yaml -->
 
 The important thing to note here is the `selector`. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is `name: hazelcast`.  If you look at the Replication Controller specification below, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
 
@@ -139,7 +139,7 @@ spec:
 ```
 
 [Download example](hazelcast-controller.yaml)
-<!-- END MUNGE: EXAMPLE -->
+<!-- END MUNGE: EXAMPLE hazelcast-controller.yaml -->
 
 There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.5`.  This is a `busybox` installation with JRE 8 Update 45.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingle.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
 

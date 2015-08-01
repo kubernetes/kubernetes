@@ -37,16 +37,16 @@ This example shows how to build a simple multi-tier web application using Kubern
 
 If you are running a cluster in Google Container Engine (GKE), instead see the [Guestbook Example for Google Container Engine](https://cloud.google.com/container-engine/docs/tutorials/guestbook).
 
-##### Table of Contents  
+##### Table of Contents
 
- * [Step Zero: Prerequisites](#step-zero) 
- * [Step One: Create the Redis master pod](#step-one) 
- * [Step Two: Create the Redis master service](#step-two) 
- * [Step Three: Create the Redis slave pods](#step-three) 
- * [Step Four: Create the Redis slave service](#step-four) 
- * [Step Five: Create the guestbook pods](#step-five) 
- * [Step Six: Create the guestbook service](#step-six) 
- * [Step Seven: View the guestbook](#step-seven) 
+ * [Step Zero: Prerequisites](#step-zero)
+ * [Step One: Create the Redis master pod](#step-one)
+ * [Step Two: Create the Redis master service](#step-two)
+ * [Step Three: Create the Redis slave pods](#step-three)
+ * [Step Four: Create the Redis slave service](#step-four)
+ * [Step Five: Create the guestbook pods](#step-five)
+ * [Step Six: Create the guestbook service](#step-six)
+ * [Step Seven: View the guestbook](#step-seven)
  * [Step Eight: Cleanup](#step-eight)
 
 ### Step Zero: Prerequisites <a id="step-zero"></a>
@@ -64,7 +64,7 @@ Use the `examples/guestbook-go/redis-master-controller.json` file to create a [r
     ```console
     $ kubectl create -f examples/guestbook-go/redis-master-controller.json
     replicationcontrollers/redis-master
-    ```    
+    ```
 
 <nop>2. To verify that the redis-master-controller is up, list all the replication controllers in the cluster with the `kubectl get rc` command:
 
@@ -102,7 +102,7 @@ Use the `examples/guestbook-go/redis-master-controller.json` file to create a [r
 
 ### Step Two: Create the Redis master service <a id="step-two"></a>
 
-A Kubernetes '[service](../../docs/user-guide/services.md)' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables or DNS. 
+A Kubernetes '[service](../../docs/user-guide/services.md)' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables or DNS.
 
 Services find the containers to load balance based on pod labels. The pod that you created in Step One has the label `app=redis` and `role=master`. The selector field of the service determines which pods will receive the traffic sent to the service.
 
@@ -179,7 +179,7 @@ Just like the master, we want to have a service to proxy connections to the read
     services/redis-slave
     ```
 
-<nop>2. To verify that the redis-slave service is up, list all the services in the cluster with the `kubectl get services` command: 
+<nop>2. To verify that the redis-slave service is up, list all the services in the cluster with the `kubectl get services` command:
 
     ```console
     $ kubectl get services
@@ -189,7 +189,7 @@ Just like the master, we want to have a service to proxy connections to the read
     ...
     ```
 
-    Result: The service is created with labels `app=redis` and `role=slave` to identify that the pods are running the Redis slaves. 
+    Result: The service is created with labels `app=redis` and `role=slave` to identify that the pods are running the Redis slaves.
 
 Tip: It is helpful to set labels on your services themselves--as we've done here--to make it easy to locate them later.
 
@@ -264,7 +264,7 @@ You can now play with the guestbook that you just created by opening it in a bro
     If you are running Kubernetes locally, to view the guestbook, navigate to `http://localhost:3000` in your browser.
 
  * **Remote Host:**
-    1. To view the guestbook on a remote host, locate the external IP of the load balancer in the **IP** column of the `kubectl get services` output. In our example, the internal IP address is `10.0.217.218` and the external IP address is `146.148.81.8` (*Note: you might need to scroll to see the IP column*). 
+    1. To view the guestbook on a remote host, locate the external IP of the load balancer in the **IP** column of the `kubectl get services` output. In our example, the internal IP address is `10.0.217.218` and the external IP address is `146.148.81.8` (*Note: you might need to scroll to see the IP column*).
 
     2. Append port `3000` to the IP address (for example `http://146.148.81.8:3000`), and then navigate to that address in your browser.
 

@@ -19,14 +19,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/cadvisor/info/v2"
+	"github.com/google/cadvisor/info/v1"
 )
 
-type collectorManager struct {
-	collectors []*collectorData
-}
+const metricLabelPrefix = "io.cadvisor.metric."
 
-var _ CollectorManager = &collectorManager{}
+type GenericCollectorManager struct {
+	Collectors         []*collectorData
+	NextCollectionTime time.Time
+}
 
 type collectorData struct {
 	collector          Collector
@@ -35,33 +36,54 @@ type collectorData struct {
 
 // Returns a new CollectorManager that is thread-compatible.
 func NewCollectorManager() (CollectorManager, error) {
-	return &collectorManager{
-		collectors: []*collectorData{},
+	return &GenericCollectorManager{
+		Collectors:         []*collectorData{},
+		NextCollectionTime: time.Now(),
 	}, nil
 }
 
-func (cm *collectorManager) RegisterCollector(collector Collector) error {
-	cm.collectors = append(cm.collectors, &collectorData{
+func GetCollectorConfigs(labels map[string]string) map[string]string {
+	configs := map[string]string{}
+	for k, v := range labels {
+		if strings.HasPrefix(k, metricLabelPrefix) {
+			name := strings.TrimPrefix(k, metricLabelPrefix)
+			configs[name] = v
+		}
+	}
+	return configs
+}
+
+func (cm *GenericCollectorManager) RegisterCollector(collector Collector) error {
+	cm.Collectors = append(cm.Collectors, &collectorData{
 		collector:          collector,
 		nextCollectionTime: time.Now(),
 	})
 	return nil
 }
 
-func (cm *collectorManager) Collect() (time.Time, []v2.Metric, error) {
+func (cm *GenericCollectorManager) GetSpec() ([]v1.MetricSpec, error) {
+	metricSpec := []v1.MetricSpec{}
+	for _, c := range cm.Collectors {
+		specs := c.collector.GetSpec()
+		metricSpec = append(metricSpec, specs...)
+	}
+
+	return metricSpec, nil
+}
+
+func (cm *GenericCollectorManager) Collect() (time.Time, map[string]v1.MetricVal, error) {
 	var errors []error
 
 	// Collect from all collectors that are ready.
 	var next time.Time
-	var metrics []v2.Metric
-	for _, c := range cm.collectors {
+	metrics := map[string]v1.MetricVal{}
+	for _, c := range cm.Collectors {
 		if c.nextCollectionTime.Before(time.Now()) {
-			nextCollection, newMetrics, err := c.collector.Collect()
+			var err error
+			c.nextCollectionTime, metrics, err = c.collector.Collect(metrics)
 			if err != nil {
 				errors = append(errors, err)
 			}
-			metrics = append(metrics, newMetrics...)
-			c.nextCollectionTime = nextCollection
 		}
 
 		// Keep track of the next collector that will be ready.
@@ -69,7 +91,7 @@ func (cm *collectorManager) Collect() (time.Time, []v2.Metric, error) {
 			next = c.nextCollectionTime
 		}
 	}
-
+	cm.NextCollectionTime = next
 	return next, metrics, compileErrors(errors)
 }
 
