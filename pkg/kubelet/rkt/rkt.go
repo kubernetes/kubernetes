@@ -194,11 +194,31 @@ func (r *runtime) runCommand(args ...string) ([]string, error) {
 	return strings.Split(strings.TrimSpace(stdout.String()), "\n"), nil
 }
 
-// makePodServiceFileName constructs the unit file name for a pod using its UID.
-func makePodServiceFileName(uid types.UID) string {
+// makePodServiceFileName constructs the unit file name for a pod using
+// its pod UID and rkt UUID. We use the rkt UUID here because it's not
+// clear how to update and reload the service file once the service remains
+// after exited.
+func makePodServiceFileName(podUID types.UID, rktUUID string) string {
 	// TODO(yifan): Add name for readability? We need to consider the
 	// limit of the length.
-	return fmt.Sprintf("%s_%s.service", kubernetesUnitPrefix, uid)
+	return fmt.Sprintf("%s_%s_%s.service", kubernetesUnitPrefix, podUID, rktUUID)
+}
+
+// parsePodServiceFileName parses a systemd service file name (e.g. k8s_PODUID_RKTUUID.service)
+// and returns the pod UID and rkt UUID on success.
+func parsePodServiceFileName(filename string) (podUID types.UID, rktUUID string, err error) {
+	if !strings.HasPrefix(filename, kubernetesUnitPrefix) {
+		err = fmt.Errorf("invalid service file name: %q", filename)
+		return
+	}
+	name := strings.TrimSuffix(filename, filepath.Ext(filename))
+	parts := strings.Split(name, "_")
+	if len(parts) != 3 {
+		err = fmt.Errorf("invalid service file name: %q", filename)
+		return
+	}
+	podUID, rktUUID = types.UID(parts[1]), parts[2]
+	return
 }
 
 type resource struct {
@@ -524,20 +544,18 @@ func apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
 // 1. Invoke 'rkt prepare' to prepare the pod, and get the rkt pod uuid.
 // 2. Creates the unit file and save it under systemdUnitDir.
 //
-// On success, it will return a string that represents name of the unit file
-// and a boolean that indicates if the unit file needs to be reloaded (whether
-// the file is already existed).
-func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, bool, error) {
+// On success, it will return a string that represents name of the unit file.
+func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, error) {
 	cmds := []string{"prepare", "--quiet", "--pod-manifest"}
 
 	// Generate the pod manifest from the pod spec.
 	manifest, err := r.makePodManifest(pod, pullSecrets)
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 	manifestFile, err := ioutil.TempFile("", fmt.Sprintf("manifest-%s-", pod.Name))
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 	defer func() {
 		manifestFile.Close()
@@ -548,21 +566,21 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, bo
 
 	data, err := json.Marshal(manifest)
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 	// Since File.Write returns error if the written length is less than len(data),
 	// so check error is enough for us.
 	if _, err := manifestFile.Write(data); err != nil {
-		return "", false, err
+		return "", err
 	}
 
 	cmds = append(cmds, manifestFile.Name())
 	output, err := r.runCommand(cmds...)
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 	if len(output) != 1 {
-		return "", false, fmt.Errorf("cannot get uuid from 'rkt prepare'")
+		return "", fmt.Errorf("cannot get uuid from 'rkt prepare'")
 	}
 	uuid := output[0]
 	glog.V(4).Infof("'rkt prepare' returns %q", uuid)
@@ -570,7 +588,7 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, bo
 	p := apiPodToruntimePod(uuid, pod)
 	b, err := json.Marshal(p)
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 
 	var runPrepared string
@@ -589,22 +607,18 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, bo
 
 	// Save the unit file under systemd's service directory.
 	// TODO(yifan) Garbage collect 'dead' service files.
-	needReload := false
-	unitName := makePodServiceFileName(pod.UID)
-	if _, err := os.Stat(path.Join(systemdServiceDir, unitName)); err == nil {
-		needReload = true
-	}
+	unitName := makePodServiceFileName(pod.UID, uuid)
 	unitFile, err := os.Create(path.Join(systemdServiceDir, unitName))
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 	defer unitFile.Close()
 
 	_, err = io.Copy(unitFile, unit.Serialize(units))
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
-	return unitName, needReload, nil
+	return unitName, nil
 }
 
 // RunPod first creates the unit file for a pod, and then calls
@@ -612,16 +626,9 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, bo
 func (r *runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 	glog.V(4).Infof("Rkt starts to run pod: name %q.", pod.Name)
 
-	name, needReload, err := r.preparePod(pod, pullSecrets)
+	name, err := r.preparePod(pod, pullSecrets)
 	if err != nil {
 		return err
-	}
-	if needReload {
-		// TODO(yifan): More graceful stop. Replace with StopUnit and wait for a timeout.
-		r.systemd.KillUnit(name, int32(syscall.SIGKILL))
-		if err := r.systemd.Reload(); err != nil {
-			return err
-		}
 	}
 
 	// TODO(yifan): This is the old version of go-systemd. Should update when libcontainer updates
@@ -719,8 +726,23 @@ func (r *runtime) KillPod(pod kubecontainer.Pod) error {
 	glog.V(4).Infof("Rkt is killing pod: name %q.", pod.Name)
 
 	// TODO(yifan): More graceful stop. Replace with StopUnit and wait for a timeout.
-	r.systemd.KillUnit(makePodServiceFileName(pod.ID), int32(syscall.SIGKILL))
-	return r.systemd.Reload()
+	// TODO(yifan): More efficient kill, we need to list all units to find
+	// the correct unit as service file name containers rkt UUID.
+	units, err := r.systemd.ListUnits()
+	if err != nil {
+		return err
+	}
+
+	for _, u := range units {
+		// u.Name contains file name ext such as .service, .socket, etc.
+		if !strings.Contains(u.Name, string(pod.ID)) {
+			continue
+		}
+
+		r.systemd.KillUnit(u.Name, int32(syscall.SIGKILL))
+		return nil
+	}
+	return fmt.Errorf("pod %q not found", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
 }
 
 // GetPodStatus currently invokes GetPods() to return the status.
@@ -1068,29 +1090,17 @@ func (r *runtime) findRktID(pod *kubecontainer.Pod) (string, error) {
 		return "", err
 	}
 
-	unitName := makePodServiceFileName(pod.ID)
 	for _, u := range units {
 		// u.Name contains file name ext such as .service, .socket, etc.
-		if u.Name != unitName {
+		if !strings.Contains(u.Name, string(pod.ID)) {
 			continue
 		}
 
-		f, err := os.Open(path.Join(systemdServiceDir, u.Name))
+		_, rktUUID, err := parsePodServiceFileName(u.Name)
 		if err != nil {
 			return "", err
 		}
-		defer f.Close()
-
-		opts, err := unit.Deserialize(f)
-		if err != nil {
-			return "", err
-		}
-
-		for _, opt := range opts {
-			if opt.Section == unitKubernetesSection && opt.Name == unitRktID {
-				return opt.Value, nil
-			}
-		}
+		return rktUUID, nil
 	}
 	return "", fmt.Errorf("rkt uuid not found for pod %v", pod)
 }
