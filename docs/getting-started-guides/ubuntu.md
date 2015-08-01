@@ -118,7 +118,7 @@ The `FLANNEL_NET` variable defines the IP range used for flannel overlay network
 
 After all the above variables being set correctly, we can use following command in cluster/ directory to bring up the whole cluster.
 
-`$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh`
+`$ KUBERNETES_PROVIDER=ubuntu ../kube-up.sh`
 
 The scripts automatically scp binaries and config files to all the machines and start the k8s service on them. The only thing you need to do is to type the sudo password when promoted. The current machine name is shown below, so you will not type in the wrong password.
 
