@@ -39,6 +39,13 @@ function verify-prereqs {
 	echo "TODO: verify-prereqs" 1>&2
 }
 
+# Validate a kubernetes cluster
+function validate-cluster {
+	# by default call the generic validate-cluster.sh script, customizable by
+	# any cluster provider if this does not fit.
+	"${KUBE_ROOT}/cluster/validate-cluster.sh"
+}
+
 # Instantiate a kubernetes cluster
 function kube-up {
 	echo "TODO: kube-up" 1>&2

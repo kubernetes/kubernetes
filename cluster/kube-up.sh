@@ -36,8 +36,8 @@ verify-prereqs
 echo "... calling kube-up" >&2
 kube-up
 
-echo "... calling validate-cluster.sh" >&2
-"${KUBE_ROOT}/cluster/validate-cluster.sh"
+echo "... calling validate-cluster" >&2
+validate-cluster
 
 echo -e "Done, listing cluster services:\n" >&2
 "${KUBE_ROOT}/cluster/kubectl.sh" cluster-info
