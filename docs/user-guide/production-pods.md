@@ -371,11 +371,11 @@ The message is recorded along with the other state of the last (i.e., most recen
 $ kubectl create -f ./pod.yaml
 pods/pod-w-message
 $ sleep 70
-$ kubectl get pods/pod-w-message -o template -t \
-    "{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}"
+$ kubectl get pods/pod-w-message -o template \
+    -t "{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}"
 Sleep expired
-$ kubectl get pods/pod-w-message -o template -t \
-    "{{range .status.containerStatuses}}{{.lastState.terminated.exitCode}}{{end}}"
+$ kubectl get pods/pod-w-message -o template \
+    -t "{{range .status.containerStatuses}}{{.lastState.terminated.exitCode}}{{end}}"
 0
 ```
 

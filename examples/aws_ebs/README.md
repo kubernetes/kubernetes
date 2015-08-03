@@ -44,9 +44,7 @@ the pod:
 Add some data to the volume if is empty:
 
 ```sh
-  $ echo  "Hello World" >& \
-    /var/lib/kubelet/plugins/kubernetes.io/aws-ebs/mounts/aws/{Region}/{Volume \
-    ID}/index.html
+  $ echo  "Hello World" >& /var/lib/kubelet/plugins/kubernetes.io/aws-ebs/mounts/aws/{Region}/{Volume ID}/index.html
 ```
 
 You should now be able to query your web server:

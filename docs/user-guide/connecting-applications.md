@@ -176,8 +176,8 @@ KUBERNETES_SERVICE_PORT=443
 Note there’s no mention of your Service. This is because you created the replicas before the Service. Another disadvantage of doing this is that the scheduler might put both pods on the same machine, which will take your entire Service down if it dies. We can do this the right way by killing the 2 pods and waiting for the replication controller to recreate them. This time around the Service exists *before* the replicas. This will given you scheduler level Service spreading of your pods (provided all your nodes have equal capacity), as well as the right environment variables:
 
 ```console
-$ kubectl scale rc my-nginx --replicas=0; kubectl scale rc my-nginx \
-    --replicas=2;
+$ kubectl scale rc my-nginx --replicas=0; \
+    kubectl scale rc my-nginx --replicas=2;
 $ kubectl get pods -l app=nginx -o wide
 NAME             READY   STATUS     RESTARTS   AGE   NODE
 my-nginx-5j8ok   1/1     Running   	0         2m    node1
@@ -366,8 +366,8 @@ NAME             READY     STATUS    RESTARTS   AGE
 curlpod          1/1       Running   0          2m
 my-nginx-7006w   1/1       Running   0          24m
 
-$ kubectl exec curlpod -- curl https://nginxsvc --cacert \
-    /etc/nginx/ssl/nginx.crt
+$ kubectl exec curlpod -- curl https://nginxsvc \
+    --cacert /etc/nginx/ssl/nginx.crt
 ...
 <title>Welcome to nginx!</title>
 ...

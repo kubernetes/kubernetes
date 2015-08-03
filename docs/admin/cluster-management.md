@@ -180,8 +180,8 @@ You can use the `kube-version-change` utility to convert config files between di
 
 ```console
 $ hack/build-go.sh cmd/kube-version-change
-$ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o \
-    myPod.v1.yaml
+$ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml \
+    -o myPod.v1.yaml
 ```
 
 

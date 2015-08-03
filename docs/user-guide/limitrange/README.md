@@ -132,8 +132,8 @@ $ kubectl get pods --namespace=limit-example
 POD           IP           CONTAINER(S)   IMAGE(S)   HOST          LABELS      STATUS    CREATED          MESSAGE
 nginx-ykj4j   10.246.1.3                             10.245.1.3/   run=nginx   Running   About a minute
                            nginx          nginx                                Running   54 seconds
-$ kubectl get pods nginx-ykj4j --namespace=limit-example -o yaml | grep \
-    resources -C 5
+$ kubectl get pods nginx-ykj4j --namespace=limit-example -o yaml |\
+    grep resources -C 5
 ```
 
 ```yaml
@@ -166,8 +166,8 @@ Let's create a pod that falls within the allowed limit boundaries.
 $ kubectl create -f docs/user-guide/limitrange/valid-pod.yaml \
     --namespace=limit-example
 pods/valid-pod
-$ kubectl get pods valid-pod --namespace=limit-example -o yaml | grep -C 5 \
-    resources
+$ kubectl get pods valid-pod --namespace=limit-example -o yaml |\
+    grep -C 5 resources
 ```
 
 ```yaml
