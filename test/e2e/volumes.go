@@ -52,6 +52,9 @@ type VolumeTestConfig struct {
 	serverImage string
 	// Ports to export from the server pod. TCP only.
 	serverPorts []int
+	// Volumes needed to be mounted to the server container from the host
+	// map <host (source) path> -> <container (dst.) path>
+	volumes map[string]string
 }
 
 // Starts a container specified by config.serverImage and exports all
@@ -71,6 +74,25 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 			ContainerPort: config.serverPorts[i],
 			Protocol:      api.ProtocolTCP,
 		}
+	}
+
+	volumeCount := len(config.volumes)
+	volumes := make([]api.Volume, volumeCount)
+	mounts := make([]api.VolumeMount, volumeCount)
+
+	i := 0
+	for src, dst := range config.volumes {
+		mountName := fmt.Sprintf("path%d", i)
+		volumes[i].Name = mountName
+		volumes[i].VolumeSource.HostPath = &api.HostPathVolumeSource{
+			Path: src,
+		}
+
+		mounts[i].Name = mountName
+		mounts[i].ReadOnly = false
+		mounts[i].MountPath = dst
+
+		i++
 	}
 
 	By(fmt.Sprint("creating ", config.prefix, " server pod"))
@@ -96,9 +118,11 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 					SecurityContext: &api.SecurityContext{
 						Privileged: privileged,
 					},
-					Ports: serverPodPorts,
+					Ports:        serverPodPorts,
+					VolumeMounts: mounts,
 				},
 			},
+			Volumes: volumes,
 		},
 	}
 	_, err := podClient.Create(serverPod)
@@ -327,6 +351,53 @@ var _ = Describe("Volumes", func() {
 			}
 			// Must match content of contrib/for-tests/volumes-tester/gluster/index.html
 			testVolumeClient(c, config, volume, "Hello from GlusterFS!")
+		})
+	})
+
+	////////////////////////////////////////////////////////////////////////
+	// iSCSI
+	////////////////////////////////////////////////////////////////////////
+
+	// Marked with [Skipped] to skip the test by default (see driver.go),
+	// the test needs privileged containers, which are disabled by default.
+	// Also, make sure that iscsiadm utility and iscsi target kernel modules
+	// are installed on all nodes!
+	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
+
+	Describe("[Skipped] iSCSI", func() {
+		It("should be mountable", func() {
+			config := VolumeTestConfig{
+				namespace:   namespace.Name,
+				prefix:      "iscsi",
+				serverImage: "gcr.io/google_containers/volume-iscsi",
+				serverPorts: []int{3260},
+				volumes: map[string]string{
+					// iSCSI container needs to insert modules from the host
+					"/lib/modules": "/lib/modules",
+				},
+			}
+
+			defer func() {
+				if clean {
+					volumeTestCleanup(c, config)
+				}
+			}()
+			pod := startVolumeServer(c, config)
+			serverIP := pod.Status.PodIP
+			Logf("iSCSI server IP address: %v", serverIP)
+
+			volume := api.VolumeSource{
+				ISCSI: &api.ISCSIVolumeSource{
+					TargetPortal: serverIP + ":3260",
+					// from contrib/for-tests/volumes-tester/iscsi/initiatorname.iscsi
+					IQN:      "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
+					Lun:      0,
+					FSType:   "ext2",
+					ReadOnly: true,
+				},
+			}
+			// Must match content of contrib/for-tests/volumes-tester/iscsi/block.tar.gz
+			testVolumeClient(c, config, volume, "Hello from iSCSI")
 		})
 	})
 })
