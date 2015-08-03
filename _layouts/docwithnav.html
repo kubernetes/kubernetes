@@ -12,21 +12,38 @@
 	{% include documentation.html %}
 </div>
 <script type="text/javascript">
-	$(document).ready(function() {
-		/* Find and set target="_blank" for all external URLs (in navigation menu and content body) so that they open in a new tab/window */
-        $('a').filter(function() {
-			return this.hostname && this.hostname !== location.hostname;
-		}).attr('target', '_blank');
-	});
+    $(document).ready(function() {
+		/* On page load, open the navigation menu and highlight the menu item that corresponds to the current URL */
+		var curnavitem = $('#wrapper a[href="' + window.location.href + '"]');
+		if(curnavitem.parent().hasClass('haschild')){
+			curnavitem.addClass('active').next('ul').slideDown('normal');
+		}
+		else {
+			curnavitem.addClass('active');
+			curnavitem.parent('li').parent('ul').slideDown('normal');
+		}
+		/* Find and set target="_blank" for all external URLs (to open in a new tab/window) */
+        $('#wrapper a').filter(function() {
+            return this.hostname && this.hostname !== location.hostname;
+        }).attr('target', '_blank');
+    });
 	$(function() {
-		/* Animate navigation menu to open/close and highlight on click */
-	    var menu_ul = $('.menu > li > ul'),
-	           menu_a  = $('.menu > li > a');
-	    menu_a.click(function(e) {
+		/* Animate navigation menu to open/close and highlight menu item on click */
+	    var menu_ul = $('.menu > li > ul');
+	    $('.menu a').click(function(e) {
 	        e.preventDefault();
 	        if(!$(this).hasClass('active')) {
-	            menu_a.removeClass('active');
-	            menu_ul.filter(':visible').slideUp('normal');
+				if(!$(this).parent().hasClass('haschild')){
+					if(!$(this).parent().parent().parent().find('a').hasClass('active')){
+						menu_ul.filter(':visible').slideUp('normal');
+					}
+				}
+				else{
+					if(!$(this).parent().find('a').hasClass('active')){
+						menu_ul.filter(':visible').slideUp('normal');
+					}
+				}
+	            $('.menu a').removeClass('active');
 	            $(this).addClass('active').next().stop(true,true).slideDown('normal');
 	        } else {
 	            $(this).removeClass('active');
