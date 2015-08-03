@@ -310,13 +310,13 @@ func TestForwardPorts(t *testing.T) {
 		},
 		{
 			Upgrader: &fakeUpgrader{conn: newFakeUpgradeConnection()},
-			Ports:    []string{"5000", "6000"},
+			Ports:    []string{"5001", "6000"},
 			Send: map[uint16]string{
-				5000: "abcd",
+				5001: "abcd",
 				6000: "ghij",
 			},
 			Receive: map[uint16]string{
-				5000: "1234",
+				5001: "1234",
 				6000: "5678",
 			},
 		},
@@ -397,4 +397,27 @@ func TestForwardPorts(t *testing.T) {
 		}
 	}
 
+}
+
+func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
+	stopChan1 := make(chan struct{}, 1)
+	defer close(stopChan1)
+
+	pf1, err := New(&client.Request{}, &client.Config{}, []string{"5555"}, stopChan1)
+	if err != nil {
+		t.Fatalf("error creating pf1: %v", err)
+	}
+	pf1.upgrader = &fakeUpgrader{conn: newFakeUpgradeConnection()}
+	go pf1.ForwardPorts()
+	<-pf1.Ready
+
+	stopChan2 := make(chan struct{}, 1)
+	pf2, err := New(&client.Request{}, &client.Config{}, []string{"5555"}, stopChan2)
+	if err != nil {
+		t.Fatalf("error creating pf2: %v", err)
+	}
+	pf2.upgrader = &fakeUpgrader{conn: newFakeUpgradeConnection()}
+	if err := pf2.ForwardPorts(); err == nil {
+		t.Fatal("expected non-nil error for pf2.ForwardPorts")
+	}
 }
