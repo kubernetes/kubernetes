@@ -19,8 +19,7 @@ package e2e
 import (
 	"fmt"
 	"os/exec"
-	"strconv"
-	"strings"
+	"regexp"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -45,8 +44,9 @@ func resizeGroup(size int) error {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
-		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone,
-			"resize", testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--new-size=%v", size)).CombinedOutput()
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "resize",
+			testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--size=%v", size),
+			"--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
 			Logf("Failed to resize node instance group: %v", string(output))
 		}
@@ -65,27 +65,14 @@ func groupSize() (int, error) {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
-		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID,
-			"--zone="+testContext.CloudConfig.Zone, "describe", testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
+			"list-instances", testContext.CloudConfig.NodeInstanceGroup, "--project="+testContext.CloudConfig.ProjectID,
+			"--zone="+testContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
 			return -1, err
 		}
-		pattern := "currentSize: "
-		i := strings.Index(string(output), pattern)
-		if i == -1 {
-			return -1, fmt.Errorf("could not find '%s' in the output '%s'", pattern, output)
-		}
-		truncated := output[i+len(pattern):]
-		j := strings.Index(string(truncated), "\n")
-		if j == -1 {
-			return -1, fmt.Errorf("could not find new line in the truncated output '%s'", truncated)
-		}
-
-		currentSize, err := strconv.Atoi(string(truncated[:j]))
-		if err != nil {
-			return -1, err
-		}
-		return currentSize, nil
+		re := regexp.MustCompile("RUNNING")
+		return len(re.FindAllString(string(output), -1)), nil
 	} else {
 		// Supported by aws
 		instanceGroups, ok := testContext.CloudConfig.Provider.(aws_cloud.InstanceGroups)
