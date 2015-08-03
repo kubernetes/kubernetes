@@ -40,15 +40,15 @@ func (t Time) UnixTime() (sec, nsec int64) {
 }
 
 // GetTime returns the current Time (100s of nanoseconds since 15 Oct 1582) and
-// adjusts the clock sequence as needed.  An error is returned if the current
-// time cannot be determined.
-func GetTime() (Time, error) {
+// clock sequence as well as adjusting the clock sequence as needed.  An error
+// is returned if the current time cannot be determined.
+func GetTime() (Time, uint16, error) {
 	defer mu.Unlock()
 	mu.Lock()
 	return getTime()
 }
 
-func getTime() (Time, error) {
+func getTime() (Time, uint16, error) {
 	t := timeNow()
 
 	// If we don't have a clock sequence already, set one.
@@ -63,7 +63,7 @@ func getTime() (Time, error) {
 		clock_seq = ((clock_seq + 1) & 0x3fff) | 0x8000
 	}
 	lasttime = now
-	return Time(now), nil
+	return Time(now), clock_seq, nil
 }
 
 // ClockSequence returns the current clock sequence, generating one if not

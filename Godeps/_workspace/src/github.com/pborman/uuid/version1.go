@@ -19,7 +19,7 @@ func NewUUID() UUID {
 		SetNodeInterface("")
 	}
 
-	now, err := GetTime()
+	now, seq, err := GetTime()
 	if err != nil {
 		return nil
 	}
@@ -34,7 +34,7 @@ func NewUUID() UUID {
 	binary.BigEndian.PutUint32(uuid[0:], time_low)
 	binary.BigEndian.PutUint16(uuid[4:], time_mid)
 	binary.BigEndian.PutUint16(uuid[6:], time_hi)
-	binary.BigEndian.PutUint16(uuid[8:], clock_seq)
+	binary.BigEndian.PutUint16(uuid[8:], seq)
 	copy(uuid[10:], nodeID)
 
 	return uuid
