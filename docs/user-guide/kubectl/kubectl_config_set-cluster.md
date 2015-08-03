@@ -52,7 +52,8 @@ kubectl config set-cluster NAME [--server=server] [--certificate-authority=path/
 $ kubectl config set-cluster e2e --server=https://1.2.3.4
 
 // Embed certificate authority data for the e2e cluster entry
-$ kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
+$ kubectl config set-cluster e2e \
+    --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
 
 // Disable cert checking for the dev cluster entry
 $ kubectl config set-cluster e2e --insecure-skip-tls-verify=true

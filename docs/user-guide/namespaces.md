@@ -93,7 +93,8 @@ context.
 First get your current context:
 
 ```console
-$ export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}')
+$ export CONTEXT=$(kubectl config view | grep current-context | awk \
+    '{print $2}')
 ```
 
 Then update the default namespace:
