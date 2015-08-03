@@ -28,6 +28,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -35,17 +37,17 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
+func newHelper(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	return fakeEtcdClient, helper
+	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
+	return fakeEtcdClient, etcdStorage
 }
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, tools.EtcdHelper) {
-	fakeEtcdClient, h := newHelper(t)
-	storage, statusStorage := NewStorage(h)
-	return storage, statusStorage, fakeEtcdClient, h
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, storage.Interface) {
+	fakeEtcdClient, etcdStorage := newHelper(t)
+	storage, statusStorage := NewStorage(etcdStorage)
+	return storage, statusStorage, fakeEtcdClient, etcdStorage
 }
 
 func validNewAutoScaler(name string) *api.AutoScaler {
@@ -75,9 +77,9 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateRegistryError(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient, etcdStorage := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _ := NewStorage(helper)
+	storage, _ := NewStorage(etcdStorage)
 
 	autoScaler := validNewAutoScaler("foo")
 	_, err := storage.Create(api.NewDefaultContext(), autoScaler)
@@ -88,8 +90,8 @@ func TestCreateRegistryError(t *testing.T) {
 
 func TestCreateSetsFields(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	fakeEtcdClient, helper := newHelper(t)
-	storage, _ := NewStorage(helper)
+	fakeEtcdClient, etcdStorage := newHelper(t)
+	storage, _ := NewStorage(etcdStorage)
 	autoScaler := validNewAutoScaler("foo")
 	_, err := storage.Create(ctx, autoScaler)
 	if err != fakeEtcdClient.Err {
@@ -101,7 +103,7 @@ func TestCreateSetsFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected key error: %v", err)
 	}
-	if err := helper.ExtractObj(key, actual, false); err != nil {
+	if err := etcdStorage.Get(key, actual, false); err != nil {
 		t.Fatalf("unexpected extraction error: %v", err)
 	}
 	if actual.Name != autoScaler.Name {
@@ -113,9 +115,9 @@ func TestCreateSetsFields(t *testing.T) {
 }
 
 func TestListError(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient, etcdStorage := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _ := NewStorage(helper)
+	storage, _ := NewStorage(etcdStorage)
 	scalers, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != fakeEtcdClient.Err {
 		t.Fatalf("Expected %#v, Got %#v", fakeEtcdClient.Err, err)
@@ -277,7 +279,7 @@ func TestListAutoScalerListSelection(t *testing.T) {
 }
 
 func TestAutoScalerDecode(t *testing.T) {
-	storage, _ := NewStorage(tools.EtcdHelper{})
+	storage, _, _, _ := newStorage(t)
 	expected := validNewAutoScaler("foo")
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {

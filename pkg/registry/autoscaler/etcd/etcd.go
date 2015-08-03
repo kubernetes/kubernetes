@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for autoscalers against etcd
@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewStorage returns RESTStorage objects that will work against AutoScalers.
-func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
+func NewStorage(s storage.Interface) (*REST, *StatusREST) {
 	prefix := "/autoScalers"
 
 	store := &etcdgeneric.Etcd{
@@ -55,7 +55,7 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
 		UpdateStrategy: autoscaler.AutoScalers,
 		EndpointName:   "autoScalers",
 
-		Helper: h,
+		Storage: s,
 	}
 
 	store.ReturnDeletedObject = true

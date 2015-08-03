@@ -12,7 +12,7 @@
       "type": "v1.AutoScalerList",
       "method": "GET",
       "summary": "list or watch objects of kind AutoScaler",
-      "nickname": "listAutoScaler",
+      "nickname": "listNamespacedAutoScaler",
       "parameters": [
        {
         "type": "string",
@@ -81,7 +81,7 @@
       "type": "v1.AutoScaler",
       "method": "POST",
       "summary": "create a AutoScaler",
-      "nickname": "createAutoScaler",
+      "nickname": "createNamespacedAutoScaler",
       "parameters": [
        {
         "type": "string",
@@ -132,7 +132,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of AutoScaler",
-      "nickname": "watchAutoScalerList",
+      "nickname": "watchNamespacedAutoScalerList",
       "parameters": [
        {
         "type": "string",
@@ -207,7 +207,7 @@
       "type": "v1.AutoScaler",
       "method": "GET",
       "summary": "read the specified AutoScaler",
-      "nickname": "readAutoScaler",
+      "nickname": "readNamespacedAutoScaler",
       "parameters": [
        {
         "type": "string",
@@ -252,7 +252,7 @@
       "type": "v1.AutoScaler",
       "method": "PUT",
       "summary": "replace the specified AutoScaler",
-      "nickname": "replaceAutoScaler",
+      "nickname": "replaceNamespacedAutoScaler",
       "parameters": [
        {
         "type": "string",
@@ -305,7 +305,7 @@
       "type": "v1.AutoScaler",
       "method": "PATCH",
       "summary": "partially update the specified AutoScaler",
-      "nickname": "patchAutoScaler",
+      "nickname": "patchNamespacedAutoScaler",
       "parameters": [
        {
         "type": "string",
@@ -360,7 +360,7 @@
       "type": "v1.Status",
       "method": "DELETE",
       "summary": "delete a AutoScaler",
-      "nickname": "deleteAutoScaler",
+      "nickname": "deleteNamespacedAutoScaler",
       "parameters": [
        {
         "type": "string",
@@ -419,7 +419,7 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind AutoScaler",
-      "nickname": "watchAutoScaler",
+      "nickname": "watchNamespacedAutoScaler",
       "parameters": [
        {
         "type": "string",
@@ -558,43 +558,6 @@
       "consumes": [
        "*/*"
       ]
-     },
-     {
-      "type": "v1.AutoScaler",
-      "method": "POST",
-      "summary": "create a AutoScaler",
-      "nickname": "createAutoScaler",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.AutoScaler",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1.AutoScaler"
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
      }
     ]
    },
@@ -673,7 +636,7 @@
       "type": "v1.AutoScaler",
       "method": "PUT",
       "summary": "replace status of the specified AutoScaler",
-      "nickname": "replaceAutoScalerStatus",
+      "nickname": "replaceNamespacedAutoScalerStatus",
       "parameters": [
        {
         "type": "string",
@@ -11672,8 +11635,45 @@
       "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.AutoScaler"
+      },
+      "description": "list of auto-scaler configurations"
+     }
+    }
+   },
+   "v1.ListMeta": {
+    "id": "v1.ListMeta",
+    "properties": {
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     }
+    }
+   },
+   "v1.AutoScaler": {
+    "id": "v1.AutoScaler",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.AutoScalerSpec",
@@ -11712,6 +11712,230 @@
       "type": "string",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
      },
+     "generation": {
+      "type": "integer",
+      "format": "int64",
+      "description": "a sequence number representing a specific generation of the desired state; populated by the system; read-only"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "labels": {
+      "type": "any",
+      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+     },
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects; see http://releases.k8s.io/HEAD/docs/user-guide/annotations.md"
+     }
+    }
+   },
+   "v1.AutoScalerSpec": {
+    "id": "v1.AutoScalerSpec",
+    "properties": {
+     "thresholds": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.AutoScaleThreshold"
+      },
+      "description": "collection of thresholds that drive the auto-scaler"
+     },
+     "maxAutoScaleCount": {
+      "type": "integer",
+      "format": "int32",
+      "description": "maximum replicas that the auto-scaler will scale upto"
+     },
+     "minAutoScaleCount": {
+      "type": "integer",
+      "format": "int32",
+      "description": "minumum replicas the auto-scaler will scale down to"
+     },
+     "targetSelector": {
+      "type": "any",
+      "description": "selector for the target the auto-scaler will resize"
+     },
+     "advisors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "list of auto-scale advisors"
+     }
+    }
+   },
+   "v1.AutoScaleThreshold": {
+    "id": "v1.AutoScaleThreshold",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "auto-scale threshold type; intention or value based"
+     },
+     "intentions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.AutoScaleIntentionThresholdConfig"
+      },
+      "description": "intentions describes the thresholds that must be reached in order for an auto-scaling action to be taken"
+     },
+     "actionType": {
+      "type": "string",
+      "description": "auto-scale action to take when the thresholds are reached"
+     },
+     "scaleBy": {
+      "type": "integer",
+      "format": "int32",
+      "description": "replicas to scale up or down by"
+     }
+    }
+   },
+   "v1.AutoScaleIntentionThresholdConfig": {
+    "id": "v1.AutoScaleIntentionThresholdConfig",
+    "properties": {
+     "intent": {
+      "type": "string",
+      "description": "requested auto-scale intention"
+     },
+     "value": {
+      "type": "number",
+      "format": "float",
+      "description": "threshold value to check the intention against"
+     },
+     "duration": {
+      "type": "integer",
+      "format": "int32",
+      "description": "time interval to use for comparing the intention threshold; in seconds"
+     }
+    }
+   },
+   "v1.AutoScalerStatus": {
+    "id": "v1.AutoScalerStatus",
+    "properties": {
+     "lastActionTrigger": {
+      "$ref": "v1.AutoScaleThreshold",
+      "description": "threshold that triggered the last action"
+     },
+     "lastActionTimestamp": {
+      "type": "string",
+      "description": "time of the last auto-scaler action"
+     }
+    }
+   },
+   "json.WatchEvent": {
+    "id": "json.WatchEvent",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"
+     },
+     "object": {
+      "type": "string",
+      "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
+     }
+    }
+   },
+   "api.Patch": {
+    "id": "api.Patch",
+    "properties": {}
+   },
+   "v1.Status": {
+    "id": "v1.Status",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "status": {
+      "type": "string",
+      "description": "status of the operation; either Success, or Failure; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "message": {
+      "type": "string",
+      "description": "human-readable description of the status of this operation"
+     },
+     "reason": {
+      "type": "string",
+      "description": "machine-readable description of why this operation is in the 'Failure' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"
+     },
+     "details": {
+      "$ref": "v1.StatusDetails",
+      "description": "extended data associated with the reason; each reason may define its own extended details; this field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type"
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "suggested HTTP return code for this status; 0 if not set"
+     }
+    }
+   },
+   "v1.StatusDetails": {
+    "id": "v1.StatusDetails",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "the name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)"
+     },
+     "kind": {
+      "type": "string",
+      "description": "the kind attribute of the resource associated with the status StatusReason; on some operations may differ from the requested resource Kind; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.StatusCause"
+      },
+      "description": "the Causes array includes more details associated with the StatusReason failure; not all StatusReasons may provide detailed causes"
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "the number of seconds before the client should attempt to retry this operation"
+     }
+    }
+   },
+   "v1.StatusCause": {
+    "id": "v1.StatusCause",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "machine-readable description of the cause of the error; if this value is empty there is no information available"
+     },
+     "message": {
+      "type": "string",
+      "description": "human-readable description of the cause of the error; this field may be presented as-is to a reader"
+     },
+     "field": {
+      "type": "string",
+      "description": "field of the resource that has caused this error, as named by its JSON serialization; may include dot and postfix notation for nested attributes; arrays are zero-indexed; fields may appear more than once in an array of causes due to fields having multiple errors"
+     }
+    }
+   },
+   "v1.DeleteOptions": {
+    "id": "v1.DeleteOptions",
+    "required": [
+     "gracePeriodSeconds"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
      "gracePeriodSeconds": {
       "type": "integer",
       "format": "int64",
@@ -11727,19 +11951,19 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "apiVersion": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects; see http://releases.k8s.io/HEAD/docs/user-guide/annotations.md"
+     "target": {
+      "$ref": "v1.ObjectReference",
+      "description": "an object to bind to"
      }
     }
    },
@@ -11800,19 +12024,6 @@
        "$ref": "v1.ComponentStatus"
       },
       "description": "list of component status objects"
-     }
-    }
-   },
-   "v1.ListMeta": {
-    "id": "v1.ListMeta",
-    "properties": {
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
      }
     }
    },
@@ -11972,124 +12183,6 @@
      "protocol": {
       "type": "string",
       "description": "protocol for this port; must be UDP or TCP; TCP if unspecified"
-     }
-    }
-   },
-   "json.WatchEvent": {
-    "id": "json.WatchEvent",
-    "properties": {
-     "type": {
-      "type": "string",
-      "description": "the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"
-     },
-     "object": {
-      "type": "string",
-      "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
-     }
-    }
-   },
-   "api.Patch": {
-    "id": "api.Patch",
-    "properties": {}
-   },
-   "v1.Status": {
-    "id": "v1.Status",
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
-     },
-     "metadata": {
-      "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
-     },
-     "status": {
-      "type": "string",
-      "description": "status of the operation; either Success, or Failure; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
-     },
-     "message": {
-      "type": "string",
-      "description": "human-readable description of the status of this operation"
-     },
-     "reason": {
-      "type": "string",
-      "description": "machine-readable description of why this operation is in the 'Failure' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"
-     },
-     "details": {
-      "$ref": "v1.StatusDetails",
-      "description": "extended data associated with the reason; each reason may define its own extended details; this field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type"
-     },
-     "code": {
-      "type": "integer",
-      "format": "int32",
-      "description": "suggested HTTP return code for this status; 0 if not set"
-     }
-    }
-   },
-   "v1.StatusDetails": {
-    "id": "v1.StatusDetails",
-    "properties": {
-     "name": {
-      "type": "string",
-      "description": "the name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)"
-     },
-     "kind": {
-      "type": "string",
-      "description": "the kind attribute of the resource associated with the status StatusReason; on some operations may differ from the requested resource Kind; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "causes": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.StatusCause"
-      },
-      "description": "the Causes array includes more details associated with the StatusReason failure; not all StatusReasons may provide detailed causes"
-     },
-     "retryAfterSeconds": {
-      "type": "integer",
-      "format": "int32",
-      "description": "the number of seconds before the client should attempt to retry this operation"
-     }
-    }
-   },
-   "v1.StatusCause": {
-    "id": "v1.StatusCause",
-    "properties": {
-     "reason": {
-      "type": "string",
-      "description": "machine-readable description of the cause of the error; if this value is empty there is no information available"
-     },
-     "message": {
-      "type": "string",
-      "description": "human-readable description of the cause of the error; this field may be presented as-is to a reader"
-     },
-     "field": {
-      "type": "string",
-      "description": "field of the resource that has caused this error, as named by its JSON serialization; may include dot and postfix notation for nested attributes; arrays are zero-indexed; fields may appear more than once in an array of causes due to fields having multiple errors"
-     }
-    }
-   },
-   "v1.DeleteOptions": {
-    "id": "v1.DeleteOptions",
-    "required": [
-     "gracePeriodSeconds"
-    ],
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
-     },
-     "gracePeriodSeconds": {
-      "type": "integer",
-      "format": "int64",
-      "description": "the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"
      }
     }
    },

@@ -59,6 +59,6 @@ func (c *FakeAutoScalers) Delete(name string) error {
 }
 
 func (c *FakeAutoScalers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-autoScaler", Value: resourceVersion})
-	return c.Fake.Watch, c.Fake.Err
+	_, err := c.Fake.Invokes(FakeAction{Action: "watch-autoScaler", Value: resourceVersion}, nil)
+	return c.Fake.Watch, err
 }
