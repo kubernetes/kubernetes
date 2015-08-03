@@ -190,7 +190,7 @@ func getBestHosts(list algorithm.HostPriorityList) []string {
 func EqualPriority(_ *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	if err != nil {
-		fmt.Errorf("failed to list nodes: %v", err)
+		glog.Errorf("failed to list nodes: %v", err)
 		return []algorithm.HostPriority{}, err
 	}
 
