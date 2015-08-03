@@ -199,11 +199,11 @@ func TestServiceAccountCreation(t *testing.T) {
 		}
 		for i, expectedName := range tc.ExpectCreatedServiceAccounts {
 			action := actions[i]
-			if action.Action != "create-serviceaccount" {
-				t.Errorf("%s: Unexpected action %s", k, action.Action)
+			if !action.Matches("create", "serviceaccounts") {
+				t.Errorf("%s: Unexpected action %s", k, action)
 				break
 			}
-			createdAccount := action.Value.(*api.ServiceAccount)
+			createdAccount := action.(testclient.CreateAction).GetObject().(*api.ServiceAccount)
 			if createdAccount.Name != expectedName {
 				t.Errorf("%s: Expected %s to be created, got %s", k, expectedName, createdAccount.Name)
 			}

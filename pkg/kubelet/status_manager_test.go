@@ -52,14 +52,16 @@ func getRandomPodStatus() api.PodStatus {
 	}
 }
 
-func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []string) {
+func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []testclient.Action) {
 	actions := kubeClient.(*testclient.Fake).Actions()
 	if len(actions) != len(expectedActions) {
 		t.Errorf("unexpected actions, got: %s expected: %s", actions, expectedActions)
 		return
 	}
 	for i := 0; i < len(actions); i++ {
-		if actions[i].Action != expectedActions[i] {
+		e := expectedActions[i]
+		a := actions[i]
+		if !a.Matches(e.GetVerb(), e.GetResource()) || a.GetSubresource() != e.GetSubresource() {
 			t.Errorf("unexpected actions, got: %s expected: %s", actions, expectedActions)
 		}
 	}
@@ -158,7 +160,11 @@ func TestSyncBatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected syncing error: %v", err)
 	}
-	verifyActions(t, syncer.kubeClient, []string{"get-pod", "update-status-pod"})
+	verifyActions(t, syncer.kubeClient, []testclient.Action{
+		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
+		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
+	},
+	)
 }
 
 // shuffle returns a new shuffled list of container statuses.

@@ -24,41 +24,66 @@ import (
 )
 
 type FakePersistentVolumes struct {
-	Fake      *Fake
-	Namespace string
-}
-
-func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-persistentVolumes"}, &api.PersistentVolumeList{})
-	return obj.(*api.PersistentVolumeList), err
+	Fake *Fake
 }
 
 func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-persistentVolumes", Value: name}, &api.PersistentVolume{})
+	obj, err := c.Fake.Invokes(NewRootGetAction("persistentvolumes", name), &api.PersistentVolume{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-persistentVolumes", Value: name}, &api.PersistentVolume{})
-	return err
+func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("persistentvolumes", label, field), &api.PersistentVolumeList{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.PersistentVolumeList), err
 }
 
 func (c *FakePersistentVolumes) Create(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-persistentVolumes"}, &api.PersistentVolume{})
+	obj, err := c.Fake.Invokes(NewRootCreateAction("persistentvolumes", pv), pv)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.PersistentVolume), err
 }
 
 func (c *FakePersistentVolumes) Update(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-persistentVolumes", Value: pv.Name}, &api.PersistentVolume{})
+	obj, err := c.Fake.Invokes(NewRootUpdateAction("persistentvolumes", pv), pv)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-persistentVolumes", Value: pv}, &api.PersistentVolume{})
-	return obj.(*api.PersistentVolume), err
+func (c *FakePersistentVolumes) Delete(name string) error {
+	_, err := c.Fake.Invokes(NewRootDeleteAction("persistentvolumes", name), &api.PersistentVolume{})
+	return err
 }
 
 func (c *FakePersistentVolumes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(FakeAction{Action: "watch-persistentVolumes", Value: resourceVersion}, nil)
+	c.Fake.Invokes(NewRootWatchAction("persistentvolumes", label, field, resourceVersion), nil)
 	return c.Fake.Watch, c.Fake.Err()
+}
+
+func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
+	action := UpdateActionImpl{}
+	action.Verb = "update"
+	action.Resource = "persistentvolumes"
+	action.Subresource = "status"
+	action.Object = pv
+
+	obj, err := c.Fake.Invokes(action, pv)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.PersistentVolume), err
 }

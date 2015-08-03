@@ -70,7 +70,7 @@ type fakeRc struct {
 }
 
 func (c *fakeRc) Get(name string) (*api.ReplicationController, error) {
-	action := testclient.FakeAction{Action: "get-controller", Value: name}
+	action := testclient.NewGetAction("replicationcontrollers", "", name)
 	if len(c.responses) == 0 {
 		return nil, fmt.Errorf("Unexpected Action: %s", action)
 	}
@@ -81,12 +81,12 @@ func (c *fakeRc) Get(name string) (*api.ReplicationController, error) {
 }
 
 func (c *fakeRc) Create(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	c.Fake.Invokes(testclient.FakeAction{Action: "create-controller", Value: controller.ObjectMeta.Name}, nil)
+	c.Fake.Invokes(testclient.NewCreateAction("replicationcontrollers", controller.Namespace, controller), nil)
 	return controller, nil
 }
 
 func (c *fakeRc) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	c.Fake.Invokes(testclient.FakeAction{Action: "update-controller", Value: controller.ObjectMeta.Name}, nil)
+	c.Fake.Invokes(testclient.NewUpdateAction("replicationcontrollers", controller.Namespace, controller), nil)
 	return controller, nil
 }
 

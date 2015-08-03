@@ -30,36 +30,62 @@ type FakeNodes struct {
 }
 
 func (c *FakeNodes) Get(name string) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-node", Value: name}, &api.Node{})
+	obj, err := c.Fake.Invokes(NewRootGetAction("nodes", name), &api.Node{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Node), err
 }
 
 func (c *FakeNodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-nodes"}, &api.NodeList{})
+	obj, err := c.Fake.Invokes(NewRootListAction("nodes", label, field), &api.NodeList{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.NodeList), err
 }
 
 func (c *FakeNodes) Create(minion *api.Node) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-node", Value: minion}, &api.Node{})
+	obj, err := c.Fake.Invokes(NewRootCreateAction("nodes", minion), minion)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.Node), err
+}
+
+func (c *FakeNodes) Update(minion *api.Node) (*api.Node, error) {
+	obj, err := c.Fake.Invokes(NewRootUpdateAction("nodes", minion), minion)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Node), err
 }
 
 func (c *FakeNodes) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-node", Value: name}, &api.Node{})
+	_, err := c.Fake.Invokes(NewRootDeleteAction("nodes", name), &api.Node{})
 	return err
 }
 
-func (c *FakeNodes) Update(minion *api.Node) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-node", Value: minion}, &api.Node{})
-	return obj.(*api.Node), err
+func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Invokes(NewRootWatchAction("nodes", label, field, resourceVersion), nil)
+	return c.Fake.Watch, c.Fake.Err()
 }
 
 func (c *FakeNodes) UpdateStatus(minion *api.Node) (*api.Node, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-node", Value: minion}, &api.Node{})
-	return obj.(*api.Node), err
-}
+	action := CreateActionImpl{}
+	action.Verb = "update"
+	action.Resource = "nodes"
+	action.Subresource = "status"
+	action.Object = minion
 
-func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(FakeAction{Action: "watch-nodes", Value: resourceVersion}, nil)
-	return c.Fake.Watch, c.Fake.Err()
+	obj, err := c.Fake.Invokes(action, minion)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.Node), err
 }

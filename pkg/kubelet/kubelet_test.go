@@ -2323,10 +2323,13 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	actions := kubeClient.Actions()
-	if len(actions) != 2 || actions[1].Action != "update-status-node" {
+	if len(actions) != 2 {
 		t.Fatalf("unexpected actions: %v", actions)
 	}
-	updatedNode, ok := actions[1].Value.(*api.Node)
+	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
+		t.Fatalf("unexpected actions: %v", actions)
+	}
+	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
@@ -2424,7 +2427,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	if len(actions) != 2 {
 		t.Errorf("unexpected actions: %v", actions)
 	}
-	updatedNode, ok := actions[1].Value.(*api.Node)
+	updateAction, ok := actions[1].(testclient.UpdateAction)
+	if !ok {
+		t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
+	}
+	updatedNode, ok := updateAction.GetObject().(*api.Node)
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
@@ -2509,12 +2516,15 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	actions := kubeClient.Actions()
-	if len(actions) != 2 || actions[1].Action != "update-status-node" {
+	if len(actions) != 2 {
 		t.Fatalf("unexpected actions: %v", actions)
 	}
-	updatedNode, ok := actions[1].Value.(*api.Node)
+	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
+		t.Fatalf("unexpected actions: %v", actions)
+	}
+	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
 	if !ok {
-		t.Errorf("unexpected object type")
+		t.Errorf("unexpected action type.  expected UpdateAction, got %#v", actions[1])
 	}
 
 	if updatedNode.Status.Conditions[0].LastHeartbeatTime.IsZero() {
@@ -2926,13 +2936,8 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactFn = func(action testclient.FakeAction) (runtime.Object, error) {
-		segments := strings.Split(action.Action, "-")
-		if len(segments) < 2 {
-			return nil, fmt.Errorf("unrecognized action, need two or three segments <verb>-<resource> or <verb>-<subresource>-<resource>: %s", action.Action)
-		}
-		verb := segments[0]
-		switch verb {
+	kubeClient.ReactFn = func(action testclient.Action) (runtime.Object, error) {
+		switch action.GetVerb() {
 		case "create":
 			// Return an error on create.
 			return &api.Node{}, &apierrors.StatusError{
@@ -2945,7 +2950,7 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 				Spec:       api.NodeSpec{ExternalID: testKubeletHostname},
 			}, nil
 		default:
-			return nil, fmt.Errorf("no reaction implemented for %s", action.Action)
+			return nil, fmt.Errorf("no reaction implemented for %s", action)
 		}
 	}
 	machineInfo := &cadvisorApi.MachineInfo{

@@ -17,6 +17,7 @@ limitations under the License.
 package namespacecontroller
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -56,10 +57,10 @@ func TestFinalize(t *testing.T) {
 	if len(actions) != 1 {
 		t.Errorf("Expected 1 mock client action, but got %v", len(actions))
 	}
-	if actions[0].Action != "finalize-namespace" {
-		t.Errorf("Expected finalize-namespace action %v", actions[0].Action)
+	if !actions[0].Matches("create", "namespaces") || actions[0].GetSubresource() != "finalize" {
+		t.Errorf("Expected finalize-namespace action %v", actions[0])
 	}
-	finalizers := actions[0].Value.(*api.Namespace).Spec.Finalizers
+	finalizers := actions[0].(testclient.CreateAction).GetObject().(*api.Namespace).Spec.Finalizers
 	if len(finalizers) != 1 {
 		t.Errorf("There should be a single finalizer remaining")
 	}
@@ -90,18 +91,19 @@ func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 	}
 	// TODO: Reuse the constants for all these strings from testclient
 	expectedActionSet := util.NewStringSet(
-		testclient.ListControllerAction,
-		"list-services",
-		"list-pods",
-		"list-resourceQuotas",
-		"list-secrets",
-		"list-limitRanges",
-		"list-events",
-		"finalize-namespace",
-		"delete-namespace")
+		strings.Join([]string{"list", "replicationcontrollers", ""}, "-"),
+		strings.Join([]string{"list", "services", ""}, "-"),
+		strings.Join([]string{"list", "pods", ""}, "-"),
+		strings.Join([]string{"list", "resourcequotas", ""}, "-"),
+		strings.Join([]string{"list", "secrets", ""}, "-"),
+		strings.Join([]string{"list", "limitranges", ""}, "-"),
+		strings.Join([]string{"list", "events", ""}, "-"),
+		strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
+		strings.Join([]string{"delete", "namespaces", ""}, "-"),
+	)
 	actionSet := util.NewStringSet()
 	for _, action := range mockClient.Actions() {
-		actionSet.Insert(action.Action)
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource(), action.GetSubresource()}, "-"))
 	}
 	if !actionSet.HasAll(expectedActionSet.List()...) {
 		t.Errorf("Expected actions: %v, but got: %v", expectedActionSet, actionSet)
@@ -126,12 +128,8 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
-	actionSet := util.NewStringSet()
-	for _, action := range mockClient.Actions() {
-		actionSet.Insert(action.Action)
-	}
-	if len(actionSet) != 0 {
-		t.Errorf("Expected no action from controller, but got: %v", actionSet)
+	if len(mockClient.Actions()) != 0 {
+		t.Errorf("Expected no action from controller, but got: %v", mockClient.Actions())
 	}
 }
 

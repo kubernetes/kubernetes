@@ -30,32 +30,48 @@ type FakeLimitRanges struct {
 	Namespace string
 }
 
-func (c *FakeLimitRanges) List(selector labels.Selector) (*api.LimitRangeList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-limitRanges"}, &api.LimitRangeList{})
-	return obj.(*api.LimitRangeList), err
-}
-
 func (c *FakeLimitRanges) Get(name string) (*api.LimitRange, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-limitRange", Value: name}, &api.LimitRange{})
+	obj, err := c.Fake.Invokes(NewGetAction("limitranges", c.Namespace, name), &api.LimitRange{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.LimitRange), err
 }
 
-func (c *FakeLimitRanges) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-limitRange", Value: name}, &api.LimitRange{})
-	return err
+func (c *FakeLimitRanges) List(label labels.Selector) (*api.LimitRangeList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("limitranges", c.Namespace, label, nil), &api.LimitRangeList{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.LimitRangeList), err
 }
 
 func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (*api.LimitRange, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-limitRange"}, &api.LimitRange{})
+	obj, err := c.Fake.Invokes(NewCreateAction("limitranges", c.Namespace, limitRange), limitRange)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.LimitRange), err
 }
 
 func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (*api.LimitRange, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-limitRange", Value: limitRange.Name}, &api.LimitRange{})
+	obj, err := c.Fake.Invokes(NewUpdateAction("limitranges", c.Namespace, limitRange), limitRange)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.LimitRange), err
 }
 
+func (c *FakeLimitRanges) Delete(name string) error {
+	_, err := c.Fake.Invokes(NewDeleteAction("limitranges", c.Namespace, name), &api.LimitRange{})
+	return err
+}
+
 func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(FakeAction{Action: "watch-limitRange", Value: resourceVersion}, nil)
+	c.Fake.Invokes(NewWatchAction("limitranges", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, nil
 }

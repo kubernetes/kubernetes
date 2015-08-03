@@ -343,7 +343,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		podEvictor.TryEvict(func(nodeName string) { nodeController.deletePods(nodeName) })
 		podEvicted := false
 		for _, action := range item.fakeNodeHandler.Actions() {
-			if action.Action == "delete-pod" {
+			if action.GetVerb() == "delete" && action.GetResource() == "pods" {
 				podEvicted = true
 			}
 		}

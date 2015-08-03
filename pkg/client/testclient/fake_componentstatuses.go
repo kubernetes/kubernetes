@@ -27,21 +27,20 @@ type FakeComponentStatuses struct {
 	Fake *Fake
 }
 
-func (c *FakeComponentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-componentstatuses"}, &api.ComponentStatusList{})
-	return obj.(*api.ComponentStatusList), err
+func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
+	obj, err := c.Fake.Invokes(NewRootGetAction("componentstatuses", name), &api.ComponentStatus{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.ComponentStatus), err
 }
 
-func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-componentstatus", Value: name}, &api.ComponentStatus{})
-	//   c.Actions = append(c.Actions, FakeAction{Action: "get-componentstatuses", Value: nil})
-	// testStatus := &api.ComponentStatus{
-	//   Name:       "test",
-	//   Health:     "ok",
-	//   HealthCode: int(probe.Success),
-	//   Message:    "ok",
-	//   Error:      "",
-	// }
-	// return &api.ComponentStatusList{Items: []api.ComponentStatus{*testStatus}}, nil
-	return obj.(*api.ComponentStatus), err
+func (c *FakeComponentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("componentstatuses", label, field), &api.ComponentStatusList{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.ComponentStatusList), err
 }
