@@ -422,6 +422,66 @@ type PersistentVolumeList struct {
 	Items []PersistentVolume `json:"items"`
 }
 
+// PersistentVolumeSet maintains a pool of one type of PersistentVolume
+type PersistentVolumeSet struct {
+	TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines a specification of a persistent volume set owned by the cluster.
+	// Provisioned by an administrator.
+	// More info: http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md
+	Spec PersistentVolumeSetSpec `json:"spec,omitempty"`
+
+	// Status is the current status of this PV controller.
+	// ReadOnly.
+	// More info: http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md
+	Status PersistentVolumeSetStatus `json:"status,omitempty"`
+}
+
+// PersistentVolumeSetSpec is the specification of a PersistentVolumeSet.
+type PersistentVolumeSetSpec struct {
+	// MinimumReplicas is the minimum number of unbound (available) persistent volumes of this type to keep in the set
+	MinimumReplicas int `json:"minimumReplicas"`
+	// MaximumReplicas is the maximum total number of persistent volumes desired in the set
+	MaximumReplicas int `json:"maximumReplicas"`
+	// Selector is a label query over persistent volumes which are part of the set
+	Selector map[string]string `json:"selector"`
+	// Template is the description of a PersistentVolume to create new replicas from
+	Template *PersistentVolumeTemplateSpec `json:"template,omitempty"`
+}
+
+// PersistentVolumeSetStatus represents the current status of a PersistentVolumeSet
+type PersistentVolumeSetStatus struct {
+	// BoundReplicas is the number of volumes in the set that are currently bound to persistent volume claims
+	BoundReplicas int `json:"boundReplicas"`
+	// AvailableReplicas is the number of volumes in the set that are current unbound and available for new claims
+	AvailableReplicas int `json:"availableReplicas"`
+}
+
+// PersistentVolumeTemplateSpec describes the persistent volume created by this controller
+type PersistentVolumeTemplateSpec struct {
+	// Metadata of the pods created from this template.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the specification of the persistent volume from which replicas are made
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+	Spec PersistentVolumeSpec `json:"spec,omitempty"`
+}
+
+// PersistentVolumeSetList is a list of PersistentVolumeSet items.
+type PersistentVolumeSetList struct {
+	TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"`
+	// Items is a list of persistent volume claims.
+	// More info: see http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md
+	Items []PersistentVolumeSet `json:"items,omitempty"`
+}
+
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaim struct {
 	TypeMeta `json:",inline"`

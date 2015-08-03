@@ -1359,6 +1359,82 @@ func convert_api_PersistentVolumeList_To_v1_PersistentVolumeList(in *api.Persist
 	return nil
 }
 
+func convert_api_PersistentVolumeSet_To_v1_PersistentVolumeSet(in *api.PersistentVolumeSet, out *PersistentVolumeSet, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PersistentVolumeSet))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_PersistentVolumeSetSpec_To_v1_PersistentVolumeSetSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_api_PersistentVolumeSetStatus_To_v1_PersistentVolumeSetStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_PersistentVolumeSetList_To_v1_PersistentVolumeSetList(in *api.PersistentVolumeSetList, out *PersistentVolumeSetList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PersistentVolumeSetList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]PersistentVolumeSet, len(in.Items))
+		for i := range in.Items {
+			if err := convert_api_PersistentVolumeSet_To_v1_PersistentVolumeSet(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_api_PersistentVolumeSetSpec_To_v1_PersistentVolumeSetSpec(in *api.PersistentVolumeSetSpec, out *PersistentVolumeSetSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PersistentVolumeSetSpec))(in)
+	}
+	out.MinimumReplicas = in.MinimumReplicas
+	out.MaximumReplicas = in.MaximumReplicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(PersistentVolumeTemplateSpec)
+		if err := convert_api_PersistentVolumeTemplateSpec_To_v1_PersistentVolumeTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_api_PersistentVolumeSetStatus_To_v1_PersistentVolumeSetStatus(in *api.PersistentVolumeSetStatus, out *PersistentVolumeSetStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PersistentVolumeSetStatus))(in)
+	}
+	out.BoundReplicas = in.BoundReplicas
+	out.AvailableReplicas = in.AvailableReplicas
+	return nil
+}
+
 func convert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api.PersistentVolumeSource, out *PersistentVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.PersistentVolumeSource))(in)
@@ -1484,6 +1560,19 @@ func convert_api_PersistentVolumeStatus_To_v1_PersistentVolumeStatus(in *api.Per
 	out.Phase = PersistentVolumePhase(in.Phase)
 	out.Message = in.Message
 	out.Reason = in.Reason
+	return nil
+}
+
+func convert_api_PersistentVolumeTemplateSpec_To_v1_PersistentVolumeTemplateSpec(in *api.PersistentVolumeTemplateSpec, out *PersistentVolumeTemplateSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PersistentVolumeTemplateSpec))(in)
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -3761,6 +3850,82 @@ func convert_v1_PersistentVolumeList_To_api_PersistentVolumeList(in *PersistentV
 	return nil
 }
 
+func convert_v1_PersistentVolumeSet_To_api_PersistentVolumeSet(in *PersistentVolumeSet, out *api.PersistentVolumeSet, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PersistentVolumeSet))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_PersistentVolumeSetSpec_To_api_PersistentVolumeSetSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_v1_PersistentVolumeSetStatus_To_api_PersistentVolumeSetStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_PersistentVolumeSetList_To_api_PersistentVolumeSetList(in *PersistentVolumeSetList, out *api.PersistentVolumeSetList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PersistentVolumeSetList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]api.PersistentVolumeSet, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_PersistentVolumeSet_To_api_PersistentVolumeSet(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_PersistentVolumeSetSpec_To_api_PersistentVolumeSetSpec(in *PersistentVolumeSetSpec, out *api.PersistentVolumeSetSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PersistentVolumeSetSpec))(in)
+	}
+	out.MinimumReplicas = in.MinimumReplicas
+	out.MaximumReplicas = in.MaximumReplicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(api.PersistentVolumeTemplateSpec)
+		if err := convert_v1_PersistentVolumeTemplateSpec_To_api_PersistentVolumeTemplateSpec(in.Template, out.Template, s); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func convert_v1_PersistentVolumeSetStatus_To_api_PersistentVolumeSetStatus(in *PersistentVolumeSetStatus, out *api.PersistentVolumeSetStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PersistentVolumeSetStatus))(in)
+	}
+	out.BoundReplicas = in.BoundReplicas
+	out.AvailableReplicas = in.AvailableReplicas
+	return nil
+}
+
 func convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *PersistentVolumeSource, out *api.PersistentVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeSource))(in)
@@ -3886,6 +4051,19 @@ func convert_v1_PersistentVolumeStatus_To_api_PersistentVolumeStatus(in *Persist
 	out.Phase = api.PersistentVolumePhase(in.Phase)
 	out.Message = in.Message
 	out.Reason = in.Reason
+	return nil
+}
+
+func convert_v1_PersistentVolumeTemplateSpec_To_api_PersistentVolumeTemplateSpec(in *PersistentVolumeTemplateSpec, out *api.PersistentVolumeTemplateSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PersistentVolumeTemplateSpec))(in)
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -4901,9 +5079,14 @@ func init() {
 		convert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource,
 		convert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim,
 		convert_api_PersistentVolumeList_To_v1_PersistentVolumeList,
+		convert_api_PersistentVolumeSetList_To_v1_PersistentVolumeSetList,
+		convert_api_PersistentVolumeSetSpec_To_v1_PersistentVolumeSetSpec,
+		convert_api_PersistentVolumeSetStatus_To_v1_PersistentVolumeSetStatus,
+		convert_api_PersistentVolumeSet_To_v1_PersistentVolumeSet,
 		convert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource,
 		convert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec,
 		convert_api_PersistentVolumeStatus_To_v1_PersistentVolumeStatus,
+		convert_api_PersistentVolumeTemplateSpec_To_v1_PersistentVolumeTemplateSpec,
 		convert_api_PersistentVolume_To_v1_PersistentVolume,
 		convert_api_PodAttachOptions_To_v1_PodAttachOptions,
 		convert_api_PodCondition_To_v1_PodCondition,
@@ -5018,9 +5201,14 @@ func init() {
 		convert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource,
 		convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim,
 		convert_v1_PersistentVolumeList_To_api_PersistentVolumeList,
+		convert_v1_PersistentVolumeSetList_To_api_PersistentVolumeSetList,
+		convert_v1_PersistentVolumeSetSpec_To_api_PersistentVolumeSetSpec,
+		convert_v1_PersistentVolumeSetStatus_To_api_PersistentVolumeSetStatus,
+		convert_v1_PersistentVolumeSet_To_api_PersistentVolumeSet,
 		convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource,
 		convert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec,
 		convert_v1_PersistentVolumeStatus_To_api_PersistentVolumeStatus,
+		convert_v1_PersistentVolumeTemplateSpec_To_api_PersistentVolumeTemplateSpec,
 		convert_v1_PersistentVolume_To_api_PersistentVolume,
 		convert_v1_PodAttachOptions_To_api_PodAttachOptions,
 		convert_v1_PodCondition_To_api_PodCondition,

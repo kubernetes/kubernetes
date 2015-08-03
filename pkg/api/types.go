@@ -329,6 +329,53 @@ type PersistentVolumeList struct {
 	Items    []PersistentVolume `json:"items"`
 }
 
+// PersistentVolumeSet maintains a pool of one type of PersistentVolume
+type PersistentVolumeSet struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the desired specification of this PV controller.
+	Spec PersistentVolumeSetSpec `json:"spec,omitempty"`
+
+	// Status is the current status of this PV controller.
+	Status PersistentVolumeSetStatus `json:"status,omitempty"`
+}
+
+// PersistentVolumeSetSpec is the specification of a PersistentVolumeSet.
+type PersistentVolumeSetSpec struct {
+	// MinimumReplicas is the minimum number of unbound persistent volumes of this type desired in the system maintain
+	MinimumReplicas int `json:"minimumReplicas"`
+	// MaximumReplicas is the maximum total number of persistent volumes desired in the system
+	MaximumReplicas int `json:"maximumReplicas"`
+	// Selector is a label query over persistent volumes which are managed by this controller
+	Selector map[string]string `json:"selector"`
+	// Template is the description of a PersistentVolume to create new replicas from
+	Template *PersistentVolumeTemplateSpec `json:"template,omitempty"`
+}
+
+// PersistentVolumeSetStatus represents the current status of a PersistentVolumeSet
+type PersistentVolumeSetStatus struct {
+	// BoundReplicas is the number of replicas of this volume that are currently bound to PersistentVolumeClaims
+	BoundReplicas int `json:"boundReplicas"`
+	// AvailableReplicas is the number of replicas that are available and unbound
+	AvailableReplicas int `json:"availableReplicas"`
+}
+
+// PersistentVolumeTemplateSpec describes the persistent volume created by this controller
+type PersistentVolumeTemplateSpec struct {
+	// Metadata of the PVs created from this template.
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines a persistent volume.
+	Spec PersistentVolumeSpec `json:"spec,omitempty"`
+}
+
+type PersistentVolumeSetList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+	Items    []PersistentVolumeSet `json:"items,omitempty"`
+}
+
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaim struct {
 	TypeMeta   `json:",inline"`

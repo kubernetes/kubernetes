@@ -67,6 +67,8 @@ func validateObject(obj runtime.Object) (errors []error) {
 		}
 	case *api.PersistentVolume:
 		errors = validation.ValidatePersistentVolume(t)
+	case *api.PersistentVolumeSet:
+		errors = validation.ValidatePersistentVolumeSet(t)
 	case *api.PersistentVolumeClaim:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
@@ -187,6 +189,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"namespace": &api.Namespace{},
 			"pod":       &api.Pod{},
 			"service":   &api.Service{},
+		},
+		"../examples/persistent-volume-set": {
+			"pvs-hostpath": &api.PersistentVolumeSet{},
 		},
 		"../examples/iscsi": {
 			"iscsi": &api.Pod{},

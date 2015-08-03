@@ -376,6 +376,7 @@ var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
+var persistentVolumeSetColumns = []string{"NAME", "LABELS", "MINIMUM", "MAXIMUM", "BOUND", "AVAILABLE", "VOLUME"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
@@ -412,6 +413,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
 	h.Handler(persistentVolumeColumns, printPersistentVolume)
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
+	h.Handler(persistentVolumeSetColumns, printPersistentVolumeSet)
+	h.Handler(persistentVolumeSetColumns, printPersistentVolumeSetList)
 	h.Handler(componentStatusColumns, printComponentStatus)
 	h.Handler(componentStatusColumns, printComponentStatusList)
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResource)
@@ -939,6 +942,35 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace 
 func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, pv := range list.Items {
 		if err := printPersistentVolume(&pv, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPersistentVolumeSet(pvs *api.PersistentVolumeSet, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	if withNamespace {
+		return fmt.Errorf("persistentVolumeSet is not namespaced")
+	}
+
+	name := pvs.Name
+	labels := labels.FormatLabels(pvs.Labels)
+	minReplicas := pvs.Spec.MinimumReplicas
+	maxReplicas := pvs.Spec.MaximumReplicas
+	bound := pvs.Status.BoundReplicas
+	available := pvs.Status.AvailableReplicas
+	vol := api.PersistentVolumeAsString(pvs.Spec.Template.Spec)
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\t%d\t%s", name, labels, minReplicas, maxReplicas, bound, available, vol); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(pvs.Labels, columnLabels))
+	return err
+}
+
+func printPersistentVolumeSetList(list *api.PersistentVolumeSetList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, pvctl := range list.Items {
+		if err := printPersistentVolumeSet(&pvctl, w, withNamespace, wide, columnLabels); err != nil {
 			return err
 		}
 	}

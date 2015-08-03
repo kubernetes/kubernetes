@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: PersistentVolumeSet
+metadata:
+  name: hostpath-pvs
+  labels:
+    name: "hostpath-pvs"
+spec:
+  minimumReplicas: 5
+  maximumReplicas: 10
+  selector:
+    type: "hostpath"
+  template:
+    metadata:
+      labels:
+        type: "hostpath"
+    spec:
+      capacity:
+        storage: 8Gi
+      accessModes:
+        - ReadWriteOnce
+      hostPath:
+        path: "/tmp/data02"
+      persistentVolumeReclaimPolicy: Recycle

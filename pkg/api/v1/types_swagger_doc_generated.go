@@ -822,6 +822,49 @@ func (PersistentVolumeList) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeList
 }
 
+var map_PersistentVolumeSet = map[string]string{
+	"":         "PersistentVolumeSet maintains a pool of one type of PersistentVolume",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec defines a specification of a persistent volume set owned by the cluster. Provisioned by an administrator. More info: http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md",
+	"status":   "Status is the current status of this PV controller. ReadOnly. More info: http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md",
+}
+
+func (PersistentVolumeSet) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeSet
+}
+
+var map_PersistentVolumeSetList = map[string]string{
+	"":         "PersistentVolumeSetList is a list of PersistentVolumeSet items.",
+	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"items":    "Items is a list of persistent volume claims. More info: see http://releases.k8s.io/HEAD/docs/design/persistent-volume-provisioning.md",
+}
+
+func (PersistentVolumeSetList) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeSetList
+}
+
+var map_PersistentVolumeSetSpec = map[string]string{
+	"":                "PersistentVolumeSetSpec is the specification of a PersistentVolumeSet.",
+	"minimumReplicas": "MinimumReplicas is the minimum number of unbound (available) persistent volumes of this type to keep in the set",
+	"maximumReplicas": "MaximumReplicas is the maximum total number of persistent volumes desired in the set",
+	"selector":        "Selector is a label query over persistent volumes which are part of the set",
+	"template":        "Template is the description of a PersistentVolume to create new replicas from",
+}
+
+func (PersistentVolumeSetSpec) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeSetSpec
+}
+
+var map_PersistentVolumeSetStatus = map[string]string{
+	"":                  "PersistentVolumeSetStatus represents the current status of a PersistentVolumeSet",
+	"boundReplicas":     "BoundReplicas is the number of volumes in the set that are currently bound to persistent volume claims",
+	"availableReplicas": "AvailableReplicas is the number of volumes in the set that are current unbound and available for new claims",
+}
+
+func (PersistentVolumeSetStatus) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeSetStatus
+}
+
 var map_PersistentVolumeSource = map[string]string{
 	"":                     "PersistentVolumeSource is similar to VolumeSource but meant for the administrator who creates PVs. Exactly one of its members must be set.",
 	"gcePersistentDisk":    "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk",
@@ -860,6 +903,16 @@ var map_PersistentVolumeStatus = map[string]string{
 
 func (PersistentVolumeStatus) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeStatus
+}
+
+var map_PersistentVolumeTemplateSpec = map[string]string{
+	"":         "PersistentVolumeTemplateSpec describes the persistent volume created by this controller",
+	"metadata": "Metadata of the pods created from this template. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec is the specification of the persistent volume from which replicas are made More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status\"",
+}
+
+func (PersistentVolumeTemplateSpec) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeTemplateSpec
 }
 
 var map_Pod = map[string]string{

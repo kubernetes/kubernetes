@@ -725,6 +725,20 @@ __EOF__
   # Post-condition: no PVs
   kube::test::get_object_assert pv "{{range.items}}{{.$id_field}}:{{end}}" ''
 
+  ###########################
+  # Persistent Volume Set   #
+  ###########################
+
+  ### Create and delete persistent volume set example
+  # Pre-condition: no persistent volume sets currently exist
+  kube::test::get_object_assert pvs "{{range.items}}{{.$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/persistent-volume-set/pvs-hostpath.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert pvs "{{range.items}}{{.$id_field}}:{{end}}" 'hostpath-pvs:'
+  kubectl delete pvs hostpath-pvs "${kube_flags[@]}"
+  # Post-condition: no sets
+  kube::test::get_object_assert pvs "{{range.items}}{{.$id_field}}:{{end}}" ''
+
   ############################
   # Persistent Volume Claims #
   ############################

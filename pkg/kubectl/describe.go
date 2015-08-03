@@ -75,6 +75,7 @@ func describerMap(c *client.Client) map[string]Describer {
 		"LimitRange":            &LimitRangeDescriber{c},
 		"ResourceQuota":         &ResourceQuotaDescriber{c},
 		"PersistentVolume":      &PersistentVolumeDescriber{c},
+		"PersistentVolumeSet":   &PersistentVolumeSetDescriber{c},
 		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
 		"Namespace":             &NamespaceDescriber{c},
 	}
@@ -658,6 +659,29 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 			printRBDVolumeSource(pv.Spec.RBD, out)
 		}
 
+		return nil
+	})
+}
+
+type PersistentVolumeSetDescriber struct {
+	client.Interface
+}
+
+func (d *PersistentVolumeSetDescriber) Describe(namespace, name string) (string, error) {
+	c := d.PersistentVolumeSets()
+
+	pvset, err := c.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", pvset.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(pvset.Labels))
+		fmt.Fprintf(out, "Template:\t%s\n", api.PersistentVolumeAsString(pvset.Spec.Template.Spec))
+		fmt.Fprintf(out, "Mix/Max Replicas:\t%d/%d\t\n", pvset.Spec.MinimumReplicas, pvset.Spec.MaximumReplicas)
+		fmt.Fprintf(out, "Available:\t%d\n", pvset.Status.AvailableReplicas)
+		fmt.Fprintf(out, "Bound:\t%d\n", pvset.Status.BoundReplicas)
 		return nil
 	})
 }

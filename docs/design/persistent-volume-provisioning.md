@@ -2,29 +2,48 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<h1>*** PLEASE NOTE: This document applies to the HEAD of the source
-tree only. If you are using a released version of Kubernetes, you almost
-certainly want the docs that go with that version.</h1>
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
 
-<strong>Documentation for specific releases can be found at
-[releases.k8s.io](http://releases.k8s.io).</strong>
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<strong>
+The latest 1.0.x release of this document can be found
+[here](http://releases.k8s.io/release-1.0/docs/design/persistent-volume-provisioning.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
 
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Persistent Volume Provisioning
 
-This document proposes a model for dynamically provisioning [Persistent Volumes](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/persistent-volumes.md)
+This document proposes a model for dynamically provisioning
 
 ### tl;dr
 
 One new API kind:
 
-A `PersistentVolumeController` (PVC) is a storage resource provisioned by an administrator.  PVCs do not have a namespace.  Just as a `ReplicationController` maintains a number of replicas of a pod, a `PersistentVolumeController` maintains a minimum number of replicas of a `PersistentVolume`.  A PVC creates new volumes from a template up to a maximum replica count in increments of the minimum replica count.  A well-provisioned cluster will have many PVCs.
+A `PersistentVolumeSet` (PVC) is a storage resource provisioned by an administrator.  PVCs do not have a namespace.  Just as a `ReplicationController` maintains a number of replicas of a pod, a `PersistentVolumeSet` maintains a minimum number of replicas of a `PersistentVolume`.  A PVC creates new volumes from a template up to a maximum replica count in increments of the minimum replica count.  A well-provisioned cluster will have many PVCs.
 
 One new system component:
 
-`PersistentVolumeControllerManager` is a singleton control loop running in master that manages all PVControllers in the system.  The PVCM reconciles the current supply of available PersistentVolumes in the system with the desired levels according to the PVControllers.   This process is similar to the ```ReplicationManager``` that manages ReplicationControllers.
+`PersistentVolumeSetManager` is a singleton control loop running in master that manages all PVControllers in the system.  The PVCM reconciles the current supply of available PersistentVolumes in the system with the desired levels according to the PVControllers.   This process is similar to the ```ReplicationManager``` that manages ReplicationControllers.
 
 Three new volume plugin interfaces:
 
@@ -44,21 +63,21 @@ Volume plugins can implement any applicable interfaces.  Each plugin will docume
 #### API types
 
 ```
-// PersistentVolumeController represents the configuration of a persistent volume.
-type PersistentVolumeController struct {
+// PersistentVolumeSet represents the configuration of a persistent volume.
+type PersistentVolumeSet struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the desired specification of this PV controller.
-	Spec PersistentVolumeControllerSpec `json:"spec,omitempty"`
+	Spec PersistentVolumeSetSpec `json:"spec,omitempty"`
 
 	// Status is the current status of this PV controller.
-	Status PersistentVolumeControllerStatus `json:"status,omitempty"`
+	Status PersistentVolumeSetStatus `json:"status,omitempty"`
 }
 
-// PersistentVolumeControllerSpec is the specification of a PV controller.
+// PersistentVolumeSetSpec is the specification of a PV controller.
 // The controller creates volumes exactly like the Template until the unbound count equals the replica count
-type PersistentVolumeControllerSpec struct {
+type PersistentVolumeSetSpec struct {
 	// MinimumReplicas is the minimum number of unbound persistent volumes of this type desired in the system maintain
 	MinimumReplicas int `json:"minimumReplicas"`
 
@@ -72,8 +91,8 @@ type PersistentVolumeControllerSpec struct {
 	Template *PersistentVolumeTemplateSpec `json:"template,omitempty"`
 }
 
-// PersistentVolumeControllerStatus represents the current status of a PVController
-type PersistentVolumeControllerStatus struct {
+// PersistentVolumeSetStatus represents the current status of a PVController
+type PersistentVolumeSetStatus struct {
 	// BoundReplicas is the number of replicas of this volume that are currently bound to PersistentVolumeClaims
 	BoundReplicas int `json:"boundReplicas"`
 	UnboundReplicas int `json:"unboundReplicas"`
@@ -94,24 +113,24 @@ Dynamic pools of storage (e.g, GCE) will maintain `MinimumReplicas` of a `Persis
 
 Static pools of storage (e.g, NFS) will have ```MinimumReplicas``` == ```MaximumReplicas```.  Creation or deletion of the resource will not occur but the controller allows recycling of the volume through the plugin.
 
-#### PersistentVolumeController API
+#### PersistentVolumeSet API
 
 | Action | HTTP Verb | Path | Description |
 | ---- | ---- | ---- | ---- |
-| CREATE | POST | /api/{version}/persistentvolumecontrollers/ | Create instance of PersistentVolumeController|
-| GET | GET | /api/{version}persistentvolumecontrollers/{name} | Get instance of PersistentVolumeController |
-| UPDATE | PUT | /api/{version}/persistentvolumecontrollers/{name} | Update instance of PersistentVolumeController |
-| DELETE | DELETE | /api/{version}/persistentvolumecontrollers/{name} | Delete instance of PersistentVolumeController |
-| LIST | GET | /api/{version}/persistentvolumecontrollers | List instances of PersistentVolumeController|
-| WATCH | GET | /api/{version}/watch/persistentvolumecontrollers | Watch for changes to a PersistentVolumeController|
+| CREATE | POST | /api/{version}/persistentvolumesets/ | Create instance of PersistentVolumeSet|
+| GET | GET | /api/{version}persistentvolumesets/{name} | Get instance of PersistentVolumeSet |
+| UPDATE | PUT | /api/{version}/persistentvolumesets/{name} | Update instance of PersistentVolumeSet |
+| DELETE | DELETE | /api/{version}/persistentvolumesets/{name} | Delete instance of PersistentVolumeSet |
+| LIST | GET | /api/{version}/persistentvolumesets | List instances of PersistentVolumeSet|
+| WATCH | GET | /api/{version}/watch/persistentvolumesets | Watch for changes to a PersistentVolumeSet|
 
 
-#### PersistentVolumeControllerManager
+#### PersistentVolumeSetManager
 
 * watch PersistentVolumes of a particular type as defined by the controller's label selector.
 ** PVs matching the selector but made manually count as replicas if they match the label selector
 ** PVs made manually or from earlier templates may have difference size capacities.  Delete largest first.
-* create a new volume ``` if unboundReplicas < minimumReplicas && totalReplicas <= maximumReplicas``` 
+* create a new volume ``` if unboundReplicas < minimumReplicas && totalReplicas <= maximumReplicas```
 * delete a volume ``` while totalReplicas > maximumReplicas, delete largest volume ```
 
 
@@ -129,9 +148,9 @@ Use of cloud and non-cloud volumes as examples for controllers.
 | gluster  | No, externally provisioned | pre-formatted during provisioning | mount volume, run "rm -rf" on volume | ? | ? | ? |
 | ceph  | No, externally provisioned | pre-formatted during provisioning | mount volume, run "rm -rf" on volume | ? | ? | ? |
 
-#### Recycler implementation 
+#### Recycler implementation
 
-Recyclers will schedule and watch a pod that mounts the specific volume being recycled.  The scrubber pod runs "rm -rf" on the volume.  
+Recyclers will schedule and watch a pod that mounts the specific volume being recycled.  The scrubber pod runs "rm -rf" on the volume.
 Recyclers block while performing their operation.  On successful return, the volume is made Available again and can be bound to a new `PersistentVolumeClaim`.
 
 

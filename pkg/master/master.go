@@ -62,6 +62,7 @@ import (
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
+	pvsetetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeset/etcd"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
@@ -438,6 +439,7 @@ func (m *Master) init(c *Config) {
 	serviceAccountStorage := serviceaccountetcd.NewREST(c.DatabaseStorage)
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(c.DatabaseStorage)
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(c.DatabaseStorage)
+	persistentVolumeSetStorage, persistentVolumeSetStatusStorage := pvsetetcd.NewREST(c.DatabaseStorage)
 
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(c.DatabaseStorage)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
@@ -502,6 +504,8 @@ func (m *Master) init(c *Config) {
 		"serviceAccounts":               serviceAccountStorage,
 		"persistentVolumes":             persistentVolumeStorage,
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
+		"persistentVolumeSets":          persistentVolumeSetStorage,
+		"persistentVolumeSets/status":   persistentVolumeSetStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
 
