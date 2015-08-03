@@ -400,4 +400,83 @@ var _ = Describe("Volumes", func() {
 			testVolumeClient(c, config, volume, "Hello from iSCSI")
 		})
 	})
+
+	////////////////////////////////////////////////////////////////////////
+	// Ceph RBD
+	////////////////////////////////////////////////////////////////////////
+
+	// Marked with [Skipped] to skip the test by default (see driver.go),
+	// the test needs privileged containers, which are disabled by default.
+	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=RBD"
+
+	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
+	Describe("[Skipped] Ceph RBD", func() {
+		It("should be mountable", func() {
+			config := VolumeTestConfig{
+				namespace:   namespace.Name,
+				prefix:      "rbd",
+				serverImage: "gcr.io/google_containers/volume-rbd",
+				serverPorts: []int{6789},
+				volumes: map[string]string{
+					// iSCSI container needs to insert modules from the host
+					"/lib/modules": "/lib/modules",
+					"/sys":         "/sys",
+				},
+			}
+
+			defer func() {
+				if clean {
+					volumeTestCleanup(c, config)
+				}
+			}()
+			pod := startVolumeServer(c, config)
+			serverIP := pod.Status.PodIP
+			Logf("Ceph server IP address: %v", serverIP)
+
+			// create secrets for the server
+			secret := api.Secret{
+				TypeMeta: api.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name: config.prefix + "-secret",
+				},
+				Data: map[string][]byte{
+					// from contrib/for-tests/volumes-tester/rbd/keyring
+					"key": []byte("AQDRrKNVbEevChAAEmRC+pW/KBVHxa0w/POILA=="),
+				},
+			}
+
+			secClient := c.Secrets(config.namespace)
+
+			defer func() {
+				if clean {
+					secClient.Delete(config.prefix + "-secret")
+				}
+			}()
+
+			if _, err := secClient.Create(&secret); err != nil {
+				Failf("Failed to create secrets for Ceph RBD: %v", err)
+			}
+
+			volume := api.VolumeSource{
+				RBD: &api.RBDVolumeSource{
+					CephMonitors: []string{serverIP},
+					RBDPool:      "rbd",
+					RBDImage:     "foo",
+					RadosUser:    "admin",
+					SecretRef: &api.LocalObjectReference{
+						Name: config.prefix + "-secret",
+					},
+					FSType:   "ext2",
+					ReadOnly: true,
+				},
+			}
+			// Must match content of contrib/for-tests/volumes-tester/gluster/index.html
+			testVolumeClient(c, config, volume, "Hello from RBD")
+
+		})
+	})
+
 })
