@@ -33,12 +33,11 @@ import (
 )
 
 const (
-	delete_long = `Delete a resource by filename, stdin, resource and name, or by resources and label selector.
+	delete_long = `Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 JSON and YAML formats are accepted.
 
-If both a filename and command line arguments are passed, the command line
-arguments are used and the filename is ignored.
+Only one type of the arguments may be specified: filenames, resources and names, or resources and label selector
 
 Note that the delete command does NOT do resource version checks, so if someone
 submits an update to a resource right when you submit a delete, their update
@@ -63,7 +62,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use:     "delete ([-f FILENAME] | (RESOURCE [(NAME | -l label | --all)]",
-		Short:   "Delete a resource by filename, stdin, resource and name, or by resources and label selector.",
+		Short:   "Delete resources by filenames, stdin, resources and names, or by resources and label selector.",
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {

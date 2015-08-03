@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl delete \- Delete a resource by filename, stdin, resource and name, or by resources and label selector.
+kubectl delete \- Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 
 .SH SYNOPSIS
@@ -13,14 +13,13 @@ kubectl delete \- Delete a resource by filename, stdin, resource and name, or by
 
 .SH DESCRIPTION
 .PP
-Delete a resource by filename, stdin, resource and name, or by resources and label selector.
+Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 .PP
 JSON and YAML formats are accepted.
 
 .PP
-If both a filename and command line arguments are passed, the command line
-arguments are used and the filename is ignored.
+Only one type of the arguments may be specified: filenames, resources and names, or resources and label selector
 
 .PP
 Note that the delete command does NOT do resource version checks, so if someone
