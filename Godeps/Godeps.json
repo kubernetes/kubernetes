@@ -521,7 +521,7 @@
 		},
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
-			"Rev": "3c85049eaeb429febe7788d9c7aac42322a377fe"
+			"Rev": "2c00daeb6c3b45114c80ac44119e7b8801fdd852"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
