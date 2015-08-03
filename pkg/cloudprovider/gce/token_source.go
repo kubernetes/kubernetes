@@ -23,10 +23,10 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"code.google.com/p/google-api-go-client/googleapi"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/googleapi"
 )
 
 const (

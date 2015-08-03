@@ -20,21 +20,6 @@
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
 		},
 		{
-			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
-			"Comment": "release-105",
-			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
-		},
-		{
-			"ImportPath": "code.google.com/p/google-api-go-client/container/v1beta1",
-			"Comment": "release-105",
-			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
-		},
-		{
-			"ImportPath": "code.google.com/p/google-api-go-client/googleapi",
-			"Comment": "release-105",
-			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
-		},
-		{
 			"ImportPath": "github.com/GoogleCloudPlatform/gcloud-golang/compute/metadata",
 			"Rev": "e34a32f9b0ecbc0784865fb2d47f3818c09521d4"
 		},
@@ -562,6 +547,18 @@
 		{
 			"ImportPath": "golang.org/x/oauth2",
 			"Rev": "b5adcc2dcdf009d0391547edc6ecbaff889f5bb9"
+		},
+		{
+			"ImportPath": "google.golang.org/api/compute/v1",
+			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+		},
+		{
+			"ImportPath": "google.golang.org/api/container/v1beta1",
+			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+		},
+		{
+			"ImportPath": "google.golang.org/api/googleapi",
+			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
 		},
 		{
 			"ImportPath": "google.golang.org/cloud/compute/metadata",

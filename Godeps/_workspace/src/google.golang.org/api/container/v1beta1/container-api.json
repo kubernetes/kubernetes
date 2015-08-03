@@ -1,11 +1,11 @@
 {
  "kind": "discovery#restDescription",
- "etag": "\"l66ggWbucbkBw9Lpos72oziyefE/ZrZBeDfQYPqAxFURJt0IhCOLUHQ\"",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/H5vlYxYcjMuH0uPSZu-WXGARHps\"",
  "discoveryVersion": "v1",
  "id": "container:v1beta1",
  "name": "container",
  "version": "v1beta1",
- "revision": "20141103",
+ "revision": "20150326",
  "title": "Google Container Engine API",
  "description": "The Google Container Engine API is used for building and managing container based applications, powered by the open source Kubernetes technology.",
  "ownerDomain": "google.com",
@@ -14,6 +14,7 @@
   "x16": "http://www.google.com/images/icons/product/search-16.gif",
   "x32": "http://www.google.com/images/icons/product/search-32.gif"
  },
+ "documentationLink": "https://cloud.google.com/container-engine/docs/v1beta1/",
  "protocol": "rest",
  "baseUrl": "https://www.googleapis.com/container/v1beta1/projects/",
  "basePath": "/container/v1beta1/projects/",
@@ -78,15 +79,14 @@
   "Cluster": {
    "id": "Cluster",
    "type": "object",
-   "externalTypeName": "container.v1beta1.Cluster",
    "properties": {
     "clusterApiVersion": {
      "type": "string",
-     "description": "The API version of the Kubernetes master and kubelets running in this cluster. Allowed value is 0.4.2, or leave blank to pick up the latest stable release."
+     "description": "The API version of the Kubernetes master and kubelets running in this cluster. Leave blank to pick up the latest stable release, or specify a version of the form \"x.y.z\". The Google Container Engine release notes lists the currently supported versions. If an incorrect version is specified, the server returns an error listing the currently supported versions."
     },
     "containerIpv4Cidr": {
      "type": "string",
-     "description": "[Output only] The IP addresses of the container pods in this cluster, in  CIDR notation (e.g. 1.2.3.4/29)."
+     "description": "The IP address range of the container pods in this cluster, in  CIDR notation (e.g. 10.96.0.0/14). Leave blank to have one automatically chosen or specify a /14 block in 10.0.0.0/8 or 172.16.0.0/12."
     },
     "creationTimestamp": {
      "type": "string",
@@ -96,17 +96,36 @@
      "type": "string",
      "description": "An optional description of this cluster."
     },
+    "enableCloudLogging": {
+     "type": "boolean",
+     "description": "Whether logs from the cluster should be made available via the Google Cloud Logging service. This includes both logs from your applications running in the cluster as well as logs from the Kubernetes components themselves."
+    },
+    "enableCloudMonitoring": {
+     "type": "boolean",
+     "description": "Whether metrics from the cluster should be made available via the Google Cloud Monitoring service."
+    },
     "endpoint": {
      "type": "string",
      "description": "[Output only] The IP address of this cluster's Kubernetes master. The endpoint can be accessed from the internet at https://username:password@endpoint/.\n\nSee the masterAuth property of this resource for username and password information."
     },
+    "instanceGroupUrls": {
+     "type": "array",
+     "description": "[Output only] The resource URLs of [instance groups](/compute/docs/instance-groups/) associated with this cluster.",
+     "items": {
+      "type": "string"
+     }
+    },
     "masterAuth": {
      "$ref": "MasterAuth",
-     "description": "The HTTP basic authentication information for accessing the master. Because the master endpoint is open to the internet, you should create a strong password."
+     "description": "The authentication information for accessing the master."
     },
     "name": {
      "type": "string",
      "description": "The name of this cluster. The name must be unique within this project and zone, and can be up to 40 characters with the following restrictions:  \n- Lowercase letters, numbers, and hyphens only.\n- Must start with a letter.\n- Must end with a number or a letter."
+    },
+    "network": {
+     "type": "string",
+     "description": "The name of the Google Compute Engine network to which the cluster is connected."
     },
     "nodeConfig": {
      "$ref": "NodeConfig",
@@ -122,9 +141,13 @@
      "description": "The number of nodes to create in this cluster. You must ensure that your Compute Engine resource quota is sufficient for this number of instances plus one (to include the master). You must also have available firewall and routes quota.",
      "format": "int32"
     },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output only] Server-defined URL for the resource."
+    },
     "servicesIpv4Cidr": {
      "type": "string",
-     "description": "[Output only] The IP addresses of the Kubernetes services in this cluster, in  CIDR notation (e.g. 1.2.3.4/29). Service addresses are always in the 10.0.0.0/16 range."
+     "description": "[Output only] The IP address range of the Kubernetes services in this cluster, in  CIDR notation (e.g. 1.2.3.4/29). Service addresses are typically put in the last /16 from the container CIDR."
     },
     "status": {
      "type": "string",
@@ -155,7 +178,6 @@
   "CreateClusterRequest": {
    "id": "CreateClusterRequest",
    "type": "object",
-   "externalTypeName": "container.v1beta1.CreateClusterRequest",
    "properties": {
     "cluster": {
      "$ref": "Cluster",
@@ -166,7 +188,6 @@
   "ListAggregatedClustersResponse": {
    "id": "ListAggregatedClustersResponse",
    "type": "object",
-   "externalTypeName": "container.v1beta1.ListAggregatedClustersResponse",
    "properties": {
     "clusters": {
      "type": "array",
@@ -180,7 +201,6 @@
   "ListAggregatedOperationsResponse": {
    "id": "ListAggregatedOperationsResponse",
    "type": "object",
-   "externalTypeName": "container.v1beta1.ListAggregatedOperationsResponse",
    "properties": {
     "operations": {
      "type": "array",
@@ -194,7 +214,6 @@
   "ListClustersResponse": {
    "id": "ListClustersResponse",
    "type": "object",
-   "externalTypeName": "container.v1beta1.ListClustersResponse",
    "properties": {
     "clusters": {
      "type": "array",
@@ -208,7 +227,6 @@
   "ListOperationsResponse": {
    "id": "ListOperationsResponse",
    "type": "object",
-   "externalTypeName": "container.v1beta1.ListOperationsResponse",
    "properties": {
     "operations": {
      "type": "array",
@@ -222,26 +240,48 @@
   "MasterAuth": {
    "id": "MasterAuth",
    "type": "object",
-   "externalTypeName": "container.v1beta1.MasterAuth",
+   "description": "The authentication information for accessing the master. Authentication is either done using HTTP basic authentication or using a bearer token.",
    "properties": {
+    "bearerToken": {
+     "type": "string",
+     "description": "The token used to authenticate API requests to the master. The token is to be included in an HTTP Authorization Header in all requests to the master endpoint. The format of the header is: \"Authorization: Bearer \"."
+    },
+    "clientCertificate": {
+     "type": "string",
+     "description": "[Output only] Base64 encoded public certificate used by clients to authenticate to the cluster endpoint."
+    },
+    "clientKey": {
+     "type": "string",
+     "description": "[Output only] Base64 encoded private key used by clients to authenticate to the cluster endpoint."
+    },
+    "clusterCaCertificate": {
+     "type": "string",
+     "description": "[Output only] Base64 encoded public certificate that is the root of trust for the cluster."
+    },
     "password": {
      "type": "string",
-     "description": "The password to use when accessing the Kubernetes master endpoint."
+     "description": "The password to use for HTTP basic authentication when accessing the Kubernetes master endpoint. Because the master endpoint is open to the internet, you should create a strong password."
     },
     "user": {
      "type": "string",
-     "description": "The username to use when accessing the Kubernetes master endpoint."
+     "description": "The username to use for HTTP basic authentication when accessing the Kubernetes master endpoint."
     }
    }
   },
   "NodeConfig": {
    "id": "NodeConfig",
    "type": "object",
-   "externalTypeName": "container.v1beta1.NodeConfig",
    "properties": {
     "machineType": {
      "type": "string",
      "description": "The name of a Google Compute Engine machine type (e.g. n1-standard-1).\n\nIf unspecified, the default machine type is n1-standard-1."
+    },
+    "serviceAccounts": {
+     "type": "array",
+     "description": "The optional list of ServiceAccounts, each with their specified scopes, to be made available on all of the node VMs. In addition to the service accounts and scopes specified, the \"default\" account will always be created with the following scopes to ensure the correct functioning of the cluster:  \n- https://www.googleapis.com/auth/compute,\n- https://www.googleapis.com/auth/devstorage.read_only",
+     "items": {
+      "$ref": "ServiceAccount"
+     }
     },
     "sourceImage": {
      "type": "string",
@@ -253,7 +293,6 @@
    "id": "Operation",
    "type": "object",
    "description": "Defines the operation resource. All fields are output only.",
-   "externalTypeName": "container.v1beta1.Operation",
    "properties": {
     "errorMessage": {
      "type": "string",
@@ -261,7 +300,7 @@
     },
     "name": {
      "type": "string",
-     "description": "The server-assigned ID for this operation. If the operation is fulfilled upfront, it may not have a resource name."
+     "description": "The server-assigned ID for the operation."
     },
     "operationType": {
      "type": "string",
@@ -274,6 +313,10 @@
       "",
       ""
      ]
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Server-defined URL for the resource."
     },
     "status": {
      "type": "string",
@@ -293,9 +336,31 @@
      "type": "string",
      "description": "[Optional] The URL of the cluster resource that this operation is associated with."
     },
+    "targetLink": {
+     "type": "string",
+     "description": "Server-defined URL for the target of the operation."
+    },
     "zone": {
      "type": "string",
      "description": "The name of the Google Compute Engine zone in which the operation is taking place."
+    }
+   }
+  },
+  "ServiceAccount": {
+   "id": "ServiceAccount",
+   "type": "object",
+   "description": "A Compute Engine service account.",
+   "properties": {
+    "email": {
+     "type": "string",
+     "description": "Email address of the service account."
+    },
+    "scopes": {
+     "type": "array",
+     "description": "The list of scopes to be made available for this service account.",
+     "items": {
+      "type": "string"
+     }
     }
    }
   }
@@ -365,7 +430,7 @@
          "id": "container.projects.zones.clusters.create",
          "path": "{projectId}/zones/{zoneId}/clusters",
          "httpMethod": "POST",
-         "description": "Creates a cluster, consisting of the specified number and type of Google Compute Engine instances, plus a Kubernetes master instance.\n\nThe cluster is created in the project's default network.\n\nA firewall is added that allows traffic into port 443 on the master, which enables HTTPS. A firewall and a route is added for each node to allow the containers on that node to communicate with all other instances in the cluster.\n\nFinally, a route named k8s-iproute-10-xx-0-0 is created to track that the cluster's 10.xx.0.0/16 CIDR has been assigned.",
+         "description": "Creates a cluster, consisting of the specified number and type of Google Compute Engine instances, plus a Kubernetes master instance.\n\nThe cluster is created in the project's default network.\n\nA firewall is added that allows traffic into port 443 on the master, which enables HTTPS. A firewall and a route is added for each node to allow the containers on that node to communicate with all other instances in the cluster.\n\nFinally, an entry is added to the project's global metadata indicating which CIDR range is being used by the cluster.",
          "parameters": {
           "projectId": {
            "type": "string",
