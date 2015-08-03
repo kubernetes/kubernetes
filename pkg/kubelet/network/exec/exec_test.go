@@ -51,7 +51,7 @@ func installPluginUnderTest(t *testing.T, vendorName string, plugName string) {
 	if err != nil {
 		t.Errorf("Failed to set exec perms on plugin")
 	}
-	writeStr := fmt.Sprintf("#!/bin/bash\necho -n $@ &> %s", path.Join(pluginDir, plugName+".out"))
+	writeStr := fmt.Sprintf("#!/bin/bash\necho -n $@ | tee %s", path.Join(pluginDir, plugName+".out"))
 	_, err = f.WriteString(writeStr)
 	if err != nil {
 		t.Errorf("Failed to write plugin exec")
@@ -140,8 +140,11 @@ func TestPluginSetupHook(t *testing.T) {
 	installPluginUnderTest(t, "", pluginName)
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
+	if err != nil {
+		t.Errorf("Expected nil: %v", err)
+	}
 
-	err = plug.SetUpPod("podNamespace", "podName", "dockerid2345")
+	result, err := plug.SetUpPod("podNamespace", "podName", "dockerid2345")
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -151,6 +154,10 @@ func TestPluginSetupHook(t *testing.T) {
 		t.Errorf("Expected nil")
 	}
 	expectedOutput := "setup podNamespace podName dockerid2345"
+	if result.Output != expectedOutput {
+		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, result.Output)
+	}
+
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
 	}

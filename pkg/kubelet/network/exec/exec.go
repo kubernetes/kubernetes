@@ -120,10 +120,15 @@ func (plugin *execNetworkPlugin) validate() error {
 	return nil
 }
 
-func (plugin *execNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) error {
+func (plugin *execNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) (*network.SetUpPodResult, error) {
 	out, err := utilexec.New().Command(plugin.getExecutable(), setUpCmd, namespace, name, string(id)).CombinedOutput()
 	glog.V(5).Infof("SetUpPod 'exec' network plugin output: %s, %v", string(out), err)
-	return err
+	lines := strings.Split(string(out), "\n")
+	result := &network.SetUpPodResult{}
+	if len(lines) > 0 {
+		result.Output = lines[len(lines)-1]
+	}
+	return result, err
 }
 
 func (plugin *execNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID) error {
