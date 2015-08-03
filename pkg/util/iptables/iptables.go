@@ -110,12 +110,17 @@ const NoFlushTables FlushFlag = false
 // (test whether a rule exists).
 const MinCheckVersion = "1.4.11"
 
+// Minimum iptables versions supporting the -w and -w2 flags
+const MinWaitVersion = "1.4.20"
+const MinWait2Version = "1.4.22"
+
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
 	mu       sync.Mutex
 	exec     utilexec.Interface
 	protocol Protocol
 	hasCheck bool
+	waitFlag []string
 }
 
 // New returns a new Interface which will exec iptables.
@@ -129,6 +134,7 @@ func New(exec utilexec.Interface, protocol Protocol) Interface {
 		exec:     exec,
 		protocol: protocol,
 		hasCheck: getIptablesHasCheckCommand(vstring),
+		waitFlag: getIptablesWaitFlag(vstring),
 	}
 }
 
@@ -309,7 +315,8 @@ func (runner *runner) iptablesCommand() string {
 func (runner *runner) run(op operation, args []string) ([]byte, error) {
 	iptablesCmd := runner.iptablesCommand()
 
-	fullArgs := append([]string{string(op)}, args...)
+	fullArgs := append(runner.waitFlag, string(op))
+	fullArgs = append(fullArgs, args...)
 	glog.V(4).Infof("running iptables %s %v", string(op), args)
 	return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
 	// Don't log err here - callers might not think it is an error.
@@ -419,6 +426,35 @@ func getIptablesHasCheckCommand(vstring string) bool {
 		return false
 	}
 	return true
+}
+
+// Checks if iptables version has a "wait" flag
+func getIptablesWaitFlag(vstring string) []string {
+	version, err := semver.NewVersion(vstring)
+	if err != nil {
+		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		return nil
+	}
+
+	minVersion, err := semver.NewVersion(MinWaitVersion)
+	if err != nil {
+		glog.Errorf("MinWaitVersion (%s) is not a valid version string: %v", MinWaitVersion, err)
+		return nil
+	}
+	if version.LessThan(*minVersion) {
+		return nil
+	}
+
+	minVersion, err = semver.NewVersion(MinWait2Version)
+	if err != nil {
+		glog.Errorf("MinWait2Version (%s) is not a valid version string: %v", MinWait2Version, err)
+		return nil
+	}
+	if version.LessThan(*minVersion) {
+		return []string{"-w"}
+	} else {
+		return []string{"-w2"}
+	}
 }
 
 // GetIptablesVersionString runs "iptables --version" to get the version string
