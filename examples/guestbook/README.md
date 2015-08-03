@@ -393,7 +393,7 @@ spec:
     spec:
       containers:
       - name: php-redis
-        image: kubernetes/example-guestbook-php-redis:v2
+        image: kubernetes/example-guestbook-php-redis:v3
         ports:
         - containerPort: 80
 ```
