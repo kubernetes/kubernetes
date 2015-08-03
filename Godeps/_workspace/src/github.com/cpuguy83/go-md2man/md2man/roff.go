@@ -1,24 +1,25 @@
-package mangen
+package md2man
 
 import (
 	"bytes"
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/russross/blackfriday"
 )
 
-type Man struct{}
+type roffRenderer struct{}
 
-func ManRenderer(flags int) blackfriday.Renderer {
-	return &Man{}
+func RoffRenderer(flags int) blackfriday.Renderer {
+	return &roffRenderer{}
 }
 
-func (m *Man) GetFlags() int {
+func (r *roffRenderer) GetFlags() int {
 	return 0
 }
 
-func (m *Man) TitleBlock(out *bytes.Buffer, text []byte) {
+func (r *roffRenderer) TitleBlock(out *bytes.Buffer, text []byte) {
 	out.WriteString(".TH ")
 
 	splitText := bytes.Split(text, []byte("\n"))
@@ -36,24 +37,23 @@ func (m *Man) TitleBlock(out *bytes.Buffer, text []byte) {
 	out.WriteString(" \"\"\n")
 }
 
-func (m *Man) BlockCode(out *bytes.Buffer, text []byte, lang string) {
+func (r *roffRenderer) BlockCode(out *bytes.Buffer, text []byte, lang string) {
 	out.WriteString("\n.PP\n.RS\n\n.nf\n")
 	escapeSpecialChars(out, text)
 	out.WriteString("\n.fi\n.RE\n")
 }
 
-func (m *Man) BlockQuote(out *bytes.Buffer, text []byte) {
+func (r *roffRenderer) BlockQuote(out *bytes.Buffer, text []byte) {
 	out.WriteString("\n.PP\n.RS\n")
 	out.Write(text)
 	out.WriteString("\n.RE\n")
 }
 
-func (m *Man) BlockHtml(out *bytes.Buffer, text []byte) {
-	fmt.Errorf("man: BlockHtml not supported")
+func (r *roffRenderer) BlockHtml(out *bytes.Buffer, text []byte) {
 	out.Write(text)
 }
 
-func (m *Man) Header(out *bytes.Buffer, text func() bool, level int, id string) {
+func (r *roffRenderer) Header(out *bytes.Buffer, text func() bool, level int, id string) {
 	marker := out.Len()
 
 	switch {
@@ -74,11 +74,11 @@ func (m *Man) Header(out *bytes.Buffer, text func() bool, level int, id string) 
 	}
 }
 
-func (m *Man) HRule(out *bytes.Buffer) {
+func (r *roffRenderer) HRule(out *bytes.Buffer) {
 	out.WriteString("\n.ti 0\n\\l'\\n(.lu'\n")
 }
 
-func (m *Man) List(out *bytes.Buffer, text func() bool, flags int) {
+func (r *roffRenderer) List(out *bytes.Buffer, text func() bool, flags int) {
 	marker := out.Len()
 	out.WriteString(".IP ")
 	if flags&blackfriday.LIST_TYPE_ORDERED != 0 {
@@ -94,12 +94,12 @@ func (m *Man) List(out *bytes.Buffer, text func() bool, flags int) {
 
 }
 
-func (m *Man) ListItem(out *bytes.Buffer, text []byte, flags int) {
+func (r *roffRenderer) ListItem(out *bytes.Buffer, text []byte, flags int) {
 	out.WriteString("\n\\item ")
 	out.Write(text)
 }
 
-func (m *Man) Paragraph(out *bytes.Buffer, text func() bool) {
+func (r *roffRenderer) Paragraph(out *bytes.Buffer, text func() bool) {
 	marker := out.Len()
 	out.WriteString("\n.PP\n")
 	if !text() {
@@ -112,7 +112,7 @@ func (m *Man) Paragraph(out *bytes.Buffer, text func() bool) {
 }
 
 // TODO: This might now work
-func (m *Man) Table(out *bytes.Buffer, header []byte, body []byte, columnData []int) {
+func (r *roffRenderer) Table(out *bytes.Buffer, header []byte, body []byte, columnData []int) {
 	out.WriteString(".TS\nallbox;\n")
 
 	out.Write(header)
@@ -120,7 +120,7 @@ func (m *Man) Table(out *bytes.Buffer, header []byte, body []byte, columnData []
 	out.WriteString("\n.TE\n")
 }
 
-func (m *Man) TableRow(out *bytes.Buffer, text []byte) {
+func (r *roffRenderer) TableRow(out *bytes.Buffer, text []byte) {
 	if out.Len() > 0 {
 		out.WriteString("\n")
 	}
@@ -128,7 +128,7 @@ func (m *Man) TableRow(out *bytes.Buffer, text []byte) {
 	out.WriteString("\n")
 }
 
-func (m *Man) TableHeaderCell(out *bytes.Buffer, text []byte, align int) {
+func (r *roffRenderer) TableHeaderCell(out *bytes.Buffer, text []byte, align int) {
 	if out.Len() > 0 {
 		out.WriteString(" ")
 	}
@@ -137,7 +137,7 @@ func (m *Man) TableHeaderCell(out *bytes.Buffer, text []byte, align int) {
 }
 
 // TODO: This is probably broken
-func (m *Man) TableCell(out *bytes.Buffer, text []byte, align int) {
+func (r *roffRenderer) TableCell(out *bytes.Buffer, text []byte, align int) {
 	if out.Len() > 0 {
 		out.WriteString("\t")
 	}
@@ -145,71 +145,68 @@ func (m *Man) TableCell(out *bytes.Buffer, text []byte, align int) {
 	out.WriteString("\t")
 }
 
-func (m *Man) Footnotes(out *bytes.Buffer, text func() bool) {
+func (r *roffRenderer) Footnotes(out *bytes.Buffer, text func() bool) {
 
 }
 
-func (m *Man) FootnoteItem(out *bytes.Buffer, name, text []byte, flags int) {
+func (r *roffRenderer) FootnoteItem(out *bytes.Buffer, name, text []byte, flags int) {
 
 }
 
-func (m *Man) AutoLink(out *bytes.Buffer, link []byte, kind int) {
+func (r *roffRenderer) AutoLink(out *bytes.Buffer, link []byte, kind int) {
 	out.WriteString("\n\\[la]")
 	out.Write(link)
 	out.WriteString("\\[ra]")
 }
 
-func (m *Man) CodeSpan(out *bytes.Buffer, text []byte) {
+func (r *roffRenderer) CodeSpan(out *bytes.Buffer, text []byte) {
 	out.WriteString("\\fB\\fC")
 	escapeSpecialChars(out, text)
 	out.WriteString("\\fR")
 }
 
-func (m *Man) DoubleEmphasis(out *bytes.Buffer, text []byte) {
+func (r *roffRenderer) DoubleEmphasis(out *bytes.Buffer, text []byte) {
 	out.WriteString("\\fB")
 	out.Write(text)
 	out.WriteString("\\fP")
 }
 
-func (m *Man) Emphasis(out *bytes.Buffer, text []byte) {
+func (r *roffRenderer) Emphasis(out *bytes.Buffer, text []byte) {
 	out.WriteString("\\fI")
 	out.Write(text)
 	out.WriteString("\\fP")
 }
 
-func (m *Man) Image(out *bytes.Buffer, link []byte, title []byte, alt []byte) {
-	fmt.Errorf("man: Image not supported")
+func (r *roffRenderer) Image(out *bytes.Buffer, link []byte, title []byte, alt []byte) {
 }
 
-func (m *Man) LineBreak(out *bytes.Buffer) {
+func (r *roffRenderer) LineBreak(out *bytes.Buffer) {
 	out.WriteString("\n.br\n")
 }
 
-func (m *Man) Link(out *bytes.Buffer, link []byte, title []byte, content []byte) {
-	m.AutoLink(out, link, 0)
+func (r *roffRenderer) Link(out *bytes.Buffer, link []byte, title []byte, content []byte) {
+	r.AutoLink(out, link, 0)
 }
 
-func (m *Man) RawHtmlTag(out *bytes.Buffer, tag []byte) {
+func (r *roffRenderer) RawHtmlTag(out *bytes.Buffer, tag []byte) {
 	out.Write(tag)
 }
 
-func (m *Man) TripleEmphasis(out *bytes.Buffer, text []byte) {
+func (r *roffRenderer) TripleEmphasis(out *bytes.Buffer, text []byte) {
 	out.WriteString("\\s+2")
 	out.Write(text)
 	out.WriteString("\\s-2")
 }
 
-func (m *Man) StrikeThrough(out *bytes.Buffer, text []byte) {
-	fmt.Errorf("man: strikethrough not supported")
+func (r *roffRenderer) StrikeThrough(out *bytes.Buffer, text []byte) {
 }
 
-func (m *Man) FootnoteRef(out *bytes.Buffer, ref []byte, id int) {
+func (r *roffRenderer) FootnoteRef(out *bytes.Buffer, ref []byte, id int) {
 
 }
 
-func (m *Man) Entity(out *bytes.Buffer, entity []byte) {
-	// TODO: convert this into a unicode character or something
-	out.Write(entity)
+func (r *roffRenderer) Entity(out *bytes.Buffer, entity []byte) {
+	out.WriteString(html.UnescapeString(string(entity)))
 }
 
 func processFooterText(text []byte) []byte {
@@ -231,18 +228,18 @@ func processFooterText(text []byte) []byte {
 	return newText
 }
 
-func (m *Man) NormalText(out *bytes.Buffer, text []byte) {
+func (r *roffRenderer) NormalText(out *bytes.Buffer, text []byte) {
 	escapeSpecialChars(out, text)
 }
 
-func (m *Man) DocumentHeader(out *bytes.Buffer) {
+func (r *roffRenderer) DocumentHeader(out *bytes.Buffer) {
 }
 
-func (m *Man) DocumentFooter(out *bytes.Buffer) {
+func (r *roffRenderer) DocumentFooter(out *bytes.Buffer) {
 }
 
 func needsBackslash(c byte) bool {
-	for _, r := range []byte("-_{}&\\~") {
+	for _, r := range []byte("-_&\\~") {
 		if c == r {
 			return true
 		}

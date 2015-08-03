@@ -141,9 +141,9 @@
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
 		},
 		{
-			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
-			"Comment": "v1.0.2-5-g2831f11",
-			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
+			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",
+			"Comment": "v1.0.3-2-g71acacd",
+			"Rev": "71acacd42f85e5e82f70a55327789582a5200a90"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
@@ -574,12 +574,12 @@
 			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
 		},
 		{
-			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "d466437aa4adc35830964cffc5b5f262c63ddcb4"
+			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
+			"Rev": "20b71e5b60d756d3d2f80def009790325acc2b23"
 		},
 		{
-			"ImportPath": "gopkg.in/natefinch/lumberjack.v2/",
-			"Rev": "20b71e5b60d756d3d2f80def009790325acc2b23"
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "d466437aa4adc35830964cffc5b5f262c63ddcb4"
 		},
 		{
 			"ImportPath": "speter.net/go/exp/math/dec/inf",

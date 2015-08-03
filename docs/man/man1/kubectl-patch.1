@@ -138,7 +138,7 @@ JSON and YAML formats are accepted.
 .nf
 
 // Partially update a node using strategic merge patch
-kubectl patch node k8s\-node\-1 \-p '\{"spec":\{"unschedulable":true\}\}'
+kubectl patch node k8s\-node\-1 \-p '{"spec":{"unschedulable":true}}'
 
 .fi
 .RE
