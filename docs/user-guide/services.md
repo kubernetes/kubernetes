@@ -48,7 +48,7 @@ Documentation for other releases can be found at
     - [Environment variables](#environment-variables)
     - [DNS](#dns)
   - [Headless services](#headless-services)
-  - [External services](#external-services)
+  - [Publishing services - service types](#publishing-services---service-types)
     - [Type NodePort](#type-nodeport)
     - [Type LoadBalancer](#type-loadbalancer)
   - [Shortcomings](#shortcomings)
@@ -355,22 +355,30 @@ they desire, but leaves them freedom to do discovery in their own way.
 Applications can still use a self-registration pattern and adapters for other
 discovery systems could easily be built upon this API.
 
-## External services
+## Publishing services - service types
 
 For some parts of your application (e.g. frontends) you may want to expose a
 Service onto an external (outside of your cluster, maybe public internet) IP
-address.  Kubernetes supports two ways of doing this: `NodePort`s and
-`LoadBalancer`s.
+address, other services should be visible only from inside of the cluster.
 
-Every `Service` has a `type` field which defines how the `Service` can be
-accessed.  Valid values for this field are:
+
+Kubernetes `ServiceTypes` allow you to specify what kind of service you want.
+The default and base type is `ClusterIP`, which exposes a service to connection
+from inside the cluster. `NodePort` and `LoadBalancer` are two types that expose
+services to external trafic.
+
+Valid values for the `ServiceType` field are:
 
    * `ClusterIP`: use a cluster-internal IP only - this is the default and is
-     discussed above
-   * `NodePort`: use a cluster IP, but also expose the service on a port on each
-     node of the cluster (the same port on each node)
-   * `LoadBalancer`: use a ClusterIP and a NodePort, but also ask the cloud
-     provider for a load balancer which forwards to the `Service`
+     discussed above. Choosing this value means that you want this service to be
+     reachable only from inside of the cluster.
+   * `NodePort`: on top of having a cluster-internal IP, expose the service on a
+     port on each node of the cluster (the same port on each node). You'll be able
+     to contact the service on any `<NodeIP>:NodePort` address.
+   * `LoadBalancer`: on top of having a cluster-internal IP and exposing service
+     on a NodePort also, ask the cloud provider for a load balancer
+     which forwards to the `Service` exposed as a `<NodeIP>:NodePort`
+     for each Node.
 
 Note that while `NodePort`s can be TCP or UDP, `LoadBalancer`s only support TCP
 as of Kubernetes 1.0.
@@ -379,17 +387,20 @@ as of Kubernetes 1.0.
 
 If you set the `type` field to `"NodePort"`, the Kubernetes master will
 allocate a port from a flag-configured range (default: 30000-32767), and each
-node will proxy that port (the same port number on every node) into your `Service`.
+Node will proxy that port (the same port number on every Node) into your `Service`.
 That port will be reported in your `Service`'s `spec.ports[*].nodePort` field.
 
 If you want a specific port number, you can specify a value in the `nodePort`
 field, and the system will allocate you that port or else the API transaction
-will fail.  The value you specify must be in the configured range for node
-ports.
+will fail (i.e. you need to take care about possible port collisions yourself).
+The value you specify must be in the configured range for node ports.
 
 This gives developers the freedom to set up their own load balancers, to
 configure cloud environments that are not fully supported by Kubernetes, or
 even to just expose one or more nodes' IPs directly.
+
+Note that this Service will be visible as both `<NodeIP>:spec.ports[*].nodePort`
+and `spec.clusterIp:spec.ports[*].port`.
 
 ### Type LoadBalancer
 
