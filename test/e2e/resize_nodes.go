@@ -104,7 +104,7 @@ func groupSize() (int, error) {
 }
 
 func waitForGroupSize(size int) error {
-	timeout := 4 * time.Minute
+	timeout := 10 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		currentSize, err := groupSize()
 		if err != nil {
