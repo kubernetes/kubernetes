@@ -400,7 +400,7 @@ function provision-minion() {
                          sudo -p '[sudo] password to copy files and start minion: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
                          && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin; \
                          sudo service etcd start; \
-                         sudo -b ~/kube/reconfDocker.sh"
+                         sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh"
 }
 
 function provision-masterandminion() {
@@ -425,7 +425,7 @@ function provision-masterandminion() {
                             sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
                             sudo service etcd start; \
-                            sudo -b ~/kube/reconfDocker.sh"
+                            sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh"
 }
 
 # Delete a kubernetes cluster

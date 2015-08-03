@@ -34,8 +34,6 @@ export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-192.168.3.0/24}  # f
 # define the IP range used for flannel overlay network, should not conflict with above SERVICE_CLUSTER_IP_RANGE
 export FLANNEL_NET=${FLANNEL_NET:-172.16.0.0/16}
 
-export FLANNEL_OPTS=${FLANNEL_OPTS:-"Network": 172.16.0.0/16}
-
 # Admission Controllers to invoke prior to persisting objects in cluster
 export ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,ServiceAccount,ResourceQuota,SecurityContextDeny
 
