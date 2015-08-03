@@ -45,7 +45,7 @@ Quick start
 
 **Step 1**
 
-Rethinkdb will discover peer using endpoints provided by kubernetes service,
+Rethinkdb will discover its peer using endpoints provided by kubernetes service,
 so first create a service so the following pod can query its endpoint
 
 ```sh
@@ -63,7 +63,7 @@ rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
 
 **Step 2**
 
-start fist server in cluster
+start the first server in the cluster
 
 ```sh
 $kubectl create -f examples/rethinkdb/rc.yaml
@@ -88,7 +88,7 @@ rethinkdb-rc-r4tb0                                    1/1       Running   0     
 Scale
 -----
 
-You can scale up you cluster using `kubectl scale`, and new pod will join to exsits cluster automatically, for example
+You can scale up your cluster using `kubectl scale`. The new pod will join to the existing cluster automatically, for example
 
 
 ```sh
@@ -124,13 +124,13 @@ rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080
 rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      28015/TCP
 ```
 
-We request for an external load balancer in the [admin-service.yaml](admin-service.yaml) file:
+We request an external load balancer in the [admin-service.yaml](admin-service.yaml) file:
 
 ```
 type: LoadBalancer
 ```
 
-The external load balancer allows us to access the service from outside via an external IP, which is 104.197.19.120 in this case.
+The external load balancer allows us to access the service from outside the firewall via an external IP, 104.197.19.120 in this case.
 
 Note that you may need to create a firewall rule to allow the traffic, assuming you are using Google Compute Engine:
 
