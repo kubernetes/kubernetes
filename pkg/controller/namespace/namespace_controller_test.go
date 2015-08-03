@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package namespace
+package namespacecontroller
 
 import (
 	"testing"
@@ -138,21 +138,21 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 func TestRunStop(t *testing.T) {
 	o := testclient.NewObjects(api.Scheme, api.Scheme)
 	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
-	nsMgr := NewNamespaceManager(client, 1*time.Second)
+	nsController := NewNamespaceController(client, 1*time.Second)
 
-	if nsMgr.StopEverything != nil {
-		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsMgr.StopEverything)
+	if nsController.StopEverything != nil {
+		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsController.StopEverything)
 	}
 
-	nsMgr.Run()
+	nsController.Run()
 
-	if nsMgr.StopEverything == nil {
+	if nsController.StopEverything == nil {
 		t.Errorf("Running manager should have a stop channel.  Got nil")
 	}
 
-	nsMgr.Stop()
+	nsController.Stop()
 
-	if nsMgr.StopEverything != nil {
-		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsMgr.StopEverything)
+	if nsController.StopEverything != nil {
+		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsController.StopEverything)
 	}
 }

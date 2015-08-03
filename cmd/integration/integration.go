@@ -40,7 +40,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/endpoint"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/node"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
 	explatest "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
@@ -51,7 +52,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
@@ -187,7 +187,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	eventBroadcaster.StartRecordingToSink(cl.Events(""))
 	scheduler.New(schedulerConfig).Run()
 
-	endpoints := service.NewEndpointController(cl)
+	endpoints := endpointcontroller.NewEndpointController(cl)
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
 	go endpoints.Run(3, util.NeverStop)
 

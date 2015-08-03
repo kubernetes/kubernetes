@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package namespace
+package namespacecontroller
 
 import (
 	"time"
@@ -33,14 +33,14 @@ import (
 	"github.com/golang/glog"
 )
 
-// NamespaceManager is responsible for performing actions dependent upon a namespace phase
-type NamespaceManager struct {
+// NamespaceController is responsible for performing actions dependent upon a namespace phase
+type NamespaceController struct {
 	controller     *framework.Controller
 	StopEverything chan struct{}
 }
 
-// NewNamespaceManager creates a new NamespaceManager
-func NewNamespaceManager(kubeClient client.Interface, resyncPeriod time.Duration) *NamespaceManager {
+// NewNamespaceController creates a new NamespaceController
+func NewNamespaceController(kubeClient client.Interface, resyncPeriod time.Duration) *NamespaceController {
 	_, controller := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
@@ -70,13 +70,13 @@ func NewNamespaceManager(kubeClient client.Interface, resyncPeriod time.Duration
 		},
 	)
 
-	return &NamespaceManager{
+	return &NamespaceController{
 		controller: controller,
 	}
 }
 
 // Run begins observing the system.  It starts a goroutine and returns immediately.
-func (nm *NamespaceManager) Run() {
+func (nm *NamespaceController) Run() {
 	if nm.StopEverything == nil {
 		nm.StopEverything = make(chan struct{})
 		go nm.controller.Run(nm.StopEverything)
@@ -84,7 +84,7 @@ func (nm *NamespaceManager) Run() {
 }
 
 // Stop gracefully shutsdown this controller
-func (nm *NamespaceManager) Stop() {
+func (nm *NamespaceController) Stop() {
 	if nm.StopEverything != nil {
 		close(nm.StopEverything)
 		nm.StopEverything = nil

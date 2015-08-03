@@ -68,7 +68,7 @@ type MasterComponents struct {
 	// Restclient used to talk to the kubernetes master
 	RestClient *client.Client
 	// Replication controller manager
-	ControllerManager *replication.ReplicationManager
+	ControllerManager *replicationcontroller.ReplicationManager
 	// Channel for stop signals to rc manager
 	rcStopCh chan struct{}
 	// Used to stop master components individually, and via MasterComponents.Stop
@@ -101,7 +101,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	}
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version(), QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
-	controllerManager := replication.NewReplicationManager(restClient, c.Burst)
+	controllerManager := replicationcontroller.NewReplicationManager(restClient, c.Burst)
 
 	// TODO: Support events once we can cleanly shutdown an event recorder.
 	controllerManager.SetEventRecorder(&record.FakeRecorder{})

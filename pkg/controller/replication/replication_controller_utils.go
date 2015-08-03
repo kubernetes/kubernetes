@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication
+package replicationcontroller
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"

@@ -19,7 +19,7 @@ package resource
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/resourcequota"
 )
 
 const (
@@ -30,14 +30,14 @@ const (
 // CPUFromPodSpec computes the cpu shares that the pod is admitted to use. Containers
 // without CPU limit are NOT taken into account.
 func PodCPULimit(pod *api.Pod) CPUShares {
-	cpuQuantity := resourcequota.PodCPU(pod)
+	cpuQuantity := resourcequotacontroller.PodCPU(pod)
 	return CPUShares(float64(cpuQuantity.MilliValue()) / 1000.0)
 }
 
 // MemFromPodSpec computes the amount of memory that the pod is admitted to use. Containers
 // without memory limit are NOT taken into account.
 func PodMemLimit(pod *api.Pod) MegaBytes {
-	memQuantity := resourcequota.PodMemory(pod)
+	memQuantity := resourcequotacontroller.PodMemory(pod)
 	return MegaBytes(float64(memQuantity.Value()) / 1024.0 / 1024.0)
 }
 

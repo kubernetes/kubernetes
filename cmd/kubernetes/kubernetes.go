@@ -34,15 +34,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/endpoint"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/node"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/replication"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/service"
 	explatest "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -140,10 +140,10 @@ func runControllerManager(cl *client.Client) {
 		glog.Warningf("Running without a service controller: %v", err)
 	}
 
-	endpoints := service.NewEndpointController(cl)
+	endpoints := endpointcontroller.NewEndpointController(cl)
 	go endpoints.Run(5, util.NeverStop)
 
-	controllerManager := replication.NewReplicationManager(cl, replication.BurstReplicas)
+	controllerManager := replicationcontroller.NewReplicationManager(cl, replicationcontroller.BurstReplicas)
 	go controllerManager.Run(5, util.NeverStop)
 }
 
