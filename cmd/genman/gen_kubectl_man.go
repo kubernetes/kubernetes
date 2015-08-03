@@ -26,7 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/cmd/genutils"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/cpuguy83/go-md2man/mangen"
+	mangen "github.com/cpuguy83/go-md2man"
 	"github.com/russross/blackfriday"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -144,7 +144,7 @@ func genMarkdown(command *cobra.Command, parent, docsDir string) {
 January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!
 `)
 
-	renderer := mangen.ManRenderer(0)
+	renderer := mangen.RoffRenderer(0)
 	extensions := 0
 	extensions |= blackfriday.EXTENSION_NO_INTRA_EMPHASIS
 	extensions |= blackfriday.EXTENSION_TABLES

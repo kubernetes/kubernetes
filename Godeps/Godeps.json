@@ -141,9 +141,9 @@
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
 		},
 		{
-			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
-			"Comment": "v1.0.2-5-g2831f11",
-			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
+			"ImportPath": "github.com/cpuguy83/go-md2man",
+			"Comment": "v1.0.3",
+			"Rev": "e69ac41993d9dad8006559d4e28763d241ab53a6"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",

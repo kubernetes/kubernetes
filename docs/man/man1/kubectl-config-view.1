@@ -88,6 +88,10 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
     The name of the kubeconfig context to use
 
 .PP
+\fB\-\-in\fP=""
+    Path to file to be processed
+
+.PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
     If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
@@ -118,6 +122,10 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 .PP
 \fB\-\-namespace\fP=""
     If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-out\fP=""
+    Path to output processed file
 
 .PP
 \fB\-\-password\fP=""
@@ -165,7 +173,7 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 $ kubectl config view
 
 // Get the password for the e2e user
-$ kubectl config view \-o template \-\-template='\{\{range .users\}\}\{\{ if eq .name "e2e" \}\}\{\{ index .user.password \}\}\{\{end\}\}\{\{end\}\}'
+$ kubectl config view \-o template \-\-template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'
 
 .fi
 .RE
