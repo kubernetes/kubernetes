@@ -1585,7 +1585,9 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	// Start everything
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
-		container.Env = append(container.Env, api.EnvVar{Name: containerNetworkEnvKey, Value: containerNetworkEnvVal})
+		if len(containerNetworkEnvVal) > 0 {
+			container.Env = append(container.Env, api.EnvVar{Name: containerNetworkEnvKey, Value: containerNetworkEnvVal})
+		}
 		glog.V(4).Infof("Creating container %+v in pod %v", container, podFullName)
 		err := dm.pullImage(pod, container, pullSecrets)
 		dm.updateReasonCache(pod, container, err)
