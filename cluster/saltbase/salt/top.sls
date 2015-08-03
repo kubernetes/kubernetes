@@ -3,6 +3,9 @@ base:
     - base
     - debian-auto-upgrades
     - salt-helpers
+{% if grains.get('cloud') == 'aws' %}
+    - ntp
+{% endif %}
 
   'roles:kubernetes-pool':
     - match: grain
