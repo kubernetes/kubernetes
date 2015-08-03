@@ -553,11 +553,6 @@
 			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
 		},
 		{
-			"ImportPath": "golang.org/x/net/spdy",
-			"Comment": "deleted-upstream",
-			"Rev": "d175081df37eff8cda13f478bc11a0a65b39958b"
-		},
-		{
 			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
 		},
