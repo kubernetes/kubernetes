@@ -17,6 +17,7 @@ limitations under the License.
 package iptables
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/util"
@@ -523,5 +524,118 @@ COMMIT
 	}
 	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll("iptables-save", "-t", "nat") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	}
+}
+
+func TestIptablesWaitFlag(t *testing.T) {
+	testCases := []struct {
+		Version string
+		Result  string
+	}{
+		{"0.55.55", ""},
+		{"1.0.55", ""},
+		{"1.4.19", ""},
+		{"1.4.20", "-w"},
+		{"1.4.21", "-w"},
+		{"1.4.22", "-w2"},
+		{"1.5.0", "-w2"},
+		{"2.0.0", "-w2"},
+	}
+
+	for _, testCase := range testCases {
+		result := getIptablesWaitFlag(testCase.Version)
+		if strings.Join(result, "") != testCase.Result {
+			t.Errorf("For %s expected %v got %v", testCase.Version, testCase.Result, result)
+		}
+	}
+}
+
+func TestWaitFlagUnavailable(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.4.19"), nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, ProtocolIpv4)
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAny("-w", "-w2") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+}
+
+func TestWaitFlagOld(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.4.20"), nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, ProtocolIpv4)
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-w") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+	if util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAny("-w2") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+}
+
+func TestWaitFlagNew(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, ProtocolIpv4)
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-w2") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+	if util.NewStringSet(fcmd.CombinedOutputLog[1]...).HasAny("-w") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 }
