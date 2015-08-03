@@ -79,59 +79,7 @@ func checkErr(err error, handleErr func(string)) {
 
 	if errors.IsInvalid(err) {
 		details := err.(*errors.StatusError).Status().Details
-		prefix := fmt.Sprintf("The %s %q is invalid:", details.Kind, details.Name)
-		errs := statusCausesToAggrError(details.Causes)
-		handleErr(MultilineError(prefix, errs))
-	}
-
-	// handle multiline errors
-	if clientcmd.IsConfigurationInvalid(err) {
-		handleErr(MultilineError("Error in configuration: ", err))
-	}
-	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
-		handleErr(MultipleErrors("", agg.Errors()))
-	}
-
-	msg, ok := StandardErrorMessage(err)
-	if !ok {
-		msg = fmt.Sprintf("error: %s\n", err.Error())
-	}
-	handleErr(msg)
-}
-
-// CheckCustomErr is like CheckErr except a custom prefix error
-// string may be provied to help produce more specific error messages.
-// For example, for the update failed case this function could be called
-// with:
-//    cmdutil.CheckCustomErr("Update failed", err)
-// This function supresses the detailed output that is produced by CheckErr
-// and specifically the field is erased and the error message has the details
-// of the spec removed. Unfortunately, what starts off as a detail message is
-// a sperate field ends up being concatentated into one string which contains
-// the spec and the detail string. To avoid significant refactoring of the error
-// data structures we just extract the required detail string by looking for it
-// after "}': " which is horrible but expedient.
-func CheckCustomErr(customPrefix string, err error) {
-	checkCustomErr(customPrefix, err, fatal)
-}
-
-func checkCustomErr(customPrefix string, err error, handleErr func(string)) {
-	if err == nil {
-		return
-	}
-
-	if errors.IsInvalid(err) {
-		details := err.(*errors.StatusError).Status().Details
-		for i := range details.Causes {
-			c := &details.Causes[i]
-			s := strings.Split(c.Message, "}': ")
-			if len(s) == 2 {
-				c.Message =
-					s[1]
-				c.Field = ""
-			}
-		}
-		prefix := fmt.Sprintf("%s", customPrefix)
+		prefix := fmt.Sprintf("The %s %q is invalid.\n", details.Kind, details.Name)
 		errs := statusCausesToAggrError(details.Causes)
 		handleErr(MultilineError(prefix, errs))
 	}

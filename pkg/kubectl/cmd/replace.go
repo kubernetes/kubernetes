@@ -59,7 +59,7 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 			err := RunReplace(f, out, cmd, args, filenames, shortOutput)
-			cmdutil.CheckCustomErr("Replace failed", err)
+			cmdutil.CheckErr(err)
 		},
 	}
 	usage := "Filename, directory, or URL to file to use to replace the resource."
