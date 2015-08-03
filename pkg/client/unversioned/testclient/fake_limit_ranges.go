@@ -72,6 +72,5 @@ func (c *FakeLimitRanges) Delete(name string) error {
 }
 
 func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("limitranges", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, nil
+	return c.Fake.InvokesWatch(NewWatchAction("limitranges", c.Namespace, label, field, resourceVersion))
 }

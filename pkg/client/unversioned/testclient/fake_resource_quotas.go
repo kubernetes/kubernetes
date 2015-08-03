@@ -72,8 +72,7 @@ func (c *FakeResourceQuotas) Delete(name string) error {
 }
 
 func (c *FakeResourceQuotas) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("resourcequotas", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, nil
+	return c.Fake.InvokesWatch(NewWatchAction("resourcequotas", c.Namespace, label, field, resourceVersion))
 }
 
 func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {

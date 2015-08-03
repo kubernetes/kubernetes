@@ -70,8 +70,7 @@ func (c *FakePersistentVolumeClaims) Delete(name string) error {
 }
 
 func (c *FakePersistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("persistentvolumeclaims", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+	return c.Fake.InvokesWatch(NewWatchAction("persistentvolumeclaims", c.Namespace, label, field, resourceVersion))
 }
 
 func (c *FakePersistentVolumeClaims) UpdateStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {

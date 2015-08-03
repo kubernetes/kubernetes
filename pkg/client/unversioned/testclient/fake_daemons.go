@@ -72,6 +72,5 @@ func (c *FakeDaemons) Delete(name string) error {
 }
 
 func (c *FakeDaemons) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("daemons", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, nil
+	return c.Fake.InvokesWatch(NewWatchAction("daemons", c.Namespace, label, field, resourceVersion))
 }

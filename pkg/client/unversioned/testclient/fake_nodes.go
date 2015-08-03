@@ -71,8 +71,7 @@ func (c *FakeNodes) Delete(name string) error {
 }
 
 func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewRootWatchAction("nodes", label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+	return c.Fake.InvokesWatch(NewRootWatchAction("nodes", label, field, resourceVersion))
 }
 
 func (c *FakeNodes) UpdateStatus(minion *api.Node) (*api.Node, error) {

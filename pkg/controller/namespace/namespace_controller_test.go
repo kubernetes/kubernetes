@@ -134,9 +134,8 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 }
 
 func TestRunStop(t *testing.T) {
-	o := testclient.NewObjects(api.Scheme, api.Scheme)
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, api.RESTMapper)}
-	nsController := NewNamespaceController(client, 1*time.Second)
+	mockClient := &testclient.Fake{}
+	nsController := NewNamespaceController(mockClient, 1*time.Second)
 
 	if nsController.StopEverything != nil {
 		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsController.StopEverything)

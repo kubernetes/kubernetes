@@ -40,24 +40,21 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	reactFunc := func(action testclient.Action) (runtime.Object, error) {
-		switch {
-		case action.Matches("get", "namespaces"):
-			if getAction, ok := action.(testclient.GetAction); ok && getAction.GetName() == namespaceObj.Name {
-				return namespaceObj, nil
-			}
-		case action.Matches("list", "namespaces"):
-			return &api.NamespaceList{Items: []api.Namespace{*namespaceObj}}, nil
-
-		}
-
-		return nil, fmt.Errorf("No result for action %v", action)
-	}
-
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	store.Add(namespaceObj)
 	fakeWatch := watch.NewFake()
-	mockClient := &testclient.Fake{Watch: fakeWatch, ReactFn: reactFunc}
+	mockClient := &testclient.Fake{}
+	mockClient.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
+	mockClient.AddReactor("get", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+		if getAction, ok := action.(testclient.GetAction); ok && getAction.GetName() == namespaceObj.Name {
+			return true, namespaceObj, nil
+		}
+		return true, nil, fmt.Errorf("No result for action %v", action)
+	})
+	mockClient.AddReactor("list", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, &api.NamespaceList{Items: []api.Namespace{*namespaceObj}}, nil
+	})
+
 	lfhandler := NewLifecycle(mockClient).(*lifecycle)
 	lfhandler.store = store
 	handler := admission.NewChainHandler(lfhandler)
