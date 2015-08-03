@@ -96,7 +96,7 @@ func validateLGTMAfterPush(client *github.Client, user, project string, pr *gith
 	for ix := range events {
 		event := &events[ix]
 		if *event.Event == "labeled" && *event.Label.Name == "lgtm" {
-			*lgtmTime = *event.CreatedAt
+			lgtmTime = event.CreatedAt
 		}
 	}
 	if lgtmTime == nil {
