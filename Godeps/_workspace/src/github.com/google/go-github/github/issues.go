@@ -72,7 +72,7 @@ type IssueListOptions struct {
 	Labels []string `url:"labels,comma,omitempty"`
 
 	// Sort specifies how to sort issues.  Possible values are: created, updated,
-	// and comments.  Default value is "assigned".
+	// and comments.  Default value is "created".
 	Sort string `url:"sort,omitempty"`
 
 	// Direction in which to sort issues.  Possible values are: asc, desc.
@@ -166,7 +166,7 @@ type IssueListByRepoOptions struct {
 	Labels []string `url:"labels,omitempty,comma"`
 
 	// Sort specifies how to sort issues.  Possible values are: created, updated,
-	// and comments.  Default value is "assigned".
+	// and comments.  Default value is "created".
 	Sort string `url:"sort,omitempty"`
 
 	// Direction in which to sort issues.  Possible values are: asc, desc.

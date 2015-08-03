@@ -27,7 +27,7 @@ func TestLicensesService_List(t *testing.T) {
 		t.Errorf("Licenses.List returned error: %v", err)
 	}
 
-	want := []License{License{
+	want := []License{{
 		Key:  String("mit"),
 		Name: String("MIT"),
 		URL:  String("https://api.github.com/licenses/mit"),

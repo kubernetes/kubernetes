@@ -35,21 +35,10 @@ use it with the oauth2 library using:
 
 	import "golang.org/x/oauth2"
 
-	// tokenSource is an oauth2.TokenSource which returns a static access token
-	type tokenSource struct {
-		token *oauth2.Token
-	}
-
-	// Token implements the oauth2.TokenSource interface
-	func (t *tokenSource) Token() (*oauth2.Token, error){
-		return t.token, nil
-	}
-
 	func main() {
-		ts := &tokenSource{
+		ts := oauth2.StaticTokenSource(
 			&oauth2.Token{AccessToken: "... your access token ..."},
-		}
-
+		)
 		tc := oauth2.NewClient(oauth2.NoContext, ts)
 
 		client := github.NewClient(tc)

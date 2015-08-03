@@ -7,6 +7,12 @@ package github
 
 import "fmt"
 
+// StarredRepository is returned by ListStarred.
+type StarredRepository struct {
+	StarredAt  *Timestamp  `json:"starred_at,omitempty"`
+	Repository *Repository `json:"repo,omitempty"`
+}
+
 // ListStargazers lists people who have starred the specified repo.
 //
 // GitHub API Docs: https://developer.github.com/v3/activity/starring/#list-stargazers
@@ -49,7 +55,7 @@ type ActivityListStarredOptions struct {
 // will list the starred repositories for the authenticated user.
 //
 // GitHub API docs: http://developer.github.com/v3/activity/starring/#list-repositories-being-starred
-func (s *ActivityService) ListStarred(user string, opt *ActivityListStarredOptions) ([]Repository, *Response, error) {
+func (s *ActivityService) ListStarred(user string, opt *ActivityListStarredOptions) ([]StarredRepository, *Response, error) {
 	var u string
 	if user != "" {
 		u = fmt.Sprintf("users/%v/starred", user)
@@ -66,7 +72,10 @@ func (s *ActivityService) ListStarred(user string, opt *ActivityListStarredOptio
 		return nil, nil, err
 	}
 
-	repos := new([]Repository)
+	// TODO: remove custom Accept header when this API fully launches
+	req.Header.Set("Accept", mediaTypeStarringPreview)
+
+	repos := new([]StarredRepository)
 	resp, err := s.client.Do(req, repos)
 	if err != nil {
 		return nil, resp, err
