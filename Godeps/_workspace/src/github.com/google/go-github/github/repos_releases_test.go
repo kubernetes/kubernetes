@@ -55,6 +55,46 @@ func TestRepositoriesService_GetRelease(t *testing.T) {
 	}
 }
 
+func TestRepositoriesService_GetLatestRelease(t *testing.T) {
+	setup()
+	defer teardown()
+
+	mux.HandleFunc("/repos/o/r/releases/latest", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{"id":3}`)
+	})
+
+	release, resp, err := client.Repositories.GetLatestRelease("o", "r")
+	if err != nil {
+		t.Errorf("Repositories.GetLatestRelease returned error: %v\n%v", err, resp.Body)
+	}
+
+	want := &RepositoryRelease{ID: Int(3)}
+	if !reflect.DeepEqual(release, want) {
+		t.Errorf("Repositories.GetLatestRelease returned %+v, want %+v", release, want)
+	}
+}
+
+func TestRepositoriesService_GetReleaseByTag(t *testing.T) {
+	setup()
+	defer teardown()
+
+	mux.HandleFunc("/repos/o/r/releases/tags/foo", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `{"id":13}`)
+	})
+
+	release, resp, err := client.Repositories.GetReleaseByTag("o", "r", "foo")
+	if err != nil {
+		t.Errorf("Repositories.GetReleaseByTag returned error: %v\n%v", err, resp.Body)
+	}
+
+	want := &RepositoryRelease{ID: Int(13)}
+	if !reflect.DeepEqual(release, want) {
+		t.Errorf("Repositories.GetReleaseByTag returned %+v, want %+v", release, want)
+	}
+}
+
 func TestRepositoriesService_CreateRelease(t *testing.T) {
 	setup()
 	defer teardown()

@@ -98,6 +98,10 @@ type APIMeta struct {
 	// username and password, sudo mode, and two-factor authentication are
 	// not supported on these servers.)
 	VerifiablePasswordAuthentication *bool `json:"verifiable_password_authentication,omitempty"`
+
+	// An array of IP addresses in CIDR format specifying the addresses
+	// which serve GitHub Pages websites.
+	Pages []string `json:"pages,omitempty"`
 }
 
 // APIMeta returns information about GitHub.com, the service. Or, if you access

@@ -157,7 +157,7 @@ func (s *GistsService) Get(id string) (*Gist, *Response, error) {
 	return gist, resp, err
 }
 
-// Get a specific revision of a gist.
+// GetRevision gets a specific revision of a gist.
 //
 // GitHub API docs: https://developer.github.com/v3/gists/#get-a-specific-revision-of-a-gist
 func (s *GistsService) GetRevision(id, sha string) (*Gist, *Response, error) {

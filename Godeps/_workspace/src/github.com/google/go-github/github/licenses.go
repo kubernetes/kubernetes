@@ -21,7 +21,7 @@ type License struct {
 	Name *string `json:"name,omitempty"`
 	URL  *string `json:"url,omitempty"`
 
-	HTMLURL        *string   `json:"html_url",omitempty`
+	HTMLURL        *string   `json:"html_url,omitempty"`
 	Featured       *bool     `json:"featured,omitempty"`
 	Description    *string   `json:"description,omitempty"`
 	Category       *string   `json:"category,omitempty"`
@@ -57,7 +57,7 @@ func (s *LicensesService) List() ([]License, *Response, error) {
 	return *licenses, resp, err
 }
 
-// Fetch extended metadata for one license.
+// Get extended metadata for one license.
 //
 // GitHub API docs: https://developer.github.com/v3/licenses/#get-an-individual-license
 func (s *LicensesService) Get(licenseName string) (*License, *Response, error) {

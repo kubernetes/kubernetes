@@ -45,7 +45,6 @@ func TestRepositoriesService_List_specifiedUser(t *testing.T) {
 			"direction": "asc",
 			"page":      "2",
 		})
-
 		fmt.Fprint(w, `[{"id":1}]`)
 	})
 

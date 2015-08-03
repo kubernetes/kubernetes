@@ -93,7 +93,7 @@ func (s *PullRequestsService) GetComment(owner string, repo string, number int) 
 
 // CreateComment creates a new comment on the specified pull request.
 //
-// GitHub API docs: https://developer.github.com/v3/pulls/comments/#get-a-single-comment
+// GitHub API docs: https://developer.github.com/v3/pulls/comments/#create-a-comment
 func (s *PullRequestsService) CreateComment(owner string, repo string, number int, comment *PullRequestComment) (*PullRequestComment, *Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/pulls/%d/comments", owner, repo, number)
 	req, err := s.client.NewRequest("POST", u, comment)

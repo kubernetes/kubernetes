@@ -49,6 +49,9 @@ type IssueEvent struct {
 	//
 	//     head_ref_restored
 	//       The pull request’s branch was restored.
+	//
+	//     labeled
+	//       A label was added.
 	Event *string `json:"event,omitempty"`
 
 	// The SHA of the commit that referenced this commit, if applicable.
@@ -56,6 +59,9 @@ type IssueEvent struct {
 
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 	Issue     *Issue     `json:"issue,omitempty"`
+
+	// Only present on 'labeled' events
+	Label *Label `json:"label,omitempty"`
 }
 
 // ListIssueEvents lists events for the specified issue.

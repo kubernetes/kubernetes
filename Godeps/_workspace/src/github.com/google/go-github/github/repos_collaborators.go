@@ -22,6 +22,8 @@ func (s *RepositoriesService) ListCollaborators(owner, repo string, opt *ListOpt
 		return nil, nil, err
 	}
 
+	req.Header.Set("Accept", mediaTypeOrgPermissionPreview)
+
 	users := new([]User)
 	resp, err := s.client.Do(req, users)
 	if err != nil {
@@ -49,15 +51,33 @@ func (s *RepositoriesService) IsCollaborator(owner, repo, user string) (bool, *R
 	return isCollab, resp, err
 }
 
+// RepositoryAddCollaboratorOptions specifies the optional parameters to the
+// RepositoriesService.AddCollaborator method.
+type RepositoryAddCollaboratorOptions struct {
+	// Permission specifies the permission to grant the user on this repository.
+	// Possible values are:
+	//     pull - team members can pull, but not push to or administer this repository
+	//     push - team members can pull and push, but not administer this repository
+	//     admin - team members can pull, push and administer this repository
+	//
+	// Default value is "pull".  This option is only valid for organization-owned repositories.
+	Permission string `json:"permission,omitempty"`
+}
+
 // AddCollaborator adds the specified Github user as collaborator to the given repo.
 //
 // GitHub API docs: http://developer.github.com/v3/repos/collaborators/#add-collaborator
-func (s *RepositoriesService) AddCollaborator(owner, repo, user string) (*Response, error) {
+func (s *RepositoriesService) AddCollaborator(owner, repo, user string, opt *RepositoryAddCollaboratorOptions) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/collaborators/%v", owner, repo, user)
-	req, err := s.client.NewRequest("PUT", u, nil)
+	req, err := s.client.NewRequest("PUT", u, opt)
 	if err != nil {
 		return nil, err
 	}
+
+	if opt != nil {
+		req.Header.Set("Accept", mediaTypeOrgPermissionPreview)
+	}
+
 	return s.client.Do(req, nil)
 }
 
