@@ -72,8 +72,7 @@ func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 }
 
 func (c *FakePods) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("pods", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+	return c.Fake.InvokesWatch(NewWatchAction("pods", c.Namespace, label, field, resourceVersion))
 }
 
 func (c *FakePods) Bind(binding *api.Binding) error {

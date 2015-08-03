@@ -501,7 +501,8 @@ type FakeWatcher struct {
 
 func TestWatchControllers(t *testing.T) {
 	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{Watch: fakeWatch}
+	client := &testclient.Fake{}
+	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -543,7 +544,8 @@ func TestWatchControllers(t *testing.T) {
 
 func TestWatchPods(t *testing.T) {
 	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{Watch: fakeWatch}
+	client := &testclient.Fake{}
+	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -587,7 +589,8 @@ func TestWatchPods(t *testing.T) {
 
 func TestUpdatePods(t *testing.T) {
 	fakeWatch := watch.NewFake()
-	client := &testclient.Fake{Watch: fakeWatch}
+	client := &testclient.Fake{}
+	client.AddWatchReactor("*", testclient.DefaultWatchReactor(fakeWatch, nil))
 	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
 
@@ -681,15 +684,14 @@ func TestControllerUpdateRequeue(t *testing.T) {
 
 func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	rc := newReplicationController(1)
-	fakeClient := &testclient.Fake{
-		ReactFn: func(action testclient.Action) (runtime.Object, error) {
-			if action.GetVerb() == "get" && action.GetResource() == "replicationcontrollers" {
-				return rc, nil
-			}
-			return &api.ReplicationController{}, fmt.Errorf("Fake error")
-		},
-	}
-	fakeRCClient := &testclient.FakeReplicationControllers{Fake: fakeClient, Namespace: "default"}
+	fakeClient := &testclient.Fake{}
+	fakeClient.AddReactor("get", "replicationcontrollers", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, rc, nil
+	})
+	fakeClient.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, &api.ReplicationController{}, fmt.Errorf("Fake error")
+	})
+	fakeRCClient := &testclient.FakeReplicationControllers{fakeClient, "default"}
 	numReplicas := 10
 	updateReplicaCount(fakeRCClient, *rc, numReplicas)
 	updates, gets := 0, 0

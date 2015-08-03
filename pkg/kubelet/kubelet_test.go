@@ -2333,9 +2333,9 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
-	}}).ReactFn
+	}}).ReactionChain
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -2418,7 +2418,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 			Spec:       api.NodeSpec{},
@@ -2439,7 +2439,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				},
 			},
 		},
-	}}).ReactFn
+	}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
@@ -2530,9 +2530,9 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	// simulates that container runtime is down.
 	fakeRuntime.VersionInfo = ""
 
-	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
-	}}).ReactFn
+	}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
@@ -2618,7 +2618,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
-	testKubelet.fakeKubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{}}).ReactFn
+	testKubelet.fakeKubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{}}).ReactionChain
 
 	if err := kubelet.updateNodeStatus(); err == nil {
 		t.Errorf("unexpected non error: %v", err)
@@ -3007,23 +3007,22 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactFn = func(action testclient.Action) (runtime.Object, error) {
-		switch action.GetVerb() {
-		case "create":
-			// Return an error on create.
-			return &api.Node{}, &apierrors.StatusError{
-				ErrStatus: api.Status{Reason: api.StatusReasonAlreadyExists},
-			}
-		case "get":
-			// Return an existing (matching) node on get.
-			return &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-				Spec:       api.NodeSpec{ExternalID: testKubeletHostname},
-			}, nil
-		default:
-			return nil, fmt.Errorf("no reaction implemented for %s", action)
+	kubeClient.AddReactor("create", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
+		// Return an error on create.
+		return true, &api.Node{}, &apierrors.StatusError{
+			ErrStatus: api.Status{Reason: api.StatusReasonAlreadyExists},
 		}
-	}
+	})
+	kubeClient.AddReactor("get", "nodes", func(action testclient.Action) (bool, runtime.Object, error) {
+		// Return an existing (matching) node on get.
+		return true, &api.Node{
+			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+			Spec:       api.NodeSpec{ExternalID: testKubeletHostname},
+		}, nil
+	})
+	kubeClient.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",

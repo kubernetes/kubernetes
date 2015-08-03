@@ -17,6 +17,7 @@ limitations under the License.
 package testclient
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -36,24 +37,64 @@ func NewSimpleFake(objects ...runtime.Object) *Fake {
 			panic(err)
 		}
 	}
-	return &Fake{ReactFn: ObjectReaction(o, latest.RESTMapper)}
-}
 
-// ReactionFunc is a function that returns an object or error for a given Action
-type ReactionFunc func(Action) (runtime.Object, error)
+	fakeClient := &Fake{}
+	fakeClient.AddReactor("*", "*", ObjectReaction(o, latest.RESTMapper))
+
+	return fakeClient
+}
 
 // Fake implements client.Interface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type Fake struct {
 	sync.RWMutex
 	actions []Action // these may be castable to other types, but "Action" is the minimum
-	err     error
 
-	Watch watch.Interface
-	// ReactFn is an optional function that will be invoked with the provided action
-	// and return a response. It can implement scenario specific behavior. The type
-	// of object returned must match the expected type from the caller (even if nil).
-	ReactFn ReactionFunc
+	// ReactionChain is the list of reactors that will be attempted for every request in the order they are tried
+	ReactionChain []Reactor
+	// WatchReactionChain is the list of watch reactors that will be attempted for every request in the order they are tried
+	WatchReactionChain []WatchReactor
+}
+
+// Reactor is an interface to allow the composition of reaction functions.
+type Reactor interface {
+	// Handles indicates whether or not this Reactor deals with a given action
+	Handles(action Action) bool
+	// React handles the action and returns results.  It may choose to delegate by indicated handled=false
+	React(action Action) (handled bool, ret runtime.Object, err error)
+}
+
+// WatchReactor is an interface to allow the composition of watch functions.
+type WatchReactor interface {
+	// Handles indicates whether or not this Reactor deals with a given action
+	Handles(action Action) bool
+	// React handles a watch action and returns results.  It may choose to delegate by indicated handled=false
+	React(action Action) (handled bool, ret watch.Interface, err error)
+}
+
+// ReactionFunc is a function that returns an object or error for a given Action.  If "handled" is false,
+// then the test client will continue ignore the results and continue to the next ReactionFunc
+type ReactionFunc func(action Action) (handled bool, ret runtime.Object, err error)
+
+// WatchReactionFunc is a function that returns a watch interface.  If "handled" is false,
+// then the test client will continue ignore the results and continue to the next ReactionFunc
+type WatchReactionFunc func(action Action) (handled bool, ret watch.Interface, err error)
+
+// AddReactor appends a reactor to the end of the chain
+func (c *Fake) AddReactor(verb, resource string, reaction ReactionFunc) {
+	c.ReactionChain = append(c.ReactionChain, &SimpleReactor{verb, resource, reaction})
+}
+
+// PrependReactor adds a reactor to the beginning of the chain
+func (c *Fake) PrependReactor(verb, resource string, reaction ReactionFunc) {
+	newChain := make([]Reactor, 0, len(c.ReactionChain)+1)
+	newChain[0] = &SimpleReactor{verb, resource, reaction}
+	newChain = append(newChain, c.ReactionChain...)
+}
+
+// AddWatchReactor appends a reactor to the end of the chain
+func (c *Fake) AddWatchReactor(resource string, reaction WatchReactionFunc) {
+	c.WatchReactionChain = append(c.WatchReactionChain, &SimpleWatchReactor{resource, reaction})
 }
 
 // Invokes records the provided Action and then invokes the ReactFn (if provided).
@@ -63,10 +104,42 @@ func (c *Fake) Invokes(action Action, defaultReturnObj runtime.Object) (runtime.
 	defer c.Unlock()
 
 	c.actions = append(c.actions, action)
-	if c.ReactFn != nil {
-		return c.ReactFn(action)
+	for _, reactor := range c.ReactionChain {
+		if !reactor.Handles(action) {
+			continue
+		}
+
+		handled, ret, err := reactor.React(action)
+		if !handled {
+			continue
+		}
+
+		return ret, err
 	}
-	return defaultReturnObj, c.err
+
+	return defaultReturnObj, nil
+}
+
+// InvokesWatch records the provided Action and then invokes the ReactFn (if provided).
+func (c *Fake) InvokesWatch(action Action) (watch.Interface, error) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.actions = append(c.actions, action)
+	for _, reactor := range c.WatchReactionChain {
+		if !reactor.Handles(action) {
+			continue
+		}
+
+		handled, ret, err := reactor.React(action)
+		if !handled {
+			continue
+		}
+
+		return ret, err
+	}
+
+	return nil, fmt.Errorf("unhandled watch: %#v", action)
 }
 
 // ClearActions clears the history of actions called on the fake client
@@ -84,22 +157,6 @@ func (c *Fake) Actions() []Action {
 	fa := make([]Action, len(c.actions))
 	copy(fa, c.actions)
 	return fa
-}
-
-// SetErr sets the error to return for client calls
-func (c *Fake) SetErr(err error) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.err = err
-}
-
-// Err returns any a client error or nil
-func (c *Fake) Err() error {
-	c.RLock()
-	c.RUnlock()
-
-	return c.err
 }
 
 func (c *Fake) LimitRanges(namespace string) client.LimitRangeInterface {

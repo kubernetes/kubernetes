@@ -69,8 +69,7 @@ func (c *FakePersistentVolumes) Delete(name string) error {
 }
 
 func (c *FakePersistentVolumes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewRootWatchAction("persistentvolumes", label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+	return c.Fake.InvokesWatch(NewRootWatchAction("persistentvolumes", label, field, resourceVersion))
 }
 
 func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.PersistentVolume, error) {

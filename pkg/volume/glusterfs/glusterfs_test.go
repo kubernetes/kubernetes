@@ -200,7 +200,8 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	o.Add(pv)
 	o.Add(claim)
 	o.Add(ep)
-	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	client := &testclient.Fake{}
+	client.AddReactor("*", "*", testclient.ObjectReaction(o, latest.RESTMapper))
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", client, nil))
