@@ -64,9 +64,14 @@ func main() {
 	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), pkgPath, util.NewStringSet("github.com/GoogleCloudPlatform/kubernetes"))
 	generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
 
-	for _, overwrite := range strings.Split(*overwrites, ",") {
-		vals := strings.Split(overwrite, "=")
-		generator.OverwritePackage(vals[0], vals[1])
+	if len(*overwrites) > 0 {
+		for _, overwrite := range strings.Split(*overwrites, ",") {
+			if !strings.Contains(overwrite, "=") {
+				glog.Fatalf("Invalid overwrite syntax: %s", overwrite)
+			}
+			vals := strings.Split(overwrite, "=")
+			generator.OverwritePackage(vals[0], vals[1])
+		}
 	}
 	for _, knownType := range api.Scheme.KnownTypes(knownVersion) {
 		if err := generator.AddType(knownType); err != nil {
