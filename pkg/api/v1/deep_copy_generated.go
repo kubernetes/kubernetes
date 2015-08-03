@@ -1878,14 +1878,6 @@ func deepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Clo
 	}
 	out.ClusterIP = in.ClusterIP
 	out.Type = in.Type
-	if in.DeprecatedPublicIPs != nil {
-		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))
-		for i := range in.DeprecatedPublicIPs {
-			out.DeprecatedPublicIPs[i] = in.DeprecatedPublicIPs[i]
-		}
-	} else {
-		out.DeprecatedPublicIPs = nil
-	}
 	out.SessionAffinity = in.SessionAffinity
 	return nil
 }

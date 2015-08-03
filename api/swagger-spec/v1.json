@@ -13401,13 +13401,6 @@
       "type": "string",
       "description": "type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services"
      },
-     "deprecatedPublicIPs": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "deprecated. externally visible IPs (e.g. load balancers) that should be proxied to this service"
-     },
      "sessionAffinity": {
       "type": "string",
       "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies"
