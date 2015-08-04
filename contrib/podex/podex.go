@@ -248,11 +248,9 @@ type imageMetadata struct {
 }
 
 func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error) {
-	var scheme string
+	scheme := "https"
 	if *flInsecureRegistry {
 		scheme = "http"
-	} else {
-		scheme = "https"
 	}
 	if host == "" {
 		host = "index.docker.io"
@@ -264,13 +262,12 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 		tag = "latest"
 	}
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: *flInsecureSkipVerify,
-		},
-	}
 	client := &http.Client{
-		Transport: tr,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: *flInsecureSkipVerify,
+			},
+		},
 	}
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s://%s/v1/repositories/%s/%s/images", scheme, host, namespace, repo), nil)
