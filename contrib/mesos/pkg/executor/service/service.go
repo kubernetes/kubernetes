@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/oom"
 
 	"github.com/spf13/pflag"
 )
@@ -125,7 +126,8 @@ func (s *KubeletExecutorServer) syncExternalShutdownWatcher() (io.Closer, error)
 func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOomAdjuster()
+	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		log.Info(err)
 	}
 

@@ -48,10 +48,12 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -167,7 +169,7 @@ func NewKubeletServer() *KubeletServer {
 		HealthzPort:                 10248,
 		HealthzBindAddress:          util.IP(net.ParseIP("127.0.0.1")),
 		RegisterNode:                true, // will be ignored if no apiserver is configured
-		OOMScoreAdj:                 -900,
+		OOMScoreAdj:                 qos.KubeletOomScoreAdj,
 		MasterServiceNamespace:      api.NamespaceDefault,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
@@ -400,7 +402,8 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 	glog.V(2).Infof("Using root directory: %v", s.RootDirectory)
 
 	// TODO(vmarmol): Do this through container config.
-	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOomAdjuster()
+	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Warning(err)
 	}
 

@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -60,13 +61,13 @@ import (
 	utilErrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/third_party/golang/expansion"
-
-	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 const (
@@ -274,6 +275,14 @@ func NewMainKubelet(
 		klet.networkPlugin = plug
 	}
 
+	machineInfo, err := klet.GetCachedMachineInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	oomAdjuster := oom.NewOomAdjuster()
+	procFs := procfs.NewProcFs()
+
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -283,6 +292,7 @@ func NewMainKubelet(
 			recorder,
 			readinessManager,
 			containerRefManager,
+			machineInfo,
 			podInfraContainerImage,
 			pullQPS,
 			pullBurst,
@@ -292,7 +302,9 @@ func NewMainKubelet(
 			klet,
 			klet.httpClient,
 			newKubeletRuntimeHooks(recorder),
-			dockerExecHandler)
+			dockerExecHandler,
+			oomAdjuster,
+			procFs)
 	case "rkt":
 		conf := &rkt.Config{InsecureSkipVerify: true}
 		rktRuntime, err := rkt.New(
