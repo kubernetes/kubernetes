@@ -83,6 +83,10 @@ re\-use the labels from the resource it exposes.
     A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
 
 .PP
+\fB\-\-session\-affinity\fP=""
+    If non\-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'
+
+.PP
 \fB\-\-target\-port\fP=""
     Name or number for the port on the container that the service should direct traffic to. Optional.
 

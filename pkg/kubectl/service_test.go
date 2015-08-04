@@ -272,6 +272,37 @@ func TestGenerateService(t *testing.T) {
 				},
 			},
 		},
+		{
+			generator: ServiceGeneratorV1{},
+			params: map[string]string{
+				"selector":         "foo=bar,baz=blah",
+				"name":             "test",
+				"port":             "80",
+				"protocol":         "TCP",
+				"container-port":   "1234",
+				"session-affinity": "ClientIP",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Port:       80,
+							Protocol:   "TCP",
+							TargetPort: util.NewIntOrStringFromInt(1234),
+						},
+					},
+					SessionAffinity: api.ServiceAffinityClientIP,
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		obj, err := test.generator.Generate(test.params)
