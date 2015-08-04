@@ -56,6 +56,7 @@ func main() {
 				if err != nil {
 					log.Fatalf("Error from Accept(): %s", err)
 				}
+				log.Printf("TCP request from %s", conn.RemoteAddr().String())
 				conn.Write([]byte(hostname))
 				conn.Close()
 			}
@@ -77,12 +78,16 @@ func main() {
 				if err != nil {
 					log.Fatalf("Error from ReadFrom(): %s", err)
 				}
+				log.Printf("UDP request from %s", cliAddr.String())
 				sock.WriteTo([]byte(hostname), cliAddr)
 			}
 		}()
 	}
 	if *doHttp {
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "%s", hostname) })
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("HTTP request from %s", r.RemoteAddr)
+			fmt.Fprintf(w, "%s", hostname)
+		})
 		go log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 	}
 
