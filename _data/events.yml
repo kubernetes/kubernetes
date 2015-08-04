@@ -5,6 +5,13 @@
     venue: "Skills Matter CodeNode"
     speaker: "Google"
     url: "http://www.meetup.com/Kubernetes-London/events/223809539/"
+-
+    date: 2015-07-21 10:00:00 -0800
+    title: "Announcing Kubernetes 1.0"
+    location: "777 NE Martin Luther King, Jr. Blvd, Portland, OR, USA"
+    venue: "Oregon Convention Center"
+    speaker: ""
+    url: "http://www.kuberneteslaunch.com/"
 - 
     date: 2015-06-24 18:30:00 +0100
     title: "DevOps Exchange @ Cloud World Forum"
