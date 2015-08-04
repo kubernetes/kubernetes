@@ -189,7 +189,7 @@ func (r *runtime) runCommand(args ...string) ([]string, error) {
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run %v: %v\nstdout: %v\nstderr: %v", args, err, stdout.String(), stderr.String())
+		return nil, fmt.Errorf("failed to run %v: %v\nstderr: %v", args, err, stderr.String())
 	}
 	return strings.Split(strings.TrimSpace(stdout.String()), "\n"), nil
 }
@@ -544,18 +544,19 @@ func apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
 // 1. Invoke 'rkt prepare' to prepare the pod, and get the rkt pod uuid.
 // 2. Creates the unit file and save it under systemdUnitDir.
 //
-// On success, it will return a string that represents name of the unit file.
-func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, error) {
+// On success, it will return a string that represents name of the unit file
+// and the runtime pod.
+func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *kubecontainer.Pod, error) {
 	cmds := []string{"prepare", "--quiet", "--pod-manifest"}
 
 	// Generate the pod manifest from the pod spec.
 	manifest, err := r.makePodManifest(pod, pullSecrets)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	manifestFile, err := ioutil.TempFile("", fmt.Sprintf("manifest-%s-", pod.Name))
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	defer func() {
 		manifestFile.Close()
@@ -566,29 +567,29 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, er
 
 	data, err := json.Marshal(manifest)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	// Since File.Write returns error if the written length is less than len(data),
 	// so check error is enough for us.
 	if _, err := manifestFile.Write(data); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	cmds = append(cmds, manifestFile.Name())
 	output, err := r.runCommand(cmds...)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if len(output) != 1 {
-		return "", fmt.Errorf("cannot get uuid from 'rkt prepare'")
+		return "", nil, fmt.Errorf("cannot get uuid from 'rkt prepare'")
 	}
 	uuid := output[0]
 	glog.V(4).Infof("'rkt prepare' returns %q", uuid)
 
-	p := apiPodToruntimePod(uuid, pod)
-	b, err := json.Marshal(p)
+	runtimePod := apiPodToruntimePod(uuid, pod)
+	b, err := json.Marshal(runtimePod)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	var runPrepared string
@@ -610,15 +611,43 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, er
 	unitName := makePodServiceFileName(pod.UID, uuid)
 	unitFile, err := os.Create(path.Join(systemdServiceDir, unitName))
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	defer unitFile.Close()
 
 	_, err = io.Copy(unitFile, unit.Serialize(units))
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return unitName, nil
+
+	return unitName, runtimePod, nil
+}
+
+// generateEvents generates several kinds of pod lifecycle events.
+// TODO(yifan): Make the string shorter.
+func (r *runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, unit string, failure error) {
+	// Set up container references.
+	for _, c := range runtimePod.Containers {
+		id := string(c.ID)
+		ref, ok := r.containerRefManager.GetRef(id)
+		if !ok {
+			glog.Warningf("No ref for container %q", id)
+			continue
+		}
+
+		switch reason {
+		case "created":
+			r.recorder.Eventf(ref, "created", "Created with %q, unit file %q", id, unit)
+		case "started":
+			r.recorder.Eventf(ref, "started", "Started with %q, unit file %q", id, unit)
+		case "failed":
+			r.recorder.Eventf(ref, "failed", "Failed to start the pod %q with error %v", id, failure)
+		case "killing":
+			r.recorder.Eventf(ref, "killing", "Killing container %q", id)
+		default:
+			glog.Errorf("Unexpected reason %q", reason)
+		}
+	}
 }
 
 // RunPod first creates the unit file for a pod, and then calls
@@ -626,34 +655,51 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, er
 func (r *runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 	glog.V(4).Infof("Rkt starts to run pod: name %q.", pod.Name)
 
-	name, err := r.preparePod(pod, pullSecrets)
-	if err != nil {
-		return err
+	name, runtimePod, prepareErr := r.preparePod(pod, pullSecrets)
+
+	// Set container references and generate events.
+	for i, c := range pod.Spec.Containers {
+		ref, err := kubecontainer.GenerateContainerRef(pod, &c)
+		if err != nil {
+			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, c.Name, err)
+			continue
+		}
+		if prepareErr != nil {
+			r.recorder.Eventf(ref, "failed", "Failed to create the container %q in pod %q: %v", c.Name, pod.Name, prepareErr)
+			continue
+		}
+		containerID := string(runtimePod.Containers[i].ID)
+		r.containerRefManager.SetRef(containerID, ref)
+		r.generateEvents(runtimePod, "created", name, nil)
+	}
+
+	if prepareErr != nil {
+		return prepareErr
 	}
 
 	// TODO(yifan): This is the old version of go-systemd. Should update when libcontainer updates
 	// its version of go-systemd.
-	_, err = r.systemd.StartUnit(name, "replace")
-	if err != nil {
+	if _, err := r.systemd.StartUnit(name, "replace"); err != nil {
+		r.generateEvents(runtimePod, "failed", "", err)
 		return err
 	}
+	r.generateEvents(runtimePod, "started", name, nil)
 	return nil
 }
 
-// makeRuntimePod constructs the container runtime pod. It will:
-// 1, Construct the pod by the information stored in the unit file.
-// 2, Construct the pod status from pod info.
-func (r *runtime) makeRuntimePod(unitName string, podInfos map[string]*podInfo) (*kubecontainer.Pod, error) {
+// readruntimePodFromUnit reads the units file and construsts the container runtime pod.
+// On success, it will return the pod and the its rkt UUID.
+func (r *runtime) readruntimePodFromUnit(unitName string) (*kubecontainer.Pod, string, error) {
 	f, err := os.Open(path.Join(systemdServiceDir, unitName))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer f.Close()
 
 	var pod kubecontainer.Pod
 	opts, err := unit.Deserialize(f)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var rktID string
@@ -665,24 +711,36 @@ func (r *runtime) makeRuntimePod(unitName string, podInfos map[string]*podInfo) 
 		case unitPodName:
 			err = json.Unmarshal([]byte(opt.Value), &pod)
 			if err != nil {
-				return nil, err
+				return nil, "", err
 			}
 		case unitRktID:
 			rktID = opt.Value
 		default:
-			return nil, fmt.Errorf("rkt: Unexpected key: %q", opt.Name)
+			return nil, "", fmt.Errorf("rkt: Unexpected key: %q", opt.Name)
 		}
 	}
 
 	if len(rktID) == 0 {
-		return nil, fmt.Errorf("rkt: cannot find rkt ID of pod %v, unit file is broken", pod)
+		return nil, "", fmt.Errorf("rkt: cannot find rkt ID of pod %v, unit file is broken", pod)
 	}
+	return &pod, rktID, nil
+}
+
+// makeruntimePod constructs the container runtime pod. It will:
+// 1, Construct the pod by the information stored in the unit file.
+// 2, Construct the pod status from pod info.
+func (r *runtime) makeruntimePod(unitName string, podInfos map[string]*podInfo) (*kubecontainer.Pod, error) {
+	pod, rktID, err := r.readruntimePodFromUnit(unitName)
+	if err != nil {
+		return nil, err
+	}
+
 	info, found := podInfos[rktID]
 	if !found {
 		return nil, fmt.Errorf("rkt: cannot find info for pod %q, rkt uuid: %q", pod.Name, rktID)
 	}
-	pod.Status = info.toPodStatus(&pod)
-	return &pod, nil
+	pod.Status = info.toPodStatus(pod)
+	return pod, nil
 }
 
 // GetPods runs 'systemctl list-unit' and 'rkt list' to get the list of rkt pods.
@@ -710,7 +768,7 @@ func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 			if !all && u.SubState != "running" {
 				continue
 			}
-			pod, err := r.makeRuntimePod(u.Name, podInfos)
+			pod, err := r.makeruntimePod(u.Name, podInfos)
 			if err != nil {
 				glog.Warningf("rkt: Cannot construct pod from unit file: %v.", err)
 				continue
@@ -723,6 +781,10 @@ func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 
 // KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
 func (r *runtime) KillPod(pod kubecontainer.Pod) error {
+	if len(pod.Containers) == 0 {
+		return nil
+	}
+
 	glog.V(4).Infof("Rkt is killing pod: name %q.", pod.Name)
 
 	// TODO(yifan): More graceful stop. Replace with StopUnit and wait for a timeout.
@@ -738,6 +800,13 @@ func (r *runtime) KillPod(pod kubecontainer.Pod) error {
 		if !strings.Contains(u.Name, string(pod.ID)) {
 			continue
 		}
+
+		// Generate 'killing' events.
+		pod, _, err := r.readruntimePodFromUnit(u.Name)
+		if err != nil {
+			return err
+		}
+		r.generateEvents(pod, "killing", "", nil)
 
 		r.systemd.KillUnit(u.Name, int32(syscall.SIGKILL))
 		return nil
