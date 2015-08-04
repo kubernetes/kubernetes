@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"time"
 
-	"code.google.com/p/gcfg"
+	"github.com/scalingdata/gcfg"
 	"github.com/rackspace/gophercloud"
 	os_servers "github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/pagination"

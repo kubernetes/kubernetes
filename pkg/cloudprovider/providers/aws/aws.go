@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/gcfg"
+	"github.com/scalingdata/gcfg"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
