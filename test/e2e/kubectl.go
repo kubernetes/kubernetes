@@ -348,7 +348,7 @@ var _ = Describe("Kubectl client", func() {
 					endpoints, err := c.Endpoints(ns).Get(name)
 					Expect(err).NotTo(HaveOccurred())
 
-					uidToPort := getPortsByPodUID(endpoints.Subsets)
+					uidToPort := getContainerPortsByPodUID(endpoints)
 					if len(uidToPort) == 0 {
 						Logf("No endpoint found, retrying")
 						continue

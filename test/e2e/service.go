@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1023,16 +1024,36 @@ func validateUniqueOrFail(s []string) {
 	}
 }
 
-func getPortsByPodUID(subsets []api.EndpointSubset) PortsByPodUID {
+func getContainerPortsByPodUID(endpoints *api.Endpoints) PortsByPodUID {
 	m := PortsByPodUID{}
-	for _, ss := range subsets {
+	for _, ss := range endpoints.Subsets {
 		for _, port := range ss.Ports {
 			for _, addr := range ss.Addresses {
-				Logf("Found pod %v and port %v", addr.TargetRef.UID, port.Port)
+				containerPort := port.Port
+				hostPort := port.Port
+
+				// use endpoint annotations to recover the container port in a Mesos setup
+				// compare contrib/mesos/pkg/service/endpoints_controller.syncService
+				// TODO(sttts): add ContainerPort to EndpointPort struct, defaulting to (host) Port
+				if providerIs("mesos/docker") {
+					key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
+					containerPortString := endpoints.Annotations[key]
+					if containerPortString == "" {
+						continue
+					}
+					var err error
+					containerPort, err = strconv.Atoi(containerPortString)
+					if err != nil {
+						continue
+					}
+					Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, containerPortString)
+				}
+
+				Logf("Found pod %v, host port %d and container port %d", addr.TargetRef.UID, hostPort, containerPort)
 				if _, ok := m[addr.TargetRef.UID]; !ok {
 					m[addr.TargetRef.UID] = make([]int, 0)
 				}
-				m[addr.TargetRef.UID] = append(m[addr.TargetRef.UID], port.Port)
+				m[addr.TargetRef.UID] = append(m[addr.TargetRef.UID], containerPort)
 			}
 		}
 	}
@@ -1089,7 +1110,7 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 		}
 		Logf("Found endpoints %v", endpoints)
 
-		portsByPodUID := getPortsByPodUID(endpoints.Subsets)
+		portsByPodUID := getContainerPortsByPodUID(endpoints)
 		Logf("Found port by pod UID %v", portsByPodUID)
 
 		expectedPortsByPodUID := translatePodNameToUIDOrFail(c, namespace, expectedEndpoints)
