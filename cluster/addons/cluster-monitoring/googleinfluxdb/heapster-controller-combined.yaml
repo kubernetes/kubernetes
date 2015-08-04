@@ -30,7 +30,9 @@ spec:
             - /heapster
             - --source=kubernetes:''
             - --sink=gcl
+            - --sink=gcmautoscaling
             - --sink=influxdb:http://monitoring-influxdb:8086
+            - --align_stats
             - --poll_duration=2m
             - --stats_resolution=1m
           volumeMounts:

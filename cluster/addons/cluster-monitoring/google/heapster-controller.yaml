@@ -30,7 +30,9 @@ spec:
             - /heapster
             - --source=kubernetes:''
             - --sink=gcm
+            - --sink=gcmautoscaling
             - --sink=gcl
+            - --align_stats
             - --poll_duration=2m
             - --stats_resolution=1m
           volumeMounts:
