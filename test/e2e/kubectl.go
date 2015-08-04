@@ -485,7 +485,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 	})
 
-	Describe("Kubectl run", func() {
+	Describe("Kubectl run rc", func() {
 		var nsFlag string
 		var rcName string
 
@@ -523,6 +523,59 @@ var _ = Describe("Kubectl client", func() {
 			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != image {
 				runKubectl("get", "pods", "-L", "run", nsFlag)
 				Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", image, len(pods))
+			}
+		})
+
+	})
+
+	Describe("Kubectl run pod", func() {
+		var nsFlag string
+		var podName string
+
+		BeforeEach(func() {
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			podName = "e2e-test-nginx-pod"
+		})
+
+		AfterEach(func() {
+			runKubectl("stop", "pods", podName, nsFlag)
+		})
+
+		It("should create a pod from an image when restart is OnFailure", func() {
+			image := "nginx"
+
+			By("running the image " + image)
+			runKubectl("run", podName, "--restart=OnFailure", "--image="+image, nsFlag)
+			By("verifying the pod " + podName + " was created")
+			pod, err := c.Pods(ns).Get(podName)
+			if err != nil {
+				Failf("Failed getting pod %s: %v", podName, err)
+			}
+			containers := pod.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != image {
+				Failf("Failed creating pod %s for 1 pod with expected image %s", podName, image)
+			}
+			if pod.Spec.RestartPolicy != api.RestartPolicyOnFailure {
+				Failf("Failed creating a pod with correct restart policy for --restart=OnFailure")
+			}
+		})
+
+		It("should create a pod from an image when restart is Never", func() {
+			image := "nginx"
+
+			By("running the image " + image)
+			runKubectl("run", podName, "--restart=Never", "--image="+image, nsFlag)
+			By("verifying the pod " + podName + " was created")
+			pod, err := c.Pods(ns).Get(podName)
+			if err != nil {
+				Failf("Failed getting pod %s: %v", podName, err)
+			}
+			containers := pod.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != image {
+				Failf("Failed creating pod %s for 1 pod with expected image %s", podName, image)
+			}
+			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
+				Failf("Failed creating a pod with correct restart policy for --restart=OnFailure")
 			}
 		})
 

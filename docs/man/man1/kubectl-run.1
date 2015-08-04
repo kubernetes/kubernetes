@@ -27,8 +27,8 @@ Creates a replication controller to manage the created container(s).
     If true, only print the object that would be sent, without sending it.
 
 .PP
-\fB\-\-generator\fP="run/v1"
-    The name of the API generator to use.  Default is 'run\-controller/v1'.
+\fB\-\-generator\fP=""
+    The name of the API generator to use.  Default is 'run/v1' if \-\-restart=Always, otherwise the default is 'run\-pod/v1'.
 
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false
@@ -69,6 +69,10 @@ Creates a replication controller to manage the created container(s).
 .PP
 \fB\-r\fP, \fB\-\-replicas\fP=1
     Number of replicas to create for this container. Default is 1.
+
+.PP
+\fB\-\-restart\fP="Always"
+    The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, only the Pod is created and \-\-replicas must be 1.  Default 'Always'
 
 .PP
 \fB\-i\fP, \fB\-\-stdin\fP=false
