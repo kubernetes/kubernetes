@@ -38,6 +38,7 @@ type ObjectCodec interface {
 type Decoder interface {
 	Decode(data []byte) (Object, error)
 	DecodeInto(data []byte, obj Object) error
+	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, kind, version string) error
 }
 
 // Encoder defines methods for serializing API objects into bytes

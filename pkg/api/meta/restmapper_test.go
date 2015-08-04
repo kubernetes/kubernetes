@@ -37,6 +37,10 @@ func (fakeCodec) DecodeInto([]byte, runtime.Object) error {
 	return nil
 }
 
+func (fakeCodec) DecodeIntoWithSpecifiedVersionKind([]byte, runtime.Object, string, string) error {
+	return nil
+}
+
 type fakeConvertor struct{}
 
 func (fakeConvertor) Convert(in, out interface{}) error {

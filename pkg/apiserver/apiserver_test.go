@@ -101,6 +101,7 @@ func addTestTypes() {
 		ResourceVersion string `json:"resourceVersion,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+	api.Scheme.AddKnownTypes(testVersion, &api.Pod{})
 }
 
 func addNewTestTypes() {
@@ -697,10 +698,12 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		response, err := client.Do(request)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
-			continue
 		}
 		defer response.Body.Close()
-		data, _ := ioutil.ReadAll(response.Body)
+		data, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if response.StatusCode != v.ErrCode {
 			t.Errorf("%s: expected %d for %s, Got %s", k, v.ErrCode, v.Method, string(data))
 			continue
@@ -843,7 +846,11 @@ func TestList(t *testing.T) {
 		}
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("%d: unexpected status: %d, Expected: %d, %#v", i, resp.StatusCode, http.StatusOK, resp)
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
 			t.Logf("%d: body: %s", i, string(body))
 			continue
 		}
@@ -907,7 +914,10 @@ func TestNonEmptyList(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		t.Logf("Data: %s", string(body))
 	}
 
@@ -955,7 +965,10 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		t.Logf("Data: %s", string(body))
 	}
 	var listOut SimpleList
@@ -1050,7 +1063,10 @@ func TestGetBinary(t *testing.T) {
 	server := httptest.NewServer(handle(map[string]rest.Storage{"simple": &simpleStorage}))
 	defer server.Close()
 
-	req, _ := http.NewRequest("GET", server.URL+"/api/version/namespaces/default/simple/binary", nil)
+	req, err := http.NewRequest("GET", server.URL+"/api/version/namespaces/default/simple/binary", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	req.Header.Add("Accept", "text/other, */*")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -1495,7 +1511,10 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, _ := ioutil.ReadAll(res.Body)
+		s, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		t.Logf(string(s))
 	}
 	if simpleStorage.deleted != ID {
@@ -1933,7 +1952,10 @@ func TestCreateNotFound(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{Other: "foo"}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1956,7 +1978,10 @@ func TestCreateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1968,7 +1993,10 @@ func TestCreateChecksDecode(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	if b, _ := ioutil.ReadAll(response.Body); !strings.Contains(string(b), "must be of type Simple") {
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
 		t.Errorf("unexpected response: %s", string(b))
 	}
 }
@@ -2059,7 +2087,10 @@ func TestCreateWithName(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{Other: "foo"}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple/"+pathName+"/sub", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2083,7 +2114,10 @@ func TestUpdateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/bar", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2095,7 +2129,10 @@ func TestUpdateChecksDecode(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	if b, _ := ioutil.ReadAll(response.Body); !strings.Contains(string(b), "must be of type Simple") {
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
 		t.Errorf("unexpected response: %s", string(b))
 	}
 }
@@ -2153,7 +2190,10 @@ func TestCreate(t *testing.T) {
 	simple := &Simple{
 		Other: "bar",
 	}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2209,7 +2249,10 @@ func TestCreateInNamespace(t *testing.T) {
 	simple := &Simple{
 		Other: "bar",
 	}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2265,7 +2308,10 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	simple := &Simple{
 		Other: "bar",
 	}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2388,7 +2434,10 @@ func TestCreateTimeout(t *testing.T) {
 	defer server.Close()
 
 	simple := &Simple{Other: "foo"}
-	data, _ := codec.Encode(simple)
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	itemOut := expectApiStatus(t, "POST", server.URL+"/api/version/namespaces/default/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
 	if itemOut.Status != api.StatusFailure || itemOut.Reason != api.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
@@ -2466,5 +2515,101 @@ func TestCORSAllowedOrigins(t *testing.T) {
 				t.Errorf("Expected Access-Control-Allow-Methods header to not be set")
 			}
 		}
+	}
+}
+
+func TestCreateChecksAPIVersion(t *testing.T) {
+	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{}
+	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
+	data, err := newCodec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("POST", server.URL+"/api/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("Unexpected response %#v", response)
+	}
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !strings.Contains(string(b), "does not match the specified apiVersion") {
+		t.Errorf("unexpected response: %s", string(b))
+	}
+}
+
+func TestCreateDefaultsAPIVersion(t *testing.T) {
+	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{}
+	data, err := codec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	delete(m, "apiVersion")
+	data, err = json.Marshal(m)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	request, err := http.NewRequest("POST", server.URL+"/api/"+testVersion+"/namespaces/default/simple", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusCreated {
+		t.Errorf("unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusCreated, response)
+	}
+}
+
+func TestUpdateChecksAPIVersion(t *testing.T) {
+	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	data, err := newCodec.Encode(simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("PUT", server.URL+"/api/"+testVersion+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("Unexpected response %#v", response)
+	}
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !strings.Contains(string(b), "does not match the specified apiVersion") {
+		t.Errorf("unexpected response: %s", string(b))
 	}
 }
