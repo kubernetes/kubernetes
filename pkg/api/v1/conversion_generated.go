@@ -221,6 +221,8 @@ func convert_api_Container_To_v1_Container(in *api.Container, out *Container, s 
 	} else {
 		out.SecurityContext = nil
 	}
+	out.Stdin = in.Stdin
+	out.TTY = in.TTY
 	return nil
 }
 
@@ -2486,6 +2488,8 @@ func convert_v1_Container_To_api_Container(in *Container, out *api.Container, s 
 	} else {
 		out.SecurityContext = nil
 	}
+	out.Stdin = in.Stdin
+	out.TTY = in.TTY
 	return nil
 }
 

@@ -12540,6 +12540,14 @@
      "securityContext": {
       "$ref": "v1.SecurityContext",
       "description": "security options the pod should run with; see http://releases.k8s.io/HEAD/docs/design/security_context.md"
+     },
+     "stdin": {
+      "type": "boolean",
+      "description": "Whether this container should allocate a buffer for stdin in the container runtime; default is false"
+     },
+     "tty": {
+      "type": "boolean",
+      "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true; default is false"
      }
     }
    },
