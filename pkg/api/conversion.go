@@ -35,7 +35,12 @@ func init() {
 			obj.LabelSelector = labels.Everything()
 			obj.FieldSelector = fields.Everything()
 		},
+		// TODO: see about moving this into v1/defaults.go
 		func(obj *PodExecOptions) {
+			obj.Stderr = true
+			obj.Stdout = true
+		},
+		func(obj *PodAttachOptions) {
 			obj.Stderr = true
 			obj.Stdout = true
 		},
