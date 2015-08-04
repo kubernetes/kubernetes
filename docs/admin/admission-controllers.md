@@ -127,7 +127,7 @@ your Kubernetes deployment, you MUST use this plug-in to enforce those constrain
 be used to apply default resource requests to Pods that don't specify any; currently, the default LimitRanger
 applies a 0.1 CPU requirement to all Pods in the `default` namespace.
 
-See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](../user-guide/limitrange/) for more details.
+See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](limitrange/) for more details.
 
 ### NamespaceExists
 

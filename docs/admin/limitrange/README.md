@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/limitrange/README.md).
+[here](http://releases.k8s.io/release-1.0/docs/admin/limitrange/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -72,7 +72,7 @@ This example will work in a custom namespace to demonstrate the concepts involve
 Let's create a new namespace called limit-example:
 
 ```console
-$ kubectl create -f docs/user-guide/limitrange/namespace.yaml
+$ kubectl create -f docs/admin/limitrange/namespace.yaml
 namespaces/limit-example
 $ kubectl get namespaces
 NAME            LABELS             STATUS
@@ -85,7 +85,7 @@ Step 2: Apply a limit to the namespace
 Let's create a simple limit in our namespace.
 
 ```console
-$ kubectl create -f docs/user-guide/limitrange/limits.yaml --namespace=limit-example
+$ kubectl create -f docs/admin/limitrange/limits.yaml --namespace=limit-example
 limitranges/mylimits
 ```
 
@@ -153,14 +153,14 @@ Note that our nginx container has picked up the namespace default cpu and memory
 Let's create a pod that exceeds our allowed limits by having it have a container that requests 3 cpu cores.
 
 ```console
-$ kubectl create -f docs/user-guide/limitrange/invalid-pod.yaml --namespace=limit-example
+$ kubectl create -f docs/admin/limitrange/invalid-pod.yaml --namespace=limit-example
 Error from server: Pod "invalid-pod" is forbidden: Maximum CPU usage per pod is 2, but requested 3
 ```
 
 Let's create a pod that falls within the allowed limit boundaries.
 
 ```console
-$ kubectl create -f docs/user-guide/limitrange/valid-pod.yaml --namespace=limit-example
+$ kubectl create -f docs/admin/limitrange/valid-pod.yaml --namespace=limit-example
 pods/valid-pod
 $ kubectl get pods valid-pod --namespace=limit-example -o yaml | grep -C 5 resources
 ```
@@ -201,6 +201,8 @@ the Kubernetes system is able to apply default resource limits if desired in ord
 amount of resource a pod consumes on a node.
 
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/limitrange/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/limitrange/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
