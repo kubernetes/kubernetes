@@ -24,6 +24,7 @@ LATEST=$(git describe)
 KUBE_GCS_NO_CACHING=n
 KUBE_GCS_MAKE_PUBLIC=y
 KUBE_GCS_UPLOAD_RELEASE=y
+KUBE_GCS_DELETE_EXISTING=y
 KUBE_GCS_RELEASE_BUCKET=kubernetes-release
 KUBE_GCS_RELEASE_PREFIX="ci/${LATEST}"
 KUBE_GCS_LATEST_FILE="ci/latest.txt"
@@ -32,5 +33,11 @@ KUBE_GCS_LATEST_CONTENTS=${LATEST}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "$KUBE_ROOT/build/common.sh"
 
-kube::release::gcs::release
-kube::release::gcs::publish_latest
+MAX_ATTEMPTS=3
+attempt=0
+while [[ ${attempt} -lt ${MAX_ATTEMPTS} ]]; do
+  kube::release::gcs::release && kube::release::gcs::publish_latest && break || true
+  attempt=$((attempt + 1))
+  sleep 5
+done
+[[ ${attempt} -lt ${MAX_ATTEMPTS} ]] || exit 1
