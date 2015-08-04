@@ -394,9 +394,9 @@ func TestComputeStatus(t *testing.T) {
 
 func TestValidateLGTMAfterPush(t *testing.T) {
 	tests := []struct {
-		issueEvents []github.IssueEvent
-		shouldPass  bool
-		pull        github.PullRequest
+		issueEvents  []github.IssueEvent
+		shouldPass   bool
+		lastModified time.Time
 	}{
 		{
 			issueEvents: []github.IssueEvent{
@@ -408,15 +408,8 @@ func TestValidateLGTMAfterPush(t *testing.T) {
 					CreatedAt: timePtr(time.Unix(10, 0)),
 				},
 			},
-			pull: github.PullRequest{
-				Number: intPtr(1),
-				Head: &github.PullRequestBranch{
-					Repo: &github.Repository{
-						PushedAt: &github.Timestamp{time.Unix(9, 0)},
-					},
-				},
-			},
-			shouldPass: true,
+			lastModified: time.Unix(9, 0),
+			shouldPass:   true,
 		},
 		{
 			issueEvents: []github.IssueEvent{
@@ -428,20 +421,13 @@ func TestValidateLGTMAfterPush(t *testing.T) {
 					CreatedAt: timePtr(time.Unix(10, 0)),
 				},
 			},
-			pull: github.PullRequest{
-				Number: intPtr(1),
-				Head: &github.PullRequestBranch{
-					Repo: &github.Repository{
-						PushedAt: &github.Timestamp{time.Unix(11, 0)},
-					},
-				},
-			},
-			shouldPass: false,
+			lastModified: time.Unix(11, 0),
+			shouldPass:   false,
 		},
 	}
 	for _, test := range tests {
 		client, server, mux := initTest()
-		mux.HandleFunc(fmt.Sprintf("/repos/o/r/issues/%d/events", test.pull.Number), func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc(fmt.Sprintf("/repos/o/r/issues/1/events"), func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "GET" {
 				t.Errorf("Unexpected method: %s", r.Method)
 			}
@@ -451,12 +437,132 @@ func TestValidateLGTMAfterPush(t *testing.T) {
 				t.Errorf("Unexpected error: %v", err)
 			}
 			w.Write(data)
-			ok, err := validateLGTMAfterPush(client, "o", "r", &test.pull)
+			ok, err := validateLGTMAfterPush(client, "o", "r", &github.PullRequest{Number: intPtr(1)}, &test.lastModified)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if ok != test.shouldPass {
 				t.Errorf("expected: %v, saw: %v", test.shouldPass, ok)
+			}
+		})
+		server.Close()
+	}
+}
+
+func TestGetLastModified(t *testing.T) {
+	tests := []struct {
+		commits      []github.RepositoryCommit
+		expectedTime *time.Time
+	}{
+		{
+			commits: []github.RepositoryCommit{
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(10, 0)),
+						},
+					},
+				},
+			},
+			expectedTime: timePtr(time.Unix(10, 0)),
+		},
+		{
+			commits: []github.RepositoryCommit{
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(10, 0)),
+						},
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(11, 0)),
+						},
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(12, 0)),
+						},
+					},
+				},
+			},
+			expectedTime: timePtr(time.Unix(12, 0)),
+		},
+		{
+			commits: []github.RepositoryCommit{
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(10, 0)),
+						},
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(9, 0)),
+						},
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(8, 0)),
+						},
+					},
+				},
+			},
+			expectedTime: timePtr(time.Unix(10, 0)),
+		},
+		{
+			commits: []github.RepositoryCommit{
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(9, 0)),
+						},
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(10, 0)),
+						},
+					},
+				},
+				{
+					Commit: &github.Commit{
+						Committer: &github.CommitAuthor{
+							Date: timePtr(time.Unix(9, 0)),
+						},
+					},
+				},
+			},
+			expectedTime: timePtr(time.Unix(10, 0)),
+		},
+	}
+	for _, test := range tests {
+		client, server, mux := initTest()
+		mux.HandleFunc(fmt.Sprintf("/repos/o/r/pulls/1/commits"), func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "GET" {
+				t.Errorf("Unexpected method: %s", r.Method)
+			}
+			w.WriteHeader(http.StatusOK)
+			data, err := json.Marshal(test.commits)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			w.Write(data)
+			ts, err := lastModifiedTime(client, "o", "r", &github.PullRequest{Number: intPtr(1)})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !ts.Equal(*test.expectedTime) {
+				t.Errorf("expected: %v, saw: %v", test.expectedTime, ts)
 			}
 		})
 		server.Close()
