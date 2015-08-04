@@ -86,7 +86,22 @@ type FilterConfig struct {
 	RequiredStatusContexts []string
 }
 
-func validateLGTMAfterPush(client *github.Client, user, project string, pr *github.PullRequest) (bool, error) {
+func lastModifiedTime(client *github.Client, user, project string, pr *github.PullRequest) (*time.Time, error) {
+	list, _, err := client.PullRequests.ListCommits(user, project, *pr.Number, &github.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var lastModified *time.Time
+	for ix := range list {
+		item := list[ix]
+		if lastModified == nil || item.Commit.Committer.Date.After(*lastModified) {
+			lastModified = item.Commit.Committer.Date
+		}
+	}
+	return lastModified, nil
+}
+
+func validateLGTMAfterPush(client *github.Client, user, project string, pr *github.PullRequest, lastModifiedTime *time.Time) (bool, error) {
 	var lgtmTime *time.Time
 	events, _, err := client.Issues.ListIssueEvents(user, project, *pr.Number, &github.ListOptions{})
 	if err != nil {
@@ -102,10 +117,7 @@ func validateLGTMAfterPush(client *github.Client, user, project string, pr *gith
 	if lgtmTime == nil {
 		return false, fmt.Errorf("Couldn't find time for LGTM label, this shouldn't happen, skipping PR: %d", *pr.Number)
 	}
-	if pr.Head == nil || pr.Head.Repo == nil || pr.Head.Repo.PushedAt == nil {
-		return false, fmt.Errorf("Couldn't find push time for PR, this shouldn't happen, skipping PR: %d", *pr.Number)
-	}
-	return pr.Head.Repo.PushedAt.Before(*lgtmTime), nil
+	return lastModifiedTime.Before(*lgtmTime), nil
 }
 
 // For each PR in the project that matches:
@@ -156,7 +168,12 @@ func ForEachCandidatePRDo(client *github.Client, user, project string, fn PRFunc
 			continue
 		}
 
-		if ok, err := validateLGTMAfterPush(client, user, project, pr); err != nil {
+		lastModifiedTime, err := lastModifiedTime(client, user, project, pr)
+		if err != nil {
+			glog.Errorf("Failed to get last modified time, skipping PR: %d", *pr.Number)
+			continue
+		}
+		if ok, err := validateLGTMAfterPush(client, user, project, pr, lastModifiedTime); err != nil {
 			glog.Errorf("Error validating LGTM: %v, Skipping: %d", err, *pr.Number)
 			continue
 		} else if !ok {
