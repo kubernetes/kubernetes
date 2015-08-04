@@ -51,6 +51,31 @@ kube::test::get_object_assert() {
   fi
 }
 
+kube::test::get_object_jsonpath_assert() {
+  local object=$1
+  local request=$2
+  local expected=$3
+
+  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath -t \"$request\")
+
+  if [[ "$res" =~ ^$expected$ ]]; then
+      echo -n ${green}
+      echo "Successful get $object $request: $res"
+      echo -n ${reset}
+      return 0
+  else
+      echo ${bold}${red}
+      echo "FAIL!"
+      echo "Get $object $request"
+      echo "  Expected: $expected"
+      echo "  Got:      $res"
+      echo ${reset}${red}
+      caller
+      echo ${reset}
+      return 1
+  fi
+}
+
 kube::test::describe_object_assert() {
   local resource=$1
   local object=$2

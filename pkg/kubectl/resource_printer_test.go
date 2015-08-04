@@ -164,6 +164,23 @@ func TestPrintTemplate(t *testing.T) {
 	}
 }
 
+func TestPrintJSONPath(t *testing.T) {
+	buf := bytes.NewBuffer([]byte{})
+	printer, found, err := GetPrinter("jsonpath", "{.metadata.name}")
+	if err != nil || !found {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+	unversionedPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj, err := api.Scheme.ConvertToVersion(unversionedPod, testapi.Version())
+	err = printer.PrintObj(obj, buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %s %#v", buf, err)
+	}
+	if buf.String() != "foo" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
 func TestPrintEmptyTemplate(t *testing.T) {
 	if _, _, err := GetPrinter("template", ""); err == nil {
 		t.Errorf("unexpected non-error")
@@ -450,6 +467,10 @@ func TestPrinters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	jsonpathPrinter, err := NewJSONPathPrinter("{.metadata.name}")
+	if err != nil {
+		t.Fatal(err)
+	}
 	printers := map[string]ResourcePrinter{
 		"humanReadable":        NewHumanReadablePrinter(true, false, false, false, []string{}),
 		"humanReadableHeaders": NewHumanReadablePrinter(false, false, false, false, []string{}),
@@ -457,6 +478,7 @@ func TestPrinters(t *testing.T) {
 		"yaml":                 &YAMLPrinter{},
 		"template":             templatePrinter,
 		"template2":            templatePrinter2,
+		"jsonpath":             jsonpathPrinter,
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
@@ -471,6 +493,7 @@ func TestPrinters(t *testing.T) {
 	// map of printer name to set of objects it should fail on.
 	expectedErrors := map[string]util.StringSet{
 		"template2": util.NewStringSet("pod", "emptyPodList", "endpoints"),
+		"jsonpath":  util.NewStringSet("emptyPodList", "nonEmptyPodList", "endpoints"),
 	}
 
 	for pName, p := range printers {

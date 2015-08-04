@@ -19,6 +19,7 @@ package jsonpath
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 )
 
@@ -69,25 +70,30 @@ func testFailJSONPath(tests []jsonpathTest, t *testing.T) {
 	}
 }
 
+type book struct {
+	Category string
+	Author   string
+	Title    string
+	Price    float32
+}
+
+func (b book) String() string {
+	return fmt.Sprintf("{Category: %s, Author: %s, Title: %s, Price: %v}", b.Category, b.Author, b.Title, b.Price)
+}
+
+type bicycle struct {
+	Color string
+	Price float32
+}
+
+type store struct {
+	Book    []book
+	Bicycle bicycle
+	Name    string
+	Labels  map[string]int
+}
+
 func TestStructInput(t *testing.T) {
-	type book struct {
-		Category string
-		Author   string
-		Title    string
-		Price    float32
-	}
-
-	type bicycle struct {
-		Color string
-		Price float32
-	}
-
-	type store struct {
-		Book    []book
-		Bicycle bicycle
-		Name    string
-		Labels  map[string]int
-	}
 
 	storeData := store{
 		Name: "jsonpath",
@@ -106,7 +112,7 @@ func TestStructInput(t *testing.T) {
 
 	storeTests := []jsonpathTest{
 		{"plain", "hello jsonpath", nil, "hello jsonpath"},
-		{"recursive", "{..}", []int{1, 2, 3}, "[1, 2, 3]"},
+		{"recursive", "{..}", []int{1, 2, 3}, "[1 2 3]"},
 		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3"},
 		{"quote", `{"{"}`, nil, "{"},
 		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4"},
@@ -197,6 +203,7 @@ func TestKubenates(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
 	nodesTests := []jsonpathTest{
 		{"range item", "{range .items[*]}{.metadata.name}, {end}{.kind}", nodesData, `127.0.0.1, 127.0.0.2, List`},
 		{"range addresss", "{.items[*].status.addresses[*].address}", nodesData,
@@ -205,10 +212,10 @@ func TestKubenates(t *testing.T) {
 			`127.0.0.1, 127.0.0.2, 127.0.0.3, `},
 		{"item name", "{.items[*].metadata.name}", nodesData, `127.0.0.1 127.0.0.2`},
 		{"union nodes capacity", "{.items[*]['metadata.name', 'status.capacity']}", nodesData,
-			`127.0.0.1 127.0.0.2 {cpu: 4} {cpu: 8}`},
+			`127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]`},
 		{"range nodes capacity", "{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}", nodesData,
-			`[127.0.0.1, {cpu: 4}] [127.0.0.2, {cpu: 8}] `},
-		{"user password", `{.users[?(@.name=="e2e")].user.password}`, nodesData, "secret"},
+			`[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] `},
+		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
 	}
 	testJSONPath(nodesTests, t)
 }
