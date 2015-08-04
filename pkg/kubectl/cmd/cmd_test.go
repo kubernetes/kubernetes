@@ -261,7 +261,7 @@ func ExamplePrintReplicationControllerWithNamespace() {
 		Codec:  codec,
 		Client: nil,
 	}
-	cmd := NewCmdRun(f, os.Stdout)
+	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
@@ -303,7 +303,7 @@ func ExamplePrintPodWithWideFormat() {
 		Client: nil,
 	}
 	nodeName := "kubernetes-minion-abcd"
-	cmd := NewCmdRun(f, os.Stdout)
+	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "test1",
@@ -337,7 +337,7 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 		Codec:  codec,
 		Client: nil,
 	}
-	cmd := NewCmdRun(f, os.Stdout)
+	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	svc := &api.ServiceList{
 		Items: []api.Service{
 			{

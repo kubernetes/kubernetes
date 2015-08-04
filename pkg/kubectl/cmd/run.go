@@ -20,11 +20,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 const (
@@ -43,7 +47,7 @@ $ kubectl run nginx --image=nginx --dry-run
 $ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'`
 )
 
-func NewCmdRun(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run NAME --image=image [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json]",
 		// run-container is deprecated
@@ -52,7 +56,7 @@ func NewCmdRun(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    run_long,
 		Example: run_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := Run(f, out, cmd, args)
+			err := Run(f, cmdIn, cmdOut, cmdErr, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -66,16 +70,29 @@ func NewCmdRun(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("port", -1, "The port that this container exposes.")
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
+	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
+	cmd.Flags().Bool("tty", false, "Allocated a TTY for each container in the pod.  Because -t is currently shorthand for --template, -t is not supported for --tty. This shorthand is deprecated and we expect to adopt -t for --tty soon.")
+	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--interactive' is set, in which case the default is true.")
 	return cmd
 }
 
-func Run(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(os.Args) > 1 && os.Args[1] == "run-container" {
 		printDeprecationWarning("run", "run-container")
 	}
 
 	if len(args) != 1 {
 		return cmdutil.UsageError(cmd, "NAME is required for run")
+	}
+
+	interactive := cmdutil.GetFlagBool(cmd, "stdin")
+	tty := cmdutil.GetFlagBool(cmd, "tty")
+	if tty && !interactive {
+		return cmdutil.UsageError(cmd, "-i/--stdin is required for containers with --tty=true")
+	}
+	replicas := cmdutil.GetFlagInt(cmd, "replicas")
+	if interactive && replicas != 1 {
+		return cmdutil.UsageError(cmd, fmt.Sprintf("-i/--stdin requires that replicas is 1, found %d", replicas))
 	}
 
 	namespace, _, err := f.DefaultNamespace()
@@ -123,5 +140,82 @@ func Run(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) e
 		}
 	}
 
-	return f.PrintObject(cmd, controller, out)
+	attachFlag := cmd.Flags().Lookup("attach")
+	attach := cmdutil.GetFlagBool(cmd, "attach")
+
+	if !attachFlag.Changed && interactive {
+		attach = true
+	}
+
+	if attach {
+		opts := &AttachOptions{
+			In:    cmdIn,
+			Out:   cmdOut,
+			Err:   cmdErr,
+			Stdin: interactive,
+			TTY:   tty,
+
+			Attach: &DefaultRemoteAttach{},
+		}
+		config, err := f.ClientConfig()
+		if err != nil {
+			return err
+		}
+		opts.Config = config
+
+		client, err := f.Client()
+		if err != nil {
+			return err
+		}
+		opts.Client = client
+		return handleAttach(client, controller.(*api.ReplicationController), opts)
+	}
+	return f.PrintObject(cmd, controller, cmdOut)
+}
+
+func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) error {
+	for {
+		pod, err := c.Pods(pod.Namespace).Get(pod.Name)
+		if err != nil {
+			return err
+		}
+		if pod.Status.Phase == api.PodRunning {
+			ready := true
+			for _, status := range pod.Status.ContainerStatuses {
+				if !status.Ready {
+					ready = false
+					break
+				}
+			}
+			if ready {
+				return nil
+			}
+		}
+		fmt.Fprintf(out, "Waiting for pod %s/%s to be running\n", pod.Namespace, pod.Name)
+		time.Sleep(2 * time.Second)
+		continue
+	}
+}
+
+func handleAttach(c *client.Client, controller *api.ReplicationController, opts *AttachOptions) error {
+	var pods *api.PodList
+	for pods == nil || len(pods.Items) == 0 {
+		var err error
+		if pods, err = c.Pods(controller.Namespace).List(labels.SelectorFromSet(controller.Spec.Selector), fields.Everything()); err != nil {
+			return err
+		}
+		if len(pods.Items) == 0 {
+			fmt.Fprint(opts.Out, "Waiting for pod to be scheduled\n")
+			time.Sleep(2 * time.Second)
+		}
+	}
+	pod := &pods.Items[0]
+
+	if err := waitForPodRunning(c, pod, opts.Out); err != nil {
+		return err
+	}
+	opts.Client = c
+	opts.PodName = pod.Name
+	opts.Namespace = pod.Namespace
+	return opts.Run()
 }

@@ -80,6 +80,17 @@ nginx-http   run=nginx-app   run=nginx-app             80/TCP
 
 With kubectl, we create a [replication controller](replication-controller.md) which will make sure that N pods are running nginx (where N is the number of replicas stated in the spec, which defaults to 1). We also create a [service](services.md) with a selector that matches the replication controller's selector. See the [Quick start](quick-start.md) for more information.
 
+By default images are run in the background, similar to `docker run -d ...`, if you want to run things in the foreground, use:
+
+```console
+kubectl run [-i] [--tty] --attach <name> --image=<image>
+```
+
+Unlike `docker run ...`, if `--attach` is specified, we attach to `stdin`, `stdout` and `stderr`, there is no ability to control which streams are attached (`docker -a ...`).
+
+Because we start a replication controller for your container, it will be restarted if you terminate the attached process (e.g. `ctrl-c`), this is different than `docker run -it`.
+To destroy the replication controller (and it's pods)  you need to run `kubectl delete rc <name>`
+
 #### docker ps
 
 How do I list what is currently running? Checkout [kubectl get](kubectl/kubectl_get.md).
