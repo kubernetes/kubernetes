@@ -55,5 +55,3 @@ else
   echo "${APIROOT} is out of date. Please run hack/update-generated-deep-copies.sh"
   exit 1
 fi
-
-# ex: ts=2 sw=2 et filetype=sh

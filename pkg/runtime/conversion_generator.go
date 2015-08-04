@@ -39,10 +39,16 @@ type ConversionGenerator interface {
 	AssumePrivateConversions()
 }
 
-func NewConversionGenerator(scheme *conversion.Scheme, targetPkg string) ConversionGenerator {
+// NewConversionGenerator creates a new conversion function generator using the provided scheme, package, and
+// generation unit. A generation unit is a package for which conversion functions of types not declared in a
+// subpackage are assumed to exist.
+// For example, using targetUnit = github.com/.../pkg/expapi, the generator will assume that types defined in
+// github.com/.../pkg/api will have registered conversion functions in the scheme.
+func NewConversionGenerator(scheme *conversion.Scheme, targetPkg, targetUnit string) ConversionGenerator {
 	g := &conversionGenerator{
 		scheme:        scheme,
 		targetPkg:     targetPkg,
+		targetUnit:    targetUnit,
 		convertibles:  make(map[reflect.Type]reflect.Type),
 		pkgOverwrites: make(map[string]string),
 		imports:       make(map[string]string),
@@ -59,6 +65,7 @@ var complexTypes []reflect.Kind = []reflect.Kind{reflect.Map, reflect.Ptr, refle
 type conversionGenerator struct {
 	scheme       *conversion.Scheme
 	targetPkg    string
+	targetUnit   string
 	convertibles map[reflect.Type]reflect.Type
 	// If pkgOverwrites is set for a given package name, that package name
 	// will be replaced while writing conversion function. If empty, package
@@ -102,15 +109,38 @@ func (g *conversionGenerator) GenerateConversionsForType(version string, reflect
 	return nil
 }
 
+func (g *conversionGenerator) inGenUnit(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Ptr:
+		return g.inGenUnit(t.Elem())
+	case reflect.Struct:
+		return strings.HasPrefix(t.PkgPath(), g.targetUnit)
+	}
+	return true
+}
+
+func (g *conversionGenerator) canConvert(inType, outType reflect.Type) (validConversion bool, err error) {
+	if !g.inGenUnit(inType) || !g.inGenUnit(outType) {
+		// assume out-of-generation-unit conversions exist
+		return true, nil
+	}
+	if val, ok := g.convertibles[inType]; ok {
+		if val != outType {
+			return false, fmt.Errorf("multiple possible convertibles for %v", inType)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 func (g *conversionGenerator) generateConversionsBetween(inType, outType reflect.Type) error {
 	existingConversion := g.scheme.Converter().HasConversionFunc(inType, outType) && g.scheme.Converter().HasConversionFunc(outType, inType)
 
 	// Avoid processing the same type multiple times.
-	if value, found := g.convertibles[inType]; found {
-		if value != outType {
-			return fmt.Errorf("multiple possible convertibles for %v", inType)
-		}
+	if ok, err := g.canConvert(inType, outType); ok {
 		return nil
+	} else if err != nil {
+		return err
 	}
 	if inType == outType {
 		// Don't generate conversion methods for the same type.
@@ -768,6 +798,10 @@ var defaultConversions []typePair = []typePair{
 func (g *conversionGenerator) existsDedicatedConversionFunction(inType, outType reflect.Type) bool {
 	if inType == outType {
 		// Assume that conversion are not defined for "deep copies".
+		return false
+	}
+
+	if !g.inGenUnit(inType) || !g.inGenUnit(outType) {
 		return false
 	}
 

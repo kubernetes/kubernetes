@@ -14,6 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package expapi
+package v1
 
-func addDeepCopyFuncs() {}
+// AUTO-GENERATED FUNCTIONS START HERE
+import api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+
+func init() {
+	err := api.Scheme.AddGeneratedDeepCopyFuncs()
+	if err != nil {
+		// if one of the deep copy functions is malformed, detect it immediately.
+		panic(err)
+	}
+}
+
+// AUTO-GENERATED FUNCTIONS END HERE

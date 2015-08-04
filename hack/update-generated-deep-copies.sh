@@ -25,51 +25,55 @@ kube::golang::setup_env
 
 function result_file_name() {
 	local version=$1
-	if [ "${version}" == "api" ]; then
-		echo "pkg/api/deep_copy_generated.go"
-	else
-		echo "pkg/api/${version}/deep_copy_generated.go"
-	fi
+	echo "pkg/${version}/deep_copy_generated.go"
 }
 
 function generate_version() {
 	local version=$1
+	local genunit=$2
 	local TMPFILE="/tmp/deep_copy_generated.$(date +%s).go"
 
 	echo "Generating for version ${version}"
 
-	sed 's/YEAR/2015/' hooks/boilerplate.go.txt > $TMPFILE
-	cat >> $TMPFILE <<EOF
-package ${version}
+	pkgname=${version##*/}
+	if [[ -z $pkgname ]]; then
+		pkgname=${version%/*}
+	fi
+
+	sed 's/YEAR/2015/' hooks/boilerplate.go.txt > "$TMPFILE"
+	cat >> "$TMPFILE" <<EOF
+package $pkgname
 
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 
-	GOPATH=$(godep path):$GOPATH go run cmd/gendeepcopy/deep_copy.go -v ${version} -f - -o "${version}=" >>  $TMPFILE
+	env GOPATH=$(godep path):$GOPATH go run cmd/gendeepcopy/deep_copy.go -v "${version}" -u "${genunit}" -f - -o "${version}=" >>  $TMPFILE
 
-	cat >> $TMPFILE <<EOF
+	cat >> "$TMPFILE" <<EOF
 // AUTO-GENERATED FUNCTIONS END HERE
 EOF
 
-	gofmt -w -s $TMPFILE
+	env GOPATH=$(godep path):$GOPATH goimports -w "$TMPFILE"
 	mv $TMPFILE `result_file_name ${version}`
 }
 
 function generate_deep_copies() {
-  local versions="api v1"
-  # To avoid compile errors, remove the currently existing files.
-  for ver in ${versions}; do
-    rm -f `result_file_name ${ver}`
-  done
-  apiVersions=""
-  for ver in ${versions}; do
-    # Ensure that the version being processed is registered by setting
-    # KUBE_API_VERSIONS.
-    if [ "${ver}" != "api" ]; then
-      apiVersions="${ver}"
-    fi
-    KUBE_API_VERSIONS="${apiVersions}" generate_version "${ver}"
-  done
+	local version_genunits=(
+		"api/" "github.com/GoogleCloudPlatform/kubernetes"
+		"api/v1" "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+		"expapi/" "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi"
+		"expapi/v1" "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/v1"
+	)
+	# To avoid compile errors, remove the currently existing files.
+	for ((i=0; i < ${#version_genunits[@]}; i+=2)); do
+		rm -f `result_file_name ${version_genunits[i]}`
+	done
+	for ((i=0; i < ${#version_genunits[@]}; i+=2)); do
+		# Ensure that the version being processed is registered by setting
+		# KUBE_API_VERSIONS.
+		apiVersions="${version_genunits[i]##*/}"
+		KUBE_API_VERSIONS="${apiVersions}" generate_version "${version_genunits[i]}" "${version_genunits[i+1]}"
+	done
 }
 
 generate_deep_copies

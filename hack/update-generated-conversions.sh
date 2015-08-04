@@ -25,29 +25,42 @@ kube::golang::setup_env
 
 function generate_version() {
 	local version=$1
+	local genunit=$2
 	local TMPFILE="/tmp/conversion_generated.$(date +%s).go"
 
 	echo "Generating for version ${version}"
 
 	sed 's/YEAR/2015/' hooks/boilerplate.go.txt > $TMPFILE
 	cat >> $TMPFILE <<EOF
-package ${version}
+package ${version##*/}
 
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 
-	GOPATH=$(godep path):$GOPATH go run cmd/genconversion/conversion.go -v ${version} -f - >>  $TMPFILE
+	env GOPATH=$(godep path):$GOPATH go run cmd/genconversion/conversion.go -v "${version}" -u "${genunit}" -f - >> "$TMPFILE"
 
-	cat >> $TMPFILE <<EOF
+	cat >> "$TMPFILE" <<EOF
 // AUTO-GENERATED FUNCTIONS END HERE
 EOF
 
-	mv $TMPFILE pkg/api/${version}/conversion_generated.go
+	env GOPATH=$(godep path):$GOPATH goimports -w "$TMPFILE"
+	mv "$TMPFILE" "pkg/${version}/conversion_generated.go"
 }
 
-VERSIONS="v1"
-for ver in $VERSIONS; do
-  # Ensure that the version being processed is registered by setting
-  # KUBE_API_VERSIONS.
-  KUBE_API_VERSIONS="${ver}" generate_version "${ver}"
+if ! which goimports >/dev/null; then
+	echo "goimports not in path, run go get golang.org/x/tools/cmd/goimports"
+	exit 1
+fi
+
+# TODO: don't set KUBE_API_VERSIONS here once we have multiple api groups
+KUBE_API_VERSIONS="v1"
+
+VERSION_GENUNITS=(
+	"api/v1" ""
+	"expapi/v1" "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi"
+)
+for ((i=0; i < ${#VERSION_GENUNITS[@]}; i+=2)); do
+	# Ensure that the version being processed is registered by setting
+	# KUBE_API_VERSIONS.
+	KUBE_API_VERSIONS="${KUBE_API_VERSIONS}" generate_version "${VERSION_GENUNITS[i]}" "${VERSION_GENUNITS[i+1]}"
 done

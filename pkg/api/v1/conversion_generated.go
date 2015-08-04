@@ -18,10 +18,11 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 import (
+	reflect "reflect"
+
 	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	resource "github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	conversion "github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	reflect "reflect"
 )
 
 func convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource(in *api.AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
