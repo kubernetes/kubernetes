@@ -21,7 +21,7 @@
 		},
 		{
 			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
-			"Comment": "release-96",
+			"Comment": "release-105",
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
 		},
 		{
@@ -31,7 +31,7 @@
 		},
 		{
 			"ImportPath": "code.google.com/p/google-api-go-client/googleapi",
-			"Comment": "release-96",
+			"Comment": "release-105",
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
 		},
 		{
@@ -195,7 +195,7 @@
 		},
 		{
 			"ImportPath": "github.com/docker/spdystream",
-			"Rev": "83ae67e694a4ab5cbaee4d3126f25118712b26e6"
+			"Rev": "b2c3287865f3ad6aa22821ddb7b4692b896ac207"
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
@@ -212,7 +212,6 @@
 		},
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Comment": "0.2.1-532-g2f1ad24",
 			"Rev": "2f1ad24900b2777139b5becee93eb63a75b00617"
 		},
 		{
@@ -395,31 +394,31 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
-			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/executor",
-			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
-			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/messenger",
-			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/scheduler",
-			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/upid",
-			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
@@ -440,7 +439,7 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
-			"Comment": "v1.0-28-g8adf9e1730c5",
+			"Comment": "v1.0-28-g8adf9e1",
 			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
 		},
 		{
@@ -501,6 +500,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
+			"Comment": "v0.0.1-44-gb91b2a9",
 			"Rev": "b91b2a94780f4e6b4d3b0c12fd9b5f4b05b1aa45"
 		},
 		{
@@ -509,19 +509,22 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
+			"Comment": "v1.0-17-g089c718",
 			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
+			"Comment": "v1.0-17-g089c718",
 			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
+			"Comment": "v1.0-17-g089c718",
 			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
 		},
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
-			"Rev": "3c85049eaeb429febe7788d9c7aac42322a377fe"
+			"Rev": "2c00daeb6c3b45114c80ac44119e7b8801fdd852"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
@@ -553,11 +556,6 @@
 			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
 		},
 		{
-			"ImportPath": "golang.org/x/net/spdy",
-			"Comment": "deleted-upstream",
-			"Rev": "d175081df37eff8cda13f478bc11a0a65b39958b"
-		},
-		{
 			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
 		},
@@ -575,6 +573,7 @@
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
+			"Comment": "v1.0-16-g20b71e5",
 			"Rev": "20b71e5b60d756d3d2f80def009790325acc2b23"
 		},
 		{

@@ -24,12 +24,46 @@ const (
 	linuxCapVer3 = 0x20080522
 )
 
-var capVers uint32
+var (
+	capVers    uint32
+	capLastCap Cap
+)
 
 func init() {
 	var hdr capHeader
 	capget(&hdr, nil)
 	capVers = hdr.version
+
+	if initLastCap() == nil {
+		CAP_LAST_CAP = capLastCap
+		if capLastCap > 31 {
+			capUpperMask = (uint32(1) << (uint(capLastCap) - 31)) - 1
+		} else {
+			capUpperMask = 0
+		}
+	}
+}
+
+func initLastCap() error {
+	if capLastCap != 0 {
+		return nil
+	}
+
+	f, err := os.Open("/proc/sys/kernel/cap_last_cap")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var b []byte = make([]byte, 11)
+	_, err = f.Read(b)
+	if err != nil {
+		return err
+	}
+
+	fmt.Sscanf(string(b), "%d", &capLastCap)
+
+	return nil
 }
 
 func mkStringCap(c Capabilities, which CapType) (ret string) {
@@ -351,7 +385,15 @@ func (c *capsV3) Load() (err error) {
 		return
 	}
 
-	f, err := os.Open(fmt.Sprintf("/proc/%d/status", c.hdr.pid))
+	var status_path string
+
+	if c.hdr.pid == 0 {
+		status_path = fmt.Sprintf("/proc/self/status")
+	} else {
+		status_path = fmt.Sprintf("/proc/%d/status", c.hdr.pid)
+	}
+
+	f, err := os.Open(status_path)
 	if err != nil {
 		return
 	}
