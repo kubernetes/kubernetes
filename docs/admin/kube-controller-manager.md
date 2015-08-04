@@ -73,7 +73,6 @@ controller, and serviceaccounts controller.
       --port=0: The port that the controller-manager's http service runs on
       --profiling=true: Enable profiling via web interface host:port/debug/pprof/
       --pvclaimbinder-sync-period=0: The period for syncing persistent volumes and persistent volume claims
-      --register-retry-count=0: The number of retries for initial node registration.  Retry interval equals node-sync-period.
       --resource-quota-sync-period=0: The period for syncing quota usage status in the system
       --root-ca-file="": If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.
       --service-account-private-key-file="": Filename containing a PEM-encoded private RSA key used to sign service account tokens.
