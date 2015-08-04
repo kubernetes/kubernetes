@@ -43,6 +43,7 @@ readonly KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel}/
 readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg}/
 readonly KUBE_GCS_LATEST_FILE=${KUBE_GCS_LATEST_FILE:-}
 readonly KUBE_GCS_LATEST_CONTENTS=${KUBE_GCS_LATEST_CONTENTS:-}
+readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
@@ -908,13 +909,15 @@ function kube::release::gcs::copy_release_artifacts() {
   # First delete all objects at the destination
   if gsutil ls "${gcs_destination}" >/dev/null 2>&1; then
     kube::log::error "${gcs_destination} not empty."
-    read -p "Delete everything under ${gcs_destination}? [y/n] " -r || {
-      echo "EOF on prompt.  Skipping upload"
-      return
-    }
-    [[ $REPLY =~ ^[yY]$ ]] || {
-      echo "Skipping upload"
-      return
+    [[ ${KUBE_GCS_DELETE_EXISTING} =~ ^[yY]$ ]] || {
+      read -p "Delete everything under ${gcs_destination}? [y/n] " -r || {
+        echo "EOF on prompt.  Skipping upload"
+        return
+      }
+      [[ $REPLY =~ ^[yY]$ ]] || {
+        echo "Skipping upload"
+        return
+      }
     }
     gsutil -q -m rm -f -R "${gcs_destination}"
   fi
