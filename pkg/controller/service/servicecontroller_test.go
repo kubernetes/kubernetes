@@ -119,7 +119,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 			}
 			actionFound := false
 			for _, action := range actions {
-				if action.Action == "update-service" {
+				if action.GetVerb() == "update" && action.GetResource() == "services" {
 					actionFound = true
 				}
 			}

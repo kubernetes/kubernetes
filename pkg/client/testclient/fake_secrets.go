@@ -30,32 +30,48 @@ type FakeSecrets struct {
 	Namespace string
 }
 
-func (c *FakeSecrets) List(labels labels.Selector, field fields.Selector) (*api.SecretList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-secrets"}, &api.SecretList{})
-	return obj.(*api.SecretList), err
-}
-
 func (c *FakeSecrets) Get(name string) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-secret", Value: name}, &api.Secret{})
+	obj, err := c.Fake.Invokes(NewGetAction("secrets", c.Namespace, name), &api.Secret{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Secret), err
 }
 
+func (c *FakeSecrets) List(label labels.Selector, field fields.Selector) (*api.SecretList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("secrets", c.Namespace, label, field), &api.SecretList{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.SecretList), err
+}
+
 func (c *FakeSecrets) Create(secret *api.Secret) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-secret", Value: secret}, &api.Secret{})
+	obj, err := c.Fake.Invokes(NewCreateAction("secrets", c.Namespace, secret), secret)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Secret), err
 }
 
 func (c *FakeSecrets) Update(secret *api.Secret) (*api.Secret, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-secret", Value: secret}, &api.Secret{})
+	obj, err := c.Fake.Invokes(NewUpdateAction("secrets", c.Namespace, secret), secret)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Secret), err
 }
 
 func (c *FakeSecrets) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-secret", Value: name}, &api.Secret{})
+	_, err := c.Fake.Invokes(NewDeleteAction("secrets", c.Namespace, name), &api.Secret{})
 	return err
 }
 
 func (c *FakeSecrets) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(FakeAction{Action: "watch-secrets", Value: resourceVersion}, nil)
+	c.Fake.Invokes(NewWatchAction("secrets", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, c.Fake.Err()
 }

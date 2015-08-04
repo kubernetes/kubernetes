@@ -30,42 +30,74 @@ type FakePods struct {
 	Namespace string
 }
 
-func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-pods"}, &api.PodList{})
-	return obj.(*api.PodList), err
-}
-
 func (c *FakePods) Get(name string) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-pod", Value: name}, &api.Pod{})
+	obj, err := c.Fake.Invokes(NewGetAction("pods", c.Namespace, name), &api.Pod{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-pod", Value: name}, &api.Pod{})
-	return err
+func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("pods", c.Namespace, label, field), &api.PodList{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.PodList), err
 }
 
 func (c *FakePods) Create(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-pod"}, &api.Pod{})
+	obj, err := c.Fake.Invokes(NewCreateAction("pods", c.Namespace, pod), pod)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Pod), err
 }
 
 func (c *FakePods) Update(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-pod", Value: pod.Name}, &api.Pod{})
+	obj, err := c.Fake.Invokes(NewUpdateAction("pods", c.Namespace, pod), pod)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Pod), err
 }
 
+func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
+	_, err := c.Fake.Invokes(NewDeleteAction("pods", c.Namespace, name), &api.Pod{})
+	return err
+}
+
 func (c *FakePods) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(FakeAction{Action: "watch-pods", Value: resourceVersion}, nil)
+	c.Fake.Invokes(NewWatchAction("pods", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, c.Fake.Err()
 }
 
-func (c *FakePods) Bind(bind *api.Binding) error {
-	c.Fake.Invokes(FakeAction{Action: "bind-pod", Value: bind.Name}, nil)
-	return nil
+func (c *FakePods) Bind(binding *api.Binding) error {
+	action := CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = "pods"
+	action.Subresource = "bindings"
+	action.Object = binding
+
+	_, err := c.Fake.Invokes(action, binding)
+	return err
 }
 
 func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-pod", Value: pod.Name}, &api.Pod{})
+	action := UpdateActionImpl{}
+	action.Verb = "update"
+	action.Resource = "pods"
+	action.Subresource = "status"
+	action.Object = pod
+
+	obj, err := c.Fake.Invokes(action, pod)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Pod), err
 }

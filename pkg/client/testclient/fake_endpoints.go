@@ -30,32 +30,48 @@ type FakeEndpoints struct {
 	Namespace string
 }
 
-func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-endpoints"}, &api.Endpoints{})
+func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
+	obj, err := c.Fake.Invokes(NewGetAction("endpoints", c.Namespace, name), &api.Endpoints{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Endpoints), err
 }
 
-func (c *FakeEndpoints) List(selector labels.Selector) (*api.EndpointsList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-endpoints"}, &api.EndpointsList{})
+func (c *FakeEndpoints) List(label labels.Selector) (*api.EndpointsList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("endpoints", c.Namespace, label, nil), &api.EndpointsList{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.EndpointsList), err
 }
 
-func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-endpoints", Value: name}, &api.Endpoints{})
+func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
+	obj, err := c.Fake.Invokes(NewCreateAction("endpoints", c.Namespace, endpoints), endpoints)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.Endpoints), err
+}
+
+func (c *FakeEndpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
+	obj, err := c.Fake.Invokes(NewUpdateAction("endpoints", c.Namespace, endpoints), endpoints)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.Endpoints), err
 }
 
 func (c *FakeEndpoints) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-endpoints", Value: name}, &api.Endpoints{})
+	_, err := c.Fake.Invokes(NewDeleteAction("endpoints", c.Namespace, name), &api.Endpoints{})
 	return err
 }
 
 func (c *FakeEndpoints) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(FakeAction{Action: "watch-endpoints", Value: resourceVersion}, nil)
+	c.Fake.Invokes(NewWatchAction("endpoints", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, c.Fake.Err()
-}
-
-func (c *FakeEndpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-endpoints", Value: endpoints.Name}, &api.Endpoints{})
-	return obj.(*api.Endpoints), err
 }

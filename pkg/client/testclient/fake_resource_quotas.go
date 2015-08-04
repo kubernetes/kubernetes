@@ -30,37 +30,63 @@ type FakeResourceQuotas struct {
 	Namespace string
 }
 
-func (c *FakeResourceQuotas) List(selector labels.Selector) (*api.ResourceQuotaList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-resourceQuotas"}, &api.ResourceQuotaList{})
-	return obj.(*api.ResourceQuotaList), err
-}
-
 func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-resourceQuota", Value: name}, &api.ResourceQuota{})
+	obj, err := c.Fake.Invokes(NewGetAction("resourcequotas", c.Namespace, name), &api.ResourceQuota{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-resourceQuota", Value: name}, &api.ResourceQuota{})
-	return err
+func (c *FakeResourceQuotas) List(label labels.Selector) (*api.ResourceQuotaList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, label, nil), &api.ResourceQuotaList{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.ResourceQuotaList), err
 }
 
 func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
+	obj, err := c.Fake.Invokes(NewCreateAction("resourcequotas", c.Namespace, resourceQuota), resourceQuota)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.ResourceQuota), err
 }
 
 func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
+	obj, err := c.Fake.Invokes(NewUpdateAction("resourcequotas", c.Namespace, resourceQuota), resourceQuota)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
-	return obj.(*api.ResourceQuota), err
+func (c *FakeResourceQuotas) Delete(name string) error {
+	_, err := c.Fake.Invokes(NewDeleteAction("resourcequotas", c.Namespace, name), &api.ResourceQuota{})
+	return err
 }
 
 func (c *FakeResourceQuotas) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(FakeAction{Action: "watch-resourceQuota", Value: resourceVersion}, nil)
+	c.Fake.Invokes(NewWatchAction("resourcequotas", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, nil
+}
+
+func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
+	action := UpdateActionImpl{}
+	action.Verb = "update"
+	action.Resource = "resourcequotas"
+	action.Subresource = "status"
+	action.Object = resourceQuota
+
+	obj, err := c.Fake.Invokes(action, resourceQuota)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.ResourceQuota), err
 }

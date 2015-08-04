@@ -37,8 +37,8 @@ func TestAdmissionDeny(t *testing.T) {
 
 func testAdmission(t *testing.T, pod *api.Pod, shouldAccept bool) {
 	mockClient := &testclient.Fake{
-		ReactFn: func(action testclient.FakeAction) (runtime.Object, error) {
-			if action.Action == "get-pod" && action.Value.(string) == pod.Name {
+		ReactFn: func(action testclient.Action) (runtime.Object, error) {
+			if action.Matches("get", "pods") && action.(testclient.GetAction).GetName() == pod.Name {
 				return pod, nil
 			}
 			t.Errorf("Unexpected API call: %#v", action)

@@ -77,10 +77,10 @@ func TestReplicationControllerScale(t *testing.T) {
 	if len(actions) != 2 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if actions[0].Action != "get-replicationController" || actions[0].Value != name {
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetName() != name {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
-	if actions[1].Action != "update-replicationController" || actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
+	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetObject().(*api.ReplicationController).Spec.Replicas != int(count) {
 		t.Errorf("unexpected action %v, expected update-replicationController with replicas = %d", actions[1], count)
 	}
 }
@@ -101,7 +101,7 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	if len(actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if actions[0].Action != "get-replicationController" || actions[0].Value != name {
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetName() != name {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
 }

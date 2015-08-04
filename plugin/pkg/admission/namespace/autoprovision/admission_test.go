@@ -49,7 +49,7 @@ func TestAdmission(t *testing.T) {
 	if len(actions) != 1 {
 		t.Errorf("Expected a create-namespace request")
 	}
-	if actions[0].Action != "create-namespace" {
+	if !actions[0].Matches("create", "namespaces") {
 		t.Errorf("Expected a create-namespace request to be made via the client")
 	}
 }

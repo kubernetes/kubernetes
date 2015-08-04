@@ -30,32 +30,48 @@ type FakePodTemplates struct {
 	Namespace string
 }
 
-func (c *FakePodTemplates) List(label labels.Selector, field fields.Selector) (*api.PodTemplateList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-podTemplates"}, &api.PodTemplateList{})
-	return obj.(*api.PodTemplateList), err
-}
-
 func (c *FakePodTemplates) Get(name string) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-podTemplate", Value: name}, &api.PodTemplate{})
+	obj, err := c.Fake.Invokes(NewGetAction("podtemplates", c.Namespace, name), &api.PodTemplate{})
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.PodTemplate), err
 }
 
-func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-podTemplate", Value: name}, &api.PodTemplate{})
-	return err
+func (c *FakePodTemplates) List(label labels.Selector, field fields.Selector) (*api.PodTemplateList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("podtemplates", c.Namespace, label, field), &api.PodTemplateList{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.PodTemplateList), err
 }
 
 func (c *FakePodTemplates) Create(pod *api.PodTemplate) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-podTemplate"}, &api.PodTemplate{})
+	obj, err := c.Fake.Invokes(NewCreateAction("podtemplates", c.Namespace, pod), pod)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.PodTemplate), err
 }
 
 func (c *FakePodTemplates) Update(pod *api.PodTemplate) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-podTemplate", Value: pod.Name}, &api.PodTemplate{})
+	obj, err := c.Fake.Invokes(NewUpdateAction("podtemplates", c.Namespace, pod), pod)
+	if obj == nil {
+		return nil, err
+	}
+
 	return obj.(*api.PodTemplate), err
 }
 
+func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error {
+	_, err := c.Fake.Invokes(NewDeleteAction("podtemplates", c.Namespace, name), &api.PodTemplate{})
+	return err
+}
+
 func (c *FakePodTemplates) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(FakeAction{Action: "watch-podTemplates", Value: resourceVersion}, nil)
+	c.Fake.Invokes(NewWatchAction("podtemplates", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, c.Fake.Err()
 }

@@ -47,34 +47,36 @@ type ObjectRetriever interface {
 // ObjectRetriever interface to satisfy retrieval of lists or retrieval of single items.
 // TODO: add support for sub resources
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
-	return func(action FakeAction) (runtime.Object, error) {
-		segments := strings.Split(action.Action, "-")
-		var verb, resource string
-		switch len(segments) {
-		case 3:
-			verb, _, resource = segments[0], segments[1], segments[2]
-		case 2:
-			verb, resource = segments[0], segments[1]
-		default:
-			return nil, fmt.Errorf("unrecognized action, need two or three segments <verb>-<resource> or <verb>-<subresource>-<resource>: %s", action.Action)
-		}
-		_, kind, err := mapper.VersionAndKindForResource(resource)
+	return func(action Action) (runtime.Object, error) {
+		_, kind, err := mapper.VersionAndKindForResource(action.GetResource())
 		if err != nil {
-			return nil, fmt.Errorf("unrecognized action %s: %v", resource, err)
+			return nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
+
 		// TODO: have mapper return a Kind for a subresource?
-		switch verb {
-		case "list", "search":
+		switch castAction := action.(type) {
+		case ListAction:
 			return o.Kind(kind+"List", "")
-		case "get", "create", "update", "delete":
-			// TODO: handle sub resources
-			if s, ok := action.Value.(string); ok && action.Value != nil {
-				return o.Kind(kind, s)
+		case GetAction:
+			return o.Kind(kind, castAction.GetName())
+		case DeleteAction:
+			return o.Kind(kind, castAction.GetName())
+		case CreateAction:
+			meta, err := api.ObjectMetaFor(castAction.GetObject())
+			if err != nil {
+				return nil, err
 			}
-			return o.Kind(kind, "unknown")
+			return o.Kind(kind, meta.Name)
+		case UpdateAction:
+			meta, err := api.ObjectMetaFor(castAction.GetObject())
+			if err != nil {
+				return nil, err
+			}
+			return o.Kind(kind, meta.Name)
 		default:
-			return nil, fmt.Errorf("no reaction implemented for %s", action.Action)
+			return nil, fmt.Errorf("no reaction implemented for %s", action)
 		}
+
 		return nil, nil
 	}
 }

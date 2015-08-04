@@ -165,7 +165,7 @@ func TestReconcile(t *testing.T) {
 		}
 		var finalRoutes []*cloudprovider.Route
 		var err error
-		timeoutChan := time.After(50 * time.Millisecond)
+		timeoutChan := time.After(200 * time.Millisecond)
 		tick := time.NewTicker(10 * time.Millisecond)
 		defer tick.Stop()
 	poll:
