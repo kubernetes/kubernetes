@@ -81,3 +81,22 @@ func TestDescribeObject(t *testing.T) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
+
+func TestDescribeListObjects(t *testing.T) {
+	pods, _, _ := testData()
+	f, tf, codec := NewAPIFactory()
+	d := &testDescriber{Output: "test output"}
+	tf.Describer = d
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf)
+	cmd.Run(cmd, []string{"pods"})
+	if buf.String() != fmt.Sprintf("%s\n\n%s\n\n", d.Output, d.Output) {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}

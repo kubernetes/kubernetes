@@ -79,3 +79,31 @@ kube::test::describe_object_assert() {
   echo -n ${reset}
   return 0
 }
+
+kube::test::describe_resource_assert() {
+  local resource=$1
+  local matches=${@:2}
+
+  result=$(eval kubectl describe "${kube_flags[@]}" $resource)
+
+  for match in ${matches}; do
+    if [[ ! $(echo "$result" | grep ${match}) ]]; then
+      echo ${bold}${red}
+      echo "FAIL!"
+      echo "Describe $resource"
+      echo "  Expected Match: $match"
+      echo "  Not found in:"
+      echo "$result"
+      echo ${reset}${red}
+      caller
+      echo ${reset}
+      return 1
+    fi
+  done
+
+  echo -n ${green}
+  echo "Successful describe $resource:"
+  echo "$result"
+  echo -n ${reset}
+  return 0
+}
