@@ -14,7 +14,8 @@
 <script type="text/javascript">
     $(document).ready(function() {
 		/* On page load, open the navigation menu and highlight the menu item that corresponds to the current URL */
-		var curnavitem = $('#wrapper a[href="' + window.location.href + '"]');
+		var noanchorhref = window.location.href.split('#')[0];
+		var curnavitem = $('#wrapper a[href="' + noanchorhref + '"]');
 		if(curnavitem.parent().hasClass('haschild')){
 			curnavitem.addClass('active').next('ul').slideDown('normal');
 		}
