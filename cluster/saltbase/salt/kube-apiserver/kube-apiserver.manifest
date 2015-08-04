@@ -99,7 +99,10 @@
 {
 "apiVersion": "v1",
 "kind": "Pod",
-"metadata": {"name":"kube-apiserver"},
+"metadata": {
+  "name":"kube-apiserver",
+  "namespace": "kube-system"
+},
 "spec":{
 "hostNetwork": true,
 "containers":[
@@ -118,8 +121,9 @@
                ],
     "livenessProbe": {
       "httpGet": {
-        "path": "/healthz",
-        "port": 8080
+        "host": "127.0.0.1",
+        "port": 8080,
+        "path": "/healthz"
       },
       "initialDelaySeconds": 15,
       "timeoutSeconds": 15

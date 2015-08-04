@@ -487,6 +487,11 @@ function yaml-quote {
 }
 
 function write-master-env {
+  # If the user requested that the master be part of the cluster, set the
+  # environment variable to program the master kubelet to register itself.
+  if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
+    KUBELET_APISERVER="${MASTER_NAME}"
+  fi
   build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
 }
 

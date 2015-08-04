@@ -49,6 +49,8 @@ KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
+KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
+KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 EOF
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
     cat >>$file <<EOF
@@ -66,6 +68,7 @@ MASTER_CERT: $(yaml-quote ${MASTER_CERT_BASE64:-})
 MASTER_KEY: $(yaml-quote ${MASTER_KEY_BASE64:-})
 KUBECFG_CERT: $(yaml-quote ${KUBECFG_CERT_BASE64:-})
 KUBECFG_KEY: $(yaml-quote ${KUBECFG_KEY_BASE64:-})
+KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
 EOF
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
@@ -93,8 +96,6 @@ EOF
 KUBERNETES_MASTER: "false"
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS:-})
-KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
-KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 EOF
     if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
