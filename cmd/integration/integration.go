@@ -176,7 +176,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	handler.delegate = m.Handler
 
 	// Scheduler
-	schedulerConfigFactory := factory.NewConfigFactory(cl)
+	schedulerConfigFactory := factory.NewConfigFactory(cl, nil)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		glog.Fatalf("Couldn't create scheduler config: %v", err)
