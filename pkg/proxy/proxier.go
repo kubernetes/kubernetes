@@ -256,7 +256,7 @@ func (proxier *Proxier) addServiceOnPort(service ServicePortName, protocol api.P
 }
 
 // How long we leave idle UDP connections open.
-const udpIdleTimeout = 10 * time.Second
+const udpIdleTimeout = 1 * time.Second
 
 // OnUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or
