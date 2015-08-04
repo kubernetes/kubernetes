@@ -16,6 +16,20 @@ else
 fi
 echo "${reset}"
 
+# Check if changes to Godeps are reproducable...
+files=($(git diff --cached --name-only --diff-filter ACM | grep "Godeps"))
+if [[ "${#files[@]}" -ne 0 ]]; then
+  echo -ne "Check if changes to Godeps are reproducable (this is pretty slow)..."
+  if ! OUT=$("hack/verify-godeps.sh" 2>&1); then
+    echo
+    echo "${red}${OUT}"
+    exit_code=1
+  else
+    echo "${green}OK"
+  fi
+  echo "${reset}"
+fi
+
 echo -ne "Checking for files that need gofmt... "
 files_need_gofmt=()
 files=($(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "third_party" -e "Godeps"))
