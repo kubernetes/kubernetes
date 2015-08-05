@@ -4,14 +4,21 @@
 
 div #doccontent {
     position: absolute;
-    top:134px;
+    top:155px;
     left:250px;
     font-family: "Roboto";
     padding-left: 30px;
     padding-right: 30px;
     max-width: 900px;
     overflow: auto;
-
+	
+	:target:before {
+	  content:"";
+	  display:block;
+	  height:155px; /* fixed header height*/
+	  margin:-155px 0 0; /* negative fixed header height */
+	}
+	
     h1 {
         font-size: 45px;
         font-weight: 700;

@@ -7,10 +7,10 @@
 		/* Do not record or act on # only hrefs (they serve as menu open/close for empty navigation menu containers). */
 		$('.nav-link').click( function() {
 			var href = $(this).attr('href');
-			var containertest = href.indexOf('#');
-			if(containertest == -1){
+			if(href != "#"){
 				history.pushState({}, null, href);
-				$('#doccontent').animate({scrollTop: 0}, 500).load(href + ' #doccontent > *');
+				$('#doccontent').load(href + ' #doccontent > *');
+				$('html, body').animate({scrollTop: 0}, 500);
 			}
 		    return false; // don't actually follow the link
 		});
@@ -18,7 +18,6 @@
 		function loadonstatechange(){
 			var popped = ('state' in window.history && window.history.state !== null), 
 					initialURL = location.href;
-
 		     $(window).bind('popstate', function (event) {
 		        // Ignore inital popstate that some browsers fire on page load
 		        var initialPop = !popped && location.href == initialURL
@@ -27,7 +26,6 @@
 				$(window).unbind('popstate');
 		        window.location = window.location.href;
 		        return;
-
 		     });
 		}
 		loadonstatechange();
