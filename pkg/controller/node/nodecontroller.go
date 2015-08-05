@@ -57,6 +57,7 @@ type NodeController struct {
 	cloud                   cloudprovider.Interface
 	clusterCIDR             *net.IPNet
 	deletingPodsRateLimiter util.RateLimiter
+	knownNodeSet            util.StringSet
 	kubeClient              client.Interface
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
@@ -118,6 +119,7 @@ func NewNodeController(
 	}
 	return &NodeController{
 		cloud:                  cloud,
+		knownNodeSet:           make(util.StringSet),
 		kubeClient:             kubeClient,
 		recorder:               recorder,
 		podEvictionTimeout:     podEvictionTimeout,
@@ -145,6 +147,12 @@ func (nc *NodeController) Run(period time.Duration) {
 	go util.Forever(func() {
 		nc.podEvictor.TryEvict(func(nodeName string) { nc.deletePods(nodeName) })
 	}, nodeEvictionPeriod)
+}
+
+// We observed a Node deletion in etcd. Currently we only need to remove Pods that
+// were assigned to it.
+func (nc *NodeController) deleteNode(nodeID string) error {
+	return nc.deletePods(nodeID)
 }
 
 // deletePods will delete all pods from master running on given node.
@@ -203,6 +211,29 @@ func (nc *NodeController) getCondition(status *api.NodeStatus, conditionType api
 // not reachable for a long period of time.
 func (nc *NodeController) monitorNodeStatus() error {
 	nodes, err := nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
+	for _, node := range nodes.Items {
+		if !nc.knownNodeSet.Has(node.Name) {
+			glog.V(1).Infof("NodeController observed a new Node: %#v", node)
+			nc.recordNodeEvent(node.Name, fmt.Sprintf("Registered Node %v in NodeController", node.Name))
+			nc.knownNodeSet.Insert(node.Name)
+		}
+	}
+	// If there's a difference between lengths of known Nodes and observed nodes
+	// we must have removed some Node.
+	if len(nc.knownNodeSet) != len(nodes.Items) {
+		observedSet := make(util.StringSet)
+		for _, node := range nodes.Items {
+			observedSet.Insert(node.Name)
+		}
+		deleted := nc.knownNodeSet.Difference(observedSet)
+		for node := range deleted {
+			glog.V(1).Infof("NodeController observed a Node deletion: %v", node)
+			nc.recordNodeEvent(node, fmt.Sprintf("Removing Node %v from NodeController", node))
+			nc.deleteNode(node)
+			nc.knownNodeSet.Delete(node)
+		}
+	}
+
 	if err != nil {
 		return err
 	}

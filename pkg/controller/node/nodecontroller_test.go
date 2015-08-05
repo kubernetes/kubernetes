@@ -554,6 +554,83 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 }
 
+func TestNodeDeletion(t *testing.T) {
+	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	fakeNodeHandler := &FakeNodeHandler{
+		Existing: []*api.Node{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{
+							Type:   api.NodeReady,
+							Status: api.ConditionTrue,
+							// Node status has just been updated.
+							LastHeartbeatTime:  fakeNow,
+							LastTransitionTime: fakeNow,
+						},
+					},
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					},
+				},
+				Spec: api.NodeSpec{
+					ExternalID: "node0",
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "node1",
+					CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{
+							Type:   api.NodeReady,
+							Status: api.ConditionTrue,
+							// Node status has just been updated.
+							LastHeartbeatTime:  fakeNow,
+							LastTransitionTime: fakeNow,
+						},
+					},
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					},
+				},
+				Spec: api.NodeSpec{
+					ExternalID: "node0",
+				},
+			},
+		},
+		Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}}),
+	}
+
+	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, NewPodEvictor(util.NewFakeRateLimiter()),
+		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
+	nodeController.now = func() util.Time { return fakeNow }
+	if err := nodeController.monitorNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	fakeNodeHandler.Delete("node1")
+	if err := nodeController.monitorNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	podEvicted := false
+	for _, action := range fakeNodeHandler.Actions() {
+		if action.GetVerb() == "delete" && action.GetResource() == "pods" {
+			podEvicted = true
+		}
+	}
+	if !podEvicted {
+		t.Error("expected pods to be evicted from the deleted node")
+	}
+}
+
 func newNode(name string) *api.Node {
 	return &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: name},
