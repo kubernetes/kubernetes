@@ -256,7 +256,7 @@ func TestLabelFunc(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		out, err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
+		err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
@@ -266,8 +266,8 @@ func TestLabelFunc(t *testing.T) {
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v %v", err, test)
 		}
-		if !reflect.DeepEqual(out, test.expected) {
-			t.Errorf("expected: %v, got %v", test.expected, out)
+		if !reflect.DeepEqual(test.obj, test.expected) {
+			t.Errorf("expected: %v, got %v", test.expected, test.obj)
 		}
 	}
 }

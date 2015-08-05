@@ -78,6 +78,7 @@ kubectl
 
 ### SEE ALSO
 
+* [kubectl annotate](kubectl_annotate.md)	 - Update the annotations on a resource
 * [kubectl api-versions](kubectl_api-versions.md)	 - Print available API versions.
 * [kubectl attach](kubectl_attach.md)	 - Attach to a running container.
 * [kubectl cluster-info](kubectl_cluster-info.md)	 - Display cluster info

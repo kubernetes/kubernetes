@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -378,4 +379,24 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 		}
 	}
 	return nil
+}
+
+// UpdateObject updates resource object with updateFn
+func UpdateObject(info *resource.Info, updateFn func(runtime.Object) error) (runtime.Object, error) {
+	helper := resource.NewHelper(info.Client, info.Mapping)
+
+	err := updateFn(info.Object)
+	if err != nil {
+		return nil, err
+	}
+	data, err := helper.Codec.Encode(info.Object)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = helper.Replace(info.Namespace, info.Name, true, data)
+	if err != nil {
+		return nil, err
+	}
+	return info.Object, nil
 }
