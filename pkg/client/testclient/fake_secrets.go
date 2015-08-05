@@ -35,8 +35,9 @@ func (c *FakeSecrets) Get(name string) (*api.Secret, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.Secret), err
+	secret := obj.(*api.Secret)
+	secret.Name = name
+	return secret, err
 }
 
 func (c *FakeSecrets) List(label labels.Selector, field fields.Selector) (*api.SecretList, error) {

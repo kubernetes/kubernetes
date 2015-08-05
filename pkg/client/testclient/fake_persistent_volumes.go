@@ -32,8 +32,9 @@ func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) 
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.PersistentVolume), err
+	pv := obj.(*api.PersistentVolume)
+	pv.Name = name
+	return pv, err
 }
 
 func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error) {

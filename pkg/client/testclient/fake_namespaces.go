@@ -34,8 +34,9 @@ func (c *FakeNamespaces) Get(name string) (*api.Namespace, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.Namespace), err
+	namespace := obj.(*api.Namespace)
+	namespace.Name = name
+	return namespace, err
 }
 
 func (c *FakeNamespaces) List(label labels.Selector, field fields.Selector) (*api.NamespaceList, error) {

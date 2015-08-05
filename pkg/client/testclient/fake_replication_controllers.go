@@ -35,8 +35,9 @@ func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationControlle
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.ReplicationController), err
+	rc := obj.(*api.ReplicationController)
+	rc.Name = name
+	return rc, err
 }
 
 func (c *FakeReplicationControllers) List(label labels.Selector) (*api.ReplicationControllerList, error) {

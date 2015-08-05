@@ -35,8 +35,9 @@ func (c *FakeServices) Get(name string) (*api.Service, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.Service), err
+	svc := obj.(*api.Service)
+	svc.Name = name
+	return svc, err
 }
 
 func (c *FakeServices) List(label labels.Selector) (*api.ServiceList, error) {

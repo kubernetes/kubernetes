@@ -34,8 +34,9 @@ func (c *FakeNodes) Get(name string) (*api.Node, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.Node), err
+	node := obj.(*api.Node)
+	node.Name = name
+	return node, err
 }
 
 func (c *FakeNodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {

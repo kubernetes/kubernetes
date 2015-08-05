@@ -35,8 +35,9 @@ func (c *FakePods) Get(name string) (*api.Pod, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.Pod), err
+	pod := obj.(*api.Pod)
+	pod.Name = name
+	return pod, err
 }
 
 func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodList, error) {

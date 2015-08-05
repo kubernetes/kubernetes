@@ -32,8 +32,9 @@ func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.ComponentStatus), err
+	componentStatus := obj.(*api.ComponentStatus)
+	componentStatus.Name = name
+	return componentStatus, err
 }
 
 func (c *FakeComponentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
