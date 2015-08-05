@@ -63,7 +63,7 @@ def clone_repository():
     of kubernetes. Subsequently used during upgrades.
     """
 
-    repository = 'https://github.com/GoogleCloudPlatform/kubernetes.git'
+    repository = 'https://github.com/kubernetes/kubernetes.git'
     kubernetes_directory = '/opt/kubernetes'
 
     command = ['git', 'clone', repository, kubernetes_directory]

@@ -80,7 +80,7 @@ class TestInstallHook():
          call is consistent. If we change this, we want to know we've broken it.
         """
         install.clone_repository()
-        repo = 'https://github.com/GoogleCloudPlatform/kubernetes.git'
+        repo = 'https://github.com/kubernetes/kubernetes.git'
         direct = '/opt/kubernetes'
         spmock.check_output.assert_called_with(['git', 'clone', repo, direct])
 

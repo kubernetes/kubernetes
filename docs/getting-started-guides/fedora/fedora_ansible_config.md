@@ -45,7 +45,7 @@ Configuring Kubernetes on Fedora via Ansible offers a simple way to quickly crea
 
 ## Prerequisites
 
-1. Host able to run ansible and able to clone the following repo: [kubernetes](https://github.com/GoogleCloudPlatform/kubernetes.git)
+1. Host able to run ansible and able to clone the following repo: [kubernetes](https://github.com/kubernetes/kubernetes.git)
 2. A Fedora 21+ host to act as cluster master
 3. As many Fedora 21+ hosts as you would like, that act as cluster nodes
 
@@ -76,7 +76,7 @@ yum install -y ansible git python-netaddr
 **Now clone down the Kubernetes repository**
 
 ```sh
-git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+git clone https://github.com/kubernetes/kubernetes.git
 cd kubernetes/contrib/ansible
 ```
 

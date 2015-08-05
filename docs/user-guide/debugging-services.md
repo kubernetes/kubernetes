@@ -548,7 +548,7 @@ us know, so we can help investigate!
 Contact us on
 [IRC](http://webchat.freenode.net/?channels=google-containers) or
 [email](https://groups.google.com/forum/#!forum/google-containers) or
-[GitHub](https://github.com/GoogleCloudPlatform/kubernetes).
+[GitHub](https://github.com/kubernetes/kubernetes).
 
 ## More information
 

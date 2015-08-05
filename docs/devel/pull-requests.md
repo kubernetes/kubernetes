@@ -56,7 +56,7 @@ These PRs require:
 * A risk assessment by the code author in the PR.  This should outline which parts of the code are being touched, the risk of regression, and complexity of the code.
 * Two LGTMs from experienced reviewers.
 
-Once those requirements are met, they will be labeled [ok-to-merge](https://github.com/GoogleCloudPlatform/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Aopen+is%3Apr+label%3Aok-to-merge) and can be merged.
+Once those requirements are met, they will be labeled [ok-to-merge](https://github.com/kubernetes/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Aopen+is%3Apr+label%3Aok-to-merge) and can be merged.
 
 These restrictions will be relaxed after v1.0 is released.
 

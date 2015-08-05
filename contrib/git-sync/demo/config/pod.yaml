@@ -14,7 +14,7 @@ spec:
       mountPath: /git
     env:
     - name: GIT_SYNC_REPO
-      value: https://github.com/GoogleCloudPlatform/kubernetes.git
+      value: https://github.com/kubernetes/kubernetes.git
     - name: GIT_SYNC_DEST
       value: /git
   - name: hugo

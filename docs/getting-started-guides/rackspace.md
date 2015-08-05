@@ -91,9 +91,9 @@ There is a specific `cluster/rackspace` directory with the scripts for the follo
 - A number of the items in `config-default.sh` are overridable via environment variables.
 - For older versions please either:
  * Sync back to `v0.9` with `git checkout v0.9`
-  * Download a [snapshot of `v0.9`](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.9.tar.gz)
+  * Download a [snapshot of `v0.9`](https://github.com/kubernetes/kubernetes/archive/v0.9.tar.gz)
  * Sync back to `v0.3` with `git checkout v0.3`
-  * Download a [snapshot of `v0.3`](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.tar.gz)
+  * Download a [snapshot of `v0.3`](https://github.com/kubernetes/kubernetes/archive/v0.3.tar.gz)
 
 ## Network Design
 

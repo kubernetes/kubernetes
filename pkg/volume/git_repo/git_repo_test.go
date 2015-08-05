@@ -114,7 +114,7 @@ func TestPlugin(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
 			GitRepo: &api.GitRepoVolumeSource{
-				Repository: "https://github.com/GoogleCloudPlatform/kubernetes.git",
+				Repository: "https://github.com/kubernetes/kubernetes.git",
 				Revision:   "2a30ce65c5ab586b98916d83385c5983edd353a1",
 			},
 		},

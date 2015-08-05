@@ -16,7 +16,7 @@ First, create your kube-apiserver.service file (change necessary variables)
 ```
     [Unit]
     Description=Kubernetes API Server
-    Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+    Documentation=https://github.com/kubernetes/kubernetes
 
     [Service]
     EnvironmentFile=/etc/network-environment

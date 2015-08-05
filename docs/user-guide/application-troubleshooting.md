@@ -57,7 +57,7 @@ This is *not* a guide for people who want to debug their cluster.  For that you 
 
 ## FAQ
 
-Users are highly encouraged to check out our [FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
+Users are highly encouraged to check out our [FAQ](https://github.com/kubernetes/kubernetes/wiki/User-FAQ)
 
 ## Diagnosing the problem
 

@@ -51,7 +51,7 @@ Below, we outline one of the more common git workflows that core developers use.
 
 ### Fork the main repository
 
-1. Go to https://github.com/GoogleCloudPlatform/kubernetes
+1. Go to https://github.com/kubernetes/kubernetes
 2. Click the "Fork" button (at the top right)
 
 ### Clone your fork
@@ -64,7 +64,7 @@ cd $GOPATH/src/github.com/GoogleCloudPlatform/
 # Replace "$YOUR_GITHUB_USERNAME" below with your github username
 git clone https://github.com/$YOUR_GITHUB_USERNAME/kubernetes.git
 cd kubernetes
-git remote add upstream 'https://github.com/GoogleCloudPlatform/kubernetes.git'
+git remote add upstream 'https://github.com/kubernetes/kubernetes.git'
 ```
 
 ### Create a branch and make changes
