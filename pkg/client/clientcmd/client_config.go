@@ -109,13 +109,13 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		mergo.Merge(clientConfig, userAuthPartialConfig)
+		mergo.MergeWithOverwrite(clientConfig, userAuthPartialConfig)
 
 		serverAuthPartialConfig, err := getServerIdentificationPartialConfig(configAuthInfo, configClusterInfo)
 		if err != nil {
 			return nil, err
 		}
-		mergo.Merge(clientConfig, serverAuthPartialConfig)
+		mergo.MergeWithOverwrite(clientConfig, serverAuthPartialConfig)
 	}
 
 	return clientConfig, nil
@@ -135,7 +135,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
-	mergo.Merge(mergedConfig, configClientConfig)
+	mergo.MergeWithOverwrite(mergedConfig, configClientConfig)
 
 	return mergedConfig, nil
 }
@@ -173,8 +173,8 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 		promptedConfig := makeUserIdentificationConfig(*promptedAuthInfo)
 		previouslyMergedConfig := mergedConfig
 		mergedConfig = &client.Config{}
-		mergo.Merge(mergedConfig, promptedConfig)
-		mergo.Merge(mergedConfig, previouslyMergedConfig)
+		mergo.MergeWithOverwrite(mergedConfig, promptedConfig)
+		mergo.MergeWithOverwrite(mergedConfig, previouslyMergedConfig)
 	}
 
 	return mergedConfig, nil
@@ -268,9 +268,9 @@ func (config DirectClientConfig) getContext() clientcmdapi.Context {
 
 	var mergedContext clientcmdapi.Context
 	if configContext, exists := contexts[contextName]; exists {
-		mergo.Merge(&mergedContext, configContext)
+		mergo.MergeWithOverwrite(&mergedContext, configContext)
 	}
-	mergo.Merge(&mergedContext, config.overrides.Context)
+	mergo.MergeWithOverwrite(&mergedContext, config.overrides.Context)
 
 	return mergedContext
 }
@@ -281,9 +281,9 @@ func (config DirectClientConfig) getAuthInfo() clientcmdapi.AuthInfo {
 
 	var mergedAuthInfo clientcmdapi.AuthInfo
 	if configAuthInfo, exists := authInfos[authInfoName]; exists {
-		mergo.Merge(&mergedAuthInfo, configAuthInfo)
+		mergo.MergeWithOverwrite(&mergedAuthInfo, configAuthInfo)
 	}
-	mergo.Merge(&mergedAuthInfo, config.overrides.AuthInfo)
+	mergo.MergeWithOverwrite(&mergedAuthInfo, config.overrides.AuthInfo)
 
 	return mergedAuthInfo
 }
@@ -293,12 +293,12 @@ func (config DirectClientConfig) getCluster() clientcmdapi.Cluster {
 	clusterInfoName := config.getClusterName()
 
 	var mergedClusterInfo clientcmdapi.Cluster
-	mergo.Merge(&mergedClusterInfo, DefaultCluster)
-	mergo.Merge(&mergedClusterInfo, EnvVarCluster)
+	mergo.MergeWithOverwrite(&mergedClusterInfo, DefaultCluster)
+	mergo.MergeWithOverwrite(&mergedClusterInfo, EnvVarCluster)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
-		mergo.Merge(&mergedClusterInfo, configClusterInfo)
+		mergo.MergeWithOverwrite(&mergedClusterInfo, configClusterInfo)
 	}
-	mergo.Merge(&mergedClusterInfo, config.overrides.ClusterInfo)
+	mergo.MergeWithOverwrite(&mergedClusterInfo, config.overrides.ClusterInfo)
 
 	return mergedClusterInfo
 }

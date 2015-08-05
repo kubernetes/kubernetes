@@ -134,8 +134,8 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
 	// get the values we expect.
 	config := clientcmdapi.NewConfig()
-	mergo.Merge(config, mapConfig)
-	mergo.Merge(config, nonMapConfig)
+	mergo.MergeWithOverwrite(config, mapConfig)
+	mergo.MergeWithOverwrite(config, nonMapConfig)
 
 	if rules.ResolvePaths() {
 		if err := ResolveLocalPaths(config); err != nil {
@@ -207,7 +207,7 @@ func mergeConfigWithFile(startingConfig *clientcmdapi.Config, filename string) e
 		return fmt.Errorf("Error loading config file \"%s\": %v", filename, err)
 	}
 
-	mergo.Merge(startingConfig, config)
+	mergo.MergeWithOverwrite(startingConfig, config)
 
 	return nil
 }
