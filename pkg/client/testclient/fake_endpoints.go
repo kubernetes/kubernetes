@@ -35,8 +35,9 @@ func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.Endpoints), err
+	endpoint := obj.(*api.Endpoints)
+	endpoint.Name = name
+	return endpoint, err
 }
 
 func (c *FakeEndpoints) List(label labels.Selector) (*api.EndpointsList, error) {

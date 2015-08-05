@@ -36,8 +36,9 @@ func (c *FakeEvents) Get(name string) (*api.Event, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.Event), err
+	event := obj.(*api.Event)
+	event.Name = name
+	return event, err
 }
 
 // List returns a list of events matching the selectors.

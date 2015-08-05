@@ -35,8 +35,9 @@ func (c *FakeLimitRanges) Get(name string) (*api.LimitRange, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.LimitRange), err
+	limitRange := obj.(*api.LimitRange)
+	limitRange.Name = name
+	return limitRange, err
 }
 
 func (c *FakeLimitRanges) List(label labels.Selector) (*api.LimitRangeList, error) {

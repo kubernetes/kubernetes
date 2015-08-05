@@ -35,8 +35,9 @@ func (c *FakeServiceAccounts) Get(name string) (*api.ServiceAccount, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.ServiceAccount), err
+	sa := obj.(*api.ServiceAccount)
+	sa.Name = name
+	return sa, err
 }
 
 func (c *FakeServiceAccounts) List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error) {

@@ -35,8 +35,9 @@ func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.ResourceQuota), err
+	rq := obj.(*api.ResourceQuota)
+	rq.Name = name
+	return rq, err
 }
 
 func (c *FakeResourceQuotas) List(label labels.Selector) (*api.ResourceQuotaList, error) {
