@@ -44,7 +44,9 @@
 
 
 # global config
-KUBECTL=${TEST_KUBECTL:-/usr/local/bin/kubectl}   # substitute for tests
+KUBECTL=${TEST_KUBECTL:-}   # substitute for tests
+KUBECTL=${KUBECTL:-${KUBECTL_BIN:-}}
+KUBECTL=${KUBECTL:-/usr/local/bin/kubectl}
 if [[ ! -x ${KUBECTL} ]]; then
     echo "ERROR: kubectl command (${KUBECTL}) not found or is not executable" 1>&2
     exit 1
