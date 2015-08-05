@@ -66,7 +66,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -82,7 +81,7 @@ const (
 
 type SchedulerServer struct {
 	Port                int
-	Address             util.IP
+	Address             net.IP
 	EnableProfiling     bool
 	AuthPath            string
 	APIServerList       []string
@@ -125,10 +124,10 @@ type SchedulerServer struct {
 	FrameworkWebURI               string
 	HA                            bool
 	AdvertisedAddress             string
-	ServiceAddress                util.IP
+	ServiceAddress                net.IP
 	HADomain                      string
 	KMPath                        string
-	ClusterDNS                    util.IP
+	ClusterDNS                    net.IP
 	ClusterDomain                 string
 	KubeletRootDirectory          string
 	KubeletDockerEndpoint         string
@@ -157,7 +156,7 @@ type schedulerProcessInterface interface {
 func NewSchedulerServer() *SchedulerServer {
 	s := SchedulerServer{
 		Port:            ports.SchedulerPort,
-		Address:         util.IP(net.ParseIP("127.0.0.1")),
+		Address:         net.ParseIP("127.0.0.1"),
 		FailoverTimeout: time.Duration((1 << 62) - 1).Seconds(),
 
 		RunProxy:                 true,
@@ -196,7 +195,7 @@ func NewSchedulerServer() *SchedulerServer {
 
 func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the scheduler's http service runs on")
-	fs.Var(&s.Address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.IPVar(&s.Address, "address", s.Address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringSliceVar(&s.APIServerList, "api-servers", s.APIServerList, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.StringVar(&s.AuthPath, "auth-path", s.AuthPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
@@ -204,7 +203,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.EtcdConfigFile, "etcd-config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with --etcd-servers.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.StringVar(&s.ClusterDomain, "cluster-domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
-	fs.Var(&s.ClusterDNS, "cluster-dns", "IP address for a cluster DNS server. If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
+	fs.IPVar(&s.ClusterDNS, "cluster-dns", s.ClusterDNS, "IP address for a cluster DNS server. If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 	fs.StringVar(&s.StaticPodsConfigPath, "static-pods-config", s.StaticPodsConfigPath, "Path for specification of static pods. Path should point to dir containing the staticPods configuration files. Defaults to none.")
 
 	fs.StringVar(&s.MesosMaster, "mesos-master", s.MesosMaster, "Location of the Mesos master. The format is a comma-delimited list of of hosts like zk://host1:port,host2:port/mesos. If using ZooKeeper, pay particular attention to the leading zk:// and trailing /mesos! If not using ZooKeeper, standard URLs like http://localhost are also acceptable.")
@@ -225,7 +224,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.FrameworkName, "framework-name", s.FrameworkName, "The framework name to register with Mesos.")
 	fs.StringVar(&s.FrameworkWebURI, "framework-weburi", s.FrameworkWebURI, "A URI that points to a web-based interface for interacting with the framework.")
 	fs.StringVar(&s.AdvertisedAddress, "advertised-address", s.AdvertisedAddress, "host:port address that is advertised to clients. May be used to construct artifact download URIs.")
-	fs.Var(&s.ServiceAddress, "service-address", "The service portal IP address that the scheduler should register with (if unset, chooses randomly)")
+	fs.IPVar(&s.ServiceAddress, "service-address", s.ServiceAddress, "The service portal IP address that the scheduler should register with (if unset, chooses randomly)")
 	fs.Var(&s.DefaultContainerCPULimit, "default-container-cpu-limit", "Containers without a CPU resource limit are admitted this much CPU shares")
 	fs.Var(&s.DefaultContainerMemLimit, "default-container-mem-limit", "Containers without a memory resource limit are admitted this much amount of memory in MB")
 
@@ -662,12 +661,12 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		Framework:        info,
 		Master:           masterUri,
 		Credential:       cred,
-		BindingAddress:   net.IP(s.Address),
+		BindingAddress:   s.Address,
 		BindingPort:      uint16(s.DriverPort),
 		HostnameOverride: s.HostnameOverride,
 		WithAuthContext: func(ctx context.Context) context.Context {
 			ctx = auth.WithLoginProvider(ctx, s.MesosAuthProvider)
-			ctx = sasl.WithBindingAddress(ctx, net.IP(s.Address))
+			ctx = sasl.WithBindingAddress(ctx, s.Address)
 			return ctx
 		},
 	}

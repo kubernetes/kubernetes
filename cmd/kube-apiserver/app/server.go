@@ -62,10 +62,10 @@ const (
 
 // APIServer runs a kubernetes api server.
 type APIServer struct {
-	InsecureBindAddress        util.IP
+	InsecureBindAddress        net.IP
 	InsecurePort               int
-	BindAddress                util.IP
-	AdvertiseAddress           util.IP
+	BindAddress                net.IP
+	AdvertiseAddress           net.IP
 	SecurePort                 int
 	ExternalHost               string
 	APIRate                    float32
@@ -114,8 +114,8 @@ type APIServer struct {
 func NewAPIServer() *APIServer {
 	s := APIServer{
 		InsecurePort:           8080,
-		InsecureBindAddress:    util.IP(net.ParseIP("127.0.0.1")),
-		BindAddress:            util.IP(net.ParseIP("0.0.0.0")),
+		InsecureBindAddress:    net.ParseIP("127.0.0.1"),
+		BindAddress:            net.ParseIP("0.0.0.0"),
 		SecurePort:             6443,
 		APIRate:                10.0,
 		APIBurst:               200,
@@ -151,20 +151,20 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"the cluster and that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup.")
 	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead")
-	fs.Var(&s.InsecureBindAddress, "insecure-bind-address", ""+
+	fs.IPVar(&s.InsecureBindAddress, "insecure-bind-address", s.InsecureBindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
 		"Defaults to localhost.")
-	fs.Var(&s.InsecureBindAddress, "address", "DEPRECATED: see --insecure-bind-address instead")
-	fs.Var(&s.BindAddress, "bind-address", ""+
+	fs.IPVar(&s.InsecureBindAddress, "address", s.InsecureBindAddress, "DEPRECATED: see --insecure-bind-address instead")
+	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --read-only-port and --secure-port ports. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
 		"clients. If blank, all interfaces will be used (0.0.0.0).")
-	fs.Var(&s.AdvertiseAddress, "advertise-address", ""+
+	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
 		"The IP address on which to advertise the apiserver to members of the cluster. This "+
 		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
-	fs.Var(&s.BindAddress, "public-address-override", "DEPRECATED: see --bind-address instead")
+	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress, "DEPRECATED: see --bind-address instead")
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
 		"don't serve HTTPS at all.")
@@ -257,7 +257,7 @@ func (s *APIServer) Run(_ []string) error {
 	// If advertise-address is not specified, use bind-address. If bind-address
 	// is also unset (or 0.0.0.0), setDefaults() in pkg/master/master.go will
 	// do the right thing and use the host's default interface.
-	if s.AdvertiseAddress == nil || net.IP(s.AdvertiseAddress).IsUnspecified() {
+	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
 		s.AdvertiseAddress = s.BindAddress
 	}
 
@@ -394,7 +394,7 @@ func (s *APIServer) Run(_ []string) error {
 		ExpAPIPrefix:           s.ExpAPIPrefix,
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadWritePort:          s.SecurePort,
-		PublicAddress:          net.IP(s.AdvertiseAddress),
+		PublicAddress:          s.AdvertiseAddress,
 		Authenticator:          authenticator,
 		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,

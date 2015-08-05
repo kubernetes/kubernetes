@@ -22,45 +22,6 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-func TestIP(t *testing.T) {
-	testCases := []struct {
-		input    string
-		success  bool
-		expected string
-	}{
-		{"0.0.0.0", true, "0.0.0.0"},
-		{" 0.0.0.0 ", true, "0.0.0.0"},
-		{"1.2.3.4", true, "1.2.3.4"},
-		{"127.0.0.1", true, "127.0.0.1"},
-		{"255.255.255.255", true, "255.255.255.255"},
-		{"", false, ""},
-		{"0", false, ""},
-		{"localhost", false, ""},
-		{"0.0.0", false, ""},
-		{"0.0.0.", false, ""},
-		{"0.0.0.0.", false, ""},
-		{"0.0.0.256", false, ""},
-		{"0 . 0 . 0 . 0", false, ""},
-	}
-
-	for i := range testCases {
-		tc := &testCases[i]
-		var f flag.Value = &IP{}
-		err := f.Set(tc.input)
-		if err != nil && tc.success == true {
-			t.Errorf("expected success, got %q", err)
-			continue
-		} else if err == nil && tc.success == false {
-			t.Errorf("expected failure")
-			continue
-		} else if tc.success {
-			if f.String() != tc.expected {
-				t.Errorf("expected %q, got %q", tc.expected, f.String())
-			}
-		}
-	}
-}
-
 func TestIPNet(t *testing.T) {
 	testCases := []struct {
 		input    string

@@ -17,29 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"net"
 	"strings"
 )
-
-// IP adapts net.IP for use as a flag.
-type IP net.IP
-
-func (ip IP) String() string {
-	return net.IP(ip).String()
-}
-
-func (ip *IP) Set(value string) error {
-	*ip = IP(net.ParseIP(strings.TrimSpace(value)))
-	if *ip == nil {
-		return fmt.Errorf("invalid IP address: '%s'", value)
-	}
-	return nil
-}
-
-func (*IP) Type() string {
-	return "ip"
-}
 
 // IPNet adapts net.IPNet for use as a flag.
 type IPNet net.IPNet
