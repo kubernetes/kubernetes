@@ -368,7 +368,6 @@ function provision-master() {
 
   # remote login to MASTER and use sudo to configue k8s master
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
-                            groupadd -f -r kube-cert; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
                             create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}" "${ADMISSION_CONTROL}" "${SERVICE_NODE_PORT_RANGE}"; \
