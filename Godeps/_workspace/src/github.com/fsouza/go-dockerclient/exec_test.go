@@ -31,6 +31,7 @@ func TestExecCreate(t *testing.T) {
 		AttachStderr: false,
 		Tty:          false,
 		Cmd:          []string{"touch", "/tmp/file"},
+		User:         "a-user",
 	}
 	execObj, err := client.CreateExec(config)
 	if err != nil {

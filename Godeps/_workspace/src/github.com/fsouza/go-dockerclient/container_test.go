@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -182,6 +183,9 @@ func TestInspectContainer(t *testing.T) {
                      "VolumesFrom": "",
                      "SecurityOpt": [
                          "label:user:USER"
+                      ],
+                      "Ulimits": [
+                          { "Name": "nofile", "Soft": 1024, "Hard": 2048 }
                       ]
              },
              "State": {
@@ -470,6 +474,18 @@ func TestCreateContainerImageNotFound(t *testing.T) {
 	}
 	if !reflect.DeepEqual(err, ErrNoSuchImage) {
 		t.Errorf("CreateContainer: Wrong error type. Want %#v. Got %#v.", ErrNoSuchImage, err)
+	}
+}
+
+func TestCreateContainerDuplicateName(t *testing.T) {
+	client := newTestClient(&FakeRoundTripper{message: "No such image", status: http.StatusConflict})
+	config := Config{AttachStdout: true, AttachStdin: true}
+	container, err := client.CreateContainer(CreateContainerOptions{Config: &config})
+	if container != nil {
+		t.Errorf("CreateContainer: expected <nil> container, got %#v.", container)
+	}
+	if err != ErrContainerAlreadyExists {
+		t.Errorf("CreateContainer: Wrong error type. Want %#v. Got %#v.", ErrContainerAlreadyExists, err)
 	}
 }
 
@@ -1347,7 +1363,7 @@ func TestExportContainer(t *testing.T) {
 
 func TestExportContainerViaUnixSocket(t *testing.T) {
 	if runtime.GOOS != "darwin" {
-		t.Skip("skipping test on %q", runtime.GOOS)
+		t.Skip(fmt.Sprintf("skipping test on %s", runtime.GOOS))
 	}
 	content := "exported container tar content"
 	var buf []byte
@@ -1570,6 +1586,38 @@ func TestTopContainerWithPsArgs(t *testing.T) {
 	}
 }
 
+func TestStatsTimeout(t *testing.T) {
+
+	l, err := net.Listen("unix", "/tmp/docker_test.sock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	received := false
+	defer l.Close()
+	go func() {
+		l.Accept()
+		received = true
+		time.Sleep(time.Millisecond * 250)
+	}()
+	client, _ := NewClient("unix:///tmp/docker_test.sock")
+	client.SkipServerVersionCheck = true
+	errC := make(chan error, 1)
+	statsC := make(chan *Stats)
+	done := make(chan bool)
+	go func() {
+		errC <- client.Stats(StatsOptions{"c", statsC, true, done, time.Millisecond * 100})
+		close(errC)
+	}()
+	err = <-errC
+	e, ok := err.(net.Error)
+	if !ok || !e.Timeout() {
+		t.Error("Failed to receive timeout exception")
+	}
+	if !received {
+		t.Fatal("Failed to receive message")
+	}
+}
+
 func TestStats(t *testing.T) {
 	jsonStats1 := `{
        "read" : "2015-01-08T22:57:31.547920715Z",
@@ -1657,6 +1705,20 @@ func TestStats(t *testing.T) {
           "sectors_recursive": []
        },
        "cpu_stats" : {
+          "cpu_usage" : {
+             "percpu_usage" : [
+                16970827,
+                1839451,
+                7107380,
+                10571290
+             ],
+             "usage_in_usermode" : 10000000,
+             "total_usage" : 36488948,
+             "usage_in_kernelmode" : 20000000
+          },
+          "system_cpu_usage" : 20091722000000000
+       },
+       "precpu_stats" : {
           "cpu_usage" : {
              "percpu_usage" : [
                 16970827,
@@ -1769,6 +1831,20 @@ func TestStats(t *testing.T) {
              "usage_in_kernelmode" : 20000000
           },
           "system_cpu_usage" : 20091722000000000
+       },
+       "precpu_stats" : {
+          "cpu_usage" : {
+             "percpu_usage" : [
+                16970827,
+                1839451,
+                7107380,
+                10571290
+             ],
+             "usage_in_usermode" : 10000000,
+             "total_usage" : 36488948,
+             "usage_in_kernelmode" : 20000000
+          },
+          "system_cpu_usage" : 20091722000000000
        }
     }`
 	var expected1 Stats
@@ -1795,8 +1871,9 @@ func TestStats(t *testing.T) {
 	client.SkipServerVersionCheck = true
 	errC := make(chan error, 1)
 	statsC := make(chan *Stats)
+	done := make(chan bool)
 	go func() {
-		errC <- client.Stats(StatsOptions{id, statsC})
+		errC <- client.Stats(StatsOptions{id, statsC, true, done, 0})
 		close(errC)
 	}()
 	var resultStats []*Stats
@@ -1832,7 +1909,8 @@ func TestStats(t *testing.T) {
 func TestStatsContainerNotFound(t *testing.T) {
 	client := newTestClient(&FakeRoundTripper{message: "no such container", status: http.StatusNotFound})
 	statsC := make(chan *Stats)
-	err := client.Stats(StatsOptions{"abef348", statsC})
+	done := make(chan bool)
+	err := client.Stats(StatsOptions{"abef348", statsC, true, done, 0})
 	expected := &NoSuchContainer{ID: "abef348"}
 	if !reflect.DeepEqual(err, expected) {
 		t.Errorf("Stats: Wrong error returned. Want %#v. Got %#v.", expected, err)
