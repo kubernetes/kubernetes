@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -49,7 +48,6 @@ kubectl replace --force -f ./pod.json`
 )
 
 func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use: "replace -f FILENAME",
 		// update is deprecated.
@@ -59,13 +57,12 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: replace_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-			err := RunReplace(f, out, cmd, args, filenames, shortOutput)
+			err := RunReplace(f, out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
 	usage := "Filename, directory, or URL to file to use to replace the resource."
-	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().Bool("force", false, "Delete and re-create the specified resource")
 	cmd.Flags().Bool("cascade", false, "Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
@@ -75,7 +72,7 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList, shortOutput bool) error {
+func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	if len(os.Args) > 1 && os.Args[1] == "update" {
 		printDeprecationWarning("replace", "update")
 	}
@@ -90,10 +87,12 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	}
 
 	force := cmdutil.GetFlagBool(cmd, "force")
+	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
 	if len(filenames) == 0 {
 		return cmdutil.UsageError(cmd, "Must specify --filename to replace")
 	}
 
+	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	if force {
 		return forceReplace(f, out, cmd, args, filenames, shortOutput)
 	}
@@ -127,7 +126,7 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	})
 }
 
-func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList, shortOutput bool) error {
+func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames []string, shortOutput bool) error {
 	schema, err := f.Validator()
 	if err != nil {
 		return err

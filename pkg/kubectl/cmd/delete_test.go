@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestDeleteObjectByTuple(t *testing.T) {
@@ -147,8 +146,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
-	filenames := cmd.Flags().Lookup("filename").Value.(*util.StringList)
-	err := RunDelete(f, buf, cmd, []string{}, *filenames, true)
+	err := RunDelete(f, buf, cmd, []string{})
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -218,8 +216,9 @@ func TestDeleteAllNotFound(t *testing.T) {
 	cmd.Flags().Set("cascade", "false")
 	// Make sure we can explicitly choose to fail on NotFound errors, even with --all
 	cmd.Flags().Set("ignore-not-found", "false")
+	cmd.Flags().Set("output", "name")
 
-	err := RunDelete(f, buf, cmd, []string{"services"}, nil, true)
+	err := RunDelete(f, buf, cmd, []string{"services"})
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -326,9 +325,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
-	filenames := cmd.Flags().Lookup("filename").Value.(*util.StringList)
-	t.Logf("filenames: %v\n", filenames)
-	err := RunDelete(f, buf, cmd, []string{}, *filenames, true)
+	err := RunDelete(f, buf, cmd, []string{})
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}

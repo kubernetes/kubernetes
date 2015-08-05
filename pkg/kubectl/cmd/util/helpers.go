@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -37,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/golang/glog"
@@ -211,17 +209,20 @@ func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
-	f := getFlag(cmd, flag)
-	return f.Value.String()
+	s, err := cmd.Flags().GetString(flag)
+	if err != nil {
+		glog.Fatalf("err %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
+	}
+	return s
 }
 
 // GetFlagStringList can be used to accept multiple argument with flag repetition (e.g. -f arg1 -f arg2 ...)
-func GetFlagStringList(cmd *cobra.Command, flag string) util.StringList {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		return util.StringList{}
+func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
+	s, err := cmd.Flags().GetStringSlice(flag)
+	if err != nil {
+		glog.Fatalf("err %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
 	}
-	return *f.Value.(*util.StringList)
+	return s
 }
 
 // GetWideFlag is used to determine if "-o wide" is used
@@ -234,33 +235,28 @@ func GetWideFlag(cmd *cobra.Command) bool {
 }
 
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
-	f := getFlag(cmd, flag)
-	result, err := strconv.ParseBool(f.Value.String())
+	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
-		glog.Fatalf("Invalid value for a boolean flag: %s", f.Value.String())
+		glog.Fatalf("err %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
 	}
-	return result
+	return b
 }
 
 // Assumes the flag has a default value.
 func GetFlagInt(cmd *cobra.Command, flag string) int {
-	f := getFlag(cmd, flag)
-	v, err := strconv.Atoi(f.Value.String())
-	// This is likely not a sufficiently friendly error message, but cobra
-	// should prevent non-integer values from reaching here.
+	i, err := cmd.Flags().GetInt(flag)
 	if err != nil {
-		glog.Fatalf("unable to convert flag value to int: %v", err)
+		glog.Fatalf("err: %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
 	}
-	return v
+	return i
 }
 
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
-	f := getFlag(cmd, flag)
-	v, err := time.ParseDuration(f.Value.String())
+	d, err := cmd.Flags().GetDuration(flag)
 	if err != nil {
-		glog.Fatalf("unable to convert flag value to Duration: %v", err)
+		glog.Fatalf("err: %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
 	}
-	return v
+	return d
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {

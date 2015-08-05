@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -59,7 +58,6 @@ $ kubectl delete pods --all`
 )
 
 func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use:     "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		Short:   "Delete resources by filenames, stdin, resources and names, or by resources and label selector.",
@@ -67,13 +65,12 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-			err := RunDelete(f, out, cmd, args, filenames, shortOutput)
+			err := RunDelete(f, out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to delete."
-	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
 	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
@@ -84,7 +81,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList, shortOutput bool) error {
+func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -94,7 +91,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, filenames...).
+		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
 		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
 		SelectAllParam(deleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
@@ -118,6 +115,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 	}
 
+	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
 		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper)

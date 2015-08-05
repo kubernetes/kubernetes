@@ -396,7 +396,12 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		}
 		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.APIVersion)
 	} else {
-		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetWideFlag(cmd), GetFlagStringList(cmd, "label-columns"))
+		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
+		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
+		if err != nil {
+			columnLabel = []string{}
+		}
+		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetWideFlag(cmd), columnLabel)
 		if err != nil {
 			return nil, err
 		}

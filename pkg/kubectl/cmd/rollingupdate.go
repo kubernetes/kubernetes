@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -34,9 +35,6 @@ import (
 )
 
 const (
-	updatePeriod       = "1m0s"
-	timeout            = "5m0s"
-	pollInterval       = "3s"
 	rollingUpdate_long = `Perform a rolling update of the given ReplicationController.
 
 Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
@@ -57,6 +55,12 @@ $ kubectl rolling-update frontend --image=image:v2
 `
 )
 
+var (
+	updatePeriod, _ = time.ParseDuration("1m0s")
+	timeout, _      = time.ParseDuration("5m0s")
+	pollInterval, _ = time.ParseDuration("3s")
+)
+
 func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
@@ -70,9 +74,9 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().String("update-period", updatePeriod, `Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
-	cmd.Flags().String("poll-interval", pollInterval, `Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
-	cmd.Flags().String("timeout", timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
+	cmd.Flags().Duration("update-period", updatePeriod, `Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
+	cmd.Flags().Duration("poll-interval", pollInterval, `Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
+	cmd.Flags().Duration("timeout", timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the new replication controller.")
 	cmd.Flags().String("image", "", "Image to use for upgrading the replication controller.  Can not be used with --filename/-f")
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
