@@ -22,9 +22,12 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/v1"
 	pkg_runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
@@ -32,9 +35,12 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+const pkgBase = "github.com/GoogleCloudPlatform/kubernetes/pkg"
+
 var (
-	functionDest = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
-	version      = flag.StringP("version", "v", "v1", "Version for conversion.")
+	functionDest  = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
+	groupVersion  = flag.StringP("version", "v", "api/v1", "groupPath/version for conversion.")
+	genUnitPrefix = flag.StringP("genUnit", "u", "", "Prefix indicating a generation unit")
 )
 
 func main() {
@@ -53,13 +59,19 @@ func main() {
 		funcOut = file
 	}
 
-	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), path.Join("github.com/GoogleCloudPlatform/kubernetes/pkg/api", *version))
-	apiShort := generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
-	generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource")
+	group, version := path.Split(*groupVersion)
+	versionPath := path.Join(pkgBase, group, version)
+	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), versionPath, *genUnitPrefix)
+	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
+	generator.AddImport(path.Join(pkgBase, group))
+	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.
-	generator.OverwritePackage(*version, "")
-	for _, knownType := range api.Scheme.KnownTypes(*version) {
-		if err := generator.GenerateConversionsForType(*version, knownType); err != nil {
+	generator.OverwritePackage(version, "")
+	for _, knownType := range api.Scheme.KnownTypes(version) {
+		if !strings.HasPrefix(knownType.PkgPath(), versionPath) {
+			continue
+		}
+		if err := generator.GenerateConversionsForType(version, knownType); err != nil {
 			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}

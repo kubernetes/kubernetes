@@ -16,14 +16,15 @@ limitations under the License.
 
 package v1
 
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-)
-
-var Codec = runtime.CodecFor(api.Scheme, "v1")
+// AUTO-GENERATED FUNCTIONS START HERE
+import api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 
 func init() {
-	addConversionFuncs()
-	addDefaultingFuncs()
+	err := api.Scheme.AddGeneratedConversionFuncs()
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 }
+
+// AUTO-GENERATED FUNCTIONS END HERE

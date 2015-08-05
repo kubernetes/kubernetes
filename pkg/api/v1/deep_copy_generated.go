@@ -23,23 +23,7 @@ import (
 	conversion "github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	util "github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	inf "speter.net/go/exp/math/dec/inf"
-	time "time"
 )
-
-func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c *conversion.Cloner) error {
-	if in.Amount != nil {
-		if newVal, err := c.DeepCopy(in.Amount); err != nil {
-			return err
-		} else {
-			out.Amount = newVal.(*inf.Dec)
-		}
-	} else {
-		out.Amount = nil
-	}
-	out.Format = in.Format
-	return nil
-}
 
 func deepCopy_v1_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, c *conversion.Cloner) error {
 	out.VolumeID = in.VolumeID
@@ -260,8 +244,10 @@ func deepCopy_v1_ContainerState(in ContainerState, out *ContainerState, c *conve
 }
 
 func deepCopy_v1_ContainerStateRunning(in ContainerStateRunning, out *ContainerStateRunning, c *conversion.Cloner) error {
-	if err := deepCopy_util_Time(in.StartedAt, &out.StartedAt, c); err != nil {
+	if newVal, err := c.DeepCopy(in.StartedAt); err != nil {
 		return err
+	} else {
+		out.StartedAt = newVal.(util.Time)
 	}
 	return nil
 }
@@ -271,11 +257,15 @@ func deepCopy_v1_ContainerStateTerminated(in ContainerStateTerminated, out *Cont
 	out.Signal = in.Signal
 	out.Reason = in.Reason
 	out.Message = in.Message
-	if err := deepCopy_util_Time(in.StartedAt, &out.StartedAt, c); err != nil {
+	if newVal, err := c.DeepCopy(in.StartedAt); err != nil {
 		return err
+	} else {
+		out.StartedAt = newVal.(util.Time)
 	}
-	if err := deepCopy_util_Time(in.FinishedAt, &out.FinishedAt, c); err != nil {
+	if newVal, err := c.DeepCopy(in.FinishedAt); err != nil {
 		return err
+	} else {
+		out.FinishedAt = newVal.(util.Time)
 	}
 	out.ContainerID = in.ContainerID
 	return nil
@@ -445,11 +435,15 @@ func deepCopy_v1_Event(in Event, out *Event, c *conversion.Cloner) error {
 	if err := deepCopy_v1_EventSource(in.Source, &out.Source, c); err != nil {
 		return err
 	}
-	if err := deepCopy_util_Time(in.FirstTimestamp, &out.FirstTimestamp, c); err != nil {
+	if newVal, err := c.DeepCopy(in.FirstTimestamp); err != nil {
 		return err
+	} else {
+		out.FirstTimestamp = newVal.(util.Time)
 	}
-	if err := deepCopy_util_Time(in.LastTimestamp, &out.LastTimestamp, c); err != nil {
+	if newVal, err := c.DeepCopy(in.LastTimestamp); err != nil {
 		return err
+	} else {
+		out.LastTimestamp = newVal.(util.Time)
 	}
 	out.Count = in.Count
 	return nil
@@ -516,8 +510,10 @@ func deepCopy_v1_GlusterfsVolumeSource(in GlusterfsVolumeSource, out *GlusterfsV
 
 func deepCopy_v1_HTTPGetAction(in HTTPGetAction, out *HTTPGetAction, c *conversion.Cloner) error {
 	out.Path = in.Path
-	if err := deepCopy_util_IntOrString(in.Port, &out.Port, c); err != nil {
+	if newVal, err := c.DeepCopy(in.Port); err != nil {
 		return err
+	} else {
+		out.Port = newVal.(util.IntOrString)
 	}
 	out.Host = in.Host
 	out.Scheme = in.Scheme
@@ -604,11 +600,11 @@ func deepCopy_v1_LimitRangeItem(in LimitRangeItem, out *LimitRangeItem, c *conve
 	if in.Max != nil {
 		out.Max = make(ResourceList)
 		for key, val := range in.Max {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Max[key] = newVal.(resource.Quantity)
 			}
-			out.Max[key] = *newVal
 		}
 	} else {
 		out.Max = nil
@@ -616,11 +612,11 @@ func deepCopy_v1_LimitRangeItem(in LimitRangeItem, out *LimitRangeItem, c *conve
 	if in.Min != nil {
 		out.Min = make(ResourceList)
 		for key, val := range in.Min {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Min[key] = newVal.(resource.Quantity)
 			}
-			out.Min[key] = *newVal
 		}
 	} else {
 		out.Min = nil
@@ -628,11 +624,11 @@ func deepCopy_v1_LimitRangeItem(in LimitRangeItem, out *LimitRangeItem, c *conve
 	if in.Default != nil {
 		out.Default = make(ResourceList)
 		for key, val := range in.Default {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Default[key] = newVal.(resource.Quantity)
 			}
-			out.Default[key] = *newVal
 		}
 	} else {
 		out.Default = nil
@@ -684,8 +680,10 @@ func deepCopy_v1_List(in List, out *List, c *conversion.Cloner) error {
 	if in.Items != nil {
 		out.Items = make([]runtime.RawExtension, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_runtime_RawExtension(in.Items[i], &out.Items[i], c); err != nil {
+			if newVal, err := c.DeepCopy(in.Items[i]); err != nil {
 				return err
+			} else {
+				out.Items[i] = newVal.(runtime.RawExtension)
 			}
 		}
 	} else {
@@ -821,11 +819,15 @@ func deepCopy_v1_NodeAddress(in NodeAddress, out *NodeAddress, c *conversion.Clo
 func deepCopy_v1_NodeCondition(in NodeCondition, out *NodeCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
-	if err := deepCopy_util_Time(in.LastHeartbeatTime, &out.LastHeartbeatTime, c); err != nil {
+	if newVal, err := c.DeepCopy(in.LastHeartbeatTime); err != nil {
 		return err
+	} else {
+		out.LastHeartbeatTime = newVal.(util.Time)
 	}
-	if err := deepCopy_util_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+	if newVal, err := c.DeepCopy(in.LastTransitionTime); err != nil {
 		return err
+	} else {
+		out.LastTransitionTime = newVal.(util.Time)
 	}
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -864,11 +866,11 @@ func deepCopy_v1_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner
 	if in.Capacity != nil {
 		out.Capacity = make(ResourceList)
 		for key, val := range in.Capacity {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Capacity[key] = newVal.(resource.Quantity)
 			}
-			out.Capacity[key] = *newVal
 		}
 	} else {
 		out.Capacity = nil
@@ -926,13 +928,16 @@ func deepCopy_v1_ObjectMeta(in ObjectMeta, out *ObjectMeta, c *conversion.Cloner
 	out.UID = in.UID
 	out.ResourceVersion = in.ResourceVersion
 	out.Generation = in.Generation
-	if err := deepCopy_util_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
+	if newVal, err := c.DeepCopy(in.CreationTimestamp); err != nil {
 		return err
+	} else {
+		out.CreationTimestamp = newVal.(util.Time)
 	}
 	if in.DeletionTimestamp != nil {
-		out.DeletionTimestamp = new(util.Time)
-		if err := deepCopy_util_Time(*in.DeletionTimestamp, out.DeletionTimestamp, c); err != nil {
+		if newVal, err := c.DeepCopy(in.DeletionTimestamp); err != nil {
 			return err
+		} else {
+			out.DeletionTimestamp = newVal.(*util.Time)
 		}
 	} else {
 		out.DeletionTimestamp = nil
@@ -1048,11 +1053,11 @@ func deepCopy_v1_PersistentVolumeClaimStatus(in PersistentVolumeClaimStatus, out
 	if in.Capacity != nil {
 		out.Capacity = make(ResourceList)
 		for key, val := range in.Capacity {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Capacity[key] = newVal.(resource.Quantity)
 			}
-			out.Capacity[key] = *newVal
 		}
 	} else {
 		out.Capacity = nil
@@ -1150,11 +1155,11 @@ func deepCopy_v1_PersistentVolumeSpec(in PersistentVolumeSpec, out *PersistentVo
 	if in.Capacity != nil {
 		out.Capacity = make(ResourceList)
 		for key, val := range in.Capacity {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Capacity[key] = newVal.(resource.Quantity)
 			}
-			out.Capacity[key] = *newVal
 		}
 	} else {
 		out.Capacity = nil
@@ -1358,9 +1363,10 @@ func deepCopy_v1_PodStatus(in PodStatus, out *PodStatus, c *conversion.Cloner) e
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
 	if in.StartTime != nil {
-		out.StartTime = new(util.Time)
-		if err := deepCopy_util_Time(*in.StartTime, out.StartTime, c); err != nil {
+		if newVal, err := c.DeepCopy(in.StartTime); err != nil {
 			return err
+		} else {
+			out.StartTime = newVal.(*util.Time)
 		}
 	} else {
 		out.StartTime = nil
@@ -1596,11 +1602,11 @@ func deepCopy_v1_ResourceQuotaSpec(in ResourceQuotaSpec, out *ResourceQuotaSpec,
 	if in.Hard != nil {
 		out.Hard = make(ResourceList)
 		for key, val := range in.Hard {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Hard[key] = newVal.(resource.Quantity)
 			}
-			out.Hard[key] = *newVal
 		}
 	} else {
 		out.Hard = nil
@@ -1612,11 +1618,11 @@ func deepCopy_v1_ResourceQuotaStatus(in ResourceQuotaStatus, out *ResourceQuotaS
 	if in.Hard != nil {
 		out.Hard = make(ResourceList)
 		for key, val := range in.Hard {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Hard[key] = newVal.(resource.Quantity)
 			}
-			out.Hard[key] = *newVal
 		}
 	} else {
 		out.Hard = nil
@@ -1624,11 +1630,11 @@ func deepCopy_v1_ResourceQuotaStatus(in ResourceQuotaStatus, out *ResourceQuotaS
 	if in.Used != nil {
 		out.Used = make(ResourceList)
 		for key, val := range in.Used {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Used[key] = newVal.(resource.Quantity)
 			}
-			out.Used[key] = *newVal
 		}
 	} else {
 		out.Used = nil
@@ -1640,11 +1646,11 @@ func deepCopy_v1_ResourceRequirements(in ResourceRequirements, out *ResourceRequ
 	if in.Limits != nil {
 		out.Limits = make(ResourceList)
 		for key, val := range in.Limits {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Limits[key] = newVal.(resource.Quantity)
 			}
-			out.Limits[key] = *newVal
 		}
 	} else {
 		out.Limits = nil
@@ -1652,11 +1658,11 @@ func deepCopy_v1_ResourceRequirements(in ResourceRequirements, out *ResourceRequ
 	if in.Requests != nil {
 		out.Requests = make(ResourceList)
 		for key, val := range in.Requests {
-			newVal := new(resource.Quantity)
-			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
+			} else {
+				out.Requests[key] = newVal.(resource.Quantity)
 			}
-			out.Requests[key] = *newVal
 		}
 	} else {
 		out.Requests = nil
@@ -1852,8 +1858,10 @@ func deepCopy_v1_ServicePort(in ServicePort, out *ServicePort, c *conversion.Clo
 	out.Name = in.Name
 	out.Protocol = in.Protocol
 	out.Port = in.Port
-	if err := deepCopy_util_IntOrString(in.TargetPort, &out.TargetPort, c); err != nil {
+	if newVal, err := c.DeepCopy(in.TargetPort); err != nil {
 		return err
+	} else {
+		out.TargetPort = newVal.(util.IntOrString)
 	}
 	out.NodePort = in.NodePort
 	return nil
@@ -1946,8 +1954,10 @@ func deepCopy_v1_StatusDetails(in StatusDetails, out *StatusDetails, c *conversi
 }
 
 func deepCopy_v1_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *conversion.Cloner) error {
-	if err := deepCopy_util_IntOrString(in.Port, &out.Port, c); err != nil {
+	if newVal, err := c.DeepCopy(in.Port); err != nil {
 		return err
+	} else {
+		out.Port = newVal.(util.IntOrString)
 	}
 	return nil
 }
@@ -2065,37 +2075,8 @@ func deepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 	return nil
 }
 
-func deepCopy_runtime_RawExtension(in runtime.RawExtension, out *runtime.RawExtension, c *conversion.Cloner) error {
-	if in.RawJSON != nil {
-		out.RawJSON = make([]uint8, len(in.RawJSON))
-		for i := range in.RawJSON {
-			out.RawJSON[i] = in.RawJSON[i]
-		}
-	} else {
-		out.RawJSON = nil
-	}
-	return nil
-}
-
-func deepCopy_util_IntOrString(in util.IntOrString, out *util.IntOrString, c *conversion.Cloner) error {
-	out.Kind = in.Kind
-	out.IntVal = in.IntVal
-	out.StrVal = in.StrVal
-	return nil
-}
-
-func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) error {
-	if newVal, err := c.DeepCopy(in.Time); err != nil {
-		return err
-	} else {
-		out.Time = newVal.(time.Time)
-	}
-	return nil
-}
-
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		deepCopy_resource_Quantity,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		deepCopy_v1_Binding,
 		deepCopy_v1_Capabilities,
@@ -2211,9 +2192,6 @@ func init() {
 		deepCopy_v1_Volume,
 		deepCopy_v1_VolumeMount,
 		deepCopy_v1_VolumeSource,
-		deepCopy_runtime_RawExtension,
-		deepCopy_util_IntOrString,
-		deepCopy_util_Time,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
