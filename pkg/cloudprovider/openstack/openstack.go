@@ -624,7 +624,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		PoolID:       pool.ID,
 		Persistence:  persistence,
 	}
-	if !externalIP.IsUnspecified() {
+	if externalIP != nil {
 		createOpts.Address = externalIP.String()
 	}
 
