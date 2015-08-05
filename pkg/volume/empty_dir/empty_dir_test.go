@@ -121,6 +121,45 @@ func TestPluginTmpfs(t *testing.T) {
 		expectedTeardownMounts:        1})
 }
 
+func TestPluginTmpfs_PodHasSELinuxOptions(t *testing.T) {
+	if !selinuxEnabled() {
+		return
+	}
+
+	doTestPlugin(t, pluginTestConfig{
+		medium:      api.StorageMediumMemory,
+		rootContext: "user:role:type:range",
+		SELinuxOptions: &api.SELinuxOptions{
+			Type:  "type2",
+			Level: "level2",
+		},
+		expectedSELinuxContext:        "user:role:type2:level2",
+		expectedChcons:                1,
+		expectedSetupMounts:           1,
+		shouldBeMountedBeforeTeardown: true,
+		expectedTeardownMounts:        1})
+}
+
+func TestPluginTmpfs_PodHasSELinuxOptions_Idempotent(t *testing.T) {
+	if !selinuxEnabled() {
+		return
+	}
+
+	doTestPlugin(t, pluginTestConfig{
+		medium:      api.StorageMediumMemory,
+		rootContext: "user:role:type:range",
+		SELinuxOptions: &api.SELinuxOptions{
+			Type:  "type2",
+			Level: "level2",
+		},
+		idempotent:                    true,
+		expectedSELinuxContext:        "user:role:type2:level2",
+		expectedChcons:                0,
+		expectedSetupMounts:           0,
+		shouldBeMountedBeforeTeardown: true,
+		expectedTeardownMounts:        1})
+}
+
 type pluginTestConfig struct {
 	medium                        api.StorageMedium
 	rootContext                   string
