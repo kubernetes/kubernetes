@@ -144,7 +144,8 @@ Bare-metal           | custom       | Fedora | _none_      | [docs](fedora/fedor
 Bare-metal           | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 libvirt              | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 KVM                  | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
-Mesos/GCE            |              |        |             | [docs](mesos.md)                                  |          | [Community](https://github.com/mesosphere/kubernetes-mesos) ([@jdef](https://github.com/jdef))
+Mesos/Docker         | custom       | Ubuntu | Docker      | [docs](mesos-docker.md)                           |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
+Mesos/GCE            |              |        |             | [docs](mesos.md)                                  |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 AWS                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community
 GCE                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community [@pires](https://github.com/pires)
 Vagrant              | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ( [@pires](https://github.com/pires), [@AntonioMeireles](https://github.com/AntonioMeireles) )
