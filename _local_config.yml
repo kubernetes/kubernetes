@@ -1,4 +1,4 @@
-url: "" # run from whatever URL they are accessing, good for testing in office
+url: "http://localhost:4000" # run from whatever URL they are accessing, good for testing in office
 google_analytics: ""
 
 sass:
