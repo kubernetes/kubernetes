@@ -17,20 +17,20 @@ limitations under the License.
 package main
 
 import (
-	"github.com/golang/glog"
+	"log"
 )
 
 func ConsumeCPU(milicores int, durationSec int) {
-	glog.Infof("ConsumeCPU milicores: %v, durationSec: %v", milicores, durationSec)
+	log.Printf("ConsumeCPU milicores: %v, durationSec: %v", milicores, durationSec)
 	// not implemented
 }
 
 func ConsumeMem(megabytes int, durationSec int) {
-	glog.Infof("ConsumeMem megabytes: %v, durationSec: %v", megabytes, durationSec)
+	log.Printf("ConsumeMem megabytes: %v, durationSec: %v", megabytes, durationSec)
 	// not implemented
 }
 
 func GetCurrentStatus() {
-	glog.Infof("GetCurrentStatus")
+	log.Printf("GetCurrentStatus")
 	// not implemented
 }
