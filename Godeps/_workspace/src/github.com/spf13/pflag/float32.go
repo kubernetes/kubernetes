@@ -25,6 +25,23 @@ func (f *float32Value) Type() string {
 
 func (f *float32Value) String() string { return fmt.Sprintf("%v", *f) }
 
+func float32Conv(sval string) (interface{}, error) {
+	v, err := strconv.ParseFloat(sval, 32)
+	if err != nil {
+		return 0, err
+	}
+	return float32(v), nil
+}
+
+// GetFloat32 return the float32 value of a flag with the given name
+func (f *FlagSet) GetFloat32(name string) (float32, error) {
+	val, err := f.getFlagType(name, "float32", float32Conv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(float32), nil
+}
+
 // Float32Var defines a float32 flag with specified name, default value, and usage string.
 // The argument p points to a float32 variable in which to store the value of the flag.
 func (f *FlagSet) Float32Var(p *float32, name string, value float32, usage string) {

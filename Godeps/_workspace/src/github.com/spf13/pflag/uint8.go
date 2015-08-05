@@ -25,6 +25,23 @@ func (i *uint8Value) Type() string {
 
 func (i *uint8Value) String() string { return fmt.Sprintf("%v", *i) }
 
+func uint8Conv(sval string) (interface{}, error) {
+	v, err := strconv.ParseUint(sval, 0, 8)
+	if err != nil {
+		return 0, err
+	}
+	return uint8(v), nil
+}
+
+// GetUint8 return the uint8 value of a flag with the given name
+func (f *FlagSet) GetUint8(name string) (uint8, error) {
+	val, err := f.getFlagType(name, "uint8", uint8Conv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(uint8), nil
+}
+
 // Uint8Var defines a uint8 flag with specified name, default value, and usage string.
 // The argument p points to a uint8 variable in which to store the value of the flag.
 func (f *FlagSet) Uint8Var(p *uint8, name string, value uint8, usage string) {

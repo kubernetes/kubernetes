@@ -25,6 +25,19 @@ func (i *int64Value) Type() string {
 
 func (i *int64Value) String() string { return fmt.Sprintf("%v", *i) }
 
+func int64Conv(sval string) (interface{}, error) {
+	return strconv.ParseInt(sval, 0, 64)
+}
+
+// GetInt64 return the int64 value of a flag with the given name
+func (f *FlagSet) GetInt64(name string) (int64, error) {
+	val, err := f.getFlagType(name, "int64", int64Conv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(int64), nil
+}
+
 // Int64Var defines an int64 flag with specified name, default value, and usage string.
 // The argument p points to an int64 variable in which to store the value of the flag.
 func (f *FlagSet) Int64Var(p *int64, name string, value int64, usage string) {

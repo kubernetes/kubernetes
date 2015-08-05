@@ -25,6 +25,19 @@ func (i *intValue) Type() string {
 
 func (i *intValue) String() string { return fmt.Sprintf("%v", *i) }
 
+func intConv(sval string) (interface{}, error) {
+	return strconv.Atoi(sval)
+}
+
+// GetInt return the int value of a flag with the given name
+func (f *FlagSet) GetInt(name string) (int, error) {
+	val, err := f.getFlagType(name, "int", intConv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(int), nil
+}
+
 // IntVar defines an int flag with specified name, default value, and usage string.
 // The argument p points to an int variable in which to store the value of the flag.
 func (f *FlagSet) IntVar(p *int, name string, value int, usage string) {

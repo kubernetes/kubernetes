@@ -18,12 +18,26 @@ func (i *uint32Value) Set(s string) error {
 	*i = uint32Value(v)
 	return err
 }
-func (i *uint32Value) Get() interface{} {
-	return uint32(*i)
-}
 
 func (i *uint32Value) Type() string {
 	return "uint32"
+}
+
+func uint32Conv(sval string) (interface{}, error) {
+	v, err := strconv.ParseUint(sval, 0, 32)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(v), nil
+}
+
+// GetUint32 return the uint32 value of a flag with the given name
+func (f *FlagSet) GetUint32(name string) (uint32, error) {
+	val, err := f.getFlagType(name, "uint32", uint32Conv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(uint32), nil
 }
 
 // Uint32Var defines a uint32 flag with specified name, default value, and usage string.

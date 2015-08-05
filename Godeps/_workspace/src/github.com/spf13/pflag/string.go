@@ -20,6 +20,19 @@ func (s *stringValue) Type() string {
 
 func (s *stringValue) String() string { return fmt.Sprintf("%s", *s) }
 
+func stringConv(sval string) (interface{}, error) {
+	return sval, nil
+}
+
+// GetString return the string value of a flag with the given name
+func (f *FlagSet) GetString(name string) (string, error) {
+	val, err := f.getFlagType(name, "string", stringConv)
+	if err != nil {
+		return "", err
+	}
+	return val.(string), nil
+}
+
 // StringVar defines a string flag with specified name, default value, and usage string.
 // The argument p points to a string variable in which to store the value of the flag.
 func (f *FlagSet) StringVar(p *string, name string, value string, usage string) {
