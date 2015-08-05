@@ -125,6 +125,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.DeletingPodsBurst, "deleting-pods-burst", 10, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")
 	fs.IntVar(&s.RegisterRetryCount, "register-retry-count", s.RegisterRetryCount, ""+
 		"The number of retries for initial node registration.  Retry interval equals node-sync-period.")
+	fs.MarkDeprecated("register-retry-count", "This flag is currenty no-op and will be deleted.")
 	fs.DurationVar(&s.NodeMonitorGracePeriod, "node-monitor-grace-period", 40*time.Second,
 		"Amount of time which we allow running Node to be unresponsive before marking it unhealty. "+
 			"Must be N times more than kubelet's nodeStatusUpdateFrequency, "+
