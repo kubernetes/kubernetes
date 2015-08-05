@@ -47,8 +47,11 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 		expectNoError(err)
 	}
 
-	// Wait for pods to start running.
-	timeout := 2 * time.Minute
+	// Wait for pods to start running.  Note: this is a functional
+	// test, not a performance test, so the timeout needs to be
+	// sufficiently long that it's only triggered if things are
+	// completely broken vs. running slowly.
+	timeout := 10 * time.Minute
 	startTime := time.Now()
 	currentlyRunningPods := 0
 	for podsRunningBefore+replicas != currentlyRunningPods {
@@ -61,7 +64,9 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 			}
 		}
 		currentlyRunningPods = runningPods
+		Logf("%v pods running", currentlyRunningPods)
 		if startTime.Add(timeout).Before(time.Now()) {
+			Logf("Timed out after %v waiting for pods to start running.", timeout)
 			break
 		}
 		time.Sleep(5 * time.Second)
@@ -215,6 +220,8 @@ var _ = Describe("SchedulerPredicates", func() {
 		})
 		expectNoError(err)
 		// Wait a bit to allow scheduler to do its thing
+		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
+		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns)
@@ -296,6 +303,8 @@ var _ = Describe("SchedulerPredicates", func() {
 		})
 		expectNoError(err)
 		// Wait a bit to allow scheduler to do its thing
+		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
+		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns)
@@ -329,6 +338,8 @@ var _ = Describe("SchedulerPredicates", func() {
 		})
 		expectNoError(err)
 		// Wait a bit to allow scheduler to do its thing
+		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
+		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns)
