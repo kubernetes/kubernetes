@@ -98,6 +98,7 @@ git push -f origin myfeature
 
 1. Visit http://github.com/$YOUR_GITHUB_USERNAME/kubernetes
 2. Click the "Compare and pull request" button next to your "myfeature" branch.
+3. Check out the pull request [process](pull-requests.md) for more details
 
 ### When to retain commits and when to squash
 
