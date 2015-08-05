@@ -195,16 +195,20 @@ type RCConfig struct {
 	MaxContainerFailures *int
 }
 
+func nowStamp() string {
+	return time.Now().Format(time.StampMilli)
+}
+
 func Logf(format string, a ...interface{}) {
-	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", a...)
+	fmt.Fprintf(GinkgoWriter, nowStamp()+": INFO: "+format+"\n", a...)
 }
 
 func Failf(format string, a ...interface{}) {
-	Fail(fmt.Sprintf(format, a...), 1)
+	Fail(nowStamp()+": "+fmt.Sprintf(format, a...), 1)
 }
 
 func Skipf(format string, args ...interface{}) {
-	Skip(fmt.Sprintf(format, args...))
+	Skip(nowStamp() + ": " + fmt.Sprintf(format, args...))
 }
 
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
