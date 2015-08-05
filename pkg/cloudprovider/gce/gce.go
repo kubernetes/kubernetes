@@ -34,12 +34,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	"code.google.com/p/gcfg"
-	compute "code.google.com/p/google-api-go-client/compute/v1"
-	container "code.google.com/p/google-api-go-client/container/v1beta1"
-	"code.google.com/p/google-api-go-client/googleapi"
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	compute "google.golang.org/api/compute/v1"
+	container "google.golang.org/api/container/v1beta1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/cloud/compute/metadata"
 )
 

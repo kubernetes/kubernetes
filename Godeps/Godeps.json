@@ -15,26 +15,6 @@
 			"Rev": "c2d3050044d05357eaf6c3547249ba57c5e235cb"
 		},
 		{
-			"ImportPath": "code.google.com/p/go-uuid/uuid",
-			"Comment": "null-12",
-			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
-		},
-		{
-			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
-			"Comment": "release-105",
-			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
-		},
-		{
-			"ImportPath": "code.google.com/p/google-api-go-client/container/v1beta1",
-			"Comment": "release-105",
-			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
-		},
-		{
-			"ImportPath": "code.google.com/p/google-api-go-client/googleapi",
-			"Comment": "release-105",
-			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
-		},
-		{
 			"ImportPath": "github.com/GoogleCloudPlatform/gcloud-golang/compute/metadata",
 			"Rev": "e34a32f9b0ecbc0784865fb2d47f3818c09521d4"
 		},
@@ -390,35 +370,35 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/auth",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/executor",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/messenger",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/scheduler",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/upid",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
@@ -441,6 +421,10 @@
 			"ImportPath": "github.com/onsi/gomega",
 			"Comment": "v1.0-28-g8adf9e1",
 			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
+		},
+		{
+			"ImportPath": "github.com/pborman/uuid",
+			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/extraction",
@@ -562,6 +546,18 @@
 		{
 			"ImportPath": "golang.org/x/oauth2",
 			"Rev": "b5adcc2dcdf009d0391547edc6ecbaff889f5bb9"
+		},
+		{
+			"ImportPath": "google.golang.org/api/compute/v1",
+			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+		},
+		{
+			"ImportPath": "google.golang.org/api/container/v1beta1",
+			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+		},
+		{
+			"ImportPath": "google.golang.org/api/googleapi",
+			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
 		},
 		{
 			"ImportPath": "google.golang.org/cloud/compute/metadata",

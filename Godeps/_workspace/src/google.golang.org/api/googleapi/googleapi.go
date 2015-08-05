@@ -9,6 +9,7 @@ package googleapi
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,10 +17,14 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"os"
+	"regexp"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
-	"code.google.com/p/google-api-go-client/googleapi/internal/uritemplates"
+	"golang.org/x/net/context"
+	"google.golang.org/api/googleapi/internal/uritemplates"
 )
 
 // ContentTyper is an interface for Readers which know (or would like
@@ -30,7 +35,25 @@ type ContentTyper interface {
 	ContentType() string
 }
 
-const Version = "0.5"
+// A SizeReaderAt is a ReaderAt with a Size method.
+// An io.SectionReader implements SizeReaderAt.
+type SizeReaderAt interface {
+	io.ReaderAt
+	Size() int64
+}
+
+const (
+	Version = "0.5"
+
+	// statusResumeIncomplete is the code returned by the Google uploader when the transfer is not yet complete.
+	statusResumeIncomplete = 308
+
+	// UserAgent is the header string used to identify this package.
+	UserAgent = "google-api-go-client/" + Version
+
+	// uploadPause determines the delay between failed upload attempts
+	uploadPause = 1 * time.Second
+)
 
 // Error contains an error response from the server.
 type Error struct {
@@ -130,14 +153,41 @@ func getMediaType(media io.Reader) (io.Reader, string) {
 		return media, typer.ContentType()
 	}
 
+	pr, pw := io.Pipe()
+	typ := "application/octet-stream"
+	buf, err := ioutil.ReadAll(io.LimitReader(media, 512))
+	if err != nil {
+		pw.CloseWithError(fmt.Errorf("error reading media: %v", err))
+		return pr, typ
+	}
+	typ = http.DetectContentType(buf)
+	mr := io.MultiReader(bytes.NewReader(buf), media)
+	go func() {
+		_, err = io.Copy(pw, mr)
+		if err != nil {
+			pw.CloseWithError(fmt.Errorf("error reading media: %v", err))
+			return
+		}
+		pw.Close()
+	}()
+	return pr, typ
+}
+
+// DetectMediaType detects and returns the content type of the provided media.
+// If the type can not be determined, "application/octet-stream" is returned.
+func DetectMediaType(media io.ReaderAt) string {
+	if typer, ok := media.(ContentTyper); ok {
+		return typer.ContentType()
+	}
+
 	typ := "application/octet-stream"
 	buf := make([]byte, 1024)
-	n, err := media.Read(buf)
+	n, err := media.ReadAt(buf, 0)
 	buf = buf[:n]
-	if err == nil {
+	if err == nil || err == io.EOF {
 		typ = http.DetectContentType(buf)
 	}
-	return io.MultiReader(bytes.NewBuffer(buf), media), typ
+	return typ
 }
 
 type Lengther interface {
@@ -145,7 +195,7 @@ type Lengther interface {
 }
 
 // endingWithErrorReader from r until it returns an error.  If the
-// final error from r is os.EOF and e is non-nil, e is used instead.
+// final error from r is io.EOF and e is non-nil, e is used instead.
 type endingWithErrorReader struct {
 	r io.Reader
 	e error
@@ -157,38 +207,6 @@ func (er endingWithErrorReader) Read(p []byte) (n int, err error) {
 		err = er.e
 	}
 	return
-}
-
-func getReaderSize(r io.Reader) (io.Reader, int64) {
-	// Ideal case, the reader knows its own size.
-	if lr, ok := r.(Lengther); ok {
-		return r, int64(lr.Len())
-	}
-
-	// But maybe it's a seeker and we can seek to the end to find its size.
-	if s, ok := r.(io.Seeker); ok {
-		pos0, err := s.Seek(0, os.SEEK_CUR)
-		if err == nil {
-			posend, err := s.Seek(0, os.SEEK_END)
-			if err == nil {
-				_, err = s.Seek(pos0, os.SEEK_SET)
-				if err == nil {
-					return r, posend - pos0
-				} else {
-					// We moved it forward but can't restore it.
-					// Seems unlikely, but can't really restore now.
-					return endingWithErrorReader{strings.NewReader(""), err}, posend - pos0
-				}
-			}
-		}
-	}
-
-	// Otherwise we have to make a copy to calculate how big the reader is.
-	buf := new(bytes.Buffer)
-	// TODO(bradfitz): put a cap on this copy? spill to disk after
-	// a certain point?
-	_, err := io.Copy(buf, r)
-	return endingWithErrorReader{buf, err}, int64(buf.Len())
 }
 
 func typeHeader(contentType string) textproto.MIMEHeader {
@@ -219,60 +237,192 @@ func (w countingWriter) Write(p []byte) (int, error) {
 // to the "multipart/related" content type, with random boundary.
 //
 // The return value is the content-length of the entire multpart body.
-func ConditionallyIncludeMedia(media io.Reader, bodyp *io.Reader, ctypep *string) (totalContentLength int64, ok bool) {
+func ConditionallyIncludeMedia(media io.Reader, bodyp *io.Reader, ctypep *string) (cancel func(), ok bool) {
 	if media == nil {
 		return
 	}
-	// Get the media type and size. The type check might return a
-	// different reader instance, so do the size check first,
-	// which looks at the specific type of the io.Reader.
+	// Get the media type, which might return a different reader instance.
 	var mediaType string
-	if typer, ok := media.(ContentTyper); ok {
-		mediaType = typer.ContentType()
-	}
-	media, mediaSize := getReaderSize(media)
-	if mediaType == "" {
-		media, mediaType = getMediaType(media)
-	}
-	body, bodyType := *bodyp, *ctypep
-	body, bodySize := getReaderSize(body)
+	media, mediaType = getMediaType(media)
 
-	// Calculate how big the the multipart will be.
-	{
-		totalContentLength = bodySize + mediaSize
-		mpw := multipart.NewWriter(countingWriter{&totalContentLength})
-		mpw.CreatePart(typeHeader(bodyType))
-		mpw.CreatePart(typeHeader(mediaType))
-		mpw.Close()
-	}
+	body, bodyType := *bodyp, *ctypep
 
 	pr, pw := io.Pipe()
 	mpw := multipart.NewWriter(pw)
 	*bodyp = pr
 	*ctypep = "multipart/related; boundary=" + mpw.Boundary()
 	go func() {
-		defer pw.Close()
-		defer mpw.Close()
-
 		w, err := mpw.CreatePart(typeHeader(bodyType))
 		if err != nil {
+			mpw.Close()
+			pw.CloseWithError(fmt.Errorf("googleapi: body CreatePart failed: %v", err))
 			return
 		}
 		_, err = io.Copy(w, body)
 		if err != nil {
+			mpw.Close()
+			pw.CloseWithError(fmt.Errorf("googleapi: body Copy failed: %v", err))
 			return
 		}
 
 		w, err = mpw.CreatePart(typeHeader(mediaType))
 		if err != nil {
+			mpw.Close()
+			pw.CloseWithError(fmt.Errorf("googleapi: media CreatePart failed: %v", err))
 			return
 		}
 		_, err = io.Copy(w, media)
 		if err != nil {
+			mpw.Close()
+			pw.CloseWithError(fmt.Errorf("googleapi: media Copy failed: %v", err))
 			return
 		}
+		mpw.Close()
+		pw.Close()
 	}()
-	return totalContentLength, true
+	cancel = func() { pw.CloseWithError(errAborted) }
+	return cancel, true
+}
+
+var errAborted = errors.New("googleapi: upload aborted")
+
+// ProgressUpdater is a function that is called upon every progress update of a resumable upload.
+// This is the only part of a resumable upload (from googleapi) that is usable by the developer.
+// The remaining usable pieces of resumable uploads is exposed in each auto-generated API.
+type ProgressUpdater func(current, total int64)
+
+// ResumableUpload is used by the generated APIs to provide resumable uploads.
+// It is not used by developers directly.
+type ResumableUpload struct {
+	Client *http.Client
+	// URI is the resumable resource destination provided by the server after specifying "&uploadType=resumable".
+	URI       string
+	UserAgent string // User-Agent for header of the request
+	// Media is the object being uploaded.
+	Media io.ReaderAt
+	// MediaType defines the media type, e.g. "image/jpeg".
+	MediaType string
+	// ContentLength is the full size of the object being uploaded.
+	ContentLength int64
+
+	mu       sync.Mutex // guards progress
+	progress int64      // number of bytes uploaded so far
+	started  bool       // whether the upload has been started
+
+	// Callback is an optional function that will be called upon every progress update.
+	Callback ProgressUpdater
+}
+
+var (
+	// rangeRE matches the transfer status response from the server. $1 is the last byte index uploaded.
+	rangeRE = regexp.MustCompile(`^bytes=0\-(\d+)$`)
+	// chunkSize is the size of the chunks created during a resumable upload and should be a power of two.
+	// 1<<18 is the minimum size supported by the Google uploader, and there is no maximum.
+	chunkSize int64 = 1 << 18
+)
+
+// Progress returns the number of bytes uploaded at this point.
+func (rx *ResumableUpload) Progress() int64 {
+	rx.mu.Lock()
+	defer rx.mu.Unlock()
+	return rx.progress
+}
+
+func (rx *ResumableUpload) transferStatus() (int64, *http.Response, error) {
+	req, _ := http.NewRequest("POST", rx.URI, nil)
+	req.ContentLength = 0
+	req.Header.Set("User-Agent", rx.UserAgent)
+	req.Header.Set("Content-Range", fmt.Sprintf("bytes */%v", rx.ContentLength))
+	res, err := rx.Client.Do(req)
+	if err != nil || res.StatusCode != statusResumeIncomplete {
+		return 0, res, err
+	}
+	var start int64
+	if m := rangeRE.FindStringSubmatch(res.Header.Get("Range")); len(m) == 2 {
+		start, err = strconv.ParseInt(m[1], 10, 64)
+		if err != nil {
+			return 0, nil, fmt.Errorf("unable to parse range size %v", m[1])
+		}
+		start += 1 // Start at the next byte
+	}
+	return start, res, nil
+}
+
+type chunk struct {
+	body io.Reader
+	size int64
+	err  error
+}
+
+func (rx *ResumableUpload) transferChunks(ctx context.Context) (*http.Response, error) {
+	var start int64
+	var err error
+	res := &http.Response{}
+	if rx.started {
+		start, res, err = rx.transferStatus()
+		if err != nil || res.StatusCode != statusResumeIncomplete {
+			return res, err
+		}
+	}
+	rx.started = true
+
+	for {
+		select { // Check for cancellation
+		case <-ctx.Done():
+			res.StatusCode = http.StatusRequestTimeout
+			return res, ctx.Err()
+		default:
+		}
+		reqSize := rx.ContentLength - start
+		if reqSize > chunkSize {
+			reqSize = chunkSize
+		}
+		r := io.NewSectionReader(rx.Media, start, reqSize)
+		req, _ := http.NewRequest("POST", rx.URI, r)
+		req.ContentLength = reqSize
+		req.Header.Set("Content-Range", fmt.Sprintf("bytes %v-%v/%v", start, start+reqSize-1, rx.ContentLength))
+		req.Header.Set("Content-Type", rx.MediaType)
+		req.Header.Set("User-Agent", rx.UserAgent)
+		res, err = rx.Client.Do(req)
+		start += reqSize
+		if err == nil && (res.StatusCode == statusResumeIncomplete || res.StatusCode == http.StatusOK) {
+			rx.mu.Lock()
+			rx.progress = start // keep track of number of bytes sent so far
+			rx.mu.Unlock()
+			if rx.Callback != nil {
+				rx.Callback(start, rx.ContentLength)
+			}
+		}
+		if err != nil || res.StatusCode != statusResumeIncomplete {
+			break
+		}
+	}
+	return res, err
+}
+
+var sleep = time.Sleep // override in unit tests
+
+// Upload starts the process of a resumable upload with a cancellable context.
+// It retries indefinitely (with a pause of uploadPause between attempts) until cancelled.
+// It is called from the auto-generated API code and is not visible to the user.
+// rx is private to the auto-generated API code.
+func (rx *ResumableUpload) Upload(ctx context.Context) (*http.Response, error) {
+	var res *http.Response
+	var err error
+	for {
+		res, err = rx.transferChunks(ctx)
+		if err != nil || res.StatusCode == http.StatusCreated || res.StatusCode == http.StatusOK {
+			return res, err
+		}
+		select { // Check for cancellation
+		case <-ctx.Done():
+			res.StatusCode = http.StatusRequestTimeout
+			return res, ctx.Err()
+		default:
+		}
+		sleep(uploadPause)
+	}
+	return res, err
 }
 
 func ResolveRelative(basestr, relstr string) string {
