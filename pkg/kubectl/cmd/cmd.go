@@ -152,6 +152,8 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdVersion(f, out))
 
+	cmds.AddCommand(NewCmdDiff(f, out))
+
 	return cmds
 }
 

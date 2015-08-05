@@ -17,6 +17,7 @@ limitations under the License.
 package strategicpatch
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -32,6 +33,34 @@ import (
 //
 // For more information, see the PATCH section of docs/api-conventions.md.
 func StrategicMergePatchData(original, patch []byte, dataStruct interface{}) ([]byte, error) {
+	diffBuffer := bytes.NewBuffer([]byte{})
+	diffWriter := &diffWriter{
+		Writer: diffBuffer,
+		Depth:  0,
+	}
+	result, err := strategicMerge(original, patch, dataStruct, diffWriter)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func StrategicMergeDiff(original, patch []byte, dataStruct interface{}) ([]byte, error) {
+	diffBuffer := bytes.NewBuffer([]byte{})
+	diffWriter := &diffWriter{
+		Writer: diffBuffer,
+		Depth:  0,
+	}
+	_, err := strategicMerge(original, patch, dataStruct, diffWriter)
+	if err != nil {
+		return nil, err
+	}
+
+	return diffBuffer.Bytes(), nil
+}
+
+func strategicMerge(original, patch []byte, dataStruct interface{}, dw *diffWriter) ([]byte, error) {
 	var o map[string]interface{}
 	err := json.Unmarshal(original, &o)
 	if err != nil {
@@ -52,11 +81,10 @@ func StrategicMergePatchData(original, patch []byte, dataStruct interface{}) ([]
 		return nil, fmt.Errorf("strategic merge patch needs a struct, %s received instead", t.Kind().String())
 	}
 
-	result, err := mergeMap(o, p, t)
+	result, err := mergeMap(o, p, t, dw)
 	if err != nil {
 		return nil, err
 	}
-
 	return json.Marshal(result)
 }
 
@@ -65,7 +93,10 @@ const specialKey = "$patch"
 // Merge fields from a patch map into the original map. Note: This may modify
 // both the original map and the patch because getting a deep copy of a map in
 // golang is highly non-trivial.
-func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[string]interface{}, error) {
+func mergeMap(original, patch map[string]interface{}, t reflect.Type, dw *diffWriter) (map[string]interface{}, error) {
+	dw.DepthInc()
+	defer dw.DepthDec()
+
 	// If the map contains "$patch: replace", don't merge it, just use the
 	// patch map directly. Later on, can add a non-recursive replace that only
 	// affects the map that the $patch is in.
@@ -90,6 +121,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 		// original. Otherwise, skip it.
 		if patchV == nil {
 			if _, ok := original[k]; ok {
+				dw.WriteRemoval(fmt.Sprintf("\"%s\": %v", k, original[k]))
 				delete(original, k)
 			}
 			continue
@@ -97,6 +129,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 		_, ok := original[k]
 		if !ok {
 			// If it's not in the original document, just take the patch value.
+			dw.WriteAddition(fmt.Sprintf("%v", patchV))
 			original[k] = patchV
 			continue
 		}
@@ -119,7 +152,9 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 				typedOriginal := original[k].(map[string]interface{})
 				typedPatch := patchV.(map[string]interface{})
 				var err error
-				original[k], err = mergeMap(typedOriginal, typedPatch, fieldType)
+				dw.WriteSame(fmt.Sprintf("\"%s\": {", k))
+				original[k], err = mergeMap(typedOriginal, typedPatch, fieldType, dw)
+				dw.WriteSame(fmt.Sprintf("}"))
 				if err != nil {
 					return nil, err
 				}
@@ -130,7 +165,9 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 				typedOriginal := original[k].([]interface{})
 				typedPatch := patchV.([]interface{})
 				var err error
-				original[k], err = mergeSlice(typedOriginal, typedPatch, elemType, fieldPatchMergeKey)
+				dw.WriteSame(fmt.Sprintf("\"%s\": {", k))
+				original[k], err = mergeSlice(typedOriginal, typedPatch, elemType, fieldPatchMergeKey, dw)
+				dw.WriteSame(fmt.Sprintf("}"))
 				if err != nil {
 					return nil, err
 				}
@@ -141,6 +178,12 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 		// If originalType and patchType are different OR the types are both
 		// maps or slices but we're just supposed to replace them, just take
 		// the value from patch.
+		if !reflect.DeepEqual(original[k], patchV) {
+			dw.WriteRemoval(fmt.Sprintf("\"%s\": %v", k, original[k]))
+			dw.WriteAddition(fmt.Sprintf("\"%s\": %v", k, patchV))
+		} else {
+			dw.WriteSame(fmt.Sprintf("\"%s\": %v", k, original[k]))
+		}
 		original[k] = patchV
 	}
 
@@ -150,7 +193,10 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 // Merge two slices together. Note: This may modify both the original slice and
 // the patch because getting a deep copy of a slice in golang is highly
 // non-trivial.
-func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey string) ([]interface{}, error) {
+func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey string, dw *diffWriter) ([]interface{}, error) {
+	dw.DepthInc()
+	defer dw.DepthDec()
+
 	if len(original) == 0 && len(patch) == 0 {
 		return original, nil
 	}
@@ -167,6 +213,12 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 	if t.Kind() != reflect.Map {
 		// Maybe in the future add a "concat" mode that doesn't
 		// uniqify.
+		if !reflect.DeepEqual(original, patch) {
+			dw.WriteRemoval(fmt.Sprintf("%v", original))
+			dw.WriteAddition(fmt.Sprintf("%v", patch))
+		} else {
+			dw.WriteSame(fmt.Sprintf("%v", original))
+		}
 		both := append(original, patch...)
 		return uniqifyScalars(both), nil
 	}
@@ -227,7 +279,7 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 			var mergedMaps interface{}
 			var err error
 			// Merge into original.
-			mergedMaps, err = mergeMap(originalMap, typedV, elemType)
+			mergedMaps, err = mergeMap(originalMap, typedV, elemType, dw)
 			if err != nil {
 				return nil, err
 			}
