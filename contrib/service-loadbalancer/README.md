@@ -32,11 +32,9 @@ __L7 load balancing of Http services__: The load balancer controller automatical
 
 __L4 loadbalancing of Tcp services__: Since one needs to specify ports at pod creation time (kubernetes doesn't currently support port ranges), a single loadbalancer is tied to a set of preconfigured node ports, and hence a set of TCP services it can expose. The load balancer controller will dynamically add rules for each configured TCP service as it pops into existence. However, each "new" (unspecified in the tcpServices section of the loadbalancer.json) service will need you to open up a new container-host port pair for traffic. You can achieve this by creating a new loadbalancer pod with the `targetPort` set to the name of your service, and that service specified in the tcpServices map of the new loadbalancer.
 
-
 ### Cross-cluster loadbalancing
 
-Still trying this out.
-
+On cloud providers that offer a private ip range for all instances on a network, you can setup multiple clusters in different availability zones, on the same network, and loadbalancer services across these zones. On GCE for example, every instance is a member of a single network. A network performs the same function that a router does: it defines the network range and gateway IP address, handles communication between instances, and serves as a gateway between instances and other networks. On such networks the endpoints of a service in one cluster are visible in all other clusters in the same network, so you can setup an edge loadbalancer that watches a kubernetes master of another cluster for services. Such a deployment allows you to fallback to a different AZ during times of duress or planned downtime (eg: database update).
 
 ### Examples
 
@@ -186,6 +184,209 @@ $ mysql -u root -ppassword --host 104.197.63.17 --port 3306 -e 'show databases;'
 | mysql              |
 | performance_schema |
 +--------------------+
+```
+
+
+#### Cross-cluster loadbalancing
+
+This is a slightly advanced example. It only works if both clusters are running on the same network, on a cloud provider that provides a private ip range per network (eg: GCE, GKE, AWS).
+
+#### Setup
+
+Before creating the cluster, lets have a look at our kubectl config:
+
+```yaml
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: REDACTED
+    server: https://104.197.84.16
+  name: <clustername>
+...
+current-context: <clustername>
+...
+```
+
+Now spin up a cluster in europe.
+```shell
+KUBE_GCE_ZONE=europe-west1-b KUBE_GCE_INSTANCE_PREFIX=eu ./cluster/kube-up.sh
+```
+
+Your kubectl config should contain both clusters:
+```yaml
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: REDACTED
+    server: https://146.148.25.221
+  name: <clustername_eu>
+- cluster:
+    certificate-authority-data: REDACTED
+    server: https://104.197.84.16
+  name: <clustername>
+...
+current-context: kubernetesdev_eu
+...
+```
+
+And kubectl get nodes should agree:
+```
+$ kubectl get nodes
+NAME             LABELS                                  STATUS
+eu-minion-0n61   kubernetes.io/hostname=eu-minion-0n61   Ready
+eu-minion-79ua   kubernetes.io/hostname=eu-minion-79ua   Ready
+eu-minion-7wz7   kubernetes.io/hostname=eu-minion-7wz7   Ready
+eu-minion-loh2   kubernetes.io/hostname=eu-minion-loh2   Ready
+
+
+$ kubectl config use-context <clustername>
+$ kubectl get nodes
+NAME                     LABELS                                                            STATUS
+kubernetes-minion-5jtd   kubernetes.io/hostname=kubernetes-minion-5jtd,role=loadbalancer   Ready
+kubernetes-minion-lqfc   kubernetes.io/hostname=kubernetes-minion-lqfc                     Ready
+kubernetes-minion-sjra   kubernetes.io/hostname=kubernetes-minion-sjra                     Ready
+kubernetes-minion-wul8   kubernetes.io/hostname=kubernetes-minion-wul8                     Ready
+```
+
+#### Testing reachability
+
+For this test to work we'll need to create a service in europe:
+```
+$ kubectl config use-context <clustername_eu>
+$ kubectl create -f /tmp/secret.json
+$ kubectl create -f nginx-app.yaml
+$ kubectl exec -it my-nginx-luiln -- echo "Europe nginx" >> /usr/share/nginx/html/index.html
+$ kubectl get ep
+NAME         ENDPOINTS
+kubernetes   10.240.249.92:443
+nginxsvc     10.244.0.4:80,10.244.0.4:443
+```
+
+Just to test reachability, we'll try hitting the europe nginx from our initial us-central cluster. Create a basic curl pod:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curlpod
+spec:
+  containers:
+  - image: radial/busyboxplus:curl
+    command:
+      - sleep
+      - "360000000"
+    imagePullPolicy: IfNotPresent
+    name: curlcontainer
+  restartPolicy: Always
+```
+
+And test that you can actually reach the test nginx service across continents.
+```
+$ kubectl config use-context kubernetesdev_kubernetes
+$ kubectl create -f curlpod.yaml
+$ kubectl -it exec curlpod -- /bin/sh
+[ root@curlpod:/ ]$ curl http://10.244.0.4:80
+Europe nginx
+```
+
+This proves reachability. Now we'll configure a loadbalancer that exposes all the services in the Europe cluster to the US cluster.
+
+#### Create the kubeconfig secret
+
+We will need to grant whatever pod we run the loadbalancer in, accesss to the remote cluster via a kubeconfig. This is so
+kubectl works in the pod, just like it did on our local machine in the previous step. First create a secret with the contents
+of the current kube config:
+
+```
+$ kubectl config use-context <clustername_eu>
+$ go run ./make_secret.go --kubeconfig=/home/beeps/.kube/config > /tmp/secret.json
+$ kubectl config use-context <clustername>
+$ kubectl create -f /tmp/secret.json
+```
+
+Now modify the loadbalancer manifest. We will create this loadbalancer in our first cluster and have it publish the services from the second cluster (eu). This is the entire modified loadbalancer manifest:
+
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: service-loadbalancer
+  labels:
+    app: service-loadbalancer
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    app: service-loadbalancer
+    version: v1
+  template:
+    metadata:
+      labels:
+        app: service-loadbalancer
+        version: v1
+    spec:
+      volumes:
+      # token from the eu cluster, must already exist
+      # and match the name of the volume using in container
+      - name: eu-config
+        secret:
+          secretName: kubeconfig
+      nodeSelector:
+        role: loadbalancer
+      containers:
+      - image: gcr.io/google_containers/servicelb:0.1
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        name: haproxy
+        ports:
+        # All http services
+        - containerPort: 80
+          hostPort: 80
+          protocol: TCP
+        # nginx https
+        - containerPort: 443
+          hostPort: 8080
+          protocol: TCP
+        # mysql
+        - containerPort: 3306
+          hostPort: 3306
+          protocol: TCP
+        # haproxy stats
+        - containerPort: 1936
+          hostPort: 1936
+          protocol: TCP
+        resources: {}
+        args:
+        - --tcp-services=mysql:3306,nginxsvc:443
+        - --use-kubernetes-cluster-service=false
+        # use-kubernetes-cluster-service=false in conjunction with the
+        # kube/config will force the service-loadbalancer to watch for
+        # services form the eu cluster.
+        volumeMounts:
+        - mountPath: /.kube
+          name: eu-config
+        env:
+        - name: KUBECONFIG
+          value: /.kube/config
+```
+
+Note that it is essentially the same as the rc.yaml checked into the service-loadbalancer directory expect that it consumes the kubeconfig secret create in the last stage and has an extra KUBECONFIG environment variable.
+
+```cmd
+$ kubectl config use-context <clustername>
+$ kubectl create -f rc.yaml
+$ kubectl get pods -o wide
+service-loadbalancer-5o2p4   1/1       Running   0          13m       kubernetes-minion-5jtd
+$ kubectl get node kubernetes-minion-5jtd -o json | grep -i externalip -A 2
+                "type": "ExternalIP",
+                "address": "104.197.81.116"
+$ curl http://104.197.81.116/nginxsvc
+Europe nginx
 ```
 
 ### Troubleshooting:
