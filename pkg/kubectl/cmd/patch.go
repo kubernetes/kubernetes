@@ -42,7 +42,7 @@ kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve
 
 func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "patch RESOURCE NAME -p PATCH",
+		Use:     "patch TYPE NAME -p PATCH",
 		Short:   "Update field(s) of a resource by stdin.",
 		Long:    patch_long,
 		Example: patch_example,

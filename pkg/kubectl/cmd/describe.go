@@ -37,9 +37,9 @@ const (
 This command joins many API calls together to form a detailed description of a
 given resource or group of resources.
 
-$ kubectl describe RESOURCE NAME_PREFIX
+$ kubectl describe TYPE NAME_PREFIX
 
-will first check for an exact match on RESOURCE and NAME_PREFIX. If no such resource
+will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
 exists, it will output details for every resource that has a name prefixed with NAME_PREFIX
 
 Possible resources include (case insensitive): pods (po), services (svc),
@@ -62,7 +62,7 @@ $ kubectl describe pods frontend`
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "describe (RESOURCE NAME_PREFIX | RESOURCE/NAME)",
+		Use:     "describe (TYPE [(NAME_PREFIX | -l label] | TYPE/NAME)",
 		Short:   "Show details of a specific resource or group of resources",
 		Long:    describe_long,
 		Example: describe_example,

@@ -32,7 +32,7 @@ import (
 const (
 	get_long = `Display one or many resources.
 
-Possible resources include (case insensitive): pods (po), services (svc),
+Possible resource types include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
 resourcequotas (quota), namespaces (ns), endpoints (ep) or secrets.
@@ -68,7 +68,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	validArgs := p.HandledResources()
 
 	cmd := &cobra.Command{
-		Use:     "get [(-o|--output=)json|yaml|template|wide|...] (RESOURCE [NAME] | RESOURCE/NAME ...)",
+		Use:     "get [(-o|--output=)json|yaml|template|wide|...] (TYPE [(NAME | -l label] | TYPE/NAME ...)",
 		Short:   "Display one or many resources",
 		Long:    get_long,
 		Example: get_example,
