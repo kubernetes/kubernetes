@@ -148,6 +148,7 @@ func NewFieldTooLong(field string, value interface{}, maxLength int) *Validation
 type ValidationErrorList []error
 
 // Prefix adds a prefix to the Field of every ValidationError in the list.
+// Also adds prefixes to multiple fields if you send an or seperator.
 // Returns the list for convenience.
 func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
 	for i := range list {
@@ -155,7 +156,11 @@ func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
 			if strings.HasPrefix(err.Field, "[") {
 				err.Field = prefix + err.Field
 			} else if len(err.Field) != 0 {
-				err.Field = prefix + "." + err.Field
+				fields := strings.SplitAfter(err.Field, " or ")
+				err.Field = ""
+				for j := range fields {
+					err.Field += prefix + "." + fields[j]
+				}
 			} else {
 				err.Field = prefix
 			}
