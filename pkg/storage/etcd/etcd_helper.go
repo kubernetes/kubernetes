@@ -72,6 +72,11 @@ func init() {
 	metrics.Register()
 }
 
+// Codec provides access to the underlying codec being used by the implementation.
+func (h *etcdHelper) Codec() runtime.Codec {
+	return h.codec
+}
+
 // Implements storage.Interface.
 func (h *etcdHelper) Backends() []string {
 	return h.client.GetCluster()
