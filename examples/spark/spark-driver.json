@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "spark-driver",
-        "image": "gurvin/spark-driver",
+        "image": "gcr.io/google_containers/spark-driver:1.4.0_v1",
         "resources": {
           "limits": {
             "cpu": "100m"
