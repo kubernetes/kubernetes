@@ -18,12 +18,12 @@ package api
 
 // AUTO-GENERATED FUNCTIONS START HERE
 import (
-	resource "github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	conversion "github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	fields "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	labels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	util "github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	resource "k8s.io/kubernetes/pkg/api/resource"
+	conversion "k8s.io/kubernetes/pkg/conversion"
+	fields "k8s.io/kubernetes/pkg/fields"
+	labels "k8s.io/kubernetes/pkg/labels"
+	runtime "k8s.io/kubernetes/pkg/runtime"
+	util "k8s.io/kubernetes/pkg/util"
 	inf "speter.net/go/exp/math/dec/inf"
 	time "time"
 )

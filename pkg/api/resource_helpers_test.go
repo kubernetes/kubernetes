@@ -19,7 +19,7 @@ package api
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 func TestResourceHelpers(t *testing.T) {

@@ -17,8 +17,8 @@ limitations under the License.
 package latest
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/client/clientcmd/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Version is the string that represents the current external default version.

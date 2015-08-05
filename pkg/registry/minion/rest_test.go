@@ -19,8 +19,8 @@ package minion
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestMatchNode(t *testing.T) {

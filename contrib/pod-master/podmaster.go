@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"

@@ -17,8 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client"
 )
 
 // This just exports required functions from kubelet proper, for use by network

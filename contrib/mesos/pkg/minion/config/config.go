@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 const (

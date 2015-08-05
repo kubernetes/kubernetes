@@ -22,8 +22,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
 	log "github.com/golang/glog"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 )
 
 const (

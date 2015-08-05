@@ -19,7 +19,7 @@ package algorithmprovider
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 )
 
 var (

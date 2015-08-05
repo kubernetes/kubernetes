@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"

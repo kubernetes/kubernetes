@@ -26,17 +26,17 @@ import (
 	"path"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	_ "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func generateConversions(t *testing.T, version string) bytes.Buffer {
-	g := runtime.NewConversionGenerator(api.Scheme.Raw(), path.Join("github.com/GoogleCloudPlatform/kubernetes/pkg/api", version))
-	apiShort := g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
-	g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource")
+	g := runtime.NewConversionGenerator(api.Scheme.Raw(), path.Join("k8s.io/kubernetes/pkg/api", version))
+	apiShort := g.AddImport("k8s.io/kubernetes/pkg/api")
+	g.AddImport("k8s.io/kubernetes/pkg/api/resource")
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	g.OverwritePackage(version, "")
 	for _, knownType := range api.Scheme.KnownTypes(version) {

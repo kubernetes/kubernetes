@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/conversion"
 )
 
 // Scheme defines methods for serializing and deserializing API objects. It
