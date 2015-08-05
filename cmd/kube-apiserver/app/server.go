@@ -94,7 +94,7 @@ type APIServer struct {
 	EtcdPathPrefix             string
 	CorsAllowedOriginList      []string
 	AllowPrivileged            bool
-	ServiceClusterIPRange      util.IPNet // TODO: make this a list
+	ServiceClusterIPRange      net.IPNet // TODO: make this a list
 	ServiceNodePortRange       util.PortRange
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
@@ -197,8 +197,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.EtcdPathPrefix, "etcd-prefix", s.EtcdPathPrefix, "The prefix for all resource paths in etcd.")
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
-	fs.Var(&s.ServiceClusterIPRange, "service-cluster-ip-range", "A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
-	fs.Var(&s.ServiceClusterIPRange, "portal-net", "Deprecated: see --service-cluster-ip-range instead.")
+	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, "A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
+	fs.IPNetVar(&s.ServiceClusterIPRange, "portal-net", s.ServiceClusterIPRange, "Deprecated: see --service-cluster-ip-range instead.")
 	fs.MarkDeprecated("portal-net", "see --service-cluster-ip-range instead.")
 	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", "A port range to reserve for services with NodePort visibility.  Example: '30000-32767'.  Inclusive at both ends of the range.")
 	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "Deprecated: see --service-node-port-range instead.")
@@ -325,7 +325,7 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
 	}
 
-	n := net.IPNet(s.ServiceClusterIPRange)
+	n := s.ServiceClusterIPRange
 
 	// Default to the private server key for service account token signing
 	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
