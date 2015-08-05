@@ -424,6 +424,60 @@ func TestValidateLGTMAfterPush(t *testing.T) {
 			lastModified: time.Unix(11, 0),
 			shouldPass:   false,
 		},
+		{
+			issueEvents: []github.IssueEvent{
+				{
+					Event: stringPtr("labeled"),
+					Label: &github.Label{
+						Name: stringPtr("lgtm"),
+					},
+					CreatedAt: timePtr(time.Unix(12, 0)),
+				},
+				{
+					Event: stringPtr("labeled"),
+					Label: &github.Label{
+						Name: stringPtr("lgtm"),
+					},
+					CreatedAt: timePtr(time.Unix(11, 0)),
+				},
+				{
+					Event: stringPtr("labeled"),
+					Label: &github.Label{
+						Name: stringPtr("lgtm"),
+					},
+					CreatedAt: timePtr(time.Unix(10, 0)),
+				},
+			},
+			lastModified: time.Unix(11, 0),
+			shouldPass:   true,
+		},
+		{
+			issueEvents: []github.IssueEvent{
+				{
+					Event: stringPtr("labeled"),
+					Label: &github.Label{
+						Name: stringPtr("lgtm"),
+					},
+					CreatedAt: timePtr(time.Unix(10, 0)),
+				},
+				{
+					Event: stringPtr("labeled"),
+					Label: &github.Label{
+						Name: stringPtr("lgtm"),
+					},
+					CreatedAt: timePtr(time.Unix(11, 0)),
+				},
+				{
+					Event: stringPtr("labeled"),
+					Label: &github.Label{
+						Name: stringPtr("lgtm"),
+					},
+					CreatedAt: timePtr(time.Unix(12, 0)),
+				},
+			},
+			lastModified: time.Unix(11, 0),
+			shouldPass:   true,
+		},
 	}
 	for _, test := range tests {
 		client, server, mux := initTest()
