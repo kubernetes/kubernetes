@@ -160,9 +160,11 @@ func NewSchedulerServer() *SchedulerServer {
 		Address:         util.IP(net.ParseIP("127.0.0.1")),
 		FailoverTimeout: time.Duration((1 << 62) - 1).Seconds(),
 
-		RunProxy:               true,
-		ExecutorSuicideTimeout: execcfg.DefaultSuicideTimeout,
-		ExecutorCgroupPrefix:   execcfg.DefaultCgroupPrefix,
+		RunProxy:                 true,
+		ExecutorSuicideTimeout:   execcfg.DefaultSuicideTimeout,
+		ExecutorCgroupPrefix:     execcfg.DefaultCgroupPrefix,
+		DefaultContainerCPULimit: mresource.DefaultDefaultContainerCPULimit,
+		DefaultContainerMemLimit: mresource.DefaultDefaultContainerMemLimit,
 
 		MinionLogMaxSize:      minioncfg.DefaultLogMaxSize(),
 		MinionLogMaxBackups:   minioncfg.DefaultLogMaxBackups,
