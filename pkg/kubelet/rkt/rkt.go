@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/dbus"
@@ -109,6 +110,7 @@ type volumeGetter interface {
 // It will test if the rkt binary is in the $PATH, and whether we can get the
 // version of it. If so, creates the rkt container runtime, otherwise returns an error.
 func New(config *Config,
+	configFile string,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
@@ -163,7 +165,40 @@ func New(config *Config,
 	if result < 0 {
 		return nil, fmt.Errorf("rkt: Version is too old, requires at least %v", rktMinimumVersion)
 	}
+
+	if err := readConfigFile(configFile); err != nil {
+		return nil, fmt.Errorf("rkt: Error configuring rkt: %v", err)
+	}
 	return rkt, nil
+}
+
+// The rkt config file object.
+type ConfigFile struct {
+	Version     string       `json:"version" description:"the version of the configuraton file"`
+	TrustedKeys []TrustedKey `json:"trustedKeys,omitempty" description:"the trusted key list"`
+}
+
+func readConfigFile(filename string) error {
+	var config ConfigFile
+
+	if filename == "" {
+		return nil
+	}
+
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	out, err := yaml.ToJSON(data)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(out, &config); err != nil {
+		return err
+	}
+
+	return importTrustedKeys(config.TrustedKeys)
 }
 
 func (r *runtime) buildCommand(args ...string) *exec.Cmd {
