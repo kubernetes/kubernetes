@@ -98,16 +98,17 @@ func init() {
 
 Invocation of admission control is handled by the **APIServer** and not individual **RESTStorage** implementations.
 
-This design assumes that **Issue 297** is adopted, and as a consequence, the general framework of the APIServer request/response flow
-will ensure the following:
+This design assumes that **Issue 297** is adopted, and as a consequence, the general framework of the APIServer request/response flow will ensure the following:
 
 1. Incoming request
 2. Authenticate user
 3. Authorize user
-4. If operation=create|update, then validate(object)
-5. If operation=create|update|delete, then admission.Admit(requestAttributes)
-  a. invoke each admission.Interface object in sequence
-6. Object is persisted
+4. If operation=create|update|delete|connect, then admission.Admit(requestAttributes)
+   - invoke each admission.Interface object in sequence
+5. Case on the operation:
+   - If operation=create|update, then validate(object) and persist
+   - If operation=delete, delete the object
+   - If operation=connect, exec
 
 If at any step, there is an error, the request is canceled.
 
