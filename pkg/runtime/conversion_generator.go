@@ -24,8 +24,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type ConversionGenerator interface {
@@ -50,7 +50,7 @@ func NewConversionGenerator(scheme *conversion.Scheme, targetPkg string) Convers
 	}
 	g.targetPackage(targetPkg)
 	g.AddImport("reflect")
-	g.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/conversion")
+	g.AddImport("k8s.io/kubernetes/pkg/conversion")
 	return g
 }
 

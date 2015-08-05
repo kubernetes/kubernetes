@@ -19,10 +19,10 @@ package prober
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 func TestFormatURL(t *testing.T) {

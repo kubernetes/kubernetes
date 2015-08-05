@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/probe"
 )
 
 func TestTcpHealthChecker(t *testing.T) {

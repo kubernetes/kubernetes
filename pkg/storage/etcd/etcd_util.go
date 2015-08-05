@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"os/exec"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/tools"
 
 	goetcd "github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"

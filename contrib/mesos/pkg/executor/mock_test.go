@@ -19,7 +19,7 @@ package executor
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

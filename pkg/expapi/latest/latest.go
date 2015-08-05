@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/registered"
+	_ "k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/expapi/v1"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 var (
@@ -39,7 +39,7 @@ var (
 	RESTMapper meta.RESTMapper
 )
 
-const importPrefix = "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi"
+const importPrefix = "k8s.io/kubernetes/pkg/expapi"
 
 func init() {
 	Version = registered.RegisteredVersions[0]

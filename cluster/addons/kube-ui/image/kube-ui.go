@@ -23,7 +23,7 @@ import (
 	"mime"
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui/data/dashboard"
+	"k8s.io/kubernetes/pkg/ui/data/dashboard"
 	"github.com/golang/glog"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"

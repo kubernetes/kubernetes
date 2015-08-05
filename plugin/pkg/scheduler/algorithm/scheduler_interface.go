@@ -17,7 +17,7 @@ limitations under the License.
 package algorithm
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Scheduler is an interface implemented by things that know how to schedule pods

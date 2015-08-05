@@ -31,9 +31,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/node"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
 

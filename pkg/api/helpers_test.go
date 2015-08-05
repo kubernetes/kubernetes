@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/resource"
 
 	"speter.net/go/exp/math/dec/inf"
 )

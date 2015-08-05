@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // FakeRuntime is a fake container runtime for testing.

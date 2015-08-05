@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/template"
+	"k8s.io/kubernetes/third_party/golang/template"
 )
 
 type JSONPath struct {

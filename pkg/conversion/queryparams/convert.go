@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func jsonTag(field reflect.StructField) (string, bool) {

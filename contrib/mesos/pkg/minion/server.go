@@ -24,12 +24,12 @@ import (
 	"os/exec"
 	"time"
 
-	exservice "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/service"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/minion/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
+	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/client"
 
 	log "github.com/golang/glog"
 	"github.com/kardianos/osext"
