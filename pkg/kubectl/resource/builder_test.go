@@ -958,12 +958,12 @@ func TestReplaceAliases(t *testing.T) {
 		{
 			name:     "all-replacement",
 			arg:      "all",
-			expected: "rc,svc,pods,pvc",
+			expected: "rc,svc,pods,pvc,as",
 		},
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "rc,svc,pods,pvc,secrets",
+			expected: "rc,svc,pods,pvc,as,secrets",
 		},
 	}
 

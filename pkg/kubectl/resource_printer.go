@@ -272,6 +272,7 @@ var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODE
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
+var autoScalerColumns = []string{"NAME", "STATUS", "BY", "AT"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -305,6 +306,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
 	h.Handler(componentStatusColumns, printComponentStatus)
 	h.Handler(componentStatusColumns, printComponentStatusList)
+	h.Handler(autoScalerColumns, printAutoScalerStatus)
+	h.Handler(autoScalerColumns, printAutoScalerStatusList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -1000,6 +1003,34 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 			return []string{"NODE"}
 		}
 	}
+	return nil
+}
+
+func printAutoScalerStatus(item *api.AutoScaler, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	status := "Unknown"
+	by := ""
+	at := ""
+	if len(item.Status.LastActionTrigger.ActionType) > 0 {
+		status = fmt.Sprintf("%v", item.Status.LastActionTrigger.ActionType)
+		by = fmt.Sprintf("%v", item.Status.LastActionTrigger.ScaleBy)
+		at = fmt.Sprintf("%v", item.Status.LastActionTimestamp)
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.Name, status, by, at); err != nil {
+		return err
+	}
+
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
+	return err
+}
+
+func printAutoScalerStatusList(list *api.AutoScalerList, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	for _, item := range list.Items {
+		if err := printAutoScalerStatus(&item, w, withNamespace, wide, columnLabels); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

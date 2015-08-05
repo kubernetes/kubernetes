@@ -46,6 +46,7 @@ type Interface interface {
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
+	AutoScalersNamespacer
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -105,6 +106,10 @@ func (c *Client) PersistentVolumeClaims(namespace string) PersistentVolumeClaimI
 
 func (c *Client) ComponentStatuses() ComponentStatusInterface {
 	return newComponentStatuses(c)
+}
+
+func (c *Client) AutoScalers(namespace string) AutoScalerInterface {
+	return newAutoScalers(c, namespace)
 }
 
 // VersionInterface has a method to retrieve the server version.

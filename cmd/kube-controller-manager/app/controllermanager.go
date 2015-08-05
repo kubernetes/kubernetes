@@ -31,6 +31,8 @@ import (
 	"strconv"
 	"time"
 
+	asmanager "github.com/GoogleCloudPlatform/kubernetes/pkg/autoscaler/manager"
+	asgenericplugin "github.com/GoogleCloudPlatform/kubernetes/pkg/autoscaler/plugins/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
@@ -62,6 +64,7 @@ type CMServer struct {
 	ConcurrentEndpointSyncs int
 	ConcurrentRCSyncs       int
 	ServiceSyncPeriod       time.Duration
+	ConcurrentASWorkers     int
 	NodeSyncPeriod          time.Duration
 	ResourceQuotaSyncPeriod time.Duration
 	NamespaceSyncPeriod     time.Duration
@@ -94,6 +97,7 @@ func NewCMServer() *CMServer {
 		ConcurrentEndpointSyncs: 5,
 		ConcurrentRCSyncs:       5,
 		ServiceSyncPeriod:       5 * time.Minute,
+		ConcurrentASWorkers:     5,
 		NodeSyncPeriod:          10 * time.Second,
 		ResourceQuotaSyncPeriod: 10 * time.Second,
 		NamespaceSyncPeriod:     5 * time.Minute,
@@ -105,6 +109,30 @@ func NewCMServer() *CMServer {
 	return &s
 }
 
+// createAutoScaleManager creates and configures an auto scaling manager.
+func createAutoScaleManager(client *client.Client) *asmanager.AutoScaleManager {
+	// Assessment interval determines how often the autoscaling policies
+	// are assessed and scaling interval how often to actually scale.
+	assessmentInterval := asmanager.DefaultAssessmentInterval
+	scalingInterval := asmanager.DefaultAutoScalingInterval
+	plugin := asgenericplugin.NewGenericAutoScaler("")
+
+	manager := asmanager.NewAutoScaleManager(client, assessmentInterval, scalingInterval)
+	glog.Infof("Created auto scale manager")
+
+	manager.Register(plugin)
+	glog.Infof("Registered generic auto scale manager plugin")
+
+	err := manager.AddDefaultAdvisors()
+	if err != nil {
+		// This can be a warning eventually, for now, a hard error.
+		glog.Fatalf("Couldn't add default advisors: %v", err)
+	}
+
+	glog.Infof("Added default autoscale manager advisors")
+	return manager
+}
+
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
 func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
@@ -114,6 +142,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
 	fs.DurationVar(&s.ServiceSyncPeriod, "service-sync-period", s.ServiceSyncPeriod, "The period for syncing services with their external load balancers")
+	fs.IntVar(&s.ConcurrentASWorkers, "concurrent_as_workers", s.ConcurrentASWorkers, "The number of auto scale workers that are allowed to scale concurrently. Larger number = faster auto scaling, but more CPU (and network) load")
 	fs.DurationVar(&s.NodeSyncPeriod, "node-sync-period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
 		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
@@ -189,6 +218,9 @@ func (s *CMServer) Run(_ []string) error {
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient, replicationControllerPkg.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
+
+	autoscaleManager := createAutoScaleManager(kubeClient)
+	go autoscaleManager.Run(s.ConcurrentASWorkers, util.NeverStop)
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {

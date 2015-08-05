@@ -1725,3 +1725,130 @@ func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
 	}
 	return allErrs
 }
+
+// ValidateAutoScalerName can be used to check whether the given namespace name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateAutoScalerName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateAutoScaler tests if required fields are set.
+func ValidateAutoScaler(autoScaler *api.AutoScaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&autoScaler.ObjectMeta, true, ValidateAutoScalerName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateAutoScalerSpec(&autoScaler.Spec)...)
+	return allErrs
+}
+
+// ValidateAutoScalerSpec tests is AutoScaler.Spec required fields are set
+func ValidateAutoScalerSpec(spec *api.AutoScalerSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	// Must have a target selector.
+	if len(spec.TargetSelector) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("targetSelector"))
+	}
+
+	// min can't be greater than max
+	if spec.MinAutoScaleCount > spec.MaxAutoScaleCount {
+		allErrs = append(allErrs, errs.NewFieldInvalid("minAutoScaleCount", spec.MinAutoScaleCount, "minAutoScaleCount cannot be greater than maxAutoScaleCount"))
+	}
+
+	// Must have some advisors.
+	if 0 == len(spec.Advisors) {
+		allErrs = append(allErrs, errs.NewFieldRequired("advisors"))
+	}
+
+	// Check all thresholds.
+	for _, t := range spec.Thresholds {
+		allErrs = append(allErrs, ValidateAutoScaleThreshold(&t).Prefix("thresholds")...)
+	}
+
+	return allErrs
+}
+
+// ValidateAutoScaleThreshold ensures required fields are set
+func ValidateAutoScaleThreshold(t *api.AutoScaleThreshold) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	switch t.Type {
+	case api.AutoScaleThresholdTypeIntention:
+		// check intentions
+		for _, i := range t.Intentions {
+			allErrs = append(allErrs, validateIntentionThreshold(&i).Prefix("intentions")...)
+		}
+	default:
+		if len(t.Type) == 0 {
+			allErrs = append(allErrs, errs.NewFieldRequired("type"))
+		} else {
+			allErrs = append(allErrs, errs.NewFieldInvalid("type", t.Type, "invalid threshold type"))
+		}
+	}
+
+	switch t.ActionType {
+	case api.AutoScaleActionTypeNone:
+		// ok.
+	case api.AutoScaleActionTypeScaleUp:
+		// ok.
+	case api.AutoScaleActionTypeScaleDown:
+		// ok.
+	default:
+		allErrs = append(allErrs, errs.NewFieldInvalid("actionType", t.ActionType, "invalid action type"))
+	}
+
+	// scaleBy needs to be positive - do we need to set an upper range?
+	if t.ScaleBy < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("scaleBy", t.ScaleBy, "scaleBy cannot be less than 0"))
+	}
+
+	return allErrs
+}
+
+// validateIntentionThreshold ensures required fields for intention based thresholds are set
+func validateIntentionThreshold(t *api.AutoScaleIntentionThresholdConfig) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if len(t.Intent) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("intent"))
+	}
+
+	//TODO validate value of intent
+
+	// duration cannot be negative (0 means last value - otherwise its
+	// the duration in seconds).
+	if t.Duration < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("duration", t.Duration, "duration cannot be less than 0"))
+	}
+
+	return allErrs
+}
+
+// ValidateAutoScalerUpdate tests to make sure am autoscaler update can be
+// applied.  Modifies newAutoScaler.
+func ValidateAutoScalerUpdate(newAutoScaler, oldAutoScaler *api.AutoScaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newAutoScaler.ObjectMeta, &oldAutoScaler.ObjectMeta).Prefix("metadata")...)
+
+	//use all creation validations
+	allErrs = append(allErrs, ValidateAutoScaler(newAutoScaler)...)
+
+	return allErrs
+}
+
+// ValidateAutoScalerStatus tests if required fields are set.
+func ValidateAutoScalerStatus(autoScaler *api.AutoScaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&autoScaler.ObjectMeta, true, ValidateAutoScalerName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateAutoScalerSpec(&autoScaler.Spec)...)
+	return allErrs
+}
+
+// ValidateAutoScalerStatusUpdate tests to make sure am autoscaler status update can be applied.  Modifies oldAutoScaler.
+func ValidateAutoScalerStatusUpdate(newAutoScaler, oldAutoScaler *api.AutoScaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newAutoScaler.ObjectMeta, &oldAutoScaler.ObjectMeta).Prefix("metadata")...)
+
+	newAutoScaler.Spec = oldAutoScaler.Spec
+	return allErrs
+}

@@ -3565,3 +3565,74 @@ func fakeValidSecurityContext(priv bool) *api.SecurityContext {
 		Privileged: &priv,
 	}
 }
+
+// TestValidateAutoScaler tests validation methods for autoscalers, their spec, and thresholds
+func TestValidateAutoScaler(t *testing.T) {
+	validAutoScaler := func() *api.AutoScaler {
+		return &api.AutoScaler{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "foo",
+				Namespace: "bar",
+			},
+			Spec: api.AutoScalerSpec{
+				TargetSelector: map[string]string{"name": "test"},
+				Advisors:       []string{"test"},
+			},
+		}
+	}
+
+	var (
+		noMetaName             = validAutoScaler()
+		noMetaNamespace        = validAutoScaler()
+		noTargetSelector       = validAutoScaler()
+		badMinMax              = validAutoScaler()
+		noAdvisors             = validAutoScaler()
+		invalidIntentThreshold = validAutoScaler()
+		validIntentThreshold   = validAutoScaler()
+	)
+
+	noMetaName.ObjectMeta.Name = ""
+	noMetaNamespace.ObjectMeta.Namespace = ""
+	noTargetSelector.Spec.TargetSelector = make(map[string]string, 0)
+	badMinMax.Spec.MinAutoScaleCount = 1
+	badMinMax.Spec.MaxAutoScaleCount = 0
+	noAdvisors.Spec.Advisors = make([]string, 0)
+	invalidIntentThreshold.Spec.Thresholds = []api.AutoScaleThreshold{
+		{
+			Type:       api.AutoScaleThresholdTypeIntention,
+			Intentions: []api.AutoScaleIntentionThresholdConfig{{}},
+		},
+	}
+	validIntentThreshold.Spec.Thresholds = []api.AutoScaleThreshold{
+		{
+			Type: api.AutoScaleThresholdTypeIntention,
+			Intentions: []api.AutoScaleIntentionThresholdConfig{
+				{Intent: "test"},
+			},
+			ActionType: api.AutoScaleActionTypeScaleUp,
+			ScaleBy:    1,
+		},
+	}
+
+	tests := map[string]struct {
+		errors     int
+		autoScaler *api.AutoScaler
+	}{
+		"valid":                  {0, validAutoScaler()},
+		"noMetaName":             {1, noMetaName},
+		"noMetaNamespace":        {1, noMetaNamespace},
+		"noTargetSelector":       {1, noTargetSelector},
+		"badMinMax":              {1, badMinMax},
+		"noAdvisors":             {1, noAdvisors},
+		"invalidIntentThreshold": {1, invalidIntentThreshold},
+		"validIntentThreshold":   {0, validIntentThreshold},
+	}
+
+	for testName, test := range tests {
+		result := ValidateAutoScaler(test.autoScaler)
+
+		if test.errors != len(result) {
+			t.Errorf("%s failed, expected %d errors but got %d : %v", testName, test.errors, len(result), result)
+		}
+	}
+}

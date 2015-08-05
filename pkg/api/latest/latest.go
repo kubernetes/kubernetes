@@ -61,7 +61,7 @@ var SelfLinker = runtime.SelfLinker(accessor)
 var RESTMapper meta.RESTMapper
 
 // userResources is a group of resources mostly used by a kubectl user
-var userResources = []string{"rc", "svc", "pods", "pvc"}
+var userResources = []string{"rc", "svc", "pods", "pvc", "as"}
 
 const importPrefix = "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 

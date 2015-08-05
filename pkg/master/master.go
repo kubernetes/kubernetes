@@ -49,6 +49,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	autoscaleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/autoscaler/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/componentstatus"
 	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
@@ -441,6 +442,7 @@ func (m *Master) init(c *Config) {
 	serviceAccountStorage := serviceaccountetcd.NewStorage(c.DatabaseStorage)
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewStorage(c.DatabaseStorage)
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewStorage(c.DatabaseStorage)
+	autoscalerStorage, autoscalerStatusStorage := autoscaleretcd.NewStorage(c.DatabaseStorage)
 
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewStorage(c.DatabaseStorage)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
@@ -508,6 +510,8 @@ func (m *Master) init(c *Config) {
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
+		"autoscalers":                   autoscalerStorage,
+		"autoscalers/status":            autoscalerStatusStorage,
 
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 	}
