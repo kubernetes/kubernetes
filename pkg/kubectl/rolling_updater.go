@@ -312,10 +312,9 @@ type updateFunc func(controller *api.ReplicationController)
 
 // updateWithRetries updates applies the given rc as an update.
 func updateWithRetries(rcClient client.ReplicationControllerInterface, rc *api.ReplicationController, applyUpdate updateFunc) (*api.ReplicationController, error) {
-	// Each update could take ~100ms, so give it 0.5 second
 	var err error
 	oldRc := rc
-	err = wait.Poll(10*time.Millisecond, 500*time.Millisecond, func() (bool, error) {
+	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
 		if rc, err = rcClient.Update(rc); err == nil {
