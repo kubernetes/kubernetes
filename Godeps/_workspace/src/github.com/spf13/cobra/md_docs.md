@@ -11,7 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd"
 	"github.com/spf13/cobra"
 )
 
