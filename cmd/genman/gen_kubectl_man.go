@@ -23,12 +23,12 @@ import (
 	"os"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/genutils"
-	"k8s.io/kubernetes/pkg/kubectl/cmd"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	mangen "github.com/cpuguy83/go-md2man/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/cmd/genutils"
+	"k8s.io/kubernetes/pkg/kubectl/cmd"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func main() {

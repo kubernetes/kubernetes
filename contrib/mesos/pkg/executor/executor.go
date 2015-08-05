@@ -25,6 +25,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fsouza/go-dockerclient"
+	"github.com/gogo/protobuf/proto"
+	log "github.com/golang/glog"
+	bindings "github.com/mesos/mesos-go/executor"
+	mesos "github.com/mesos/mesos-go/mesosproto"
+	mutil "github.com/mesos/mesos-go/mesosutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
@@ -35,12 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
-	"github.com/fsouza/go-dockerclient"
-	"github.com/gogo/protobuf/proto"
-	log "github.com/golang/glog"
-	bindings "github.com/mesos/mesos-go/executor"
-	mesos "github.com/mesos/mesos-go/mesosproto"
-	mutil "github.com/mesos/mesos-go/mesosutil"
 )
 
 const (

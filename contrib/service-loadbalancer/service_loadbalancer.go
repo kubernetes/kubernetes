@@ -30,6 +30,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -38,8 +40,6 @@ import (
 	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"github.com/golang/glog"
-	flag "github.com/spf13/pflag"
 )
 
 const (

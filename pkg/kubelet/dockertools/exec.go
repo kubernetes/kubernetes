@@ -23,9 +23,9 @@ import (
 	"os/exec"
 	"time"
 
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.

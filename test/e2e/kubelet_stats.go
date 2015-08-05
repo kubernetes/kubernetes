@@ -28,6 +28,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	cadvisor "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/fields"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
-	cadvisor "github.com/google/cadvisor/info/v1"
 
 	"github.com/prometheus/client_golang/extraction"
 	"github.com/prometheus/client_golang/model"

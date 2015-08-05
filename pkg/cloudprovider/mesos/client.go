@@ -26,12 +26,12 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	log "github.com/golang/glog"
 	"github.com/mesos/mesos-go/detector"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 const defaultClusterName = "mesos"

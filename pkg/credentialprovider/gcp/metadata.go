@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 const (

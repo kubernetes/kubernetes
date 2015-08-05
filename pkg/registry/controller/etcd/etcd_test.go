@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -34,7 +35,6 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"github.com/coreos/go-etcd/etcd"
 )
 
 const (

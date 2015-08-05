@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -31,8 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (

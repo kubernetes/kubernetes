@@ -19,8 +19,8 @@ package dockertools
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	docker "github.com/fsouza/go-dockerclient"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 type instrumentedDockerInterface struct {

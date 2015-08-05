@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 const (

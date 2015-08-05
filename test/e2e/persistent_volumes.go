@@ -19,12 +19,12 @@ package e2e
 import (
 	"fmt"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"time"
 )
 

@@ -30,9 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/aws"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/cloudprovider/aws"
 )
 
 const serveHostnameImage = "gcr.io/google_containers/serve_hostname:1.1"

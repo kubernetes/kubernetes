@@ -32,6 +32,12 @@ import (
 	kutil "k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
+	log "github.com/golang/glog"
+	mesos "github.com/mesos/mesos-go/mesosproto"
+	util "github.com/mesos/mesos-go/mesosutil"
+	bindings "github.com/mesos/mesos-go/scheduler"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	assertext "k8s.io/kubernetes/contrib/mesos/pkg/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/messages"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
@@ -40,12 +46,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
-	log "github.com/golang/glog"
-	mesos "github.com/mesos/mesos-go/mesosproto"
-	util "github.com/mesos/mesos-go/mesosutil"
-	bindings "github.com/mesos/mesos-go/scheduler"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 // A apiserver mock which partially mocks the pods API

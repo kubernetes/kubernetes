@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/golang/glog"
 )
 
 // rkt pod state.

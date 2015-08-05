@@ -20,11 +20,11 @@ import (
 	"io/ioutil"
 	"time"
 
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 
 	"github.com/spf13/pflag"
 )

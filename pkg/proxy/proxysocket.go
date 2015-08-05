@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/golang/glog"
 )
 
 // Abstraction over TCP/UDP sockets which are proxied.

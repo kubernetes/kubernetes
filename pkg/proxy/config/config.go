@@ -19,10 +19,10 @@ package config
 import (
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/config"
-	"github.com/golang/glog"
 )
 
 // Operation is a type of operation of services or endpoints.

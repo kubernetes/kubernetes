@@ -22,13 +22,13 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
-	"github.com/golang/glog"
 )
 
 type upgrader interface {

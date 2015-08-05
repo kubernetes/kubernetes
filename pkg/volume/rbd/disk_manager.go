@@ -25,8 +25,8 @@ package rbd
 import (
 	"os"
 
-	"k8s.io/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // Abstract interface to disk operations.

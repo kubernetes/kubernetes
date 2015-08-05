@@ -20,13 +20,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/coreos/go-etcd/etcd"
 )
 
 type Tester struct {

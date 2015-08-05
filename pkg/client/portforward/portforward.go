@@ -26,11 +26,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
-	"github.com/golang/glog"
 )
 
 type upgrader interface {

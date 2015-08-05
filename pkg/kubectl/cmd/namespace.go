@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // TODO remove once people have been given enough time to notice

@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/aws"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"github.com/golang/glog"
 )
 
 // This is the primary entrypoint for volume plugins.

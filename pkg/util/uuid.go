@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/types"
 	"github.com/pborman/uuid"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 var uuidLock sync.Mutex

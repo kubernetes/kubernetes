@@ -19,9 +19,9 @@ package election
 import (
 	"testing"
 
+	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/watch"
-	"github.com/coreos/go-etcd/etcd"
 )
 
 func TestEtcdMasterOther(t *testing.T) {

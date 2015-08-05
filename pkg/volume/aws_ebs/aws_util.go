@@ -22,9 +22,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"github.com/golang/glog"
 )
 
 type AWSDiskUtil struct{}

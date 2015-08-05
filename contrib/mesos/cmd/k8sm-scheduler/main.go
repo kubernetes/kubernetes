@@ -21,11 +21,11 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/service"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
-	"github.com/spf13/pflag"
 )
 
 func main() {
