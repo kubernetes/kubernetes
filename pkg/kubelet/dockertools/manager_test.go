@@ -30,17 +30,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	kubeprober "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	uexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	docker "github.com/fsouza/go-dockerclient"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/record"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubeprober "k8s.io/kubernetes/pkg/kubelet/prober"
+	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 type fakeHTTP struct {
@@ -597,7 +597,7 @@ func replaceProber(dm *DockerManager, result probe.Result, err error) {
 // Unknown or error.
 //
 // PLEASE READ THE PROBE DOCS BEFORE CHANGING THIS TEST IF YOU ARE UNSURE HOW PROBES ARE SUPPOSED TO WORK:
-// (See https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md#pod-conditions)
+// (See https://github.com/kubernetes/kubernetes/blob/master/docs/pod-states.md#pod-conditions)
 func TestProbeContainer(t *testing.T) {
 	manager, _ := newTestDockerManager()
 	dc := &docker.APIContainers{

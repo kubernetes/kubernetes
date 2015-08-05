@@ -9,7 +9,7 @@ import (
         "io/ioutil"
         "os"
 
-        "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+        "k8s.io/kubernetes/pkg/kubectl/cmd"
 )
 
 func main() {
@@ -67,7 +67,7 @@ cmds := &cobra.Command{
 	Short: "kubectl controls the Kubernetes cluster manager",
 	Long: `kubectl controls the Kubernetes cluster manager.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
+Find more information at https://github.com/kubernetes/kubernetes.`,
 	Run: runHelp,
 	BashCompletionFunction: bash_completion_func,
 }

@@ -19,8 +19,8 @@ package apiserver
 import (
 	"errors"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 )
 
 // Attributes implements authorizer.Attributes interface.

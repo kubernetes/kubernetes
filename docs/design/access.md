@@ -118,8 +118,8 @@ Pods configs should be largely portable between Org-run and hosted configuration
 # Design
 
 Related discussion:
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/442
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/443
+- https://github.com/kubernetes/kubernetes/issues/442
+- https://github.com/kubernetes/kubernetes/issues/443
 
 This doc describes two security profiles:
   - Simple profile:  like single-user mode.  Make it easy to evaluate K8s without lots of configuring accounts and policies.  Protects from unauthorized users, but does not partition authorized users.
@@ -176,7 +176,7 @@ Initially:
 Improvements:
 - Kubelet allocates disjoint blocks of root-namespace uids for each container.  This may provide some defense-in-depth against container escapes. (https://github.com/docker/docker/pull/4572)
 - requires docker to integrate user namespace support, and deciding what getpwnam() does for these uids.
-- any features that help users avoid use of privileged containers (https://github.com/GoogleCloudPlatform/kubernetes/issues/391)
+- any features that help users avoid use of privileged containers (https://github.com/kubernetes/kubernetes/issues/391)
 
 ### Namespaces
 
@@ -253,7 +253,7 @@ Policy objects may be applicable only to a single namespace or to all namespaces
 
 ## Accounting
 
-The API should have a `quota` concept (see https://github.com/GoogleCloudPlatform/kubernetes/issues/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources design doc](resources.md)).
+The API should have a `quota` concept (see https://github.com/kubernetes/kubernetes/issues/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources design doc](resources.md)).
 
 Initially:
 - a `quota` object is immutable.

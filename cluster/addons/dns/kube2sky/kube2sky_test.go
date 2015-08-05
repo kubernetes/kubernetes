@@ -25,11 +25,11 @@ import (
 	"testing"
 	"time"
 
-	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 type fakeEtcdClient struct {

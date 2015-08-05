@@ -17,11 +17,11 @@ limitations under the License.
 package dockertools
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
-	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/client/record"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func NewFakeDockerManager(

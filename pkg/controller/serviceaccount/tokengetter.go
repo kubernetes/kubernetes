@@ -17,13 +17,13 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
-	secretetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount"
-	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/registry/secret"
+	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
+	"k8s.io/kubernetes/pkg/registry/serviceaccount"
+	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret

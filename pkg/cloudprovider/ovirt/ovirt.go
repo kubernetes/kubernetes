@@ -30,8 +30,8 @@ import (
 	"strings"
 
 	"code.google.com/p/gcfg"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 const ProviderName = "ovirt"

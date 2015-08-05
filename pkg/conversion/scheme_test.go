@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/gofuzz"

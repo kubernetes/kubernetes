@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/davecgh/go-spew/spew"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestPackSubsets(t *testing.T) {

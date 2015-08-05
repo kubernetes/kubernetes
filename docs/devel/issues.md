@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 GitHub Issues for the Kubernetes Project
 ========================================
 
-A list quick overview of how we will review and prioritize incoming issues at https://github.com/GoogleCloudPlatform/kubernetes/issues
+A list quick overview of how we will review and prioritize incoming issues at https://github.com/kubernetes/kubernetes/issues
 
 Priorities
 ----------

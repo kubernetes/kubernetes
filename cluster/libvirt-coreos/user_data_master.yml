@@ -9,7 +9,7 @@ coreos:
         After=opt-kubernetes.mount etcd.service
         ConditionFileIsExecutable=/opt/kubernetes/bin/kube-apiserver
         Description=Kubernetes API Server
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=opt-kubernetes.mount etcd.service
 
         [Service]
@@ -31,7 +31,7 @@ coreos:
         After=opt-kubernetes.mount kube-apiserver.service
         ConditionFileIsExecutable=/opt/kubernetes/bin/kube-controller-manager
         Description=Kubernetes Controller Manager
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=opt-kubernetes.mount kube-apiserver.service
 
         [Service]
@@ -49,7 +49,7 @@ coreos:
         After=opt-kubernetes.mount kube-apiserver.service
         ConditionFileIsExecutable=/opt/kubernetes/bin/kube-scheduler
         Description=Kubernetes Scheduler
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=opt-kubernetes.mount kube-apiserver.service
 
         [Service]
@@ -67,7 +67,7 @@ coreos:
         After=opt-kubernetes.mount kube-apiserver.service
         ConditionPathIsDirectory=/opt/kubernetes/addons
         Description=Kubernetes addons
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=opt-kubernetes.mount
         Wants=kube-apiserver.service
 

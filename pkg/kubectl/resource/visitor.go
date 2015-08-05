@@ -28,19 +28,19 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const constSTDINstr string = "STDIN"
 
 // Visitor lets clients walk a list of resources.
 // TODO: we should rethink how we handle errors in the visit loop
-// (See https://github.com/GoogleCloudPlatform/kubernetes/pull/9357#issuecomment-109600305)
+// (See https://github.com/kubernetes/kubernetes/pull/9357#issuecomment-109600305)
 type Visitor interface {
 	Visit(VisitorFunc) error
 }

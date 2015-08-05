@@ -23,10 +23,10 @@ import (
 	"path"
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	pkg_runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/v1"
+	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -53,9 +53,9 @@ func main() {
 		funcOut = file
 	}
 
-	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), path.Join("github.com/GoogleCloudPlatform/kubernetes/pkg/api", *version))
-	apiShort := generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
-	generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource")
+	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), path.Join("k8s.io/kubernetes/pkg/api", *version))
+	apiShort := generator.AddImport("k8s.io/kubernetes/pkg/api")
+	generator.AddImport("k8s.io/kubernetes/pkg/api/resource")
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	generator.OverwritePackage(*version, "")
 	for _, knownType := range api.Scheme.KnownTypes(*version) {

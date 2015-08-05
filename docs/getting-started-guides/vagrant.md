@@ -72,7 +72,7 @@ export KUBERNETES_PROVIDER=vagrant
 curl -sS https://get.k8s.io | bash
 ```
 
-Alternatively, you can download [Kubernetes release](https://github.com/GoogleCloudPlatform/kubernetes/releases) and extract the archive. To start your local cluster, open a shell and run:
+Alternatively, you can download [Kubernetes release](https://github.com/kubernetes/kubernetes/releases) and extract the archive. To start your local cluster, open a shell and run:
 
 ```sh
 cd kubernetes

@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	utilrand "github.com/GoogleCloudPlatform/kubernetes/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/testclient"
+	"k8s.io/kubernetes/pkg/runtime"
+	utilrand "k8s.io/kubernetes/pkg/util/rand"
 )
 
 type testGenerator struct {

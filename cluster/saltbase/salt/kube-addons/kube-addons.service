@@ -1,6 +1,6 @@
 [Unit]
 Description=Kubernetes Addon Object Manager
-Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 ExecStart=/etc/kubernetes/kube-addons.sh

@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/user"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/golang/glog"

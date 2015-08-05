@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/probe"
 )
 
 type fakeRoundTripper struct {

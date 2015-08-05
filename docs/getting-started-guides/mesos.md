@@ -85,7 +85,7 @@ ssh jclouds@${ip_address_of_master_node}
 Build Kubernetes-Mesos.
 
 ```bash
-git clone https://github.com/GoogleCloudPlatform/kubernetes
+git clone https://github.com/kubernetes/kubernetes
 cd kubernetes
 export KUBERNETES_CONTRIB=mesos
 make

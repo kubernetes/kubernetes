@@ -9,7 +9,7 @@ coreos:
         After=opt-kubernetes.mount etcd.service docker.socket
         ConditionFileIsExecutable=/opt/kubernetes/bin/kubelet
         Description=Kubernetes Kubelet
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=opt-kubernetes.mount etcd.service docker.socket
 
         [Service]
@@ -32,7 +32,7 @@ coreos:
         After=opt-kubernetes.mount etcd.service
         ConditionFileIsExecutable=/opt/kubernetes/bin/kube-proxy
         Description=Kubernetes Proxy
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=opt-kubernetes.mount etcd.service
 
         [Service]

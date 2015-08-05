@@ -441,7 +441,7 @@ though exactly how that works depends on the cloud provider.
 We expect that using iptables and userspace proxies for VIPs will work at
 small to medium scale, but may not scale to very large clusters with thousands
 of Services.  See [the original design proposal for
-portals](https://github.com/GoogleCloudPlatform/kubernetes/issues/1107) for more
+portals](https://github.com/kubernetes/kubernetes/issues/1107) for more
 details.
 
 Using the kube-proxy obscures the source-IP of a packet accessing a `Service`.
@@ -462,7 +462,7 @@ envision that some `Services` will have "real" load balancers, in which case the
 VIP will simply transport the packets there.
 
 There's a
-[proposal](https://github.com/GoogleCloudPlatform/kubernetes/issues/3760) to
+[proposal](https://github.com/kubernetes/kubernetes/issues/3760) to
 eliminate userspace proxying in favor of doing it all in iptables.  This should
 perform better and fix the source-IP obfuscation, though is less flexible than
 arbitrary userspace code.
@@ -531,7 +531,7 @@ of which `Pods` they are actually accessing.
 
 Service is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Service API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_service).
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_service).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

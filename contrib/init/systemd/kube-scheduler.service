@@ -1,6 +1,6 @@
 [Unit]
 Description=Kubernetes Scheduler Plugin
-Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 EnvironmentFile=-/etc/kubernetes/config

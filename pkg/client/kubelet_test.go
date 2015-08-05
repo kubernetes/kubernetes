@@ -25,8 +25,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestHTTPKubeletClient(t *testing.T) {

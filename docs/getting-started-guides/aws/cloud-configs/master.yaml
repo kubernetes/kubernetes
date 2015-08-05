@@ -95,7 +95,7 @@ coreos:
       content: |
         [Unit]
         Description=Get kubectl client tool
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=network-online.target
         After=network-online.target
 
@@ -109,7 +109,7 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes API Server
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=etcd2-waiter.service
         After=etcd2-waiter.service
 
@@ -127,7 +127,7 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes Controller Manager
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=kube-apiserver.service
         After=kube-apiserver.service
 
@@ -143,7 +143,7 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes Scheduler
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=kube-apiserver.service
         After=kube-apiserver.service
 

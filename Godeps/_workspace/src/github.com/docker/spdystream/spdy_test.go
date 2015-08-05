@@ -802,7 +802,7 @@ func (s *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// see https://github.com/GoogleCloudPlatform/kubernetes/issues/4882
+// see https://github.com/kubernetes/kubernetes/issues/4882
 func TestFramingAfterRemoteConnectionClosed(t *testing.T) {
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		streamCh := make(chan *Stream)

@@ -17,8 +17,8 @@ limitations under the License.
 package record
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // FakeRecorder is used as a fake during tests.
