@@ -375,35 +375,35 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/auth",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/executor",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/messenger",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/scheduler",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/upid",
-			"Rev": "6440c09c9d8a1b365f3c3e9b2297dd856abd017c"
+			"Rev": "65cb9ffec50a76f4ed9fe4808405b66b3bb7010d"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",

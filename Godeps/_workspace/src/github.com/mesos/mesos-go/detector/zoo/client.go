@@ -270,9 +270,6 @@ func (zkc *Client) monitorSession(sessionEvents <-chan zk.Event, connected chan 
 				default: // message buf full, this becomes a non-blocking noop
 				}
 
-			case zk.StateSyncConnected:
-				log.Infoln("syncConnected to zookper server")
-
 			case zk.StateDisconnected:
 				log.Infoln("zookeeper client disconnected")
 
