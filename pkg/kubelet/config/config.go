@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/config"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
-	"github.com/golang/glog"
 )
 
 // PodConfigNotificationMode describes how changes are sent to the update channel.

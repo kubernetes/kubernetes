@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"github.com/golang/glog"
 )
 
 const (

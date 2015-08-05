@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/client"
 )
 
 const (

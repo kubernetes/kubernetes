@@ -22,11 +22,11 @@ import (
 	"io"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
-	"github.com/spf13/cobra"
 )
 
 // AnnotateOptions have the data required to perform the annotate operation

@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	docker "github.com/fsouza/go-dockerclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
-	docker "github.com/fsouza/go-dockerclient"
 )
 
 func TestToRuntimeContainer(t *testing.T) {

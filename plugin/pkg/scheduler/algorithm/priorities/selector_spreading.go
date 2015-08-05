@@ -17,10 +17,10 @@ limitations under the License.
 package priorities
 
 import (
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	"github.com/golang/glog"
 )
 
 type SelectorSpread struct {

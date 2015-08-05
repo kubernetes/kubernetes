@@ -23,10 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 func newTestContainerGC(t *testing.T, MinAge time.Duration, MaxPerPodContainer, MaxContainers int) (containerGC, *dockertools.FakeDockerClient) {

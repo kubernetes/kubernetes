@@ -19,9 +19,9 @@ package dockertools
 import (
 	"fmt"
 
+	docker "github.com/fsouza/go-dockerclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
-	docker "github.com/fsouza/go-dockerclient"
 )
 
 // This file contains helper functions to convert docker API types to runtime

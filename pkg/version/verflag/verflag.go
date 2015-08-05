@@ -23,8 +23,8 @@ import (
 	"os"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/version"
 	flag "github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 type versionValue int

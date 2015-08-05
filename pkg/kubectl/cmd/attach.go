@@ -23,13 +23,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/docker/docker/pkg/term"
+	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/client/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/docker/docker/pkg/term"
-	"github.com/golang/glog"
-	"github.com/spf13/cobra"
 )
 
 const (

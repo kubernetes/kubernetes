@@ -19,9 +19,9 @@ package record
 import (
 	"sync"
 
+	"github.com/golang/groupcache/lru"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/golang/groupcache/lru"
 )
 
 type history struct {

@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
 
-	"k8s.io/kubernetes/third_party/golang/netutil"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/third_party/golang/netutil"
 )
 
 // ProxyHandler provides a http.Handler which will proxy traffic to locations

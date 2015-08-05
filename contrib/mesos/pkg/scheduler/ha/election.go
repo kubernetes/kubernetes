@@ -17,8 +17,8 @@ limitations under the License.
 package ha
 
 import (
-	"k8s.io/kubernetes/contrib/mesos/pkg/election"
 	log "github.com/golang/glog"
+	"k8s.io/kubernetes/contrib/mesos/pkg/election"
 )
 
 type roleType int

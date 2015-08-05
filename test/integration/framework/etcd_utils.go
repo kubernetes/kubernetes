@@ -22,13 +22,13 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"github.com/coreos/go-etcd/etcd"
-	"github.com/golang/glog"
 )
 
 // If you need to start an etcd instance by hand, you also need to insert a key

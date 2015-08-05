@@ -22,11 +22,11 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/emicklei/go-restful/swagger"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/errors"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/yaml"
-	"github.com/emicklei/go-restful/swagger"
-	"github.com/golang/glog"
 )
 
 type InvalidTypeError struct {

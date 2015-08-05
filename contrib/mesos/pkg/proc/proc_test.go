@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	log "github.com/golang/glog"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 )
 
 // logs a testing.Fatalf if the elapsed time d passes before signal chan done is closed

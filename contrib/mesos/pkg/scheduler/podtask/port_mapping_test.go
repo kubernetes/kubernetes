@@ -19,8 +19,8 @@ package podtask
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestDefaultHostPortMatching(t *testing.T) {
