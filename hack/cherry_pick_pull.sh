@@ -28,6 +28,15 @@ cd "${KUBE_ROOT}"
 declare -r STARTINGBRANCH=$(git symbolic-ref --short HEAD)
 declare -r REBASEMAGIC="${KUBE_ROOT}/.git/rebase-apply"
 
+if [[ -z ${GITHUB_USER:-} ]]; then
+  echo "Please export GITHUB_USER=<your-user>"
+  exit 1
+fi
+
+if ! which hub > /dev/null; then
+  echo "Can't find 'hub' tool in PATH, please install from https://github.com/github/hub"
+fi
+
 if [[ "$#" -lt 2 ]]; then
   echo "${0} <remote branch> <pr-number>...: cherry pick one or more <pr> onto <remote branch> and leave instructions for proposing pull request"
   echo ""
@@ -124,17 +133,9 @@ done
 gitamcleanup=false
 
 function make-a-pr() {
-  echo "+++ Now you must propose ${NEWBRANCH} as a pull against ${BRANCH} (<--- NOT MASTER)."
-  echo "    You are constructing a pull against the upstream release branch! To do"
-  echo "    this in the GitHub UI, when you get to the 'Comparing Changes' screen, keep the"
-  echo "    'base fork' as GoogleCloudPlatform/kubernetes, but change the 'base' to e.g. 'release-1.0',"
-  echo "    presumably ${BRANCH}. (This selection is near the top left.)"
-  echo
-  echo "    Use this subject: 'Automated cherry pick of ${PULLSUBJ}' and include a justification."
-  echo
-  echo "    Note: the tools actually scrape the branch name you just pushed, so don't worry about"
-  echo "    the subject too much, but DO keep at least ${NEWBRANCHREQ} in the remote branch name."
-  echo
+  echo "+++ Creating a pull request on github"
+  echo hub pull-request -m "Automated cherry pick of ${PULLSUBJ}" -h ${GITHUB_USER}:${NEWBRANCH} -b GoogleCloudPlatform:`basename ${BRANCH}`
+  hub pull-request -m "Automated cherry pick of ${PULLSUBJ}" -h ${GITHUB_USER}:${NEWBRANCH} -b GoogleCloudPlatform:`basename ${BRANCH}`
 }
 
 if git remote -v | grep ^origin | grep GoogleCloudPlatform/kubernetes.git; then
