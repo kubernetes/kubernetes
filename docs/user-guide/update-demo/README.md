@@ -99,7 +99,8 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```console
-$ kubectl rolling-update update-demo-nautilus --update-period=10s -f docs/user-guide/update-demo/kitten-rc.yaml
+$ kubectl rolling-update update-demo-nautilus --update-period=10s \
+    -f docs/user-guide/update-demo/kitten-rc.yaml
 ```
 
 The rolling-update command in kubectl will do 2 things:

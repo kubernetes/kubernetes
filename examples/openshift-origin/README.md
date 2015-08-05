@@ -79,7 +79,8 @@ $ mkdir ${OPENSHIFT_CONFIG}
 OpenShift Origin uses a configuration file to know how to access your Kubernetes cluster with administrative authority.
 
 ```
-$ cluster/kubectl.sh config view --output=yaml --flatten=true --minify=true > ${OPENSHIFT_CONFIG}/kubeconfig
+$ cluster/kubectl.sh config view --output=yaml --flatten=true --minify=true > \
+    ${OPENSHIFT_CONFIG}/kubeconfig
 ```
 
 The output from this command will contain a single file that has all the required information needed to connect to your
@@ -108,7 +109,8 @@ build default certificates.
 Grab the public IP address of the service we previously created.
 
 ```sh
-$ export PUBLIC_IP=$(cluster/kubectl.sh get services openshift --template="{{ index .status.loadBalancer.ingress 0 \"ip\" }}")
+$ export PUBLIC_IP=$(cluster/kubectl.sh get services openshift \
+    --template="{{ index .status.loadBalancer.ingress 0 \"ip\" }}")
 $ echo $PUBLIC_IP
 ```
 
@@ -182,7 +184,9 @@ Open a browser and visit the OpenShift master public address reported in your lo
 You can use the CLI commands by running the following:
 
 ```sh
-$ docker run --privileged --entrypoint="/usr/bin/bash" -it -e="OPENSHIFTCONFIG=/config/admin.kubeconfig" -v ${OPENSHIFT_CONFIG}:/config openshift/origin
+$ docker run --privileged --entrypoint="/usr/bin/bash" -it \
+    -e="OPENSHIFTCONFIG=/config/admin.kubeconfig" -v ${OPENSHIFT_CONFIG}:/config \
+    openshift/origin
 $ osc config use-context public-default
 $ osc --help
 ```

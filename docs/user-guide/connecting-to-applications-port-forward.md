@@ -56,7 +56,8 @@ redis-master   2/2       Running   0          41s
 The Redis master is listening on port 6397, to verify this,
 
 ```console
-$ kubectl get pods redis-master -t='{{(index (index .spec.containers 0).ports 0).containerPort}}{{"\n"}}'
+$ kubectl get pods redis-master \
+    -t='{{(index (index .spec.containers 0).ports 0).containerPort}}{{"\n"}}'
 6379
 ```
 

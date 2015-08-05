@@ -65,10 +65,12 @@ kubectl config set-credentials NAME [--client-certificate=path/to/certfile] [--c
 $ kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
 
 // Set basic auth for the "cluster-admin" entry
-$ kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
+$ kubectl config set-credentials cluster-admin --username=admin \
+    --password=uXFGweU9l35qcif
 
 // Embed client certificate data in the "cluster-admin" entry
-$ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true
+$ kubectl config set-credentials cluster-admin \
+    --client-certificate=~/.kube/admin.crt --embed-certs=true
 ```
 
 ### Options

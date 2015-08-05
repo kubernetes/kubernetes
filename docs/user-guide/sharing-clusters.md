@@ -102,7 +102,8 @@ $ kubectl config set-credentials $USER_NICK \
     --kubeconfig=/path/to/standalone/.kubeconfig
 
 # create context entry
-$ kubectl config set-context $CONTEXT_NAME --cluster=$CLUSTER_NICKNAME --user=$USER_NICK
+$ kubectl config set-context $CONTEXT_NAME --cluster=$CLUSTER_NICKNAME \
+    --user=$USER_NICK
 ```
 
 Notes:
