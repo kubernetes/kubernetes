@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/httpstream"
 	"github.com/golang/glog"
 )
 

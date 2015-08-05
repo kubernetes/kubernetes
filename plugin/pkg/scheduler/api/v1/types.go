@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	apiv1 "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 type Policy struct {

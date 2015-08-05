@@ -19,10 +19,10 @@ package scheduler
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/proc"
-	schedcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/config"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
+	schedcfg "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	util "github.com/mesos/mesos-go/mesosutil"
 	"github.com/stretchr/testify/assert"

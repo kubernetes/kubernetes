@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"golang.org/x/net/websocket"
 )
 

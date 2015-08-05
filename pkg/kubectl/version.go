@@ -21,8 +21,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 func GetVersion(w io.Writer, kubeClient client.Interface) {

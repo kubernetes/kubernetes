@@ -19,7 +19,7 @@ package testclient
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/client"
 )
 
 // This test file just ensures that Fake and structs it is embedded in

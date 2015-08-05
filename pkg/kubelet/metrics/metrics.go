@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )

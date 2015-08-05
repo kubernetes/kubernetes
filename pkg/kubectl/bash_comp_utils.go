@@ -19,7 +19,7 @@ limitations under the License.
 package kubectl
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

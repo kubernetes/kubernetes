@@ -23,10 +23,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	pkg_runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/v1"
+	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -60,9 +60,9 @@ func main() {
 		knownVersion = api.Scheme.Raw().InternalVersion
 		registerTo = "Scheme"
 	}
-	pkgPath := path.Join("github.com/GoogleCloudPlatform/kubernetes/pkg/api", knownVersion)
-	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), pkgPath, util.NewStringSet("github.com/GoogleCloudPlatform/kubernetes"))
-	generator.AddImport("github.com/GoogleCloudPlatform/kubernetes/pkg/api")
+	pkgPath := path.Join("k8s.io/kubernetes/pkg/api", knownVersion)
+	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), pkgPath, util.NewStringSet("k8s.io/kubernetes"))
+	generator.AddImport("k8s.io/kubernetes/pkg/api")
 
 	if len(*overwrites) > 0 {
 		for _, overwrite := range strings.Split(*overwrites, ",") {

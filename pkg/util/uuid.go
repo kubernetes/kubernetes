@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/types"
 	"github.com/pborman/uuid"
 )
 

@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/rest"
 )
 
 // LocationStreamer is a resource that streams the contents of a particular

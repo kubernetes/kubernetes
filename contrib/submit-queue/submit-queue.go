@@ -45,8 +45,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/submit-queue/github"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/submit-queue/jenkins"
+	"k8s.io/kubernetes/contrib/submit-queue/github"
+	"k8s.io/kubernetes/contrib/submit-queue/jenkins"
 
 	"github.com/golang/glog"
 	github_api "github.com/google/go-github/github"
