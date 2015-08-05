@@ -67,9 +67,9 @@ footer:
       - label: stackoverflow
         url: http://stackoverflow.com/questions/tagged/kubernetes
       - label: twitter
-        url: https://twitter.com/googlecloud
+        url: https://twitter.com/kubernetesio
       - label: googleplus
-        url: https://plus.google.com/+googlecloudplatform
+        url: https://plus.google.com/u/0/b/116512812300813784482/116512812300813784482
             
     links:
       - label: Freenode
