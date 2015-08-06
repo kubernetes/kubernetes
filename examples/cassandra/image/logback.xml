@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<configuration scan="true">
+  <jmxConfigurator/>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%-5level %date{HH:mm:ss,SSS} %msg%n</pattern>
+    </encoder>
+  </appender>
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+  </root>
+  <logger name="com.thinkaurelius.thrift" level="ERROR"/>
+</configuration>

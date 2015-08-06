@@ -215,7 +215,7 @@ counter_cache_save_period: 7200
 
 # saved caches
 # If not set, the default directory is $CASSANDRA_HOME/data/saved_caches.
-saved_caches_directory: /var/lib/cassandra/saved_caches
+saved_caches_directory: /cassandra_data/saved_caches
 
 # commitlog_sync may be either "periodic" or "batch." 
 # When in batch mode, Cassandra won't ack writes until the commit log
