@@ -369,7 +369,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       CGO_ENABLED=0 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
     done
@@ -377,7 +377,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
     done
@@ -386,12 +386,12 @@ kube::golang::build_binaries_for_platform() {
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
       go install "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
       CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
-        -ldflags "${version_ldflags}" \
+        -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
     fi
   fi
@@ -405,7 +405,7 @@ kube::golang::build_binaries_for_platform() {
     pushd "$(dirname ${outfile})" >/dev/null
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
-      -ldflags "${version_ldflags}" \
+      -ldflags "${goldflags}" \
       "$(dirname ${test})"
     popd >/dev/null
   done
@@ -447,16 +447,13 @@ kube::golang::build_binaries() {
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
 
-    # Fetch the version.
-    local version_ldflags
-    version_ldflags=$(kube::version::ldflags)
-
     local host_platform
     host_platform=$(kube::golang::host_platform)
 
     # Use eval to preserve embedded quoted strings.
-    local goflags
+    local goflags goldflags
     eval "goflags=(${KUBE_GOFLAGS:-})"
+    goldflags="${KUBE_GOLDFLAGS:-} $(kube::version::ldflags)"
 
     local use_go_build
     local -a targets=()
