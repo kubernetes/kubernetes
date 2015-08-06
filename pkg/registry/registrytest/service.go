@@ -46,7 +46,7 @@ func (r *ServiceRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *ServiceRegistry) ListServices(ctx api.Context) (*api.ServiceList, error) {
+func (r *ServiceRegistry) ListServices(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ServiceList, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

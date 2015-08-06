@@ -167,26 +167,11 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	service, err := rs.registry.GetService(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return service, err
+	return rs.registry.GetService(ctx, id)
 }
 
 func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	list, err := rs.registry.ListServices(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var filtered []api.Service
-	for _, service := range list.Items {
-		if label.Matches(labels.Set(service.Labels)) {
-			filtered = append(filtered, service)
-		}
-	}
-	list.Items = filtered
-	return list, err
+	return rs.registry.ListServices(ctx, label, field)
 }
 
 // Watch returns Services events via a watch.Interface.

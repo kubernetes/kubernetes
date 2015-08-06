@@ -20,10 +20,10 @@ package podtask
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic/etcd"
 )
 
 // makePodKey constructs etcd paths to pod items enforcing namespace rules.
 func MakePodKey(ctx api.Context, id string) (string, error) {
-	return etcd.MakeEtcdItemKey(ctx, PodPath, id)
+	return etcd.NamespaceKeyFunc(ctx, PodPath, id)
 }

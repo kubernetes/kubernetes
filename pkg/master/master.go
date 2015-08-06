@@ -53,7 +53,6 @@ import (
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
-	"k8s.io/kubernetes/pkg/registry/etcd"
 	"k8s.io/kubernetes/pkg/registry/event"
 	"k8s.io/kubernetes/pkg/registry/limitrange"
 	"k8s.io/kubernetes/pkg/registry/minion"
@@ -68,6 +67,7 @@ import (
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
+	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
 	"k8s.io/kubernetes/pkg/storage"
@@ -448,7 +448,9 @@ func (m *Master) init(c *Config) {
 
 	nodeStorage, nodeStatusStorage := nodeetcd.NewStorage(c.DatabaseStorage, c.KubeletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
-	m.serviceRegistry = etcd.NewRegistry(c.DatabaseStorage)
+
+	serviceStorage := serviceetcd.NewStorage(c.DatabaseStorage)
+	m.serviceRegistry = service.NewRegistry(serviceStorage)
 
 	var serviceClusterIPRegistry service.RangeRegistry
 	serviceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(m.serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
