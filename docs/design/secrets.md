@@ -119,7 +119,7 @@ which consumes this type of secret, the Kubelet may take a number of actions:
     file system
 2.  Configure that node's `kube-proxy` to decorate HTTP requests from that pod to the
     `kubernetes-master` service with the auth token, e. g. by adding a header to the request
-    (see the [LOAS Daemon](https://github.com/GoogleCloudPlatform/kubernetes/issues/2209) proposal)
+    (see the [LOAS Daemon](http://issue.k8s.io/2209) proposal)
 
 #### Example: service account consumes docker registry credentials
 
@@ -263,11 +263,11 @@ the right storage size for their installation and configuring their Kubelets cor
 
 Configuring each Kubelet is not the ideal story for operator experience; it is more intuitive that
 the cluster-wide storage size be readable from a central configuration store like the one proposed
-in [#1553](https://github.com/GoogleCloudPlatform/kubernetes/issues/1553).  When such a store
+in [#1553](http://issue.k8s.io/1553).  When such a store
 exists, the Kubelet could be modified to read this configuration item from the store.
 
 When the Kubelet is modified to advertise node resources (as proposed in
-[#4441](https://github.com/GoogleCloudPlatform/kubernetes/issues/4441)), the capacity calculation
+[#4441](http://issue.k8s.io/4441)), the capacity calculation
 for available memory should factor in the potential size of the node-level tmpfs in order to avoid
 memory overcommit on the node.
 

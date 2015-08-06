@@ -39,7 +39,7 @@ Multiple kubeconfig files are allowed.  At runtime they are loaded and merged to
 
 ## Related discussion
 
-https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
+http://issue.k8s.io/1755
 
 ## Example kubeconfig file
 

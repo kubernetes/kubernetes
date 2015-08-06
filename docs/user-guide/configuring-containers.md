@@ -103,7 +103,7 @@ Let’s say you specified `entrypoint` instead of `command`. You’d see output 
 
 ```console
 I0709 06:33:05.600829   14160 schema.go:126] unknown field: entrypoint
-I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842
+I0709 06:33:05.600988   14160 schema.go:129] this may be a false alarm, see http://issue.k8s.io/6842
 pods/hello-world
 ```
 

@@ -768,7 +768,7 @@ func (r *runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthCo
 // TODO(yifan): Now we only support docker images, this should be changed
 // once the format of image is landed, see:
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/issues/7203
+// http://issue.k8s.io/7203
 //
 func (r *runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Secret) error {
 	img := image.Image

@@ -165,7 +165,7 @@ Use of imagePullSecrets is desribed in the [images documentation](images.md#spec
 ### Automatic use of Manually Created Secrets
 
 *This feature is planned but not implemented.  See [issue
-9902](https://github.com/GoogleCloudPlatform/kubernetes/issues/9902).*
+9902](http://issue.k8s.io/9902).*
 
 You can reference manually created secrets from a [service account](service-accounts.md).
 Then, pods which use that service account will have

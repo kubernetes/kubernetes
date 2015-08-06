@@ -78,7 +78,7 @@ containers:
         memory: 200Mi
 ```
 
-These limits, however, are based on data collected from addons running on 4-node clusters (see [#10335](https://github.com/GoogleCloudPlatform/kubernetes/issues/10335#issuecomment-117861225)). The addons consume a lot more resources when running on large deployment clusters (see [#5880](https://github.com/GoogleCloudPlatform/kubernetes/issues/5880#issuecomment-113984085)). So, if a large cluster is deployed without adjusting these values, the addons may continuously get killed because they keep hitting the limits.
+These limits, however, are based on data collected from addons running on 4-node clusters (see [#10335](http://issue.k8s.io/10335#issuecomment-117861225)). The addons consume a lot more resources when running on large deployment clusters (see [#5880](http://issue.k8s.io/5880#issuecomment-113984085)). So, if a large cluster is deployed without adjusting these values, the addons may continuously get killed because they keep hitting the limits.
 
 To avoid running into cluster addon resource issues, when creating a cluster with many nodes, consider the following:
 * Scale memory and CPU limits for each of the following addons, if used, along with the size of cluster (there is one replica of each handling the entire cluster so memory and CPU usage tends to grow proportionally with size/load on cluster):

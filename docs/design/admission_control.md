@@ -37,7 +37,7 @@ Documentation for other releases can be found at
 
 | Topic | Link |
 | ----- | ---- |
-| Separate validation from RESTStorage | https://github.com/GoogleCloudPlatform/kubernetes/issues/2977 |
+| Separate validation from RESTStorage | http://issue.k8s.io/2977 |
 
 ## Background
 
