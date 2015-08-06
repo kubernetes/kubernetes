@@ -19,13 +19,13 @@ package master
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	explatest "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
 func TestGetServersToValidate(t *testing.T) {

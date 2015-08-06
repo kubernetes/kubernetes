@@ -28,9 +28,9 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	clientcmdlatest "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	clientcmdlatest "k8s.io/kubernetes/pkg/client/clientcmd/api/latest"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (

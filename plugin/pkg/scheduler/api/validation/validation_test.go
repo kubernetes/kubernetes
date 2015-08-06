@@ -19,7 +19,7 @@ package validation
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 func TestValidatePriorityWithNoWeight(t *testing.T) {

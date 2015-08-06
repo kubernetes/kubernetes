@@ -19,8 +19,8 @@ package cache
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Enumerator should be able to return the list of objects to be synced with

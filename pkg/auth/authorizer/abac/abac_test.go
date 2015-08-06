@@ -21,8 +21,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 func TestEmptyFile(t *testing.T) {

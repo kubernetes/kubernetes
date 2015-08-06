@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
+	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.4.2",
 	"Packages": [
 		"./..."

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/workqueue"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 func TestBasic(t *testing.T) {

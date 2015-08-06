@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 )
 
 // ConfigOverrides holds values that should override whatever information is pulled from the actual Config object.  You can't

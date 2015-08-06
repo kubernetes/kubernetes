@@ -21,8 +21,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 func TestSelectorSpreadPriority(t *testing.T) {

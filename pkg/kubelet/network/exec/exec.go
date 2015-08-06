@@ -54,10 +54,10 @@ import (
 	"path"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
-	utilexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 type execNetworkPlugin struct {

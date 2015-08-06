@@ -18,8 +18,8 @@ limitations under the License.
 package main
 
 import (
-	kubeproxy "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-proxy/app"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
+	kubeproxy "k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 )
 
 // NewKubeProxy creates a new hyperkube Server object that includes the

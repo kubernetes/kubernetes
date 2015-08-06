@@ -18,8 +18,8 @@ limitations under the License.
 package main
 
 import (
-	kubeapiserver "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
+	kubeapiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 )
 
 // NewKubeAPIServer creates a new hyperkube Server object that includes the

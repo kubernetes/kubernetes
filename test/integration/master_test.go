@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestExperimentalPrefix(t *testing.T) {

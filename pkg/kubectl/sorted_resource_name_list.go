@@ -17,7 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 type SortableResourceNames []api.ResourceName

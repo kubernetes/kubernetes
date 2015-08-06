@@ -20,11 +20,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/mock"
+	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // implements SchedulerInterface
