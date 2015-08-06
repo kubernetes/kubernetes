@@ -87,7 +87,7 @@ class Registrator:
             'message', '').startswith('The requested resource does not exist'):
             # There's something fishy in the kube api here (0.4 dev), first time we
             # go to register a new minion, we always seem to get this error.
-            # https://github.com/GoogleCloudPlatform/kubernetes/issues/1995
+            # http://issue.k8s.io/1995
             time.sleep(1)
             print("Retrying registration...")
             raise ValueError("Registration returned 500, retry")

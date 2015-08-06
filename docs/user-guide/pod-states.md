@@ -81,7 +81,7 @@ The possible values for RestartPolicy are `Always`, `OnFailure`, or `Never`. If 
 
 The only controller we have today is [`ReplicationController`](replication-controller.md).  `ReplicationController` is *only* appropriate for pods with `RestartPolicy = Always`.  `ReplicationController` should refuse to instantiate any pod that has a different restart policy.
 
-There is a legitimate need for a controller which keeps pods with other policies alive. Pods having any of the other policies (`OnFailure` or `Never`) eventually terminate, at which point the controller should stop recreating them.  Because of this fundamental distinction, let's hypothesize a new controller, called [`JobController`](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624) for the sake of this document, which can implement this policy.
+There is a legitimate need for a controller which keeps pods with other policies alive. Pods having any of the other policies (`OnFailure` or `Never`) eventually terminate, at which point the controller should stop recreating them.  Because of this fundamental distinction, let's hypothesize a new controller, called [`JobController`](http://issue.k8s.io/1624) for the sake of this document, which can implement this policy.
 
 ## Pod lifetime
 

@@ -586,7 +586,7 @@ var _ = Describe("Services", func() {
 		}
 		ingress2 := service.Status.LoadBalancer.Ingress[0]
 
-		// TODO: Fix the issue here: https://github.com/GoogleCloudPlatform/kubernetes/issues/11002
+		// TODO: Fix the issue here: http://issue.k8s.io/11002
 		if providerIs("aws") {
 			// TODO: Make this less of a hack (or fix the underlying bug)
 			time.Sleep(time.Second * 120)

@@ -33,7 +33,7 @@
 # boot, run-salt will installs kube-apiserver.manifest files to
 # kubelet config directory before the installation of proper version
 # kubelet. Please see
-# https://github.com/GoogleCloudPlatform/kubernetes/issues/10122#issuecomment-114566063
+# http://issue.k8s.io/10122#issuecomment-114566063
 # for detail explanation on this very issue.
 /etc/kubernetes/manifests/kube-apiserver.manifest:
   file.managed:
