@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	explatest "github.com/GoogleCloudPlatform/kubernetes/pkg/expapi/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/api"
+	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 // Interface holds the experimental methods for clients of Kubernetes
