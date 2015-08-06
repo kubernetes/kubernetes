@@ -28,7 +28,10 @@ support is experimental.
 
 package expapi
 
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+)
 
 // ScaleSpec describes the attributes a Scale subresource
 type ScaleSpec struct {
@@ -60,4 +63,50 @@ type Scale struct {
 // Dummy definition
 type ReplicationControllerDummy struct {
 	api.TypeMeta `json:",inline"`
+}
+
+// SubresourceReference contains enough information to let you inspect or modify the referred subresource.
+type SubresourceReference struct {
+	Kind        string `json:"kind,omitempty"`
+	Namespace   string `json:"namespace,omitempty"`
+	Name        string `json:"name,omitempty"`
+	APIVersion  string `json:"apiVersion,omitempty"`
+	Subresource string `json:"subresource,omitempty"`
+}
+
+// TargetConsumption is an object for specifying target average resource consumption of a particular resource.
+type TargetConsumption struct {
+	Resource api.ResourceName  `json:"resource,omitempty"`
+	Quantity resource.Quantity `json:"quantity,omitempty"`
+}
+
+// HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.
+type HorizontalPodAutoscalerSpec struct {
+	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current resource consumption from its status,
+	// and will set the desired number of pods by modyfying its spec.
+	ScaleRef *SubresourceReference `json:"scaleRef"`
+	// MinCount is the lower limit for the number of pods that can be set by the autoscaler.
+	MinCount int `json:"minCount"`
+	// MaxCount is the upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinCount.
+	MaxCount int `json:"maxCount"`
+	// Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods.
+	// Currently two types of resources are supported: "cpu" and "memory".
+	Target TargetConsumption `json:"target"`
+}
+
+// HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
+type HorizontalPodAutoscaler struct {
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the behaviour of autoscaler.
+	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
+}
+
+// HorizontalPodAutoscaler is a collection of pod autoscalers.
+type HorizontalPodAutoscalerList struct {
+	api.TypeMeta `json:",inline"`
+	api.ListMeta `json:"metadata,omitempty"`
+
+	Items []HorizontalPodAutoscaler `json:"items"`
 }

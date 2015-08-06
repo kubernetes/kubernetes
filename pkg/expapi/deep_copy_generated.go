@@ -21,9 +21,17 @@ import (
 	time "time"
 
 	api "k8s.io/kubernetes/pkg/api"
+	resource "k8s.io/kubernetes/pkg/api/resource"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	util "k8s.io/kubernetes/pkg/util"
+	inf "speter.net/go/exp/math/dec/inf"
 )
+
+func deepCopy_api_ListMeta(in api.ListMeta, out *api.ListMeta, c *conversion.Cloner) error {
+	out.SelfLink = in.SelfLink
+	out.ResourceVersion = in.ResourceVersion
+	return nil
+}
 
 func deepCopy_api_ObjectMeta(in api.ObjectMeta, out *api.ObjectMeta, c *conversion.Cloner) error {
 	out.Name = in.Name
@@ -69,6 +77,72 @@ func deepCopy_api_TypeMeta(in api.TypeMeta, out *api.TypeMeta, c *conversion.Clo
 	return nil
 }
 
+func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c *conversion.Cloner) error {
+	if in.Amount != nil {
+		if newVal, err := c.DeepCopy(in.Amount); err != nil {
+			return err
+		} else if newVal == nil {
+			out.Amount = nil
+		} else {
+			out.Amount = newVal.(*inf.Dec)
+		}
+	} else {
+		out.Amount = nil
+	}
+	out.Format = in.Format
+	return nil
+}
+
+func deepCopy_expapi_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_expapi_HorizontalPodAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_expapi_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]HorizontalPodAutoscaler, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_expapi_HorizontalPodAutoscaler(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_expapi_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, c *conversion.Cloner) error {
+	if in.ScaleRef != nil {
+		out.ScaleRef = new(SubresourceReference)
+		if err := deepCopy_expapi_SubresourceReference(*in.ScaleRef, out.ScaleRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.ScaleRef = nil
+	}
+	out.MinCount = in.MinCount
+	out.MaxCount = in.MaxCount
+	if err := deepCopy_expapi_TargetConsumption(in.Target, &out.Target, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_expapi_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -110,6 +184,23 @@ func deepCopy_expapi_ScaleStatus(in ScaleStatus, out *ScaleStatus, c *conversion
 	return nil
 }
 
+func deepCopy_expapi_SubresourceReference(in SubresourceReference, out *SubresourceReference, c *conversion.Cloner) error {
+	out.Kind = in.Kind
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	out.APIVersion = in.APIVersion
+	out.Subresource = in.Subresource
+	return nil
+}
+
+func deepCopy_expapi_TargetConsumption(in TargetConsumption, out *TargetConsumption, c *conversion.Cloner) error {
+	out.Resource = in.Resource
+	if err := deepCopy_resource_Quantity(in.Quantity, &out.Quantity, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) error {
 	if newVal, err := c.DeepCopy(in.Time); err != nil {
 		return err
@@ -121,12 +212,19 @@ func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) erro
 
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
+		deepCopy_api_ListMeta,
 		deepCopy_api_ObjectMeta,
 		deepCopy_api_TypeMeta,
+		deepCopy_resource_Quantity,
+		deepCopy_expapi_HorizontalPodAutoscaler,
+		deepCopy_expapi_HorizontalPodAutoscalerList,
+		deepCopy_expapi_HorizontalPodAutoscalerSpec,
 		deepCopy_expapi_ReplicationControllerDummy,
 		deepCopy_expapi_Scale,
 		deepCopy_expapi_ScaleSpec,
 		deepCopy_expapi_ScaleStatus,
+		deepCopy_expapi_SubresourceReference,
+		deepCopy_expapi_TargetConsumption,
 		deepCopy_util_Time,
 	)
 	if err != nil {
