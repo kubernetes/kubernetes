@@ -24,7 +24,7 @@ class Registrator:
     def __init__(self):
         self.ds ={
           "creationTimestamp": "",
-          "kind": "Minion",
+          "kind": "Node",
           "name": "", # private_address
           "metadata": {
             "name": "", #private_address,
