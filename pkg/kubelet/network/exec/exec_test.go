@@ -228,3 +228,33 @@ func TestPluginStatusHook(t *testing.T) {
 		t.Errorf("Mismatch in expected output for status hook. Expected '10.20.30.40', got '%s'", ip.IP.String())
 	}
 }
+
+func TestPluginStatusHookIPv6(t *testing.T) {
+	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
+	defer tearDownPlugin(pluginName)
+	pluginDir := path.Join(testPluginPath, pluginName)
+	execTemplate := &map[string]interface{}{
+		"IPAddress":  "fe80::e2cb:4eff:fef9:6710",
+		"OutputFile": path.Join(pluginDir, pluginName+".out"),
+	}
+	installPluginUnderTest(t, "", pluginName, execTemplate)
+
+	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, network.NewFakeHost(nil))
+
+	ip, err := plug.Status("namespace", "name", "dockerid2345")
+	if err != nil {
+		t.Errorf("Expected nil got %v", err)
+	}
+	// check output of status hook
+	output, err := ioutil.ReadFile(path.Join(testPluginPath, pluginName, pluginName+".out"))
+	if err != nil {
+		t.Errorf("Expected nil")
+	}
+	expectedOutput := "status namespace name dockerid2345"
+	if string(output) != expectedOutput {
+		t.Errorf("Mismatch in expected output for status hook. Expected '%s', got '%s'", expectedOutput, string(output))
+	}
+	if ip.IP.String() != "fe80::e2cb:4eff:fef9:6710" {
+		t.Errorf("Mismatch in expected output for status hook. Expected 'fe80::e2cb:4eff:fef9:6710', got '%s'", ip.IP.String())
+	}
+}
