@@ -40,7 +40,7 @@ const constSTDINstr string = "STDIN"
 
 // Visitor lets clients walk a list of resources.
 // TODO: we should rethink how we handle errors in the visit loop
-// (See https://github.com/GoogleCloudPlatform/kubernetes/pull/9357#issuecomment-109600305)
+// (See http://pr.k8s.io/9357#issuecomment-109600305)
 type Visitor interface {
 	Visit(VisitorFunc) error
 }

@@ -192,7 +192,7 @@ It is up to an admission plugin to determine if the security context is acceptab
 time of writing, the admission control plugin for security contexts will only allow a context that
 has defined capabilities or privileged.  Contexts that attempt to define a UID or SELinux options
 will be denied by default.  In the future the admission plugin will base this decision upon
-configurable policies that reside within the [service account](https://github.com/GoogleCloudPlatform/kubernetes/pull/2297).
+configurable policies that reside within the [service account](http://pr.k8s.io/2297).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

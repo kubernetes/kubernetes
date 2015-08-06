@@ -113,7 +113,7 @@ This demonstrates what would have been 20 separate entries (indicating schedulin
  * PR [#4157](http://issue.k8s.io/4157): Add "Update Event" to Kubernetes API
  * PR [#4206](http://issue.k8s.io/4206): Modify Event struct to allow compressing multiple recurring events in to a single event
  * PR [#4306](http://issue.k8s.io/4306): Compress recurring events in to a single event to optimize etcd storage
- * PR [#4444](https://github.com/GoogleCloudPlatform/kubernetes/pull/4444): Switch events history to use LRU cache instead of map
+ * PR [#4444](http://pr.k8s.io/4444): Switch events history to use LRU cache instead of map
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
