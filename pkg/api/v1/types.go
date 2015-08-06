@@ -1028,6 +1028,54 @@ type ReplicationControllerList struct {
 	Items []ReplicationController `json:"items" description:"list of replication controllers; see http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md"`
 }
 
+// DaemonSpec is the specification of a daemon.
+type DaemonSpec struct {
+	// Selector is a label query over pods that are managed by the daemon.
+	Selector map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to be controlled by this daemon, if empty defaulted to labels on Pod template; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"`
+
+	// Template is the object that describes the pod that will be created.
+	// The Daemon will create exactly one copy of this pod on every node
+	// that matches the template's node selector (or on every node if no node
+	// selector is specified).
+	Template *PodTemplateSpec `json:"template,omitempty" description:"object that describes the pod that will be created by this daemon; see http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template"`
+}
+
+// DaemonStatus represents the current status of a daemon.
+type DaemonStatus struct {
+	// CurrentNumberScheduled is the number of nodes that are running exactly 1 copy of the
+	// daemon and are supposed to run the daemon.
+	CurrentNumberScheduled int `json:"currentNumberScheduled" description:"number of nodes that are running exactly 1 copy of the daemon and are supposed to run the daemon"`
+
+	// NumberMisscheduled is the number of nodes that are running the daemon, but are
+	// not supposed to run the daemon.
+	NumberMisscheduled int `json:"numberMisscheduled" description:"number of nodes that are running the Daemon, but are not supposed to run the daemon"`
+
+	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
+	// (including nodes correctly running the daemon).
+	DesiredNumberScheduled int `json:"desiredNumberScheduled" description:"total number of nodes that should be running the Daemon (including nodes correctly running the daemon)"`
+}
+
+// Daemon represents the configuration of a daemon.
+type Daemon struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+
+	// Spec defines the desired behavior of this daemon.
+	Spec DaemonSpec `json:"spec,omitempty" description:"specification of the desired behavior of the daemon; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+
+	// Status is the current status of this daemon. This data may be
+	// out of date by some window of time.
+	Status DaemonStatus `json:"status,omitempty" description:"most recently observed status of the daemon; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+}
+
+// DaemonList is a collection of daemon.
+type DaemonList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+
+	Items []Daemon `json:"items" description:"list of daemons"`
+}
+
 // Session Affinity Type string
 type ServiceAffinity string
 
@@ -1829,6 +1877,8 @@ const (
 	ResourceServices ResourceName = "services"
 	// ReplicationControllers, number
 	ResourceReplicationControllers ResourceName = "replicationcontrollers"
+	// Daemon, number
+	ResourceDaemon ResourceName = "daemon"
 	// ResourceQuotas, number
 	ResourceQuotas ResourceName = "resourcequotas"
 	// ResourceSecrets, number

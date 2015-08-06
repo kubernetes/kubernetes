@@ -94,7 +94,8 @@ func init() {
 		"PodLogOptions",
 		"PodExecOptions",
 		"PodAttachOptions",
-		"PodProxyOptions")
+		"PodProxyOptions",
+		"Daemon")
 
 	mapper := api.NewDefaultRESTMapper(versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
 	// setup aliases for groups of resources

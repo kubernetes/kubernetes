@@ -155,6 +155,64 @@ func TestSetDefaultReplicationController(t *testing.T) {
 	}
 }
 
+func TestSetDefaultDaemon(t *testing.T) {
+	tests := []struct {
+		dc                 *versioned.Daemon
+		expectLabelsChange bool
+	}{
+		{
+			dc: &versioned.Daemon{
+				Spec: versioned.DaemonSpec{
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectLabelsChange: true,
+		},
+		{
+			dc: &versioned.Daemon{
+				ObjectMeta: versioned.ObjectMeta{
+					Labels: map[string]string{
+						"bar": "foo",
+					},
+				},
+				Spec: versioned.DaemonSpec{
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectLabelsChange: false,
+		},
+	}
+
+	for _, test := range tests {
+		dc := test.dc
+		obj2 := roundTrip(t, runtime.Object(dc))
+		dc2, ok := obj2.(*versioned.Daemon)
+		if !ok {
+			t.Errorf("unexpected object: %v", dc2)
+			t.FailNow()
+		}
+		if test.expectLabelsChange != reflect.DeepEqual(dc2.Labels, dc2.Spec.Template.Labels) {
+			if test.expectLabelsChange {
+				t.Errorf("expected: %v, got: %v", dc2.Spec.Template.Labels, dc2.Labels)
+			} else {
+				t.Errorf("unexpected equality: %v", dc.Labels)
+			}
+		}
+	}
+}
+
 func newInt(val int) *int {
 	p := new(int)
 	*p = val
