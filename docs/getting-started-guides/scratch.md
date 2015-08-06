@@ -209,7 +209,7 @@ You have several choices for Kubernetes images:
 
 For etcd, you can:
 - Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.0.12`
-- Use images hosted on [Docker Hub](https://registry.hub.docker.com/u/coreos/etcd/) or [quay.io](https://registry.hub.docker.com/u/coreos/etcd/)
+- Use images hosted on [Docker Hub](https://registry.hub.docker.com/u/coreos/etcd/) or [quay.io](https://quay.io/repository/coreos/etcd/)
 - Use etcd binary included in your OS distro.
 - Build your own image
   - You can do: `cd kubernetes/cluster/images/etcd; make`
