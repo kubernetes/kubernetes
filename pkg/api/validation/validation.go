@@ -180,7 +180,7 @@ func ValidateEndpointsName(name string, prefix bool) (bool, string) {
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateComponentName(name string, prefix bool) (bool, string) {
-	return NameIsDNS952Label(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
