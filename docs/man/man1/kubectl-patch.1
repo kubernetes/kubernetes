@@ -25,6 +25,10 @@ Please refer to the models in
 
 .SH OPTIONS
 .PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to update
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for patch
 
@@ -143,6 +147,9 @@ Please refer to the models in
 
 # Partially update a node using strategic merge patch
 kubectl patch node k8s\-node\-1 \-p '{"spec":{"unschedulable":true}}'
+
+# Partially update a node identified by the type and name specified in "node.json" using strategic merge patch
+kubectl patch \-f node.json \-p '{"spec":{"unschedulable":true}}'
 
 # Update a container's image; spec.containers[*].name is required because it's a merge key
 kubectl patch pod valid\-pod \-p '{"spec":{"containers":[{"name":"kubernetes\-serve\-hostname","image":"new image"}]}}'
