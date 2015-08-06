@@ -349,16 +349,40 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeMinutes)
 		}
 	}
+
+	// Lock proxier to copy it's content to local arrays
+	// opentPortal is slow to process iptables actions
+	// it result on a freeze in network flow processed by all proxysocket functions
+	// until it return.
+	// By copying proxier.serviceMap outside of the main loop we unlock as soon as
+	// possible the network treatment.
+	// Global network flow is a top priority to ensure performance.
 	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
+	// Copy serviceMap key to localServiceName[]
+	// Copy serviceMap value to localServiceInfo[]
+	// keep them sync by local counter
+
+	index := 0
+	serviceMapLen := len(proxier.serviceMap)
+	localServiceName := make([]ServicePortName, serviceMapLen)
+	localServiceInfo := make([]*serviceInfo, serviceMapLen)
+
 	for name, info := range proxier.serviceMap {
+		localServiceName[index] = name
+		localServiceInfo[index] = info
+		index++
+	}
+	// release the lock and let the network flow to process
+	proxier.mu.Unlock()
+
+	for index, name := range localServiceName {
 		if !activeServices[name] {
 			glog.V(1).Infof("Stopping service %q", name)
-			err := proxier.closePortal(name, info)
+			err := proxier.closePortal(name, localServiceInfo[index])
 			if err != nil {
 				glog.Errorf("Failed to close portal for %q: %v", name, err)
 			}
-			err = proxier.stopProxyInternal(name, info)
+			err = proxier.stopProxyInternal(name, localServiceInfo[index])
 			if err != nil {
 				glog.Errorf("Failed to stop service %q: %v", name, err)
 			}
