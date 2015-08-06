@@ -33,9 +33,14 @@ def file_passes(filename, extension, ref, regexs):
 
     data = f.read()
 
-    # remove build tags from the top of Go file
+    # remove build tags from the top of Go files
     if extension == "go":
         p = regexs["go_build_constraints"]
+        (data, found) = p.subn("", data, 1)
+
+    # remove shebang from the top of shell files
+    if extension == "sh":
+        p = regexs["shebang"]
         (data, found) = p.subn("", data, 1)
 
     data = data.splitlines()
@@ -91,6 +96,8 @@ def main():
     regexs["date"] = re.compile( '(2014|2015)' )
     # strip // +build \n\n build constraints
     regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
+    # strip #!.* from shell scripts
+    regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
 
     for filename in filenames:
         if not file_passes(filename, extension, ref, regexs):

@@ -4,7 +4,7 @@
 
 .PHONY: all container push
 
-TAG = v1
+TAG = v2
 PREFIX = gcr.io/google_containers
 NAME = proxy-to-service
 
