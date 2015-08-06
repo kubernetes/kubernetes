@@ -144,6 +144,13 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 		return nil, err
 	}
 
+	// TODO: can leave dangling endpoints, and potentially return incorrect
+	// endpoints if a new service is created with the same name
+	err = rs.endpoints.DeleteEndpoints(ctx, id)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
 	if api.IsServiceIPSet(service) {
 		rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
 	}

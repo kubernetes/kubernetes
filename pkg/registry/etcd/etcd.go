@@ -20,11 +20,9 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -44,14 +42,12 @@ const (
 // MinionRegistry, PodRegistry and ServiceRegistry, backed by etcd.
 type Registry struct {
 	storage.Interface
-	endpoints endpoint.Registry
 }
 
 // NewRegistry creates an etcd registry.
-func NewRegistry(storage storage.Interface, endpoints endpoint.Registry) *Registry {
+func NewRegistry(storage storage.Interface) *Registry {
 	registry := &Registry{
 		Interface: storage,
-		endpoints: endpoints,
 	}
 	return registry
 }
@@ -131,13 +127,6 @@ func (r *Registry) DeleteService(ctx api.Context, name string) error {
 	err = r.RecursiveDelete(key, true)
 	if err != nil {
 		return etcderr.InterpretDeleteError(err, "service", name)
-	}
-
-	// TODO: can leave dangling endpoints, and potentially return incorrect
-	// endpoints if a new service is created with the same name
-	err = r.endpoints.DeleteEndpoints(ctx, name)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
 	}
 	return nil
 }

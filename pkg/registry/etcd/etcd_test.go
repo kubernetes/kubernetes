@@ -25,8 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/endpoint"
-	endpointetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -38,14 +36,13 @@ import (
 
 func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
 	storage := etcdstorage.NewEtcdStorage(client, latest.Codec, etcdtest.PathPrefix())
-	registry := NewRegistry(storage, nil)
+	registry := NewRegistry(storage)
 	return registry
 }
 
 func NewTestEtcdRegistryWithPods(client tools.EtcdClient) *Registry {
 	etcdStorage := etcdstorage.NewEtcdStorage(client, latest.Codec, etcdtest.PathPrefix())
-	endpointStorage := endpointetcd.NewStorage(etcdStorage)
-	registry := NewRegistry(etcdStorage, endpoint.NewRegistry(endpointStorage))
+	registry := NewRegistry(etcdStorage)
 	return registry
 }
 
@@ -236,14 +233,11 @@ func TestEtcdDeleteService(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(fakeClient.DeletedKeys) != 2 {
+	if len(fakeClient.DeletedKeys) != 1 {
 		t.Errorf("Expected 2 delete, found %#v", fakeClient.DeletedKeys)
 	}
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-	if fakeClient.DeletedKeys[1] != endpointsKey {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[1], endpointsKey)
 	}
 }
 
@@ -339,64 +333,6 @@ func TestEtcdWatchServicesBadSelector(t *testing.T) {
 	if err == nil {
 		t.Errorf("unexpected non-error: %v", err)
 	}
-}
-
-func TestEtcdWatchEndpoints(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	fakeClient := tools.NewFakeEtcdClient(t)
-	registry := NewTestEtcdRegistryWithPods(fakeClient)
-	watching, err := registry.endpoints.WatchEndpoints(
-		ctx,
-		labels.Everything(),
-		fields.SelectorFromSet(fields.Set{"name": "foo"}),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	default:
-	}
-	fakeClient.WatchInjectError <- nil
-	if _, ok := <-watching.ResultChan(); ok {
-		t.Errorf("watching channel should be closed")
-	}
-	watching.Stop()
-}
-
-func TestEtcdWatchEndpointsAcrossNamespaces(t *testing.T) {
-	ctx := api.NewContext()
-	fakeClient := tools.NewFakeEtcdClient(t)
-	registry := NewTestEtcdRegistryWithPods(fakeClient)
-	watching, err := registry.endpoints.WatchEndpoints(
-		ctx,
-		labels.Everything(),
-		fields.Everything(),
-		"1",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-
-	select {
-	case _, ok := <-watching.ResultChan():
-		if !ok {
-			t.Errorf("watching channel should be open")
-		}
-	default:
-	}
-	fakeClient.WatchInjectError <- nil
-	if _, ok := <-watching.ResultChan(); ok {
-		t.Errorf("watching channel should be closed")
-	}
-	watching.Stop()
 }
 
 // TODO We need a test for the compare and swap behavior.  This basically requires two things:
