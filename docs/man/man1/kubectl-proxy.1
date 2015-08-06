@@ -52,7 +52,7 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 
 .PP
 \fB\-\-disable\-filter\fP=false
-    If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks.  Use with caution.
+    If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.
 
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false
@@ -69,6 +69,10 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 .PP
 \fB\-\-reject\-paths\fP="^/api/.\fI/exec,^/api/.\fP/run"
     Regular expression for paths that the proxy should reject.
+
+.PP
+\fB\-u\fP, \fB\-\-unix\-socket\fP=""
+    Unix socket on which to run the proxy.
 
 .PP
 \fB\-w\fP, \fB\-\-www\fP=""
