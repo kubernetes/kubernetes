@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	endpointetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
-	"k8s.io/kubernetes/pkg/registry/pod"
-	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
@@ -40,15 +38,14 @@ import (
 
 func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
 	storage := etcdstorage.NewEtcdStorage(client, latest.Codec, etcdtest.PathPrefix())
-	registry := NewRegistry(storage, nil, nil)
+	registry := NewRegistry(storage, nil)
 	return registry
 }
 
 func NewTestEtcdRegistryWithPods(client tools.EtcdClient) *Registry {
 	etcdStorage := etcdstorage.NewEtcdStorage(client, latest.Codec, etcdtest.PathPrefix())
-	podStorage := podetcd.NewStorage(etcdStorage, nil)
 	endpointStorage := endpointetcd.NewStorage(etcdStorage)
-	registry := NewRegistry(etcdStorage, pod.NewRegistry(podStorage.Pod), endpoint.NewRegistry(endpointStorage))
+	registry := NewRegistry(etcdStorage, endpoint.NewRegistry(endpointStorage))
 	return registry
 }
 

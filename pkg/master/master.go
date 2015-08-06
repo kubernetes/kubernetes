@@ -62,7 +62,6 @@ import (
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
-	"k8s.io/kubernetes/pkg/registry/pod"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
@@ -429,7 +428,6 @@ func (m *Master) init(c *Config) {
 	healthzChecks := []healthz.HealthzChecker{}
 	m.clock = util.RealClock{}
 	podStorage := podetcd.NewStorage(c.DatabaseStorage, c.KubeletClient)
-	podRegistry := pod.NewRegistry(podStorage.Pod)
 
 	podTemplateStorage := podtemplateetcd.NewREST(c.DatabaseStorage)
 
@@ -452,7 +450,7 @@ func (m *Master) init(c *Config) {
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
 	// TODO: split me up into distinct storage registries
-	registry := etcd.NewRegistry(c.DatabaseStorage, podRegistry, m.endpointRegistry)
+	registry := etcd.NewRegistry(c.DatabaseStorage, m.endpointRegistry)
 	m.serviceRegistry = registry
 
 	var serviceClusterIPRegistry service.RangeRegistry
@@ -490,7 +488,7 @@ func (m *Master) init(c *Config) {
 		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator),
 		"endpoints":              endpointsStorage,
 		"nodes":                  nodeStorage,
 		"nodes/status":           nodeStatusStorage,

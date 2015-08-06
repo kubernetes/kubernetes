@@ -35,17 +35,15 @@ import (
 
 func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry) {
 	registry := registrytest.NewServiceRegistry()
-	machines := []string{"foo", "bar", "baz"}
 	endpointRegistry := &registrytest.EndpointRegistry{
 		Endpoints: endpoints,
 	}
-	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
 	r := ipallocator.NewCIDRRange(makeIPNet(t))
 
 	portRange := util.PortRange{Base: 30000, Size: 1000}
 	portAllocator := portallocator.NewPortAllocator(portRange)
 
-	storage := NewStorage(registry, nodeRegistry, endpointRegistry, r, portAllocator, "kubernetes")
+	storage := NewStorage(registry, endpointRegistry, r, portAllocator)
 
 	return storage, registry
 }
