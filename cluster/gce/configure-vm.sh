@@ -331,24 +331,38 @@ function create-salt-master-auth() {
   fi
 }
 
-# TODO(roberthbailey): Remove the insecure kubeconfig configuration files
-# once the certs are being plumbed through for GKE.
-function create-salt-node-auth() {
-  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
-    if [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-      mkdir -p /srv/kubernetes
-      (umask 077;
-        echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
-        echo "${KUBELET_CERT}" | base64 -d > /srv/kubernetes/kubelet.crt;
-        echo "${KUBELET_KEY}" | base64 -d > /srv/kubernetes/kubelet.key)
-    fi
+# This should happen only on cluster initialization. After the first boot
+# and on upgrade, the kubeconfig file exists on the master-pd and should
+# never be touched again.
+#
+#  - Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and
+#    KUBELET_KEY to generate a kubeconfig file for the kubelet to securely
+#    connect to the apiserver.
+function create-salt-master-kubelet-auth() {
+  # Only configure the kubelet on the master if the required variables are
+  # set in the environment.
+  if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
+    create-salt-kubelet-auth
   fi
-  kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+}
+
+# This should happen both on cluster initialization and node upgrades.
+#
+#  - Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and
+#    KUBELET_KEY to generate a kubeconfig file for the kubelet to securely
+#    connect to the apiserver.
+
+function create-salt-kubelet-auth() {
+  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
+    # If there isn't a CA certificate set specifically for the kubelet, use
+    # the cluster CA certificate.
+    if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
+      KUBELET_CA_CERT="${CA_CERT}"
+    fi
     mkdir -p /srv/salt-overlay/salt/kubelet
-    if [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-      (umask 077;
-        cat > "${kubelet_kubeconfig_file}" <<EOF
+    (umask 077;
+      cat > "${kubelet_kubeconfig_file}" <<EOF
 apiVersion: v1
 kind: Config
 users:
@@ -359,7 +373,7 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
+    certificate-authority-data: ${KUBELET_CA_CERT}
 contexts:
 - context:
     cluster: local
@@ -368,35 +382,18 @@ contexts:
 current-context: service-account-context
 EOF
 )
-    else
-      (umask 077;
-      cat > "${kubelet_kubeconfig_file}" <<EOF
-apiVersion: v1
-kind: Config
-users:
-- name: kubelet
-  user:
-    token: ${KUBELET_TOKEN}
-clusters:
-- name: local
-  cluster:
-     insecure-skip-tls-verify: true
-contexts:
-- context:
-    cluster: local
-    user: kubelet
-  name: service-account-context
-current-context: service-account-context
-EOF
-)
-    fi
   fi
+}
 
-  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+# This should happen both on cluster initialization and node upgrades.
+#
+#  - Uses the CA_CERT and KUBE_PROXY_TOKEN to generate a kubeconfig file for
+#    the kube-proxy to securely connect to the apiserver.
+function create-salt-kubeproxy-auth() {
+  local -r kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
   if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-proxy
-    if [[ ! -z "${CA_CERT:-}" ]]; then
-      (umask 077;
+    (umask 077;
         cat > "${kube_proxy_kubeconfig_file}" <<EOF
 apiVersion: v1
 kind: Config
@@ -416,28 +413,6 @@ contexts:
 current-context: service-account-context
 EOF
 )
-    else
-      (umask 077;
-      cat > "${kube_proxy_kubeconfig_file}" <<EOF
-apiVersion: v1
-kind: Config
-users:
-- name: kube-proxy
-  user:
-    token: ${KUBE_PROXY_TOKEN}
-clusters:
-- name: local
-  cluster:
-     insecure-skip-tls-verify: true
-contexts:
-- context:
-    cluster: local
-    user: kube-proxy
-  name: service-account-context
-current-context: service-account-context
-EOF
-)
-    fi
   fi
 }
 
@@ -513,7 +488,6 @@ function salt-master-role() {
 grains:
   roles:
     - kubernetes-master
-  cbr-cidr: ${MASTER_IP_RANGE}
   cloud: gce
 EOF
   if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
@@ -530,6 +504,21 @@ EOF
   proxy_ssh_user: '${PROXY_SSH_USER}'
 EOF
   fi
+
+  # If the kubelet on the master is enabled, give it the same CIDR range
+  # as a generic node.
+  if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  kubelet_api_servers: '${KUBELET_APISERVER}'
+  cbr-cidr: 10.123.45.0/30
+EOF
+  else
+    # If the kubelet is running disconnected from a master, give it a fixed
+    # CIDR range.
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  cbr-cidr: ${MASTER_IP_RANGE}
+EOF
+  fi
 }
 
 function salt-node-role() {
@@ -539,6 +528,7 @@ grains:
     - kubernetes-pool
   cbr-cidr: 10.123.45.0/30
   cloud: gce
+  api_servers: '${KUBERNETES_MASTER_NAME}'
 EOF
 }
 
@@ -556,12 +546,6 @@ EOF
   fi
 }
 
-function salt-set-apiserver() {
-  cat <<EOF >>/etc/salt/minion.d/grains.conf
-  api_servers: '${KUBERNETES_MASTER_NAME}'
-EOF
-}
-
 function configure-salt() {
   fix-apt-sources
   mkdir -p /etc/salt/minion.d
@@ -574,7 +558,6 @@ function configure-salt() {
   else
     salt-node-role
     salt-docker-opts
-    salt-set-apiserver
   fi
   install-salt
   stop-salt-minion
@@ -597,8 +580,10 @@ if [[ -z "${is_push}" ]]; then
   create-salt-pillar
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
     create-salt-master-auth
+    create-salt-master-kubelet-auth
   else
-    create-salt-node-auth
+    create-salt-kubelet-auth
+    create-salt-kubeproxy-auth
   fi
   download-release
   configure-salt
