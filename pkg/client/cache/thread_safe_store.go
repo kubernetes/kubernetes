@@ -150,7 +150,7 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 		}
 	}
 
-	list := []interface{}{}
+	list := make([]interface{}, 0, returnKeySet.Len())
 	for absoluteKey := range returnKeySet {
 		list = append(list, c.items[absoluteKey])
 	}
