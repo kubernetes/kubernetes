@@ -145,7 +145,7 @@ A security context resides on the container and represents the runtime parameter
 be used to create and run the container via container APIs. Following is an example of an initial implementation:
 
 ```go
-type type Container struct {
+type Container struct {
 	... other fields omitted ...
 	// Optional: SecurityContext defines the security options the pod should be run with
     SecurityContext *SecurityContext
