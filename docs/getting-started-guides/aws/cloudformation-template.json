@@ -90,12 +90,12 @@
       "Type": "AWS::EC2::VPC::Id"
     },
     "SubnetId": {
-      "Description": "The ID of the subnet to launch into (that must be within the supplied VPC)",
-      "Type": "AWS::EC2::Subnet::Id"
+      "Description": "List of IDs of the subnets to launch into (that must be within the supplied VPC)",
+      "Type": "List<AWS::EC2::Subnet::Id>"
     },
     "SubnetAZ": {
-      "Description": "The availability zone of the subnet supplied (for example eu-west-1a)",
-      "Type": "String"
+      "Description": "List of availability zones of the subnet supplied (for example eu-west-1a, eu-west-1b)",
+      "Type": "List<AWS::EC2::AvailabilityZone::Name>"
     }
   },
   "Conditions": {
@@ -149,7 +149,11 @@
           "AssociatePublicIpAddress" : "true",
           "DeviceIndex"              : "0",
           "DeleteOnTermination"      : "true",
-          "SubnetId"                 : {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "SubnetId"}]}
+          "SubnetId"                 : {"Fn::If": [
+            "UseEC2Classic",
+            {"Ref": "AWS::NoValue"},
+            {"Fn::Select": [0, {"Ref": "SubnetId"}]}
+          ]}
         }],
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI"]},
         "InstanceType": {"Ref": "InstanceType"},
@@ -401,8 +405,16 @@
     "KubernetesAutoScalingGroup": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
-        "AvailabilityZones": {"Fn::If": ["UseEC2Classic", {"Fn::GetAZs": ""}, [{"Ref": "SubnetAZ"}]]},
-        "VPCZoneIdentifier": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, [{"Ref": "SubnetId"}]]},
+        "AvailabilityZones": {"Fn::If": [
+          "UseEC2Classic",
+          {"Fn::GetAZs": ""},
+          {"Ref": "SubnetAZ"}
+        ]},
+        "VPCZoneIdentifier": {"Fn::If": [
+          "UseEC2Classic",
+          {"Ref": "AWS::NoValue"},
+          {"Ref": "SubnetId"}
+        ]},
         "LaunchConfigurationName": {"Ref": "KubernetesNodeLaunchConfig"},
         "MinSize": "2",
         "MaxSize": "12",
