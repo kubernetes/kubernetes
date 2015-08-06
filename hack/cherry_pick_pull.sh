@@ -35,6 +35,7 @@ fi
 
 if ! which hub > /dev/null; then
   echo "Can't find 'hub' tool in PATH, please install from https://github.com/github/hub"
+  exit 1
 fi
 
 if [[ "$#" -lt 2 ]]; then
@@ -133,9 +134,13 @@ done
 gitamcleanup=false
 
 function make-a-pr() {
+  local rel=$(basename ${BRANCH})
   echo "+++ Creating a pull request on github"
-  echo hub pull-request -m "Automated cherry pick of ${PULLSUBJ}" -h ${GITHUB_USER}:${NEWBRANCH} -b GoogleCloudPlatform:`basename ${BRANCH}`
-  hub pull-request -m "Automated cherry pick of ${PULLSUBJ}" -h ${GITHUB_USER}:${NEWBRANCH} -b GoogleCloudPlatform:`basename ${BRANCH}`
+  hub pull-request -F- -h "${GITHUB_USER}:${NEWBRANCH}" -b "GoogleCloudPlatform:${rel}" <<EOF
+Automated cherry pick of ${PULLSUBJ}
+
+Cherry pick of ${PULLSUBJ} on ${rel}.
+EOF
 }
 
 if git remote -v | grep ^origin | grep GoogleCloudPlatform/kubernetes.git; then
