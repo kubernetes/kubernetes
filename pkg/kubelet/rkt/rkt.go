@@ -423,7 +423,7 @@ func (r *runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 		}
 
 		if imgManifest.App == nil {
-			return nil, fmt.Errorf("no app section in image manifest for image: %q", c.Image)
+			imgManifest.App = new(appctypes.App)
 		}
 
 		img, err := r.getImageByName(c.Image)
