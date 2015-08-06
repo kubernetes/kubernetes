@@ -25,7 +25,7 @@ spec:
           resources:
             limits:
               cpu: 100m
-              memory: 200Mi
+              memory: 300Mi
           command:
             - /heapster
             - --source=kubernetes:''
