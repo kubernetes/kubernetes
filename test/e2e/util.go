@@ -1480,15 +1480,39 @@ func NodeSSHHosts(c *client.Client) ([]string, error) {
 // is no error performing the SSH, the stdout, stderr, and exit code are
 // returned.
 func SSH(cmd, host, provider string) (string, string, int, error) {
+	return sshCore(cmd, host, provider, false)
+}
+
+// SSHVerbose is just like SSH, but it logs the command, user, host, stdout,
+// stderr, exit code, and error.
+func SSHVerbose(cmd, host, provider string) (string, string, int, error) {
+	return sshCore(cmd, host, provider, true)
+}
+
+func sshCore(cmd, host, provider string, verbose bool) (string, string, int, error) {
 	// Get a signer for the provider.
 	signer, err := getSigner(provider)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
 	}
 
+	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
+	// defaulting here as well for logging clarity.
 	user := os.Getenv("KUBE_SSH_USER")
-	// RunSSHCommand will default to Getenv("USER") if user == ""
-	return util.RunSSHCommand(cmd, user, host, signer)
+	if user == "" {
+		user = os.Getenv("USER")
+	}
+
+	stdout, stderr, code, err := util.RunSSHCommand(cmd, user, host, signer)
+	if verbose {
+		remote := fmt.Sprintf("%s@%s", user, host)
+		Logf("[%s] Running    `%s`", remote, cmd)
+		Logf("[%s] stdout:    %q", remote, stdout)
+		Logf("[%s] stderr:    %q", remote, stderr)
+		Logf("[%s] exit code: %d", remote, code)
+		Logf("[%s] error:     %v", remote, err)
+	}
+	return stdout, stderr, code, err
 }
 
 // getSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
