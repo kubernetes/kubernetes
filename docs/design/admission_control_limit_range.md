@@ -35,139 +35,184 @@ Documentation for other releases can be found at
 
 ## Background
 
-This document proposes a system for enforcing min/max limits per resource as part of admission control.
+This document proposes a system for enforcing resource requirements constraints as part of admission control.
 
-## Model Changes
+## Use cases
 
-A new resource, **LimitRange**, is introduced to enumerate min/max limits for a resource type scoped to a
-Kubernetes namespace.
+1. Ability to enumerate resource requirement constraints per namespace
+2. Ability to enumerate min/max resource constraints for a pod
+3. Ability to enumerate min/max resource constraints for a container
+4. Ability to specify default resource limits for a container
+5. Ability to specify default resource requests for a container
+6. Ability to enforce a ratio between request and limit for a resource.
+
+## Data Model
+
+The **LimitRange** resource is scoped to a **Namespace**.
+
+### Type
 
 ```go
+// A type of object that is limited
+type LimitType string
+
 const (
   // Limit that applies to all pods in a namespace
-  LimitTypePod string = "Pod"
+  LimitTypePod LimitType = "Pod"
   // Limit that applies to all containers in a namespace
-  LimitTypeContainer string = "Container"
+  LimitTypeContainer LimitType = "Container"
 )
 
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind
 type LimitRangeItem struct {
   // Type of resource that this limit applies to
-  Type string `json:"type,omitempty"`
+  Type LimitType `json:"type,omitempty" description:"type of resource that this limit applies to"`
   // Max usage constraints on this kind by resource name
-  Max ResourceList `json:"max,omitempty"`
+  Max ResourceList `json:"max,omitempty" description:"max usage constraints on this kind by resource name"`
   // Min usage constraints on this kind by resource name
-  Min ResourceList `json:"min,omitempty"`
-  // Default usage constraints on this kind by resource name
-  Default ResourceList `json:"default,omitempty"`
+  Min ResourceList `json:"min,omitempty" description:"min usage constraints on this kind by resource name"`
+  // Default resource limits on this kind by resource name
+  Default ResourceList `json:"default,omitempty" description:"default resource limits values on this kind by resource name if omitted"`
+  // DefaultRequests resource requests on this kind by resource name
+  DefaultRequests ResourceList `json:"defaultRequests,omitempty" description:"default resource requests values on this kind by resource name if omitted"`
+  // LimitRequestRatio is the ratio of limit over request that is the maximum allowed burst for the named resource
+  LimitRequestRatio ResourceList `json:"limitRequestRatio,omitempty" description:"the ratio of limit over request that is the maximum allowed burst for the named resource. if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value"`
 }
 
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind
 type LimitRangeSpec struct {
   // Limits is the list of LimitRangeItem objects that are enforced
-  Limits []LimitRangeItem `json:"limits"`
+  Limits []LimitRangeItem `json:"limits" description:"limits is the list of LimitRangeItem objects that are enforced"`
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
 type LimitRange struct {
   TypeMeta   `json:",inline"`
-  ObjectMeta `json:"metadata,omitempty"`
+  ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
   // Spec defines the limits enforced
-  Spec LimitRangeSpec `json:"spec,omitempty"`
+  Spec LimitRangeSpec `json:"spec,omitempty" description:"spec defines the limits enforced; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
 }
 
 // LimitRangeList is a list of LimitRange items.
 type LimitRangeList struct {
   TypeMeta `json:",inline"`
-  ListMeta `json:"metadata,omitempty"`
+  ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
   // Items is a list of LimitRange objects
-  Items []LimitRange `json:"items"`
+  Items []LimitRange `json:"items" description:"items is a list of LimitRange objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md"`
 }
+```
+
+### Validation
+
+Validation of a **LimitRange** enforces that for a given named resource the following rules apply:
+
+Min (if specified) <= DefaultRequests (if specified) <= Default (if specified) <= Max (if specified)
+
+### Default Value Behavior
+
+The following default value behaviors are applied to a LimitRange for a given named resource.
+
+```
+if LimitRangeItem.Default[resourceName] is undefined 
+  if LimitRangeItem.Max[resourceName] is defined
+    LimitRangeItem.Default[resourceName] = LimitRangeItem.Max[resourceName]
+```
+
+```
+if LimitRangeItem.DefaultRequests[resourceName] is undefined
+  if LimitRangeItem.Default[resourceName] is defined
+    LimitRangeItem.DefaultRequests[resourceName] = LimitRangeItem.Default[resourceName]
+  else if LimitRangeItem.Min[resourceName] is defined
+    LimitRangeItem.DefaultRequests[resourceName] = LimitRangeItem.Min[resourceName]
 ```
 
 ## AdmissionControl plugin: LimitRanger
 
-The **LimitRanger** plug-in introspects all incoming admission requests.
+The **LimitRanger** plug-in introspects all incoming pod requests and evaluates the constraints defined on a LimitRange.
 
-It makes decisions by evaluating the incoming object against all defined **LimitRange** objects in the request context namespace.
+If a constraint is not specified for an enumerated resource, it is not enforced or tracked.
 
-The following min/max limits are imposed:
-
-**Type: Container**
-
-| ResourceName | Description |
-| ------------ | ----------- |
-| cpu | Min/Max amount of cpu per container |
-| memory | Min/Max amount of memory per container |
-
-**Type: Pod**
-
-| ResourceName | Description |
-| ------------ | ----------- |
-| cpu | Min/Max amount of cpu per pod |
-| memory | Min/Max amount of memory per pod |
-
-If a resource specifies a default value, it may get applied on the incoming resource.  For example, if a default
-value is provided for container cpu, it is set on the incoming container if and only if the incoming container
-does not specify a resource requirements limit field.
-
-If a resource specifies a min value, it may get applied on the incoming resource.  For example, if a min
-value is provided for container cpu, it is set on the incoming container if and only if the incoming container does
-not specify a resource requirements requests field.
-
-If the incoming object would cause a violation of the enumerated constraints, the request is denied with a set of
-messages explaining what constraints were the source of the denial.
-
-If a constraint is not enumerated by a **LimitRange** it is not tracked.
-
-## kube-apiserver
-
-The server is updated to be aware of **LimitRange** objects.
-
-The constraints are only enforced if the kube-apiserver is started as follows:
+To enable the plug-in and support for LimitRange, the kube-apiserver must be configured as follows:
 
 ```console
 $ kube-apiserver -admission_control=LimitRanger
 ```
 
-## kubectl
+### Enforcement of constraints
 
-kubectl is modified to support the **LimitRange** resource.
+**Type: Container**
 
-`kubectl describe` provides a human-readable output of limits.
+Supported Resources:
 
-For example,
+1. memory
+2. cpu
 
-```console
-$ kubectl namespace myspace
-$ kubectl create -f docs/admin/limitrange/limits.yaml
-$ kubectl get limits
-NAME
-limits
-$ kubectl describe limits limits
-Name:           limits
-Type            Resource        Min     Max     Default
-----            --------        ---     ---     ---
-Pod             memory          1Mi     1Gi     -
-Pod             cpu             250m    2       -
-Container       memory          1Mi     1Gi     1Mi
-Container       cpu             250m    250m    250m
+Supported Constraints:
+
+Per container, the following must hold true
+
+| Constraint | Behavior |
+| ---------- | -------- |
+| Min | Min <= Request (required) <= Limit (optional) |
+| Max | Limit (required) <= Max |
+| LimitRequestRatio | LimitRequestRatio <= ( Limit (required, non-zero) / Request (required, non-zero)) |
+
+Supported Defaults:
+
+1. Default - if the named resource has no enumerated value, the Limit is equal to the Default
+2. DefaultRequest - if the named resource has no enumerated value, the Request is equal to the DefaultRequest
+
+**Type: Pod**
+
+Supported Resources:
+
+1. memory
+2. cpu
+
+Supported Constraints:
+
+Across all containers in pod, the following must hold true
+
+| Constraint | Behavior |
+| ---------- | -------- |
+| Min | Min <= Request (required) <= Limit (optional) |
+| Max | Limit (required) <= Max |
+| LimitRequestRatio | LimitRequestRatio <= ( Limit (required, non-zero) / Request (non-zero) ) |
+
+## Run-time configuration
+
+The default ```LimitRange``` that is applied via Salt configuration will be updated as follows:
+
 ```
-
-## Future Enhancements: Define limits for a particular pod or container.
-
-In the current proposal, the **LimitRangeItem** matches purely on **LimitRangeItem.Type**
-
-It is expected we will want to define limits for particular pods or containers by name/uid and label/field selector.
-
-To make a **LimitRangeItem** more restrictive, we will intend to add these additional restrictions at a future point in time.
+apiVersion: "v1"
+kind: "LimitRange"
+metadata:
+  name: "limits"
+  namespace: default
+spec:
+  limits:
+    - type: "Container"
+      defaultRequests:
+        cpu: "100m"
+```
 
 ## Example
 
-See the [example of Limit Range](../admin/limitrange/) for more information.
+An example LimitRange configuration:
 
+| Type | Resource | Min | Max | Default | DefaultRequest | LimitRequestRatio |
+| ---- | -------- | --- | --- | ------- | -------------- | ----------------- |
+| Container | cpu | .1 | 1 | 500m | 250m | 4 |
+| Container | memory | 250Mi | 1Gi | 500Mi | 250Mi | |
+
+Assuming an incoming container that specified no incoming resource requirements,
+the following would happen.
+
+1. The incoming container cpu would request 250m with a limit of 500m.
+2. The incoming container memory would request 250Mi with a limit of 500Mi
+3. If the container is later resized, it's cpu would be constrained to between .1 and 1 and the ratio of limit to request could not exceed 4.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.md?pixel)]()
