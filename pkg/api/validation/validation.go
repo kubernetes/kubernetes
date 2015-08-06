@@ -44,9 +44,9 @@ func intervalErrorMsg(lo, hi int) string {
 
 var labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, util.LabelValueMaxLength, util.LabelValueFmt)
 var qualifiedNameErrorMsg string = fmt.Sprintf(`must be a qualified name (at most %d characters, matching regex %s), with an optional DNS subdomain prefix (at most %d characters, matching regex %s) and slash (/): e.g. "MyName" or "example.com/MyName"`, util.QualifiedNameMaxLength, util.QualifiedNameFmt, util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
-var dnsSubdomainErrorMsg string = fmt.Sprintf(`must be a DNS subdomain (at most %d characters, matching regex %s): e.g. "example.com"`, util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
-var dns1123LabelErrorMsg string = fmt.Sprintf(`must be a DNS label (at most %d characters, matching regex %s): e.g. "my-name"`, util.DNS1123LabelMaxLength, util.DNS1123LabelFmt)
-var dns952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, util.DNS952LabelMaxLength, util.DNS952LabelFmt)
+var DNSSubdomainErrorMsg string = fmt.Sprintf(`must be a DNS subdomain (at most %d characters, matching regex %s): e.g. "example.com"`, util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
+var DNS1123LabelErrorMsg string = fmt.Sprintf(`must be a DNS label (at most %d characters, matching regex %s): e.g. "my-name"`, util.DNS1123LabelMaxLength, util.DNS1123LabelFmt)
+var DNS952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, util.DNS952LabelMaxLength, util.DNS952LabelFmt)
 var pdPartitionErrorMsg string = intervalErrorMsg(0, 255)
 var portRangeErrorMsg string = intervalErrorMsg(0, 65536)
 var portNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 characters, matching regex %s, it must contain at least one letter [a-z], and hyphens cannot be adjacent to other hyphens): e.g. "http"`, util.IdentifierNoHyphensBeginEndFmt)
@@ -101,7 +101,7 @@ func maskTrailingDash(name string) string {
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidatePodName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 // ValidateReplicationControllerName can be used to check whether the given replication
@@ -109,35 +109,35 @@ func ValidatePodName(name string, prefix bool) (bool, string) {
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateReplicationControllerName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 // ValidateServiceName can be used to check whether the given service name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateServiceName(name string, prefix bool) (bool, string) {
-	return nameIsDNS952Label(name, prefix)
+	return NameIsDNS952Label(name, prefix)
 }
 
 // ValidateNodeName can be used to check whether the given node name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateNodeName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 // ValidateNamespaceName can be used to check whether the given namespace name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateNamespaceName(name string, prefix bool) (bool, string) {
-	return nameIsDNSLabel(name, prefix)
+	return NameIsDNSLabel(name, prefix)
 }
 
 // ValidateLimitRangeName can be used to check whether the given limit range name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateLimitRangeName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 // ValidateResourceQuotaName can be used to check whether the given
@@ -145,61 +145,61 @@ func ValidateLimitRangeName(name string, prefix bool) (bool, string) {
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateResourceQuotaName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 // ValidateSecretName can be used to check whether the given secret name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateSecretName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 // ValidateServiceAccountName can be used to check whether the given service account name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateServiceAccountName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 // ValidateEndpointsName can be used to check whether the given endpoints name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateEndpointsName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
-// nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
-func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
+// NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
+func NameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
 		name = maskTrailingDash(name)
 	}
 	if util.IsDNS1123Subdomain(name) {
 		return true, ""
 	}
-	return false, dnsSubdomainErrorMsg
+	return false, DNSSubdomainErrorMsg
 }
 
-// nameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
-func nameIsDNSLabel(name string, prefix bool) (bool, string) {
+// NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
+func NameIsDNSLabel(name string, prefix bool) (bool, string) {
 	if prefix {
 		name = maskTrailingDash(name)
 	}
 	if util.IsDNS1123Label(name) {
 		return true, ""
 	}
-	return false, dns1123LabelErrorMsg
+	return false, DNS1123LabelErrorMsg
 }
 
-// nameIsDNS952Label is a ValidateNameFunc for names that must be a DNS 952 label.
-func nameIsDNS952Label(name string, prefix bool) (bool, string) {
+// NameIsDNS952Label is a ValidateNameFunc for names that must be a DNS 952 label.
+func NameIsDNS952Label(name string, prefix bool) (bool, string) {
 	if prefix {
 		name = maskTrailingDash(name)
 	}
 	if util.IsDNS952Label(name) {
 		return true, ""
 	}
-	return false, dns952LabelErrorMsg
+	return false, DNS952LabelErrorMsg
 }
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
@@ -229,7 +229,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 		if len(meta.Namespace) == 0 {
 			allErrs = append(allErrs, errs.NewFieldRequired("namespace"))
 		} else if ok, _ := ValidateNamespaceName(meta.Namespace, false); !ok {
-			allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, dns1123LabelErrorMsg))
+			allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, DNS1123LabelErrorMsg))
 		}
 	} else {
 		if len(meta.Namespace) != 0 {
@@ -290,7 +290,7 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationError
 		if len(vol.Name) == 0 {
 			el = append(el, errs.NewFieldRequired("name"))
 		} else if !util.IsDNS1123Label(vol.Name) {
-			el = append(el, errs.NewFieldInvalid("name", vol.Name, dns1123LabelErrorMsg))
+			el = append(el, errs.NewFieldInvalid("name", vol.Name, DNS1123LabelErrorMsg))
 		} else if allNames.Has(vol.Name) {
 			el = append(el, errs.NewFieldDuplicate("name", vol.Name))
 		}
@@ -474,7 +474,7 @@ func validateRBD(rbd *api.RBDVolumeSource) errs.ValidationErrorList {
 }
 
 func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return NameIsDNSSubdomain(name, prefix)
 }
 
 func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList {
@@ -853,7 +853,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		if len(ctr.Name) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("name"))
 		} else if !util.IsDNS1123Label(ctr.Name) {
-			cErrs = append(cErrs, errs.NewFieldInvalid("name", ctr.Name, dns1123LabelErrorMsg))
+			cErrs = append(cErrs, errs.NewFieldInvalid("name", ctr.Name, DNS1123LabelErrorMsg))
 		} else if allNames.Has(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
 		} else {
@@ -1139,7 +1139,7 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *util.S
 		allErrs = append(allErrs, errs.NewFieldRequired("name"))
 	} else if sp.Name != "" {
 		if !util.IsDNS1123Label(sp.Name) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("name", sp.Name, dns1123LabelErrorMsg))
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", sp.Name, DNS1123LabelErrorMsg))
 		} else if allNames.Has(sp.Name) {
 			allErrs = append(allErrs, errs.NewFieldDuplicate("name", sp.Name))
 		} else {
@@ -1682,7 +1682,7 @@ func validateEndpointPort(port *api.EndpointPort, requireName bool) errs.Validat
 		allErrs = append(allErrs, errs.NewFieldRequired("name"))
 	} else if port.Name != "" {
 		if !util.IsDNS1123Label(port.Name) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("name", port.Name, dns1123LabelErrorMsg))
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", port.Name, DNS1123LabelErrorMsg))
 		}
 	}
 	if !util.IsValidPortNum(port.Port) {
