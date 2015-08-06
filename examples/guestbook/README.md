@@ -393,7 +393,7 @@ spec:
     spec:
       containers:
       - name: php-redis
-        image: kubernetes/example-guestbook-php-redis:v3
+        image: gcr.io/google_containers/example-guestbook-php-redis:v3
         ports:
         - containerPort: 80
 ```
