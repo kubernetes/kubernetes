@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
-	"k8s.io/kubernetes/pkg/registry/pod"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -45,15 +44,13 @@ const (
 // MinionRegistry, PodRegistry and ServiceRegistry, backed by etcd.
 type Registry struct {
 	storage.Interface
-	pods      pod.Registry
 	endpoints endpoint.Registry
 }
 
 // NewRegistry creates an etcd registry.
-func NewRegistry(storage storage.Interface, pods pod.Registry, endpoints endpoint.Registry) *Registry {
+func NewRegistry(storage storage.Interface, endpoints endpoint.Registry) *Registry {
 	registry := &Registry{
 		Interface: storage,
-		pods:      pods,
 		endpoints: endpoints,
 	}
 	return registry

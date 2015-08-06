@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
-	"k8s.io/kubernetes/pkg/registry/minion"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -44,23 +43,19 @@ import (
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
 	registry         Registry
-	machines         minion.Registry
 	endpoints        endpoint.Registry
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
-	clusterName      string
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface, clusterName string) *REST {
+func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
+	serviceNodePorts portallocator.Interface) *REST {
 	return &REST{
 		registry:         registry,
-		machines:         machines,
 		endpoints:        endpoints,
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
-		clusterName:      clusterName,
 	}
 }
 

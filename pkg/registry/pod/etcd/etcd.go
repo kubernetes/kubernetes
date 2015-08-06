@@ -80,13 +80,10 @@ func NewStorage(s storage.Interface, k client.ConnectionInfoGetter) PodStorage {
 	}
 	statusStore := *store
 
-	bindings := &podLifecycle{}
 	store.CreateStrategy = pod.Strategy
 	store.UpdateStrategy = pod.Strategy
-	store.AfterUpdate = bindings.AfterUpdate
 	store.DeleteStrategy = pod.Strategy
 	store.ReturnDeletedObject = true
-	store.AfterDelete = bindings.AfterDelete
 
 	statusStore.UpdateStrategy = pod.StatusStrategy
 
@@ -179,16 +176,6 @@ func (r *BindingREST) assignPod(ctx api.Context, podID string, machine string, a
 		}
 	}
 	return
-}
-
-type podLifecycle struct{}
-
-func (h *podLifecycle) AfterUpdate(obj runtime.Object) error {
-	return nil
-}
-
-func (h *podLifecycle) AfterDelete(obj runtime.Object) error {
-	return nil
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
