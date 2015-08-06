@@ -12,6 +12,7 @@ matrix:
         - KUBE_TEST_API_VERSIONS=v1 KUBE_TEST_ETCD_PREFIXES=kubernetes.io/registry
 
 before_install:
+  - env
   - source $HOME/.gvm/scripts/gvm;
   - if [[ $SHIPPABLE_GO_VERSION == "tip" ]]; then gvm install tip; gvm use tip; fi
   - if [[ $SHIPPABLE_GO_VERSION == *release* ]]; then gvm install release; gvm use release; fi
