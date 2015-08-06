@@ -4,8 +4,8 @@ metadata:
   name: openshift
 spec:
   ports:
-    - port: 8443
-      name: openshift
+    - name: openshift
+      port: 8443
       targetPort: 8443
   selector:
     name: openshift
