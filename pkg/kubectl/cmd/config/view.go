@@ -28,12 +28,11 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type ViewOptions struct {
 	ConfigAccess ConfigAccess
-	Merge        util.BoolFlag
+	Merge        bool
 	Flatten      bool
 	Minify       bool
 	RawByteData  bool
@@ -59,7 +58,11 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			options.Complete()
+			if options.ConfigAccess.IsExplicitFile() {
+				if !cmd.Flags().Changed("merge") {
+					options.Merge = false
+				}
+			}
 
 			printer, _, err := cmdutil.PrinterForCommand(cmd)
 			if err != nil {
@@ -79,8 +82,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 	// Default to yaml
 	cmd.Flags().Set("output", "yaml")
 
-	options.Merge.Default(true)
-	cmd.Flags().Var(&options.Merge, "merge", "merge together the full hierarchy of kubeconfig files")
+	cmd.Flags().BoolVar(&options.Merge, "merge", true, "merge together the full hierarchy of kubeconfig files")
 	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "display raw byte data")
 	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self contained output (useful for creating portable kubeconfig files)")
 	cmd.Flags().BoolVar(&options.Minify, "minify", false, "remove all information not used by current-context from the output")
@@ -115,16 +117,6 @@ func (o ViewOptions) Run(out io.Writer, printer kubectl.ResourcePrinter) error {
 	return nil
 }
 
-func (o *ViewOptions) Complete() bool {
-	if o.ConfigAccess.IsExplicitFile() {
-		if !o.Merge.Provided() {
-			o.Merge.Set("false")
-		}
-	}
-
-	return true
-}
-
 func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {
 	err := o.Validate()
 	if err != nil {
@@ -136,7 +128,7 @@ func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {
 }
 
 func (o ViewOptions) Validate() error {
-	if !o.Merge.Value() && !o.ConfigAccess.IsExplicitFile() {
+	if !o.Merge && !o.ConfigAccess.IsExplicitFile() {
 		return errors.New("if merge==false a precise file must to specified")
 	}
 
@@ -146,7 +138,7 @@ func (o ViewOptions) Validate() error {
 // getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong
 func (o *ViewOptions) getStartingConfig() (*clientcmdapi.Config, error) {
 	switch {
-	case !o.Merge.Value():
+	case !o.Merge:
 		return clientcmd.LoadFromFile(o.ConfigAccess.GetExplicitFile())
 
 	default:

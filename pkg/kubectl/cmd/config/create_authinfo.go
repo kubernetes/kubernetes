@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type createAuthInfoOptions struct {
@@ -39,7 +38,7 @@ type createAuthInfoOptions struct {
 	token         string
 	username      string
 	password      string
-	embedCertData util.BoolFlag
+	embedCertData bool
 }
 
 var create_authinfo_long = fmt.Sprintf(`Sets a user entry in kubeconfig
@@ -88,7 +87,7 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Co
 	cmd.Flags().StringVar(&options.token, clientcmd.FlagBearerToken, "", clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
 	cmd.Flags().StringVar(&options.username, clientcmd.FlagUsername, "", clientcmd.FlagUsername+" for the user entry in kubeconfig")
 	cmd.Flags().StringVar(&options.password, clientcmd.FlagPassword, "", clientcmd.FlagPassword+" for the user entry in kubeconfig")
-	cmd.Flags().Var(&options.embedCertData, clientcmd.FlagEmbedCerts, "embed client cert/key for the user entry in kubeconfig")
+	cmd.Flags().BoolVar(&options.embedCertData, clientcmd.FlagEmbedCerts, false, "embed client cert/key for the user entry in kubeconfig")
 
 	return cmd
 }
@@ -133,7 +132,7 @@ func (o *createAuthInfoOptions) modifyAuthInfo(cmd *cobra.Command, existingAuthI
 
 	if cmd.Flags().Changed(clientcmd.FlagCertFile) {
 		certPath := o.certPath
-		if o.embedCertData.Value() {
+		if o.embedCertData {
 			modifiedAuthInfo.ClientCertificateData, _ = ioutil.ReadFile(certPath)
 			modifiedAuthInfo.ClientCertificate = ""
 		} else {
@@ -146,7 +145,7 @@ func (o *createAuthInfoOptions) modifyAuthInfo(cmd *cobra.Command, existingAuthI
 	}
 	if cmd.Flags().Changed(clientcmd.FlagKeyFile) {
 		keyPath := o.keyPath
-		if o.embedCertData.Value() {
+		if o.embedCertData {
 			modifiedAuthInfo.ClientKeyData, _ = ioutil.ReadFile(keyPath)
 			modifiedAuthInfo.ClientKey = ""
 		} else {
@@ -201,7 +200,7 @@ func (o createAuthInfoOptions) validate() error {
 	if len(methods) > 1 {
 		return fmt.Errorf("You cannot specify more than one authentication method at the same time: %v", strings.Join(methods, ", "))
 	}
-	if o.embedCertData.Value() {
+	if o.embedCertData {
 		certPath := o.certPath
 		keyPath := o.keyPath
 		if certPath == "" && keyPath == "" {

@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type createClusterOptions struct {
@@ -35,9 +34,9 @@ type createClusterOptions struct {
 	name                  string
 	server                string
 	apiVersion            string
-	insecureSkipTLSVerify util.BoolFlag
+	insecureSkipTLSVerify bool
 	caPath                string
-	embedCAData           util.BoolFlag
+	embedCAData           bool
 }
 
 const (
@@ -74,13 +73,11 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Com
 		},
 	}
 
-	options.insecureSkipTLSVerify.Default(false)
-
 	cmd.Flags().StringVar(&options.server, clientcmd.FlagAPIServer, "", clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
 	cmd.Flags().StringVar(&options.apiVersion, clientcmd.FlagAPIVersion, "", clientcmd.FlagAPIVersion+" for the cluster entry in kubeconfig")
-	cmd.Flags().Var(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
+	cmd.Flags().BoolVar(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, false, clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
 	cmd.Flags().StringVar(&options.caPath, clientcmd.FlagCAFile, "", "path to "+clientcmd.FlagCAFile+" for the cluster entry in kubeconfig")
-	cmd.Flags().Var(&options.embedCAData, clientcmd.FlagEmbedCerts, clientcmd.FlagEmbedCerts+" for the cluster entry in kubeconfig")
+	cmd.Flags().BoolVar(&options.embedCAData, clientcmd.FlagEmbedCerts, false, clientcmd.FlagEmbedCerts+" for the cluster entry in kubeconfig")
 
 	return cmd
 }
@@ -122,8 +119,8 @@ func (o *createClusterOptions) modifyCluster(cmd *cobra.Command, existingCluster
 	if cmd.Flags().Changed(clientcmd.FlagAPIVersion) {
 		modifiedCluster.APIVersion = o.apiVersion
 	}
-	if o.insecureSkipTLSVerify.Provided() {
-		modifiedCluster.InsecureSkipTLSVerify = o.insecureSkipTLSVerify.Value()
+	if cmd.Flags().Changed(clientcmd.FlagInsecure) {
+		modifiedCluster.InsecureSkipTLSVerify = o.insecureSkipTLSVerify
 		// Specifying insecure mode clears any certificate authority
 		if modifiedCluster.InsecureSkipTLSVerify {
 			modifiedCluster.CertificateAuthority = ""
@@ -132,7 +129,7 @@ func (o *createClusterOptions) modifyCluster(cmd *cobra.Command, existingCluster
 	}
 	if cmd.Flags().Changed(clientcmd.FlagCAFile) {
 		caPath := o.caPath
-		if o.embedCAData.Value() {
+		if o.embedCAData {
 			modifiedCluster.CertificateAuthorityData, _ = ioutil.ReadFile(caPath)
 			modifiedCluster.InsecureSkipTLSVerify = false
 			modifiedCluster.CertificateAuthority = ""
@@ -154,11 +151,12 @@ func (o createClusterOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("You must specify a non-empty cluster name")
 	}
-	if o.insecureSkipTLSVerify.Value() && caPath != "" {
+	caPath := o.caPath
+
+	if o.insecureSkipTLSVerify && caPath != "" {
 		return errors.New("You cannot specify a certificate authority and insecure mode at the same time")
 	}
-	if o.embedCAData.Value() {
-		caPath := o.caPath
+	if o.embedCAData {
 		if caPath == "" {
 			return fmt.Errorf("You must specify a --%s to embed", clientcmd.FlagCAFile)
 		}
