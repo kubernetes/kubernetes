@@ -19,9 +19,9 @@ package cache
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using

@@ -30,14 +30,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/dbus"
@@ -45,6 +37,14 @@ import (
 	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
+	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const (

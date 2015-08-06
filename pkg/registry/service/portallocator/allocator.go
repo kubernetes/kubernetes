@@ -19,9 +19,9 @@ package portallocator
 import (
 	"errors"
 	"fmt"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/registry/service/allocator"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Interface manages the allocation of ports out of a range. Interface

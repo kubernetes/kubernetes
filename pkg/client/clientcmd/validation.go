@@ -22,9 +22,9 @@ import (
 	"os"
 	"strings"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	"k8s.io/kubernetes/pkg/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 var ErrNoContext = errors.New("no context chosen")

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	log "github.com/golang/glog"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/offers"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 )
 
 // A first-come-first-serve scheduler: acquires the first offer that can support the task

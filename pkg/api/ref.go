@@ -22,8 +22,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (

@@ -23,16 +23,16 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
-	allocator_etcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/storage"
-	etcdstorage "github.com/GoogleCloudPlatform/kubernetes/pkg/storage/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/registry/service/allocator"
+	allocator_etcd "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
+	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
 func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {

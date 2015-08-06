@@ -22,11 +22,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
-	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 
 	"github.com/golang/glog"
 )

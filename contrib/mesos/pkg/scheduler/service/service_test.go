@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/archive"
-	mresource "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 
 	"github.com/stretchr/testify/assert"
 )

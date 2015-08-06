@@ -19,7 +19,7 @@ package deny
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/admission"
 )
 
 func TestAdmission(t *testing.T) {

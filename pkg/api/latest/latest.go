@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Version is the string that represents the current external default version.
@@ -63,7 +63,7 @@ var RESTMapper meta.RESTMapper
 // userResources is a group of resources mostly used by a kubectl user
 var userResources = []string{"rc", "svc", "pods", "pvc"}
 
-const importPrefix = "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+const importPrefix = "k8s.io/kubernetes/pkg/api"
 
 func init() {
 	// Use the first API version in the list of registered versions as the latest.

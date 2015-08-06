@@ -19,7 +19,7 @@ package storage
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/errors"
 )
 
 func TestEtcdParseWatchResourceVersion(t *testing.T) {

@@ -18,9 +18,9 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 import (
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	resource "github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	conversion "github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	api "k8s.io/kubernetes/pkg/api"
+	resource "k8s.io/kubernetes/pkg/api/resource"
+	conversion "k8s.io/kubernetes/pkg/conversion"
 	reflect "reflect"
 )
 

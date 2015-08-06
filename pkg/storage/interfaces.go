@@ -19,8 +19,8 @@ package storage
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Versioner abstracts setting and retrieving metadata fields from database response

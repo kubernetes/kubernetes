@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/testclient"
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestIgnoresNonCreate(t *testing.T) {

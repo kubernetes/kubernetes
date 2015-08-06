@@ -68,7 +68,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/client"
 )
 
 // Info holds Kubernetes API authorization config.  It is intended

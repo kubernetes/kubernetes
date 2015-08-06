@@ -18,8 +18,8 @@ limitations under the License.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/controllermanager"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
+	"k8s.io/kubernetes/contrib/mesos/pkg/controllermanager"
+	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 )
 
 // NewHyperkubeServer creates a new hyperkube Server object that includes the

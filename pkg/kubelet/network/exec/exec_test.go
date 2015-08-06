@@ -26,7 +26,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network"
 )
 
 // The temp dir where test plugins will be stored.

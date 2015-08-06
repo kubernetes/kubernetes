@@ -21,10 +21,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 const (

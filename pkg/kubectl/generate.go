@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // GeneratorParam is a parameter for a generator

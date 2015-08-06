@@ -17,9 +17,9 @@ limitations under the License.
 package validation
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
+	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
 // ValidateEvent makes sure that the event makes sense.

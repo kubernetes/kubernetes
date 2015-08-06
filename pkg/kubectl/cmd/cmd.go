@@ -19,10 +19,10 @@ package cmd
 import (
 	"io"
 
-	cmdconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/config"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/spf13/cobra"
 )

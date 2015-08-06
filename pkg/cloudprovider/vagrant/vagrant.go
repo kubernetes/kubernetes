@@ -27,8 +27,8 @@ import (
 	neturl "net/url"
 	"sort"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 const ProviderName = "vagrant"
