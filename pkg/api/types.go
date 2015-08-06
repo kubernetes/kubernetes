@@ -2126,14 +2126,19 @@ const (
 // Type and constants for component type.
 type ComponentType string
 
-// These are the valid conditions for the component type.
+// ComponentType constants define the known types of components.
+// Each type may have multiple instances.
+// Each instance's name is prefixed by the type, with a random suffix. See SimpleNameGenerator.
 const (
 	ComponentAPIServer         ComponentType = "apiserver"
 	ComponentControllerManager ComponentType = "controller-manager"
 	ComponentScheduler         ComponentType = "scheduler" // TODO: move mesos-specific component type & validation to contrib
 )
 
-// Component describes metadata about a core component.
+// Component describes a core part of Kubernetes.
+// Each component is expected to serve a <location>/healthz endpoint.
+// Each component is also expected to heartbeat component updates so that LastTimestamp is updated.
+// If the LastTimestamp is sufficiently old (config? query param?) the component is considered unhealthy.
 type Component struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`

@@ -605,7 +605,7 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 				}
 			} else {
 				log.Error("Heartbeat Exited")
-				heartbeatErrCh = nil // skip this case in the future
+				heartbeatErrCh = nil   // skip this case in the future
 				schedulerProcess.End() // TODO: block on return channel or just wait for errCh to close?
 			}
 		}
