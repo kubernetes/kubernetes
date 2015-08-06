@@ -593,9 +593,6 @@ func (dm *DockerManager) runContainer(
 			CPUShares:  cpuShares,
 			WorkingDir: container.WorkingDir,
 			Labels:     labels,
-			// Interactive containers:
-			OpenStdin: container.Stdin,
-			Tty:       container.TTY,
 		},
 	}
 
