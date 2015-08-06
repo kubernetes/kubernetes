@@ -1195,6 +1195,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 
 	// Mount volumes.
+	// TODO: This method now does more than mounting the volumes and should be renamed.
+	// Not touching that for now as this is POC work.
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
 		if ref != nil {

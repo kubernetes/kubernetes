@@ -120,6 +120,12 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if err != nil {
 			return nil, err
 		}
+
+		err = volume.SetVolumeOwnership(volSpec, pod)
+		if err != nil {
+			return nil, err
+		}
+
 		podVolumes[volSpec.Name] = builder
 	}
 	return podVolumes, nil
