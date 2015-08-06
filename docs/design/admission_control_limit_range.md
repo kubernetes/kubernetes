@@ -142,7 +142,7 @@ For example,
 
 ```console
 $ kubectl namespace myspace
-$ kubectl create -f docs/user-guide/limitrange/limits.yaml
+$ kubectl create -f docs/admin/limitrange/limits.yaml
 $ kubectl get limits
 NAME
 limits
@@ -166,7 +166,7 @@ To make a **LimitRangeItem** more restrictive, we will intend to add these addit
 
 ## Example
 
-See the [example of Limit Range](../user-guide/limitrange/) for more information.
+See the [example of Limit Range](../admin/limitrange/) for more information.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -247,7 +247,7 @@ More examples can be found in our [blog article](http://blog.kubernetes.io/2015/
 
 Kubernetes’s scheduler will place applications only where they have adequate CPU and memory, but it can only do so if it knows how much [resources they require](compute-resources.md). The consequence of specifying too little CPU is that the containers could be starved of CPU if too many other containers were scheduled onto the same node. Similarly, containers could die unpredictably due to running out of memory if no memory were requested, which can be especially likely for large-memory applications.
 
-If no resource requirements are specified, a nominal amount of resources is assumed. (This default is applied via a [LimitRange](limitrange/) for the default [Namespace](namespaces.md). It can be viewed with `kubectl describe limitrange limits`.) You may explicitly specify the amount of resources required as follows:
+If no resource requirements are specified, a nominal amount of resources is assumed. (This default is applied via a [LimitRange](../admin/limitrange/) for the default [Namespace](namespaces.md). It can be viewed with `kubectl describe limitrange limits`.) You may explicitly specify the amount of resources required as follows:
 
 ```yaml
 apiVersion: v1
