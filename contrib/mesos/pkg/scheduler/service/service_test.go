@@ -31,6 +31,7 @@ import (
 	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/client/testclient"
 )
 
 type fakeSchedulerProcess struct {
@@ -63,7 +64,9 @@ func Test_awaitFailoverDone(t *testing.T) {
 	p := &fakeSchedulerProcess{
 		doneFunc: func() <-chan struct{} { return done },
 	}
-	ss := &SchedulerServer{}
+	ss := &SchedulerServer{
+		client: &testclient.Fake{},
+	}
 	failoverHandlerCalled := false
 	failoverFailedHandler := func() error {
 		failoverHandlerCalled = true
@@ -93,7 +96,9 @@ func Test_awaitFailoverDoneFailover(t *testing.T) {
 		doneFunc:     func() <-chan struct{} { return ch },
 		failoverFunc: func() <-chan struct{} { return ch },
 	}
-	ss := &SchedulerServer{}
+	ss := &SchedulerServer{
+		client: &testclient.Fake{},
+	}
 	failoverHandlerCalled := false
 	failoverFailedHandler := func() error {
 		failoverHandlerCalled = true

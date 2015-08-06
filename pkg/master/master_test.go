@@ -20,35 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
-	explatest "k8s.io/kubernetes/pkg/expapi/latest"
-	"k8s.io/kubernetes/pkg/registry/registrytest"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
-
-func TestGetServersToValidate(t *testing.T) {
-	master := Master{}
-	config := Config{}
-	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	config.DatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, latest.Codec, etcdtest.PathPrefix())
-	config.ExpDatabaseStorage = etcdstorage.NewEtcdStorage(fakeClient, explatest.Codec, etcdtest.PathPrefix())
-
-	master.nodeRegistry = registrytest.NewMinionRegistry([]string{"node1", "node2"}, api.NodeResources{})
-
-	servers := master.getServersToValidate(&config)
-
-	if len(servers) != 5 {
-		t.Errorf("unexpected server list: %#v", servers)
-	}
-	for _, server := range []string{"scheduler", "controller-manager", "etcd-0", "etcd-1", "etcd-2"} {
-		if _, ok := servers[server]; !ok {
-			t.Errorf("server list missing: %s", server)
-		}
-	}
-}
 
 func TestFindExternalAddress(t *testing.T) {
 	expectedIP := "172.0.0.1"

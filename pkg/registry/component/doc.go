@@ -14,6 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package componentstatus provides interfaces and implementation for retrieving cluster
-// component status.
-package componentstatus
+// Package component provides a client for storing cluster core component metadata.
+package component

@@ -24,7 +24,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
-	"net/url"
 	"os"
 	rt "runtime"
 	"strconv"
@@ -48,8 +47,10 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/registry/componentstatus"
+	probehttp "k8s.io/kubernetes/pkg/probe/http"
+	"k8s.io/kubernetes/pkg/registry/component"
+	componentetcd "k8s.io/kubernetes/pkg/registry/component/etcd"
+	componentstatus "k8s.io/kubernetes/pkg/registry/component/status"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
@@ -69,7 +70,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
-	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/storage"
@@ -77,6 +78,8 @@ import (
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/registry/service/allocator"
+	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
@@ -84,8 +87,6 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/registry/service/allocator"
-	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 )
 
 const (
@@ -215,6 +216,7 @@ type Master struct {
 	// TODO: define the internal typed interface in a way that clients can
 	// also be replaced
 	nodeRegistry              minion.Registry
+	componentRegistry         component.Registry
 	namespaceRegistry         namespace.Registry
 	serviceRegistry           service.Registry
 	endpointRegistry          endpoint.Registry
@@ -453,6 +455,11 @@ func (m *Master) init(c *Config) {
 	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(c.DatabaseStorage, true, c.KubeletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
+	componentStorage := componentetcd.NewStorage(c.DatabaseStorage, c.KubeletClient)
+	m.componentRegistry = component.NewRegistry(componentStorage)
+
+	componentStatusStorage := componentstatus.NewStorage(m.componentRegistry, c.DatabaseStorage, probehttp.DefaultTimeoutClient)
+
 	serviceStorage := serviceetcd.NewREST(c.DatabaseStorage)
 	m.serviceRegistry = service.NewRegistry(serviceStorage)
 
@@ -510,7 +517,9 @@ func (m *Master) init(c *Config) {
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
 
-		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
+		"components":      componentStorage,
+		"componentStatus": componentStatusStorage,
+		//TODO: deprecate componentStatuses
 	}
 
 	// establish the node proxy dialer
@@ -714,36 +723,6 @@ func (m *Master) InstallSwaggerAPI() {
 		SwaggerFilePath: "/swagger-ui/",
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
-}
-
-func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
-	serversToValidate := map[string]apiserver.Server{
-		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
-	}
-	for ix, machine := range c.DatabaseStorage.Backends() {
-		etcdUrl, err := url.Parse(machine)
-		if err != nil {
-			glog.Errorf("Failed to parse etcd url for validation: %v", err)
-			continue
-		}
-		var port int
-		var addr string
-		if strings.Contains(etcdUrl.Host, ":") {
-			var portString string
-			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
-			if err != nil {
-				glog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
-				continue
-			}
-			port, _ = strconv.Atoi(portString)
-		} else {
-			addr = etcdUrl.Host
-			port = 4001
-		}
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: etcdstorage.EtcdHealthCheck}
-	}
-	return serversToValidate
 }
 
 func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {

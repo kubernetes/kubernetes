@@ -17,6 +17,9 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"net"
+	"strconv"
 	"strings"
 )
 
@@ -37,4 +40,20 @@ func SplitPort(id string) (name, port string, valid bool) {
 		return parts[0], parts[1], len(parts[0]) > 0
 	}
 	return id, "", len(id) > 0
+}
+
+// ParsePort parses a raw host string of the form "host:port".
+// Will error if port is absent, non-numeric, or out of allowed port range.
+func ParsePort(rawhost string) (host string, port int, err error) {
+	var portString string
+	if host, portString, err = net.SplitHostPort(rawhost); err != nil {
+		return "", 0, fmt.Errorf("failed to parse port from host (%s): %v", rawhost, err)
+	}
+	if port, err = strconv.Atoi(portString); err != nil {
+		return "", 0, fmt.Errorf("failed to parse port as int from host (%s): %v", rawhost, err)
+	}
+	if port < 0 || port > 0xFFFF {
+		return "", 0, fmt.Errorf("failed to parse port from host (%s): port out of range (%d)", rawhost, port)
+	}
+	return host, port, nil
 }

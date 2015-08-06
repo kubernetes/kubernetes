@@ -14,30 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package probe
+package http
 
-type Result string
+import (
+	"net/url"
 
-const (
-	Success Result = "success"
-	Failure Result = "failure"
-	Unknown Result = "unknown"
+	"k8s.io/kubernetes/pkg/probe"
 )
 
-func (s Result) String() string {
-	switch s {
-	case Success:
-		return "success"
-	case Failure:
-		return "failure"
-	default:
-		return "unknown"
-	}
+// URLProber implements probe.Prober for a predefined URL endpoint.
+type URLProber struct {
+	URL        *url.URL
+	Client     HTTPGetter
+	Validators []BodyValidator
 }
 
-type Prober interface {
-	// Probe executes a health probe and returns the result.
-	// If the execution fails, an error is returned.
-	// If the probe results in failure, a message may be returned instead of an error.
-	Probe() (result Result, msg string, err error)
+func (up *URLProber) Probe() (result probe.Result, msg string, err error) {
+	client := up.Client
+	if client == nil {
+		client = DefaultTimeoutClient
+	}
+	return DoHTTPProbe(up.URL, client, up.Validators...)
 }

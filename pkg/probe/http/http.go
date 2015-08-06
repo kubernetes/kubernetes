@@ -17,7 +17,6 @@ limitations under the License.
 package http
 
 import (
-	"crypto/tls"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -28,49 +27,58 @@ import (
 	"github.com/golang/glog"
 )
 
-func New() HTTPProber {
-	tlsConfig := &tls.Config{InsecureSkipVerify: true}
-	transport := &http.Transport{TLSClientConfig: tlsConfig}
-	return httpProber{transport}
-}
-
 type HTTPProber interface {
 	Probe(url *url.URL, timeout time.Duration) (probe.Result, string, error)
 }
 
-type httpProber struct {
-	transport *http.Transport
+func New() HTTPProber {
+	return httpProber{}
 }
+
+type httpProber struct{}
 
 // Probe returns a ProbeRunner capable of running an http check.
 func (pr httpProber) Probe(url *url.URL, timeout time.Duration) (probe.Result, string, error) {
-	return DoHTTPProbe(url, &http.Client{Timeout: timeout, Transport: pr.transport})
+	return DoHTTPProbe(url, NewTimeoutClient(timeout))
 }
 
-type HTTPGetInterface interface {
+type HTTPGetter interface {
 	Get(u string) (*http.Response, error)
 }
 
+type BodyValidator interface {
+	// Validate returns an error if the response body is unhealthy
+	Validate(body []byte) error
+}
+
 // DoHTTPProbe checks if a GET request to the url succeeds.
-// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
-// If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
+// If the HTTP communication fails or times out, it returns Failure.
+// If the HTTP response code is < 200 or >= 400, it returns Failure.
+// If the HTTP response body causes a validation error, it returns Failure.
+// Otherwise the probe returns Success
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url *url.URL, client HTTPGetInterface) (probe.Result, string, error) {
+func DoHTTPProbe(url *url.URL, client HTTPGetter, validators ...BodyValidator) (probe.Result, string, error) {
 	res, err := client.Get(url.String())
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
 		return probe.Failure, err.Error(), nil
 	}
 	defer res.Body.Close()
-	b, err := ioutil.ReadAll(res.Body)
+	bodyBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return probe.Failure, "", err
 	}
-	body := string(b)
-	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		glog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-		return probe.Success, body, nil
+	body := string(bodyBytes)
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusBadRequest {
+		glog.V(4).Infof("Probe failed for %s, Response: %v, Invalid Status Code", url.String(), *res)
+		return probe.Failure, body, nil
 	}
-	glog.V(4).Infof("Probe failed for %s, Response: %v", url.String(), *res)
-	return probe.Failure, body, nil
+	for _, validator := range validators {
+		if err = validator.Validate(bodyBytes); err != nil {
+			glog.V(4).Infof("Probe failed for %s, Response: %v: Invalid Body: %v", url.String(), *res, err)
+			return probe.Failure, body, nil
+		}
+	}
+	glog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+	return probe.Success, body, nil
 }

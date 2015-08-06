@@ -284,6 +284,7 @@ var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
+var componentColumns = []string{"NAME", "TYPE", "URL", "FIRSTSEEN", "LASTSEEN"} //TODO(karlkfi): status
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
@@ -318,6 +319,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
 	h.Handler(persistentVolumeColumns, printPersistentVolume)
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
+	h.Handler(componentColumns, printComponent)
+	h.Handler(componentColumns, printComponentList)
 	h.Handler(componentStatusColumns, printComponentStatus)
 	h.Handler(componentStatusColumns, printComponentStatusList)
 	h.Handler(thirdPartyResourceColumns, printThirdPartyResource)
@@ -979,6 +982,29 @@ func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer, withNamesp
 			return err
 		}
 	}
+	return nil
+}
+
+func printComponent(item *api.Component, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	if withNamespace {
+		return fmt.Errorf("component is not namespaced")
+	}
+	firstSeen := item.CreationTimestamp.Time.Format(time.RFC1123Z)
+	lastSeen := item.LastTimestamp.Time.Format(time.RFC1123Z)
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s", item.Name, item.Type, item.URL, firstSeen, lastSeen); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
+	return err
+}
+
+func printComponentList(list *api.ComponentList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, item := range list.Items {
+		if err := printComponent(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

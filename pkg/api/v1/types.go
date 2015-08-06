@@ -2492,6 +2492,33 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
+// Type and constants for component type.
+type ComponentType string
+
+// These are the valid conditions for the component type.
+const (
+	ComponentAPIServer         ComponentType = "apiserver"
+	ComponentControllerManager ComponentType = "controller-manager"
+	ComponentScheduler         ComponentType = "scheduler"
+)
+
+// Component describes metadata about a core component.
+type Component struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+
+	Type          ComponentType `json:"type" description:"Type of the component"`
+	URL           string        `json:"location" description:"URL to reach the component (scheme, host, port, path)"`
+	LastTimestamp util.Time     `json:"lastTimestamp,omitempty" description:"The time at which the component was last updated"`
+}
+
+type ComponentList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+
+	Items []Component `json:"items" description:"list of component objects"`
+}
+
 // Type and constants for component health validation.
 type ComponentConditionType string
 

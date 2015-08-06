@@ -65,6 +65,8 @@ func init() {
 		&PodLogOptions{},
 		&PodExecOptions{},
 		&PodProxyOptions{},
+		&Component{},
+		&ComponentList{},
 		&ComponentStatus{},
 		&ComponentStatusList{},
 		&SerializedReference{},
@@ -118,6 +120,8 @@ func (*PodAttachOptions) IsAnAPIObject()          {}
 func (*PodLogOptions) IsAnAPIObject()             {}
 func (*PodExecOptions) IsAnAPIObject()            {}
 func (*PodProxyOptions) IsAnAPIObject()           {}
+func (*Component) IsAnAPIObject()                 {}
+func (*ComponentList) IsAnAPIObject()             {}
 func (*ComponentStatus) IsAnAPIObject()           {}
 func (*ComponentStatusList) IsAnAPIObject()       {}
 func (*SerializedReference) IsAnAPIObject()       {}

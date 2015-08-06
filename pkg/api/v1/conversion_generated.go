@@ -76,6 +76,24 @@ func convert_api_Capabilities_To_v1_Capabilities(in *api.Capabilities, out *Capa
 	return nil
 }
 
+func convert_api_Component_To_v1_Component(in *api.Component, out *Component, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.Component))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.Type = ComponentType(in.Type)
+	out.URL = in.URL
+	if err := s.Convert(&in.LastTimestamp, &out.LastTimestamp, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_api_ComponentCondition_To_v1_ComponentCondition(in *api.ComponentCondition, out *ComponentCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ComponentCondition))(in)
@@ -84,6 +102,29 @@ func convert_api_ComponentCondition_To_v1_ComponentCondition(in *api.ComponentCo
 	out.Status = ConditionStatus(in.Status)
 	out.Message = in.Message
 	out.Error = in.Error
+	return nil
+}
+
+func convert_api_ComponentList_To_v1_ComponentList(in *api.ComponentList, out *ComponentList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ComponentList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Component, len(in.Items))
+		for i := range in.Items {
+			if err := convert_api_Component_To_v1_Component(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -2441,6 +2482,24 @@ func convert_v1_Capabilities_To_api_Capabilities(in *Capabilities, out *api.Capa
 	return nil
 }
 
+func convert_v1_Component_To_api_Component(in *Component, out *api.Component, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Component))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.Type = api.ComponentType(in.Type)
+	out.URL = in.URL
+	if err := s.Convert(&in.LastTimestamp, &out.LastTimestamp, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1_ComponentCondition_To_api_ComponentCondition(in *ComponentCondition, out *api.ComponentCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ComponentCondition))(in)
@@ -2449,6 +2508,29 @@ func convert_v1_ComponentCondition_To_api_ComponentCondition(in *ComponentCondit
 	out.Status = api.ConditionStatus(in.Status)
 	out.Message = in.Message
 	out.Error = in.Error
+	return nil
+}
+
+func convert_v1_ComponentList_To_api_ComponentList(in *ComponentList, out *api.ComponentList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ComponentList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]api.Component, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_Component_To_api_Component(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -4762,8 +4844,10 @@ func init() {
 		convert_api_Binding_To_v1_Binding,
 		convert_api_Capabilities_To_v1_Capabilities,
 		convert_api_ComponentCondition_To_v1_ComponentCondition,
+		convert_api_ComponentList_To_v1_ComponentList,
 		convert_api_ComponentStatusList_To_v1_ComponentStatusList,
 		convert_api_ComponentStatus_To_v1_ComponentStatus,
+		convert_api_Component_To_v1_Component,
 		convert_api_ContainerPort_To_v1_ContainerPort,
 		convert_api_ContainerStateRunning_To_v1_ContainerStateRunning,
 		convert_api_ContainerStateTerminated_To_v1_ContainerStateTerminated,
@@ -4880,8 +4964,10 @@ func init() {
 		convert_v1_Binding_To_api_Binding,
 		convert_v1_Capabilities_To_api_Capabilities,
 		convert_v1_ComponentCondition_To_api_ComponentCondition,
+		convert_v1_ComponentList_To_api_ComponentList,
 		convert_v1_ComponentStatusList_To_api_ComponentStatusList,
 		convert_v1_ComponentStatus_To_api_ComponentStatus,
+		convert_v1_Component_To_api_Component,
 		convert_v1_ContainerPort_To_api_ContainerPort,
 		convert_v1_ContainerStateRunning_To_api_ContainerStateRunning,
 		convert_v1_ContainerStateTerminated_To_api_ContainerStateTerminated,

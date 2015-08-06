@@ -63,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
+	"k8s.io/kubernetes/pkg/heartbeat"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
@@ -139,7 +140,7 @@ type SchedulerServer struct {
 	StaticPodsConfigPath          string
 
 	executable  string // path to the binary running this service
-	client      *client.Client
+	client      client.Interface
 	driver      bindings.SchedulerDriver
 	driverMutex sync.RWMutex
 	mux         *http.ServeMux
@@ -281,17 +282,22 @@ func (s *SchedulerServer) serveFrameworkArtifact(path string) (string, string) {
 	}
 	serveFile("/"+base, path)
 
-	hostURI := ""
-	if s.AdvertisedAddress != "" {
-		hostURI = fmt.Sprintf("http://%s/%s", s.AdvertisedAddress, base)
-	} else if s.HA && s.HADomain != "" {
-		hostURI = fmt.Sprintf("http://%s.%s:%d/%s", SCHEDULER_SERVICE_NAME, s.HADomain, ports.SchedulerPort, base)
-	} else {
-		hostURI = fmt.Sprintf("http://%s:%d/%s", s.Address.String(), s.Port, base)
-	}
+	hostURI := s.URI(base)
 	log.V(2).Infof("Hosting artifact '%s' at '%s'", path, hostURI)
 
 	return hostURI, base
+}
+
+func (s *SchedulerServer) URI(path string) string {
+	var hostURI string
+	if s.AdvertisedAddress != "" {
+		hostURI = fmt.Sprintf("http://%s/%s", s.AdvertisedAddress, path)
+	} else if s.HA && s.HADomain != "" {
+		hostURI = fmt.Sprintf("http://%s.%s:%d/%s", SCHEDULER_SERVICE_NAME, s.HADomain, ports.SchedulerPort, path)
+	} else {
+		hostURI = fmt.Sprintf("http://%s:%d/%s", s.Address.String(), s.Port, path)
+	}
+	return hostURI
 }
 
 func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.ExecutorInfo, *uid.UID, error) {
@@ -533,9 +539,9 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 		err := handler()
 		if err != nil {
 			defer schedulerProcess.End()
-			err = fmt.Errorf("failover failed, scheduler will terminate: %v", err)
+			return fmt.Errorf("failover failed, scheduler will terminate: %v", err)
 		}
-		return err
+		return nil
 	}
 
 	// guard for failover signal processing, first signal processor wins
@@ -565,7 +571,50 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 		}
 		errCh <- doFailover()
 	})
-	return <-errCh
+
+	heart, heartbeatErrCh := heartbeat.Start(
+		s.client.ComponentsClient(),
+		5*time.Second,
+		api.ComponentScheduler,
+		s.URI(""),
+	)
+
+	var firstErr error
+	for {
+		select {
+		case err, ok := <-errCh:
+			if ok {
+				log.Errorf("Scheduler Error: %s", err)
+				// Only allow one error (per old code)
+				// TODO: make the writer close, not the reader
+				close(errCh)
+				if firstErr == nil {
+					firstErr = err
+				}
+			} else {
+				log.Error("Scheduler Exited")
+				errCh = nil // skip this case in the future
+				heart.Stop()
+			}
+		case err, ok := <-heartbeatErrCh:
+			if ok {
+				log.Errorf("Heartbeat Error: %s", err)
+				// multiple errors allowed. heartbeat closes channel on exit
+				if firstErr == nil {
+					firstErr = err
+				}
+			} else {
+				log.Error("Heartbeat Exited")
+				heartbeatErrCh = nil // skip this case in the future
+				schedulerProcess.End() // TODO: block on return channel or just wait for errCh to close?
+			}
+		}
+
+		if errCh == nil && heartbeatErrCh == nil {
+			break
+		}
+	}
+	return firstErr
 }
 
 func validateLeadershipTransition(desired, current string) {

@@ -2123,10 +2123,41 @@ const (
 	StrategicMergePatchType PatchType = "application/strategic-merge-patch+json"
 )
 
+// Type and constants for component type.
+type ComponentType string
+
+// These are the valid conditions for the component type.
+const (
+	ComponentAPIServer         ComponentType = "apiserver"
+	ComponentControllerManager ComponentType = "controller-manager"
+	ComponentScheduler         ComponentType = "scheduler" // TODO: move mesos-specific component type & validation to contrib
+)
+
+// Component describes metadata about a core component.
+type Component struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Type of the component
+	Type ComponentType `json:"type"`
+	// URL to reach the component (scheme, host, port, path)
+	URL string `json:"location"`
+
+	// The time at which the component was last updated.
+	LastTimestamp util.Time `json:"lastTimestamp,omitempty"`
+}
+
+type ComponentList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []Component `json:"items"`
+}
+
 // Type and constants for component health validation.
 type ComponentConditionType string
 
-// These are the valid conditions for the component.
+// These are the valid conditions for the component condition type.
 const (
 	ComponentHealthy ComponentConditionType = "Healthy"
 )

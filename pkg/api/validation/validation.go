@@ -176,6 +176,13 @@ func ValidateEndpointsName(name string, prefix bool) (bool, string) {
 	return NameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateServiceName can be used to check whether the given component name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateComponentName(name string, prefix bool) (bool, string) {
+	return NameIsDNS952Label(name, prefix)
+}
+
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
@@ -1848,4 +1855,54 @@ func ValidateThirdPartyResource(obj *api.ThirdPartyResource) errs.ValidationErro
 
 func ValidateSchemaUpdate(oldResource, newResource *api.ThirdPartyResource) errs.ValidationErrorList {
 	return errs.ValidationErrorList{fmt.Errorf("Schema update is not supported.")}
+}
+
+var supportedComponentType = util.NewStringSet(
+	string(api.ComponentAPIServer),
+	string(api.ComponentControllerManager),
+	string(api.ComponentScheduler),
+)
+
+// ValidateComponent tests if required fields in the component are set for create.
+func ValidateComponent(component *api.Component) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&component.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
+
+	//TODO: validate name is empty
+	//TODO: validate url is valid (scheme, host, port, path) if not empty (set default?)
+	//TODO: detect duplicate urls?
+
+	// validate type is non-empty and well known
+	if component.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("type"))
+	} else if !supportedComponentType.Has(string(component.Type)) {
+		allErrs = append(allErrs, errs.NewFieldValueNotSupported("type", component.Type, supportedComponentType.List()))
+	}
+
+	return allErrs
+}
+
+// ValidateComponentUpdate tests if required fields in the component are set for update.
+func ValidateComponentUpdate(old, new *api.Component) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&new.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
+
+	//TODO: validate url is valid (scheme, host, port, path) if not empty (set default?)
+	//TODO: detect duplicate urls?
+
+	// validate name is non-empty and valid
+	if new.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldNotFound("name", new.Name))
+	}
+	//TODO: validate name is valid format
+	//TODO: validate name exists in registry?
+
+	// validate type is non-empty and well known
+	if new.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("type"))
+	} else if !supportedComponentType.Has(string(new.Type)) {
+		allErrs = append(allErrs, errs.NewFieldValueNotSupported("type", new.Type, supportedComponentType.List()))
+	}
+
+	return allErrs
 }

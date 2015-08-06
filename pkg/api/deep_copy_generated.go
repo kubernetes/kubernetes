@@ -71,11 +71,46 @@ func deepCopy_api_Capabilities(in Capabilities, out *Capabilities, c *conversion
 	return nil
 }
 
+func deepCopy_api_Component(in Component, out *Component, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.Type = in.Type
+	out.URL = in.URL
+	if err := deepCopy_util_Time(in.LastTimestamp, &out.LastTimestamp, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_api_ComponentCondition(in ComponentCondition, out *ComponentCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
 	out.Message = in.Message
 	out.Error = in.Error
+	return nil
+}
+
+func deepCopy_api_ComponentList(in ComponentList, out *ComponentList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Component, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_api_Component(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -2189,7 +2224,9 @@ func init() {
 		deepCopy_api_AWSElasticBlockStoreVolumeSource,
 		deepCopy_api_Binding,
 		deepCopy_api_Capabilities,
+		deepCopy_api_Component,
 		deepCopy_api_ComponentCondition,
+		deepCopy_api_ComponentList,
 		deepCopy_api_ComponentStatus,
 		deepCopy_api_ComponentStatusList,
 		deepCopy_api_Container,

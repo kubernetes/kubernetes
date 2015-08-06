@@ -1,0 +1,7 @@
+---
+apiVersion: v1
+kind: Component
+metadata:
+  name: scheduler-3vcjt
+type: scheduler
+location: http://172.17.0.215:10251/healthz

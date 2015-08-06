@@ -22,8 +22,10 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/heartbeat"
 	"k8s.io/kubernetes/pkg/util"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
@@ -188,6 +191,16 @@ func (s *CMServer) Run(_ []string) error {
 		kubeClient,
 		serviceaccount.DefaultServiceAccountsControllerOptions(),
 	).Run()
+
+	_, errCh := heartbeat.Start(
+		kubeClient.ComponentsClient(),
+		5*time.Second,
+		api.ComponentControllerManager,
+		kubeconfig.Host,
+	)
+	for err = range errCh {
+		glog.Errorf("Heartbeat Error: %s", err)
+	}
 
 	select {}
 }
