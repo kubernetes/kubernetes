@@ -47,6 +47,7 @@ This is *not* a guide for people who want to debug their cluster.  For that you 
       - [My pod stays pending](#my-pod-stays-pending)
       - [My pod stays waiting](#my-pod-stays-waiting)
       - [My pod is crashing or otherwise unhealthy](#my-pod-is-crashing-or-otherwise-unhealthy)
+      - [My pod is running but not doing what I told it to do](#my-pod-is-running-but-not-doing-what-i-told-it-to-do)
     - [Debugging Replication Controllers](#debugging-replication-controllers)
     - [Debugging Services](#debugging-services)
       - [My service is missing endpoints](#my-service-is-missing-endpoints)
@@ -135,6 +136,36 @@ $ kubectl exec cassandra -- cat /var/log/cassandra/system.log
 If none of these approaches work, you can find the host machine that the pod is running on and SSH into that host,
 but this should generally not be necessary given tools in the Kubernetes API. Therefore, if you find yourself needing to ssh into a machine, please file a
 feature request on GitHub describing your use case and why these tools are insufficient.
+
+#### My pod is running but not doing what I told it to do
+
+If your pod is not behaving as you expected, it may be that there was an error in your
+pod description (e.g. `mypod.yaml` file on your local machine), and that the error
+was silently ignored when you created the pod.  Often a section of the pod description
+is nested incorrectly, or a key name is typed incorrectly, and so the key is ignored.
+For example, if you misspelled `command` as `commnd` then the pod will be created but
+will not use the command line you intended it to use.
+
+The first thing to do is to delete your pod and try creating it again with the `--validate` option.
+For example, run `kubectl create --validate -f mypod.yaml`.
+If you misspelled `command` as `commnd` then  will give an error like this:
+
+```
+I0805 10:43:25.129850   46757 schema.go:126] unknown field: commnd
+I0805 10:43:25.129973   46757 schema.go:129] this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842
+pods/mypod
+```
+
+<!-- TODO: Now that #11914 is merged, this advice may need to be updated -->
+
+The next thing to check is whether the pod on the apiserver
+matches the pod you meant to create (e.g. in a yaml file on your local machine).
+For example, run `kubectl get pods/mypod -o yaml > mypod-on-apiserver.yaml` and then
+manually compare the original pod description, `mypod.yaml` with the one you got
+back from apiserver, `mypod-on-apiserver.yaml`.  There will typically be some
+lines on the "apiserver" version that are not on the original version.  This is
+expected.  However, if there are lines on the original that are not on the apiserver
+version, then this may indicate a problem with your pod spec.
 
 ### Debugging Replication Controllers
 
