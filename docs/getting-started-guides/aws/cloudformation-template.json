@@ -154,6 +154,7 @@
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI"]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
+        "IamInstanceProfile": {"Ref" : "KubernetesMasterInstanceProfile" },
         "Tags" : [
           {"Key" : "Name", "Value" : {"Fn::Join" : [ "-", [ {"Ref" : "AWS::StackName"}, "k8s-master" ] ]}},
           {"Key" : "KubernetesRole", "Value" : "node"}
@@ -324,6 +325,7 @@
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI" ]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
+        "IamInstanceProfile": {"Ref" : "KubernetesNodeInstanceProfile" },
         "AssociatePublicIpAddress" : "true",
         "SecurityGroups": [{"Fn::If": [
           "UseEC2Classic",
@@ -409,6 +411,107 @@
           {"Key" : "Name", "Value" : {"Fn::Join" : [ "-", [ {"Ref" : "AWS::StackName"}, "k8s-node" ] ]}, "PropagateAtLaunch" : true},
           {"Key" : "KubernetesRole", "Value" : "node", "PropagateAtLaunch" : true}
         ]
+      }
+    },
+    "KubernetesMasterRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version" : "2012-10-17",
+          "Statement": [ {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": [ "ec2.amazonaws.com" ]
+            },
+            "Action": [ "sts:AssumeRole" ]
+          } ]
+        },
+        "Path": "/",
+        "Policies": [ {
+          "PolicyName": "kubernetes-master",
+          "PolicyDocument": {
+            "Version" : "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["ec2:*"],
+                "Resource": ["*"]
+              },
+              {
+                "Effect": "Allow",
+                "Action": ["elasticloadbalancing:*"],
+                "Resource": ["*"]
+              },
+              {
+                "Effect": "Allow",
+                "Action": "s3:*",
+                "Resource": [
+                  "arn:aws:s3:::kubernetes-*"
+                ]
+              }
+            ]
+          }
+        } ]
+      }
+    },
+    "KubernetesMasterInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [ { "Ref": "KubernetesMasterRole" } ]
+      }
+    },
+    "KubernetesNodeRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version" : "2012-10-17",
+          "Statement": [ {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": [ "ec2.amazonaws.com" ]
+            },
+            "Action": [ "sts:AssumeRole" ]
+          } ]
+        },
+        "Path": "/",
+        "Policies": [ {
+          "PolicyName": "kubernetes-minion",
+          "PolicyDocument": {
+            "Version" : "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:*",
+                "Resource": [
+                  "arn:aws:s3:::kubernetes-*"
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": "ec2:Describe*",
+                "Resource": "*"
+              },
+              {
+                "Effect": "Allow",
+                "Action": "ec2:AttachVolume",
+                "Resource": "*"
+              },
+              {
+                "Effect": "Allow",
+                "Action": "ec2:DetachVolume",
+                "Resource": "*"
+              }
+            ]
+          }
+        } ]
+      }
+    },
+    "KubernetesNodeInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [ { "Ref": "KubernetesNodeRole" } ]
       }
     }
   },
