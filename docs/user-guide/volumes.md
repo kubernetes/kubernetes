@@ -347,7 +347,7 @@ A feature of RBD is that it can be mounted as read-only by multiple consumers
 simultaneously.  This means that you can pre-populate a volume with your dataset
 and then serve it in parallel from as many pods as you need.  Unfortunately,
 RBD volumes can only be mounted by a single consumer in read-write mode - no
-simultaneous readers allowed.
+simultaneous writers allowed.
 
 See the [RBD example](../../examples/rbd/) for more details.
 
