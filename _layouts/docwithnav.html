@@ -47,8 +47,10 @@
 	            $('.menu a').removeClass('active');
 	            $(this).addClass('active').next().stop(true,true).slideDown('normal');
 	        } else {
-	            $(this).removeClass('active');
-	            $(this).next().stop(true,true).slideUp('normal');
+				if($(this).hasClass('active') && $(this).parent().hasClass('haschild')){
+	            	$(this).removeClass('active');
+					$(this).next().stop(true,true).slideUp('normal');
+				}
 	        }
 	    });
 	});
