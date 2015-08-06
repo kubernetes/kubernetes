@@ -49,7 +49,7 @@ func (c *FakeResourceQuotas) List(label labels.Selector) (*api.ResourceQuotaList
 }
 
 func (c *FakeResourceQuotas) DeleteAll() error {
-	_, err := c.Fake.Invokes(NewDeleteAllAction(), &api.ResourceQuota{})
+	_, err := c.Fake.Invokes(NewDeleteAllAction("resourcequotas", c.Namespace), &api.ResourceQuota{})
 	return err
 }
 

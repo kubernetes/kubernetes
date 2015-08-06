@@ -72,7 +72,7 @@ func (c *FakeServiceAccounts) Delete(name string) error {
 }
 
 func (c *FakeServiceAccounts) DeleteAll() error {
-	_, err := c.Fake.Invokes(NewDeleteAllAction(), &api.ServiceAccount{})
+	_, err := c.Fake.Invokes(NewDeleteAllAction("serviceaccounts", c.Namespace), &api.ServiceAccount{})
 	return err
 }
 

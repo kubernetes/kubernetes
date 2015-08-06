@@ -119,10 +119,11 @@ func NewDeleteAction(resource, namespace, name string) DeleteActionImpl {
 	return action
 }
 
-func NewDeleteAllAction() DeleteAllActionImpl {
+func NewDeleteAllAction(resource, namespace string) DeleteAllActionImpl {
 	action := DeleteAllActionImpl{}
 	action.Verb = "delete-all"
-
+	action.Resource = resource
+	action.Namespace = namespace
 	return action
 }
 

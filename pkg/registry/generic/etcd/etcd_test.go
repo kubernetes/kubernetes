@@ -726,20 +726,20 @@ func TestEtcdDeleteCollection(t *testing.T) {
 	fakeClient.Data[path] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Key:           "/foo",
-				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
-				Dir:           false,
-				ModifiedIndex: 1,
+				Key: path,
+				Dir: true,
+				Nodes: []*etcd.Node{
+					{
+						Value: runtime.EncodeOrDie(testapi.Codec(), podA),
+						Dir:   false,
+					},
+				},
 			},
 		},
 	}
 	obj, err := registry.DeleteCollection(api.WithNamespace(api.NewContext(), "testns"))
 	if err != nil {
 		t.Errorf("unexpected error: %v (%#v)", err, obj)
-	}
-	_, err = fakeClient.Get(path, false, false)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
 	}
 }
 

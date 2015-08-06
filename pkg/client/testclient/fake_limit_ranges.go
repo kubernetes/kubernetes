@@ -49,7 +49,7 @@ func (c *FakeLimitRanges) List(label labels.Selector) (*api.LimitRangeList, erro
 }
 
 func (c *FakeLimitRanges) DeleteAll() error {
-	_, err := c.Fake.Invokes(NewDeleteAllAction(), &api.LimitRange{})
+	_, err := c.Fake.Invokes(NewDeleteAllAction("limitranges", c.Namespace), &api.LimitRange{})
 	return err
 }
 

@@ -49,7 +49,7 @@ func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodL
 }
 
 func (c *FakePods) DeleteAll() error {
-	_, err := c.Fake.Invokes(NewDeleteAllAction(), &api.Pod{})
+	_, err := c.Fake.Invokes(NewDeleteAllAction("pods", c.Namespace), &api.Pod{})
 	return err
 }
 

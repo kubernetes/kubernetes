@@ -142,8 +142,7 @@ func DeleteCollectionPerNamespaceFunc(newListFunc func() runtime.Object) func(ap
 		if !ok || len(ns) == 0 {
 			return nil, kubeerr.NewBadRequest("Namespace parameter required.")
 		}
-		out := newListFunc()
-		if err := s.Delete(NamespaceKeyRootFunc(ctx, prefix), out); err != nil {
+		if err := s.RecursiveDelete(NamespaceKeyRootFunc(ctx, prefix), true); err != nil {
 			return &api.Status{Status: api.StatusFailure}, err
 		}
 		return &api.Status{Status: api.StatusSuccess}, nil

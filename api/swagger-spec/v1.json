@@ -369,7 +369,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a Endpoints",
+      "summary": "delete all Endpoints",
       "nickname": "deleteNamespacedEndpoints",
       "parameters": [
        {
@@ -378,14 +378,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -2262,7 +2254,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a Namespace",
+      "summary": "delete all Namespace",
       "nickname": "deleteNamespacedNamespace",
       "parameters": [
        {
@@ -2271,14 +2263,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        }
       ],
@@ -2827,7 +2811,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a Node",
+      "summary": "delete all Node",
       "nickname": "deleteNamespacedNode",
       "parameters": [
        {
@@ -2836,14 +2820,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        }
       ],
@@ -3681,7 +3657,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a PersistentVolumeClaim",
+      "summary": "delete all PersistentVolumeClaim",
       "nickname": "deleteNamespacedPersistentVolumeClaim",
       "parameters": [
        {
@@ -3690,14 +3666,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -4393,7 +4361,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a PersistentVolume",
+      "summary": "delete all PersistentVolume",
       "nickname": "deleteNamespacedPersistentVolume",
       "parameters": [
        {
@@ -4402,14 +4370,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        }
       ],
@@ -4923,7 +4883,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a Pod",
+      "summary": "delete all Pod",
       "nickname": "deleteNamespacedPod",
       "parameters": [
        {
@@ -4932,14 +4892,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -7095,7 +7047,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a PodTemplate",
+      "summary": "delete all PodTemplate",
       "nickname": "deleteNamespacedPodTemplate",
       "parameters": [
        {
@@ -7104,14 +7056,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -7764,7 +7708,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a ReplicationController",
+      "summary": "delete all ReplicationController",
       "nickname": "deleteNamespacedReplicationController",
       "parameters": [
        {
@@ -7773,14 +7717,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -8433,7 +8369,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a ResourceQuota",
+      "summary": "delete all ResourceQuota",
       "nickname": "deleteNamespacedResourceQuota",
       "parameters": [
        {
@@ -8442,14 +8378,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -9161,7 +9089,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a Secret",
+      "summary": "delete all Secret",
       "nickname": "deleteNamespacedSecret",
       "parameters": [
        {
@@ -9170,14 +9098,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -9830,7 +9750,7 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete a ServiceAccount",
+      "summary": "delete all ServiceAccount",
       "nickname": "deleteNamespacedServiceAccount",
       "parameters": [
        {
@@ -9839,14 +9759,6 @@
         "name": "pretty",
         "description": "If 'true', then the output is pretty printed.",
         "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
         "allowMultiple": false
        },
        {
@@ -11802,6 +11714,23 @@
      }
     }
    },
+   "json.WatchEvent": {
+    "id": "json.WatchEvent",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"
+     },
+     "object": {
+      "type": "string",
+      "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
+     }
+    }
+   },
+   "api.Patch": {
+    "id": "api.Patch",
+    "properties": {}
+   },
    "v1.DeleteOptions": {
     "id": "v1.DeleteOptions",
     "required": [
@@ -11822,23 +11751,6 @@
       "description": "the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"
      }
     }
-   },
-   "json.WatchEvent": {
-    "id": "json.WatchEvent",
-    "properties": {
-     "type": {
-      "type": "string",
-      "description": "the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"
-     },
-     "object": {
-      "type": "string",
-      "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
-     }
-    }
-   },
-   "api.Patch": {
-    "id": "api.Patch",
-    "properties": {}
    },
    "v1.EventList": {
     "id": "v1.EventList",

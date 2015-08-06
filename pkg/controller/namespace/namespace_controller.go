@@ -165,7 +165,7 @@ func deleteAllContent(kubeClient client.Interface, namespace string, before util
 	if err != nil {
 		return estimate, err
 	}
-	estimate, err = deletePods(kubeClient, namespace, before)
+	err = deletePods(kubeClient, namespace)
 	if err != nil {
 		return estimate, err
 	}

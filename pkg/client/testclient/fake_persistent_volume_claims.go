@@ -47,7 +47,7 @@ func (c *FakePersistentVolumeClaims) List(label labels.Selector, field fields.Se
 }
 
 func (c *FakePersistentVolumeClaims) DeleteAll() error {
-	_, err := c.Fake.Invokes(NewDeleteAllAction(), &api.PersistentVolumeClaim{})
+	_, err := c.Fake.Invokes(NewDeleteAllAction("persistentvolumeclaims", c.Namespace), &api.PersistentVolumeClaim{})
 	return err
 }
 

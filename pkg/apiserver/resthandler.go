@@ -514,6 +514,63 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 	}
 }
 
+// DeleteCollection returns a function that will handle a collection deletion
+func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
+	return func(req *restful.Request, res *restful.Response) {
+		w := res.ResponseWriter
+
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
+
+		namespace, err := scope.Namer.Namespace(req)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		ctx := scope.ContextFunc(req)
+		ctx = api.WithNamespace(ctx, namespace)
+
+		if admit.Handles(admission.Delete) {
+			userInfo, _ := api.UserFrom(ctx)
+
+			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
+		}
+
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			return r.DeleteCollection(ctx)
+		})
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+
+		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
+		// object with the response.
+		if result == nil {
+			result = &api.Status{
+				Status: api.StatusSuccess,
+				Code:   http.StatusOK,
+				Details: &api.StatusDetails{
+					Kind: scope.Kind,
+				},
+			}
+		} else {
+			// when a non-status response is returned, set the self link
+			if _, ok := result.(*api.Status); !ok {
+				if err := setSelfLink(result, req, scope.Namer); err != nil {
+					errorJSON(err, scope.Codec, w)
+					return
+				}
+			}
+		}
+		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+	}
+}
+
 // DeleteResource returns a function that will handle a resource deletion
 func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {

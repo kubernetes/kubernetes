@@ -121,7 +121,7 @@ func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
 }
 
 func (c *FakeEvents) DeleteAll() error {
-	_, err := c.Fake.Invokes(NewDeleteAllAction(), &api.Event{})
+	_, err := c.Fake.Invokes(NewDeleteAllAction("events", c.Namespace), &api.Event{})
 	return err
 }
 

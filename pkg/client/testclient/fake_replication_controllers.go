@@ -72,7 +72,7 @@ func (c *FakeReplicationControllers) Delete(name string) error {
 }
 
 func (c *FakeReplicationControllers) DeleteAll() error {
-	_, err := c.Fake.Invokes(NewDeleteAllAction(), &api.ReplicationController{})
+	_, err := c.Fake.Invokes(NewDeleteAllAction("replicationcontrollers", c.Namespace), &api.ReplicationController{})
 	return err
 }
 
