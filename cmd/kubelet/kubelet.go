@@ -43,7 +43,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+	if err := s.Run(nil); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

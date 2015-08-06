@@ -32,8 +32,8 @@ func NewKubelet() *Server {
 		queries Docker to see what is currently running.  It synchronizes the
 		configuration data, with the running set of containers by starting or stopping
 		Docker containers.`,
-		Run: func(_ *Server, args []string) error {
-			return s.Run(args)
+		Run: func(_ *Server, _ []string) error {
+			return s.Run(nil)
 		},
 	}
 	s.AddFlags(hks.Flags())
