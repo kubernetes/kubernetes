@@ -16,19 +16,37 @@
 
 # deploy the add-on services after the cluster is available
 
-set -e
-
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "config-default.sh"
-if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
-  echo "Deploying DNS on kubernetes"
+KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+
+function deploy_dns {
+  echo "Deploying DNS on Kubernetes"
   sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" > skydns-rc.yaml
   sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" > skydns-svc.yaml
-  
+      
   # use kubectl to create kube-system namespace
-  "${KUBE_ROOT}/cluster/kubectl.sh" create -f namespace.yaml
+  ${KUBECTL} create -f namespace.yaml 
   # use kubectl to create skydns rc and service
-  "${KUBE_ROOT}/cluster/kubectl.sh" --namespace=kube-system create -f skydns-rc.yaml
-  "${KUBE_ROOT}/cluster/kubectl.sh" --namespace=kube-system create -f skydns-svc.yaml
+  ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
+  ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+}
+
+function deploy_ui {
+  echo "Deploying Kubernetes UI"
+  ${KUBECTL} create -f namespace.yaml
+  # use kubectl to create kube-ui rc and service
+  ${KUBECTL} --namespace=kube-system create \
+      -f ${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-rc.yaml
+  ${KUBECTL} --namespace=kube-system create \
+      -f ${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-svc.yaml
+}
+
+if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
+  deploy_dns
+fi
+
+if [ "${ENABLE_CLUSTER_UI}" == true ]; then
+  deploy_ui
 fi
 
