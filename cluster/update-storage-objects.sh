@@ -32,7 +32,7 @@ KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 
 # List of resources to be updated.
 # TODO: Get this list of resources from server once
-# https://github.com/GoogleCloudPlatform/kubernetes/issues/2057 is fixed.
+# http://issue.k8s.io/2057 is fixed.
 declare -a resources=(
     "endpoints"
     "events"

@@ -100,7 +100,7 @@ cleanbranch="${NEWBRANCHUNIQ}"
 gitamcleanup=true
 for pull in "${PULLS[@]}"; do
   echo "+++ Downloading patch to /tmp/${pull}.patch (in case you need to do this again)"
-  curl -o "/tmp/${pull}.patch" -sSL "https://github.com/GoogleCloudPlatform/kubernetes/pull/${pull}.patch"
+  curl -o "/tmp/${pull}.patch" -sSL "http://pr.k8s.io/${pull}.patch"
   echo
   echo "+++ About to attempt cherry pick of PR. To reattempt:"
   echo "  $ git am -3 /tmp/${pull}.patch"

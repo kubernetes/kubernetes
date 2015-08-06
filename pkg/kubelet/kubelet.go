@@ -869,7 +869,7 @@ func makePortMappings(container *api.Container) (ports []kubecontainer.PortMappi
 
 		// We need to create some default port name if it's not specified, since
 		// this is necessary for rkt.
-		// https://github.com/GoogleCloudPlatform/kubernetes/issues/7710
+		// http://issue.k8s.io/7710
 		if p.Name == "" {
 			pm.Name = fmt.Sprintf("%s-%s:%d", container.Name, p.Protocol, p.ContainerPort)
 		} else {

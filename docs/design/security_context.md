@@ -42,7 +42,7 @@ A security context is a set of constraints that are applied to a container in or
 
 ## Background
 
-The problem of securing containers in Kubernetes has come up [before](https://github.com/GoogleCloudPlatform/kubernetes/issues/398) and the potential problems with container security are [well known](http://opensource.com/business/14/7/docker-security-selinux). Although it is not possible to completely isolate Docker containers from their hosts, new features like [user namespaces](https://github.com/docker/libcontainer/pull/304) make it possible to greatly reduce the attack surface.
+The problem of securing containers in Kubernetes has come up [before](http://issue.k8s.io/398) and the potential problems with container security are [well known](http://opensource.com/business/14/7/docker-security-selinux). Although it is not possible to completely isolate Docker containers from their hosts, new features like [user namespaces](https://github.com/docker/libcontainer/pull/304) make it possible to greatly reduce the attack surface.
 
 ## Motivation
 
@@ -192,7 +192,7 @@ It is up to an admission plugin to determine if the security context is acceptab
 time of writing, the admission control plugin for security contexts will only allow a context that
 has defined capabilities or privileged.  Contexts that attempt to define a UID or SELinux options
 will be denied by default.  In the future the admission plugin will base this decision upon
-configurable policies that reside within the [service account](https://github.com/GoogleCloudPlatform/kubernetes/pull/2297).
+configurable policies that reside within the [service account](http://pr.k8s.io/2297).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -46,18 +46,18 @@ done automatically based on statistical analysis and thresholds.
 
 * Provide a concrete proposal for implementing auto-scaling pods within Kubernetes
 * Implementation proposal should be in line with current discussions in existing issues:
-    * Scale verb - [1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629)
+    * Scale verb - [1629](http://issue.k8s.io/1629)
     * Config conflicts - [Config](https://github.com/GoogleCloudPlatform/kubernetes/blob/c7cb991987193d4ca33544137a5cb7d0292cf7df/docs/config.md#automated-re-configuration-processes)
-    * Rolling updates - [1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)
-    * Multiple scalable types - [1624](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624)
+    * Rolling updates - [1353](http://issue.k8s.io/1353)
+    * Multiple scalable types - [1624](http://issue.k8s.io/1624)
 
 ## Constraints and Assumptions
 
-* This proposal is for horizontal scaling only.  Vertical scaling will be handled in [issue 2072](https://github.com/GoogleCloudPlatform/kubernetes/issues/2072)
+* This proposal is for horizontal scaling only.  Vertical scaling will be handled in [issue 2072](http://issue.k8s.io/2072)
 * `ReplicationControllers` will not know about the auto-scaler, they are the target of the auto-scaler.  The `ReplicationController` responsibilities are
 constrained to only ensuring that the desired number of pods are operational per the [Replication Controller Design](../user-guide/replication-controller.md#responsibilities-of-the-replication-controller)
 * Auto-scalers will be loosely coupled with data gathering components in order to allow a wide variety of input sources
-* Auto-scalable resources will support a scale verb ([1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629))
+* Auto-scalable resources will support a scale verb ([1629](http://issue.k8s.io/1629))
 such that the auto-scaler does not directly manipulate the underlying resource.
 * Initially, most thresholds will be set by application administrators. It should be possible for an autoscaler to be
 written later that sets thresholds automatically based on past behavior (CPU used vs incoming requests).
@@ -120,7 +120,7 @@ Since an auto-scaler is a durable object it is best represented as a resource.
     type AutoScalerInterface interface {
         //ScaleApplication adjusts a resource's replica count.  Calls scale endpoint.  
         //Args to this are based on what the endpoint
-        //can support.  See https://github.com/GoogleCloudPlatform/kubernetes/issues/1629
+        //can support.  See http://issue.k8s.io/1629
         ScaleApplication(num int) error
     }
 

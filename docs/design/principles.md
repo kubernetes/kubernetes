@@ -70,7 +70,7 @@ TODO: pluggability
 
 ## Bootstrapping
 
-* [Self-hosting](https://github.com/GoogleCloudPlatform/kubernetes/issues/246) of all components is a goal.
+* [Self-hosting](http://issue.k8s.io/246) of all components is a goal.
 * Minimize the number of dependencies, particularly those required for steady-state operation.
 * Stratify the dependencies that remain via principled layering.
 * Break any circular dependencies by converting hard dependencies to soft dependencies.

@@ -195,7 +195,7 @@ References in the status of the referee to the referrer may be permitted, when t
 
 #### Lists of named subobjects preferred over maps
 
-Discussed in [#2004](https://github.com/GoogleCloudPlatform/kubernetes/issues/2004) and elsewhere. There are no maps of subobjects in any API objects. Instead, the convention is to use a list of subobjects containing name fields.
+Discussed in [#2004](http://issue.k8s.io/2004) and elsewhere. There are no maps of subobjects in any API objects. Instead, the convention is to use a list of subobjects containing name fields.
 
 For example:
 

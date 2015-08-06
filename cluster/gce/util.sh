@@ -636,7 +636,7 @@ function kube-up {
   # Generate a bearer token for this cluster. We push this separately
   # from the other cluster variables so that the client (this
   # computer) can forget it later. This should disappear with
-  # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
+  # http://issue.k8s.io/3168
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
@@ -1083,7 +1083,7 @@ function kube-push {
   # is solved (because that's blocking automatic dynamic nodes from
   # working). The node-kube-env has to be composed with the KUBELET_TOKEN
   # and KUBE_PROXY_TOKEN.  Ideally we would have
-  # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
+  # http://issue.k8s.io/3168
   # implemented before then, though, so avoiding this mess until then.
 
   echo
