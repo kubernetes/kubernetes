@@ -117,6 +117,16 @@ func TLSConfigFor(config *Config) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
+// tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor
+func tlsConfigKey(config *Config) (string, error) {
+	// Make sure ca/key/cert content is loaded
+	if err := LoadTLSFiles(config); err != nil {
+		return "", err
+	}
+	// Only include the things that actually affect the tls.Config
+	return fmt.Sprintf("%v/%x/%x/%x", config.Insecure, config.CAData, config.CertData, config.KeyData), nil
+}
+
 // LoadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
 // KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
 // either populated or were empty to start.
