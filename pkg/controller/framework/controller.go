@@ -106,6 +106,16 @@ func (c *Controller) HasSynced() bool {
 	return c.reflector.LastSyncResourceVersion() != ""
 }
 
+// Requeue adds the provided object back into the queue if it does not already exist.
+func (c *Controller) Requeue(obj interface{}) error {
+	return c.config.Queue.AddIfNotPresent(cache.Deltas{
+		cache.Delta{
+			Type:   cache.Sync,
+			Object: obj,
+		},
+	})
+}
+
 // processLoop drains the work queue.
 // TODO: Consider doing the processing in parallel. This will require a little thought
 // to make sure that we don't end up processing the same object multiple times
