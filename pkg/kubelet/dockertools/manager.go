@@ -67,6 +67,9 @@ const (
 // DockerManager implements the Runtime interface.
 var _ kubecontainer.Runtime = &DockerManager{}
 
+// TODO: make this a TTL based pull (if image older than X policy, pull)
+var podInfraContainerImagePullPolicy = api.PullIfNotPresent
+
 type DockerManager struct {
 	client              DockerInterface
 	recorder            record.EventRecorder
@@ -866,9 +869,10 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 		}
 	}
 	expectedPodInfraContainer := &api.Container{
-		Name:  PodInfraContainerName,
-		Image: dm.podInfraContainerImage,
-		Ports: ports,
+		Name:            PodInfraContainerName,
+		Image:           dm.podInfraContainerImage,
+		Ports:           ports,
+		ImagePullPolicy: podInfraContainerImagePullPolicy,
 	}
 	return podInfraContainer.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
 }
@@ -1357,36 +1361,15 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 	}
 
 	container := &api.Container{
-		Name:  PodInfraContainerName,
-		Image: dm.podInfraContainerImage,
-		Ports: ports,
+		Name:            PodInfraContainerName,
+		Image:           dm.podInfraContainerImage,
+		Ports:           ports,
+		ImagePullPolicy: podInfraContainerImagePullPolicy,
 	}
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-	}
-	spec := kubecontainer.ImageSpec{container.Image}
-	// TODO: make this a TTL based pull (if image older than X policy, pull)
-	ok, err := dm.IsImagePresent(spec)
-	if err != nil {
-		if ref != nil {
-			dm.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
-		}
+
+	// No pod secrets for the infra container.
+	if err := dm.pullImage(pod, container, nil); err != nil {
 		return "", err
-	}
-	if !ok {
-		if err := dm.PullImage(spec, nil /* no pod secrets for the infra container */); err != nil {
-			if ref != nil {
-				dm.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
-			}
-			return "", err
-		}
-		if ref != nil {
-			dm.recorder.Eventf(ref, "pulled", "Successfully pulled Pod container image %q", container.Image)
-		}
-	}
-	if ok && ref != nil {
-		dm.recorder.Eventf(ref, "pulled", "Pod container image %q already present on machine", container.Image)
 	}
 
 	id, err := dm.runContainerInPod(pod, container, netNamespace, "")
@@ -1544,25 +1527,28 @@ func (dm *DockerManager) clearReasonCache(pod *api.Pod, container *api.Container
 
 // Pull the image for the specified pod and container.
 func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error {
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	}
 	spec := kubecontainer.ImageSpec{container.Image}
 	present, err := dm.IsImagePresent(spec)
-
 	if err != nil {
-		ref, err := kubecontainer.GenerateContainerRef(pod, container)
-		if err != nil {
-			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-		}
 		if ref != nil {
 			dm.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
 		}
 		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
 	}
 	if !dm.runtimeHooks.ShouldPullImage(pod, container, present) {
+		if present && ref != nil {
+			dm.recorder.Eventf(ref, "pulled", "Container image %q already present on machine", container.Image)
+		}
 		return nil
 	}
 
+	dm.runtimeHooks.ReportImagePulling(pod, container)
 	err = dm.PullImage(spec, pullSecrets)
-	dm.runtimeHooks.ReportImagePull(pod, container, err)
+	dm.runtimeHooks.ReportImagePulled(pod, container, err)
 	return err
 }
 

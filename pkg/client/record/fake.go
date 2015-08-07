@@ -17,16 +17,24 @@ limitations under the License.
 package record
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 // FakeRecorder is used as a fake during tests.
-type FakeRecorder struct{}
+type FakeRecorder struct {
+	Events []string
+}
 
-func (f *FakeRecorder) Event(object runtime.Object, reason, message string) {}
+func (f *FakeRecorder) Event(object runtime.Object, reason, message string) {
+	f.Events = append(f.Events, fmt.Sprintf("%s %s", reason, message))
+}
 
-func (f *FakeRecorder) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {}
+func (f *FakeRecorder) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
+	f.Events = append(f.Events, fmt.Sprintf(reason+" "+messageFmt, args...))
+}
 
 func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{}) {
 }
