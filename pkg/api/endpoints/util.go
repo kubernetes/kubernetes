@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -33,31 +34,35 @@ import (
 // form for things like comparison.  The result is a newly allocated slice.
 func RepackSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	// First map each unique port definition to the sets of hosts that
-	// offer it.  The sets of hosts must be de-duped, using IP as the key.
-	type ipString string
-	allAddrs := map[ipString]*api.EndpointAddress{}
+	// offer it.  The sets of hosts must be de-duped, using IP+UID as the key.
+	type addressKey struct {
+		ip  string
+		uid types.UID
+	}
+	allAddrs := map[addressKey]*api.EndpointAddress{}
 	portsToAddrs := map[api.EndpointPort]addressSet{}
 	for i := range subsets {
 		for j := range subsets[i].Ports {
 			epp := &subsets[i].Ports[j]
 			for k := range subsets[i].Addresses {
 				epa := &subsets[i].Addresses[k]
-				ipstr := ipString(epa.IP)
-				// Accumulate the most "complete" address we can.
-				if allAddrs[ipstr] == nil {
+				ak := addressKey{ip: epa.IP}
+				if epa.TargetRef != nil {
+					ak.uid = epa.TargetRef.UID
+				}
+				// Accumulate the address.
+				if allAddrs[ak] == nil {
 					// Make a copy so we don't write to the
 					// input args of this function.
 					p := &api.EndpointAddress{}
 					*p = *epa
-					allAddrs[ipstr] = p
-				} else if allAddrs[ipstr].TargetRef == nil {
-					allAddrs[ipstr].TargetRef = epa.TargetRef
+					allAddrs[ak] = p
 				}
 				// Remember that this port maps to this address.
 				if _, found := portsToAddrs[*epp]; !found {
 					portsToAddrs[*epp] = addressSet{}
 				}
-				portsToAddrs[*epp].Insert(allAddrs[ipstr])
+				portsToAddrs[*epp].Insert(allAddrs[ak])
 			}
 		}
 	}
@@ -104,18 +109,32 @@ func hashAddresses(addrs addressSet) string {
 	for k := range addrs {
 		slice = append(slice, k)
 	}
-	sort.Sort(addrPtrsByIP(slice))
+	sort.Sort(addrPtrsByIpAndUID(slice))
 	hasher := md5.New()
 	util.DeepHashObject(hasher, slice)
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
 
-type addrPtrsByIP []*api.EndpointAddress
+func LessEndpointAddress(a, b *api.EndpointAddress) bool {
+	ipComparison := bytes.Compare([]byte(a.IP), []byte(b.IP))
+	if ipComparison != 0 {
+		return ipComparison < 0
+	}
+	if b.TargetRef == nil {
+		return false
+	}
+	if a.TargetRef == nil {
+		return true
+	}
+	return a.TargetRef.UID < b.TargetRef.UID
+}
 
-func (sl addrPtrsByIP) Len() int      { return len(sl) }
-func (sl addrPtrsByIP) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrPtrsByIP) Less(i, j int) bool {
-	return bytes.Compare([]byte(sl[i].IP), []byte(sl[j].IP)) < 0
+type addrPtrsByIpAndUID []*api.EndpointAddress
+
+func (sl addrPtrsByIpAndUID) Len() int      { return len(sl) }
+func (sl addrPtrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrPtrsByIpAndUID) Less(i, j int) bool {
+	return LessEndpointAddress(sl[i], sl[j])
 }
 
 // SortSubsets sorts an array of EndpointSubset objects in place.  For ease of
@@ -123,7 +142,7 @@ func (sl addrPtrsByIP) Less(i, j int) bool {
 func SortSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	for i := range subsets {
 		ss := &subsets[i]
-		sort.Sort(addrsByIP(ss.Addresses))
+		sort.Sort(addrsByIpAndUID(ss.Addresses))
 		sort.Sort(portsByHash(ss.Ports))
 	}
 	sort.Sort(subsetsByHash(subsets))
@@ -146,12 +165,12 @@ func (sl subsetsByHash) Less(i, j int) bool {
 	return bytes.Compare(h1, h2) < 0
 }
 
-type addrsByIP []api.EndpointAddress
+type addrsByIpAndUID []api.EndpointAddress
 
-func (sl addrsByIP) Len() int      { return len(sl) }
-func (sl addrsByIP) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrsByIP) Less(i, j int) bool {
-	return bytes.Compare([]byte(sl[i].IP), []byte(sl[j].IP)) < 0
+func (sl addrsByIpAndUID) Len() int      { return len(sl) }
+func (sl addrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrsByIpAndUID) Less(i, j int) bool {
+	return LessEndpointAddress(&sl[i], &sl[j])
 }
 
 type portsByHash []api.EndpointPort
