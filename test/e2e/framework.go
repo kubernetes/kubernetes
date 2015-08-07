@@ -94,7 +94,8 @@ func (f *Framework) afterEach() {
 	}
 
 	By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
-	if err := f.Client.Namespaces().Delete(f.Namespace.Name); err != nil {
+
+	if err := deleteNS(f.Client, f.Namespace.Name); err != nil {
 		Failf("Couldn't delete ns %q: %s", f.Namespace.Name, err)
 	}
 	// Paranoia-- prevent reuse!
