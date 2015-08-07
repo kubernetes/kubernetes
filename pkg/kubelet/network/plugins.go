@@ -30,7 +30,7 @@ import (
 
 const DefaultPluginName = "kubernetes.io/no-op"
 
-// Plugin is an interface to network plugins for the kubelet
+// NetworkPlugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
@@ -43,10 +43,16 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
+	SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) (*SetUpPodResult, error)
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
 	TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
+}
+
+// SetUpPodResult is returned when calling NetworkPlugin.SetUpPod. It contains the output
+// of running the plugin.
+type SetUpPodResult struct {
+	Output string
 }
 
 // Host is an interface that plugins can use to access the kubelet.
@@ -113,8 +119,8 @@ func (plugin *noopNetworkPlugin) Name() string {
 	return DefaultPluginName
 }
 
-func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) error {
-	return nil
+func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) (*SetUpPodResult, error) {
+	return &SetUpPodResult{}, nil
 }
 
 func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID) error {

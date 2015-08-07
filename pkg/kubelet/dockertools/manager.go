@@ -64,6 +64,8 @@ const (
 	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
 	// hence, setting ndots to be 5.
 	ndotsDNSOption = "options ndots:5\n"
+
+	containerNetworkEnvKey = "NETWORK"
 )
 
 // DockerManager implements the Runtime interface.
@@ -1564,23 +1566,31 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 	// If we should create infra container then we do it first.
 	podInfraContainerID := containerChanges.InfraContainerId
+	var containerNetworkEnvVal string
 	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
 		podInfraContainerID, err = dm.createPodInfraContainer(pod)
 
-		// Call the networking plugin
-		if err == nil {
-			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
-		}
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
 			return err
 		}
+
+		// Call the networking plugin
+		result, err := dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
+		if err != nil {
+			glog.Errorf("Network plugin failed for pod infra container: %v; Skipping pod %q", err, podFullName)
+			return err
+		}
+		containerNetworkEnvVal = result.Output
 	}
 
 	// Start everything
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
+		if len(containerNetworkEnvVal) > 0 {
+			container.Env = append(container.Env, api.EnvVar{Name: containerNetworkEnvKey, Value: containerNetworkEnvVal})
+		}
 		glog.V(4).Infof("Creating container %+v in pod %v", container, podFullName)
 		err := dm.pullImage(pod, container, pullSecrets)
 		dm.updateReasonCache(pod, container, err)
