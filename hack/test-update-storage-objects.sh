@@ -46,13 +46,13 @@ function startApiServer() {
   KUBE_API_VERSIONS="${KUBE_API_VERSIONS}" \
     "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
     --address="127.0.0.1" \
-    --public_address_override="127.0.0.1" \
+    --public-address-override="127.0.0.1" \
     --port="${API_PORT}" \
-    --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-    --public_address_override="127.0.0.1" \
-    --kubelet_port=${KUBELET_PORT} \
-    --runtime_config="${RUNTIME_CONFIG}" \
-    --cert_dir="${TMPDIR:-/tmp/}" \
+    --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
+    --public-address-override="127.0.0.1" \
+    --kubelet-port=${KUBELET_PORT} \
+    --runtime-config="${RUNTIME_CONFIG}" \
+    --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
   APISERVER_PID=$!
 

@@ -10,13 +10,13 @@ spec:
     command:
     - /bin/sh
     - -c
-    - /usr/local/bin/kube-apiserver --address=127.0.0.1 --etcd_servers=http://127.0.0.1:4001
-      --cloud_provider=gce   --admission_control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
-      --service-cluster-ip-range=10.0.0.0/16 --client_ca_file=/srv/kubernetes/ca.crt
-      --basic_auth_file=/srv/kubernetes/basic_auth.csv --cluster_name=e2e-test-bburns
-      --tls_cert_file=/srv/kubernetes/server.cert --tls_private_key_file=/srv/kubernetes/server.key
-      --secure_port=443 --token_auth_file=/srv/kubernetes/known_tokens.csv  --v=2
-      --allow_privileged=False 1>>/var/log/kube-apiserver.log 2>&1
+    - /usr/local/bin/kube-apiserver --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001
+      --cloud-provider=gce   --admission-control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      --service-cluster-ip-range=10.0.0.0/16 --client-ca-file=/srv/kubernetes/ca.crt
+      --basic-auth-file=/srv/kubernetes/basic_auth.csv --cluster-name=e2e-test-bburns
+      --tls-cert-file=/srv/kubernetes/server.cert --tls-private-key-file=/srv/kubernetes/server.key
+      --secure-port=443 --token-auth-file=/srv/kubernetes/known_tokens.csv  --v=2
+      --allow-privileged=False 1>>/var/log/kube-apiserver.log 2>&1
     ports:
     - containerPort: 443
       hostPort: 443

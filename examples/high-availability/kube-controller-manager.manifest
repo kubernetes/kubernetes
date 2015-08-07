@@ -14,7 +14,7 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-controller-manager --master=192.168.4.102:8080 --service_account_private_key_file=/srv/kubernetes/server.key --v=4  1>>/var/log/kube-controller-manager.log 2>&1"
+                 "/usr/local/bin/kube-controller-manager --master=192.168.4.102:8080 --service-account-private-key-file=/srv/kubernetes/server.key --v=4  1>>/var/log/kube-controller-manager.log 2>&1"
                ],
     "livenessProbe": {
       "httpGet": {

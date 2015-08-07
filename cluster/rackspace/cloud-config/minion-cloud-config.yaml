@@ -150,11 +150,11 @@ coreos:
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
         ExecStart=/opt/bin/kubelet \
         --address=$private_ipv4 \
-        --api_servers=${FIRST_APISERVER_URL} \
-        --cluster_dns=DNS_SERVER_IP \
-        --cluster_domain=DNS_DOMAIN \
+        --api-servers=${FIRST_APISERVER_URL} \
+        --cluster-dns=DNS_SERVER_IP \
+        --cluster-domain=DNS_DOMAIN \
         --healthz-bind-address=$private_ipv4 \
-        --hostname_override=$private_ipv4 \
+        --hostname-override=$private_ipv4 \
         --logtostderr=true \
         --v=2
         Restart=always
@@ -176,7 +176,7 @@ coreos:
         ExecStartPre=/run/config-kube-proxy.sh
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-proxy /opt/bin/kube-proxy
         ExecStart=/opt/bin/kube-proxy \
-        --bind_address=$private_ipv4 \
+        --bind-address=$private_ipv4 \
         --kubeconfig=/var/lib/kube-proxy/kubeconfig \
         --logtostderr=true \
         --master=${FIRST_APISERVER_URL}

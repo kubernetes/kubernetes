@@ -213,15 +213,15 @@ function start_apiserver {
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/kube-apiserver" ${priv_arg}\
       --v=${LOG_LEVEL} \
-      --cert_dir="${CERT_DIR}" \
-      --service_account_key_file="${SERVICE_ACCOUNT_KEY}" \
-      --service_account_lookup="${SERVICE_ACCOUNT_LOOKUP}" \
-      --admission_control="${ADMISSION_CONTROL}" \
+      --cert-dir="${CERT_DIR}" \
+      --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
+      --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
+      --admission-control="${ADMISSION_CONTROL}" \
       --address="${API_HOST}" \
       --port="${API_PORT}" \
-      --etcd_servers="http://127.0.0.1:4001" \
+      --etcd-servers="http://127.0.0.1:4001" \
       --service-cluster-ip-range="10.0.0.0/24" \
-      --cors_allowed_origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
+      --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
@@ -233,8 +233,8 @@ function start_controller_manager {
     CTLRMGR_LOG=/tmp/kube-controller-manager.log
     sudo -E "${GO_OUT}/kube-controller-manager" \
       --v=${LOG_LEVEL} \
-      --service_account_private_key_file="${SERVICE_ACCOUNT_KEY}" \
-      --root_ca_file="${ROOT_CA_FILE}" \
+      --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
+      --root-ca-file="${ROOT_CA_FILE}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -244,11 +244,11 @@ function start_kubelet {
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       sudo -E "${GO_OUT}/kubelet" ${priv_arg}\
         --v=${LOG_LEVEL} \
-        --chaos_chance="${CHAOS_CHANCE}" \
-        --container_runtime="${CONTAINER_RUNTIME}" \
-        --hostname_override="127.0.0.1" \
+        --chaos-chance="${CHAOS_CHANCE}" \
+        --container-runtime="${CONTAINER_RUNTIME}" \
+        --hostname-override="127.0.0.1" \
         --address="127.0.0.1" \
-        --api_servers="${API_HOST}:${API_PORT}" \
+        --api-servers="${API_HOST}:${API_PORT}" \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
