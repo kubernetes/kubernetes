@@ -51,6 +51,7 @@ type Interface interface {
 	DeleteRule(table Table, chain Chain, args ...string) error
 	// IsIpv6 returns true if this is managing ipv6 tables
 	IsIpv6() bool
+	// TODO: (BenTheElder) Unit-Test Save/SaveAll, Restore/RestoreAll
 	// Save calls `iptables-save` for table.
 	Save(table Table) ([]byte, error)
 	// SaveAll calls `iptables-save`.
@@ -232,52 +233,23 @@ func (runner *runner) SaveAll() ([]byte, error) {
 
 // Restore is part of Interface.
 func (runner *runner) Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
 	// setup args
 	args := []string{"-T", string(table)}
-	if !flush {
-		args = append(args, "--noflush")
-	}
-	if counters {
-		args = append(args, "--counters")
-	}
-	// create temp file through which to pass data
-	temp, err := ioutil.TempFile("", "kube-temp-iptables-restore-")
-	// make sure we delete the temp file
-	defer os.Remove(temp.Name())
-	if err != nil {
-		return err
-	}
-	// Put the filename at the end of args.
-	// NOTE: the filename must be at the end.
-	// See: https://git.netfilter.org/iptables/commit/iptables-restore.c?id=e6869a8f59d779ff4d5a0984c86d80db70784962
-	args = append(args, temp.Name())
-	if err != nil {
-		return err
-	}
-	// write data to the file
-	_, err = temp.Write(data)
-	temp.Close()
-	if err != nil {
-		return err
-	}
-	// run the command and return the output or an error including the output and error
-	b, err := runner.exec.Command(cmdIptablesRestore, args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v (%s)", err, b)
-	}
-	return nil
+	return runner.restoreInternal(args, data, flush, counters)
 }
 
 // RestoreAll is part of Interface.
 func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
+	// setup args
+	args := make([]string, 0)
+	return runner.restoreInternal(args, data, flush, counters)
+}
+
+// restoreInternal is the shared part of Restore/RestoreAll
+func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	// setup args
-	args := make([]string, 0)
 	if !flush {
 		args = append(args, "--noflush")
 	}
@@ -286,11 +258,11 @@ func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreC
 	}
 	// create temp file through which to pass data
 	temp, err := ioutil.TempFile("", "kube-temp-iptables-restore-")
-	// make sure we delete the temp file
-	defer os.Remove(temp.Name())
 	if err != nil {
 		return err
 	}
+	// make sure we delete the temp file
+	defer os.Remove(temp.Name())
 	// Put the filename at the end of args.
 	// NOTE: the filename must be at the end.
 	// See: https://git.netfilter.org/iptables/commit/iptables-restore.c?id=e6869a8f59d779ff4d5a0984c86d80db70784962
