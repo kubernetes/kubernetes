@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package providers
 
 import (
 	// Cloud providers
-	_ "k8s.io/kubernetes/pkg/cloudprovider/aws"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/gce"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/mesos"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/openstack"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/ovirt"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/rackspace"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/vagrant"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/vagrant"
 )
