@@ -19,6 +19,7 @@ package defaults
 
 import (
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -30,7 +31,7 @@ func init() {
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all minions
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
-	factory.RegisterPriorityFunction("EqualPriority", priorities.EqualPriority, 1)
+	factory.RegisterPriorityFunction("EqualPriority", scheduler.EqualPriority, 1)
 }
 
 func defaultPredicates() util.StringSet {
