@@ -33,6 +33,7 @@ type FakeRuntime struct {
 	sync.Mutex
 	CalledFunctions   []string
 	PodList           []*Pod
+	AllPodList        []*Pod
 	ImageList         []Image
 	PodStatus         api.PodStatus
 	StartedPods       []string
@@ -89,6 +90,7 @@ func (f *FakeRuntime) ClearCalls() {
 
 	f.CalledFunctions = []string{}
 	f.PodList = []*Pod{}
+	f.AllPodList = []*Pod{}
 	f.PodStatus = api.PodStatus{}
 	f.StartedPods = []string{}
 	f.KilledPods = []string{}
@@ -155,6 +157,9 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPods")
+	if all {
+		return f.AllPodList, f.Err
+	}
 	return f.PodList, f.Err
 }
 
