@@ -77,3 +77,10 @@ type codecWrapper struct {
 func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
 	return c.EncodeToVersion(obj, c.version)
 }
+
+// TODO: Make this behaviour default when we move everyone away from
+// the unversioned types.
+//
+// func (c *codecWrapper) Decode(data []byte) (Object, error) {
+// 	return c.DecodeToVersion(data, c.version)
+// }

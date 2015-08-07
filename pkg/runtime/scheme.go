@@ -446,6 +446,19 @@ func (s *Scheme) Decode(data []byte) (Object, error) {
 	return obj.(Object), nil
 }
 
+// DecodeToVersion converts a YAML or JSON string back into a pointer to an api
+// object.  Deduces the type based upon the APIVersion and Kind fields, which
+// are set by Encode. Only versioned objects (APIVersion != "") are
+// accepted. The object will be converted into the in-memory versioned type
+// requested before being returned.
+func (s *Scheme) DecodeToVersion(data []byte, version string) (Object, error) {
+	obj, err := s.raw.DecodeToVersion(data, version)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(Object), nil
+}
+
 // DecodeInto parses a YAML or JSON string and stores it in obj. Returns an error
 // if data.Kind is set and doesn't match the type of obj. Obj should be a
 // pointer to an api type.

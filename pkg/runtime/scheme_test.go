@@ -87,14 +87,15 @@ func TestScheme(t *testing.T) {
 		TestString: "foo",
 	}
 
-	// Test Encode, Decode, and DecodeInto
+	// Test Encode, Decode, DecodeInto, and DecodeToVersion
 	obj := runtime.Object(simple)
 	data, err := scheme.EncodeToVersion(obj, "externalVersion")
 	obj2, err2 := scheme.Decode(data)
 	obj3 := &InternalSimple{}
 	err3 := scheme.DecodeInto(data, obj3)
-	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v' '%v'", err, err2, err3)
+	obj4, err4 := scheme.DecodeToVersion(data, "externalVersion")
+	if err != nil || err2 != nil || err3 != nil || err4 != nil {
+		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)
 	}
 	if _, ok := obj2.(*InternalSimple); !ok {
 		t.Fatalf("Got wrong type")
@@ -104,6 +105,9 @@ func TestScheme(t *testing.T) {
 	}
 	if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
+	}
+	if _, ok := obj4.(*ExternalSimple); !ok {
+		t.Fatalf("Got wrong type")
 	}
 
 	// Test Convert
