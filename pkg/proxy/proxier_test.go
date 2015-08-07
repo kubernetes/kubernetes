@@ -104,6 +104,22 @@ func (fake *fakeIptables) IsIpv6() bool {
 	return false
 }
 
+func (fake *fakeIptables) Save(table iptables.Table) ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (fake *fakeIptables) SaveAll() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (fake *fakeIptables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+	return nil
+}
+
+func (fake *fakeIptables) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+	return nil
+}
+
 var tcpServerPort int
 var udpServerPort int
 

@@ -25,10 +25,10 @@ import (
 
 func getIptablesCommand(protocol Protocol) string {
 	if protocol == ProtocolIpv4 {
-		return "iptables"
+		return cmdIptables
 	}
 	if protocol == ProtocolIpv6 {
-		return "ip6tables"
+		return cmdIp6tables
 	}
 	panic("Unknown protocol")
 }
@@ -503,7 +503,7 @@ func TestCheckRuleWithoutCheckPresent(t *testing.T) {
 :PREROUTING ACCEPT [2136997:197881818]
 :POSTROUTING ACCEPT [4284525:258542680]
 :OUTPUT ACCEPT [5901660:357267963]
--A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER 
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
 COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 
@@ -541,7 +541,7 @@ func TestCheckRuleWithoutCheckAbsent(t *testing.T) {
 :PREROUTING ACCEPT [2136997:197881818]
 :POSTROUTING ACCEPT [4284525:258542680]
 :OUTPUT ACCEPT [5901660:357267963]
--A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER 
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
 COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 

@@ -18,6 +18,8 @@ package iptables
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,6 +51,19 @@ type Interface interface {
 	DeleteRule(table Table, chain Chain, args ...string) error
 	// IsIpv6 returns true if this is managing ipv6 tables
 	IsIpv6() bool
+	// TODO: (BenTheElder) Unit-Test Save/SaveAll, Restore/RestoreAll
+	// Save calls `iptables-save` for table.
+	Save(table Table) ([]byte, error)
+	// SaveAll calls `iptables-save`.
+	SaveAll() ([]byte, error)
+	// Restore runs `iptables-restore` passing data through a temporary file.
+	// table is the Table to restore
+	// data should be formatted like the output of Save()
+	// flush sets the presence of the "--noflush" flag. see: FlushFlag
+	// counters sets the "--counters" flag. see: RestoreCountersFlag
+	Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error
+	// RestoreAll is the same as Restore except that no table is specified.
+	RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error
 }
 
 type Protocol byte
@@ -71,6 +86,25 @@ const (
 	ChainPrerouting  Chain = "PREROUTING"
 	ChainOutput      Chain = "OUTPUT"
 )
+
+const (
+	cmdIptablesSave    string = "iptables-save"
+	cmdIptablesRestore string = "iptables-restore"
+	cmdIptables        string = "iptables"
+	cmdIp6tables       string = "ip6tables"
+)
+
+// Option flag for Restore
+type RestoreCountersFlag bool
+
+const RestoreCounters RestoreCountersFlag = true
+const NoRestoreCounters RestoreCountersFlag = false
+
+// Option flag for Restore
+type FlushFlag bool
+
+const FlushTables FlushFlag = true
+const NoFlushTables FlushFlag = false
 
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
@@ -178,11 +212,83 @@ func (runner *runner) IsIpv6() bool {
 	return runner.protocol == ProtocolIpv6
 }
 
+// Save is part of Interface.
+func (runner *runner) Save(table Table) ([]byte, error) {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	// run and return
+	args := []string{"-t", string(table)}
+	return runner.exec.Command(cmdIptablesSave, args...).CombinedOutput()
+}
+
+// SaveAll is part of Interface.
+func (runner *runner) SaveAll() ([]byte, error) {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	// run and return
+	return runner.exec.Command(cmdIptablesSave, []string{}...).CombinedOutput()
+}
+
+// Restore is part of Interface.
+func (runner *runner) Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
+	// setup args
+	args := []string{"-T", string(table)}
+	return runner.restoreInternal(args, data, flush, counters)
+}
+
+// RestoreAll is part of Interface.
+func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
+	// setup args
+	args := make([]string, 0)
+	return runner.restoreInternal(args, data, flush, counters)
+}
+
+// restoreInternal is the shared part of Restore/RestoreAll
+func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	if !flush {
+		args = append(args, "--noflush")
+	}
+	if counters {
+		args = append(args, "--counters")
+	}
+	// create temp file through which to pass data
+	temp, err := ioutil.TempFile("", "kube-temp-iptables-restore-")
+	if err != nil {
+		return err
+	}
+	// make sure we delete the temp file
+	defer os.Remove(temp.Name())
+	// Put the filename at the end of args.
+	// NOTE: the filename must be at the end.
+	// See: https://git.netfilter.org/iptables/commit/iptables-restore.c?id=e6869a8f59d779ff4d5a0984c86d80db70784962
+	args = append(args, temp.Name())
+	if err != nil {
+		return err
+	}
+	// write data to the file
+	_, err = temp.Write(data)
+	temp.Close()
+	if err != nil {
+		return err
+	}
+	// run the command and return the output or an error including the output and error
+	b, err := runner.exec.Command(cmdIptablesRestore, args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v (%s)", err, b)
+	}
+	return nil
+}
+
 func (runner *runner) iptablesCommand() string {
 	if runner.IsIpv6() {
-		return "ip6tables"
+		return cmdIp6tables
 	} else {
-		return "iptables"
+		return cmdIptables
 	}
 }
 
@@ -215,7 +321,7 @@ func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool,
 // of hack and half-measures.  We should nix this ASAP.
 func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
 	glog.V(1).Infof("running iptables-save -t %s", string(table))
-	out, err := runner.exec.Command("iptables-save", "-t", string(table)).CombinedOutput()
+	out, err := runner.exec.Command(cmdIptablesSave, "-t", string(table)).CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("error checking rule: %v", err)
 	}
@@ -335,11 +441,11 @@ func extractIptablesVersion(str string) (int, int, int, error) {
 
 // Runs "iptables --version" to get the version string
 func getIptablesVersionString(exec utilexec.Interface) (string, error) {
-	bytes, err := exec.Command("iptables", "--version").CombinedOutput()
+	// this doesn't access mutable state so we don't need to use the interface / runner
+	bytes, err := exec.Command(cmdIptables, "--version").CombinedOutput()
 	if err != nil {
 		return "", err
 	}
-
 	return string(bytes), nil
 }
 
