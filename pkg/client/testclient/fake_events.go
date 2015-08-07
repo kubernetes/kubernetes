@@ -27,12 +27,17 @@ import (
 // FakeEvents implements EventInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeEvents struct {
-	Fake *Fake
+	Fake      *Fake
+	Namespace string
 }
 
 // Get returns the given event, or an error.
 func (c *FakeEvents) Get(name string) (*api.Event, error) {
-	obj, err := c.Fake.Invokes(NewRootGetAction("events", name), &api.Event{})
+	action := NewRootGetAction("events", name)
+	if c.Namespace != "" {
+		action = NewGetAction("events", c.Namespace, name)
+	}
+	obj, err := c.Fake.Invokes(action, &api.Event{})
 	if obj == nil {
 		return nil, err
 	}
@@ -42,7 +47,11 @@ func (c *FakeEvents) Get(name string) (*api.Event, error) {
 
 // List returns a list of events matching the selectors.
 func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("events", label, field), &api.EventList{})
+	action := NewRootListAction("events", label, field)
+	if c.Namespace != "" {
+		action = NewListAction("events", c.Namespace, label, field)
+	}
+	obj, err := c.Fake.Invokes(action, &api.EventList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -52,7 +61,11 @@ func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*api.Ev
 
 // Create makes a new event. Returns the copy of the event the server returns, or an error.
 func (c *FakeEvents) Create(event *api.Event) (*api.Event, error) {
-	obj, err := c.Fake.Invokes(NewRootCreateAction("events", event), event)
+	action := NewRootCreateAction("events", event)
+	if c.Namespace != "" {
+		action = NewCreateAction("events", c.Namespace, event)
+	}
+	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
 		return nil, err
 	}
@@ -62,7 +75,11 @@ func (c *FakeEvents) Create(event *api.Event) (*api.Event, error) {
 
 // Update replaces an existing event. Returns the copy of the event the server returns, or an error.
 func (c *FakeEvents) Update(event *api.Event) (*api.Event, error) {
-	obj, err := c.Fake.Invokes(NewRootUpdateAction("events", event), event)
+	action := NewRootUpdateAction("events", event)
+	if c.Namespace != "" {
+		action = NewUpdateAction("events", c.Namespace, event)
+	}
+	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
 		return nil, err
 	}
@@ -71,19 +88,31 @@ func (c *FakeEvents) Update(event *api.Event) (*api.Event, error) {
 }
 
 func (c *FakeEvents) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewRootDeleteAction("events", name), &api.Event{})
+	action := NewRootDeleteAction("events", name)
+	if c.Namespace != "" {
+		action = NewDeleteAction("events", c.Namespace, name)
+	}
+	_, err := c.Fake.Invokes(action, &api.Event{})
 	return err
 }
 
 // Watch starts watching for events matching the given selectors.
 func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewRootWatchAction("events", label, field, resourceVersion), nil)
+	action := NewRootWatchAction("events", label, field, resourceVersion)
+	if c.Namespace != "" {
+		action = NewWatchAction("events", c.Namespace, label, field, resourceVersion)
+	}
+	c.Fake.Invokes(action, nil)
 	return c.Fake.Watch, c.Fake.Err()
 }
 
 // Search returns a list of events matching the specified object.
 func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("events", nil, nil), &api.EventList{})
+	action := NewRootListAction("events", nil, nil)
+	if c.Namespace != "" {
+		action = NewListAction("events", c.Namespace, nil, nil)
+	}
+	obj, err := c.Fake.Invokes(action, &api.EventList{})
 	if obj == nil {
 		return nil, err
 	}

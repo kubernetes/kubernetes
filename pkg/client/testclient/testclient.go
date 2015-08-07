@@ -119,7 +119,7 @@ func (c *Fake) Nodes() client.NodeInterface {
 }
 
 func (c *Fake) Events(namespace string) client.EventInterface {
-	return &FakeEvents{Fake: c}
+	return &FakeEvents{Fake: c, Namespace: namespace}
 }
 
 func (c *Fake) Endpoints(namespace string) client.EndpointsInterface {
