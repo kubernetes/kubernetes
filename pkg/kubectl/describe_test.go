@@ -51,7 +51,7 @@ func TestDescribePod(t *testing.T) {
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar")
+	out, err := d.Describe("foo", "bar", false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestDescribeService(t *testing.T) {
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ServiceDescriber{c}
-	out, err := d.Describe("foo", "bar")
+	out, err := d.Describe("foo", "bar", false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 	d := PodDescriber{c}
 
 	// Act
-	out, err := d.Describe("foo", "bar")
+	out, err := d.Describe("foo", "bar", false)
 
 	// Assert
 	if err != nil {
