@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -210,34 +209,6 @@ func UsingSystemdInitSystem() bool {
 	}
 
 	return false
-}
-
-// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
-func ApplyOomScoreAdj(pid int, value int) error {
-	if value < -1000 || value > 1000 {
-		return fmt.Errorf("invalid value(%d) specified for oom_score_adj. Values must be within the range [-1000, 1000]", value)
-	}
-	if pid < 0 {
-		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
-	}
-
-	var pidStr string
-	if pid == 0 {
-		pidStr = "self"
-	} else {
-		pidStr = strconv.Itoa(pid)
-	}
-
-	oom_value, err := ioutil.ReadFile(path.Join("/proc", pidStr, "oom_score_adj"))
-	if err != nil {
-		return fmt.Errorf("failed to read oom_score_adj: %v", err)
-	} else if string(oom_value) != strconv.Itoa(value) {
-		if err := ioutil.WriteFile(path.Join("/proc", pidStr, "oom_score_adj"), []byte(strconv.Itoa(value)), 0700); err != nil {
-			return fmt.Errorf("failed to set oom_score_adj to %d: %v", value, err)
-		}
-	}
-
-	return nil
 }
 
 // Tests whether all pointer fields in a struct are nil.  This is useful when,

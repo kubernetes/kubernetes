@@ -17,11 +17,14 @@ limitations under the License.
 package dockertools
 
 import (
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/procfs"
 )
 
 func NewFakeDockerManager(
@@ -29,6 +32,7 @@ func NewFakeDockerManager(
 	recorder record.EventRecorder,
 	readinessManager *kubecontainer.ReadinessManager,
 	containerRefManager *kubecontainer.RefManager,
+	machineInfo *cadvisorApi.MachineInfo,
 	podInfraContainerImage string,
 	qps float32,
 	burst int,
@@ -39,8 +43,11 @@ func NewFakeDockerManager(
 	httpClient kubeletTypes.HttpGetter,
 	runtimeHooks kubecontainer.RuntimeHooks) *DockerManager {
 
-	dm := NewDockerManager(client, recorder, readinessManager, containerRefManager, podInfraContainerImage, qps,
-		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, runtimeHooks, &NativeExecHandler{})
+	fakeOomAdjuster := oom.NewFakeOomAdjuster()
+	fakeProcFs := procfs.NewFakeProcFs()
+	dm := NewDockerManager(client, recorder, readinessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
+		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, runtimeHooks, &NativeExecHandler{},
+		fakeOomAdjuster, fakeProcFs)
 	dm.puller = &FakeDockerPuller{}
 	dm.prober = prober.New(nil, readinessManager, containerRefManager, recorder)
 	return dm

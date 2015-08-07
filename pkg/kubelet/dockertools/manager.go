@@ -34,6 +34,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/golang/groupcache/lru"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -42,20 +43,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/procfs"
 )
 
 const (
-	// The oom_score_adj of the POD infrastructure container. The default is 0 for
-	// any other docker containers, so any value below that makes it *less* likely
-	// to get OOM killed.
-	podOomScoreAdj           = -100
-	userContainerOomScoreAdj = 0
-
 	maxReasonCacheEntries = 200
 
 	kubernetesPodLabel       = "io.kubernetes.pod.data"
@@ -75,6 +73,7 @@ type DockerManager struct {
 	readinessManager    *kubecontainer.ReadinessManager
 	containerRefManager *kubecontainer.RefManager
 	os                  kubecontainer.OSInterface
+	machineInfo         *cadvisorApi.MachineInfo
 
 	// The image name of the pod infra container.
 	podInfraContainerImage string
@@ -114,6 +113,12 @@ type DockerManager struct {
 
 	// Handler used to execute commands in containers.
 	execHandler ExecHandler
+
+	// Used to set OOM scores of processes.
+	oomAdjuster *oom.OomAdjuster
+
+	// Get information from /proc mount.
+	procFs procfs.ProcFsInterface
 }
 
 func NewDockerManager(
@@ -121,6 +126,7 @@ func NewDockerManager(
 	recorder record.EventRecorder,
 	readinessManager *kubecontainer.ReadinessManager,
 	containerRefManager *kubecontainer.RefManager,
+	machineInfo *cadvisorApi.MachineInfo,
 	podInfraContainerImage string,
 	qps float32,
 	burst int,
@@ -130,7 +136,9 @@ func NewDockerManager(
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubeletTypes.HttpGetter,
 	runtimeHooks kubecontainer.RuntimeHooks,
-	execHandler ExecHandler) *DockerManager {
+	execHandler ExecHandler,
+	oomAdjuster *oom.OomAdjuster,
+	procFs procfs.ProcFsInterface) *DockerManager {
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
@@ -164,11 +172,12 @@ func NewDockerManager(
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
 
 	dm := &DockerManager{
-		client:              client,
-		recorder:            recorder,
-		readinessManager:    readinessManager,
-		containerRefManager: containerRefManager,
-		os:                  osInterface,
+		client:                 client,
+		recorder:               recorder,
+		readinessManager:       readinessManager,
+		containerRefManager:    containerRefManager,
+		os:                     osInterface,
+		machineInfo:            machineInfo,
 		podInfraContainerImage: podInfraContainerImage,
 		reasonCache:            reasonCache,
 		puller:                 newDockerPuller(client, qps, burst),
@@ -179,6 +188,8 @@ func NewDockerManager(
 		generator:              generator,
 		runtimeHooks:           runtimeHooks,
 		execHandler:            execHandler,
+		oomAdjuster:            oomAdjuster,
+		procFs:                 procFs,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
@@ -1242,32 +1253,42 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", podFullName, container.Name, err)
 	}
 
-	// Set OOM score of POD container to lower than those of the other containers
-	// which have OOM score 0 by default in the pod. This ensures that it is
-	// killed only as a last resort.
+	// Container information is used in adjusting OOM scores and adding ndots.
 	containerInfo, err := dm.client.InspectContainer(string(id))
 	if err != nil {
 		return "", err
 	}
-
 	// Ensure the PID actually exists, else we'll move ourselves.
 	if containerInfo.State.Pid == 0 {
 		return "", fmt.Errorf("failed to get init PID for Docker container %q", string(id))
 	}
+
+	// Set OOM score of the container based on the priority of the container.
+	// Processes in lower-priority pods should be killed first if the system runs out of memory.
+	// The main pod infrastructure container is considered high priority, since if it is killed the
+	// whole pod will die.
+	var oomScoreAdj int
 	if container.Name == PodInfraContainerName {
-		util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
-		// currently, Docker does not have a flag by which the ndots option can be passed.
-		// (A seperate issue has been filed with Docker to add a ndots flag)
-		// The addNDotsOption call appends the ndots option to the resolv.conf file generated by docker.
-		// This resolv.conf file is shared by all containers of the same pod, and needs to be modified only once per pod.
-		// we modify it when the pause container is created since it is the first container created in the pod since it holds
-		// the networking namespace.
-		err = addNDotsOption(containerInfo.ResolvConfPath)
+		oomScoreAdj = qos.PodInfraOomAdj
 	} else {
-		// Children processes of docker daemon will inheritant the OOM score from docker
-		// daemon process. We explicitly apply OOM score 0 by default to the user
-		// containers to avoid daemons or POD containers are killed by oom killer.
-		util.ApplyOomScoreAdj(containerInfo.State.Pid, userContainerOomScoreAdj)
+		oomScoreAdj = qos.GetContainerOomScoreAdjust(container, dm.machineInfo.MemoryCapacity)
+	}
+	cgroupName, err := dm.procFs.GetFullContainerName(containerInfo.State.Pid)
+	if err != nil {
+		return "", err
+	}
+	if err = dm.oomAdjuster.ApplyOomScoreAdjContainer(cgroupName, oomScoreAdj, 5); err != nil {
+		return "", err
+	}
+
+	// currently, Docker does not have a flag by which the ndots option can be passed.
+	// (A seperate issue has been filed with Docker to add a ndots flag)
+	// The addNDotsOption call appends the ndots option to the resolv.conf file generated by docker.
+	// This resolv.conf file is shared by all containers of the same pod, and needs to be modified only once per pod.
+	// we modify it when the pause container is created since it is the first container created in the pod since it holds
+	// the networking namespace.
+	if container.Name == PodInfraContainerName {
+		err = addNDotsOption(containerInfo.ResolvConfPath)
 	}
 
 	return kubeletTypes.DockerID(id), err

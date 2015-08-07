@@ -28,11 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/kubernetes/pkg/util/oom"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -56,7 +58,7 @@ func NewProxyServer() *ProxyServer {
 		BindAddress:        util.IP(net.ParseIP("0.0.0.0")),
 		HealthzPort:        10249,
 		HealthzBindAddress: util.IP(net.ParseIP("127.0.0.1")),
-		OOMScoreAdj:        -899,
+		OOMScoreAdj:        qos.KubeProxyOomScoreAdj,
 		ResourceContainer:  "/kube-proxy",
 	}
 }
@@ -76,7 +78,8 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 // Run runs the specified ProxyServer.  This should never exit.
 func (s *ProxyServer) Run(_ []string) error {
 	// TODO(vmarmol): Use container config for this.
-	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
+	oomAdjuster := oom.NewOomAdjuster()
+	if err := oomAdjuster.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.V(2).Info(err)
 	}
 

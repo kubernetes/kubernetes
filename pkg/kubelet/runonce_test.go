@@ -154,6 +154,7 @@ func TestRunOnce(t *testing.T) {
 		kb.recorder,
 		kb.readinessManager,
 		kb.containerRefManager,
+		&cadvisorApi.MachineInfo{},
 		dockertools.PodInfraContainerImage,
 		0,
 		0,
