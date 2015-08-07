@@ -258,18 +258,18 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
-var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
-var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP(S)", "PORT(S)"}
-var endpointColumns = []string{"NAME", "ENDPOINTS"}
-var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
+var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS", "AGE"}
+var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP(S)", "PORT(S)", "AGE"}
+var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
+var nodeColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
-var limitRangeColumns = []string{"NAME"}
-var resourceQuotaColumns = []string{"NAME"}
-var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
-var secretColumns = []string{"NAME", "TYPE", "DATA"}
-var serviceAccountColumns = []string{"NAME", "SECRETS"}
-var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON"}
-var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
+var limitRangeColumns = []string{"NAME", "AGE"}
+var resourceQuotaColumns = []string{"NAME", "AGE"}
+var namespaceColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
+var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
+var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
+var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
+var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "AGE"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
@@ -517,12 +517,13 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s",
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
 		formatLabels(controller.Spec.Selector),
 		controller.Spec.Replicas,
+		translateTimestamp(controller.CreationTimestamp),
 	); err != nil {
 		return err
 	}
@@ -574,8 +575,13 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s", name, formatLabels(svc.Labels),
-		formatLabels(svc.Spec.Selector), ips[0], svc.Spec.Ports[0].Port, svc.Spec.Ports[0].Protocol); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\t%s",
+		name,
+		formatLabels(svc.Labels),
+		formatLabels(svc.Spec.Selector),
+		ips[0], svc.Spec.Ports[0].Port, svc.Spec.Ports[0].Protocol,
+		translateTimestamp(svc.CreationTimestamp),
+	); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, appendLabels(svc.Labels, columnLabels)); err != nil {
@@ -629,7 +635,7 @@ func printEndpoints(endpoints *api.Endpoints, w io.Writer, withNamespace bool, w
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s", name, formatEndpoints(endpoints, nil)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", name, formatEndpoints(endpoints, nil), translateTimestamp(endpoints.CreationTimestamp)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(endpoints.Labels, columnLabels))
@@ -649,7 +655,8 @@ func printNamespace(item *api.Namespace, w io.Writer, withNamespace bool, wide b
 	if withNamespace {
 		return fmt.Errorf("namespace is not namespaced")
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", item.Name, formatLabels(item.Labels), item.Status.Phase); err != nil {
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", item.Name, formatLabels(item.Labels), item.Status.Phase, translateTimestamp(item.CreationTimestamp)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
@@ -674,7 +681,7 @@ func printSecret(item *api.Secret, w io.Writer, withNamespace bool, wide bool, c
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%v", name, item.Type, len(item.Data)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%v\t%s", name, item.Type, len(item.Data), translateTimestamp(item.CreationTimestamp)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
@@ -700,7 +707,7 @@ func printServiceAccount(item *api.ServiceAccount, w io.Writer, withNamespace bo
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%d", name, len(item.Secrets)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%s", name, len(item.Secrets), translateTimestamp(item.CreationTimestamp)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
@@ -744,7 +751,7 @@ func printNode(node *api.Node, w io.Writer, withNamespace bool, wide bool, colum
 		status = append(status, "SchedulingDisabled")
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", node.Name, formatLabels(node.Labels), strings.Join(status, ",")); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", node.Name, formatLabels(node.Labels), strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(node.Labels, columnLabels))
@@ -778,7 +785,15 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace 
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.Value()
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\t%s", name, formatLabels(pv.Labels), aSize, modesStr, pv.Status.Phase, claimRefUID, pv.Status.Reason); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s",
+		name,
+		formatLabels(pv.Labels),
+		aSize, modesStr,
+		pv.Status.Phase,
+		claimRefUID,
+		pv.Status.Reason,
+		translateTimestamp(pv.CreationTimestamp),
+	); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(pv.Labels, columnLabels))
@@ -809,7 +824,8 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, wit
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, formatLabels(pvc.Labels), pvc.Status.Phase, pvc.Spec.VolumeName); err != nil {
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s", name, pvc.Labels, pvc.Status.Phase, pvc.Spec.VolumeName, translateTimestamp(pvc.CreationTimestamp)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(pvc.Labels, columnLabels))
@@ -871,7 +887,11 @@ func printLimitRange(limitRange *api.LimitRange, w io.Writer, withNamespace bool
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s", name); err != nil {
+	if _, err := fmt.Fprintf(
+		w, "%s\t%s",
+		name,
+		translateTimestamp(limitRange.CreationTimestamp),
+	); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(limitRange.Labels, columnLabels))
@@ -898,7 +918,11 @@ func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer, withNames
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s", name); err != nil {
+	if _, err := fmt.Fprintf(
+		w, "%s\t%s",
+		name,
+		translateTimestamp(resourceQuota.CreationTimestamp),
+	); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(resourceQuota.Labels, columnLabels))
