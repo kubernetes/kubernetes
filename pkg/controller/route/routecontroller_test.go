@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/fake"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
 
 func TestIsResponsibleForRoute(t *testing.T) {

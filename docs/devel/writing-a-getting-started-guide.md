@@ -82,7 +82,7 @@ Just file an issue or chat us on IRC and one of the committers will link to it f
 
 These guidelines say *what* to do.  See the Rationale section for *why*.
   - the main reason to add a new development distro is to support a new IaaS provider (VM and
-    network management).  This means implementing a new `pkg/cloudprovider/$IAAS_NAME`.
+    network management).  This means implementing a new `pkg/cloudprovider/providers/$IAAS_NAME`.
   - Development distros should use Saltstack for Configuration Management.
   - development distros need to support automated cluster creation, deletion, upgrading, etc.
     This mean writing scripts in `cluster/$IAAS_NAME`.
