@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"reflect"
@@ -30,9 +30,9 @@ func addConversionFuncs() {
 	err := api.Scheme.AddConversionFuncs(
 		convert_api_PodSpec_To_v1_PodSpec,
 		convert_v1_PodSpec_To_api_PodSpec,
-		convert_expapi_DeploymentSpec_To_v1_DeploymentSpec,
-		convert_v1_DeploymentSpec_To_expapi_DeploymentSpec,
-		convert_v1_DeploymentStrategy_To_expapi_DeploymentStrategy,
+		convert_expapi_DeploymentSpec_To_v1alpha1_DeploymentSpec,
+		convert_v1alpha1_DeploymentSpec_To_expapi_DeploymentSpec,
+		convert_v1alpha1_DeploymentStrategy_To_expapi_DeploymentStrategy,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -174,7 +174,7 @@ func convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	return nil
 }
 
-func convert_expapi_DeploymentSpec_To_v1_DeploymentSpec(in *expapi.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
+func convert_expapi_DeploymentSpec_To_v1alpha1_DeploymentSpec(in *expapi.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.DeploymentSpec))(in)
 	}
@@ -196,7 +196,7 @@ func convert_expapi_DeploymentSpec_To_v1_DeploymentSpec(in *expapi.DeploymentSpe
 	} else {
 		out.Template = nil
 	}
-	if err := convert_expapi_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := convert_expapi_DeploymentStrategy_To_v1alpha1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	if in.UniqueLabelKey != nil {
@@ -208,7 +208,7 @@ func convert_expapi_DeploymentSpec_To_v1_DeploymentSpec(in *expapi.DeploymentSpe
 	return nil
 }
 
-func convert_v1_DeploymentSpec_To_expapi_DeploymentSpec(in *DeploymentSpec, out *expapi.DeploymentSpec, s conversion.Scope) error {
+func convert_v1alpha1_DeploymentSpec_To_expapi_DeploymentSpec(in *DeploymentSpec, out *expapi.DeploymentSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentSpec))(in)
 	}
@@ -229,7 +229,7 @@ func convert_v1_DeploymentSpec_To_expapi_DeploymentSpec(in *DeploymentSpec, out 
 	} else {
 		out.Template = nil
 	}
-	if err := convert_v1_DeploymentStrategy_To_expapi_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := convert_v1alpha1_DeploymentStrategy_To_expapi_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	if in.UniqueLabelKey != nil {
@@ -241,14 +241,14 @@ func convert_v1_DeploymentSpec_To_expapi_DeploymentSpec(in *DeploymentSpec, out 
 	return nil
 }
 
-func convert_v1_DeploymentStrategy_To_expapi_DeploymentStrategy(in *DeploymentStrategy, out *expapi.DeploymentStrategy, s conversion.Scope) error {
+func convert_v1alpha1_DeploymentStrategy_To_expapi_DeploymentStrategy(in *DeploymentStrategy, out *expapi.DeploymentStrategy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentStrategy))(in)
 	}
 	out.Type = expapi.DeploymentType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(expapi.RollingUpdateDeployment)
-		if err := convert_v1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+		if err := convert_v1alpha1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
 	} else {

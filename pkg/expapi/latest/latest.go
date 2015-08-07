@@ -23,14 +23,33 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	_ "k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/v1"
+	"k8s.io/kubernetes/pkg/expapi/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 var (
-	Version  string
+	// GroupVersion represents the current external default version of the group. It
+	// is in the form of "group/version".
+	GroupVersion string
+
+	// LatestVersion represents the current external default version of the group.
+	// It equals to the "version" part of GroupVersion.
+	Version string
+
+	// Group represents the name of the group
+	Group string
+
+	// GroupVersions is the list of groupVersions in the form of "group/version"
+	// that are recognized in code. The order provided may be assumed to be least
+	// feature rich to most feature rich, and clients may choose to prefer the
+	// latter items in the list over the former items when presented with a set of
+	// versions to choose.
+	GroupVersions []string
+
+	// Versions is the "version" part of GroupVersions
 	Versions []string
 
 	accessor   = meta.NewAccessor()
@@ -42,11 +61,18 @@ var (
 const importPrefix = "k8s.io/kubernetes/pkg/expapi"
 
 func init() {
-	Version = registered.RegisteredVersions[0]
-	Codec = runtime.CodecFor(api.Scheme, Version)
+	expGroupVersions := registered.GroupVersionsForGroup("experimental")
+	if len(expGroupVersions) == 0 {
+		return
+	}
+	GroupVersion = expGroupVersions[0]
+	Group = apiutil.GetGroup(GroupVersion)
+	Version = apiutil.GetVersion(GroupVersion)
+	Codec = runtime.CodecFor(api.Scheme, GroupVersion)
 	// Put the registered versions in Versions in reverse order.
-	for i := len(registered.RegisteredVersions) - 1; i >= 0; i-- {
-		Versions = append(Versions, registered.RegisteredVersions[i])
+	for i := len(expGroupVersions) - 1; i >= 0; i-- {
+		GroupVersions = append(GroupVersions, expGroupVersions[i])
+		Versions = append(Versions, apiutil.GetVersion(expGroupVersions[i]))
 	}
 
 	// the list of kinds that are scoped at the root of the api hierarchy
@@ -55,7 +81,7 @@ func init() {
 
 	ignoredKinds := util.NewStringSet()
 
-	RESTMapper = api.NewDefaultRESTMapper("experimental", Versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
+	RESTMapper = api.NewDefaultRESTMapper(Group, GroupVersions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(RESTMapper)
 }
 
@@ -63,13 +89,13 @@ func init() {
 // string, or an error if the version is not known.
 func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
-	case "v1":
+	case "v1alpha1":
 		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
+			Codec:            v1alpha1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(GroupVersions, ", "))
 	}
 }

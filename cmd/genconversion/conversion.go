@@ -26,9 +26,10 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	_ "k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/expapi"
-	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	_ "k8s.io/kubernetes/pkg/expapi/v1alpha1"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -41,7 +42,7 @@ const pkgBase = "k8s.io/kubernetes/pkg"
 
 var (
 	functionDest = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
-	groupVersion = flag.StringP("version", "v", "api/v1", "groupPath/version for conversion.")
+	groupVersion = flag.StringP("version", "v", "v1", "groupPath/version for conversion.")
 )
 
 func main() {
@@ -62,8 +63,8 @@ func main() {
 
 	data := new(bytes.Buffer)
 
-	group, version := path.Split(*groupVersion)
-	group = strings.TrimRight(group, "/")
+	group := apiutil.GetGroup(*groupVersion)
+	version := apiutil.GetVersion(*groupVersion)
 
 	_, err := data.WriteString(fmt.Sprintf("package %v\n", version))
 	if err != nil {
@@ -71,12 +72,19 @@ func main() {
 	}
 
 	versionPath := path.Join(pkgBase, group, version)
+	if group == "experimental" {
+		//TODO: we should rename the direcotry /expapi to /experimental, so directory path match groupVerson
+		versionPath = path.Join(pkgBase, "expapi", version)
+	}
 	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
 	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
 	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	generator.OverwritePackage(version, "")
-	for _, knownType := range api.Scheme.KnownTypes(version) {
+	if *groupVersion == "api/v1" {
+		*groupVersion = "v1"
+	}
+	for _, knownType := range api.Scheme.KnownTypes(*groupVersion) {
 		if !strings.HasPrefix(knownType.PkgPath(), versionPath) {
 			continue
 		}

@@ -178,7 +178,7 @@ func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 	action.Resource = "apiversions"
 
 	c.Invokes(action, nil)
-	return &api.APIVersions{Versions: registered.RegisteredVersions}, nil
+	return &api.APIVersions{Versions: registered.RegisteredGroupVersions}, nil
 }
 
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {

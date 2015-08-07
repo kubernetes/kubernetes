@@ -45,6 +45,12 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	return nil
 }
 
+func deepCopy_v1_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.APIGroup = in.APIGroup
+	return nil
+}
+
 func deepCopy_v1_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, c *conversion.Cloner) error {
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
@@ -1987,6 +1993,27 @@ func deepCopy_v1_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *co
 	return nil
 }
 
+func deepCopy_v1_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyResource, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.Description = in.Description
+	if in.Versions != nil {
+		out.Versions = make([]APIVersion, len(in.Versions))
+		for i := range in.Versions {
+			if err := deepCopy_v1_APIVersion(in.Versions[i], &out.Versions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Versions = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -2001,6 +2028,26 @@ func deepCopy_v1_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPar
 		}
 	} else {
 		out.Data = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ThirdPartyResource, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_ThirdPartyResource(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -2149,6 +2196,7 @@ func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) erro
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_resource_Quantity,
+		deepCopy_v1_APIVersion,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		deepCopy_v1_Binding,
 		deepCopy_v1_Capabilities,
@@ -2260,7 +2308,9 @@ func init() {
 		deepCopy_v1_StatusCause,
 		deepCopy_v1_StatusDetails,
 		deepCopy_v1_TCPSocketAction,
+		deepCopy_v1_ThirdPartyResource,
 		deepCopy_v1_ThirdPartyResourceData,
+		deepCopy_v1_ThirdPartyResourceList,
 		deepCopy_v1_TypeMeta,
 		deepCopy_v1_Volume,
 		deepCopy_v1_VolumeMount,

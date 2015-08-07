@@ -161,7 +161,6 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		EnableLogsSupport:     false,
 		EnableProfiling:       true,
 		APIPrefix:             "/api",
-		ExpAPIPrefix:          "/experimental",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,

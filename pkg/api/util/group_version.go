@@ -1,7 +1,5 @@
-// +build integration,!no-etcd
-
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,24 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package util
 
-import (
-	"net/http"
-	"testing"
+import "strings"
 
-	"k8s.io/kubernetes/test/integration/framework"
-)
-
-func TestExperimentalPrefix(t *testing.T) {
-	_, s := framework.RunAMaster(t)
-	defer s.Close()
-
-	resp, err := http.Get(s.URL + "/api/experimental/")
-	if err != nil {
-		t.Fatalf("unexpected error getting experimental prefix: %v", err)
+func GetVersion(groupVersion string) string {
+	s := strings.Split(groupVersion, "/")
+	if len(s) != 2 {
+		//e.g. return "v1" for groupVersion="v1"
+		return s[len(s)-1]
 	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
+	return s[1]
+}
+
+func GetGroup(groupVersion string) string {
+	s := strings.Split(groupVersion, "/")
+	if len(s) == 1 {
+		//e.g. return "" for groupVersion="v1"
+		return ""
 	}
+	return s[0]
 }

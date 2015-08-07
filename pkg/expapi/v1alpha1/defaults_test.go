@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"reflect"
@@ -84,7 +84,7 @@ func TestSetDefaultDaemon(t *testing.T) {
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := v1.Codec.Encode(obj)
+	data, err := Codec.Encode(obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
