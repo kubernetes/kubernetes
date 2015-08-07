@@ -286,7 +286,7 @@ function kube-up {
     openssl req -new \
         -key ${KUBE_TEMP}/server.key \
         -out ${KUBE_TEMP}/server.csr \
-        -subj "/CN=server"
+        -subj "/CN=${AZ_CS}"
     openssl x509 -req -days 1095 \
         -in ${KUBE_TEMP}/server.csr \
         -CA ${KUBE_TEMP}/ca.crt \
