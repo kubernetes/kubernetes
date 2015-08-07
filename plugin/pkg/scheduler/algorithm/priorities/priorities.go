@@ -245,21 +245,3 @@ func fractionOfCapacity(requested, capacity int64) float64 {
 	}
 	return float64(requested) / float64(capacity)
 }
-
-// EqualPriority is a prioritizer function that gives an equal score of one to all nodes
-func EqualPriority(_ *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
-	nodes, err := minionLister.List()
-	if err != nil {
-		glog.Errorf("failed to list nodes: %v", err)
-		return []algorithm.HostPriority{}, err
-	}
-
-	result := []algorithm.HostPriority{}
-	for _, minion := range nodes.Items {
-		result = append(result, algorithm.HostPriority{
-			Host:  minion.Name,
-			Score: 1,
-		})
-	}
-	return result, nil
-}
