@@ -141,7 +141,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdPortForward(f))
 	cmds.AddCommand(NewCmdProxy(f, out))
 
-	cmds.AddCommand(NewCmdRun(f, out))
+	cmds.AddCommand(NewCmdRun(f, in, out, err))
 	cmds.AddCommand(NewCmdStop(f, out))
 	cmds.AddCommand(NewCmdExposeService(f, out))
 

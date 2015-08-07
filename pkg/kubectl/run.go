@@ -35,6 +35,8 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"image", true},
 		{"port", false},
 		{"hostport", false},
+		{"stdin", false},
+		{"tty", false},
 	}
 }
 
@@ -64,6 +66,16 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 	if err != nil {
 		return nil, err
 	}
+	stdin, err := GetBool(params, "stdin", false)
+	if err != nil {
+		return nil, err
+	}
+
+	tty, err := GetBool(params, "tty", false)
+	if err != nil {
+		return nil, err
+	}
+
 	controller := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
@@ -81,6 +93,8 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 						{
 							Name:  name,
 							Image: params["image"],
+							Stdin: stdin,
+							TTY:   tty,
 						},
 					},
 				},

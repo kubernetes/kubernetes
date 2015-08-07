@@ -19,6 +19,10 @@ Creates a replication controller to manage the created container(s).
 
 .SH OPTIONS
 .PP
+\fB\-\-attach\fP=false
+    If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '\-i/\-\-interactive' is set, in which case the default is true.
+
+.PP
 \fB\-\-dry\-run\fP=false
     If true, only print the object that would be sent, without sending it.
 
@@ -67,9 +71,17 @@ Creates a replication controller to manage the created container(s).
     Number of replicas to create for this container. Default is 1.
 
 .PP
+\fB\-i\fP, \fB\-\-stdin\fP=false
+    Keep stdin open on the container(s) in the pod, even if nothing is attached.
+
+.PP
 \fB\-t\fP, \fB\-\-template\fP=""
     Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+
+.PP
+\fB\-\-tty\fP=false
+    Allocated a TTY for each container in the pod.  Because \-t is currently shorthand for \-\-template, \-t is not supported for \-\-tty. This shorthand is deprecated and we expect to adopt \-t for \-\-tty soon.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
