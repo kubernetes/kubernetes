@@ -27,6 +27,7 @@ import (
 )
 
 // Registry is a Storage-like interface with a Component-typed API.
+//TODO(karlkfi): delete if unneeded
 type Registry interface {
 	ListComponents(api.Context, labels.Selector, fields.Selector) (*api.ComponentList, error)
 	GetComponent(ctx api.Context, name string) (*api.Component, error)

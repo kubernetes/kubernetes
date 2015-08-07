@@ -2492,24 +2492,51 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
-// Type and constants for component type.
 type ComponentType string
 
-// These are the valid conditions for the component type.
 const (
 	ComponentAPIServer         ComponentType = "apiserver"
 	ComponentControllerManager ComponentType = "controller-manager"
 	ComponentScheduler         ComponentType = "scheduler"
 )
 
-// Component describes metadata about a core component.
+type ComponentSpec struct {
+	Type    ComponentType `json:"type" description:"type of the component"`
+	Address string        `json:"address,omitempty" description:"address to reach the component (scheme, host, port, path); address paths determined by component type"`
+}
+
+type ComponentPhase string
+
+// These are the valid phases of a component.
+const (
+	// ComponentPending means the component is starting, but not yet fully functional.
+	ComponentPending ComponentPhase = "Pending"
+	// ComponentRunning means the component is started and is fully functional.
+	ComponentRunning ComponentPhase = "Running"
+	// ComponentStalled means the component is started but is not fully functional.
+	ComponentStalled ComponentPhase = "Stalled"
+	// ComponentUnknown means the component did not respond to the last health check.
+	ComponentUnknown ComponentPhase = "Unknown"
+	// ComponentLost means the component has not responded to recent health checks and is considered dead.
+	ComponentLost ComponentPhase = "Lost"
+	// ComponentStopped means the component stopped gracefully with an error.
+	ComponentFailed ComponentPhase = "Failed"
+)
+
+type ComponentStatus struct {
+	Phase              ComponentPhase `json:"phase" description:"current lifecycle phase of the component"`
+	LastUpdateTime     util.Time      `json:"lastUpdateTime,omitempty" description:"last time the component status was updated"`
+	LastHeartbeatTime  util.Time      `json:"lastHeartbeatTime,omitempty" description:"last time the component updated its status"`
+	LastTransitionTime util.Time      `json:"lastTransitionTime,omitempty" description:"last time the component status changed"`
+}
+
 type Component struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
-	Type          ComponentType `json:"type" description:"Type of the component"`
-	URL           string        `json:"location" description:"URL to reach the component (scheme, host, port, path)"`
-	LastTimestamp util.Time     `json:"lastTimestamp,omitempty" description:"The time at which the component was last updated"`
+	Spec ComponentSpec `json:"spec" description:"specification of the component"`
+
+	Status ComponentStatus `json:"status" description:"last known status of the component"`
 }
 
 type ComponentList struct {
@@ -2543,8 +2570,8 @@ type ComponentCondition struct {
 	Error string `json:"error,omitempty"`
 }
 
-// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
-type ComponentStatus struct {
+// ComponentStatuses (and ComponentStatusesList) holds the cluster validation info.
+type ComponentStatuses struct {
 	TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
@@ -2554,15 +2581,15 @@ type ComponentStatus struct {
 	Conditions []ComponentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
-// Status of all the conditions for the component as a list of ComponentStatus objects.
-type ComponentStatusList struct {
+// Status of all the conditions for the component as a list of ComponentStatuses objects.
+type ComponentStatusesList struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	ListMeta `json:"metadata,omitempty"`
 
-	// List of ComponentStatus objects.
-	Items []ComponentStatus `json:"items"`
+	// List of ComponentStatuses objects.
+	Items []ComponentStatuses `json:"items"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.

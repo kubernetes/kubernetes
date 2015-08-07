@@ -47,10 +47,9 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/labels"
-	probehttp "k8s.io/kubernetes/pkg/probe/http"
 	"k8s.io/kubernetes/pkg/registry/component"
 	componentetcd "k8s.io/kubernetes/pkg/registry/component/etcd"
-	componentstatus "k8s.io/kubernetes/pkg/registry/component/status"
+	"k8s.io/kubernetes/pkg/registry/componentstatuses"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
@@ -216,7 +215,7 @@ type Master struct {
 	// TODO: define the internal typed interface in a way that clients can
 	// also be replaced
 	nodeRegistry              minion.Registry
-	componentRegistry         component.Registry
+	componentRegistry         component.Registry //TODO(karlkfi): delete if unneeded
 	namespaceRegistry         namespace.Registry
 	serviceRegistry           service.Registry
 	endpointRegistry          endpoint.Registry
@@ -455,10 +454,10 @@ func (m *Master) init(c *Config) {
 	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(c.DatabaseStorage, true, c.KubeletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
-	componentStorage := componentetcd.NewStorage(c.DatabaseStorage, c.KubeletClient)
+	componentStorage, componentStatusStorage := componentetcd.NewStorage(c.DatabaseStorage)
 	m.componentRegistry = component.NewRegistry(componentStorage)
 
-	componentStatusStorage := componentstatus.NewStorage(m.componentRegistry, c.DatabaseStorage, probehttp.DefaultTimeoutClient)
+	componentStatusesStorage := componentstatuses.NewStorage(c.DatabaseStorage, http.DefaultTransport)
 
 	serviceStorage := serviceetcd.NewREST(c.DatabaseStorage)
 	m.serviceRegistry = service.NewRegistry(serviceStorage)
@@ -517,9 +516,9 @@ func (m *Master) init(c *Config) {
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
 
-		"components":      componentStorage,
-		"componentStatus": componentStatusStorage,
-		//TODO: deprecate componentStatuses
+		"components":        componentStorage,
+		"components/status": componentStatusStorage,
+		"componentStatuses": componentStatusesStorage, //TODO(karlkfi): deprecate
 	}
 
 	// establish the node proxy dialer

@@ -181,7 +181,7 @@ func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 	return &api.APIVersions{Versions: registered.RegisteredVersions}, nil
 }
 
-func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
+func (c *Fake) ComponentStatuses() client.ComponentStatusesClient {
 	return &FakeComponentStatuses{Fake: c}
 }
 

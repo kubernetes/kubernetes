@@ -578,6 +578,10 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 		api.ComponentScheduler,
 		s.URI(""),
 	)
+	go func() {
+		//TODO(karlkfi): change state smarter
+		heart.Transition(api.ComponentRunning)
+	}()
 
 	var firstErr error
 	for {

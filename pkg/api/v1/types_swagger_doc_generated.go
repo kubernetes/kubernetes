@@ -81,24 +81,24 @@ func (ComponentCondition) SwaggerDoc() map[string]string {
 	return map_ComponentCondition
 }
 
-var map_ComponentStatus = map[string]string{
-	"":           "ComponentStatus (and ComponentStatusList) holds the cluster validation info.",
+var map_ComponentStatuses = map[string]string{
+	"":           "ComponentStatuses (and ComponentStatusesList) holds the cluster validation info.",
 	"metadata":   "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"conditions": "List of component conditions observed",
 }
 
-func (ComponentStatus) SwaggerDoc() map[string]string {
-	return map_ComponentStatus
+func (ComponentStatuses) SwaggerDoc() map[string]string {
+	return map_ComponentStatuses
 }
 
-var map_ComponentStatusList = map[string]string{
-	"":         "Status of all the conditions for the component as a list of ComponentStatus objects.",
+var map_ComponentStatusesList = map[string]string{
+	"":         "Status of all the conditions for the component as a list of ComponentStatuses objects.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-	"items":    "List of ComponentStatus objects.",
+	"items":    "List of ComponentStatuses objects.",
 }
 
-func (ComponentStatusList) SwaggerDoc() map[string]string {
-	return map_ComponentStatusList
+func (ComponentStatusesList) SwaggerDoc() map[string]string {
+	return map_ComponentStatusesList
 }
 
 var map_Container = map[string]string{

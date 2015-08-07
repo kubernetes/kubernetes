@@ -93,9 +93,10 @@ func deepCopy_v1_Component(in Component, out *Component, c *conversion.Cloner) e
 	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	out.Type = in.Type
-	out.URL = in.URL
-	if err := deepCopy_util_Time(in.LastTimestamp, &out.LastTimestamp, c); err != nil {
+	if err := deepCopy_v1_ComponentSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ComponentStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
 	return nil
@@ -129,7 +130,27 @@ func deepCopy_v1_ComponentList(in ComponentList, out *ComponentList, c *conversi
 	return nil
 }
 
+func deepCopy_v1_ComponentSpec(in ComponentSpec, out *ComponentSpec, c *conversion.Cloner) error {
+	out.Type = in.Type
+	out.Address = in.Address
+	return nil
+}
+
 func deepCopy_v1_ComponentStatus(in ComponentStatus, out *ComponentStatus, c *conversion.Cloner) error {
+	out.Phase = in.Phase
+	if err := deepCopy_util_Time(in.LastUpdateTime, &out.LastUpdateTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_util_Time(in.LastHeartbeatTime, &out.LastHeartbeatTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_util_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_ComponentStatuses(in ComponentStatuses, out *ComponentStatuses, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -149,7 +170,7 @@ func deepCopy_v1_ComponentStatus(in ComponentStatus, out *ComponentStatus, c *co
 	return nil
 }
 
-func deepCopy_v1_ComponentStatusList(in ComponentStatusList, out *ComponentStatusList, c *conversion.Cloner) error {
+func deepCopy_v1_ComponentStatusesList(in ComponentStatusesList, out *ComponentStatusesList, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
@@ -157,9 +178,9 @@ func deepCopy_v1_ComponentStatusList(in ComponentStatusList, out *ComponentStatu
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]ComponentStatus, len(in.Items))
+		out.Items = make([]ComponentStatuses, len(in.Items))
 		for i := range in.Items {
-			if err := deepCopy_v1_ComponentStatus(in.Items[i], &out.Items[i], c); err != nil {
+			if err := deepCopy_v1_ComponentStatuses(in.Items[i], &out.Items[i], c); err != nil {
 				return err
 			}
 		}
@@ -2229,8 +2250,10 @@ func init() {
 		deepCopy_v1_Component,
 		deepCopy_v1_ComponentCondition,
 		deepCopy_v1_ComponentList,
+		deepCopy_v1_ComponentSpec,
 		deepCopy_v1_ComponentStatus,
-		deepCopy_v1_ComponentStatusList,
+		deepCopy_v1_ComponentStatuses,
+		deepCopy_v1_ComponentStatusesList,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerPort,
 		deepCopy_v1_ContainerState,

@@ -192,12 +192,16 @@ func (s *CMServer) Run(_ []string) error {
 		serviceaccount.DefaultServiceAccountsControllerOptions(),
 	).Run()
 
-	_, errCh := heartbeat.Start(
+	heart, errCh := heartbeat.Start(
 		kubeClient.ComponentsClient(),
 		5*time.Second,
 		api.ComponentControllerManager,
 		kubeconfig.Host,
 	)
+	go func() {
+		//TODO(karlkfi): change state smarter
+		heart.Transition(api.ComponentRunning)
+	}()
 	for err = range errCh {
 		glog.Errorf("Heartbeat Error: %s", err)
 	}

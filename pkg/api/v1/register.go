@@ -82,8 +82,8 @@ func addKnownTypes() {
 		&PodProxyOptions{},
 		&Component{},
 		&ComponentList{},
-		&ComponentStatus{},
-		&ComponentStatusList{},
+		&ComponentStatuses{},
+		&ComponentStatusesList{},
 		&SerializedReference{},
 		&RangeAllocation{},
 		&ThirdPartyResource{},
@@ -137,8 +137,8 @@ func (*PodExecOptions) IsAnAPIObject()            {}
 func (*PodProxyOptions) IsAnAPIObject()           {}
 func (*Component) IsAnAPIObject()                 {}
 func (*ComponentList) IsAnAPIObject()             {}
-func (*ComponentStatus) IsAnAPIObject()           {}
-func (*ComponentStatusList) IsAnAPIObject()       {}
+func (*ComponentStatuses) IsAnAPIObject()         {}
+func (*ComponentStatusesList) IsAnAPIObject()     {}
 func (*SerializedReference) IsAnAPIObject()       {}
 func (*RangeAllocation) IsAnAPIObject()           {}
 func (*ThirdPartyResource) IsAnAPIObject()        {}

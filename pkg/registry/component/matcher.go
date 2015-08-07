@@ -26,12 +26,15 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// NodeToSelectableFields returns a label set that represents the object.
+// ComponentToSelectableFields returns a field set that represents the object.
+// These fields can be used for filtering.
+// TODO(karlkfi): add time fields?
 func ComponentToSelectableFields(component *api.Component) fields.Set {
 	return fields.Set{
 		"metadata.name": component.ObjectMeta.Name,
-		"type":          string(component.Type),
-		"url":           component.URL,
+		"spec.type":     string(component.Spec.Type),
+		"spec.address":  component.Spec.Address,
+		"status.phase":  string(component.Status.Phase),
 	}
 }
 

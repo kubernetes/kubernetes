@@ -14,15 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package status
-
-import (
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"testing"
-)
-
-func TestRegistry(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Component Status Suite")
-}
+// Package componentstatuses provides interfaces and implementation for retrieving cluster component status.
+package componentstatuses

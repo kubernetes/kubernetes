@@ -26,58 +26,69 @@ import (
 )
 
 // createStrategy implements create and update validation for Components
-type createStrategy struct {
+type createUpdateStrategy struct {
 	runtime.ObjectTyper
 	api.NameGenerator
 }
 
-// CreateStrategy is the default create/update logic for Component objects.
-var CreateStrategy = createStrategy{api.Scheme, api.SimpleNameGenerator}
+// CreateUpdateStrategy is the default create/update logic for Component objects.
+var CreateUpdateStrategy = createUpdateStrategy{api.Scheme, api.SimpleNameGenerator}
 
 // NamespaceScoped returns false because components are global.
-func (createStrategy) NamespaceScoped() bool {
+func (createUpdateStrategy) NamespaceScoped() bool {
 	return false
 }
 
 // AllowCreateOnUpdate returns false because creation handles naming.
 // If the component has a name (required for update) but the storage doesn't know about it, something is seriously wrong.
-func (createStrategy) AllowCreateOnUpdate() bool {
+func (createUpdateStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
 // AllowUnconditionalUpdate returns true because the user is not required to supply a resource version when performing an update.
-func (createStrategy) AllowUnconditionalUpdate() bool {
+func (createUpdateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by components on creation.
-func (createStrategy) PrepareForCreate(obj runtime.Object) {
+func (createUpdateStrategy) PrepareForCreate(obj runtime.Object) {
 	component := obj.(*api.Component)
 
 	component.Name = ""
-	component.GenerateName = fmt.Sprintf("%s-", component.Type)
-	//TODO(karlkfi): does LastTimestamp need to match component.ObjectMeta.CreationTimestamp?
-	component.LastTimestamp = util.Now()
+	component.GenerateName = fmt.Sprintf("%s-", component.Spec.Type)
+
+	now := util.Now()
+	component.Status.LastHeartbeatTime = now // TODO(karlkfi): how do we know this is a heartbeat?
+	component.Status.LastUpdateTime = now
+	component.Status.LastTransitionTime = now
+	//TODO(karlkfi): do the timestamps need to match component.ObjectMeta.CreationTimestamp?
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by components on update.
 // LastTimestamp is set to the current server time.
-func (createStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (createUpdateStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newC := obj.(*api.Component)
 	oldC := old.(*api.Component)
 
-	newC.LastTimestamp = util.Now()
+	// allow some metadata values to be omitted on update (name is unique id)
 	newC.CreationTimestamp = oldC.CreationTimestamp
-	newC.UID = oldC.UID //TODO(karlkfi): validate uid match or just use name??
+	newC.UID = oldC.UID
+
+	now := util.Now()
+	newC.Status.LastHeartbeatTime = now // TODO(karlkfi): how do we know this is a heartbeat?
+	newC.Status.LastUpdateTime = now
+	if newC.Status.Phase != oldC.Status.Phase {
+		newC.Status.LastTransitionTime = now
+	}
 }
 
 // Validate validates a new component.
-func (createStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (createUpdateStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	service := obj.(*api.Component)
-	return validation.ValidateComponent(service)
+	return validation.ValidateComponentCreate(service)
 }
 
 // Validate validates an update to an existing component.
-func (createStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (createUpdateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateComponentUpdate(old.(*api.Component), obj.(*api.Component))
 }

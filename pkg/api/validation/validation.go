@@ -1863,20 +1863,27 @@ var supportedComponentType = util.NewStringSet(
 	string(api.ComponentScheduler),
 )
 
-// ValidateComponent tests if required fields in the component are set for create.
-func ValidateComponent(component *api.Component) errs.ValidationErrorList {
+// ValidateComponentCreate tests if required fields in the component are set for create.
+func ValidateComponentCreate(component *api.Component) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&component.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
 
-	//TODO: validate name is empty
-	//TODO: validate url is valid (scheme, host, port, path) if not empty (set default?)
-	//TODO: detect duplicate urls?
+	//TODO(karlkfi): validate address is a valid url (scheme, host, port, path) if not empty (set default?)
 
-	// validate type is non-empty and well known
-	if component.Type == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("type"))
-	} else if !supportedComponentType.Has(string(component.Type)) {
-		allErrs = append(allErrs, errs.NewFieldValueNotSupported("type", component.Type, supportedComponentType.List()))
+	if component.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldNotFound("metadata.name", component.Name))
+	}
+	// name is auto-generated before validation?
+	//	if component.Name != "" {
+	//		allErrs = append(allErrs, errs.NewFieldForbidden("metadata.name", component.Name))
+	//	}
+
+	if component.Spec.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
+	}
+
+	if component.Status.Phase == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("status.phase"))
 	}
 
 	return allErrs
@@ -1887,21 +1894,60 @@ func ValidateComponentUpdate(old, new *api.Component) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&new.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
 
-	//TODO: validate url is valid (scheme, host, port, path) if not empty (set default?)
-	//TODO: detect duplicate urls?
+	//TODO: validate address is a valid url (scheme, host, port, path) if not empty
 
-	// validate name is non-empty and valid
 	if new.Name == "" {
-		allErrs = append(allErrs, errs.NewFieldNotFound("name", new.Name))
+		allErrs = append(allErrs, errs.NewFieldNotFound("metadata.name", new.Name))
 	}
-	//TODO: validate name is valid format
-	//TODO: validate name exists in registry?
 
-	// validate type is non-empty and well known
-	if new.Type == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("type"))
-	} else if !supportedComponentType.Has(string(new.Type)) {
-		allErrs = append(allErrs, errs.NewFieldValueNotSupported("type", new.Type, supportedComponentType.List()))
+	if new.Name != old.Name {
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.name", new.Name, fmt.Sprintf("expected: %s", old.Name)))
+	}
+
+	//TODO(karlkfi): validate name is valid format
+	//TODO(karlkfi): validate name exists in registry?
+
+	if new.Spec.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
+	}
+
+	if new.Spec.Type != old.Spec.Type {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.type", new.Spec.Type, fmt.Sprintf("expected: %s", old.Spec.Type)))
+	}
+
+	if new.Status.Phase == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("status.phase"))
+	}
+
+	return allErrs
+}
+
+// ValidateComponentStatusUpdate tests if required fields in the component status are set for update.
+func ValidateComponentStatusUpdate(old, new *api.Component) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&new.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
+
+	if new.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldNotFound("metadata.name", new.Name))
+	}
+
+	if new.Name != old.Name {
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.name", new.Name, fmt.Sprintf("expected: %s", old.Name)))
+	}
+
+	//TODO(karlkfi): validate name is valid format
+	//TODO(karlkfi): validate name exists in registry?
+
+	if new.Spec.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
+	}
+
+	if new.Spec.Type != old.Spec.Type {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.type", new.Spec.Type, fmt.Sprintf("expected: %s", old.Spec.Type)))
+	}
+
+	if new.Status.Phase == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("status.phase"))
 	}
 
 	return allErrs

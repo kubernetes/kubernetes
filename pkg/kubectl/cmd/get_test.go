@@ -92,30 +92,30 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
-func testComponentStatusData() *api.ComponentStatusList {
-	good := &api.ComponentStatus{
+func testComponentStatusesData() *api.ComponentStatusesList {
+	good := &api.ComponentStatuses{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: "nil"},
 		},
 	}
 	good.Name = "servergood"
 
-	bad := &api.ComponentStatus{
+	bad := &api.ComponentStatuses{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionFalse, Message: "", Error: "bad status: 500"},
 		},
 	}
 	bad.Name = "serverbad"
 
-	unknown := &api.ComponentStatus{
+	unknown := &api.ComponentStatuses{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
 		},
 	}
 	unknown.Name = "serverunknown"
 
-	return &api.ComponentStatusList{
-		Items: []api.ComponentStatus{*good, *bad, *unknown},
+	return &api.ComponentStatusesList{
+		Items: []api.ComponentStatuses{*good, *bad, *unknown},
 	}
 }
 
@@ -358,8 +358,10 @@ func TestGetAllListObjects(t *testing.T) {
 	}
 }
 
-func TestGetListComponentStatus(t *testing.T) {
-	statuses := testComponentStatusData()
+// TODO(karlkfi): add test for Components
+
+func TestGetListComponentStatuses(t *testing.T) {
+	statuses := testComponentStatusesData()
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}

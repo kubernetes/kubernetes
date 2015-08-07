@@ -867,7 +867,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			isNamespaced: true,
 		},
 		{
-			obj: &api.ComponentStatus{
+			obj: &api.ComponentStatuses{
 				Conditions: []api.ComponentCondition{
 					{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: ""},
 				},

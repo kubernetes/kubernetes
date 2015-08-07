@@ -25,6 +25,8 @@ import (
 )
 
 type HeartBeat interface {
+	// Transition changes the component's current phase
+	Transition(api.ComponentPhase)
 	// Stop terminates continuous heart beating.
 	Stop()
 }
@@ -33,22 +35,29 @@ type heartbeat struct {
 	componentsClient client.ComponentsClient
 	errCh            chan error
 	ticker           *time.Ticker
-	component        *api.Component
+	componentBuffer  chan api.Component
 }
 
 // Start registers a new component and initiates continuous heart beating (component updates).
 // The returned channel may receive zero or more errors before closing.
 // When the HeartBeat is stopped or dies the channel will be closed.
+// Phase initialized to Pending, use Transition(phase) to change to Running or Stopped.
 func Start(componentsClient client.ComponentsClient, period time.Duration, t api.ComponentType, location string) (HeartBeat, <-chan error) {
-	errCh := make(chan error, 1)
-	ticker := time.NewTicker(period)
 	hb := &heartbeat{
 		componentsClient: componentsClient,
-		errCh:            errCh,
-		ticker:           ticker,
-		component: &api.Component{
-			Type: t,
-			URL:  location,
+		errCh:            make(chan error, 1),
+		ticker:           time.NewTicker(period),
+		componentBuffer:  make(chan api.Component, 1),
+	}
+
+	// init buffer
+	hb.componentBuffer <- api.Component{
+		Spec: api.ComponentSpec{
+			Type:    t,
+			Address: location,
+		},
+		Status: api.ComponentStatus{
+			Phase: api.ComponentPending,
 		},
 	}
 
@@ -56,11 +65,19 @@ func Start(componentsClient client.ComponentsClient, period time.Duration, t api
 	err := hb.create()
 	if err != nil {
 		hb.kill(err)
-		return nil, errCh
+		return nil, hb.errCh
 	}
 
 	go hb.run()
-	return hb, errCh
+	return hb, hb.errCh
+}
+
+func (hb *heartbeat) Transition(phase api.ComponentPhase) {
+	hb.updateBuffer(func(component api.Component) (api.Component, error) {
+		component.Status.Phase = phase
+		return component, nil
+	})
+	//TODO(karlkfi): immediately do an update?
 }
 
 func (hb *heartbeat) Stop() {
@@ -79,19 +96,34 @@ func (hb *heartbeat) run() {
 }
 
 func (hb *heartbeat) create() error {
-	newC, err := hb.componentsClient.Create(hb.component)
-	if err != nil {
-		return fmt.Errorf("heartbeat component create failed (component=%+v): %v", hb.component, err)
-	}
-	hb.component = newC
-	return nil
+	return hb.updateBuffer(func(component api.Component) (api.Component, error) {
+		newC, err := hb.componentsClient.Create(&component)
+		if err != nil {
+			return component, fmt.Errorf("heartbeat component create failed (component=%+v): %v", component, err)
+		}
+		return *newC, nil
+	})
 }
 
 func (hb *heartbeat) update(_ time.Time) error {
-	newC, err := hb.componentsClient.Update(hb.component)
+	return hb.updateBuffer(func(component api.Component) (api.Component, error) {
+		newC, err := hb.componentsClient.Update(&component)
+		if err != nil {
+			return component, fmt.Errorf("heartbeat component update failed (component=%+v): %v", component, err)
+		}
+		return *newC, nil
+	})
+}
+
+// updateBuffer updates the buffered component in a synchronized way
+func (hb *heartbeat) updateBuffer(updater func(api.Component) (api.Component, error)) error {
+	component := <-hb.componentBuffer
+	defer func() { hb.componentBuffer <- component }()
+	newC, err := updater(component)
 	if err != nil {
-		return fmt.Errorf("heartbeat component update failed (component=%+v): %v", hb.component, err)
+		// ignore update on error
+		return err
 	}
-	hb.component = newC
+	component = newC
 	return nil
 }

@@ -19,17 +19,17 @@ package etcd
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/registry/component"
+	"k8s.io/kubernetes/pkg/registry/component/status"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 // NewStorage returns a database backed Storage impl that stores components.
-func NewStorage(s storage.Interface, connection client.ConnectionInfoGetter) rest.StandardStorage {
+func NewStorage(s storage.Interface) (store rest.StandardStorage, statusStore rest.Patcher) {
 	prefix := "/components"
-	return &etcdgeneric.Etcd{
+	etcdStore := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Component{} },
 		NewListFunc: func() runtime.Object { return &api.ComponentList{} },
 		KeyRootFunc: func(ctx api.Context) string {
@@ -44,9 +44,15 @@ func NewStorage(s storage.Interface, connection client.ConnectionInfoGetter) res
 		PredicateFunc: component.MatchComponent,
 		EndpointName:  "components",
 
-		CreateStrategy: component.CreateStrategy,
-		UpdateStrategy: component.CreateStrategy,
+		CreateStrategy: component.CreateUpdateStrategy,
+		UpdateStrategy: component.CreateUpdateStrategy,
 
 		Storage: s,
 	}
+
+	etcdStatusStore := *etcdStore
+	etcdStatusStore.CreateStrategy = nil //TODO(karlkfi): does this disable create?
+	etcdStatusStore.UpdateStrategy = status.UpdateStrategy
+
+	return etcdStore, &etcdStatusStore
 }

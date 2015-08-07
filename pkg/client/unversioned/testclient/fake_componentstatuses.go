@@ -27,20 +27,20 @@ type FakeComponentStatuses struct {
 	Fake *Fake
 }
 
-func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatus, error) {
-	obj, err := c.Fake.Invokes(NewRootGetAction("componentstatuses", name), &api.ComponentStatus{})
+func (c *FakeComponentStatuses) Get(name string) (*api.ComponentStatuses, error) {
+	obj, err := c.Fake.Invokes(NewRootGetAction("componentstatuses", name), &api.ComponentStatuses{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*api.ComponentStatus), err
+	return obj.(*api.ComponentStatuses), err
 }
 
-func (c *FakeComponentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusList, err error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("componentstatuses", label, field), &api.ComponentStatusList{})
+func (c *FakeComponentStatuses) List(label labels.Selector, field fields.Selector) (result *api.ComponentStatusesList, err error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("componentstatuses", label, field), &api.ComponentStatusesList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	return obj.(*api.ComponentStatusList), err
+	return obj.(*api.ComponentStatusesList), err
 }

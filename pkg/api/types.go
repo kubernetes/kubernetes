@@ -2135,6 +2135,45 @@ const (
 	ComponentScheduler         ComponentType = "scheduler" // TODO: move mesos-specific component type & validation to contrib
 )
 
+// ComponentSpec describes the attributes that a component is created with.
+type ComponentSpec struct {
+	// Type of the component
+	Type ComponentType `json:"type"`
+	// Address to reach the component (scheme, host, port, path). Address paths determined by component type.
+	Address string `json:"address,omitempty"`
+}
+
+type ComponentPhase string
+
+// These are the valid phases of a component.
+const (
+	// ComponentPending means the component is starting, but not yet fully functional.
+	ComponentPending ComponentPhase = "Pending"
+	// ComponentRunning means the component is started and is fully functional.
+	ComponentRunning ComponentPhase = "Running"
+	// ComponentStalled means the component is started but is not fully functional.
+	ComponentStalled ComponentPhase = "Stalled"
+	// ComponentUnknown means the component did not respond to the last health check.
+	ComponentUnknown ComponentPhase = "Unknown"
+	// ComponentLost means the component has not responded to recent health checks and is considered dead.
+	ComponentLost ComponentPhase = "Lost"
+	// ComponentStopped means the component stopped gracefully with an error.
+	ComponentFailed ComponentPhase = "Failed"
+)
+
+// ComponentStatus is information about the current status of a component.
+type ComponentStatus struct {
+	// ComponentPhase is the current lifecycle phase of the component.
+	Phase ComponentPhase `json:"phase"`
+	// LastUpdateTime is the last time the component status was updated.
+	LastUpdateTime util.Time `json:"lastUpdateTime,omitempty"`
+	// LastHeartbeatTime is the last time the component updated its status.
+	LastHeartbeatTime util.Time `json:"lastHeartbeatTime,omitempty"`
+	// LastTransitionTime is the last time the component status changed.
+	LastTransitionTime util.Time `json:"lastTransitionTime,omitempty"`
+	//TODO: Do we need a Condition? Or are the phases specific enough?
+}
+
 // Component describes a core part of Kubernetes.
 // Each component is expected to serve a <location>/healthz endpoint.
 // Each component is also expected to heartbeat component updates so that LastTimestamp is updated.
@@ -2143,13 +2182,11 @@ type Component struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// Type of the component
-	Type ComponentType `json:"type"`
-	// URL to reach the component (scheme, host, port, path)
-	URL string `json:"location"`
+	// Spec defines the behavior of a component.
+	Spec ComponentSpec `json:"spec"`
 
-	// The time at which the component was last updated.
-	LastTimestamp util.Time `json:"lastTimestamp,omitempty"`
+	// Status of the component
+	Status ComponentStatus `json:"status"`
 }
 
 type ComponentList struct {
@@ -2174,19 +2211,19 @@ type ComponentCondition struct {
 	Error   string                 `json:"error,omitempty"`
 }
 
-// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
-type ComponentStatus struct {
+// ComponentStatuses (and ComponentStatusesList) holds the cluster validation info.
+type ComponentStatuses struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
 	Conditions []ComponentCondition `json:"conditions,omitempty"`
 }
 
-type ComponentStatusList struct {
+type ComponentStatusesList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
 
-	Items []ComponentStatus `json:"items"`
+	Items []ComponentStatuses `json:"items"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.  SecurityContext
