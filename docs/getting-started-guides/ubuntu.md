@@ -102,7 +102,7 @@ export FLANNEL_NET=172.16.0.0/16
 
 The first variable `nodes` defines all your cluster nodes, MASTER node comes first and separated with blank space like `<user_1@ip_1> <user_2@ip_2> <user_3@ip_3> `
 
-Then the `roles ` variable defines the role of above machine in the same order, "ai" stands for machine acts as both master and node, "a" stands for master, "i" stands for node. So they are just defined the k8s cluster as the table above described.
+Then the `role` variable defines the role of above machine in the same order, "ai" stands for machine acts as both master and node, "a" stands for master, "i" stands for node. So they are just defined the k8s cluster as the table above described.
 
 The `NUM_MINIONS` variable defines the total number of nodes.
 
@@ -168,7 +168,7 @@ DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 ```
 
-The `DNS_SERVER_IP` is defining the ip of dns server which must be in the service_cluster_ip_range.
+The `DNS_SERVER_IP` is defining the ip of dns server which must be in the `SERVICE_CLUSTER_IP_RANGE`.
 
 The `DNS_REPLICAS` describes how many dns pod running in the cluster.
 
