@@ -1676,3 +1676,93 @@ func getUidFromUser(id string) string {
 	// no gid, just return the id
 	return id
 }
+
+// A helper function to Get the pod/container information from the name of the
+// container.
+func GetPodInfoFromDockerName(rawName string) (*kubecontainer.Pod, string, uint64, error) {
+	dockerName, hash, err := ParseDockerName(rawName)
+	if err != nil {
+		return &kubecontainer.Pod{}, "", 0, fmt.Errorf("parse docker container name %q error: %v", rawName, err)
+	}
+	name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
+	if err != nil {
+		return &kubecontainer.Pod{}, "", 0, fmt.Errorf("parse pod full name %q error: %v", dockerName.PodFullName, err)
+	}
+
+	return &kubecontainer.Pod{ID: dockerName.PodUID, Name: name, Namespace: namespace}, dockerName.ContainerName, hash, nil
+}
+
+type ContainerExaminationResult struct {
+	Pod              *kubecontainer.Pod
+	IP               string
+	IsInfraContainer bool
+}
+
+// TODO(yujuhong): Refactor this function to share code with or replace
+// inspectContainer(). Note that this function doesn't handle tPath.
+func (dm *DockerManager) ExamineContainer(dockerID string) (*ContainerExaminationResult, error) {
+	result := &ContainerExaminationResult{}
+	iResult, err := dm.client.InspectContainer(dockerID)
+	if err != nil {
+		return result, err
+	}
+	if iResult == nil {
+		// Why did we not get an error?
+		return result, fmt.Errorf("Empty inspect result for container %q", dockerID)
+	}
+
+	glog.V(5).Infof("ExamineContainer: %+v", *iResult)
+	pod, containerName, hash, err := GetPodInfoFromDockerName(iResult.Name)
+	if err != nil {
+		glog.Infof("ExamineContainer: unable to get pod infor from docker name:%v", err)
+		return result, err
+	}
+	result.Pod = pod
+	result.IsInfraContainer = (containerName == PodInfraContainerName)
+
+	pod.Containers = []*kubecontainer.Container{&kubecontainer.Container{
+		ID:      types.UID(dockerID),
+		Name:    containerName,
+		Image:   iResult.Config.Image,
+		Created: iResult.Created.Unix(),
+		Hash:    hash,
+	}}
+
+	// Fill in the ContainerStatus for the container.
+	status := &api.ContainerStatus{
+		Name:        containerName,
+		Image:       iResult.Config.Image,
+		ImageID:     DockerPrefix + iResult.Image,
+		ContainerID: DockerPrefix + dockerID,
+	}
+	if iResult.State.Running {
+		status.State.Running = &api.ContainerStateRunning{
+			StartedAt: util.NewTime(iResult.State.StartedAt),
+		}
+		if result.IsInfraContainer && iResult.NetworkSettings != nil {
+			result.IP = iResult.NetworkSettings.IPAddress
+		}
+	} else if !iResult.State.FinishedAt.IsZero() {
+		reason := iResult.State.Error
+		// Note: An application might handle OOMKilled gracefully.
+		// In that case, the container is oom killed, but the exit
+		// code could be 0.
+		if iResult.State.OOMKilled {
+			reason = "OOM Killed"
+		}
+		status.State.Terminated = &api.ContainerStateTerminated{
+			ExitCode:    iResult.State.ExitCode,
+			Reason:      reason,
+			StartedAt:   util.NewTime(iResult.State.StartedAt),
+			FinishedAt:  util.NewTime(iResult.State.FinishedAt),
+			ContainerID: DockerPrefix + dockerID,
+		}
+	} else {
+		status.State.Waiting = &api.ContainerStateWaiting{
+			Reason: ErrContainerCannotRun.Error(),
+		}
+	}
+	pod.Status.ContainerStatuses = []api.ContainerStatus{*status}
+
+	return result, nil
+}
