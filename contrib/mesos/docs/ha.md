@@ -52,8 +52,8 @@ Within the scheduler, compatibility is largely determined by comparing executor 
   a hash is calculated from a subset of the executor-related command line parameters provided to the scheduler process.
 The command line parameters that affect the hash calculation are listed below.
 
-- `--allow_privileged`
-- `--api_servers`
+- `--allow-privileged`
+- `--api-servers`
 - `--auth_path`
 - `--cluster_*`
 - `--executor_*`
