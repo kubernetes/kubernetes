@@ -195,6 +195,10 @@ type containerResourceUsage struct {
 	CPUInterval time.Duration
 }
 
+func (r *containerResourceUsage) isStrictlyGreaterThan(rhs *containerResourceUsage) bool {
+	return r.CPUUsageInCores > rhs.CPUUsageInCores && r.MemoryUsageInBytes > rhs.MemoryUsageInBytes && r.MemoryWorkingSetInBytes > rhs.MemoryWorkingSetInBytes
+}
+
 // getOneTimeResourceUsageOnNode queries the node's /stats/container endpoint
 // and returns the resource usage of targetContainers for the past
 // cpuInterval.
