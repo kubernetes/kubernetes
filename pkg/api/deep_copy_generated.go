@@ -18,6 +18,8 @@ package api
 
 // AUTO-GENERATED FUNCTIONS START HERE
 import (
+	time "time"
+
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	fields "k8s.io/kubernetes/pkg/fields"
@@ -25,7 +27,6 @@ import (
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	util "k8s.io/kubernetes/pkg/util"
 	inf "speter.net/go/exp/math/dec/inf"
-	time "time"
 )
 
 func deepCopy_api_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, c *conversion.Cloner) error {

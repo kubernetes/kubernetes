@@ -29,11 +29,11 @@ function generate_version() {
 	local version=$1
 	local TMPFILE="/tmp/conversion_generated.$(date +%s).go"
 
-	echo "Generating for version ${version}"
+	echo "Generating for ${version}"
 
 	sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > "$TMPFILE"
 	cat >> "$TMPFILE" <<EOF
-package ${version}
+package ${version##*/}
 
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
@@ -44,14 +44,19 @@ EOF
 // AUTO-GENERATED FUNCTIONS END HERE
 EOF
 
-	mv "$TMPFILE" "pkg/api/${version}/conversion_generated.go"
+	env GOPATH=$(godep path):$GOPATH goimports -w "$TMPFILE"
+	mv "$TMPFILE" "pkg/${version}/conversion_generated.go"
 }
 
-VERSIONS="v1"
-for ver in $VERSIONS; do
-  # Ensure that the version being processed is registered by setting
-  # KUBE_API_VERSIONS.
-  KUBE_API_VERSIONS="${ver}" generate_version "${ver}"
-done
+if ! which goimports >/dev/null; then
+	echo "goimports not in path, run go get golang.org/x/tools/cmd/goimports"
+	exit 1
+fi
 
-# ex: ts=2 sw=2 et filetype=sh
+DEFAULT_VERSIONS="api/v1 expapi/v1"
+VERSIONS=${VERSIONS:-$DEFAULT_VERSIONS}
+for ver in $VERSIONS; do
+	# Ensure that the version being processed is registered by setting
+	# KUBE_API_VERSIONS.
+	KUBE_API_VERSIONS="${ver##*/}" generate_version "${ver}"
+done

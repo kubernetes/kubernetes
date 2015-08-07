@@ -21,6 +21,7 @@ before_install:
 
 install:
   - go get golang.org/x/tools/cmd/cover
+  - go get golang.org/x/tools/cmd/goimports
   - go get github.com/mattn/goveralls
   - go get github.com/tools/godep
   - ./hack/travis/install-etcd.sh

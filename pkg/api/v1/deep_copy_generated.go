@@ -18,13 +18,14 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 import (
+	time "time"
+
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	util "k8s.io/kubernetes/pkg/util"
 	inf "speter.net/go/exp/math/dec/inf"
-	time "time"
 )
 
 func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c *conversion.Cloner) error {

@@ -27,22 +27,25 @@ gendeepcopy=$(kube::util::find-binary "gendeepcopy")
 
 function result_file_name() {
 	local version=$1
-	if [ "${version}" == "api" ]; then
-		echo "pkg/api/deep_copy_generated.go"
-	else
-		echo "pkg/api/${version}/deep_copy_generated.go"
-	fi
+	echo "pkg/${version}/deep_copy_generated.go"
 }
 
 function generate_version() {
 	local version=$1
 	local TMPFILE="/tmp/deep_copy_generated.$(date +%s).go"
 
-	echo "Generating for version ${version}"
+	echo "Generating for ${version}"
+
+	# version is group/version, so use the version number as the package name unless
+	# this is an internal version, in which case use the group name. 
+	pkgname=${version##*/}
+	if [[ -z $pkgname ]]; then
+		pkgname=${version%/*}
+	fi
 
 	sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > $TMPFILE
 	cat >> $TMPFILE <<EOF
-package ${version}
+package $pkgname
 
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
@@ -53,27 +56,24 @@ EOF
 // AUTO-GENERATED FUNCTIONS END HERE
 EOF
 
-	gofmt -w -s "$TMPFILE"
+	env GOPATH=$(godep path):$GOPATH goimports -w "$TMPFILE"
 	mv "$TMPFILE" `result_file_name ${version}`
 }
 
 function generate_deep_copies() {
-  local versions="api v1"
-  # To avoid compile errors, remove the currently existing files.
-  for ver in ${versions}; do
-    rm -f `result_file_name ${ver}`
-  done
-  apiVersions=""
-  for ver in ${versions}; do
-    # Ensure that the version being processed is registered by setting
-    # KUBE_API_VERSIONS.
-    if [ "${ver}" != "api" ]; then
-      apiVersions="${ver}"
-    fi
-    KUBE_API_VERSIONS="${apiVersions}" generate_version "${ver}"
-  done
+	local versions="$@"
+	# To avoid compile errors, remove the currently existing files.
+	for ver in ${versions}; do
+		rm -f `result_file_name ${ver}`
+	done
+	for ver in ${versions}; do
+		# Ensure that the version being processed is registered by setting
+		# KUBE_API_VERSIONS.
+		apiVersions="${ver##*/}"
+		KUBE_API_VERSIONS="${apiVersions}" generate_version "${ver}"
+	done
 }
 
+DEFAULT_VERSIONS="api/ api/v1 expapi/ expapi/v1"
+VERSIONS=${VERSIONS:-$DEFAULT_VERSIONS}
 generate_deep_copies
-
-# ex: ts=2 sw=2 et filetype=sh
