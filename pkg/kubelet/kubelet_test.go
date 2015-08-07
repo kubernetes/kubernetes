@@ -86,6 +86,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.os = kubecontainer.FakeOS{}
 
+	kubelet.pods = MaxPods
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = testKubeletHostname
 	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
@@ -2139,6 +2140,44 @@ func TestHandleMemExceeded(t *testing.T) {
 	}
 }
 
+// Tests that we reject pods > max-pods.
+func TestMaxPods(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kl := testKubelet.kubelet
+	kl.pods = 0
+	kl.nodeLister = testNodeLister{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
+	}}
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "podA",
+				Namespace: "foo",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "podB",
+				Namespace: "foo",
+			},
+		},
+	}
+	kl.handleNotFittingPods(pods)
+	for i := range pods {
+		notfittingPodName := kubecontainer.GetPodFullName(pods[i])
+		status, found := kl.statusManager.GetPodStatus(notfittingPodName)
+		if !found {
+			t.Fatalf("status of pod %q is not found in the status map", notfittingPodName)
+		}
+		if status.Phase != api.PodFailed || !strings.Contains(status.Reason, "CapacityExceeded") {
+			t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+		}
+	}
+}
+
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	testKubelet := newTestKubelet(t)
@@ -2312,7 +2351,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				api.ResourcePods:   *resource.NewQuantity(MaxPods, resource.DecimalSI),
 			},
 			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
 		},
@@ -2367,7 +2406,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
 					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
-					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+					api.ResourcePods:   *resource.NewQuantity(MaxPods, resource.DecimalSI),
 				},
 			},
 		},
@@ -2413,7 +2452,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				api.ResourcePods:   *resource.NewQuantity(MaxPods, resource.DecimalSI),
 			},
 			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
 		},
@@ -2504,7 +2543,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				api.ResourcePods:   *resource.NewQuantity(MaxPods, resource.DecimalSI),
 			},
 			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
 		},

@@ -78,6 +78,10 @@ const (
 
 	// Location of container logs.
 	containerLogsDir = "/var/log/containers"
+
+	// Default for the maximum number of pods this kubelet can handle.
+	// Configurable via the max-pods command line flag give to the kubelet server.
+	MaxPods = 40
 )
 
 var (
@@ -1580,6 +1584,7 @@ func (kl *Kubelet) checkCapacityExceeded(pods []*api.Pod) (fitting []*api.Pod, n
 	sort.Sort(podsByCreationTime(pods))
 
 	capacity := CapacityFromMachineInfo(info)
+	capacity[api.ResourcePods] = *resource.NewQuantity(int64(kl.pods), resource.DecimalSI)
 	return predicates.CheckPodsExceedingCapacity(pods, capacity)
 }
 

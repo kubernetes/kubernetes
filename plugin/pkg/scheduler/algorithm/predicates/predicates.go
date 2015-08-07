@@ -118,13 +118,21 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList) (fitting []*api.Pod, notFitting []*api.Pod) {
 	totalMilliCPU := capacity.Cpu().MilliValue()
 	totalMemory := capacity.Memory().Value()
+	totalPods := capacity.Pods().Value()
 	milliCPURequested := int64(0)
 	memoryRequested := int64(0)
+	podsRequested := int64(0)
 	for _, pod := range pods {
 		podRequest := getResourceRequest(pod)
 		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
-		if !fitsCPU || !fitsMemory {
+		// If totalPods is 0 respect it, that means the kubelet was started with max-pods=0.
+		// If this isn't the case, whenever the kubelet heartbeats the right number of total pods,
+		// the scheduler will assign pods to it. This is different from totalMilliCPU/Memory because
+		// in the case of the latter, a 0 limit might just mean cadvisor isn't ready to report
+		// these stats, and we (arguably, #10962) don't want to reject pods in this case.
+		fitsPodCount := totalPods > 0 && (totalPods-1) >= podsRequested
+		if !fitsCPU || !fitsMemory || !fitsPodCount {
 			// the pod doesn't fit
 			notFitting = append(notFitting, pod)
 			continue
@@ -132,6 +140,7 @@ func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList) (fit
 		// the pod fits
 		milliCPURequested += podRequest.milliCPU
 		memoryRequested += podRequest.memory
+		podsRequested += 1
 		fitting = append(fitting, pod)
 	}
 	return
@@ -139,19 +148,15 @@ func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList) (fit
 
 // PodFitsResources calculates fit based on requested, rather than used resources
 func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
-	podRequest := getResourceRequest(pod)
 	info, err := r.info.GetNodeInfo(node)
 	if err != nil {
 		return false, err
-	}
-	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
-		return int64(len(existingPods)) < info.Status.Capacity.Pods().Value(), nil
 	}
 	pods := []*api.Pod{}
 	copy(pods, existingPods)
 	pods = append(existingPods, pod)
 	_, exceeding := CheckPodsExceedingCapacity(pods, info.Status.Capacity)
-	if len(exceeding) > 0 || int64(len(pods)) > info.Status.Capacity.Pods().Value() {
+	if len(exceeding) > 0 {
 		glog.V(4).Infof("Cannot schedule Pod %v, because Node %v is full, running %v out of %v Pods.", pod, node, len(pods)-1, info.Status.Capacity.Pods().Value())
 		return false, nil
 	}
