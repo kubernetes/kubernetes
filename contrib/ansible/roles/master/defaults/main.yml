@@ -1,0 +1,4 @@
+# These default values are for the apiserver UI component.
+# you can change or overide these values to your needs.
+kube_auth_username: "kube"
+kube_auth_password: "password"

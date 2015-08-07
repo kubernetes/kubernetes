@@ -9,6 +9,11 @@
   tags:
     - binary-update
 
+- name: Create basic authentication configuration for kube-apiserver
+  template: src=basic_auth.csv.j2 dest={{ kube_config_dir }}/basic_auth.csv
+  notify:
+    - restart apiserver
+
 - name: write the config file for the api server
   template: src=apiserver.j2 dest={{ kube_config_dir }}/apiserver
   notify:

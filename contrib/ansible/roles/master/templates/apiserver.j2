@@ -23,4 +23,4 @@ KUBE_ETCD_SERVERS="--etcd_servers={% for node in groups['etcd'] %}http://{{ node
 KUBE_ADMISSION_CONTROL="--admission_control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
 
 # Add your own!
-KUBE_API_ARGS="--tls_cert_file={{ kube_cert_dir }}/server.crt --tls_private_key_file={{ kube_cert_dir }}/server.key --client_ca_file={{ kube_cert_dir }}/ca.crt --token_auth_file={{ kube_token_dir }}/known_tokens.csv --service_account_key_file={{ kube_cert_dir }}/server.crt"
+KUBE_API_ARGS="--tls_cert_file={{ kube_cert_dir }}/server.crt --tls_private_key_file={{ kube_cert_dir }}/server.key --client_ca_file={{ kube_cert_dir }}/ca.crt --token_auth_file={{ kube_token_dir }}/known_tokens.csv --service_account_key_file={{ kube_cert_dir }}/server.crt --basic_auth_file={{ kube_config_dir }}/basic_auth.csv"
