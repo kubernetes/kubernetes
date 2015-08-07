@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 )
 
 type FailedPredicateMap map[string]util.StringSet
@@ -148,7 +149,7 @@ func PrioritizeNodes(pod *api.Pod, podLister algorithm.PodLister, priorityConfig
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
 	if len(priorityConfigs) == 0 {
-		return EqualPriority(pod, podLister, minionLister)
+		return priorities.EqualPriority(pod, podLister, minionLister)
 	}
 
 	combinedScores := map[string]int{}
@@ -184,24 +185,6 @@ func getBestHosts(list algorithm.HostPriorityList) []string {
 		}
 	}
 	return result
-}
-
-// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-func EqualPriority(_ *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
-	nodes, err := minionLister.List()
-	if err != nil {
-		glog.Errorf("failed to list nodes: %v", err)
-		return []algorithm.HostPriority{}, err
-	}
-
-	result := []algorithm.HostPriority{}
-	for _, minion := range nodes.Items {
-		result = append(result, algorithm.HostPriority{
-			Host:  minion.Name,
-			Score: 1,
-		})
-	}
-	return result, nil
 }
 
 func NewGenericScheduler(predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, pods algorithm.PodLister, random *rand.Rand) algorithm.ScheduleAlgorithm {

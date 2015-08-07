@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 )
 
 func falsePredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
@@ -176,14 +177,14 @@ func TestGenericScheduler(t *testing.T) {
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"false": falsePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: priorities.EqualPriority, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			expectsErr:   true,
 			name:         "test 1",
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: priorities.EqualPriority, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			// Random choice between both, the rand seeded above with zero, chooses "machine1"
 			expectedHost: "machine1",
@@ -192,7 +193,7 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			// Fits on a machine where the pod ID matches the machine name
 			predicates:   map[string]algorithm.FitPredicate{"matches": matchesPredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: priorities.EqualPriority, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "machine2"}},
 			expectedHost: "machine2",
