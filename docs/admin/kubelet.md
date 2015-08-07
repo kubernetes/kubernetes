@@ -41,7 +41,7 @@ Documentation for other releases can be found at
 The kubelet is the primary "node agent" that runs on each
 node. The kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
 that describes a pod. The kubelet takes a set of PodSpecs that are provided through
-various echanisms (primarily through the apiserver) and ensures that the containers
+various mechanisms (primarily through the apiserver) and ensures that the containers
 described in those PodSpecs are running and healthy.
 
 Other than from an PodSpec from the apiserver, there are three ways that a container
