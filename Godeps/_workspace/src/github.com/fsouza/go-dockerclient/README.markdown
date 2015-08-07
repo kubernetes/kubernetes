@@ -35,11 +35,9 @@ func main() {
 }
 ```
 
-## Using with Boot2Docker
+## Using with TLS
 
-Boot2Docker runs Docker with TLS enabled. In order to instantiate the client you should use NewTLSClient, passing the endpoint and path for key and certificates as parameters.
-
-For more details about TLS support in Boot2Docker, please refer to [TLS support](https://github.com/boot2docker/boot2docker#tls-support) on Boot2Docker's readme.
+In order to instantiate the client for a TLS-enabled daemon, you should use NewTLSClient, passing the endpoint and path for key and certificates as parameters.
 
 ```go
 package main
@@ -60,6 +58,27 @@ func main() {
 	// use client
 }
 ```
+
+If using [docker-machine](https://docs.docker.com/machine/), or another application that exports environment variables
+`DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH`, you can use NewClientFromEnv.
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/fsouza/go-dockerclient"
+)
+
+func main() {
+	client, _ := docker.NewClientFromEnv()
+	// use client
+}
+```
+
+See the documentation for more details.
 
 ## Developing
 

@@ -15,6 +15,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newTestClient(rt *FakeRoundTripper) Client {
@@ -233,15 +234,28 @@ func TestRemoveImageExtended(t *testing.T) {
 
 func TestInspectImage(t *testing.T) {
 	body := `{
-     "id":"b750fe79269d2ec9a3c593ef05b4332b1d1a02a62b4accb2c21d589ff2f5f2dc",
-     "parent":"27cf784147099545",
-     "created":"2013-03-23T22:24:18.818426-07:00",
-     "container":"3d67245a8d72ecf13f33dffac9f79dcdf70f75acb84d308770391510e0c23ad0",
-     "container_config":{"Memory":0}
+     "Id":"b750fe79269d2ec9a3c593ef05b4332b1d1a02a62b4accb2c21d589ff2f5f2dc",
+     "Parent":"27cf784147099545",
+     "Created":"2013-03-23T22:24:18.818426Z",
+     "Container":"3d67245a8d72ecf13f33dffac9f79dcdf70f75acb84d308770391510e0c23ad0",
+     "ContainerConfig":{"Memory":1},
+     "VirtualSize":12345
 }`
-	var expected Image
-	if err := json.Unmarshal([]byte(body), &expected); err != nil {
+
+	created, err := time.Parse(time.RFC3339Nano, "2013-03-23T22:24:18.818426Z")
+	if err != nil {
 		t.Fatal(err)
+	}
+
+	expected := Image{
+		ID:        "b750fe79269d2ec9a3c593ef05b4332b1d1a02a62b4accb2c21d589ff2f5f2dc",
+		Parent:    "27cf784147099545",
+		Created:   created,
+		Container: "3d67245a8d72ecf13f33dffac9f79dcdf70f75acb84d308770391510e0c23ad0",
+		ContainerConfig: Config{
+			Memory: 1,
+		},
+		VirtualSize: 12345,
 	}
 	fakeRT := &FakeRoundTripper{message: body, status: http.StatusOK}
 	client := newTestClient(fakeRT)
