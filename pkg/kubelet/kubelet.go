@@ -35,6 +35,7 @@ import (
 
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -100,7 +101,8 @@ const (
 	// Relisting is used to discover missing container events.
 	// Use a shorter period because generic PLEG relies on relisting for
 	// container events.
-	plegRelistPeriod = time.Second * 3
+	plegRelistPeriod       = time.Second * 3
+	dockerPlegRelistPeriod = time.Second * 30
 )
 
 var (
@@ -315,7 +317,8 @@ func NewMainKubelet(
 			procFs,
 			klet.cpuCFSQuota)
 		klet.containerRuntimeName = "docker"
-		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
+		klet.pleg = pleg.NewDockerPLEG(pleg.NewDockerEventWatcher(dockerClient), klet.containerRuntime.(*dockertools.DockerManager),
+			plegChannelCapacity, dockerPlegRelistPeriod)
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,

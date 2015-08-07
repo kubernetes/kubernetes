@@ -198,3 +198,21 @@ func (in instrumentedDockerInterface) AttachToContainer(opts docker.AttachToCont
 	recordError(operation, err)
 	return err
 }
+
+func (in instrumentedDockerInterface) AddEventListener(listener chan<- *docker.APIEvents) error {
+	const operation = "add_event_listener"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.AddEventListener(listener)
+	recordError(operation, err)
+	return err
+}
+
+func (in instrumentedDockerInterface) RemoveEventListener(listener chan *docker.APIEvents) error {
+	const operation = "remove_event_listener"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.RemoveEventListener(listener)
+	recordError(operation, err)
+	return err
+}
