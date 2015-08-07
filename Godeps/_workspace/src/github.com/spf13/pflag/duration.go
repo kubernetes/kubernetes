@@ -1,6 +1,8 @@
 package pflag
 
-import "time"
+import (
+	"time"
+)
 
 // -- time.Duration Value
 type durationValue time.Duration
@@ -21,6 +23,19 @@ func (d *durationValue) Type() string {
 }
 
 func (d *durationValue) String() string { return (*time.Duration)(d).String() }
+
+func durationConv(sval string) (interface{}, error) {
+	return time.ParseDuration(sval)
+}
+
+// GetDuration return the duration value of a flag with the given name
+func (f *FlagSet) GetDuration(name string) (time.Duration, error) {
+	val, err := f.getFlagType(name, "duration", durationConv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(time.Duration), nil
+}
 
 // DurationVar defines a time.Duration flag with specified name, default value, and usage string.
 // The argument p points to a time.Duration variable in which to store the value of the flag.

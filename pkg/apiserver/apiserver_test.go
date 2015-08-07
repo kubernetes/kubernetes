@@ -2446,7 +2446,7 @@ func TestCreateTimeout(t *testing.T) {
 
 func TestCORSAllowedOrigins(t *testing.T) {
 	table := []struct {
-		allowedOrigins util.StringList
+		allowedOrigins []string
 		origin         string
 		allowed        bool
 	}{

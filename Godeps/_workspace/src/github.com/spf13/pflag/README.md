@@ -20,11 +20,11 @@ pflag is available using the standard `go get` command.
 
 Install by running:
 
-    go get github.com/ogier/pflag
+    go get github.com/spf13/pflag
 
 Run tests by running:
 
-    go test github.com/ogier/pflag
+    go test github.com/spf13/pflag
 
 ## Usage
 
@@ -33,7 +33,7 @@ pflag under the name "flag" then all code should continue to function
 with no changes.
 
 ``` go
-import flag "github.com/ogier/pflag"
+import flag "github.com/spf13/pflag"
 ```
 
 There is one exception to this: if you directly instantiate the Flag struct
@@ -84,6 +84,16 @@ fmt.Println("ip has value ", *ip)
 fmt.Println("flagvar has value ", flagvar)
 ```
 
+There are helpers function to get values later if you have the FlagSet but
+it was difficult to keep up with all of the the flag pointers in your code.
+If you have a pflag.FlagSet with a flag called 'flagname' of type int you
+can use GetInt() to get the int value. But notice that 'flagname' must exist
+and it must be an int. GetString("flagname") will fail.
+
+``` go
+i, err := flagset.GetInt("flagname")
+```
+
 After parsing, the arguments after the flag are available as the
 slice flag.Args() or individually as flag.Arg(i).
 The arguments are indexed from 0 through flag.NArg()-1.
@@ -111,29 +121,56 @@ in a command-line interface. The methods of FlagSet are
 analogous to the top-level functions for the command-line
 flag set.
 
+## Setting no option default values for flags
+
+After you create a flag it is possible to set the pflag.NoOptDefVal for
+the given flag. Doing this changes the meaning of the flag slightly. If
+a flag has a NoOptDefVal and the flag is set on the command line without
+an option the flag will be set to the NoOptDefVal. For example given:
+
+``` go
+var ip = flag.IntP("flagname", "f", 1234, "help message")
+flag.Lookup("flagname").NoOptDefVal = "4321"
+```
+
+Would result in something like
+
+| Parsed Arguments | Resulting Value |
+| -------------    | -------------   |
+| --flagname=1357  | ip=1357         |
+| --flagname       | ip=4321         |
+| [nothing]        | ip=1234         |
+
 ## Command line flag syntax
 
 ```
---flag    // boolean flags only
+--flag    // boolean flags, or flags with no option default values
+--flag x  // only on flags without a default value
 --flag=x
 ```
 
 Unlike the flag package, a single dash before an option means something
 different than a double dash. Single dashes signify a series of shorthand
-letters for flags. All but the last shorthand letter must be boolean flags.
+letters for flags. All but the last shorthand letter must be boolean flags
+or a flag with a default value
 
 ```
-// boolean flags
+// boolean or flags where the 'no option default value' is set
 -f
+-f=true
 -abc
+but
+-b true is INVALID
 
-// non-boolean flags
+// non-boolean and flags without a 'no option default value'
 -n 1234
--Ifile
+-n=1234
+-n1234
 
 // mixed
 -abcs "hello"
--abcn1234
+-absd="hello"
+-abcs1234
 ```
 
 Flag parsing stops after the terminator "--". Unlike the flag package,
@@ -151,7 +188,7 @@ It is possible to set a custom flag name 'normalization function.' It allows fla
 
 **Example #1**: You want -, _, and . in flags to compare the same. aka --my-flag == --my_flag == --my.flag
 
-```go
+``` go
 func wordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	from := []string{"-", "_"}
 	to := "."
@@ -166,7 +203,7 @@ myFlagSet.SetNormalizeFunc(wordSepNormalizeFunc)
 
 **Example #2**: You want to alias two flags. aka --old-flag-name == --new-flag-name
 
-```go
+``` go
 func aliasNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	switch name {
 	case "old-flag-name":

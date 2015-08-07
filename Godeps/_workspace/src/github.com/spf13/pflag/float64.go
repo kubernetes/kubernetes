@@ -25,6 +25,19 @@ func (f *float64Value) Type() string {
 
 func (f *float64Value) String() string { return fmt.Sprintf("%v", *f) }
 
+func float64Conv(sval string) (interface{}, error) {
+	return strconv.ParseFloat(sval, 64)
+}
+
+// GetFloat64 return the float64 value of a flag with the given name
+func (f *FlagSet) GetFloat64(name string) (float64, error) {
+	val, err := f.getFlagType(name, "float64", float64Conv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(float64), nil
+}
+
 // Float64Var defines a float64 flag with specified name, default value, and usage string.
 // The argument p points to a float64 variable in which to store the value of the flag.
 func (f *FlagSet) Float64Var(p *float64, name string, value float64, usage string) {

@@ -25,6 +25,23 @@ func (i *uintValue) Type() string {
 
 func (i *uintValue) String() string { return fmt.Sprintf("%v", *i) }
 
+func uintConv(sval string) (interface{}, error) {
+	v, err := strconv.ParseUint(sval, 0, 0)
+	if err != nil {
+		return 0, err
+	}
+	return uint(v), nil
+}
+
+// GetUint return the uint value of a flag with the given name
+func (f *FlagSet) GetUint(name string) (uint, error) {
+	val, err := f.getFlagType(name, "uint", uintConv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(uint), nil
+}
+
 // UintVar defines a uint flag with specified name, default value, and usage string.
 // The argument p points to a uint variable in which to store the value of the flag.
 func (f *FlagSet) UintVar(p *uint, name string, value uint, usage string) {

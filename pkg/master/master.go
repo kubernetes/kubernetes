@@ -109,7 +109,7 @@ type Config struct {
 	EnableProfiling       bool
 	APIPrefix             string
 	ExpAPIPrefix          string
-	CorsAllowedOriginList util.StringList
+	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
 	SupportsBasicAuth      bool
@@ -186,7 +186,7 @@ type Master struct {
 	enableProfiling       bool
 	apiPrefix             string
 	expAPIPrefix          string
-	corsAllowedOriginList util.StringList
+	corsAllowedOriginList []string
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
 	admissionControl      admission.Interface

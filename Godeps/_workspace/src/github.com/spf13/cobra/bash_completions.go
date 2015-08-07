@@ -219,9 +219,13 @@ func writeFlagHandler(name string, annotations map[string][]string, out *bytes.B
 		case BashCompFilenameExt:
 			fmt.Fprintf(out, "    flags_with_completion+=(%q)\n", name)
 
-			ext := strings.Join(value, "|")
-			ext = "__handle_filename_extension_flag " + ext
-			fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			if len(value) > 0 {
+				ext := "__handle_filename_extension_flag " + strings.Join(value, "|")
+				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			} else {
+				ext := "_filedir"
+				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			}
 		}
 	}
 }
@@ -343,15 +347,24 @@ func (cmd *Command) GenBashCompletionFile(filename string) error {
 	return nil
 }
 
-func (cmd *Command) MarkFlagRequired(name string) {
-	flag := cmd.Flags().Lookup(name)
-	if flag == nil {
-		return
-	}
-	if flag.Annotations == nil {
-		flag.Annotations = make(map[string][]string)
-	}
-	annotation := make([]string, 1)
-	annotation[0] = "true"
-	flag.Annotations[BashCompOneRequiredFlag] = annotation
+// MarkFlagRequired adds the BashCompOneRequiredFlag annotation to the named flag, if it exists.
+func (cmd *Command) MarkFlagRequired(name string) error {
+	return MarkFlagRequired(cmd.Flags(), name)
+}
+
+// MarkFlagRequired adds the BashCompOneRequiredFlag annotation to the named flag in the flag set, if it exists.
+func MarkFlagRequired(flags *pflag.FlagSet, name string) error {
+	return flags.SetAnnotation(name, BashCompOneRequiredFlag, []string{"true"})
+}
+
+// MarkFlagFilename adds the BashCompFilenameExt annotation to the named flag, if it exists.
+// Generated bash autocompletion will select filenames for the flag, limiting to named extensions if provided.
+func (cmd *Command) MarkFlagFilename(name string, extensions ...string) error {
+	return MarkFlagFilename(cmd.Flags(), name, extensions...)
+}
+
+// MarkFlagFilename adds the BashCompFilenameExt annotation to the named flag in the flag set, if it exists.
+// Generated bash autocompletion will select filenames for the flag, limiting to named extensions if provided.
+func MarkFlagFilename(flags *pflag.FlagSet, name string, extensions ...string) error {
+	return flags.SetAnnotation(name, BashCompFilenameExt, extensions)
 }
