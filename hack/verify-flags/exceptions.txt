@@ -1,0 +1,536 @@
+test/e2e/secrets.go:							"--file_content=/etc/secret-volume/data-1",
+test/e2e/secrets.go:							"--file_mode=/etc/secret-volume/data-1"},
+test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
+test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
+test/e2e/es_cluster_logging.go:		Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
+test/e2e/host_path.go:			fmt.Sprintf("--fs_type=%v", volumePath),
+test/e2e/host_path.go:			fmt.Sprintf("--file_mode=%v", volumePath),
+test/e2e/host_path.go:			fmt.Sprintf("--fs_type=%v", volumePath),
+test/e2e/host_path.go:			fmt.Sprintf("--file_mode=%v", filePath),
+test/e2e/service_accounts.go:							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountTokenKey),
+test/e2e/service_accounts.go:							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountRootCAKey),
+test/e2e/empty_dir.go:		fmt.Sprintf("--fs_type=%v", volumePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--file_perm=%v", volumePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--fs_type=%v", volumePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--new_file_0644=%v", filePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--file_perm=%v", filePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--fs_type=%v", volumePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--new_file_0666=%v", filePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--file_perm=%v", filePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--fs_type=%v", volumePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--new_file_0777=%v", filePath),
+test/e2e/empty_dir.go:		fmt.Sprintf("--file_perm=%v", filePath),
+test/soak/serve_hostnames/serve_hostnames.go:	podsPerNode    = flag.Int("pods_per_node", 1, "Number of serve_hostname pods per node")
+test/soak/serve_hostnames/serve_hostnames.go:	upTo           = flag.Int("up_to", 1, "Number of iterations or -1 for no limit")
+test/soak/serve_hostnames/serve_hostnames.go:	maxPar         = flag.Int("max_par", 500, "Maximum number of queries in flight")
+test/soak/serve_hostnames/serve_hostnames.go:	gke            = flag.String("gke_context", "", "Target GKE cluster with context gke_{project}_{zone}_{cluster-name}")
+test/soak/serve_hostnames/README.md:The number of iterations to perform for issuing queries can be changed from the default of 1 to some higher value e.g. `--up_to=3` and the number of pods per node can also be changed e.g. `--pods_per_node=2`:
+test/soak/serve_hostnames/README.md:$ ./serve_hostnames --up_to=3 --pods_per_node=2
+test/soak/serve_hostnames/README.md:For a soak test use `--up_to=-1` which will loop indefinitely.
+test/soak/cauldron/cauldron-rc.yaml:        args: ["--up_to=-1"]
+test/soak/cauldron/cauldron.go:	podsPerNode    = flag.Int("pods_per_node", 1, "Number of serve_hostname pods per node")
+test/soak/cauldron/cauldron.go:	upTo           = flag.Int("up_to", 1, "Number of iterations or -1 for no limit")
+test/soak/cauldron/cauldron.go:	maxPar         = flag.Int("max_in_flight", 100, "Maximum number of queries in flight")
+pkg/kubelet/qos/memory_policy_test.go:	lowOomScoreAdj  int // The max oom_score_adj score the container should be assigned.
+pkg/kubelet/qos/memory_policy_test.go:	highOomScoreAdj int // The min oom_score_adj score the container should be assigned.
+pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOomScoreAdj, test.highOomScoreAdj, oomScoreAdj)
+pkg/api/v1/types.go:	Items []LimitRange `json:"items" description:"items is a list of LimitRange objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md"`
+pkg/api/v1/types.go:	Hard ResourceList `json:"hard,omitempty" description:"hard is the set of desired hard limits for each named resource; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+pkg/api/v1/types.go:	Hard ResourceList `json:"hard,omitempty" description:"hard is the set of enforced hard limits for each named resource; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+pkg/api/v1/types.go:	Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+pkg/kubectl/cmd/util/factory_test.go:	factory.flags.Bool("valid_flag", false, "bool value")
+pkg/kubectl/cmd/util/factory_test.go:	if factory.flags.Lookup("valid_flag").Name != "valid-flag" {
+pkg/util/logs.go:var logFlushFreq = pflag.Duration("log_flush_frequency", 5*time.Second, "Maximum number of seconds between log flushes")
+pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
+pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
+pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
+pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to read oom_score_adj: %v", readErr)
+pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to set oom_score_adj to %d: %v", oomScoreAdj, writeErr)
+pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
+pkg/cloudprovider/providers/vagrant/vagrant_test.go:		testSaltMinionsResponse = []byte(`{ "return": [{"kubernetes-minion-1": {"kernel": "Linux", "domain": "", "zmqversion": "3.2.4", "kernelrelease": "3.11.10-301.fc20.x86_64", "pythonpath": ["/usr/bin", "/usr/lib64/python27.zip", "/usr/lib64/python2.7", "/usr/lib64/python2.7/plat-linux2", "/usr/lib64/python2.7/lib-tk", "/usr/lib64/python2.7/lib-old", "/usr/lib64/python2.7/lib-dynload", "/usr/lib64/python2.7/site-packages", "/usr/lib/python2.7/site-packages"], "etcd_servers": "10.245.1.2", "ip_interfaces": {"lo": ["127.0.0.1"], "docker0": ["172.17.42.1"], "enp0s8": ["10.245.2.2"], "p2p1": ["10.0.2.15"]}, "shell": "/bin/sh", "mem_total": 491, "saltversioninfo": [2014, 1, 7], "osmajorrelease": ["20"], "node_ip": "10.245.2.2", "id": "kubernetes-minion-1", "osrelease": "20", "ps": "ps -efH", "server_id": 1005530826, "num_cpus": 1, "hwaddr_interfaces": {"lo": "00:00:00:00:00:00", "docker0": "56:84:7a:fe:97:99", "enp0s8": "08:00:27:17:c5:0f", "p2p1": "08:00:27:96:96:e1"}, "virtual": "VirtualBox", "osfullname": "Fedora", "master": "kubernetes-master", "ipv4": ["10.0.2.15", "10.245.2.2", "127.0.0.1", "172.17.42.1"], "ipv6": ["::1", "fe80::a00:27ff:fe17:c50f", "fe80::a00:27ff:fe96:96e1"], "cpu_flags": ["fpu", "vme", "de", "pse", "tsc", "msr", "pae", "mce", "cx8", "apic", "sep", "mtrr", "pge", "mca", "cmov", "pat", "pse36", "clflush", "mmx", "fxsr", "sse", "sse2", "syscall", "nx", "rdtscp", "lm", "constant_tsc", "rep_good", "nopl", "pni", "monitor", "ssse3", "lahf_lm"], "localhost": "kubernetes-minion-1", "lsb_distrib_id": "Fedora", "fqdn_ip4": ["127.0.0.1"], "fqdn_ip6": [], "nodename": "kubernetes-minion-1", "saltversion": "2014.1.7", "saltpath": "/usr/lib/python2.7/site-packages/salt", "pythonversion": [2, 7, 5, "final", 0], "host": "kubernetes-minion-1", "os_family": "RedHat", "oscodename": "Heisenbug", "defaultencoding": "UTF-8", "osfinger": "Fedora-20", "roles": ["kubernetes-pool"], "num_gpus": 1, "cpu_model": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz", "fqdn": "kubernetes-minion-1", "osarch": "x86_64", "cpuarch": "x86_64", "gpus": [{"model": "VirtualBox Graphics Adapter", "vendor": "unknown"}], "path": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin", "os": "Fedora", "defaultlanguage": "en_US"}}]}`)
+contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&fsTypePath, "fs_type", "", "Path to print the fs type for")
+contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
+contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
+contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
+contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
+contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
+contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&newFilePath0777, "new_file_0777", "", "Path to write to and read from with perm 0777")
+contrib/mesos/pkg/controllermanager/controllermanager.go:	fs.BoolVar(&s.UseHostPortEndpoints, "host_port_endpoints", s.UseHostPortEndpoints, "Map service endpoints to hostIP:hostPort instead of podIP:containerPort. Default true.")
+contrib/mesos/docs/ha.md:- `--km_path` or else (`--executor_path` and `--proxy_path`) should reference non-local-file URI's and must be identical across schedulers.
+contrib/mesos/docs/ha.md:$ ./bin/km scheduler ... --mesos_master=zk://zk1:2181,zk2:2181/mesos --ha --km_path=hdfs:///km
+contrib/mesos/docs/ha.md:- `--auth_path`
+contrib/mesos/docs/ha.md:- `--km_path`
+contrib/mesos/docs/issues.md:* execute the k8sm controller-manager with `-host_port_endpoints=false`
+contrib/mesos/docs/issues.md:The default `executor_shutdown_grace_period` of a Mesos slave is 3 seconds.
+contrib/mesos/docs/issues.md:However, if terminating the Docker containers takes longer than the `executor_shutdown_grace_period` then some containers may not get a termination signal at all.
+contrib/mesos/docs/issues.md:* Adjust the value of `executor_shutdown_grace_period` to something greater than 3 seconds.
+contrib/prometheus/README.md:http://service_address:service_port/metrics.
+contrib/ansible/vagrant/Vagrantfile:$num_nodes = (ENV['NUM_NODES'] || 2).to_i
+contrib/ansible/vagrant/Vagrantfile:  $num_nodes.times do |i|
+contrib/ansible/roles/flannel/tasks/config.yml:    conf_loc: "/{{ cluster_name }}/network/config"
+contrib/ansible/roles/flannel/templates/flanneld.j2:FLANNEL_ETCD_KEY="/{{ cluster_name }}/network"
+contrib/ansible/roles/kubernetes-addons/files/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
+contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:current-context: proxy-to-{{ cluster_name }}
+contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:    cluster: {{ cluster_name }}
+contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:  name: proxy-to-{{ cluster_name }}
+contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:    server: https://{{ groups['masters'][0] }}:{{ kube_master_api_port }}
+contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:  name: {{ cluster_name }}
+contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:current-context: kubelet-to-{{ cluster_name }}
+contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:    server: https://{{ groups['masters'][0] }}:{{ kube_master_api_port }}
+contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:  name: {{ cluster_name }}
+contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:    cluster: {{ cluster_name }}
+contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:  name: kubelet-to-{{ cluster_name }}
+contrib/ansible/roles/master/tasks/firewalld.yml:  firewalld: port={{ kube_master_api_port }}/tcp permanent=false state=enabled
+contrib/ansible/roles/master/tasks/firewalld.yml:  firewalld: port={{ kube_master_api_port }}/tcp permanent=true state=enabled
+contrib/ansible/roles/master/tasks/iptables.yml:  command: /sbin/iptables -I INPUT 1 -p tcp --dport {{ kube_master_api_port }} -j ACCEPT -m comment --comment "kube-apiserver"
+contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:current-context: scheduler-to-{{ cluster_name }}
+contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:    server: https://{{ groups['masters'][0] }}:{{ kube_master_api_port }}
+contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:  name: {{ cluster_name }}
+contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:    cluster: {{ cluster_name }}
+contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:  name: scheduler-to-{{ cluster_name }}
+contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:current-context: kubectl-to-{{ cluster_name }}
+contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:    server: https://{{ groups['masters'][0] }}:{{ kube_master_api_port }}
+contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:  name: {{ cluster_name }}
+contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:    cluster: {{ cluster_name }}
+contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:  name: kubectl-to-{{ cluster_name }}
+contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:current-context: controller-manager-to-{{ cluster_name }}
+contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:    server: https://{{ groups['masters'][0] }}:{{ kube_master_api_port }}
+contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:  name: {{ cluster_name }}
+contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:    cluster: {{ cluster_name }}
+contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:  name: controller-manager-to-{{ cluster_name }}
+contrib/ansible/roles/kubernetes/tasks/secrets.yml:    path={{ kube_cert_dir }}
+contrib/ansible/roles/kubernetes/tasks/secrets.yml:    src: "{{ kube_cert_dir }}/ca.crt"
+contrib/ansible/roles/kubernetes/tasks/secrets.yml:  copy: content="{{ kube_ca_cert }}" dest="{{ kube_cert_dir }}/ca.crt"
+contrib/ansible/roles/kubernetes/tasks/gen_certs.yml:    creates: "{{ kube_cert_dir }}/server.crt"
+contrib/ansible/roles/kubernetes/tasks/gen_certs.yml:    SERVICE_CLUSTER_IP_RANGE: "{{ kube_service_addresses }}"
+contrib/ansible/roles/kubernetes/tasks/gen_certs.yml:    CERT_DIR: "{{ kube_cert_dir }}"
+contrib/ansible/roles/kubernetes/tasks/gen_certs.yml:    - "{{ kube_cert_dir }}/ca.crt"
+contrib/ansible/roles/kubernetes/tasks/gen_certs.yml:    - "{{ kube_cert_dir }}/server.crt"
+contrib/ansible/roles/kubernetes/tasks/gen_certs.yml:    - "{{ kube_cert_dir }}/server.key"
+contrib/ansible/roles/kubernetes/tasks/gen_certs.yml:    - "{{ kube_cert_dir }}/kubecfg.crt"
+contrib/ansible/roles/kubernetes/tasks/gen_certs.yml:    - "{{ kube_cert_dir }}/kubecfg.key"
+contrib/ansible/roles/kubernetes/defaults/main.yml:kube_master_api_port: 443
+contrib/ansible/roles/kubernetes/defaults/main.yml:kube_cert_dir: "{{ kube_config_dir }}/certs"
+contrib/ansible/roles/kubernetes/defaults/main.yml:dns_domain: "{{ cluster_name }}"
+contrib/ansible/roles/kubernetes/defaults/main.yml:# the range specified as kube_service_addresses. This magic will actually
+contrib/ansible/roles/kubernetes/defaults/main.yml:# pick the 10th ip address in the kube_service_addresses range and use that.
+contrib/ansible/roles/kubernetes/defaults/main.yml:dns_server: "{{ kube_service_addresses|ipaddr('net')|ipaddr(10)|ipaddr('address') }}"
+contrib/ansible/roles/kubernetes/templates/config.j2:KUBE_MASTER="--master=https://{{ groups['masters'][0] }}:{{ kube_master_api_port }}"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cert_dir="${CERT_DIR:-"/srv/kubernetes"}"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:mkdir -p "$cert_dir"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/ca.crt "${cert_dir}/ca.crt"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p "pki/issued/${master_name}.crt" "${cert_dir}/server.crt" > /dev/null 2>&1
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p "pki/private/${master_name}.key" "${cert_dir}/server.key" > /dev/null 2>&1
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/issued/kubelet.crt "${cert_dir}/kubelet.crt"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/private/kubelet.key "${cert_dir}/kubelet.key"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:  chgrp "${cert_group}" "${cert_dir}/${cert}"
+contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:  chmod 660 "${cert_dir}/${cert}"
+contrib/ansible/group_vars/all.yml:cluster_name: cluster.local
+contrib/ansible/group_vars/all.yml:#ansible_ssh_user: root
+contrib/ansible/group_vars/all.yml:# password for the ansible_ssh_user. If this is unset you will need to set up
+contrib/ansible/group_vars/all.yml:kube_service_addresses: 10.254.0.0/16
+hooks/pre-commit:invalid_flag_lines=$(hack/verify-flags-underscore.py "${allfiles[@]}")
+hooks/pre-commit:if [[ "${invalid_flag_lines:-}" != "" ]]; then
+hooks/pre-commit:  for line in "${invalid_flag_lines[@]}"; do
+www/master/gulpfile.js:        var _file_contents = 'app.constant("manifestRoutes", ' + output_sections + ');\n';
+www/master/gulpfile.js:        stringSrc("sections.js", _file_contents).pipe(gulp.dest("js"));
+examples/nfs/README.md:allow_privileged: true
+examples/openshift-origin/README.md:allow_privileged: true
+examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
+examples/cluster-dns/images/frontend/client.py:  print service_address
+examples/cassandra/image/cassandra.yaml:cluster_name: 'Test Cluster'
+examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
+examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
+examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
+examples/elasticsearch/README.md:"cluster_name" : "mytunes-db",
+api/swagger-spec/v1.json:      "description": "items is a list of LimitRange objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md"
+api/swagger-spec/v1.json:      "description": "items is a list of ResourceQuota objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"
+api/swagger-spec/v1.json:      "description": "hard is the set of desired hard limits for each named resource; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"
+api/swagger-spec/v1.json:      "description": "hard is the set of enforced hard limits for each named resource; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"
+cmd/kube-controller-manager/app/controllermanager.go:	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
+hack/test-cmd.sh:kube_api_versions=(
+hack/test-cmd.sh:for version in "${kube_api_versions[@]}"; do
+hack/test-go.sh:  cover_report_dir="/tmp/k8s_coverage/${KUBE_API_VERSION}/$(kube::util::sortable_date)"
+hack/test-go.sh:  kube::log::status "Saving coverage output in '${cover_report_dir}'"
+hack/test-go.sh:  mkdir -p "${@+${@/#/${cover_report_dir}/}}"
+hack/test-go.sh:          -coverprofile="${cover_report_dir}/{}/${cover_profile}" \
+hack/test-go.sh:  COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
+hack/test-go.sh:    for x in `find "${cover_report_dir}" -name "${cover_profile}"`; do
+hack/test-go.sh:  coverage_html_file="${cover_report_dir}/combined-coverage.html"
+hack/parallel-e2e.sh:    go run hack/e2e.go -test --test_args="--ginkgo.noColor" "${@:-}" -down 2>&1 | tee ${cluster_dir}/e2e.log &
+hack/e2e.go:	testArgs         = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
+hack/e2e.go:	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
+hack/upgrade-e2e-test.sh:go run "$(dirname $0)/e2e.go" -build -up -v -test -test_args='--ginkgo.focus=Skipped.*Cluster\supgrade.*gce-upgrade' -check_version_skew=false
+hack/upgrade-e2e-test.sh:    go run "$(dirname $0)/e2e.go" -v -version="" -test -check_version_skew=false
+hack/gen-swagger-doc/example-output/definitions.html:<td class="tableblock halign-left valign-top"><p class="tableblock">hard is the set of desired hard limits for each named resource; see <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota">http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota</a></p></td>
+hack/gen-swagger-doc/example-output/definitions.html:<td class="tableblock halign-left valign-top"><p class="tableblock">hard is the set of enforced hard limits for each named resource; see <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota">http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota</a></p></td>
+hack/gen-swagger-doc/example-output/definitions.html:<td class="tableblock halign-left valign-top"><p class="tableblock">items is a list of ResourceQuota objects; see <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota">http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota</a></p></td>
+hack/gen-swagger-doc/example-output/definitions.html:<td class="tableblock halign-left valign-top"><p class="tableblock">items is a list of LimitRange objects; see <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md">http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md</a></p></td>
+hack/jenkins/e2e.sh:    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}" && exitcode=0 || exitcode=$?
+hack/lib/golang.sh:  local go_root_dir=$(go env GOROOT);
+hack/lib/golang.sh:  local cgo_pkg_dir=${go_root_dir}/pkg/${go_host_os}_${go_host_arch}_cgo;
+hack/lib/golang.sh:  if [ -w ${go_root_dir}/pkg ]; then
+hack/lib/golang.sh:  kube::log::status "+++ Warning: stdlib pkg cannot be rebuilt since ${go_root_dir}/pkg is not writable by `whoami`";
+hack/lib/golang.sh:  kube::log::status "+++ Warning: Make ${go_root_dir}/pkg writable for `whoami` for a one-time stdlib install, Or"
+hack/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
+hack/lib/logging.sh:      echo "  $i: ${source_file}:${source_lineno} ${funcname}(...)" >&2
+hack/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
+hack/lib/logging.sh:  echo "!!! Error in ${source_file}:${source_line}" >&2
+docs/devel/development.md:go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
+docs/devel/README.md:* **Admission Control Plugins** ([admission_control](../design/admission_control.md))
+docs/user-guide/accessing-the-cluster.md:	 "cluster_name" : "kubernetes_logging",
+docs/user-guide/secrets/secret-pod.yaml:      command: [ "/mt", "--file_content=/etc/secret-volume/data-1" ]
+docs/api-reference/definitions.html:<td class="tableblock halign-left valign-top"><p class="tableblock">hard is the set of desired hard limits for each named resource; see <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota">http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota</a></p></td>
+docs/api-reference/definitions.html:<td class="tableblock halign-left valign-top"><p class="tableblock">hard is the set of enforced hard limits for each named resource; see <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota">http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota</a></p></td>
+docs/api-reference/definitions.html:<td class="tableblock halign-left valign-top"><p class="tableblock">items is a list of ResourceQuota objects; see <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota">http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota</a></p></td>
+docs/api-reference/definitions.html:<td class="tableblock halign-left valign-top"><p class="tableblock">items is a list of LimitRange objects; see <a href="http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md">http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md</a></p></td>
+docs/design/admission_control_resource_quota.md:[here](http://releases.k8s.io/release-1.0/docs/design/admission_control_resource_quota.md).
+docs/design/admission_control_resource_quota.md:  Hard ResourceList `json:"hard,omitempty" description:"hard is the set of desired hard limits for each named resource; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+docs/design/admission_control_resource_quota.md:  Hard ResourceList `json:"hard,omitempty" description:"hard is the set of enforced hard limits for each named resource; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+docs/design/admission_control_resource_quota.md:  Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+docs/design/admission_control_resource_quota.md:[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()
+docs/design/admission_control_limit_range.md:[here](http://releases.k8s.io/release-1.0/docs/design/admission_control_limit_range.md).
+docs/design/admission_control_limit_range.md:  Items []LimitRange `json:"items" description:"items is a list of LimitRange objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md"`
+docs/design/admission_control_limit_range.md:[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_limit_range.md?pixel)]()
+docs/design/admission_control.md:[here](http://releases.k8s.io/release-1.0/docs/design/admission_control.md).
+docs/design/admission_control.md:[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control.md?pixel)]()
+docs/design/namespaces.md:See [Admission control: Limit Range](admission_control_limit_range.md)
+docs/design/namespaces.md:See [Admission control: Resource Quota](admission_control_resource_quota.md)
+docs/admin/salt.md:  etcd_servers: $MASTER_IP
+docs/admin/salt.md:  cloud_provider: vagrant
+docs/admin/salt.md:`api_servers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
+docs/admin/salt.md:`etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role, or 127.0.0.1 on GCE.
+docs/admin/salt.md:`hostname_override` | (Optional) Mapped to the kubelet hostname-override
+docs/admin/introduction.md:* **Admission Controllers** [admission_controllers](admission-controllers.md)
+docs/admin/resource-quota.md:See [ResourceQuota design doc](../design/admission_control_resource_quota.md) for more information.
+docs/admin/namespaces.md:See [Admission control: Limit Range](../design/admission_control_limit_range.md)
+docs/admin/admission-controllers.md:The Kubernetes API server supports a flag, `admission_control` that takes a comma-delimited,
+docs/admin/admission-controllers.md:See the [resourceQuota design doc](../design/admission_control_resource_quota.md) and the [example of Resource Quota](../user-guide/resourcequota/) for more details.
+docs/admin/admission-controllers.md:See the [limitRange design doc](../design/admission_control_limit_range.md) and the [example of Limit Range](limitrange/) for more details.
+docs/admin/limitrange/README.md:See [LimitRange design doc](../../design/admission_control_limit_range.md) for more information. For a detailed description of the Kubernetes resource model, see [Resources](../../../docs/user-guide/compute-resources.md)
+docs/getting-started-guides/mesos.md:Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos_master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
+docs/getting-started-guides/mesos.md:`http://<mesos_master_ip:port>`. Make sure you have an active VPN connection.
+docs/getting-started-guides/mesos.md:- add `--kube_master_url=${KUBERNETES_MASTER}` parameter to the kube2sky container command.
+docs/getting-started-guides/mesos.md:"s,\(command = \"/kube2sky\"\),\\1\\"$'\n'"        - --kube_master_url=${KUBERNETES_MASTER},;"\
+docs/getting-started-guides/logging-elasticsearch.md:  "cluster_name" : "kubernetes-logging",
+docs/getting-started-guides/cloudstack.md:      k8s_num_nodes: 2
+docs/getting-started-guides/aws/cloudformation-template.json:          "    etcd_servers: http://localhost:2379\n",
+docs/getting-started-guides/aws/cloudformation-template.json:          "    etcd_servers: http://localhost:2379\n",
+docs/getting-started-guides/aws/cloud-configs/master.yaml:    etcd_servers: http://localhost:2379
+docs/getting-started-guides/aws/cloud-configs/node.yaml:    etcd_servers: http://localhost:2379
+docs/getting-started-guides/coreos/azure/scale-kubernetes-cluster.js:  azure.queue_machines('kube', 'stable', kube.create_node_cloud_config),
+docs/getting-started-guides/coreos/azure/create-kubernetes-cluster.js:    kube.create_etcd_cloud_config),
+docs/getting-started-guides/coreos/azure/create-kubernetes-cluster.js:    kube.create_node_cloud_config),
+docs/getting-started-guides/coreos/azure/addons/skydns-rc.yaml:        - -kube_master_url=http://kube-00:8080
+docs/getting-started-guides/coreos/azure/lib/cloud_config.js:var write_cloud_config_from_object = function (data, output_file) {
+docs/getting-started-guides/coreos/azure/lib/cloud_config.js:  return write_cloud_config_from_object(processor(_.clone(data)), output_file);
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:exports.queue_machines = function (name_prefix, coreos_update_channel, cloud_config_creator) {
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:  var cloud_config = cloud_config_creator(x, conf);
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:    if (cloud_config instanceof Array) {
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config[n];
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config;
+docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:        "--custom-data=<%= cloud_config_file %>",
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:exports.create_etcd_cloud_config = function (node_count, conf) {
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var input_file = './cloud_config_templates/kubernetes-cluster-etcd-node-template.yml';
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:exports.create_node_cloud_config = function (node_count, conf) {
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var input_file = './cloud_config_templates/kubernetes-cluster-main-nodes-template.yml';
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:    return cloud_config.generate_environment_file_entry_from_object(util.hostname(n, 'kube'), {
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
+docs/getting-started-guides/fedora/fedora_ansible_config.md:ansible_ssh_user: root
+docs/getting-started-guides/fedora/fedora_ansible_config.md:kube_service_addresses: 10.254.0.0/16
+cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    template_data['etcd_servers'] = ",".join([
+cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    template_data['api_bind_address'] = _bind_addr(hookenv.unit_private_ip())
+cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    template_data['bind_address'] = "127.0.0.1"
+cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    template_data['etcd_servers'] = ",".join([
+cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    template_data['api_bind_address'] = _bind_addr(hookenv.unit_private_ip())
+cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    template_data['bind_address'] = "127.0.0.1"
+cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    template_data['etcd_servers'] = ",".join([
+cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    template_data['api_bind_address'] = _bind_addr(hookenv.unit_private_ip())
+cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    template_data['bind_address'] = "127.0.0.1"
+cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['etcd_servers'] = ",".join([
+cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['api_bind_address'] = _bind_addr(hookenv.unit_private_ip())
+cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['bind_address'] = "127.0.0.1"
+cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    for k in ('etcd_servers',):
+cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    template_data['etcd_servers'] = ",".join([
+cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    template_data['api_bind_address'] = _bind_addr(hookenv.unit_private_ip())
+cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    template_data['bind_address'] = "127.0.0.1"
+cluster/juju/charms/trusty/kubernetes-master/files/apiserver.upstart.tmpl:     --address=%(api_bind_address)s \
+cluster/juju/charms/trusty/kubernetes-master/files/scheduler.upstart.tmpl:     --address=%(bind_address)s \
+cluster/juju/charms/trusty/kubernetes-master/files/distribution.conf.tmpl:    listen %(api_bind_address)s:80;
+cluster/juju/charms/trusty/kubernetes-master/files/controller-manager.upstart.tmpl:     --address=%(bind_address)s \
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    if api_servers:
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        api_info = api_servers.pop()
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    template_data['kubeapi_server'] = api_servers
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    template_data['etcd_servers'] = ','.join([
+cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    for k in ('etcd_servers', 'kubeapi_server'):
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    if api_servers:
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        api_info = api_servers.pop()
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    template_data['kubeapi_server'] = api_servers
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    template_data['etcd_servers'] = ','.join([
+cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    if api_servers:
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        api_info = api_servers.pop()
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    template_data['kubeapi_server'] = api_servers
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    template_data['etcd_servers'] = ','.join([
+cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    if api_servers:
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        api_info = api_servers.pop()
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    template_data['kubeapi_server'] = api_servers
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    template_data['etcd_servers'] = ','.join([
+cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
+cluster/gce/configure-vm.sh:cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:apiserver_test_args: '$(echo "$APISERVER_TEST_ARGS" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:kubelet_test_args: '$(echo "$KUBELET_TEST_ARGS" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:controller_manager_test_args: '$(echo "$CONTROLLER_MANAGER_TEST_ARGS" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:scheduler_test_args: '$(echo "$SCHEDULER_TEST_ARGS" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:kubeproxy_test_args: '$(echo "$KUBEPROXY_TEST_ARGS" | sed -e "s/'/''/g")'
+cluster/gce/configure-vm.sh:  cloud_config: /etc/gce.conf
+cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
+cluster/gce/configure-vm.sh:  proxy_ssh_user: '${PROXY_SSH_USER}'
+cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
+cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
+cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
+cluster/saltbase/pillar/privilege.sls:allow_privileged: false
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cluster_name = "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cluster_cidr = "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set allocate_node_cidrs = "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% set cluster_name = "--cluster-name=" + pillar['instance_prefix'] -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar['cluster_cidr'] is defined and pillar['cluster_cidr'] != "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% set cluster_cidr = "--cluster-cidr=" + pillar['cluster_cidr'] -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar['allocate_node_cidrs'] is defined -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% set allocate_node_cidrs = "--allocate-node-cidrs=" + pillar['allocate_node_cidrs'] -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cloud_provider = "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cloud_config = "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cloud_config_mount = "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cloud_config_volume = "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:    {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set root_ca_file = "" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:   {% set root_ca_file = "--root-ca-file=/srv/kubernetes/ca.crt" -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + cloud_provider  + " " + cloud_config + service_account_key + pillar['log_level'] + " " + root_ca_file -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:# test_args has to be kept at the end, so they'll overwrite any prior configuration
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar['controller_manager_test_args'] is defined -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = params + " " + pillar['controller_manager_test_args'] -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:        {{cloud_config_mount}}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {{cloud_config_volume}}
+cluster/saltbase/salt/kube-proxy/default:  {% set api_servers = "--master=http://" + ips[0][0] -%}
+cluster/saltbase/salt/kube-proxy/default:  {% set api_servers_with_port = api_servers + ":7080" -%}
+cluster/saltbase/salt/kube-proxy/default:  {% if grains.api_servers is defined -%}
+cluster/saltbase/salt/kube-proxy/default:    {% set api_servers = "--master=https://" + grains.api_servers -%}
+cluster/saltbase/salt/kube-proxy/default:    {% set api_servers = "--master=https://" + ips[0][0] -%}
+cluster/saltbase/salt/kube-proxy/default:     {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/kube-proxy/default:    {% set api_servers_with_port = api_servers + ":6443" -%}
+cluster/saltbase/salt/kube-proxy/default:{% set test_args = "" -%}
+cluster/saltbase/salt/kube-proxy/default:{% if pillar['kubeproxy_test_args'] is defined -%}
+cluster/saltbase/salt/kube-proxy/default:  {% set test_args=pillar['kubeproxy_test_args'] %}
+cluster/saltbase/salt/kube-proxy/default:# test_args has to be kept at the end, so they'll overwrite any prior configuration
+cluster/saltbase/salt/kube-proxy/default:DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{kubeconfig}} {{pillar['log_level']}} {{test_args}}"
+cluster/saltbase/salt/kube-scheduler/kube-scheduler.manifest:# test_args has to be kept at the end, so they'll overwrite any prior configuration
+cluster/saltbase/salt/kube-scheduler/kube-scheduler.manifest:{% if pillar['scheduler_test_args'] is defined -%}
+cluster/saltbase/salt/kube-scheduler/kube-scheduler.manifest:{% set params = params + " " + pillar['scheduler_test_args'] -%}
+cluster/saltbase/salt/kubelet/default:{% if grains.api_servers is defined -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + grains.apiservers -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + master_ipv4 -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + ips[0][0] -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
+cluster/saltbase/salt/kubelet/default:    {% if grains.kubelet_api_servers is defined -%}
+cluster/saltbase/salt/kubelet/default:      {% set api_servers_with_port = "--api_servers=https://" + grains.kubelet_api_servers -%}
+cluster/saltbase/salt/kubelet/default:      {% set api_servers_with_port = "" -%}
+cluster/saltbase/salt/kubelet/default:{% set cloud_provider = "" -%}
+cluster/saltbase/salt/kubelet/default:  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+cluster/saltbase/salt/kubelet/default:{% set manifest_url = "" -%}
+cluster/saltbase/salt/kubelet/default:  {% set manifest_url = "--manifest-url=http://metadata.google.internal/computeMetadata/v1/instance/attributes/google-container-manifest --manifest-url-header=Metadata-Flavor:Google" -%}
+cluster/saltbase/salt/kubelet/default:{% set hostname_override = "" -%}
+cluster/saltbase/salt/kubelet/default:{% if grains.hostname_override is defined -%}
+cluster/saltbase/salt/kubelet/default:  {% set hostname_override = " --hostname-override=" + grains.hostname_override -%}
+cluster/saltbase/salt/kubelet/default:{% set cluster_dns = "" %}
+cluster/saltbase/salt/kubelet/default:{% set cluster_domain = "" %}
+cluster/saltbase/salt/kubelet/default:{% if pillar.get('enable_cluster_dns', '').lower() == 'true' %}
+cluster/saltbase/salt/kubelet/default:  {% set cluster_dns = "--cluster-dns=" + pillar['dns_server'] %}
+cluster/saltbase/salt/kubelet/default:  {% set cluster_domain = "--cluster-domain=" + pillar['dns_domain'] %}
+cluster/saltbase/salt/kubelet/default:{% set configure_cbr0 = "" -%}
+cluster/saltbase/salt/kubelet/default:{% if pillar['allocate_node_cidrs'] is defined -%}
+cluster/saltbase/salt/kubelet/default:  {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
+cluster/saltbase/salt/kubelet/default:{% set system_container = "" -%}
+cluster/saltbase/salt/kubelet/default:{% set cgroup_root = "" -%}
+cluster/saltbase/salt/kubelet/default:  {% set system_container = "--system-container=/system" -%}
+cluster/saltbase/salt/kubelet/default:  {% set cgroup_root = "--cgroup-root=/" -%}
+cluster/saltbase/salt/kubelet/default:  {% set cgroup_root = "--cgroup-root=docker" -%}
+cluster/saltbase/salt/kubelet/default:{% set pod_cidr = "" %}
+cluster/saltbase/salt/kubelet/default:  {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
+cluster/saltbase/salt/kubelet/default:{% set test_args = "" -%}
+cluster/saltbase/salt/kubelet/default:{% if pillar['kubelet_test_args'] is defined -%}
+cluster/saltbase/salt/kubelet/default:  {% set test_args=pillar['kubelet_test_args'] %}
+cluster/saltbase/salt/kubelet/default:# test_args has to be kept at the end, so they'll overwrite any prior configuration
+cluster/saltbase/salt/kubelet/default:DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{test_args}}"
+cluster/saltbase/salt/generate-cert/make-cert.sh:cert_dir=${CERT_DIR:-/srv/kubernetes}
+cluster/saltbase/salt/generate-cert/make-cert.sh:mkdir -p "$cert_dir"
+cluster/saltbase/salt/generate-cert/make-cert.sh:  -keyout "${cert_dir}/server.key" -out "${cert_dir}/server.cert"
+cluster/saltbase/salt/generate-cert/make-cert.sh:chgrp $cert_group "${cert_dir}/server.key" "${cert_dir}/server.cert"
+cluster/saltbase/salt/generate-cert/make-cert.sh:chmod 660 "${cert_dir}/server.key" "${cert_dir}/server.cert"
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:cert_dir=${CERT_DIR:-/srv/kubernetes}
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:mkdir -p "$cert_dir"
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:    cp -p pki/issued/$cert_ip.crt "${cert_dir}/server.cert" > /dev/null 2>&1
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:    cp -p pki/private/$cert_ip.key "${cert_dir}/server.key" > /dev/null 2>&1
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:    cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:    cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:cp -p pki/ca.crt "${cert_dir}/ca.crt"
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:chgrp $cert_group "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.crt"
+cluster/saltbase/salt/generate-cert/make-ca-cert.sh:chmod 660 "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.crt"
+cluster/saltbase/salt/monit/monit_watcher.sh:# after applying oom_score_adj
+cluster/saltbase/salt/monit/monit_watcher.sh:# Apply oom_score_adj: -901 to processes
+cluster/saltbase/salt/monit/monit_watcher.sh:    echo -901 > /proc/$pid/oom_score_adj
+cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# after applying oom_score_adj
+cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
+cluster/saltbase/salt/supervisor/supervisor_watcher.sh:    echo -901 > /proc/$pid/oom_score_adj
+cluster/saltbase/salt/kube-addons/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
+cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
+cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
+cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
+cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
+cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
+cluster/saltbase/salt/kube-addons/init.sls:{% if pillar.get('enable_cluster_dns', '').lower() == 'true' %}
+cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
+cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
+cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
+cluster/saltbase/salt/kube-admission-controls/init.sls:    - file_mode: 644
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_provider = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_config = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_config_mount = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_config_volume = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:    {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set advertise_address = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if grains.advertise_address is defined -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set advertise_address = "--advertise-address=" + grains.advertise_address -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if grains.proxy_ssh_user is defined -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cluster_name = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set cluster_name = "--cluster-name=" + pillar['instance_prefix'] -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set bind_address = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set bind_address = "--bind-address=" + grains.publicAddressOverride -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set etcd_servers = "--etcd-servers=http://127.0.0.1:4001" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set service_cluster_ip_range = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if pillar['service_cluster_ip_range'] is defined -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set service_cluster_ip_range = "--service-cluster-ip-range=" + pillar['service_cluster_ip_range'] -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set client_ca_file = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set secure_port = "6443" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set secure_port = "443" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set client_ca_file = "--client-ca-file=/srv/kubernetes/ca.crt" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set token_auth_file = "--token-auth-file=/dev/null" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set basic_auth_file = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set min_request_timeout = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set min_request_timeout = "--min-request-timeout=" + grains.minRequestTimeout -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:    {% set token_auth_file = "--token-auth-file=/srv/kubernetes/known_tokens.csv" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set basic_auth_file = "--basic-auth-file=/srv/kubernetes/basic_auth.csv" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set admission_control = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if pillar['admission_control'] is defined -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest: {% set admission_control = "--admission-control=" + pillar['admission_control'] -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set runtime_config = "" -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if grains.runtime_config is defined -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest: {% set runtime_config = "--runtime-config=" + grains.runtime_config -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:# test_args has to be kept at the end, so they'll overwrite any prior configuration
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if pillar['apiserver_test_args'] is defined -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = params + " " + pillar['apiserver_test_args'] -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:        "containerPort": {{secure_port}},
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:        "hostPort": {{secure_port}}},{
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:        {{cloud_config_mount}}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {{cloud_config_volume}}
+cluster/azure/templates/create-dynamic-salt-files.sh:service_cluster_ip_range: $SERVICE_CLUSTER_IP_RANGE
+cluster/azure/templates/create-dynamic-salt-files.sh:admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+cluster/aws/util.sh:function get_instance_public_ip {
+cluster/aws/util.sh:    KUBE_MASTER_IP=$(get_instance_public_ip ${KUBE_MASTER_ID})
+cluster/aws/util.sh:      minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
+cluster/aws/util.sh:  local assigned_public_ip=$1
+cluster/aws/util.sh:    assign-ip-to-instance "${MASTER_RESERVED_IP}" "${master_instance_id}" "${assigned_public_ip}"
+cluster/aws/util.sh:    assign-ip-to-instance $(allocate-elastic-ip) "${master_instance_id}" "${assigned_public_ip}"
+cluster/aws/util.sh:    echo "${assigned_public_ip}"
+cluster/aws/util.sh:    local ip=$(get_instance_public_ip ${master_id})
+cluster/aws/util.sh:  local public_ip_option
+cluster/aws/util.sh:    public_ip_option="--associate-public-ip-address"
+cluster/aws/util.sh:    public_ip_option="--no-associate-public-ip-address"
+cluster/aws/util.sh:      ${public_ip_option} \
+cluster/aws/util.sh:  local ip=$(get_instance_public_ip ${node})
+cluster/aws/templates/create-dynamic-salt-files.sh:cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
+cluster/aws/templates/create-dynamic-salt-files.sh:allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
+cluster/aws/templates/create-dynamic-salt-files.sh:service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
+cluster/aws/templates/create-dynamic-salt-files.sh:enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+cluster/aws/templates/create-dynamic-salt-files.sh:admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
+cluster/aws/templates/salt-minion.sh:  hostname_override: "${HOSTNAME_OVERRIDE}"
+cluster/vagrant/provision-minion.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-minion.sh:  hostname_override: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-master.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-master.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-master.sh:  service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-master.sh:  enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-master.sh:  admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+cluster/libvirt-coreos/user_data.yml:    addr: ${public_ip}:4001
+cluster/libvirt-coreos/user_data.yml:    peer-addr: ${public_ip}:7001
+cluster/libvirt-coreos/user_data.yml:        Address=${public_ip}/24
+cluster/libvirt-coreos/util.sh:        public_ip=$MASTER_IP
+cluster/libvirt-coreos/util.sh:      public_ip=${MINION_IPS[$i]}
+cluster/rackspace/cloud-config/master-cloud-config.yaml:        ExecStart=/bin/sh -c 'etcdctl set /corekube/apiservers/$public_ipv4 $public_ipv4'
+cluster/addons/dns/kube2sky/kube2sky.go:	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
+cluster/addons/dns/kube2sky/kube2sky.go:	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
+cluster/addons/dns/kube2sky/kube2sky.go:	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
+cluster/addons/dns/kube2sky/kube2sky.go:// etcd_mutation_timeout.
+cluster/addons/dns/kube2sky/kube2sky.go:		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterURL, err)
+cluster/addons/dns/kube2sky/kube2sky.go:		return "", fmt.Errorf("invalid --kube_master_url specified %s", *argKubeMasterURL)
+cluster/addons/dns/kube2sky/kube2sky.go:	// If the user specified --kube_master_url, expand env vars and verify it.
+cluster/addons/dns/kube2sky/kube2sky.go:		// Only --kube_master_url was provided.
+cluster/addons/dns/kube2sky/kube2sky.go:		//  1) --kube_master_url and --kubecfg_file
+cluster/addons/dns/kube2sky/kube2sky.go:		//  2) just --kubecfg_file
+cluster/addons/dns/kube2sky/README.md:`-etcd_mutation_timeout`: For how long the application will keep retrying etcd 
+cluster/addons/dns/kube2sky/README.md:`--kube_master_url`: URL of kubernetes master. Required if `--kubecfg_file` is not set.
+cluster/addons/dns/kube2sky/README.md:`--kubecfg_file`: Path to kubecfg file that contains the master URL and tokens to authenticate with the master.
+cluster/addons/cluster-monitoring/README.md:Heapster enables monitoring of Kubernetes Clusters using [cAdvisor](https://github.com/google/cadvisor). The kubelet will communicate with an instance of cAdvisor running on localhost and proxy container stats to Heapster. Kubelet will attempt to connect to cAdvisor on port 4194 by default but this port can be configured with kubelet's `-cadvisor_port` run flag. Detailed information about heapster can be found [here](https://github.com/GoogleCloudPlatform/heapster).
+cluster/vsphere/templates/create-dynamic-salt-files.sh:service_cluster_ip_range: $SERVICE_CLUSTER_IP_RANGE
+cluster/vsphere/templates/create-dynamic-salt-files.sh:enable_cluster_dns: $ENABLE_CLUSTER_DNS
+cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
+cluster/mesos/docker/util-ssl.sh:function cluster::mesos::docker::create_root_certificate_authority {
+cluster/mesos/docker/util.sh:# go run hack/e2e.go -v -test -check_version_skew=false
+cluster/mesos/docker/util.sh:  cluster::mesos::docker::create_root_certificate_authority "${certdir}"
+cluster/mesos/docker/km/build.sh:km_path=$(find-binary km linux/amd64)
+cluster/mesos/docker/km/build.sh:if [ -z "$km_path" ]; then
+cluster/mesos/docker/km/build.sh:kube_bin_path=$(dirname ${km_path})

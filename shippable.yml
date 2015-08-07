@@ -32,6 +32,7 @@ install:
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
   - ./hack/verify-description.sh
+  - ./hack/verify-flags-underscore.py
   - ./hack/travis/install-std-race.sh
   - ./hack/verify-generated-conversions.sh
   - ./hack/verify-generated-deep-copies.sh
