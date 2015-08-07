@@ -1581,7 +1581,7 @@ func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 func isNodeReadySetAsExpected(node *api.Node, wantReady bool) bool {
 	// Check the node readiness condition (logging all).
 	for i, cond := range node.Status.Conditions {
-		Logf("Node %s condition %d/%d: type: %v, status: %v, reason: %q, message: %q, last transistion time: %v",
+		Logf("Node %s condition %d/%d: type: %v, status: %v, reason: %q, message: %q, last transition time: %v",
 			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status,
 			cond.Reason, cond.Message, cond.LastTransitionTime)
 		// Ensure that the condition type is readiness and the status
