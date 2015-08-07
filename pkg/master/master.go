@@ -54,6 +54,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/lock"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	nodeetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
@@ -447,6 +448,8 @@ func (m *Master) init(c *Config) {
 	registry := etcd.NewRegistry(c.DatabaseStorage, podRegistry, m.endpointRegistry)
 	m.serviceRegistry = registry
 
+	lockRegistry := lock.NewEtcdRegistry(c.DatabaseStorage)
+
 	var serviceClusterIPRegistry service.RangeRegistry
 	serviceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(m.serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
@@ -488,6 +491,7 @@ func (m *Master) init(c *Config) {
 		"events":                 event.NewStorage(eventRegistry),
 
 		"limitRanges":                   limitrange.NewStorage(limitRangeRegistry),
+		"locks":                         lock.NewStorage(lockRegistry),
 		"resourceQuotas":                resourceQuotaStorage,
 		"resourceQuotas/status":         resourceQuotaStatusStorage,
 		"namespaces":                    namespaceStorage,

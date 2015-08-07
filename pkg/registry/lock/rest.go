@@ -1,0 +1,163 @@
+/*
+Copyright 2015 The Kubernetes Authors All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package lock
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+)
+
+// REST provides the RESTStorage access patterns to work with LimitRange objects.
+type REST struct {
+	registry generic.Registry
+}
+
+// NewStorage returns a new REST. You must use a registry created by
+// NewEtcdRegistry unless you're testing.
+func NewStorage(registry generic.Registry) *REST {
+	return &REST{
+		registry: registry,
+	}
+}
+
+// Create the lock.  Fail if a lock already exists
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	lock, ok := obj.(*api.Lock)
+	if !ok {
+		return nil, fmt.Errorf("invalid object type")
+	}
+
+	if !api.ValidNamespace(ctx, &lock.ObjectMeta) {
+		return nil, errors.NewConflict("lock", lock.Namespace, fmt.Errorf("Lock.Namespace does not match the provided context"))
+	}
+
+	if len(lock.Name) == 0 {
+		return nil, fmt.Errorf("Lock must have a name.  The provided name is empty")
+	}
+
+	if errs := validation.ValidateLock(lock); len(errs) > 0 {
+		return nil, errors.NewInvalid("lock", lock.Name, errs)
+	}
+	api.FillObjectMetaSystemFields(ctx, &lock.ObjectMeta)
+	lock.Spec.AcquiredTime = time.Now().String()
+	lock.Spec.RenewTime = lock.Spec.AcquiredTime
+
+	err := rs.registry.CreateWithName(ctx, lock.Name, lock)
+	if err != nil {
+		return nil, err
+	}
+	return rs.registry.Get(ctx, lock.Name)
+}
+
+// Update updates a Lock object.
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	lock, ok := obj.(*api.Lock)
+	if !ok {
+		return nil, false, fmt.Errorf("invalid object type")
+	}
+
+	if !api.ValidNamespace(ctx, &lock.ObjectMeta) {
+		return nil, false, errors.NewConflict("lock", lock.Namespace, fmt.Errorf("Lock.Namespace does not match the provided context"))
+	}
+
+	oldObj, err := rs.registry.Get(ctx, lock.Name)
+	if err != nil {
+		return nil, false, err
+	}
+
+	editLock := oldObj.(*api.Lock)
+	if editLock.Spec.HeldBy != lock.Spec.HeldBy {
+		return nil, false, fmt.Errorf("Lock %s is held by %s but attempted to be updated by %s", lock.Name, editLock.Spec.HeldBy, lock.Spec.HeldBy)
+	}
+
+	// Preserve the time the lock was first acquired
+	atime := editLock.Spec.AcquiredTime
+
+	// set the editable fields on the existing object
+	editLock.Labels = lock.Labels
+	editLock.ResourceVersion = lock.ResourceVersion
+	editLock.Annotations = lock.Annotations
+	editLock.Spec = lock.Spec
+	editLock.Spec.RenewTime = time.Now().String()
+	editLock.Spec.AcquiredTime = atime
+
+	if errs := validation.ValidateLock(editLock); len(errs) > 0 {
+		return nil, false, errors.NewInvalid("lock", editLock.Name, errs)
+	}
+
+	if err := rs.registry.UpdateWithName(ctx, editLock.Name, editLock); err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.Get(ctx, editLock.Name)
+	return out, false, err
+}
+
+// Delete deletes the Lock with the specified name
+func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
+	obj, err := rs.registry.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	_, ok := obj.(*api.Lock)
+	if !ok {
+		return nil, fmt.Errorf("invalid object type")
+	}
+	return rs.registry.Delete(ctx, name, nil)
+}
+
+// Get gets a Lock with the specified name
+func (rs *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
+	obj, err := rs.registry.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	lock, ok := obj.(*api.Lock)
+	if !ok {
+		return nil, fmt.Errorf("invalid object type")
+	}
+	return lock, err
+}
+
+func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
+	return labels.Set{}, fields.Set{}, nil
+}
+
+func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
+	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
+}
+
+func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
+}
+
+// New returns a new api.Lock
+func (*REST) New() runtime.Object {
+	return &api.Lock{}
+}
+
+func (*REST) NewList() runtime.Object {
+	return &api.LockList{}
+}

@@ -169,6 +169,19 @@ func ValidateEndpointsName(name string, prefix bool) (bool, string) {
 	return nameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateLockName can be used to check whether the given lock name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateLockName(name string, prefix bool) (bool, string) {
+	if prefix {
+		name = maskTrailingDash(name)
+	}
+	if len(name) > 0 {
+		return true, ""
+	}
+	return false, "Must be longer than 0 characters"
+}
+
 // nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
@@ -1719,6 +1732,19 @@ func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
 		if *sc.RunAsUser < 0 {
 			allErrs = append(allErrs, errs.NewFieldInvalid("runAsUser", *sc.RunAsUser, "runAsUser cannot be negative"))
 		}
+	}
+	return allErrs
+}
+
+func ValidateLock(lock *api.Lock) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&lock.ObjectMeta, true, ValidateLockName).Prefix("metadata")...)
+
+	if len(lock.Spec.HeldBy) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("heldby"))
+	}
+	if lock.Spec.LeaseTime == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("duration"))
 	}
 	return allErrs
 }
