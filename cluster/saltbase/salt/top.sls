@@ -23,7 +23,11 @@ base:
   {% endif %}
 {% endif %}
     - logrotate
+{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
+    - supervisor
+{% else %}
     - monit
+{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
@@ -32,7 +36,11 @@ base:
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler
+{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
+    - supervisor
+{% else %}
     - monit
+{% endif %}
 {% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce', 'vagrant' ] %}
     - nginx
 {% endif %}
