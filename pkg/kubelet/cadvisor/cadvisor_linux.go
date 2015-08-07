@@ -159,3 +159,7 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorApiV2.FsInfo, error) 
 func (cc *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return cc.WatchForEvents(request)
 }
+
+func (cc *cadvisorClient) StopWatch(watch_id int) {
+	cc.StopWatch(watch_id)
+}
