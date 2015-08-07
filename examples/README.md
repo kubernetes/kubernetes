@@ -3,7 +3,7 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Kubernetes Examples: releases.k8s.io/v1.0.2
+# Kubernetes Examples: releases.k8s.io/v1.0.3
 
 This directory contains a number of different examples of how to run
 applications with Kubernetes.
