@@ -84,7 +84,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				makeContainer(1),
@@ -114,7 +114,7 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				makeContainer(1),
@@ -159,7 +159,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				makeContainer(1),
@@ -175,7 +175,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	require.True(t, ok)
 
 	// Simulate container being stopped.
-	fakeRuntime.PodList = []*container.Pod{}
+	fakeRuntime.AllPodList = []*container.Pod{}
 	err = manager.detectImages(time.Now())
 	require.NoError(t, err)
 	assert.Equal(manager.imageRecordsLen(), 2)
@@ -195,7 +195,7 @@ func TestDetectImagesWithRemovedImages(t *testing.T) {
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				makeContainer(1),
@@ -221,7 +221,7 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				makeContainer(1),
@@ -242,7 +242,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 	}
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				makeContainer(0),
@@ -253,7 +253,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 
 	// Make 1 be more recently used than 0.
 	require.NoError(t, manager.detectImages(zero))
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				makeContainer(1),
@@ -261,7 +261,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 		},
 	}
 	require.NoError(t, manager.detectImages(time.Now()))
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{},
 		},
@@ -281,7 +281,7 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 	}
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				makeContainer(0),
@@ -296,7 +296,7 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 		makeImage(1, 2048),
 	}
 	require.NoError(t, manager.detectImages(time.Now()))
-	fakeRuntime.PodList = []*container.Pod{}
+	fakeRuntime.AllPodList = []*container.Pod{}
 	require.NoError(t, manager.detectImages(time.Now()))
 	require.Equal(t, manager.imageRecordsLen(), 2)
 
@@ -317,7 +317,7 @@ func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
 			Size: 2048,
 		},
 	}
-	fakeRuntime.PodList = []*container.Pod{
+	fakeRuntime.AllPodList = []*container.Pod{
 		{
 			Containers: []*container.Container{
 				{
