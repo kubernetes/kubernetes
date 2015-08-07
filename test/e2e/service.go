@@ -1034,7 +1034,6 @@ func getContainerPortsByPodUID(endpoints *api.Endpoints) PortsByPodUID {
 
 				// use endpoint annotations to recover the container port in a Mesos setup
 				// compare contrib/mesos/pkg/service/endpoints_controller.syncService
-				// TODO(sttts): add ContainerPort to EndpointPort struct, defaulting to (host) Port
 				if providerIs("mesos/docker") {
 					key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
 					containerPortString := endpoints.Annotations[key]
