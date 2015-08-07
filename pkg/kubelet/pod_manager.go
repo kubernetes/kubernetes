@@ -44,6 +44,7 @@ type podManager interface {
 	GetPods() []*api.Pod
 	GetPodByFullName(podFullName string) (*api.Pod, bool)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
+	GetPodByUID(uid types.UID) (*api.Pod, bool)
 	GetPodByMirrorPod(*api.Pod) (*api.Pod, bool)
 	GetMirrorPodByPod(*api.Pod) (*api.Pod, bool)
 	GetPodsAndMirrorPods() ([]*api.Pod, []*api.Pod)
@@ -191,6 +192,15 @@ func (pm *basicPodManager) GetPodsAndMirrorPods() ([]*api.Pod, []*api.Pod) {
 // Returns all pods (including mirror pods).
 func (pm *basicPodManager) getAllPods() []*api.Pod {
 	return append(podsMapToPods(pm.podByUID), podsMapToPods(pm.mirrorPodByUID)...)
+}
+
+// GetPodByUID provides the (non-mirror) pod that matches pod UID, as well as
+// whether the pod is found.
+func (pm *basicPodManager) GetPodByUID(uid types.UID) (*api.Pod, bool) {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+	pod, ok := pm.podByUID[uid]
+	return pod, ok
 }
 
 // GetPodByName provides the (non-mirror) pod that matches namespace and name,
