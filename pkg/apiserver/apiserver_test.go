@@ -204,12 +204,12 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 		Context: requestContextMapper,
 	}
 	if legacy {
-		group.Version = testVersion
+		group.GroupVersion = testVersion
 		group.ServerVersion = testVersion
 		group.Codec = codec
 		group.Mapper = namespaceMapper
 	} else {
-		group.Version = newVersion
+		group.GroupVersion = newVersion
 		group.ServerVersion = newVersion
 		group.Codec = newCodec
 		group.Mapper = namespaceMapper
@@ -219,7 +219,7 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
 	if err := group.InstallREST(container); err != nil {
-		panic(fmt.Sprintf("unable to install container %s: %v", group.Version, err))
+		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 	ws := new(restful.WebService)
 	InstallSupport(mux, ws, false)
@@ -2020,7 +2020,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		Version:       newVersion,
+		GroupVersion:  newVersion,
 		ServerVersion: newVersion,
 		Codec:         newCodec,
 	}
@@ -2048,7 +2048,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		Version:       newVersion,
+		GroupVersion:  newVersion,
 		ServerVersion: newVersion,
 		Codec:         newCodec,
 	}

@@ -111,7 +111,6 @@ type Config struct {
 	EnableIndex           bool
 	EnableProfiling       bool
 	APIPrefix             string
-	ExpAPIPrefix          string
 	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
@@ -188,7 +187,6 @@ type Master struct {
 	enableSwaggerSupport  bool
 	enableProfiling       bool
 	apiPrefix             string
-	expAPIPrefix          string
 	corsAllowedOriginList []string
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
@@ -343,7 +341,6 @@ func New(c *Config) *Master {
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
 		enableProfiling:       c.EnableProfiling,
 		apiPrefix:             c.APIPrefix,
-		expAPIPrefix:          c.ExpAPIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
@@ -568,7 +565,7 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling, healthzChecks...)
-	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
+	apiserver.AddApiWebService(m.handlerContainer, "/api", apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), RestMapper: defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
@@ -578,9 +575,9 @@ func (m *Master) init(c *Config) {
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		apiserver.AddApiWebService(m.handlerContainer, c.ExpAPIPrefix, []string{expVersion.Version})
-		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
-		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
+		apiserver.AddApiWebService(m.handlerContainer, "/kube-api/experimental", []string{"v1alpha1"})
+		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), expVersion.Mapper}
+		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.GroupVersion})
 	}
 
 	// Register root handler.
@@ -771,8 +768,9 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 		storage[strings.ToLower(k)] = v
 	}
 	version := m.defaultAPIGroupVersion()
+	version.Root = "/api"
 	version.Storage = storage
-	version.Version = "v1"
+	version.GroupVersion = latest.GroupVersion
 	version.Codec = v1.Codec
 	return version
 }
@@ -787,19 +785,19 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
 		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
 	}
-
 	return &apiserver.APIGroupVersion{
-		Root: m.expAPIPrefix,
+		Root: m.apiPrefix,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  explatest.RESTMapper,
-		Codec:   explatest.Codec,
-		Linker:  explatest.SelfLinker,
-		Storage: storage,
-		Version: explatest.Version,
+		Mapper:        explatest.RESTMapper,
+		Codec:         explatest.Codec,
+		Linker:        explatest.SelfLinker,
+		Storage:       storage,
+		GroupVersion:  explatest.GroupVersion,
+		ServerVersion: latest.GroupVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

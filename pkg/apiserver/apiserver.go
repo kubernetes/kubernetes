@@ -76,8 +76,8 @@ type Mux interface {
 type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
-	Root    string
-	Version string
+	Root         string
+	GroupVersion string
 
 	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
@@ -116,7 +116,7 @@ const (
 func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	info := &APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(g.Root, "/")), g.Mapper}
 
-	prefix := path.Join(g.Root, g.Version)
+	prefix := path.Join(g.Root, g.GroupVersion)
 	installer := &APIInstaller{
 		group:             g,
 		info:              info,

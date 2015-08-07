@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package to keep track of API Versions that should be registered in api.Scheme.
+// Package to keep track of API GroupVersions that should be registered in api.Scheme.
 package registered
 
 import (
@@ -22,44 +22,56 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // List of registered API versions.
 // The list is in the order of most preferred to the least.
-var RegisteredVersions []string
+var RegisteredGroupVersions []string
 
 func init() {
-	validAPIVersions := map[string]bool{
+	validAPIGroupVersions := map[string]bool{
 		"v1": true,
+		"experimental/v1alpha1": true,
 	}
 
 	// The default list of supported api versions, in order of most preferred to the least.
-	defaultSupportedVersions := "v1"
+	defaultSupportedGroupVersions := "v1"
 	// Env var KUBE_API_VERSIONS is a comma separated list of API versions that should be registered in the scheme.
 	// The versions should be in the order of most preferred to the least.
-	supportedVersions := os.Getenv("KUBE_API_VERSIONS")
-	if supportedVersions == "" {
-		supportedVersions = defaultSupportedVersions
+	supportedGroupVersions := os.Getenv("KUBE_API_VERSIONS")
+	if supportedGroupVersions == "" {
+		supportedGroupVersions = defaultSupportedGroupVersions
 	}
-	versions := strings.Split(supportedVersions, ",")
+	versions := strings.Split(supportedGroupVersions, ",")
 	for _, version := range versions {
 		// Verify that the version is valid.
-		valid, ok := validAPIVersions[version]
+		valid, ok := validAPIGroupVersions[version]
 		if !ok || !valid {
 			// Not a valid API version.
 			glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %v",
-				version, os.Getenv("KUBE_API_VERSIONS"), validAPIVersions)
+				version, os.Getenv("KUBE_API_VERSIONS"), validAPIGroupVersions)
 		}
-		RegisteredVersions = append(RegisteredVersions, version)
+		RegisteredGroupVersions = append(RegisteredGroupVersions, version)
 	}
 }
 
-// Returns true if the given api version is one of the registered api versions.
-func IsRegisteredAPIVersion(version string) bool {
-	for _, apiVersion := range RegisteredVersions {
-		if apiVersion == version {
+// Returns true if the given groupVersion is one of the registered groupVersions.
+func IsRegisteredAPIVersion(groupVersion string) bool {
+	for _, apiGroupVersion := range RegisteredGroupVersions {
+		if apiGroupVersion == groupVersion {
 			return true
 		}
 	}
 	return false
+}
+
+func GroupVersionsForGroup(group string) []string {
+	ret := []string{}
+	for _, v := range RegisteredGroupVersions {
+		if util.GetGroup(v) == group {
+			ret = append(ret, v)
+		}
+	}
+	return ret
 }
