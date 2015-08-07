@@ -35,6 +35,10 @@ namespaces (ns) or secrets.
 
 .SH OPTIONS
 .PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file containing the resource to describe
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for describe
 
@@ -151,6 +155,9 @@ $ kubectl describe nodes kubernetes\-minion\-emt8.c.myproject.internal
 
 // Describe a pod
 $ kubectl describe pods/nginx
+
+// Describe a pod using the data in pod.json.
+$ kubectl describe \-f pod.json
 
 // Describe pods by label name=myLabel
 $ kubectl describe po \-l name=myLabel
