@@ -20,9 +20,7 @@ function start()
     # prepare /etc/exports
     for i in "$@"; do
         # fsid=0: needed for NFSv4
-        # no_root_squash: root can read/write
-        # insecure: allow access from ports > 1024
-        echo "$i *(rw,fsid=0,no_root_squash,insecure)" >> /etc/exports
+        echo "$i *(rw,fsid=0,no_root_squash)" >> /etc/exports
         echo "Serving $i"
     done
 
