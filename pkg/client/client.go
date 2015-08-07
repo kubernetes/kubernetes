@@ -33,6 +33,7 @@ type Interface interface {
 	PodsNamespacer
 	PodTemplatesNamespacer
 	ReplicationControllersNamespacer
+	DaemonsNamespacer
 	ServicesNamespacer
 	EndpointsNamespacer
 	VersionInterface
@@ -50,6 +51,10 @@ type Interface interface {
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
 	return newReplicationControllers(c, namespace)
+}
+
+func (c *Client) Daemons(namespace string) DaemonInterface {
+	return newDaemons(c, namespace)
 }
 
 func (c *Client) Nodes() NodeInterface {

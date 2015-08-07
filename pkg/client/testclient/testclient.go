@@ -114,6 +114,10 @@ func (c *Fake) ReplicationControllers(namespace string) client.ReplicationContro
 	return &FakeReplicationControllers{Fake: c, Namespace: namespace}
 }
 
+func (c *Fake) Daemons(namespace string) client.DaemonInterface {
+	return &FakeDaemons{Fake: c, Namespace: namespace}
+}
+
 func (c *Fake) Nodes() client.NodeInterface {
 	return &FakeNodes{Fake: c}
 }
