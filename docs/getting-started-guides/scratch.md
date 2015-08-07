@@ -420,7 +420,7 @@ for rkt networking support.  You can start rkt metadata service by using command
 `sudo systemd-run rkt metadata-service`
 
 Then you need to configure your kubelet with flag:
-  - `--container_runtime=rkt`
+  - `--container-runtime=rkt`
 
 ### kubelet
 

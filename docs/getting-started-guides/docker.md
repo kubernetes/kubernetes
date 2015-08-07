@@ -176,7 +176,6 @@ the cluster, you need to first kill the kubelet container, and then any other co
 
 You may use `docker kill $(docker ps -aq)`, note this removes _all_ containers running under Docker, so use with caution.
 
-
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

@@ -64,7 +64,7 @@ Neither contention nor changes to quota will affect already-running pods.
 ## Enabling Resource Quota
 
 Resource Quota support is enabled by default for many Kubernetes distributions.  It is
-enabled when the apiserver `--admission_control=` flag has `ResourceQuota` as
+enabled when the apiserver `--admission-control=` flag has `ResourceQuota` as
 one of its arguments.
 
 Resource Quota is enforced in a particular namespace when there is a

@@ -26,7 +26,7 @@ First, create your kube-apiserver.service file (change necessary variables)
     ExecStart=/opt/bin/kube-apiserver \
     --address=0.0.0.0 \
     --port=8080 \
-    --etcd_servers=http://10.1.10.10:4001
+    --etcd-servers=http://10.1.10.10:4001
     ExecStartPost=/usr/bin/etcdctl -C 10.1.10.10:4001 set /frontend:172.20.1.20 '[ "kubernetes", "http://${DEFAULT_IPV4}:8080" ]'
     Restart=always
     RestartSec=10
