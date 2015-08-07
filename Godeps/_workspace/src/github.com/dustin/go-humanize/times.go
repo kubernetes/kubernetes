@@ -22,14 +22,43 @@ const (
 //
 // Time(someT) -> "3 weeks ago"
 func Time(then time.Time) string {
-	return RelTime(then, time.Now(), "ago", "from now")
+	return RelTime(then, time.Now(), "ago", "from now", default_magnitudes)
 }
 
-var magnitudes = []struct {
+// CustomTime allow users customized units and output format
+func CustomTime(then time.Time, format CustomFormat) string {
+	return RelTime(then, time.Now(), format.beforeLabel, format.afterLabel, format.magnitudes)
+}
+
+type Magnitude struct {
 	d      int64
 	format string
 	divby  int64
-}{
+}
+
+func NewMagitude(d int64, format string, divby int64) Magnitude {
+	return Magnitude{
+		d:      d,
+		format: format,
+		divby:  divby,
+	}
+}
+
+type CustomFormat struct {
+	magnitudes  []Magnitude
+	beforeLabel string
+	afterLabel  string
+}
+
+func NewCustomFormat(magnitudes []Magnitude, beforeLabel, afterLabel string) CustomFormat {
+	return CustomFormat{
+		magnitudes:  magnitudes,
+		beforeLabel: beforeLabel,
+		afterLabel:  afterLabel,
+	}
+}
+
+var default_magnitudes = []Magnitude{
 	{1, "now", 1},
 	{2, "1 second %s", 1},
 	{Minute, "%d seconds %s", 1},
@@ -56,7 +85,7 @@ var magnitudes = []struct {
 // the label corresponding to the smaller time is applied.
 //
 // RelTime(timeInPast, timeInFuture, "earlier", "later") -> "3 weeks earlier"
-func RelTime(a, b time.Time, albl, blbl string) string {
+func RelTime(a, b time.Time, albl, blbl string, magnitudes []Magnitude) string {
 	lbl := albl
 	diff := b.Unix() - a.Unix()
 

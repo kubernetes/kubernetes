@@ -64,8 +64,42 @@ func TestFuture(t *testing.T) {
 func TestRange(t *testing.T) {
 	start := time.Time{}
 	end := time.Unix(math.MaxInt64, math.MaxInt64)
-	x := RelTime(start, end, "ago", "from now")
+	x := RelTime(start, end, "ago", "from now", default_magnitudes)
 	if x != "a long while from now" {
 		t.Errorf("Expected a long while from now, got %q", x)
 	}
+}
+
+func TestCustomTime(t *testing.T) {
+	magnitudes := []Magnitude{
+		{1, "now", 1},
+		{2, "1s %s", 1},
+		{Minute, "s %s", 1},
+		{2 * Minute, "1m %s", 1},
+		{Hour, "%dm %s", Minute},
+		{2 * Hour, "1h %s", 1},
+		{Day, "%dh %s", Hour},
+		{2 * Day, "1D %s", 1},
+		{Month, "%dD %s", Day},
+		{2 * Month, "1M %s", 1},
+		{Year, "%dM %s", Month},
+		{18 * Month, "1Y %s", 1},
+		{2 * Year, "2Y %s", 1},
+		{math.MaxInt64, "%dY %s", Year},
+	}
+	format := CustomFormat{
+		magnitudes: magnitudes,
+		//beforeLabel: "",
+		afterLabel: "later",
+	}
+	now := time.Now().Unix()
+	testList{
+		{"now", CustomTime(time.Unix(now, 0), format), "now"},
+		{"1 second from now", CustomTime(time.Unix(now+1, 0), format), "1s later"},
+		// Unit week has been removed from magnitudes
+		{"1 week ago (2)", CustomTime(time.Unix(now-12*Day, 0), format), "12D "},
+		{"3 months ago", CustomTime(time.Unix(now-99*Day, 0), format), "3M "},
+		{"1 year ago (1)", CustomTime(time.Unix(now-365*Day, 0), format), "1Y "},
+		{"a while from now", CustomTime(time.Unix(now+LongTime, 0), format), "37Y later"},
+	}.validate(t)
 }
