@@ -330,6 +330,15 @@ func (f *FlagSet) SetAnnotation(name, key string, values []string) error {
 	return nil
 }
 
+func (f *FlagSet) Changed(name string) bool {
+	flag := f.Lookup(name)
+	// If a flag doesn't exist, it wasn't changed....
+	if flag == nil {
+		return false
+	}
+	return flag.Changed
+}
+
 // Set sets the value of the named command-line flag.
 func Set(name, value string) error {
 	return CommandLine.Set(name, value)
