@@ -27,7 +27,11 @@ gendeepcopy=$(kube::util::find-binary "gendeepcopy")
 
 function result_file_name() {
 	local version=$1
-	echo "pkg/${version}/deep_copy_generated.go"
+    if [ "${version%/*}" == "experimental" ]; then
+        echo "pkg/expapi/${version##*/}/deep_copy_generated.go"
+    else
+	    echo "pkg/${version}/deep_copy_generated.go"
+    fi
 }
 
 function generate_version() {
@@ -56,11 +60,15 @@ function generate_deep_copies() {
 	for ver in ${versions}; do
 		# Ensure that the version being processed is registered by setting
 		# KUBE_API_VERSIONS.
-		apiVersions="${ver##*/}"
-		KUBE_API_VERSIONS="${apiVersions}" generate_version "${ver}"
-	done
+		if [[ ${ver##*/} == "v1" ]] || [[ ${ver##*/} == "" ]]; then
+			apiVersions="${ver##*/}"
+		else 
+			apiVersions="${ver}"
+		fi
+			KUBE_API_VERSIONS="${apiVersions}" generate_version "${ver}"
+		done
 }
 
-DEFAULT_VERSIONS="api/ api/v1 expapi/ expapi/v1"
+DEFAULT_VERSIONS="api/ api/v1 experimental/ experimental/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_VERSIONS}
 generate_deep_copies "$VERSIONS"

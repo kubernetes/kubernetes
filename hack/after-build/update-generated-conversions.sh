@@ -39,13 +39,23 @@ EOF
 
   "${genconversion}" -v "${version}" -f - >>  "$TMPFILE"
 
-	mv "$TMPFILE" "pkg/${version}/conversion_generated.go"
+    #TODO: remove this case if we rename the directory expapi/ to experimental/
+    if [ "${version%/*}" == "experimental" ]; then
+        mv "$TMPFILE" "pkg/expapi/${version##*/}/conversion_generated.go"
+    else
+	    mv "$TMPFILE" "pkg/${version}/conversion_generated.go"
+    fi
 }
 
-DEFAULT_VERSIONS="api/v1 expapi/v1"
+DEFAULT_VERSIONS="api/v1 experimental/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_VERSIONS}
 for ver in $VERSIONS; do
 	# Ensure that the version being processed is registered by setting
 	# KUBE_API_VERSIONS.
-	KUBE_API_VERSIONS="${ver##*/}" generate_version "${ver}"
+    if [[ ${ver} == "api/v1" ]]; then
+        kube_ver="v1"
+    else
+        kube_ver="${ver}"
+    fi
+	KUBE_API_VERSIONS="${kube_ver}" generate_version "${ver}"
 done
