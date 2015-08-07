@@ -51,7 +51,7 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
-	go r.listAndWatch(util.NeverStop)
+	go r.ListAndWatch(util.NeverStop)
 	fw.Error(pod)
 	select {
 	case _, ok := <-fw.ResultChan():
@@ -214,7 +214,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	}
 }
 
-func TestReflector_listAndWatch(t *testing.T) {
+func TestReflector_ListAndWatch(t *testing.T) {
 	createdFakes := make(chan *watch.FakeWatcher)
 
 	// The ListFunc says that it's at revision 1. Therefore, we expect our WatchFunc
@@ -239,7 +239,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 	}
 	s := NewFIFO(MetaNamespaceKeyFunc)
 	r := NewReflector(lw, &api.Pod{}, s, 0)
-	go r.listAndWatch(util.NeverStop)
+	go r.ListAndWatch(util.NeverStop)
 
 	ids := []string{"foo", "bar", "baz", "qux", "zoo"}
 	var fw *watch.FakeWatcher
@@ -272,7 +272,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 	}
 }
 
-func TestReflector_listAndWatchWithErrors(t *testing.T) {
+func TestReflector_ListAndWatchWithErrors(t *testing.T) {
 	mkPod := func(id string, rv string) *api.Pod {
 		return &api.Pod{ObjectMeta: api.ObjectMeta{Name: id, ResourceVersion: rv}}
 	}
@@ -356,6 +356,37 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 			},
 		}
 		r := NewReflector(lw, &api.Pod{}, s, 0)
-		r.listAndWatch(util.NeverStop)
+		r.ListAndWatch(util.NeverStop)
+	}
+}
+
+func TestReflectorForWatchCache(t *testing.T) {
+	store := NewWatchCache(5)
+
+	{
+		_, version := store.ListWithVersion()
+		if version != 0 {
+			t.Errorf("unexpected resource version: %d", version)
+		}
+	}
+
+	lw := &testLW{
+		WatchFunc: func(rv string) (watch.Interface, error) {
+			fw := watch.NewFake()
+			go fw.Stop()
+			return fw, nil
+		},
+		ListFunc: func() (runtime.Object, error) {
+			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "10"}}, nil
+		},
+	}
+	r := NewReflector(lw, &api.Pod{}, store, 0)
+	r.ListAndWatch(util.NeverStop)
+
+	{
+		_, version := store.ListWithVersion()
+		if version != 10 {
+			t.Errorf("unexpected resource version: %d", version)
+		}
 	}
 }
