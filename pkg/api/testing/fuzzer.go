@@ -158,6 +158,22 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			//q.Amount.SetScale(inf.Scale(-c.Intn(12)))
 			q.Amount.SetUnscaled(c.Int63n(1000))
 		},
+		func(q *api.ResourceRequirements, c fuzz.Continue) {
+			randomQuantity := func() resource.Quantity {
+				return *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
+			}
+			q.Limits = make(api.ResourceList)
+			q.Requests = make(api.ResourceList)
+			cpuLimit := randomQuantity()
+			q.Limits[api.ResourceCPU] = *cpuLimit.Copy()
+			q.Requests[api.ResourceCPU] = *cpuLimit.Copy()
+			memoryLimit := randomQuantity()
+			q.Limits[api.ResourceMemory] = *memoryLimit.Copy()
+			q.Requests[api.ResourceMemory] = *memoryLimit.Copy()
+			storageLimit := randomQuantity()
+			q.Limits[api.ResourceStorage] = *storageLimit.Copy()
+			q.Requests[api.ResourceStorage] = *storageLimit.Copy()
+		},
 		func(p *api.PullPolicy, c fuzz.Continue) {
 			policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
 			*p = policies[c.Rand.Intn(len(policies))]

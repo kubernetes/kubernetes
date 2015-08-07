@@ -845,6 +845,62 @@ func TestValidateContainers(t *testing.T) {
 			ImagePullPolicy: "IfNotPresent",
 		},
 		{
+			Name:  "resources-request-limit-simple",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU): resource.MustParse("8"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+				},
+			},
+			ImagePullPolicy: "IfNotPresent",
+		},
+		{
+			Name:  "resources-request-limit-edge",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+				},
+			},
+			ImagePullPolicy: "IfNotPresent",
+		},
+		{
+			Name:  "resources-request-limit-partials",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("9.5"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):   resource.MustParse("10"),
+					api.ResourceName("my.org/resource"): resource.MustParse("10m"),
+				},
+			},
+			ImagePullPolicy: "IfNotPresent",
+		},
+		{
+			Name:  "resources-request",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("9.5"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			ImagePullPolicy: "IfNotPresent",
+		},
+		{
 			Name:  "same-host-port-different-protocol",
 			Image: "image",
 			Ports: []api.ContainerPort{
@@ -1007,6 +1063,28 @@ func TestValidateContainers(t *testing.T) {
 				Image: "image",
 				Resources: api.ResourceRequirements{
 					Limits: getResourceLimits("0", "-10"),
+				},
+				ImagePullPolicy: "IfNotPresent",
+			},
+		},
+		"Request limit simple invalid": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Limits:   getResourceLimits("5", "3"),
+					Requests: getResourceLimits("6", "3"),
+				},
+				ImagePullPolicy: "IfNotPresent",
+			},
+		},
+		"Request limit multiple invalid": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Limits:   getResourceLimits("5", "3"),
+					Requests: getResourceLimits("6", "4"),
 				},
 				ImagePullPolicy: "IfNotPresent",
 			},

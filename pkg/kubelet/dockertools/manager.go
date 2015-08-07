@@ -601,7 +601,19 @@ func (dm *DockerManager) runContainer(
 		}
 	}
 	memoryLimit := container.Resources.Limits.Memory().Value()
-	cpuShares := milliCPUToShares(container.Resources.Limits.Cpu().MilliValue())
+	cpuRequest := container.Resources.Requests.Cpu()
+	cpuLimit := container.Resources.Limits.Cpu()
+	var cpuShares int64
+	// If request is not specified, but limit is, we want request to default to limit.
+	// API server does this for new containers, but we repeat this logic in Kubelet
+	// for containers running on existing Kubernetes clusters.
+	if cpuRequest.Amount == nil && cpuLimit.Amount != nil {
+		cpuShares = milliCPUToShares(cpuLimit.MilliValue())
+	} else {
+		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
+		// of CPU shares.
+		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
+	}
 	dockerOpts := docker.CreateContainerOptions{
 		Name: BuildDockerName(dockerName, container),
 		Config: &docker.Config{

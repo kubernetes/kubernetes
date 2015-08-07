@@ -682,12 +682,11 @@ type Capabilities struct {
 
 // ResourceRequirements describes the compute resource requirements.
 type ResourceRequirements struct {
-	// Limits describes the maximum amount of compute resources required.
+	// Limits describes the maximum amount of compute resources allowed.
 	Limits ResourceList `json:"limits,omitempty"`
 	// Requests describes the minimum amount of compute resources required.
-	// Note: 'Requests' are honored only for Persistent Volumes as of now.
-	// TODO: Update the scheduler to use 'Requests' in addition to 'Limits'. If Request is omitted for a container,
-	// it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value
+	// If Request is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value
 	Requests ResourceList `json:"requests,omitempty"`
 }
 

@@ -656,13 +656,12 @@ type Capabilities struct {
 
 // ResourceRequirements describes the compute resource requirements.
 type ResourceRequirements struct {
-	// Limits describes the maximum amount of compute resources required.
+	// Limits describes the maximum amount of compute resources allowed.
 	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed; see http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications"`
 	// Requests describes the minimum amount of compute resources required.
-	// Note: 'Requests' are honored only for Persistent Volumes as of now.
-	// TODO: Update the scheduler to use 'Requests' in addition to 'Limits'. If Request is omitted for a container,
-	// it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value
-	Requests ResourceList `json:"requests,omitempty" description:"Minimum amount of resources requested; requests are honored only for persistent volumes as of now; see http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications"`
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value.
+	Requests ResourceList `json:"requests,omitempty" description:"Minimum amount of resources requested; if Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value; see http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications"`
 }
 
 const (
