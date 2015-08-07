@@ -26,13 +26,13 @@ import (
 	"runtime"
 	"time"
 
-	"k8s.io/golang/glog"
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
-	"k8s.io/spf13/pflag"
 )
 
 func init() {
