@@ -302,8 +302,10 @@ $ kubectl get services
 
 Then, find the external IP for your WordPress service by running:
 
-```
-$ kubectl get services/wpfrontend --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
+```console
+$ kubectl get services/wpfrontend
+NAME                  CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+wpfrontend            10.0.0.2         1.2.3.4           80/TCP        ...                    ...
 ```
 
 or by listing the forwarding rules for your project:

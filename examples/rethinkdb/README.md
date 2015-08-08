@@ -56,9 +56,9 @@ check out:
 
 ```sh
 $kubectl get services
-NAME               LABELS        SELECTOR       IP(S)         PORT(S)
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+rethinkdb-driver  10.0.27.114      <none>            28015/TCP     db=rethinkdb           10m
 [...]
-rethinkdb-driver   db=influxdb   db=rethinkdb   10.0.27.114   28015/TCP
 ```
 
 **Step 2**
@@ -115,13 +115,12 @@ kubectl create -f examples/rethinkdb/admin-service.yaml
 
 find the service
 
-```sh
+```console
 $kubectl get services
-NAME               LABELS        SELECTOR                  IP(S)            PORT(S)
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR                  AGE
 [...]
-rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080/TCP
-                                                           104.197.19.120
-rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      28015/TCP
+rethinkdb-admin   10.0.131.19      104.197.19.120    8080/TCP      db=rethinkdb,role=admin   10m
+rethinkdb-driver  10.0.27.114      <none>            28015/TCP     db=rethinkdb              20m
 ```
 
 We request an external load balancer in the [admin-service.yaml](admin-service.yaml) file:

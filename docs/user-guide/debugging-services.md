@@ -209,16 +209,16 @@ walk-through - you can use your own `Service`'s details here.
 
 ```console
 $ kubectl expose rc hostnames --port=80 --target-port=9376
-NAME        LABELS          SELECTOR        IP(S)     PORT(S)
-hostnames   app=hostnames   app=hostnames             80/TCP
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+hostnames         10.0.0.1         <none>            80/TCP        run=hostnames          1h
 ```
 
 And read it back, just to be sure:
 
 ```console
 $ kubectl get svc hostnames
-NAME        LABELS          SELECTOR        IP(S)        PORT(S)
-hostnames   app=hostnames   app=hostnames   10.0.1.175   80/TCP
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+hostnames         10.0.0.1         <none>            80/TCP        run=hostnames          1h
 ```
 
 As before, this is the same as if you had started the `Service` with YAML:

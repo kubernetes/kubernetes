@@ -145,15 +145,11 @@ $ kubectl get --all-namespaces services
 should show a set of [services](../user-guide/services.md) that look something like this:
 
 ```console
-NAMESPACE     NAME                  LABELS                                                                           SELECTOR                IP(S)       PORT(S)
-default       kubernetes            component=apiserver,provider=kubernetes                                          <none>                  10.0.0.1    443/TCP
-kube-system   kube-dns              k8s-app=kube-dns,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeDNS   k8s-app=kube-dns        10.0.0.10   53/UDP
-                                                                                                                                                         53/TCP
-kube-system   kube-ui               k8s-app=kube-ui,kubernetes.io/cluster-service=true,kubernetes.io/name=KubeUI     k8s-app=kube-ui         10.0.59.25     80/TCP
-kube-system   monitoring-grafana    kubernetes.io/cluster-service=true,kubernetes.io/name=Grafana                    k8s-app=influxGrafana   10.0.41.246    80/TCP
-kube-system   monitoring-heapster   kubernetes.io/cluster-service=true,kubernetes.io/name=Heapster                   k8s-app=heapster        10.0.59.48     80/TCP
-kube-system   monitoring-influxdb   kubernetes.io/cluster-service=true,kubernetes.io/name=InfluxDB                   k8s-app=influxGrafana   10.0.210.156   8083/TCP
-                                                                                                                                                            8086/TCP
+NAMESPACE     NAME                  CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+default       kubernetes            10.0.0.1         <none>            443/TCP       <none>                 1d
+kube-system   kube-dns              10.0.0.2         <none>            53/TCP,53/UDP k8s-app=kube-dns       1d
+kube-system   kube-ui               10.0.0.3         <none>            80/TCP        k8s-app=kube-ui        1d
+...                                                                                                                                                            8086/TCP
 ```
 
 Similarly, you can take a look at the set of [pods](../user-guide/pods.md) that were created during cluster startup.

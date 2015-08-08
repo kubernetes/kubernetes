@@ -632,6 +632,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 		{
 			Spec: api.ServiceSpec{
 				ClusterIP: "1.2.3.4",
+				Type:      "LoadBalancer",
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -674,6 +675,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 		{
 			Spec: api.ServiceSpec{
 				ClusterIP: "1.2.3.4",
+				Type:      "LoadBalancer",
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -702,6 +704,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 		{
 			Spec: api.ServiceSpec{
 				ClusterIP: "1.2.3.4",
+				Type:      "LoadBalancer",
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -758,13 +761,9 @@ func TestPrintHumanReadableService(t *testing.T) {
 				t.Errorf("expected to contain port: %s, but doesn't: %s", portSpec, output)
 			}
 		}
-		// Max of # ports and (# public ip + cluster ip)
-		count := len(svc.Spec.Ports)
-		if len(svc.Status.LoadBalancer.Ingress)+1 > count {
-			count = len(svc.Status.LoadBalancer.Ingress) + 1
-		}
-		if count != strings.Count(output, "\n") {
-			t.Errorf("expected %d newlines, found %d", count, strings.Count(output, "\n"))
+		// Each service should print on one line
+		if 1 != strings.Count(output, "\n") {
+			t.Errorf("expected a single newline, found %d", strings.Count(output, "\n"))
 		}
 	}
 }

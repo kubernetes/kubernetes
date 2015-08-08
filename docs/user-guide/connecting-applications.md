@@ -133,7 +133,7 @@ Check your Service:
 
 ```console
 $ kubectl get svc
-NAME         CLUSTER IP       EXTERNAL IP       PORT(S)                SELECTOR     AGE
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
 kubernetes   10.179.240.1     <none>            443/TCP                <none>       8d
 nginxsvc     10.179.252.126   122.222.183.144   80/TCP,81/TCP,82/TCP   run=nginx2   11m
 ```
@@ -196,7 +196,7 @@ Kubernetes offers a DNS cluster addon Service that uses skydns to automatically 
 
 ```console
 $ kubectl get services kube-dns --namespace=kube-system
-NAME       CLUSTER IP      EXTERNAL IP   PORT(S)         SELECTOR           AGE
+NAME       CLUSTER_IP      EXTERNAL_IP   PORT(S)         SELECTOR           AGE
 kube-dns   10.179.240.10   <none>        53/UDP,53/TCP   k8s-app=kube-dns   8d
 ```
 
@@ -413,7 +413,7 @@ Lets now recreate the Service to use a cloud load balancer, just change the `Typ
 $ kubectl delete rc, svc -l app=nginx
 $ kubectl create -f ./nginx-app.yaml
 $ kubectl get svc nginxsvc
-NAME      CLUSTER IP       EXTERNAL IP       PORT(S)                SELECTOR     AGE
+NAME      CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
 nginxsvc  10.179.252.126   162.222.184.144   80/TCP,81/TCP,82/TCP   run=nginx2   13m
 
 $ curl https://162.22.184.144 -k
@@ -421,7 +421,8 @@ $ curl https://162.22.184.144 -k
 <title>Welcome to nginx!</title>
 ```
 
-You can generally tell the external IP of the service, since it will be the one that doesn't start with a `10.*`
+The IP address in the `EXTERNAL_IP` column is the one that is available on the public internet.  The `CLUSTER_IP` is only available inside your
+cluster/private cloud network.
 
 ## What's next?
 

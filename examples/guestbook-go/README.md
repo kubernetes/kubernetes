@@ -117,8 +117,8 @@ Services find the containers to load balance based on pod labels. The pod that y
 
     ```console
     $ kubectl get services
-    NAME               LABELS                    SELECTOR                     IP(S)          PORT(S)
-    redis-master       app=redis,role=master     app=redis,role=master        10.0.136.3     6379/TCP
+    NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+    redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master  1h
     ...
     ```
 
@@ -183,9 +183,9 @@ Just like the master, we want to have a service to proxy connections to the read
 
     ```console
     $ kubectl get services
-    NAME               LABELS                    SELECTOR                        IP(S)          PORT(S)
-    redis-master       app=redis,role=master     app=redis,role=master           10.0.136.3     6379/TCP
-    redis-slave        app=redis,role=slave      app=redis,role=slave            10.0.21.92     6379/TCP
+    NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+    redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master  1h
+    redis-slave       10.0.21.92       <none>            6379/TCP      app-redis,role=slave   1h
     ...
     ```
 
@@ -246,11 +246,10 @@ Just like the others, we create a service to group the guestbook pods but this t
 
     ```
     $ kubectl get services
-    NAME             LABELS                     SELECTOR                        IP(S)          PORT(S)
-    guestbook        app=guestbook              app=guestbook                   10.0.217.218   3000/TCP
-                                                                                146.148.81.8   
-    redis-master     app=redis,role=master      app=redis,role=master           10.0.136.3     6379/TCP
-    redis-slave      app=redis,role=slave       app=redis,role=slave            10.0.21.92     6379/TCP
+    NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+    guestbook         10.0.217.218     146.148.81.8      3000/TCP      app=guestbook          1h
+    redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master  1h
+    redis-slave       10.0.21.92       <none>            6379/TCP      app-redis,role=slave   1h
     ...
     ```
 

@@ -151,11 +151,11 @@ kubectl expose rc nginx --port=80
 This should print:
 
 ```console
-NAME      LABELS    SELECTOR              IP          PORT(S)
-nginx     run=nginx run=nginx             <ip-addr>   80/TCP
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+nginx             10.0.93.211      <none>            80/TCP        run=nginx              1h
 ```
 
-If ip-addr is blank run the following command to obtain it. Know issue #10836
+If `CLUSTER_IP` is blank run the following command to obtain it. Know issue #10836
 
 ```sh
 kubectl get svc nginx
