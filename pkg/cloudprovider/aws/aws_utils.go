@@ -17,8 +17,8 @@ limitations under the License.
 package aws_cloud
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/aws/aws-sdk-go/aws"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func stringSetToPointers(in util.StringSet) []*string {
