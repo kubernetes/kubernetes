@@ -1,0 +1,104 @@
+---
+layout: default
+---
+
+<div class="media">
+ <div class="container">
+  <ul class="steps">
+{% for medi in page.mediatypes %}
+   <li class="step">
+    <div class="row">
+     <div class="col-lg-1 col-md-1 col-sm-1">
+      <div class="bullet hidden-xs">
+      </div>
+     </div>
+     <div class="col-lg-10 col-md-10 col-sm-10">
+      <div class="row">
+       <div class="col-xs-12">
+        <div class="bullet visible-xs-block float-left">
+        </div>
+        <h3 class="vertical-center height-52 text-gray">{{medi.title}}</h3>
+       </div>
+      </div>
+      <div class="row">
+       <div class="col-xs-12">
+        <p class="interior">{{medi.text}}</p>
+       </div>
+      </div>
+    {% if 'videos' == medi.slug %}
+      <div class="row">
+         <div class="video-tile">
+        {% for video in site.data.videos %}
+          <div class="col-lg-3 col-md-4 col-sm-3 col-xs-6 centered hovertext">
+	       <a href="{{video.url}}" onclick="trackOutboundLink('{{video.url}}'); return false;"><img src="{{video.img}}" alt="{{video.label}}" class="img-responsive tile"/>{{video.label}}</a>
+		   <div class="video-text text-gray">
+			   {{video.description}}
+			   <br/>{{video.location}}
+		   </div>
+          </div>
+        {% endfor %}
+         </div>
+      </div>
+    {% elsif 'presentations' == medi.slug %}
+      <div class="row">
+       <div>
+			   <ul>
+        {% for presentation in site.data.presentations %}
+				<li class="bullets">
+	        <a href="{{presentation.url}}" onclick="trackOutboundLink('{{presentation.url}}'); return false;">{{presentation.label}}</a>
+   				</li>
+   		{% endfor %}
+   			  </ul>
+			  <div class="findmore">
+			  <p>Find more presentations at:</p>
+	  			   <ul>
+	          {% for decksources in site.data.decksources %}
+	  				<li class="bullets">
+	  	        <a href="{{decksources.url}}" onclick="trackOutboundLink('{{decksources.url}}'); return false;">{{decksources.label}}</a>
+	     				</li>
+	     		{% endfor %}
+	     			  </ul>
+				  </div>
+       </div>
+      </div>
+    {% elsif 'articles' == medi.slug %}
+      <div class="row">
+       <div>
+	       <div>
+			   <ul>
+        {% for article in site.data.articles %}
+				<li class="bullets">
+					<a href="{{article.url}}" onclick="trackOutboundLink('{{article.url}}'); return false;">{{article.label}}</a>
+				</li>
+		{% endfor %}
+			  </ul>
+			  <p>
+	       </div>
+       </div>
+      </div>
+    {% elsif 'postsnews' == medi.slug %}
+      <div class="row">
+       <div>
+	       <div>
+			   <ul>
+        {% for postsnews in site.data.postsnews %}
+				<li class="bullets">
+					<a href="{{postsnews.url}}" onclick="trackOutboundLink('{{postsnews.url}}'); return false;">{{postsnews.label}}</a>
+				</li>
+		{% endfor %}
+			  </ul>
+	       </div>
+       </div>
+      </div>
+    {% endif %}
+     </div>
+    </div>
+   </li>
+{% endfor %}
+  </ul>
+ </div>
+ <div class="centered">
+	 <p>Want to keep up to date?</p>
+	 <p>Why not follow us &darr;</p>
+ </div>
+</div>

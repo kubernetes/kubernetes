@@ -56,6 +56,10 @@ nav:
    url: /events
    slug: events
    external: false
+ - label: Media
+   url: /media
+   slug: media
+   external: false
  - label: Blog
    url: http://kubernetesio.blogspot.com/
    slug: blog

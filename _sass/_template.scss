@@ -531,3 +531,45 @@ ul {
         }
     }
 }
+
+.media {
+    .centered {
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    .bullets  {
+        text-align: left;
+        padding-top: 12px;
+        list-style-type: initial;
+    }
+    .findmore {
+        margin-top: 12px;
+        li {
+            margin-left: 15px;
+        }
+    }
+    .video-tile {
+        float: left;
+        padding: 0;
+        a{
+            padding: 5px;
+        }
+    }
+    .video-text {
+        position: absolute;
+        display: none;
+        bottom: 75%;
+        left: 5%;
+        right: 5%;
+        border: 1px solid #7d7d7d;
+        background-color: #fff;
+        z-index: 1000;
+        box-shadow: 3px 3px 6px #535353;
+        border-radius: 7px 7px 7px 7px;
+        text-align: center;
+        padding: 2px;
+    }
+    .hovertext:hover .video-text{
+        display: block;
+    }
+}
