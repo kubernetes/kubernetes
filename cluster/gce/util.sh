@@ -401,7 +401,7 @@ function create-node-template {
   local preemptible_minions=""
   if [[ "${PREEMPTIBLE_MINION}" == "true" ]]; then
     preemptible_minions="--preemptible --maintenance-policy TERMINATE"
-  fi  
+  fi
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
     if ! gcloud compute instance-templates create "$1" \
@@ -412,7 +412,8 @@ function create-node-template {
       --image-project="${MINION_IMAGE_PROJECT}" \
       --image "${MINION_IMAGE}" \
       --tags "${MINION_TAG}" \
-      --network "${NETWORK}" ${preemptible_minions} \
+      --network "${NETWORK}" \
+      ${preemptible_minions} \
       $2 \
       --can-ip-forward \
       --metadata-from-file "$3","$4" >&2; then
