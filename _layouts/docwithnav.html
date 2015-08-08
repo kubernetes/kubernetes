@@ -12,46 +12,68 @@
 	{% include documentation.html %}
 </div>
 <script type="text/javascript">
-    $(document).ready(function() {
-		/* On page load, open the navigation menu and highlight the menu item that corresponds to the current URL */
-		var noanchorhref = window.location.href.split('#')[0];
-		var curnavitem = $('#wrapper a[href="' + noanchorhref + '"]');
-		if(curnavitem.parent().hasClass('haschild')){
-			curnavitem.addClass('active').next('ul').slideDown('normal');
-		}
-		else {
-			curnavitem.addClass('active');
-			curnavitem.parent('li').parent('ul').slideDown('normal');
-		}
-		/* Find and set target="_blank" for all external URLs (to open in a new tab/window) */
-        $('#wrapper a').filter(function() {
-            return this.hostname && this.hostname !== location.hostname;
-        }).attr('target', '_blank');
-    });
 	$(function() {
-		/* Animate navigation menu to open/close and highlight menu item on click */
+		/* For the current URL, find the corresponding item in navigation menu */
+		function findcurnavitem(){
+			var noanchorhref = window.location.href.split('#')[0];
+			var navitem = $('#wrapper a[href="' + noanchorhref + '"]');
+			return navitem;
+		}
+		/* Open the navigation menu and highlight the menu item that corresponds to the current URL */
+		function syncmenutourl(){
+			var curnavitem = findcurnavitem();
+			curnavitem.addClass('active');
+			if(curnavitem.parent().hasClass('haschild')){
+				curnavitem.next('ul').slideDown('normal');
+			}
+			else {
+				curnavitem.parent('li').parent('ul').slideDown('normal');
+			}
+			return;
+		}
+		syncmenutourl(); //Sync the nav menu on page load
+		/* Look for change in page state and load any changes */
+		function loadonstatechange(){
+		    $(window).bind('popstate', function (event) {
+				var returnLocation = history.location || document.location;
+				$('.menu a').removeClass('active');
+				$('#doccontent').load(returnLocation + ' #doccontent > *');
+				syncmenutourl();
+		       return;
+		    });
+		}
+		loadonstatechange();
+		/* Load only the doccontent div on click, push state so back/forward browser buttons work, and animate nav menu */
 	    var menu_ul = $('.menu > li > ul');
-	    $('.menu a').click(function(e) {
+	    $('a').click(function(e) {
 	        e.preventDefault();
-	        if(!$(this).hasClass('active')) {
-				if(!$(this).parent().hasClass('haschild')){
-					if(!$(this).parent().parent().parent().find('a').hasClass('active')){
+			var clickedon = $(this),
+				href = $(this).attr('href');
+			if (this.host != location.host){//open external links in new tab/window
+				window.open(href, '_blank');
+			} else if(href != "#"){//check for and skip empty nav menu containers
+				history.pushState(null, null, href);
+				$('#doccontent').load(href + ' #doccontent > *');
+				$('html, body').animate({scrollTop: 0}, 500);
+			} 
+			if(!$(clickedon).hasClass('active')) {//Animate navigation menu to open/close and highlight item
+				if(!$(clickedon).parent().hasClass('haschild')){
+					if(!$(clickedon).parent().parent().parent().find('a').hasClass('active')){
 						menu_ul.filter(':visible').slideUp('normal');
 					}
 				}
 				else{
-					if(!$(this).parent().find('a').hasClass('active')){
+					if(!$(clickedon).parent().find('a').hasClass('active')){
 						menu_ul.filter(':visible').slideUp('normal');
 					}
 				}
 	            $('.menu a').removeClass('active');
-	            $(this).addClass('active').next().stop(true,true).slideDown('normal');
-	        } else {
-				if($(this).hasClass('active') && $(this).parent().hasClass('haschild')){
-	            	$(this).removeClass('active');
-					$(this).next().stop(true,true).slideUp('normal');
-				}
-	        }
+	            $(clickedon).addClass('active').next().stop(true,true).slideDown('normal');
+	        }else if($(clickedon).hasClass('active') && $(clickedon).parent().hasClass('haschild')){ //slide close the sub-menu
+				$(clickedon).removeClass('active');
+				$(clickedon).next().stop(true,true).slideUp('normal');
+			}	
+		    return false; // don't actually follow the link
 	    });
 	});
 </script>
