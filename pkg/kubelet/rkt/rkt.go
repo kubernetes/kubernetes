@@ -374,6 +374,10 @@ func (r *runtime) getImageManifest(image string) (*appcschema.ImageManifest, err
 	return &manifest, json.Unmarshal([]byte(output[0]), &manifest)
 }
 
+func (r *runtime) InspectImage(imageSpec container.ImageSpec) (container.Image, error) {
+	return container.Image{}, nil
+}
+
 // makePodManifest transforms a kubelet pod spec to the rkt pod manifest.
 func (r *runtime) makePodManifest(pod *api.Pod) (*appcschema.PodManifest, error) {
 	var globalPortMappings []kubecontainer.PortMapping

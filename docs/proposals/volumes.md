@@ -187,6 +187,9 @@ the container runtime to determine which UID the image will run as.  Once the li
 to use a volume is known, the kubelet can determine which ownership and permissions should be used
 to make the volume functional.
 
+If a volume is used only by a single UID within the pod, the ownership can be set to that UID.
+Otherwise, the volume should be owned by a group and the containers run in that group.
+
 #### Handling non-numeric UIDs
 
 If a non-numeric user is specified by an image, the behavior of container runtimes is to look up the
@@ -204,10 +207,15 @@ a chown and chmod on the volume directory.
 #### `chown`, `chmod`, and distributed filesystems
 
 The success of `chown` and `chmod` operations on distributed filesystems can depend on the
-configuration of the server hosting the volumes.  For example, actions taken by root on an NFS
+configuration of the server hosting the volumes.  It may not be appropriate to perform chown or
+chmod operations on some distributed file systems.  For example, actions taken by root on an NFS
 client are treated as `nobody` on the server unless the `no_squash_root` setting is enabled for that
-volume's NFS export.  We should publish guidance for administrators describing the correct settings
-to make volumes usable as non-root.
+volume's NFS export.  Enabling `no_squash_root` contradicts Red Hat's security guidance for NFS (as
+an example), so there will need to be another mechanism that prepares some distributed fs volumes.
+
+One possibility is that if the server hosting the filesystem is itself a Kubernetes node, a pod
+could be scheduled onto that node that prepared the volume by setting the ownership, permissions,
+and SELinux context.
 
 ### Relabeling volumes with correct SELinux context
 
@@ -220,10 +228,32 @@ container and set the correct bind-mount flags on the docker container configura
 container uses a volume, the `:Z` flag should be used; if the volume is shared by multiple
 containers, the `:z` flag should be used.
 
-Relabeling should be an optional aspect of a volume plugin accomodate:
+Relabeling should be an optional aspect of a volume plugin to accomodate:
 
 1.  volume types for which generalized relabeling support is not desired
 2.  testing for each volume plugin individually
+
+#### SELinux and distributed file systems
+
+Some distributed filesystems have complications where SELinux is involved.  Let's look at NFS as an
+example.  Files in NFS volumes cannot have their contexts changed with `chcon` after the volume is
+mounted; the `context` argument must be passed to the `mount` call.
+
+For NFS, there is an SELinux boolean, `virt_use_nfs` that allows containers to use files with the
+SELinux type `nfs_t`.  Setting `virt_use_nfs` on a system would allow containers to use *any* NFS
+mount without the kubelet having to relabel the files.  However, the semantics would be different
+from what might be expected, since SELinux will not provide any protection against containers from
+one pod using files in an NFS mount belonging to another pod.
+
+NFS is a case where the `chcon` approach isn't going to solve the whole problem.  Instead, the NFS
+volume plugin will have to handle calling `mount` with the `context` argument in order to gain
+cross-container protection from SELinux.
+
+TODO: analyses of other file systems and SELinux
+TODO: generalize to classes of situations:
+TODO:  1.  chcon is ok
+TODO:  2.  chcon won't work, mount flag required
+TODO:  3.  chcon and mount flag won't work, SELinux boolean must be turned on
 
 #### The `hostPath` volume and SELinux
 
