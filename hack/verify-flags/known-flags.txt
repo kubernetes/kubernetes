@@ -238,6 +238,7 @@ session-affinity
 shutdown-fd
 shutdown-fifo
 skip-munges
+sort-by
 source-file
 ssh-keyfile
 ssh-user

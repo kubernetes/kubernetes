@@ -53,17 +53,31 @@ func (j *JSONPath) Parse(text string) (err error) {
 
 // Execute bounds data into template and write the result
 func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
+	fullResults, err := j.FindResults(data)
+	if err != nil {
+		return err
+	}
+	for ix := range fullResults {
+		if err := j.PrintResults(wr, fullResults[ix]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 	if j.parser == nil {
-		return fmt.Errorf("%s is an incomplete jsonpath template", j.name)
+		return nil, fmt.Errorf("%s is an incomplete jsonpath template", j.name)
 	}
 
 	j.cur = []reflect.Value{reflect.ValueOf(data)}
 	nodes := j.parser.Root.Nodes
+	fullResult := [][]reflect.Value{}
 	for i := 0; i < len(nodes); i++ {
 		node := nodes[i]
 		results, err := j.walk(j.cur, node)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		//encounter an end node, break the current block
@@ -80,20 +94,17 @@ func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 				if k == len(results)-1 {
 					j.inRange -= 1
 				}
-				err := j.Execute(wr, value.Interface())
+				nextResults, err := j.FindResults(value.Interface())
 				if err != nil {
-					return err
+					return nil, err
 				}
-
+				fullResult = append(fullResult, nextResults...)
 			}
 			break
 		}
-		err = j.PrintResults(wr, results)
-		if err != nil {
-			return err
-		}
+		fullResult = append(fullResult, results)
 	}
-	return nil
+	return fullResult, nil
 }
 
 // PrintResults write the results into writer

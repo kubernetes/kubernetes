@@ -471,6 +471,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			return nil, err
 		}
+		printer = maybeWrapSortingPrinter(cmd, printer)
 	}
 	return printer, nil
 }
