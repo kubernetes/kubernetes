@@ -14,32 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proxy
+package userspace
 
 import (
-	"fmt"
 	"net"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/proxy"
 )
 
 // LoadBalancer is an interface for distributing incoming requests to service endpoints.
 type LoadBalancer interface {
 	// NextEndpoint returns the endpoint to handle a request for the given
 	// service-port and source address.
-	NextEndpoint(service ServicePortName, srcAddr net.Addr) (string, error)
-	NewService(service ServicePortName, sessionAffinityType api.ServiceAffinity, stickyMaxAgeMinutes int) error
-	CleanupStaleStickySessions(service ServicePortName)
-}
-
-// ServicePortName carries a namespace + name + portname.  This is the unique
-// identfier for a load-balanced service.
-type ServicePortName struct {
-	types.NamespacedName
-	Port string
-}
-
-func (spn ServicePortName) String() string {
-	return fmt.Sprintf("%s:%s", spn.NamespacedName.String(), spn.Port)
+	NextEndpoint(service proxy.ServicePortName, srcAddr net.Addr) (string, error)
+	NewService(service proxy.ServicePortName, sessionAffinityType api.ServiceAffinity, stickyMaxAgeMinutes int) error
+	CleanupStaleStickySessions(service proxy.ServicePortName)
 }
