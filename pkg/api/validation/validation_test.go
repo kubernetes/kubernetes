@@ -460,12 +460,18 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"host1", "path", false}}},
 		{Name: "rbd", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "bar", FSType: "ext4"}}},
 	}
-	names, errs := validateVolumes(successCase)
+	validatedVolumes, errs := validateVolumes(successCase)
+
+	validatedVolumeNames := util.NewStringSet()
+	for _, vol := range validatedVolumes {
+		validatedVolumeNames.Insert(vol.Name)
+	}
+
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret", "iscsidisk") {
-		t.Errorf("wrong names result: %v", names)
+	if len(validatedVolumes) != len(successCase) || !validatedVolumeNames.HasAll("abc", "123", "abc-123", "empty", "gcepd", "awsebs", "gitrepo", "iscsidisk", "secret", "glusterfs", "rbd") {
+		t.Errorf("wrong validated volumes result; validated volume names: %v", validatedVolumeNames)
 	}
 	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}
 	emptyPortal := api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{"", "iqn.2015-02.example.com:test", 1, "ext4", false}}
@@ -685,12 +691,30 @@ func TestValidateEnv(t *testing.T) {
 }
 
 func TestValidateVolumeMounts(t *testing.T) {
-	volumes := util.NewStringSet("abc", "123", "abc-123")
+	volumes := []api.Volume{
+		{
+			Name:         "abc",
+			VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+		},
+		{
+			Name:         "123",
+			VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+		},
+		{
+			Name:         "abc-123",
+			VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+		},
+		{
+			Name:         "secret",
+			VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{}},
+		},
+	}
 
 	successCase := []api.VolumeMount{
 		{Name: "abc", MountPath: "/foo"},
 		{Name: "123", MountPath: "/foo"},
 		{Name: "abc-123", MountPath: "/bar"},
+		{Name: "secret", MountPath: "/secret", ReadOnly: true},
 	}
 	if errs := validateVolumeMounts(successCase, volumes); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -700,6 +724,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"empty name":      {{Name: "", MountPath: "/foo"}},
 		"name not found":  {{Name: "", MountPath: "/foo"}},
 		"empty mountpath": {{Name: "abc", MountPath: ""}},
+		"secret rw":       {{Name: "secret", MountPath: "/secret"}},
 	}
 	for k, v := range errorCases {
 		if errs := validateVolumeMounts(v, volumes); len(errs) == 0 {
@@ -813,7 +838,7 @@ func getResourceLimits(cpu, memory string) api.ResourceList {
 }
 
 func TestValidateContainers(t *testing.T) {
-	volumes := util.StringSet{}
+	volumes := []api.Volume{}
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
