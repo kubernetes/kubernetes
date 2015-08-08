@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -67,7 +68,7 @@ func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
 	var endpoints []api.Endpoints
 	loadBalancer.OnUpdate(endpoints)
-	service := proxy.servicePortName{types.NamespacedName{"testnamespace", "foo"}, "does-not-exist"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "does-not-exist"}
 	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err == nil {
 		t.Errorf("Didn't fail with non-existent service")
