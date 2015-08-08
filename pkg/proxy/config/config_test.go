@@ -57,7 +57,7 @@ func NewServiceHandlerMock() *ServiceHandlerMock {
 	return &ServiceHandlerMock{services: make([]api.Service, 0)}
 }
 
-func (h *ServiceHandlerMock) OnUpdate(services []api.Service) {
+func (h *ServiceHandlerMock) OnServiceUpdate(services []api.Service) {
 	sort.Sort(sortedServices(services))
 	h.services = services
 	h.updated.Done()
@@ -95,7 +95,7 @@ func NewEndpointsHandlerMock() *EndpointsHandlerMock {
 	return &EndpointsHandlerMock{endpoints: make([]api.Endpoints, 0)}
 }
 
-func (h *EndpointsHandlerMock) OnUpdate(endpoints []api.Endpoints) {
+func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []api.Endpoints) {
 	sort.Sort(sortedEndpoints(endpoints))
 	h.endpoints = endpoints
 	h.updated.Done()
