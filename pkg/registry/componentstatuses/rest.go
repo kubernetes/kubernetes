@@ -111,15 +111,15 @@ func (rs *REST) getComponentStatuses(ns namedServer) *api.ComponentStatuses {
 		errorMsg = "nil"
 	}
 
-	c := &api.ComponentCondition{
-		Type:    api.ComponentHealthy,
+	c := &api.ComponentStatusesCondition{
+		Type:    api.ComponentStatusesHealthy,
 		Status:  ToConditionStatus(status),
 		Message: msg,
 		Error:   errorMsg,
 	}
 
 	retVal := &api.ComponentStatuses{
-		Conditions: []api.ComponentCondition{*c},
+		Conditions: []api.ComponentStatusesCondition{*c},
 	}
 	retVal.Name = ns.name
 

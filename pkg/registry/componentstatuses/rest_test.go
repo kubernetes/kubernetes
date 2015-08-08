@@ -66,8 +66,8 @@ func NewTestREST(resp testResponse) rest.ReadableStorage {
 
 func createTestStatus(name string, status api.ConditionStatus, msg string, err string) *api.ComponentStatuses {
 	retVal := &api.ComponentStatuses{
-		Conditions: []api.ComponentCondition{
-			{Type: api.ComponentHealthy, Status: status, Message: msg, Error: err},
+		Conditions: []api.ComponentStatusesCondition{
+			{Type: api.ComponentStatusesHealthy, Status: status, Message: msg, Error: err},
 		},
 	}
 	retVal.Name = name

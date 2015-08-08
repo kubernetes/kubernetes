@@ -11994,7 +11994,7 @@
      },
      "spec": {
       "$ref": "v1.ComponentSpec",
-      "description": "specification of the component"
+      "description": "defines the behavior of the component"
      },
      "status": {
       "$ref": "v1.ComponentStatus",
@@ -12028,17 +12028,45 @@
       "type": "string",
       "description": "current lifecycle phase of the component"
      },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ComponentCondition"
+      },
+      "description": "array of historical node conditions"
+     },
      "lastUpdateTime": {
       "type": "string",
       "description": "last time the component status was updated"
      },
-     "lastHeartbeatTime": {
-      "type": "string",
-      "description": "last time the component updated its status"
-     },
      "lastTransitionTime": {
       "type": "string",
-      "description": "last time the component status changed"
+      "description": "last time the component status (phase or condition) changed"
+     }
+    }
+   },
+   "v1.ComponentCondition": {
+    "id": "v1.ComponentCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "type of condition: Pending, Running, or Terminated"
+     },
+     "status": {
+      "type": "string",
+      "description": "status of the condition: True, False, or Unknown"
+     },
+     "message": {
+      "type": "string",
+      "description": "reason (brief) for the transition to this condition"
+     },
+     "error": {
+      "type": "string",
+      "description": "message (detailed) explaining the reason for the transition to this condition"
      }
     }
    },
@@ -12194,7 +12222,6 @@
    },
    "v1.ComponentStatuses": {
     "id": "v1.ComponentStatuses",
-    "description": "ComponentStatuses (and ComponentStatusesList) holds the cluster validation info.",
     "properties": {
      "kind": {
       "type": "string",
@@ -12211,14 +12238,14 @@
      "conditions": {
       "type": "array",
       "items": {
-       "$ref": "v1.ComponentCondition"
+       "$ref": "v1.ComponentStatusesCondition"
       },
-      "description": "List of component conditions observed"
+      "description": "List of component statuses conditions observed"
      }
     }
    },
-   "v1.ComponentCondition": {
-    "id": "v1.ComponentCondition",
+   "v1.ComponentStatusesCondition": {
+    "id": "v1.ComponentStatusesCondition",
     "description": "Information about the condition of a component.",
     "required": [
      "type",

@@ -105,8 +105,8 @@ func deepCopy_v1_Component(in Component, out *Component, c *conversion.Cloner) e
 func deepCopy_v1_ComponentCondition(in ComponentCondition, out *ComponentCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
+	out.Reason = in.Reason
 	out.Message = in.Message
-	out.Error = in.Error
 	return nil
 }
 
@@ -138,10 +138,17 @@ func deepCopy_v1_ComponentSpec(in ComponentSpec, out *ComponentSpec, c *conversi
 
 func deepCopy_v1_ComponentStatus(in ComponentStatus, out *ComponentStatus, c *conversion.Cloner) error {
 	out.Phase = in.Phase
-	if err := deepCopy_util_Time(in.LastUpdateTime, &out.LastUpdateTime, c); err != nil {
-		return err
+	if in.Conditions != nil {
+		out.Conditions = make([]ComponentCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := deepCopy_v1_ComponentCondition(in.Conditions[i], &out.Conditions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
-	if err := deepCopy_util_Time(in.LastHeartbeatTime, &out.LastHeartbeatTime, c); err != nil {
+	if err := deepCopy_util_Time(in.LastUpdateTime, &out.LastUpdateTime, c); err != nil {
 		return err
 	}
 	if err := deepCopy_util_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
@@ -158,15 +165,23 @@ func deepCopy_v1_ComponentStatuses(in ComponentStatuses, out *ComponentStatuses,
 		return err
 	}
 	if in.Conditions != nil {
-		out.Conditions = make([]ComponentCondition, len(in.Conditions))
+		out.Conditions = make([]ComponentStatusesCondition, len(in.Conditions))
 		for i := range in.Conditions {
-			if err := deepCopy_v1_ComponentCondition(in.Conditions[i], &out.Conditions[i], c); err != nil {
+			if err := deepCopy_v1_ComponentStatusesCondition(in.Conditions[i], &out.Conditions[i], c); err != nil {
 				return err
 			}
 		}
 	} else {
 		out.Conditions = nil
 	}
+	return nil
+}
+
+func deepCopy_v1_ComponentStatusesCondition(in ComponentStatusesCondition, out *ComponentStatusesCondition, c *conversion.Cloner) error {
+	out.Type = in.Type
+	out.Status = in.Status
+	out.Message = in.Message
+	out.Error = in.Error
 	return nil
 }
 
@@ -2253,6 +2268,7 @@ func init() {
 		deepCopy_v1_ComponentSpec,
 		deepCopy_v1_ComponentStatus,
 		deepCopy_v1_ComponentStatuses,
+		deepCopy_v1_ComponentStatusesCondition,
 		deepCopy_v1_ComponentStatusesList,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerPort,

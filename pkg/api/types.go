@@ -2126,9 +2126,8 @@ const (
 // Type and constants for component type.
 type ComponentType string
 
-// ComponentType constants define the known types of components.
-// Each type may have multiple instances.
-// Each instance's name is prefixed by the type, with a random suffix. See SimpleNameGenerator.
+// ComponentType constants define some known types of components.
+// Each type may have multiple instances, as long as their names are unique.
 const (
 	ComponentAPIServer         ComponentType = "apiserver"
 	ComponentControllerManager ComponentType = "controller-manager"
@@ -2147,37 +2146,52 @@ type ComponentPhase string
 
 // These are the valid phases of a component.
 const (
-	// ComponentPending means the component is starting, but not yet fully functional.
+	// ComponentPending means the component has been created, but is still starting up.
 	ComponentPending ComponentPhase = "Pending"
-	// ComponentRunning means the component is started and is fully functional.
+	// ComponentRunning means the component has started, but may or may not be healthy.
 	ComponentRunning ComponentPhase = "Running"
-	// ComponentStalled means the component is started but is not fully functional.
-	ComponentStalled ComponentPhase = "Stalled"
-	// ComponentUnknown means the component did not respond to the last health check.
-	ComponentUnknown ComponentPhase = "Unknown"
-	// ComponentLost means the component has not responded to recent health checks and is considered dead.
-	ComponentLost ComponentPhase = "Lost"
-	// ComponentStopped means the component stopped gracefully with an error.
-	ComponentFailed ComponentPhase = "Failed"
+	// ComponentTerminated means the component has been removed from the cluster, whether cleanly or not.
+	ComponentTerminated ComponentPhase = "Terminated"
 )
+
+type ComponentConditionType string
+
+// These are the valid conditions for a component to have.
+const (
+	// ComponentRunningHealthy means the component is up and running, when true
+	ComponentRunningHealthy ComponentConditionType = "Healthy"
+	// ComponentTerminatedCleanly means the component is down and stopped without error, when true
+	ComponentTerminatedCleanly ComponentConditionType = "Cleanly"
+)
+
+type ComponentCondition struct {
+	// Type of condition: Pending, Running, or Terminated
+	Type ComponentConditionType `json:"type"`
+	// Status of the condition: True, False, or Unknown
+	Status ConditionStatus `json:"status"`
+	// Reason (brief) for the transition to this condition
+	Reason string `json:"message,omitempty"`
+	// Message (detailed) explaining the reason for the transition to this condition
+	Message string `json:"error,omitempty"`
+}
 
 // ComponentStatus is information about the current status of a component.
 type ComponentStatus struct {
 	// ComponentPhase is the current lifecycle phase of the component.
 	Phase ComponentPhase `json:"phase"`
+	// Conditions is an array of historical node conditions.
+	Conditions []ComponentCondition `json:"conditions,omitempty"`
 	// LastUpdateTime is the last time the component status was updated.
+	// TODO(karlkfi): move LastUpdateTime to ObjectMeta? maybe both (one for spec, one for status)?
 	LastUpdateTime util.Time `json:"lastUpdateTime,omitempty"`
-	// LastHeartbeatTime is the last time the component updated its status.
-	LastHeartbeatTime util.Time `json:"lastHeartbeatTime,omitempty"`
-	// LastTransitionTime is the last time the component status changed.
+	// LastTransitionTime is the last time the component status (phase or condition) changed.
 	LastTransitionTime util.Time `json:"lastTransitionTime,omitempty"`
-	//TODO: Do we need a Condition? Or are the phases specific enough?
 }
 
 // Component describes a core part of Kubernetes.
 // Each component is expected to serve a <location>/healthz endpoint.
-// Each component is also expected to heartbeat component updates so that LastTimestamp is updated.
-// If the LastTimestamp is sufficiently old (config? query param?) the component is considered unhealthy.
+// Each component is also expected to heartbeat component status updates.
+// If Status.LastHeartbeatTime is sufficiently old (configurable) the component is considered unhealthy.
 type Component struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
@@ -2197,18 +2211,18 @@ type ComponentList struct {
 }
 
 // Type and constants for component health validation.
-type ComponentConditionType string
+type ComponentStatusesConditionType string
 
 // These are the valid conditions for the component condition type.
 const (
-	ComponentHealthy ComponentConditionType = "Healthy"
+	ComponentStatusesHealthy ComponentStatusesConditionType = "Healthy"
 )
 
-type ComponentCondition struct {
-	Type    ComponentConditionType `json:"type"`
-	Status  ConditionStatus        `json:"status"`
-	Message string                 `json:"message,omitempty"`
-	Error   string                 `json:"error,omitempty"`
+type ComponentStatusesCondition struct {
+	Type    ComponentStatusesConditionType `json:"type"`
+	Status  ConditionStatus                `json:"status"`
+	Message string                         `json:"message,omitempty"`
+	Error   string                         `json:"error,omitempty"`
 }
 
 // ComponentStatuses (and ComponentStatusesList) holds the cluster validation info.
@@ -2216,7 +2230,7 @@ type ComponentStatuses struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	Conditions []ComponentCondition `json:"conditions,omitempty"`
+	Conditions []ComponentStatusesCondition `json:"conditions,omitempty"`
 }
 
 type ComponentStatusesList struct {

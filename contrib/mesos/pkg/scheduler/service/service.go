@@ -580,8 +580,12 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 	)
 	go func() {
 		//TODO(karlkfi): change state smarter
-		heart.Transition(api.ComponentRunning)
+		heart.Transition(api.ComponentRunning, api.ComponentCondition{
+			Type:   api.ComponentRunningHealthy,
+			Status: api.ConditionTrue,
+		})
 	}()
+	//TODO(karlkfi): change state on error
 
 	var firstErr error
 	for {

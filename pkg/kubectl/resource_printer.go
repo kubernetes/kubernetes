@@ -284,7 +284,7 @@ var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
-var componentColumns = []string{"NAME", "TYPE", "URL", "STATUS", "LASTUPDATE", "LASTSEEN", "LASTCHANGE", "FIRSTSEEN"}
+var componentColumns = []string{"NAME", "TYPE", "URL", "STATUS", "CONDITION"}
 var componentStatusesColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
@@ -989,11 +989,22 @@ func printComponent(item *api.Component, w io.Writer, withNamespace bool, wide b
 	if withNamespace {
 		return fmt.Errorf("component is not namespaced")
 	}
-	lastUpdate := item.Status.LastUpdateTime.Time.Format(time.RFC1123Z)
-	lastSeen := item.Status.LastHeartbeatTime.Time.Format(time.RFC1123Z)
-	lastChange := item.Status.LastTransitionTime.Time.Format(time.RFC1123Z)
-	firstSeen := item.CreationTimestamp.Time.Format(time.RFC1123Z)
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s", item.Name, item.Spec.Type, item.Spec.Address, item.Status.Phase, lastUpdate, lastSeen, lastChange, firstSeen); err != nil {
+
+	lastCondition := ""
+	count := len(item.Status.Conditions)
+	if count > 0 {
+		condition := item.Status.Conditions[count-1]
+		switch condition.Status {
+		case api.ConditionTrue:
+			lastCondition = string(condition.Type)
+		case api.ConditionFalse:
+			lastCondition = "Not" + string(condition.Type)
+		default:
+			lastCondition = string(condition.Type)
+		}
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s", item.Name, item.Spec.Type, item.Spec.Address, item.Status.Phase, lastCondition); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
@@ -1018,7 +1029,7 @@ func printComponentStatuses(item *api.ComponentStatuses, w io.Writer, withNamesp
 	message := ""
 	error := ""
 	for _, condition := range item.Conditions {
-		if condition.Type == api.ComponentHealthy {
+		if condition.Type == api.ComponentStatusesHealthy {
 			if condition.Status == api.ConditionTrue {
 				status = "Healthy"
 			} else {

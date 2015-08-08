@@ -50,35 +50,41 @@ func (createUpdateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// PrepareForCreate clears fields that are not allowed to be set by components on creation.
+// PrepareForCreate initializes the status and enables name generation (if name is empty).
 func (createUpdateStrategy) PrepareForCreate(obj runtime.Object) {
 	component := obj.(*api.Component)
 
-	component.Name = ""
-	component.GenerateName = fmt.Sprintf("%s-", component.Spec.Type)
+	// Generate the name by default
+	if component.Name == "" {
+		component.GenerateName = fmt.Sprintf("%s-", component.Spec.Type)
+	}
 
+	// Status sent by creator will be ignored
 	now := util.Now()
-	component.Status.LastHeartbeatTime = now // TODO(karlkfi): how do we know this is a heartbeat?
-	component.Status.LastUpdateTime = now
-	component.Status.LastTransitionTime = now
-	//TODO(karlkfi): do the timestamps need to match component.ObjectMeta.CreationTimestamp?
+	component.Status = api.ComponentStatus{
+		Phase:              api.ComponentPending,
+		Conditions:         []api.ComponentCondition{},
+		LastUpdateTime:     now,
+		LastTransitionTime: now,
+	}
+	// TODO(karlkfi): do the timestamps need to match component.ObjectMeta.CreationTimestamp? Is CreationTimestamp already populated?
 }
 
-// PrepareForUpdate clears fields that are not allowed to be set by components on update.
-// LastTimestamp is set to the current server time.
-func (createUpdateStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newC := obj.(*api.Component)
-	oldC := old.(*api.Component)
+// PrepareForUpdate updates timestamps.
+func (createUpdateStrategy) PrepareForUpdate(newO, oldO runtime.Object) {
+	component := newO.(*api.Component)
+	old := oldO.(*api.Component)
 
-	// allow some metadata values to be omitted on update (name is unique id)
-	newC.CreationTimestamp = oldC.CreationTimestamp
-	newC.UID = oldC.UID
+	// Allow some metadata values to be omitted on update
+	component.CreationTimestamp = old.CreationTimestamp
 
+	// Component update should not be used if only the status phase changed. Use Component/Status update instead.
 	now := util.Now()
-	newC.Status.LastHeartbeatTime = now // TODO(karlkfi): how do we know this is a heartbeat?
-	newC.Status.LastUpdateTime = now
-	if newC.Status.Phase != oldC.Status.Phase {
-		newC.Status.LastTransitionTime = now
+	// every update bumps LastUpdateTime
+	component.Status.LastUpdateTime = now
+	// only updates that change the phase bump LastTransitionTime
+	if component.Status.Phase != old.Status.Phase {
+		component.Status.LastTransitionTime = now
 	}
 }
 

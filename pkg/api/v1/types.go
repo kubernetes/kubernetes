@@ -2507,34 +2507,38 @@ type ComponentSpec struct {
 
 type ComponentPhase string
 
-// These are the valid phases of a component.
 const (
-	// ComponentPending means the component is starting, but not yet fully functional.
-	ComponentPending ComponentPhase = "Pending"
-	// ComponentRunning means the component is started and is fully functional.
-	ComponentRunning ComponentPhase = "Running"
-	// ComponentStalled means the component is started but is not fully functional.
-	ComponentStalled ComponentPhase = "Stalled"
-	// ComponentUnknown means the component did not respond to the last health check.
-	ComponentUnknown ComponentPhase = "Unknown"
-	// ComponentLost means the component has not responded to recent health checks and is considered dead.
-	ComponentLost ComponentPhase = "Lost"
-	// ComponentStopped means the component stopped gracefully with an error.
-	ComponentFailed ComponentPhase = "Failed"
+	ComponentPending    ComponentPhase = "Pending"
+	ComponentRunning    ComponentPhase = "Running"
+	ComponentTerminated ComponentPhase = "Terminated"
 )
 
+type ComponentConditionType string
+
+const (
+	ComponentRunningHealthy    ComponentConditionType = "Healthy"
+	ComponentTerminatedCleanly ComponentConditionType = "Cleanly"
+)
+
+type ComponentCondition struct {
+	Type    ComponentConditionType `json:"type" description:"type of condition: Pending, Running, or Terminated"`
+	Status  ConditionStatus        `json:"status" description:"status of the condition: True, False, or Unknown"`
+	Reason  string                 `json:"message,omitempty" description:"reason (brief) for the transition to this condition"`
+	Message string                 `json:"error,omitempty" description:"message (detailed) explaining the reason for the transition to this condition"`
+}
+
 type ComponentStatus struct {
-	Phase              ComponentPhase `json:"phase" description:"current lifecycle phase of the component"`
-	LastUpdateTime     util.Time      `json:"lastUpdateTime,omitempty" description:"last time the component status was updated"`
-	LastHeartbeatTime  util.Time      `json:"lastHeartbeatTime,omitempty" description:"last time the component updated its status"`
-	LastTransitionTime util.Time      `json:"lastTransitionTime,omitempty" description:"last time the component status changed"`
+	Phase              ComponentPhase       `json:"phase" description:"current lifecycle phase of the component"`
+	Conditions         []ComponentCondition `json:"conditions,omitempty" description:"array of historical node conditions"`
+	LastUpdateTime     util.Time            `json:"lastUpdateTime,omitempty" description:"last time the component status was updated"`
+	LastTransitionTime util.Time            `json:"lastTransitionTime,omitempty" description:"last time the component status (phase or condition) changed"`
 }
 
 type Component struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
-	Spec ComponentSpec `json:"spec" description:"specification of the component"`
+	Spec ComponentSpec `json:"spec" description:"defines the behavior of the component"`
 
 	Status ComponentStatus `json:"status" description:"last known status of the component"`
 }
@@ -2546,19 +2550,17 @@ type ComponentList struct {
 	Items []Component `json:"items" description:"list of component objects"`
 }
 
-// Type and constants for component health validation.
-type ComponentConditionType string
+type ComponentStatusesConditionType string
 
-// These are the valid conditions for the component.
 const (
-	ComponentHealthy ComponentConditionType = "Healthy"
+	ComponentStatusesHealthy ComponentStatusesConditionType = "Healthy"
 )
 
 // Information about the condition of a component.
-type ComponentCondition struct {
+type ComponentStatusesCondition struct {
 	// Type of condition for a component.
 	// Valid value: "Healthy"
-	Type ComponentConditionType `json:"type"`
+	Type ComponentStatusesConditionType `json:"type"`
 	// Status of the condition for a component.
 	// Valid values for "Healthy": "True", "False", or "Unknown".
 	Status ConditionStatus `json:"status"`
@@ -2570,15 +2572,14 @@ type ComponentCondition struct {
 	Error string `json:"error,omitempty"`
 }
 
-// ComponentStatuses (and ComponentStatusesList) holds the cluster validation info.
 type ComponentStatuses struct {
 	TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// List of component conditions observed
-	Conditions []ComponentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	// List of component statuses conditions observed
+	Conditions []ComponentStatusesCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // Status of all the conditions for the component as a list of ComponentStatuses objects.

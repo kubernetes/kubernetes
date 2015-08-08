@@ -101,8 +101,8 @@ func convert_api_ComponentCondition_To_v1_ComponentCondition(in *api.ComponentCo
 	}
 	out.Type = ComponentConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
+	out.Reason = in.Reason
 	out.Message = in.Message
-	out.Error = in.Error
 	return nil
 }
 
@@ -143,10 +143,17 @@ func convert_api_ComponentStatus_To_v1_ComponentStatus(in *api.ComponentStatus, 
 		defaulting.(func(*api.ComponentStatus))(in)
 	}
 	out.Phase = ComponentPhase(in.Phase)
-	if err := s.Convert(&in.LastUpdateTime, &out.LastUpdateTime, 0); err != nil {
-		return err
+	if in.Conditions != nil {
+		out.Conditions = make([]ComponentCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := convert_api_ComponentCondition_To_v1_ComponentCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
-	if err := s.Convert(&in.LastHeartbeatTime, &out.LastHeartbeatTime, 0); err != nil {
+	if err := s.Convert(&in.LastUpdateTime, &out.LastUpdateTime, 0); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
@@ -166,15 +173,26 @@ func convert_api_ComponentStatuses_To_v1_ComponentStatuses(in *api.ComponentStat
 		return err
 	}
 	if in.Conditions != nil {
-		out.Conditions = make([]ComponentCondition, len(in.Conditions))
+		out.Conditions = make([]ComponentStatusesCondition, len(in.Conditions))
 		for i := range in.Conditions {
-			if err := convert_api_ComponentCondition_To_v1_ComponentCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+			if err := convert_api_ComponentStatusesCondition_To_v1_ComponentStatusesCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
 				return err
 			}
 		}
 	} else {
 		out.Conditions = nil
 	}
+	return nil
+}
+
+func convert_api_ComponentStatusesCondition_To_v1_ComponentStatusesCondition(in *api.ComponentStatusesCondition, out *ComponentStatusesCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ComponentStatusesCondition))(in)
+	}
+	out.Type = ComponentStatusesConditionType(in.Type)
+	out.Status = ConditionStatus(in.Status)
+	out.Message = in.Message
+	out.Error = in.Error
 	return nil
 }
 
@@ -2534,8 +2552,8 @@ func convert_v1_ComponentCondition_To_api_ComponentCondition(in *ComponentCondit
 	}
 	out.Type = api.ComponentConditionType(in.Type)
 	out.Status = api.ConditionStatus(in.Status)
+	out.Reason = in.Reason
 	out.Message = in.Message
-	out.Error = in.Error
 	return nil
 }
 
@@ -2576,10 +2594,17 @@ func convert_v1_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus, out 
 		defaulting.(func(*ComponentStatus))(in)
 	}
 	out.Phase = api.ComponentPhase(in.Phase)
-	if err := s.Convert(&in.LastUpdateTime, &out.LastUpdateTime, 0); err != nil {
-		return err
+	if in.Conditions != nil {
+		out.Conditions = make([]api.ComponentCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := convert_v1_ComponentCondition_To_api_ComponentCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
-	if err := s.Convert(&in.LastHeartbeatTime, &out.LastHeartbeatTime, 0); err != nil {
+	if err := s.Convert(&in.LastUpdateTime, &out.LastUpdateTime, 0); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
@@ -2599,15 +2624,26 @@ func convert_v1_ComponentStatuses_To_api_ComponentStatuses(in *ComponentStatuses
 		return err
 	}
 	if in.Conditions != nil {
-		out.Conditions = make([]api.ComponentCondition, len(in.Conditions))
+		out.Conditions = make([]api.ComponentStatusesCondition, len(in.Conditions))
 		for i := range in.Conditions {
-			if err := convert_v1_ComponentCondition_To_api_ComponentCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+			if err := convert_v1_ComponentStatusesCondition_To_api_ComponentStatusesCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
 				return err
 			}
 		}
 	} else {
 		out.Conditions = nil
 	}
+	return nil
+}
+
+func convert_v1_ComponentStatusesCondition_To_api_ComponentStatusesCondition(in *ComponentStatusesCondition, out *api.ComponentStatusesCondition, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ComponentStatusesCondition))(in)
+	}
+	out.Type = api.ComponentStatusesConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	out.Message = in.Message
+	out.Error = in.Error
 	return nil
 }
 
@@ -4901,6 +4937,7 @@ func init() {
 		convert_api_ComponentList_To_v1_ComponentList,
 		convert_api_ComponentSpec_To_v1_ComponentSpec,
 		convert_api_ComponentStatus_To_v1_ComponentStatus,
+		convert_api_ComponentStatusesCondition_To_v1_ComponentStatusesCondition,
 		convert_api_ComponentStatusesList_To_v1_ComponentStatusesList,
 		convert_api_ComponentStatuses_To_v1_ComponentStatuses,
 		convert_api_Component_To_v1_Component,
@@ -5023,6 +5060,7 @@ func init() {
 		convert_v1_ComponentList_To_api_ComponentList,
 		convert_v1_ComponentSpec_To_api_ComponentSpec,
 		convert_v1_ComponentStatus_To_api_ComponentStatus,
+		convert_v1_ComponentStatusesCondition_To_api_ComponentStatusesCondition,
 		convert_v1_ComponentStatusesList_To_api_ComponentStatusesList,
 		convert_v1_ComponentStatuses_To_api_ComponentStatuses,
 		convert_v1_Component_To_api_Component,

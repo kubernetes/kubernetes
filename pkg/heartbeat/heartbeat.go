@@ -26,7 +26,7 @@ import (
 
 type HeartBeat interface {
 	// Transition changes the component's current phase
-	Transition(api.ComponentPhase)
+	Transition(api.ComponentPhase, api.ComponentCondition)
 	// Stop terminates continuous heart beating.
 	Stop()
 }
@@ -57,7 +57,8 @@ func Start(componentsClient client.ComponentsClient, period time.Duration, t api
 			Address: location,
 		},
 		Status: api.ComponentStatus{
-			Phase: api.ComponentPending,
+			Phase:      api.ComponentPending,
+			Conditions: []api.ComponentCondition{},
 		},
 	}
 
@@ -72,9 +73,10 @@ func Start(componentsClient client.ComponentsClient, period time.Duration, t api
 	return hb, hb.errCh
 }
 
-func (hb *heartbeat) Transition(phase api.ComponentPhase) {
+func (hb *heartbeat) Transition(phase api.ComponentPhase, condition api.ComponentCondition) {
 	hb.updateBuffer(func(component api.Component) (api.Component, error) {
 		component.Status.Phase = phase
+		component.Status.Conditions = append(component.Status.Conditions, condition)
 		return component, nil
 	})
 	//TODO(karlkfi): immediately do an update?

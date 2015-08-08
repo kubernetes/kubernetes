@@ -200,8 +200,12 @@ func (s *CMServer) Run(_ []string) error {
 	)
 	go func() {
 		//TODO(karlkfi): change state smarter
-		heart.Transition(api.ComponentRunning)
+		heart.Transition(api.ComponentRunning, api.ComponentCondition{
+			Type:   api.ComponentRunningHealthy,
+			Status: api.ConditionTrue,
+		})
 	}()
+	//TODO(karlkfi): change state on error
 	for err = range errCh {
 		glog.Errorf("Heartbeat Error: %s", err)
 	}

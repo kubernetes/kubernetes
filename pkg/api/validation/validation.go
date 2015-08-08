@@ -1907,6 +1907,11 @@ func ValidateComponentUpdate(old, new *api.Component) errs.ValidationErrorList {
 	//TODO(karlkfi): validate name is valid format
 	//TODO(karlkfi): validate name exists in registry?
 
+	// only updaters with both the name and uid may update the resource
+	if new.UID != old.UID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.uid", new.UID, "uid must match existing uid"))
+	}
+
 	if new.Spec.Type == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
 	}
@@ -1937,6 +1942,11 @@ func ValidateComponentStatusUpdate(old, new *api.Component) errs.ValidationError
 
 	//TODO(karlkfi): validate name is valid format
 	//TODO(karlkfi): validate name exists in registry?
+
+	// only updaters with both the name and uid may update the resource
+	if new.UID != old.UID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.uid", new.UID, "uid must match existing uid"))
+	}
 
 	if new.Spec.Type == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))

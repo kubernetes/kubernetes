@@ -53,17 +53,15 @@ func (updateStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newC := obj.(*api.Component)
 	oldC := old.(*api.Component)
 
-	// allow some metadata values to be omitted on update (name is unique id)
+	// allow some metadata values to be omitted on update
 	newC.CreationTimestamp = oldC.CreationTimestamp
-	newC.UID = oldC.UID
 
 	// transfer existing spec
 	newC.Spec = oldC.Spec
 
 	now := util.Now()
-	newC.Status.LastHeartbeatTime = now // TODO(karlkfi): how do we know this is a heartbeat?
 	newC.Status.LastUpdateTime = now
-	if newC.Status.Phase != oldC.Status.Phase {
+	if newC.Status.Phase != oldC.Status.Phase || !ConditionsMatch(newC.Status.Conditions, oldC.Status.Conditions) {
 		newC.Status.LastTransitionTime = now
 	}
 }
@@ -71,4 +69,18 @@ func (updateStrategy) PrepareForUpdate(obj, old runtime.Object) {
 // Validate validates an update to an existing component status.
 func (updateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateComponentStatusUpdate(old.(*api.Component), obj.(*api.Component))
+}
+
+func ConditionsMatch(a []api.ComponentCondition, b []api.ComponentCondition) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
