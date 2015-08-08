@@ -17,7 +17,10 @@ limitations under the License.
 package proxy
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // ProxyProvider is the interface provided by proxier implementations.
@@ -30,4 +33,15 @@ type ProxyProvider interface {
 	// This is expected to run as a goroutine or as the main loop of the app.
 	// It does not return.
 	SyncLoop()
+}
+
+// ServicePortName carries a namespace + name + portname.  This is the unique
+// identfier for a load-balanced service.
+type ServicePortName struct {
+	types.NamespacedName
+	Port string
+}
+
+func (spn ServicePortName) String() string {
+	return fmt.Sprintf("%s:%s", spn.NamespacedName.String(), spn.Port)
 }
