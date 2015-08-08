@@ -427,7 +427,7 @@ func TestIsDefaultRegistryMatch(t *testing.T) {
 	for _, sample := range samples {
 		for expected, imageName := range sample {
 			if got := isDefaultRegistryMatch(imageName); got != expected {
-				t.Errorf("Expected '%s' to be %s, got %s", imageName, expected, got)
+				t.Errorf("Expected '%s' to be %t, got %t", imageName, expected, got)
 			}
 		}
 	}

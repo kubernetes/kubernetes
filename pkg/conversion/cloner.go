@@ -58,7 +58,7 @@ func verifyDeepCopyFunctionSignature(ft reflect.Type) error {
 		return fmt.Errorf("expected func, got: %v", ft)
 	}
 	if ft.NumIn() != 3 {
-		return fmt.Errorf("expected three 'in' params, got $v", ft)
+		return fmt.Errorf("expected three 'in' params, got %v", ft)
 	}
 	if ft.NumOut() != 1 {
 		return fmt.Errorf("expected one 'out' param, got %v", ft)

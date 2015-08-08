@@ -550,7 +550,7 @@ var _ = Describe("Nodes", func() {
 					pod, err := c.Pods(ns).Get(additionalPod)
 					Expect(err).NotTo(HaveOccurred())
 					if pod.Spec.NodeName != node.Name {
-						Logf("Pod %s found on invalid node: %s instead of %s", pod.Spec.NodeName, node.Name)
+						Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
 					}
 				}
 			})

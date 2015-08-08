@@ -213,7 +213,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		}
 		service = cachedService.lastState
 		delta.Object = cachedService.lastState
-		namespacedName = types.NamespacedName{service.Namespace, service.Name}
+		namespacedName = types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	} else {
 		namespacedName.Namespace = service.Namespace
 		namespacedName.Name = service.Name
@@ -659,7 +659,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 
 	// It's only an actual error if the load balancer still exists.
 	if _, exists, err := s.balancer.GetTCPLoadBalancer(name, s.zone.Region); err != nil {
-		glog.Errorf("External error while checking if TCP load balancer %q exists: name, %v")
+		glog.Errorf("External error while checking if TCP load balancer %q exists: name, %v", name, err)
 	} else if !exists {
 		return nil
 	}

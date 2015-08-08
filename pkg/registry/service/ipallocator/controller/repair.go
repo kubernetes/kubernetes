@@ -124,7 +124,7 @@ func (c *Repair) RunOnce() error {
 			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
 		case ipallocator.ErrFull:
 			// TODO: send event
-			return fmt.Errorf("the service CIDR %s is full; you must widen the CIDR in order to create new services")
+			return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services", r)
 		default:
 			return fmt.Errorf("unable to allocate cluster IP %s for service %s/%s due to an unknown error, exiting: %v", ip, svc.Name, svc.Namespace, err)
 		}

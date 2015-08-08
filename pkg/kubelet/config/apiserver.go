@@ -38,7 +38,7 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 		for _, o := range objs {
 			pods = append(pods, o.(*api.Pod))
 		}
-		updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.ApiserverSource}
+		updates <- kubelet.PodUpdate{Pods: pods, Op: kubelet.SET, Source: kubelet.ApiserverSource}
 	}
 	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
 }

@@ -187,7 +187,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	// TODO: extract this flag to a central location, when such a location exists.
 	if !cmdutil.GetFlagBool(cmd, "dry-run") {
-		resourceMapper := &resource.Mapper{typer, mapper, f.ClientMapperForCommand()}
+		resourceMapper := &resource.Mapper{ObjectTyper: typer, RESTMapper: mapper, ClientMapper: f.ClientMapperForCommand()}
 		info, err := resourceMapper.InfoForObject(object)
 		if err != nil {
 			return err

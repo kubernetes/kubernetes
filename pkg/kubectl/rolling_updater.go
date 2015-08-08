@@ -377,7 +377,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	retry := &RetryParams{interval, timeout}
 	waitForReplicas := &RetryParams{interval, timeout}
 	if newRc.Spec.Replicas <= 0 {
-		return fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %s\n", newName, newRc.Spec)
+		return fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %d\n", newName, newRc.Spec.Replicas)
 	}
 	desired := newRc.Spec.Replicas
 	sourceId := fmt.Sprintf("%s:%s", oldName, oldRc.ObjectMeta.UID)

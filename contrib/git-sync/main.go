@@ -47,7 +47,7 @@ func envInt(key string, def int) int {
 	if env := os.Getenv(key); env != "" {
 		val, err := strconv.Atoi(env)
 		if err != nil {
-			log.Println("invalid value for %q: using default: %q", key, def)
+			log.Printf("invalid value for %q: using default: %q", key, def)
 			return def
 		}
 		return val

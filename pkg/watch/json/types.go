@@ -49,5 +49,5 @@ func Object(codec runtime.Codec, event *watch.Event) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &WatchEvent{event.Type, runtime.RawExtension{json.RawMessage(data)}}, nil
+	return &WatchEvent{event.Type, runtime.RawExtension{RawJSON: json.RawMessage(data)}}, nil
 }

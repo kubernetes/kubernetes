@@ -479,7 +479,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								Status:             api.ConditionUnknown,
 								Reason:             fmt.Sprintf("Kubelet stopped posting node status."),
 								LastHeartbeatTime:  util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: util.Time{util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
+								LastTransitionTime: util.Time{Time: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
 							},
 						},
 						Capacity: api.ResourceList{

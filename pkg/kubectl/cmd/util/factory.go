@@ -90,7 +90,7 @@ type Factory struct {
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 // if optionalClientConfig is not nil, then this factory will make use of it.
 func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
-	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
+	mapper := kubectl.ShortcutExpander{RESTMapper: latest.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
@@ -119,7 +119,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			CheckErr(err)
 			cmdApiVersion := cfg.Version
 
-			return kubectl.OutputVersionMapper{mapper, cmdApiVersion}, api.Scheme
+			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersion: cmdApiVersion}, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion("")

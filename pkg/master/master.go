@@ -376,7 +376,7 @@ func New(c *Config) *Master {
 	m.handlerContainer = handlerContainer
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	m.handlerContainer.Router(restful.CurlyRouter{})
-	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
+	m.muxHelper = &apiserver.MuxHelper{Mux: m.mux, RegisteredPaths: []string{}}
 
 	m.init(c)
 
@@ -548,7 +548,7 @@ func (m *Master) init(c *Config) {
 				httpKubeletClient.Client.Transport = transport
 			}
 		} else {
-			glog.Errorf("Failed to cast %v to HTTPKubeletClient, skipping SSH tunnel.")
+			glog.Errorf("Failed to cast %v to HTTPKubeletClient, skipping SSH tunnel.", c.KubeletClient)
 		}
 		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", m.IsTunnelSyncHealthy))
 		m.lastSyncMetric = prometheus.NewGaugeFunc(prometheus.GaugeOpts{
@@ -568,7 +568,7 @@ func (m *Master) init(c *Config) {
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling, healthzChecks...)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
-	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}
+	requestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), RestMapper: defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
 	if m.exp {
@@ -577,7 +577,7 @@ func (m *Master) init(c *Config) {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
 		apiserver.AddApiWebService(m.handlerContainer, c.ExpAPIPrefix, []string{expVersion.Version})
-		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), expVersion.Mapper}
+		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), RestMapper: expVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, expRequestInfoResolver, []string{expVersion.Version})
 	}
 

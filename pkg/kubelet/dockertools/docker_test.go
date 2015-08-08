@@ -269,7 +269,7 @@ func TestPullWithJSONError(t *testing.T) {
 		}
 		err := puller.Pull(test.imageName, []api.Secret{})
 		if err == nil || !strings.Contains(err.Error(), test.expectedError) {
-			t.Errorf("%d: expect error %s, got : %s", i, test.expectedError, err)
+			t.Errorf("%s: expect error %s, got : %s", i, test.expectedError, err)
 			continue
 		}
 	}

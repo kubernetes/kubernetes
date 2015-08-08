@@ -105,7 +105,7 @@ func NewSimpleModeler(queuedPods, scheduledPods ExtendedPodLister) *SimpleModele
 		queuedPods:    queuedPods,
 		scheduledPods: scheduledPods,
 		assumedPods: &cache.StoreToPodLister{
-			cache.NewTTLStore(cache.MetaNamespaceKeyFunc, 30*time.Second),
+			Store: cache.NewTTLStore(cache.MetaNamespaceKeyFunc, 30*time.Second),
 		},
 	}
 }

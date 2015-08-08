@@ -158,14 +158,14 @@ func TestIsValidPortName(t *testing.T) {
 	goodValues := []string{"telnet", "re-mail-ck", "pop3", "a", "a-1", "1-a", "a-1-b-2-c", "1-a-2-b-3"}
 	for _, val := range goodValues {
 		if !IsValidPortName(val) {
-			t.Errorf("expected true for '%d'", val)
+			t.Errorf("expected true for %q", val)
 		}
 	}
 
 	badValues := []string{"longerthan15characters", "", "12345", "1-2-3-4", "-begin", "end-", "two--hyphens", "1-2", "whois++"}
 	for _, val := range badValues {
 		if IsValidPortName(val) {
-			t.Errorf("expected false for '%d'", val)
+			t.Errorf("expected false for %q", val)
 		}
 	}
 }

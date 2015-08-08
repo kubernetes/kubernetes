@@ -54,8 +54,6 @@ func updateReplicaCount(rcClient client.ReplicationControllerInterface, controll
 			return getErr
 		}
 	}
-	// Failed 2 updates one of which was with the latest controller, return the update error
-	return
 }
 
 // OverlappingControllers sorts a list of controllers by creation timestamp, using their names as a tie breaker.

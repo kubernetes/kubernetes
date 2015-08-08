@@ -68,7 +68,7 @@ func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
 	var endpoints []api.Endpoints
 	loadBalancer.OnEndpointsUpdate(endpoints)
-	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "does-not-exist"}
+	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "does-not-exist"}
 	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err == nil {
 		t.Errorf("Didn't fail with non-existent service")
@@ -90,7 +90,7 @@ func expectEndpoint(t *testing.T, loadBalancer *LoadBalancerRR, service proxy.Se
 
 func TestLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "p"}
+	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "p"}
 	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -128,7 +128,7 @@ func stringsInSlice(haystack []string, needles ...string) bool {
 
 func TestLoadBalanceWorksWithMultipleEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "p"}
+	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "p"}
 	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -155,8 +155,8 @@ func TestLoadBalanceWorksWithMultipleEndpoints(t *testing.T) {
 
 func TestLoadBalanceWorksWithMultipleEndpointsMultiplePorts(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	serviceP := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "p"}
-	serviceQ := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "q"}
+	serviceP := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "p"}
+	serviceQ := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "q"}
 	endpoint, err := loadBalancer.NextEndpoint(serviceP, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -198,8 +198,8 @@ func TestLoadBalanceWorksWithMultipleEndpointsMultiplePorts(t *testing.T) {
 
 func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	serviceP := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "p"}
-	serviceQ := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "q"}
+	serviceP := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "p"}
+	serviceQ := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "q"}
 	endpoint, err := loadBalancer.NextEndpoint(serviceP, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -289,8 +289,8 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 
 func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	fooServiceP := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, "p"}
-	barServiceP := proxy.ServicePortName{types.NamespacedName{"testnamespace", "bar"}, "p"}
+	fooServiceP := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "p"}
+	barServiceP := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "bar"}, Port: "p"}
 	endpoint, err := loadBalancer.NextEndpoint(fooServiceP, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -345,7 +345,7 @@ func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 
 func TestStickyLoadBalanceWorksWithNewServiceCalledFirst(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, ""}
+	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: ""}
 	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -402,7 +402,7 @@ func TestStickyLoadBalanceWorksWithNewServiceCalledFirst(t *testing.T) {
 
 func TestStickyLoadBalanceWorksWithNewServiceCalledSecond(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, ""}
+	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: ""}
 	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -464,7 +464,7 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsRemoveOne(t *testing.T) {
 	client5 := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 5), Port: 0}
 	client6 := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 6), Port: 0}
 	loadBalancer := NewLoadBalancerRR()
-	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, ""}
+	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: ""}
 	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -538,7 +538,7 @@ func TestStickyLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	client2 := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 2), Port: 0}
 	client3 := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 3), Port: 0}
 	loadBalancer := NewLoadBalancerRR()
-	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, ""}
+	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: ""}
 	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -599,7 +599,7 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	client2 := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 2), Port: 0}
 	client3 := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 3), Port: 0}
 	loadBalancer := NewLoadBalancerRR()
-	fooService := proxy.ServicePortName{types.NamespacedName{"testnamespace", "foo"}, ""}
+	fooService := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: ""}
 	endpoint, err := loadBalancer.NextEndpoint(fooService, nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
@@ -615,7 +615,7 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 			},
 		},
 	}
-	barService := proxy.ServicePortName{types.NamespacedName{"testnamespace", "bar"}, ""}
+	barService := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "bar"}, Port: ""}
 	loadBalancer.NewService(barService, api.ServiceAffinityClientIP, 0)
 	endpoints[1] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: barService.Name, Namespace: barService.Namespace},

@@ -55,7 +55,7 @@ func AddSourceToErr(verb string, source string, err error) error {
 		if statusError, ok := err.(*errors.StatusError); ok {
 			status := statusError.Status()
 			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
-			return &errors.StatusError{status}
+			return &errors.StatusError{ErrStatus: status}
 		}
 		return fmt.Errorf("error when %s %q: %v", verb, source, err)
 	}
@@ -211,7 +211,7 @@ func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	s, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		glog.Fatalf("err %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -220,7 +220,7 @@ func GetFlagString(cmd *cobra.Command, flag string) string {
 func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringSlice(flag)
 	if err != nil {
-		glog.Fatalf("err %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -237,7 +237,7 @@ func GetWideFlag(cmd *cobra.Command) bool {
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
-		glog.Fatalf("err %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return b
 }
@@ -246,7 +246,7 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	i, err := cmd.Flags().GetInt(flag)
 	if err != nil {
-		glog.Fatalf("err: %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -254,7 +254,7 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	d, err := cmd.Flags().GetDuration(flag)
 	if err != nil {
-		glog.Fatalf("err: %v accessing flag %s for command %s: %s", err, flag, cmd.Name())
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return d
 }

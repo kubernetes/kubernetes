@@ -72,7 +72,7 @@ func TestRecycler(t *testing.T) {
 	}
 	recycler, err := plug.NewRecycler(spec)
 	if err != nil {
-		t.Error("Failed to make a new Recyler: %v", err)
+		t.Errorf("Failed to make a new Recyler: %v", err)
 	}
 	if recycler.GetPath() != spec.PersistentVolumeSource.HostPath.Path {
 		t.Errorf("Expected %s but got %s", spec.PersistentVolumeSource.HostPath.Path, recycler.GetPath())
@@ -112,7 +112,7 @@ func TestPlugin(t *testing.T) {
 	}
 	spec := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/vol1"}},
+		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/vol1"}},
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{}, nil)
@@ -152,7 +152,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{"foo"},
+				HostPath: &api.HostPathVolumeSource{Path: "foo"},
 			},
 			ClaimRef: &api.ObjectReference{
 				Name: "claimA",

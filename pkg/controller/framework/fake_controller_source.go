@@ -52,40 +52,40 @@ type nnu struct {
 // Add adds an object to the set and sends an add event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Add(obj runtime.Object) {
-	f.Change(watch.Event{watch.Added, obj}, 1)
+	f.Change(watch.Event{Type: watch.Added, Object: obj}, 1)
 }
 
 // Modify updates an object in the set and sends a modified event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Modify(obj runtime.Object) {
-	f.Change(watch.Event{watch.Modified, obj}, 1)
+	f.Change(watch.Event{Type: watch.Modified, Object: obj}, 1)
 }
 
 // Delete deletes an object from the set and sends a delete event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Delete(lastValue runtime.Object) {
-	f.Change(watch.Event{watch.Deleted, lastValue}, 1)
+	f.Change(watch.Event{Type: watch.Deleted, Object: lastValue}, 1)
 }
 
 // AddDropWatch adds an object to the set but forgets to send an add event to
 // watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) AddDropWatch(obj runtime.Object) {
-	f.Change(watch.Event{watch.Added, obj}, 0)
+	f.Change(watch.Event{Type: watch.Added, Object: obj}, 0)
 }
 
 // ModifyDropWatch updates an object in the set but forgets to send a modify
 // event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) ModifyDropWatch(obj runtime.Object) {
-	f.Change(watch.Event{watch.Modified, obj}, 0)
+	f.Change(watch.Event{Type: watch.Modified, Object: obj}, 0)
 }
 
 // DeleteDropWatch deletes an object from the set but forgets to send a delete
 // event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) DeleteDropWatch(lastValue runtime.Object) {
-	f.Change(watch.Event{watch.Deleted, lastValue}, 0)
+	f.Change(watch.Event{Type: watch.Deleted, Object: lastValue}, 0)
 }
 
 func (f *FakeControllerSource) key(meta *api.ObjectMeta) nnu {
@@ -170,7 +170,7 @@ func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, e
 			if err != nil {
 				return nil, err
 			}
-			changes = append(changes, watch.Event{c.Type, objCopy.(runtime.Object)})
+			changes = append(changes, watch.Event{Type: c.Type, Object: objCopy.(runtime.Object)})
 		}
 		return f.broadcaster.WatchWithPrefix(changes), nil
 	} else if rc > len(f.changes) {

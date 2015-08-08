@@ -180,7 +180,7 @@ func (r *hostPathRecycler) Recycle() error {
 				{
 					Name: "vol",
 					VolumeSource: api.VolumeSource{
-						HostPath: &api.HostPathVolumeSource{r.path},
+						HostPath: &api.HostPathVolumeSource{Path: r.path},
 					},
 				},
 			},

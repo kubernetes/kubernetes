@@ -247,7 +247,7 @@ func (s *scope) describe() (src, dest string) {
 
 // error makes an error that includes information about where we were in the objects
 // we were asked to convert.
-func (s *scope) error(message string, args ...interface{}) error {
+func (s *scope) errorf(message string, args ...interface{}) error {
 	srcPath, destPath := s.describe()
 	where := fmt.Sprintf("converting %v to %v: ", srcPath, destPath)
 	return fmt.Errorf(where+message, args...)
@@ -473,7 +473,7 @@ func (c *Converter) callCustom(sv, dv, custom reflect.Value, scope *scope) error
 	}
 	if !dv.CanAddr() {
 		if !dv.CanSet() {
-			return scope.error("can't addr or set dest.")
+			return scope.errorf("can't addr or set dest.")
 		}
 		dvOrig := dv
 		dv := reflect.New(dvOrig.Type())
@@ -527,11 +527,11 @@ func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
 
 	if !dv.CanSet() {
-		return scope.error("Cannot set dest. (Tried to deep copy something with unexported fields?)")
+		return scope.errorf("Cannot set dest. (Tried to deep copy something with unexported fields?)")
 	}
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.nameFunc(dt) != c.nameFunc(st) {
-		return scope.error(
+		return scope.errorf(
 			"type names don't match (%v, %v), and no conversion 'func (%v, %v) error' registered.",
 			c.nameFunc(st), c.nameFunc(dt), st, dt)
 	}
@@ -620,7 +620,7 @@ func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 		dv.Set(reflect.ValueOf(tmpdv.Interface()))
 		return nil
 	default:
-		return scope.error("couldn't copy '%v' into '%v'; didn't understand types", st, dt)
+		return scope.errorf("couldn't copy '%v' into '%v'; didn't understand types", st, dt)
 	}
 	return nil
 }
@@ -762,9 +762,9 @@ func (c *Converter) convertKV(skv, dkv kvValue, scope *scope) error {
 			case scope.flags.IsSet(IgnoreMissingFields):
 				// No error.
 			case scope.flags.IsSet(SourceToDest):
-				return scope.error("%v not present in dest", dkey)
+				return scope.errorf("%v not present in dest", dkey)
 			default:
-				return scope.error("%v not present in src", skey)
+				return scope.errorf("%v not present in src", skey)
 			}
 			continue
 		}

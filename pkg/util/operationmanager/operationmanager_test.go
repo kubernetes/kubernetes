@@ -148,7 +148,7 @@ func verifyNoError(t *testing.T, err error, name string) {
 
 func verifyError(t *testing.T, err error, name string) {
 	if err == nil {
-		t.Fatalf("Unexpected response on %q. Expected: <error> Actual: <no error>")
+		t.Fatalf("Unexpected response on %q. Expected: <error> Actual: <no error>", name)
 	}
 }
 

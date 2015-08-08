@@ -128,13 +128,13 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 	case ADD:
 		glog.V(4).Infof("Adding new endpoint from source %s : %+v", source, update.Endpoints)
 		for _, value := range update.Endpoints {
-			name := types.NamespacedName{value.Namespace, value.Name}
+			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			endpoints[name] = value
 		}
 	case REMOVE:
 		glog.V(4).Infof("Removing an endpoint %+v", update)
 		for _, value := range update.Endpoints {
-			name := types.NamespacedName{value.Namespace, value.Name}
+			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			delete(endpoints, name)
 		}
 	case SET:
@@ -142,7 +142,7 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 		// Clear the old map entries by just creating a new map
 		endpoints = make(map[types.NamespacedName]api.Endpoints)
 		for _, value := range update.Endpoints {
-			name := types.NamespacedName{value.Namespace, value.Name}
+			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			endpoints[name] = value
 		}
 	default:
@@ -226,13 +226,13 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 	case ADD:
 		glog.V(4).Infof("Adding new service from source %s : %+v", source, update.Services)
 		for _, value := range update.Services {
-			name := types.NamespacedName{value.Namespace, value.Name}
+			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			services[name] = value
 		}
 	case REMOVE:
 		glog.V(4).Infof("Removing a service %+v", update)
 		for _, value := range update.Services {
-			name := types.NamespacedName{value.Namespace, value.Name}
+			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			delete(services, name)
 		}
 	case SET:
@@ -240,7 +240,7 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 		// Clear the old map entries by just creating a new map
 		services = make(map[types.NamespacedName]api.Service)
 		for _, value := range update.Services {
-			name := types.NamespacedName{value.Namespace, value.Name}
+			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
 			services[name] = value
 		}
 	default:

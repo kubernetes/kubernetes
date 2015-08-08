@@ -77,7 +77,7 @@ func gcloudListNodes() {
 	output, err := exec.Command("gcloud", "compute", "instances", "list",
 		"--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone).CombinedOutput()
 	if err != nil {
-		Logf("Failed to list nodes: %v, %v", err)
+		Logf("Failed to list nodes: %v", err)
 		return
 	}
 	Logf(string(output))

@@ -288,7 +288,7 @@ func (f *FakeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Ex
 	defer f.Unlock()
 	f.execCmd = opts.Cmd
 	f.called = append(f.called, "create_exec")
-	return &docker.Exec{"12345678"}, nil
+	return &docker.Exec{ID: "12345678"}, nil
 }
 
 func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {

@@ -84,7 +84,7 @@ func main() {
 			log.Fatalf("failed to resolve make.bash path: %v", err)
 		}
 		if _, err := os.Stat(makeBash); os.IsNotExist(err) {
-			log.Fatalf("`make.bash` not found %q: %v", err)
+			log.Fatalf("`make.bash` not found %q: %v", makeBash, err)
 		}
 		makeBashCmd := fmt.Sprintf("(cd %s; GOOS=linux GOARCH=amd64 ./make.bash --no-clean)", filepath.Dir(makeBash))
 		log.Fatalf("`go %s` toolchain not found: %v, run: %q", "linux_amd64", crossErr, makeBashCmd)
@@ -127,7 +127,7 @@ func main() {
 
 	imageIDBytes := make([]byte, 32)
 	if _, err := rand.Read(imageIDBytes); err != nil {
-		log.Fatalf("failed to generate ID: %v")
+		log.Fatalf("failed to generate ID: %v", err)
 	}
 	imageID := hex.EncodeToString(imageIDBytes)
 	repo := map[string]map[string]string{

@@ -85,7 +85,7 @@ func TestValidateArgs(t *testing.T) {
 			t.Errorf("unexpected error: %v (%s)", err, test.testName)
 		}
 		if err == nil && test.expectErr {
-			t.Error("unexpected non-error (%s)", test.testName)
+			t.Errorf("unexpected non-error (%s)", test.testName)
 		}
 	}
 }

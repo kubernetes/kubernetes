@@ -38,7 +38,7 @@ func TestMatchNode(t *testing.T) {
 			m := MatchNode(labels.Everything(), field.AsSelector())
 			_, matchesSingle := m.MatchesSingle()
 			if e, a := expectedResult, matchesSingle; e != a {
-				t.Errorf("%+v: expected %v, got %v", e, a)
+				t.Errorf("%+v: expected %v, got %v", fieldSet, e, a)
 			}
 		}
 	}

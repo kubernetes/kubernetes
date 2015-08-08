@@ -336,5 +336,4 @@ func WaitForPending(client *github.Client, user, project string, prNumber int) e
 		glog.V(4).Info("PR is not pending, waiting for 30 seconds")
 		time.Sleep(30 * time.Second)
 	}
-	return nil
 }

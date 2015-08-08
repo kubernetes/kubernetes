@@ -1813,7 +1813,7 @@ func resetMetrics(c *client.Client) error {
 		return err
 	}
 	if string(body) != "metrics reset\n" {
-		return fmt.Errorf("Unexpected response: ", string(body))
+		return fmt.Errorf("Unexpected response: %q", string(body))
 	}
 	return nil
 }

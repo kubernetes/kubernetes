@@ -107,7 +107,7 @@ func NewEtcdClientStartServerIfNecessary(server string) (tools.EtcdClient, error
 
 type etcdHealth struct {
 	// Note this has to be public so the json library can modify it.
-	Health string `json:health`
+	Health string `json:"health"`
 }
 
 func EtcdHealthCheck(data []byte) error {

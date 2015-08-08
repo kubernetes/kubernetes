@@ -689,7 +689,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 			return &api.ReplicationController{}, fmt.Errorf("Fake error")
 		},
 	}
-	fakeRCClient := &testclient.FakeReplicationControllers{fakeClient, "default"}
+	fakeRCClient := &testclient.FakeReplicationControllers{Fake: fakeClient, Namespace: "default"}
 	numReplicas := 10
 	updateReplicaCount(fakeRCClient, *rc, numReplicas)
 	updates, gets := 0, 0

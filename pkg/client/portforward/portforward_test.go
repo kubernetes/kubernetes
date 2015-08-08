@@ -269,7 +269,7 @@ func TestGetListener(t *testing.T) {
 		}
 
 		if listener == nil {
-			t.Errorf("Test case #%d did not raised an error (%t) but failed in initializing listener", i, err)
+			t.Errorf("Test case #%d did not raise an error but failed in initializing listener", i)
 			continue
 		}
 

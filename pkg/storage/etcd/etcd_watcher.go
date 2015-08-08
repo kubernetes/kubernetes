@@ -181,8 +181,8 @@ func (w *etcdWatcher) translate() {
 		case err := <-w.etcdError:
 			if err != nil {
 				w.emit(watch.Event{
-					watch.Error,
-					&api.Status{
+					Type: watch.Error,
+					Object: &api.Status{
 						Status:  api.StatusFailure,
 						Message: err.Error(),
 					},

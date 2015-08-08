@@ -63,7 +63,7 @@ func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
 
 		for event := range eventChannel.GetChannel() {
 			glog.V(2).Infof("Got sys oom event from cadvisor: %v", event)
-			ow.recorder.PastEventf(ref, util.Time{event.Timestamp}, systemOOMEvent, "System OOM encountered")
+			ow.recorder.PastEventf(ref, util.Time{Time: event.Timestamp}, systemOOMEvent, "System OOM encountered")
 		}
 		glog.Errorf("Unexpectedly stopped receiving OOM notifications from cAdvisor")
 	}()

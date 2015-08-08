@@ -390,7 +390,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 func TestMountExternalVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{&volume.FakeVolumePlugin{"fake", nil}}, &volumeHost{kubelet})
+	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{&volume.FakeVolumePlugin{PluginName: "fake", Host: nil}}, &volumeHost{kubelet})
 
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -425,7 +425,7 @@ func TestMountExternalVolumes(t *testing.T) {
 func TestGetPodVolumesFromDisk(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	plug := &volume.FakeVolumePlugin{"fake", nil}
+	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
 
 	volsOnDisk := []struct {
@@ -439,7 +439,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 
 	expectedPaths := []string{}
 	for i := range volsOnDisk {
-		fv := volume.FakeVolume{volsOnDisk[i].podUID, volsOnDisk[i].volName, plug}
+		fv := volume.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
 		fv.SetUp()
 		expectedPaths = append(expectedPaths, fv.GetPath())
 	}
@@ -3140,7 +3140,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	podFullName := kubecontainer.GetPodFullName(pods[0])
 	status, found := kubelet.statusManager.GetPodStatus(podFullName)
 	if !found {
-		t.Errorf("expected to found status for pod %q", status)
+		t.Errorf("expected to found status for pod %q", podFullName)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q, ot %q.", api.PodFailed, status.Phase)
@@ -3195,7 +3195,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	podFullName := kubecontainer.GetPodFullName(pods[0])
 	status, found := kubelet.statusManager.GetPodStatus(podFullName)
 	if !found {
-		t.Errorf("expected to found status for pod %q", status)
+		t.Errorf("expected to found status for pod %q", podFullName)
 	}
 	if status.Phase == api.PodFailed {
 		t.Fatalf("expected pod status to not be %q", status.Phase)

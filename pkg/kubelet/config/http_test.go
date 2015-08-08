@@ -247,7 +247,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		var versionedPods runtime.Object
 		err := testapi.Converter().Convert(&testCase.pods, &versionedPods)
 		if err != nil {
-			t.Fatalf("error in versioning the pods: %s", testCase.desc, err)
+			t.Fatalf("%s: error in versioning the pods: %s", testCase.desc, err)
 		}
 		data, err := testapi.Codec().Encode(versionedPods)
 		if err != nil {

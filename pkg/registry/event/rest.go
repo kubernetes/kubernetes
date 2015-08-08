@@ -137,13 +137,13 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fi
 }
 
 func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
+	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: rs.getAttrs})
 }
 
 // Watch returns Events events via a watch.Interface.
 // It implements rest.Watcher.
 func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
+	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: rs.getAttrs}, resourceVersion)
 }
 
 // New returns a new api.Event

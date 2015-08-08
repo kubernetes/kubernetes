@@ -195,7 +195,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		versionedDeleterObject = indirectArbitraryPointer(objectPtr)
 		isDeleter = true
 	case isDeleter:
-		gracefulDeleter = rest.GracefulDeleteAdapter{deleter}
+		gracefulDeleter = rest.GracefulDeleteAdapter{Deleter: deleter}
 	}
 
 	versionedStatusPtr, err := a.group.Creater.New(serverVersion, "Status")

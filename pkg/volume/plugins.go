@@ -251,7 +251,7 @@ func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVo
 	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
 		return persistentVolumePlugin, nil
 	}
-	return nil, fmt.Errorf("no persistent volume plugin matched: %+v")
+	return nil, fmt.Errorf("no persistent volume plugin matched")
 }
 
 // FindRecyclablePluginByName fetches a persistent volume plugin by name.  If no plugin

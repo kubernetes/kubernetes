@@ -142,7 +142,7 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 		} else {
 			if obj, err := api.Scheme.Decode(responseErrorBytes); err == nil {
 				if status, ok := obj.(*api.Status); ok {
-					return nil, &apierrors.StatusError{*status}
+					return nil, &apierrors.StatusError{ErrStatus: *status}
 				}
 			}
 			responseError = string(responseErrorBytes)

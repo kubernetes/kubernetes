@@ -600,8 +600,6 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		bodyText := string(bodyBytes)
 		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, url, bodyText)
 	}
-
-	return resp.Body, nil
 }
 
 // Upgrade upgrades the request so that it supports multiplexed bidirectional

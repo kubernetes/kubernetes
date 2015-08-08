@@ -207,7 +207,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 		encoded string
 	}{
 		{
-			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{nil}},
+			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
 			`{"kind":"OptionalExtensionType","apiVersion":"testExternal"}`,
 		},
 	}
@@ -245,13 +245,13 @@ func TestExtensionMapping(t *testing.T) {
 		encoded string
 	}{
 		{
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionA{TestString: "foo"}}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionA{TestString: "foo"}}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}`,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionB{TestString: "bar"}}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionB{TestString: "bar"}}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}`,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{nil}},
+			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
 			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}`,
 		},
 	}

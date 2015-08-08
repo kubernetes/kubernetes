@@ -150,7 +150,7 @@ func LLENHandler(rw http.ResponseWriter, req *http.Request) {
 	infoL := HandleError(pool.Get(0).Do("LLEN", "k8petstore")).(int64)
 	fmt.Printf("=========== LLEN is %d ", infoL)
 	lengthJSON := HandleError(json.MarshalIndent(infoL, "", "  ")).([]byte)
-	fmt.Printf("================ LLEN json is %s", infoL)
+	fmt.Printf("================ LLEN json is %d", infoL)
 
 	print("RETURN LEN = " + string(lengthJSON))
 	rw.Write(lengthJSON)

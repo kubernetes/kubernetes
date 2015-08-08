@@ -39,8 +39,8 @@ import (
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
 func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *util.FakeClock) {
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{fakeTime}
-	ttlPolicy := &cache.TTLPolicy{ttl, fakeClock}
+	fakeClock := &util.FakeClock{Time: fakeTime}
+	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
 	return &ControllerExpectations{ttlStore}, fakeClock
