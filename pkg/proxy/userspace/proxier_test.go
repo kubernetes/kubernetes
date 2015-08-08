@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proxy
+package userspace
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/iptables"
@@ -211,7 +212,7 @@ func waitForNumProxyLoops(t *testing.T, p *Proxier, want int32) {
 
 func TestTCPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -238,7 +239,7 @@ func TestTCPProxy(t *testing.T) {
 
 func TestUDPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -265,8 +266,8 @@ func TestUDPProxy(t *testing.T) {
 
 func TestMultiPortProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	serviceP := ServicePortName{types.NamespacedName{"testnamespace", "echo-p"}, "p"}
-	serviceQ := ServicePortName{types.NamespacedName{"testnamespace", "echo-q"}, "q"}
+	serviceP := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo-p"}, "p"}
+	serviceQ := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo-q"}, "q"}
 	lb.OnUpdate([]api.Endpoints{{
 		ObjectMeta: api.ObjectMeta{Name: serviceP.Name, Namespace: serviceP.Namespace},
 		Subsets: []api.EndpointSubset{{
@@ -304,9 +305,9 @@ func TestMultiPortProxy(t *testing.T) {
 
 func TestMultiPortOnUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	serviceP := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
-	serviceQ := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "q"}
-	serviceX := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "x"}
+	serviceP := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	serviceQ := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "q"}
+	serviceX := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "x"}
 
 	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil)
 	if err != nil {
@@ -350,7 +351,7 @@ func TestMultiPortOnUpdate(t *testing.T) {
 }
 
 // Helper: Stops the proxy for the named service.
-func stopProxyByName(proxier *Proxier, service ServicePortName) error {
+func stopProxyByName(proxier *Proxier, service proxy.ServicePortName) error {
 	info, found := proxier.getServiceInfo(service)
 	if !found {
 		return fmt.Errorf("unknown service: %s", service)
@@ -360,7 +361,7 @@ func stopProxyByName(proxier *Proxier, service ServicePortName) error {
 
 func TestTCPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
@@ -398,7 +399,7 @@ func TestTCPProxyStop(t *testing.T) {
 
 func TestUDPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
@@ -436,7 +437,7 @@ func TestUDPProxyStop(t *testing.T) {
 
 func TestTCPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
@@ -473,7 +474,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 
 func TestUDPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Namespace: service.Namespace, Name: service.Name},
@@ -510,7 +511,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 
 func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -562,7 +563,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 
 func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -614,7 +615,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 
 func TestTCPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -662,7 +663,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 
 func TestUDPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -707,7 +708,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 
 func TestProxyUpdatePublicIPs(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -759,7 +760,7 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 
 func TestProxyUpdatePortal(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	service := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
+	service := proxy.ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "p"}
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},

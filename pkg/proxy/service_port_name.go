@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,20 +18,9 @@ package proxy
 
 import (
 	"fmt"
-	"net"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 )
-
-// LoadBalancer is an interface for distributing incoming requests to service endpoints.
-type LoadBalancer interface {
-	// NextEndpoint returns the endpoint to handle a request for the given
-	// service-port and source address.
-	NextEndpoint(service ServicePortName, srcAddr net.Addr) (string, error)
-	NewService(service ServicePortName, sessionAffinityType api.ServiceAffinity, stickyMaxAgeMinutes int) error
-	CleanupStaleStickySessions(service ServicePortName)
-}
 
 // ServicePortName carries a namespace + name + portname.  This is the unique
 // identfier for a load-balanced service.

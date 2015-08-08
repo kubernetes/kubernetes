@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/iptables"
@@ -97,8 +97,8 @@ func (s *ProxyServer) Run(_ []string) error {
 	if net.IP(s.BindAddress).To4() == nil {
 		protocol = iptables.ProtocolIpv6
 	}
-	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier, err := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), s.PortRange)
+	loadBalancer := userspace.NewLoadBalancerRR()
+	proxier, err := userspace.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), s.PortRange)
 	if err != nil {
 		glog.Fatalf("Unable to create proxer: %v", err)
 	}

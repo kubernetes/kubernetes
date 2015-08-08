@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proxy
+package userspace
 
 import (
 	"errors"
@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
@@ -53,7 +54,7 @@ type affinityPolicy struct {
 // LoadBalancerRR is a round-robin load balancer.
 type LoadBalancerRR struct {
 	lock     sync.RWMutex
-	services map[ServicePortName]*balancerState
+	services map[proxy.ServicePortName]*balancerState
 }
 
 // Ensure this implements LoadBalancer.
@@ -76,11 +77,11 @@ func newAffinityPolicy(affinityType api.ServiceAffinity, ttlMinutes int) *affini
 // NewLoadBalancerRR returns a new LoadBalancerRR.
 func NewLoadBalancerRR() *LoadBalancerRR {
 	return &LoadBalancerRR{
-		services: map[ServicePortName]*balancerState{},
+		services: map[proxy.ServicePortName]*balancerState{},
 	}
 }
 
-func (lb *LoadBalancerRR) NewService(svcPort ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) error {
+func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) error {
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 	lb.newServiceInternal(svcPort, affinityType, ttlMinutes)
@@ -88,7 +89,7 @@ func (lb *LoadBalancerRR) NewService(svcPort ServicePortName, affinityType api.S
 }
 
 // This assumes that lb.lock is already held.
-func (lb *LoadBalancerRR) newServiceInternal(svcPort ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) *balancerState {
+func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) *balancerState {
 	if ttlMinutes == 0 {
 		ttlMinutes = 180 //default to 3 hours if not specified.  Should 0 be unlimeted instead????
 	}
@@ -113,7 +114,7 @@ func isSessionAffinity(affinity *affinityPolicy) bool {
 
 // NextEndpoint returns a service endpoint.
 // The service endpoint is chosen using the round-robin algorithm.
-func (lb *LoadBalancerRR) NextEndpoint(svcPort ServicePortName, srcAddr net.Addr) (string, error) {
+func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr net.Addr) (string, error) {
 	// Coarse locking is simple.  We can get more fine-grained if/when we
 	// can prove it matters.
 	lb.lock.Lock()
@@ -190,7 +191,7 @@ func flattenValidEndpoints(endpoints []hostPortPair) []string {
 }
 
 // Remove any session affinity records associated to a particular endpoint (for example when a pod goes down).
-func removeSessionAffinityByEndpoint(state *balancerState, svcPort ServicePortName, endpoint string) {
+func removeSessionAffinityByEndpoint(state *balancerState, svcPort proxy.ServicePortName, endpoint string) {
 	for _, affinity := range state.affinity.affinityMap {
 		if affinity.endpoint == endpoint {
 			glog.V(4).Infof("Removing client: %s from affinityMap for service %q", affinity.endpoint, svcPort)
@@ -202,7 +203,7 @@ func removeSessionAffinityByEndpoint(state *balancerState, svcPort ServicePortNa
 // Loop through the valid endpoints and then the endpoints associated with the Load Balancer.
 // Then remove any session affinity records that are not in both lists.
 // This assumes the lb.lock is held.
-func (lb *LoadBalancerRR) updateAffinityMap(svcPort ServicePortName, newEndpoints []string) {
+func (lb *LoadBalancerRR) updateAffinityMap(svcPort proxy.ServicePortName, newEndpoints []string) {
 	allEndpoints := map[string]int{}
 	for _, newEndpoint := range newEndpoints {
 		allEndpoints[newEndpoint] = 1
@@ -226,7 +227,7 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort ServicePortName, newEndpoint
 // Registered endpoints are updated if found in the update set or
 // unregistered if missing from the update set.
 func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
-	registeredEndpoints := make(map[ServicePortName]bool)
+	registeredEndpoints := make(map[proxy.ServicePortName]bool)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
@@ -250,7 +251,7 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 		}
 
 		for portname := range portsToEndpoints {
-			svcPort := ServicePortName{types.NamespacedName{svcEndpoints.Namespace, svcEndpoints.Name}, portname}
+			svcPort := proxy.ServicePortName{types.NamespacedName{svcEndpoints.Namespace, svcEndpoints.Name}, portname}
 			state, exists := lb.services[svcPort]
 			curEndpoints := []string{}
 			if state != nil {
@@ -294,7 +295,7 @@ func slicesEquiv(lhs, rhs []string) bool {
 	return false
 }
 
-func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort ServicePortName) {
+func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort proxy.ServicePortName) {
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
