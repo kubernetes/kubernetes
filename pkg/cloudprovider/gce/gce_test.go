@@ -50,6 +50,10 @@ func TestGetHostTag(t *testing.T) {
 			host:     "gke-test-ea6e8c80-node-8ytk",
 			expected: "gke-test-ea6e8c80-node",
 		},
+		{
+			host:     "kubernetes-minion-559o.c.PROJECT_NAME.internal",
+			expected: "kubernetes-minion",
+		},
 	}
 
 	gce := &GCECloud{}
