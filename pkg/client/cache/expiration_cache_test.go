@@ -118,7 +118,7 @@ func TestTTLPolicy(t *testing.T) {
 	}
 	fakeTimestampedEntry.timestamp = fakeTime
 	if policy.IsExpired(fakeTimestampedEntry) {
-		t.Errorf("TTL Cache should not expire entires before ttl")
+		t.Errorf("TTL Cache should not expire entries before ttl")
 	}
 	fakeTimestampedEntry.timestamp = expiredTime
 	if !policy.IsExpired(fakeTimestampedEntry) {

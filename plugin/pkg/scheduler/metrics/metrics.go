@@ -30,7 +30,7 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: schedulerSubsystem,
 			Name:      "e2e_scheduling_latency_microseconds",
-			Help:      "E2e scheduling latency (scheduling algorith + binding)",
+			Help:      "E2e scheduling latency (scheduling algorithm + binding)",
 		},
 	)
 	SchedulingAlgorithmLatency = prometheus.NewSummary(

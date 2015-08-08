@@ -39,7 +39,7 @@ func recordOperation(operation string, start time.Time) {
 	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
 }
 
-// Record error for metric if an error occured.
+// Record error for metric if an error occurred.
 func recordError(operation string, err error) {
 	if err != nil {
 		metrics.DockerErrors.WithLabelValues(operation).Inc()

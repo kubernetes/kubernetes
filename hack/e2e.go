@@ -318,7 +318,7 @@ func printPrefixedLines(prefix, s string) {
 }
 
 // returns either "", or a list of args intended for appending with the
-// kubectl command (begining with a space).
+// kubectl command (beginning with a space).
 func kubectlArgs() string {
 	if *checkVersionSkew {
 		return " --match-server-version"

@@ -172,7 +172,7 @@ function get-kubeconfig-bearertoken() {
 }
 
 # Sets KUBE_VERSION variable to the version passed in as an argument, or if argument is
-# latest_stable, latest_release, or latest_ci fetches and sets the correponding version number
+# latest_stable, latest_release, or latest_ci fetches and sets the corresponding version number
 #
 # Args:
 #   $1 version string from command line

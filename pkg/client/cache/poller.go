@@ -30,7 +30,7 @@ type Enumerator interface {
 	Get(index int) (object interface{})
 }
 
-// GetFunc should return an enumerator that you wish the Poller to proccess.
+// GetFunc should return an enumerator that you wish the Poller to process.
 type GetFunc func() (Enumerator, error)
 
 // Poller is like Reflector, but it periodically polls instead of watching.

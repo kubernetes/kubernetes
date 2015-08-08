@@ -1,4 +1,4 @@
-# Alpine linux would be great for this, but it's DNS does not use seach paths.
+# Alpine linux would be great for this, but it's DNS does not use search paths.
 FROM progrium/busybox
 MAINTAINER Tim Hockin "thockin@google.com"
 

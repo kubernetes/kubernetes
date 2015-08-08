@@ -1,4 +1,4 @@
-## This file is used as input to deployment script, which ammends it as needed.
+## This file is used as input to deployment script, which amends it as needed.
 ## More specifically, we need to add environment files for as many nodes as we
 ## are going to deploy.
 

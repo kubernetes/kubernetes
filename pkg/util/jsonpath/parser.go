@@ -166,7 +166,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		p.backup()
 		return p.parseIdentifier(cur)
 	default:
-		return fmt.Errorf("unrecognized charactor in action: %#U", r)
+		return fmt.Errorf("unrecognized character in action: %#U", r)
 	}
 	return p.parseInsideAction(cur)
 }

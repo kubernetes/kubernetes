@@ -636,7 +636,7 @@ func (r *runtime) makeRuntimePod(unitName string, podInfos map[string]*podInfo) 
 }
 
 // GetPods runs 'systemctl list-unit' and 'rkt list' to get the list of rkt pods.
-// Then it will use the result to contruct a list of container runtime pods.
+// Then it will use the result to construct a list of container runtime pods.
 // If all is false, then only running pods will be returned, otherwise all pods will be
 // returned.
 func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {

@@ -158,8 +158,8 @@ func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet util.StringSet
 					// Retry on error. See issue #11321
 					glog.Errorf("Error checking if path exists: %v", err)
 				} else if pathExists {
-					// A device path has succesfully been created for the PD
-					glog.Infof("Succesfully attached GCE PD %q.", b.pdName)
+					// A device path has successfully been created for the PD
+					glog.Infof("Successfully attached GCE PD %q.", b.pdName)
 					return path, nil
 				}
 			}
@@ -181,7 +181,7 @@ func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 	defer util.HandleCrash()
 
 	// Start operation, so that other threads can wait on this detach operation.
-	// Set bufferSize to 0 so senders are blocked on send until we recieve.
+	// Set bufferSize to 0 so senders are blocked on send until we receive.
 	ch, err := detachCleanupManager.Start(c.pdName, 0 /* bufferSize */)
 	if err != nil {
 		glog.Errorf("Error adding %q to detachCleanupManager: %v", c.pdName, err)
@@ -244,7 +244,7 @@ func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 			}
 			if allPathsRemoved {
 				// All paths to the PD have been succefully removed
-				glog.Infof("Succesfully detached GCE PD %q.", c.pdName)
+				glog.Infof("Successfully detached GCE PD %q.", c.pdName)
 				return
 			}
 

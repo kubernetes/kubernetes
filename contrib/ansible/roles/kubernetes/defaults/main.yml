@@ -25,7 +25,7 @@ kube_token_dir: "{{ kube_config_dir }}/tokens"
 kube_manifest_dir: "{{ kube_config_dir }}/manifests"
 
 # This is the group that the cert creation scripts chgrp the
-# cert files to. Not really changable...
+# cert files to. Not really changeable...
 kube_cert_group: kube-cert
 
 # Internal DNS domain name.

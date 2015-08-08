@@ -91,7 +91,7 @@ func expectPodUpdate(t *testing.T, ch <-chan kubelet.PodUpdate, expected ...kube
 	for i := range expected {
 		update := <-ch
 		sort.Sort(sortedPods(update.Pods))
-		// Clear the annotation field before the comparision.
+		// Clear the annotation field before the comparison.
 		// TODO: consider mock out recordFirstSeen in config.go
 		for _, pod := range update.Pods {
 			delete(pod.Annotations, kubelet.ConfigFirstSeenAnnotationKey)

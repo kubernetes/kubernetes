@@ -43,7 +43,7 @@ func TestAddNode(t *testing.T) {
 
 	queuePattern := []string{"first", "second", "third"}
 	if len(evictor.queue.queue) != len(queuePattern) {
-		t.Fatalf("Queue %v should have lenght %d", evictor.queue.queue, len(queuePattern))
+		t.Fatalf("Queue %v should have length %d", evictor.queue.queue, len(queuePattern))
 	}
 	if !CheckQueueEq(queuePattern, evictor.queue.queue) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
@@ -89,7 +89,7 @@ func TestDelNode(t *testing.T) {
 
 	queuePattern = []string{"first", "third"}
 	if len(evictor.queue.queue) != len(queuePattern) {
-		t.Fatalf("Queue %v should have lenght %d", evictor.queue.queue, len(queuePattern))
+		t.Fatalf("Queue %v should have length %d", evictor.queue.queue, len(queuePattern))
 	}
 	if !CheckQueueEq(queuePattern, evictor.queue.queue) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
@@ -111,7 +111,7 @@ func TestDelNode(t *testing.T) {
 
 	queuePattern = []string{"first", "second"}
 	if len(evictor.queue.queue) != len(queuePattern) {
-		t.Fatalf("Queue %v should have lenght %d", evictor.queue.queue, len(queuePattern))
+		t.Fatalf("Queue %v should have length %d", evictor.queue.queue, len(queuePattern))
 	}
 	if !CheckQueueEq(queuePattern, evictor.queue.queue) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)

@@ -179,7 +179,7 @@ func rewriteHTML(reader io.Reader, writer io.Writer, urlRewriter func(string) st
 	return nil
 }
 
-// rewriteResponse modifies an HTML response by updating absolute links refering
+// rewriteResponse modifies an HTML response by updating absolute links referring
 // to the original host to instead refer to the proxy transport.
 func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*http.Response, error) {
 	origBody := resp.Body

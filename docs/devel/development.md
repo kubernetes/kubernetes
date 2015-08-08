@@ -87,7 +87,7 @@ Note: If you have write access to the main repository at github.com/GoogleCloudP
 git remote set-url --push upstream no_push
 ```
 
-### Commiting changes to your fork
+### Committing changes to your fork
 
 ```sh
 git commit

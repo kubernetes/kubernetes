@@ -218,7 +218,7 @@ function validate-cluster {
   echo "Validating ${KUBERNETES_PROVIDER} cluster" 1>&2
 
   # Do not validate cluster size. There will be zero k8s minions until a pod is created.
-  # TODO(karlkfi): use componentstatuses or equivelent when it supports non-localhost core components
+  # TODO(karlkfi): use componentstatuses or equivalent when it supports non-localhost core components
 
   # Validate immediate cluster reachability and responsiveness
   echo "KubeDNS: $(cluster::mesos::docker::addon_status 'kube-dns')"

@@ -141,7 +141,7 @@ func TestGetServices(t *testing.T) {
 		{Port: 20, TargetPort: util.NewIntOrStringFromInt(ports[1])},
 	}
 
-	// 2 services targetting the same endpoints, one of which is declared as a tcp service.
+	// 2 services targeting the same endpoints, one of which is declared as a tcp service.
 	svc1 := getService(servicePorts)
 	svc2 := getService(servicePorts)
 	endpoints := []*api.Endpoints{

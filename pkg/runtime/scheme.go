@@ -83,7 +83,7 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 		return err
 	}
 
-	// Copy the kind field into the ouput object.
+	// Copy the kind field into the output object.
 	err = s.Convert(
 		&emptyPlugin{PluginBase: PluginBase{Kind: kind}},
 		outObj,

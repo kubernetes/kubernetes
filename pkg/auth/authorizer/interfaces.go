@@ -24,7 +24,7 @@ import (
 // that is used to make an authorization decision.
 type Attributes interface {
 	// The user string which the request was authenticated as, or empty if
-	// no authentication occured and the request was allowed to proceed.
+	// no authentication occurred and the request was allowed to proceed.
 	GetUserName() string
 
 	// The list of group names the authenticated user is a member of. Can be

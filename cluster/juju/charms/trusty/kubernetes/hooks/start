@@ -3,7 +3,7 @@
 set -ex
 
 # Start is guaranteed to be called once when after the unit is installed
-# *AND* once everytime a machine is rebooted.
+# *AND* once every time a machine is rebooted.
 
 if [ ! -f $CHARM_DIR/.unit-state ]
 then

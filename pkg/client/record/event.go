@@ -68,16 +68,16 @@ type EventRecorder interface {
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
 type EventBroadcaster interface {
-	// StartEventWatcher starts sending events recieved from this EventBroadcaster to the given
+	// StartEventWatcher starts sending events received from this EventBroadcaster to the given
 	// event handler function. The return value can be ignored or used to stop recording, if
 	// desired.
 	StartEventWatcher(eventHandler func(*api.Event)) watch.Interface
 
-	// StartRecordingToSink starts sending events recieved from this EventBroadcaster to the given
+	// StartRecordingToSink starts sending events received from this EventBroadcaster to the given
 	// sink. The return value can be ignored or used to stop recording, if desired.
 	StartRecordingToSink(sink EventSink) watch.Interface
 
-	// StartLogging starts sending events recieved from this EventBroadcaster to the given logging
+	// StartLogging starts sending events received from this EventBroadcaster to the given logging
 	// function. The return value can be ignored or used to stop recording, if desired.
 	StartLogging(logf func(format string, args ...interface{})) watch.Interface
 
@@ -95,7 +95,7 @@ type eventBroadcasterImpl struct {
 	*watch.Broadcaster
 }
 
-// StartRecordingToSink starts sending events recieved from the specified eventBroadcaster to the given sink.
+// StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
 // The return value can be ignored or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
 func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interface {
@@ -195,7 +195,7 @@ func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) boo
 	return false
 }
 
-// StartLogging starts sending events recieved from this EventBroadcaster to the given logging function.
+// StartLogging starts sending events received from this EventBroadcaster to the given logging function.
 // The return value can be ignored or used to stop recording, if desired.
 func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
 	return eventBroadcaster.StartEventWatcher(
@@ -204,7 +204,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format stri
 		})
 }
 
-// StartEventWatcher starts sending events recieved from this EventBroadcaster to the given event handler function.
+// StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value can be ignored or used to stop recording, if desired.
 func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*api.Event)) watch.Interface {
 	watcher := eventBroadcaster.Watch()

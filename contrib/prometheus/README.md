@@ -52,7 +52,7 @@ This is a v1 api based, containerized prometheus ReplicationController, which sc
 
 1. Use kubectl to handle auth & proxy the kubernetes API locally, emulating the old KUBERNETES_RO service.
 
-1. The list of services to be monitored is passed as a command line aguments in
+1. The list of services to be monitored is passed as a command line arguments in
 the yaml file.
 
 1. The startup scripts assumes that each service T will have

@@ -263,7 +263,7 @@ func TestExecutorRegister(t *testing.T) {
 }
 
 // TestExecutorDisconnect ensures that the executor thinks that it is not
-// connected after a call to Disconnected has occured.
+// connected after a call to Disconnected has occurred.
 func TestExecutorDisconnect(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	executor := NewTestKubernetesExecutor()
@@ -346,7 +346,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	select {
 	case <-updates:
 	case <-time.After(time.Second):
-		t.Fatalf("Executor should send an intial update on Registration")
+		t.Fatalf("Executor should send an initial update on Registration")
 	}
 
 	pod := NewTestPod(1)

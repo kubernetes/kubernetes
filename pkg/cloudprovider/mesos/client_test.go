@@ -164,7 +164,7 @@ func (md FakeMasterDetector) Done() <-chan struct{} {
 	return md.done
 }
 
-// Auxilliary functions
+// Auxiliary functions
 
 func makeHttpMocks() (*httptest.Server, *http.Client, *http.Transport) {
 	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
