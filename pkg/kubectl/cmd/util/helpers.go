@@ -93,7 +93,7 @@ func checkErr(err error, handleErr func(string)) {
 
 	msg, ok := StandardErrorMessage(err)
 	if !ok {
-		msg = fmt.Sprintf("error: %s\n", err.Error())
+		msg = fmt.Sprintf("error: %s", err.Error())
 	}
 	handleErr(msg)
 }
