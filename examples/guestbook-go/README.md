@@ -280,7 +280,7 @@ You can now play with the guestbook that you just created by opening it in a bro
 
 ### Step Eight: Cleanup <a id="step-eight"></a>
 
-After you're done playing with the guestbook, you can cleanup by deleting the guestbook service and removing the associated resources that were created, including load balancers, forwarding rules, target pools, and Kuberentes replication controllers and services.
+After you're done playing with the guestbook, you can cleanup by deleting the guestbook service and removing the associated resources that were created, including load balancers, forwarding rules, target pools, and Kubernetes replication controllers and services.
 
 Delete all the resources by running the following `kubectl delete -f` *`filename`* command:
 

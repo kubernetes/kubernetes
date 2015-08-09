@@ -98,7 +98,7 @@ $ cluster/kubectl.sh config view --output=yaml --flatten=true --minify=true > ${
 
 The output from this command will contain a single file that has all the required information needed to connect to your Kubernetes cluster that you previously provisioned. This file should be considered sensitive, so do not share this file with untrusted parties.
 
-We will later use this file to tell OpenShift how to bootstap its own configuration.
+We will later use this file to tell OpenShift how to bootstrap its own configuration.
 
 ### Step 2: Create an External Load Balancer to Route Traffic to OpenShift
 

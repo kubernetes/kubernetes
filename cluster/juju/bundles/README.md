@@ -14,7 +14,7 @@ containerized applications.
 
 The [Juju](https://juju.ubuntu.com) system provides provisioning and
 orchestration across a variety of clouds and bare metal. A juju bundle
-describes collection of services and how they interelate. `juju
+describes collection of services and how they interrelate. `juju
 quickstart` allows you to bootstrap a deployment environment and
 deploy a bundle.
 
@@ -136,7 +136,7 @@ configuration on it's own
 
 ## Installing the kubectl outside of kubernetes master machine
 
-Download the Kuberentes release from:
+Download the Kubernetes release from:
 https://github.com/GoogleCloudPlatform/kubernetes/releases and extract
 the release, you can then just directly use the cli binary at
 ./kubernetes/platforms/linux/amd64/kubectl

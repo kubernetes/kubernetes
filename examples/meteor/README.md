@@ -141,7 +141,7 @@ your cluster. Edit [`meteor-controller.json`](meteor-controller.json)
 and make sure the `image:` points to the container you just pushed to
 the Docker Hub or GCR.
 
-We will need to provide MongoDB a persistent Kuberetes volume to
+We will need to provide MongoDB a persistent Kubernetes volume to
 store its data. See the [volumes documentation](../../docs/user-guide/volumes.md) for
 options. We're going to use Google Compute Engine persistent
 disks. Create the MongoDB disk by running:

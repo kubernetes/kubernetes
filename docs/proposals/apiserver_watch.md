@@ -67,14 +67,14 @@ When a client sends a watch request to apiserver, instead of redirecting it to
 etcd, it will cause:
 
   - registering a handler to receive all new changes coming from etcd
-  - iteratiting though a watch window, starting at the requested resourceVersion
-    to the head and sending filetered changes directory to the client, blocking
+  - iterating though a watch window, starting at the requested resourceVersion
+    to the head and sending filtered changes directory to the client, blocking
     the above until this iteration has caught up
 
 This will be done be creating a go-routine per watcher that will be responsible
 for performing the above.
 
-The following section describes the proposal in more details, analizes some
+The following section describes the proposal in more details, analyzes some
 corner cases and divides the whole design in more fine-grained steps.
 
 

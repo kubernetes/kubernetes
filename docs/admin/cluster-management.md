@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 This document describes several topics related to the lifecycle of a cluster: creating a new cluster,
 upgrading your cluster's
-master and worker nodes, performing node maintainence (e.g. kernel upgrades), and upgrading the Kubernetes API version of a
+master and worker nodes, performing node maintenance (e.g. kernel upgrades), and upgrading the Kubernetes API version of a
 running cluster.
 
 ## Creating and configuring a Cluster
@@ -132,7 +132,7 @@ For pods with a replication controller, the pod will eventually be replaced by a
 
 For pods with no replication controller, you need to bring up a new copy of the pod, and assuming it is not part of a service, redirect clients to it.
 
-Perform maintainence work on the node.
+Perform maintenance work on the node.
 
 Make the node schedulable again:
 

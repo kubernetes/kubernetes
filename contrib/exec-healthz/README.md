@@ -1,6 +1,6 @@
 # Exec healthz server
 
-The exec healthz server is a sidecar container meant to serve as a liveness-exec-over-http bridge. It isolates pods from the idiosyncracies of container runtime exec implemetations.
+The exec healthz server is a sidecar container meant to serve as a liveness-exec-over-http bridge. It isolates pods from the idiosyncrasies of container runtime exec implementations.
 
 ## Examples:
 

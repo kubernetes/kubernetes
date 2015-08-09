@@ -87,7 +87,7 @@ cd kubernetes/cluster/docker-multinode
 
 `Master done!`
 
-See [here](docker-multinode/master.md) for detailed instructions explaination.
+See [here](docker-multinode/master.md) for detailed instructions explanation.
 
 ## Adding a worker node
 
@@ -104,7 +104,7 @@ cd kubernetes/cluster/docker-multinode
 
 `Worker done!`
 
-See [here](docker-multinode/worker.md) for detailed instructions explaination.
+See [here](docker-multinode/worker.md) for detailed instructions explanation.
 
 ## Testing your cluster
 

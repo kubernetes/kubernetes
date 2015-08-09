@@ -73,7 +73,7 @@ Kubernetes documentation is organized into several categories.
     - in the [Kubernetes Cluster Admin Guide](docs/admin/README.md)
   - **Developer and API documentation**
     - for people who want to write programs that access the Kubernetes API, write plugins
-      or extensions, or modify the core Kubernete code
+      or extensions, or modify the core Kubernetes code
     - in the [Kubernetes Developer Guide](docs/devel/README.md)
     - see also [notes on the API](docs/api.md)
     - see also the [API object documentation](http://kubernetes.io/third_party/swagger-ui/), a
