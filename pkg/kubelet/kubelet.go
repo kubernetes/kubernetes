@@ -2009,7 +2009,10 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	} else {
 		addr := net.ParseIP(kl.hostname)
 		if addr != nil {
-			node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: addr.String()}}
+			node.Status.Addresses = []api.NodeAddress{
+				{Type: api.NodeLegacyHostIP, Address: addr.String()},
+				{Type: api.NodeInternalIP, Address: addr.String()},
+			}
 		} else {
 			addrs, err := net.LookupIP(node.Name)
 			if err != nil {
@@ -2025,7 +2028,10 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 					}
 
 					if ip.To4() != nil {
-						node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}
+						node.Status.Addresses = []api.NodeAddress{
+							{Type: api.NodeLegacyHostIP, Address: ip.String()},
+							{Type: api.NodeInternalIP, Address: ip.String()},
+						}
 						break
 					}
 				}
@@ -2036,7 +2042,10 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 						return err
 					}
 
-					node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}
+					node.Status.Addresses = []api.NodeAddress{
+						{Type: api.NodeLegacyHostIP, Address: ip.String()},
+						{Type: api.NodeInternalIP, Address: ip.String()},
+					}
 				}
 			}
 		}
