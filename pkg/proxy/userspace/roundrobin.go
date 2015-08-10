@@ -223,10 +223,10 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort proxy.ServicePortName, newEn
 	}
 }
 
-// OnUpdate manages the registered service endpoints.
+// OnEndpointsUpdate manages the registered service endpoints.
 // Registered endpoints are updated if found in the update set or
 // unregistered if missing from the update set.
-func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
+func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	registeredEndpoints := make(map[proxy.ServicePortName]bool)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
@@ -262,7 +262,7 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 			if !exists || state == nil || len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
 				glog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
 				lb.updateAffinityMap(svcPort, newEndpoints)
-				// OnUpdate can be called without NewService being called externally.
+				// OnEndpointsUpdate can be called without NewService being called externally.
 				// To be safe we will call it here.  A new service will only be created
 				// if one does not already exist.  The affinity will be updated
 				// later, once NewService is called.

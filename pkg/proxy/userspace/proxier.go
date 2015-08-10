@@ -265,7 +265,7 @@ const udpIdleTimeout = 1 * time.Second
 // OnUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or
 // shutdown if missing from the update set.
-func (proxier *Proxier) OnUpdate(services []api.Service) {
+func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 	glog.V(4).Infof("Received update notice: %+v", services)
 	activeServices := make(map[proxy.ServicePortName]bool) // use a map as a set
 	for i := range services {

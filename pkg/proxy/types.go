@@ -25,10 +25,10 @@ import (
 
 // ProxyProvider is the interface provided by proxier implementations.
 type ProxyProvider interface {
-	// OnUpdate manages the active set of service proxies.
+	// OnServiceUpdate manages the active set of service proxies.
 	// Active service proxies are reinitialized if found in the update set or
 	// removed if missing from the update set.
-	OnUpdate(services []api.Service)
+	OnServiceUpdate(services []api.Service)
 	// SyncLoop runs periodic work.
 	// This is expected to run as a goroutine or as the main loop of the app.
 	// It does not return.
