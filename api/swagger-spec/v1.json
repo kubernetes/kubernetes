@@ -12721,7 +12721,7 @@
     "properties": {
      "port": {
       "type": "string",
-      "description": "number of name of the port to access on the container; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"
+      "description": "number or name of the port to access on the container; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"
      }
     }
    },
