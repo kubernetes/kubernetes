@@ -47,7 +47,7 @@ const (
 	updateDemoContainer      = "update-demo"
 	frontendSelector         = "name=frontend"
 	redisMasterSelector      = "name=redis-master"
-	redisSlaveSelector       = "name=redis-slave"
+	redisSlaveSelector       = "name=redis-worker"
 	kubectlProxyPort         = 8011
 	guestbookStartupTimeout  = 10 * time.Minute
 	guestbookResponseTimeout = 3 * time.Minute
@@ -750,7 +750,7 @@ func makeRequestToGuestbook(c *client.Client, cmd, value string, ns string) (str
 		Namespace(ns).
 		Resource("services").
 		Name("frontend").
-		Suffix("/index.php").
+		Suffix("/guestbook.php").
 		Param("cmd", cmd).
 		Param("key", "messages").
 		Param("value", value).

@@ -559,15 +559,15 @@ __EOF__
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
   kubectl create -f examples/guestbook/redis-master-service.yaml "${kube_flags[@]}"
-  kubectl create -f examples/guestbook/redis-slave-service.yaml "${kube_flags[@]}"
-  # Post-condition: redis-master and redis-slave services are running
-  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
+  kubectl create -f examples/guestbook/redis-worker-service.yaml "${kube_flags[@]}"
+  # Post-condition: redis-master and redis-worker services are running
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-worker:'
 
   ### Delete multiple services at once
-  # Pre-condition: redis-master and redis-slave services are running
-  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
+  # Pre-condition: redis-master and redis-worker services are running
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-worker:'
   # Command
-  kubectl delete services redis-master redis-slave "${kube_flags[@]}" # delete multiple services at once
+  kubectl delete services redis-master redis-worker "${kube_flags[@]}" # delete multiple services at once
   # Post-condition: Only the default kubernetes services are running
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
@@ -625,14 +625,14 @@ __EOF__
 
   ### Scale multiple replication controllers
   kubectl create -f examples/guestbook/redis-master-controller.yaml "${kube_flags[@]}"
-  kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-worker-controller.yaml "${kube_flags[@]}"
   # Command
-  kubectl scale rc/redis-master rc/redis-slave --replicas=4
+  kubectl scale rc/redis-master rc/redis-worker --replicas=4
   # Post-condition: 4 replicas each
   kube::test::get_object_assert 'rc redis-master' "{{$rc_replicas_field}}" '4'
-  kube::test::get_object_assert 'rc redis-slave' "{{$rc_replicas_field}}" '4'
+  kube::test::get_object_assert 'rc redis-worker' "{{$rc_replicas_field}}" '4'
   # Clean-up
-  kubectl delete rc redis-{master,slave} "${kube_flags[@]}"
+  kubectl delete rc redis-{master,worker} "${kube_flags[@]}"
 
   ### Expose replication controller as service
   # Pre-condition: 3 replicas
@@ -681,15 +681,15 @@ __EOF__
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
-  kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
-  # Post-condition: frontend and redis-slave
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
+  kubectl create -f examples/guestbook/redis-worker-controller.yaml "${kube_flags[@]}"
+  # Post-condition: frontend and redis-worker
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-worker:'
 
   ### Delete multiple controllers at once
-  # Pre-condition: frontend and redis-slave
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
+  # Pre-condition: frontend and redis-worker
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-worker:'
   # Command
-  kubectl stop rc frontend redis-slave "${kube_flags[@]}" # delete multiple controllers at once
+  kubectl stop rc frontend redis-worker "${kube_flags[@]}" # delete multiple controllers at once
   # Post-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
 

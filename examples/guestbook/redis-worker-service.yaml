@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis-slave
+  name: redis-worker
   labels:
-    name: redis-slave
+    name: redis-worker
 spec:
   ports:
     # the port that this service should serve on
   - port: 6379
   selector:
-    name: redis-slave
+    name: redis-worker
