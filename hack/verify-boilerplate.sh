@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-boiler="${KUBE_ROOT}/hooks/boilerplate.py"
+boiler="${KUBE_ROOT}/hack/boilerplate/boilerplate.py"
 
 cd ${KUBE_ROOT}
 

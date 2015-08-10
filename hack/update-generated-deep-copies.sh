@@ -38,7 +38,7 @@ function generate_version() {
 
 	echo "Generating for version ${version}"
 
-	sed 's/YEAR/2015/' hooks/boilerplate.go.txt > $TMPFILE
+	sed 's/YEAR/2015/' hack/boilerplate/boilerplate.go.txt > $TMPFILE
 	cat >> $TMPFILE <<EOF
 package ${version}
 
