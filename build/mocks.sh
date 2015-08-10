@@ -24,7 +24,7 @@ set -o pipefail
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)
 
-GOPATH=$(cd "${KUBE_ROOT}/../../../.." && pwd)
+GOPATH=$(cd "${KUBE_ROOT}/../../.." && pwd)
 GOPATH="${GOPATH}:${KUBE_ROOT}/Godeps/_workspace"
 
 # TODO: install counterfeiter? use container? https://github.com/maxbrunsfeld/counterfeiter
