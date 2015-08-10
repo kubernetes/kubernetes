@@ -560,7 +560,7 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 	})
 }
 
-// waitForRCPodOnNode returns the pod from the given replication controller (decribed by rcName) which is scheduled on the given node.
+// waitForRCPodOnNode returns the pod from the given replication controller (described by rcName) which is scheduled on the given node.
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
@@ -583,7 +583,7 @@ func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, er
 	return p, err
 }
 
-// waitForRCPodToDisappear returns nil if the pod from the given replication controller (decribed by rcName) no longer exists.
+// waitForRCPodToDisappear returns nil if the pod from the given replication controller (described by rcName) no longer exists.
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
@@ -1011,7 +1011,7 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 			continue
 
 		}
-		By(fmt.Sprintf("Succesfully fetched pod logs:%v\n", string(logs)))
+		By(fmt.Sprintf("Successfully fetched pod logs:%v\n", string(logs)))
 		break
 	}
 

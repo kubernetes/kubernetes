@@ -34,7 +34,7 @@ const (
 	StatusTooManyRequests     = 429
 	// HTTP recommendations are for servers to define 5xx error codes
 	// for scenarios not covered by behavior. In this case, ServerTimeout
-	// is an indication that a transient server error has occured and the
+	// is an indication that a transient server error has occurred and the
 	// client *should* retry, with an optional Retry-After header to specify
 	// the back off window.
 	StatusServerTimeout = 504

@@ -1709,7 +1709,7 @@ func (kl *Kubelet) handleNotFittingPods(pods []*api.Pod) []*api.Pod {
 // that don't fit on the node, and may reject pods if node is overcommitted.
 func (kl *Kubelet) admitPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncPodType) []*api.Pod {
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
-	// it should never leave irregardless of the restart policy. The statuses
+	// it should never leave regardless of the restart policy. The statuses
 	// of such pods should not be changed, and there is no need to sync them.
 	// TODO: the logic here does not handle two cases:
 	//   1. If the containers were removed immediately after they died, kubelet

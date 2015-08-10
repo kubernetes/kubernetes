@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-//TODO : Consolodate this code with the code for emptyDir.
+//TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
 var _ = Describe("hostPath", func() {
 	var (

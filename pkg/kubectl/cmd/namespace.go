@@ -28,13 +28,13 @@ import (
 func NewCmdNamespace(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "namespace [namespace]",
-		Short: "SUPERCEDED: Set and view the current Kubernetes namespace",
-		Long: `SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
+		Short: "SUPERSEDED: Set and view the current Kubernetes namespace",
+		Long: `SUPERSEDED:  Set and view the current Kubernetes namespace scope for command line requests.
 
-namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
+namespace has been superseded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
 `,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(fmt.Errorf("namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details."))
+			util.CheckErr(fmt.Errorf("namespace has been superseded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details."))
 		},
 	}
 	return cmd

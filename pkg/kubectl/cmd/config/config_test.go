@@ -95,13 +95,13 @@ func TestSetCurrentContext(t *testing.T) {
 	test.run(t)
 }
 
-func TestSetNonExistantContext(t *testing.T) {
+func TestSetNonExistentContext(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	test := configCommandTest{
-		args:            []string{"use-context", "non-existant-config"},
+		args:            []string{"use-context", "non-existent-config"},
 		startingConfig:  expectedConfig,
 		expectedConfig:  expectedConfig,
-		expectedOutputs: []string{`No context exists with the name: "non-existant-config"`},
+		expectedOutputs: []string{`No context exists with the name: "non-existent-config"`},
 	}
 	test.run(t)
 }

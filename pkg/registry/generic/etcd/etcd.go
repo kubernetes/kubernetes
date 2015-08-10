@@ -490,7 +490,7 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 // if the TTL cannot be calculated. The defaultTTL is changed to 1 if less than zero. Zero means
 // no TTL, not expire immediately.
 func (e *Etcd) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (ttl uint64, err error) {
-	// etcd may return a negative TTL for a node if the expiration has not occured due
+	// etcd may return a negative TTL for a node if the expiration has not occurred due
 	// to server lag - we will ensure that the value is at least set.
 	if defaultTTL < 0 {
 		defaultTTL = 1

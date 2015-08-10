@@ -107,7 +107,7 @@ type failParserTest struct {
 func TestFailParser(t *testing.T) {
 	failParserTests := []failParserTest{
 		{"unclosed action", "{.hello", "unclosed action"},
-		{"unrecognized charactor", "{*}", "unrecognized charactor in action: U+002A '*'"},
+		{"unrecognized character", "{*}", "unrecognized character in action: U+002A '*'"},
 		{"invalid number", "{+12.3.0}", "cannot parse number +12.3.0"},
 		{"unterminated array", "{[1}", "unterminated array"},
 		{"invalid index", "{[::-1]}", "invalid array index ::-1"},

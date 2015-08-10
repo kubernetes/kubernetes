@@ -244,7 +244,7 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 		socket:              sock,
 		timeout:             timeout,
 		sessionAffinityType: api.ServiceAffinityNone, // default
-		stickyMaxAgeMinutes: 180,                     // TODO: paramaterize this in the API.
+		stickyMaxAgeMinutes: 180,                     // TODO: parameterize this in the API.
 	}
 	proxier.setServiceInfo(service, si)
 

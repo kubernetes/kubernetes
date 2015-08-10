@@ -91,7 +91,7 @@ func (m *Broadcaster) Watch() Interface {
 
 // WatchWithPrefix adds a new watcher to the list and returns an Interface for it. It sends
 // queuedEvents down the new watch before beginning to send ordinary events from Broadcaster.
-// The returned watch will have a queue length that is at least large enough to accomodate
+// The returned watch will have a queue length that is at least large enough to accommodate
 // all of the items in queuedEvents.
 func (m *Broadcaster) WatchWithPrefix(queuedEvents []Event) Interface {
 	m.lock.Lock()
@@ -151,7 +151,7 @@ func (m *Broadcaster) Shutdown() {
 	close(m.incoming)
 }
 
-// loop recieves from m.incoming and distributes to all watchers.
+// loop receives from m.incoming and distributes to all watchers.
 func (m *Broadcaster) loop() {
 	// Deliberately not catching crashes here. Yes, bring down the process if there's a
 	// bug in watch.Broadcaster.

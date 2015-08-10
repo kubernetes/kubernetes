@@ -249,7 +249,7 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.clients.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
 
-	// Normalize all flags that are comming from other packages or pre-configurations
+	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
 }

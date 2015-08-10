@@ -182,7 +182,7 @@ func parseTimeISO8601(s string) (time.Time, error) {
 			theTime.offMinute = v
 			s = s[2:]
 		default:
-			return time.Time{}, errors.New("an unknown error occured")
+			return time.Time{}, errors.New("an unknown error occurred")
 		}
 		state++
 	}

@@ -33,14 +33,14 @@ Documentation for other releases can be found at
 
 ## kubectl namespace
 
-SUPERCEDED: Set and view the current Kubernetes namespace
+SUPERSEDED: Set and view the current Kubernetes namespace
 
 ### Synopsis
 
 
-SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
+SUPERSEDED:  Set and view the current Kubernetes namespace scope for command line requests.
 
-namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
+namespace has been superseded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
 
 
 ```

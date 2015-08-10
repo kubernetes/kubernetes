@@ -223,7 +223,7 @@ var _ = Describe("Kubectl client", func() {
 		It("should check if Kubernetes master services is included in cluster-info", func() {
 			By("validating cluster-info")
 			output := runKubectl("cluster-info")
-			// Can't check exact strings due to terminal controll commands (colors)
+			// Can't check exact strings due to terminal control commands (colors)
 			requiredItems := []string{"Kubernetes master", "is running at"}
 			if providerIs("gce", "gke") {
 				requiredItems = append(requiredItems, "KubeDNS", "Heapster")

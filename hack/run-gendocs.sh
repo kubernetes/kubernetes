@@ -47,7 +47,7 @@ kube::util::gen-analytics "${KUBE_ROOT}"
 
 "${mungedocs}" "--root-dir=${KUBE_ROOT}/docs/" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
-  echo "${KUBE_ROOT}/docs/ requires manual changes.  See preceeding errors."
+  echo "${KUBE_ROOT}/docs/ requires manual changes.  See preceding errors."
   exit 1
 elif [[ $ret -gt 1 ]]; then
   echo "Error running mungedocs."
@@ -56,7 +56,7 @@ fi
 
 "${mungedocs}" "--root-dir=${KUBE_ROOT}/examples/" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then
-  echo "${KUBE_ROOT}/examples/ requires manual changes.  See preceeding errors."
+  echo "${KUBE_ROOT}/examples/ requires manual changes.  See preceding errors."
   exit 1
 elif [[ $ret -gt 1 ]]; then
   echo "Error running mungedocs."

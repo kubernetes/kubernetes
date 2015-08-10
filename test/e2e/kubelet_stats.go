@@ -43,7 +43,7 @@ import (
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
-// TODO: Get some more structure aroud the metrics and this type
+// TODO: Get some more structure around the metrics and this type
 type KubeletMetric struct {
 	// eg: list, info, create
 	Operation string

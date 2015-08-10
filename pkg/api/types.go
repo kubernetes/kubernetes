@@ -1808,7 +1808,7 @@ type StatusCause struct {
 }
 
 // CauseType is a machine readable value providing more detail about what
-// occured in a status response. An operation may have multiple causes for a
+// occurred in a status response. An operation may have multiple causes for a
 // status (whether Failure or Success).
 type CauseType string
 
@@ -1897,7 +1897,7 @@ type Event struct {
 	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
 	FirstTimestamp util.Time `json:"firstTimestamp,omitempty"`
 
-	// The time at which the most recent occurance of this event was recorded.
+	// The time at which the most recent occurrence of this event was recorded.
 	LastTimestamp util.Time `json:"lastTimestamp,omitempty"`
 
 	// The number of times this event has occurred.

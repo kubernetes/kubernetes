@@ -34,7 +34,7 @@ func IsEtcdNotFound(err error) bool {
 	return isEtcdErrorNum(err, tools.EtcdErrorCodeNotFound)
 }
 
-// IsEtcdNodeExist returns true iff err is an etcd node aleady exist error.
+// IsEtcdNodeExist returns true iff err is an etcd node already exist error.
 func IsEtcdNodeExist(err error) bool {
 	return isEtcdErrorNum(err, tools.EtcdErrorCodeNodeExist)
 }

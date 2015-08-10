@@ -90,7 +90,7 @@ function write_api_server_config {
     mkdir -p -m 777 /srv/kubernetes/
 
     ### We will move files back and forth between the /srv/kube.. directory.
-    ### That is how we modulate leader.  Each node will continously either
+    ### That is how we modulate leader.  Each node will continuously either
     ### ensure that the manifests are in this dir, or else, are in the kubelet manifest dir.
     cp /vagrant/kube-scheduler.manifest /vagrant/kube-controller-manager.manifest /srv/kubernetes
 

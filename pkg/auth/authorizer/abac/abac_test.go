@@ -110,7 +110,7 @@ func NotTestAuthorize(t *testing.T) {
 		{User: uChuck, RO: true, Resource: "pods", NS: "ns1", ExpectAllow: false},
 		{User: uChuck, RO: true, Resource: "floop", NS: "ns1", ExpectAllow: false},
 		// Chunk can't access things with no kind or namespace
-		// TODO: find a way to give someone access to miscelaneous endpoints, such as
+		// TODO: find a way to give someone access to miscellaneous endpoints, such as
 		// /healthz, /version, etc.
 		{User: uChuck, RO: true, Resource: "", NS: "", ExpectAllow: false},
 	}

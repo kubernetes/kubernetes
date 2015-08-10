@@ -111,7 +111,7 @@ type Scope interface {
 	DefaultConvert(src, dest interface{}, flags FieldMatchingFlags) error
 
 	// If registered, returns a function applying defaults for objects of a given type.
-	// Used for automatically generating convertion functions.
+	// Used for automatically generating conversion functions.
 	DefaultingInterface(inType reflect.Type) (interface{}, bool)
 
 	// SrcTags and DestTags contain the struct tags that src and dest had, respectively.
@@ -649,7 +649,7 @@ type kvValue interface {
 	tagOf(key string) reflect.StructTag
 	// Will return the zero Value if the key doesn't exist.
 	value(key string) reflect.Value
-	// Maps require explict setting-- will do nothing for structs.
+	// Maps require explicit setting-- will do nothing for structs.
 	// Returns false on failure.
 	confirmSet(key string, v reflect.Value) bool
 }

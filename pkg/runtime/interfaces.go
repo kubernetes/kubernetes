@@ -130,7 +130,7 @@ type SelfLinker interface {
 }
 
 // All api types must support the Object interface. It's deliberately tiny so that this is not an onerous
-// burden. Implement it with a pointer reciever; this will allow us to use the go compiler to check the
+// burden. Implement it with a pointer receiver; this will allow us to use the go compiler to check the
 // one thing about our objects that it's capable of checking for us.
 type Object interface {
 	// This function is used only to enforce membership. It's never called.

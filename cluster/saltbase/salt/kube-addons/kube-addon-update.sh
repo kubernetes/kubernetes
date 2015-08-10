@@ -25,7 +25,7 @@
 # LIMITATIONS
 # 1. controllers are not updated unless their name is changed
 # 3. Services will not be updated unless their name is changed,
-#    but for services we acually want updates without name change.
+#    but for services we actually want updates without name change.
 # 4. Json files are not handled at all. Currently addons must be
 #    in yaml files
 # 5. exit code is probably not always correct (I haven't checked

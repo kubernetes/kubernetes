@@ -176,7 +176,7 @@ type handlerEntry struct {
 // HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide
 // more elegant output. It is not threadsafe, but you may call PrintObj repeatedly; headers
 // will only be printed if the object type changes. This makes it useful for printing items
-// recieved from watches.
+// received from watches.
 type HumanReadablePrinter struct {
 	handlerMap    map[reflect.Type]*handlerEntry
 	noHeaders     bool

@@ -44,7 +44,7 @@ const (
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
 // allows test cases to have fine-grained control over mock behaviors. We also need
 // PodsInterface and PodInterface to test list & delet pods, which is implemented in
-// the embeded client.Fake field.
+// the embedded client.Fake field.
 type FakeNodeHandler struct {
 	*testclient.Fake
 

@@ -350,7 +350,7 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
 		}
 
-		// write resource limits into the pod spec which is transfered to the executor. From here
+		// write resource limits into the pod spec which is transferred to the executor. From here
 		// on we can expect that the pod spec of a task has proper limits for CPU and memory.
 		// TODO(sttts): For a later separation of the kubelet and the executor also patch the pod on the apiserver
 		if unlimitedCPU := mresource.LimitPodCPU(&task.Pod, k.defaultContainerCPULimit); unlimitedCPU {

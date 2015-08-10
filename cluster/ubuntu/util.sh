@@ -35,7 +35,7 @@ function test-build-release {
   "${KUBE_ROOT}/build/release.sh"
 }
 
-# From user input set the necessary k8s and etcd configuration infomation
+# From user input set the necessary k8s and etcd configuration information
 function setClusterInfo() {
   # Initialize MINION_IPS in setClusterInfo function
   # MINION_IPS is defined as a global variable, and is concatenated with other nodeIP

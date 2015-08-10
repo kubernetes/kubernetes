@@ -46,10 +46,10 @@ type FakePodControl struct {
 	err            error
 }
 
-// Give each test that starts a background controller upto 1/2 a second.
+// Give each test that starts a background controller up to 1/2 a second.
 // Since we need to start up a goroutine to test watch, this routine needs
 // to get cpu before the test can complete. If the test is starved of cpu,
-// the watch test will take upto 1/2 a second before timing out.
+// the watch test will take up to 1/2 a second before timing out.
 const controllerTimeout = 500 * time.Millisecond
 
 var alwaysReady = func() bool { return true }
@@ -638,7 +638,7 @@ func TestUpdatePods(t *testing.T) {
 }
 
 func TestControllerUpdateRequeue(t *testing.T) {
-	// This server should force a requeue of the controller becuase it fails to update status.Replicas.
+	// This server should force a requeue of the controller because it fails to update status.Replicas.
 	fakeHandler := util.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
@@ -806,7 +806,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 			// Create/Delete the last pod
 			// The last add pod will decrease the expectation of the rc to 0,
-			// which will cause it to create/delete the remaining replicas upto burstReplicas.
+			// which will cause it to create/delete the remaining replicas up to burstReplicas.
 			if replicas != 0 {
 				manager.podStore.Store.Add(&pods.Items[expectedPods-1])
 				manager.addPod(&pods.Items[expectedPods-1])

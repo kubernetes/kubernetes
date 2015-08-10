@@ -314,7 +314,7 @@ func setDefaults(c *Config) {
 // Public fields:
 //   Handler -- The returned master has a field TopHandler which is an
 //   http.Handler which handles all the endpoints provided by the master,
-//   including the API, the UI, and miscelaneous debugging endpoints.  All
+//   including the API, the UI, and miscellaneous debugging endpoints.  All
 //   these are subject to authorization and authentication.
 //   InsecureHandler -- an http.Handler which handles all the same
 //   endpoints as Handler, but no authorization and authentication is done.

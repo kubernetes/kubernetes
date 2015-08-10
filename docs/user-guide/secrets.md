@@ -160,7 +160,7 @@ See another example of creating a secret and a pod that consumes that secret in 
 
 ### Manually specifying an imagePullSecret
 
-Use of imagePullSecrets is desribed in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)
+Use of imagePullSecrets is described in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)
 
 ### Automatic use of Manually Created Secrets
 

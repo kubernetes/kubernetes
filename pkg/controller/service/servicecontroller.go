@@ -242,7 +242,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 			return err, retry
 		}
 		// Always update the cache upon success.
-		// NOTE: Since we update the cached service if and only if we successully
+		// NOTE: Since we update the cached service if and only if we successfully
 		// processed it, a cached service being nil implies that it hasn't yet
 		// been successfully processed.
 		cachedService.appliedState = service

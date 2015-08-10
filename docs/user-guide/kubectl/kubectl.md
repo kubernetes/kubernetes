@@ -91,7 +91,7 @@ kubectl
 * [kubectl get](kubectl_get.md)	 - Display one or many resources
 * [kubectl label](kubectl_label.md)	 - Update the labels on a resource
 * [kubectl logs](kubectl_logs.md)	 - Print the logs for a container in a pod.
-* [kubectl namespace](kubectl_namespace.md)	 - SUPERCEDED: Set and view the current Kubernetes namespace
+* [kubectl namespace](kubectl_namespace.md)	 - SUPERSEDED: Set and view the current Kubernetes namespace
 * [kubectl patch](kubectl_patch.md)	 - Update field(s) of a resource by stdin.
 * [kubectl port-forward](kubectl_port-forward.md)	 - Forward one or more local ports to a pod.
 * [kubectl proxy](kubectl_proxy.md)	 - Run a proxy to the Kubernetes API server

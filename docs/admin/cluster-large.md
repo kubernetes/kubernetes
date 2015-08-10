@@ -88,7 +88,7 @@ To avoid running into cluster addon resource issues, when creating a cluster wit
   * [Kibana](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/kibana-controller.yaml)
 * Scale number of replicas for the following addons, if used, along with the size of cluster (there are multiple replicas of each so increasing replicas should help handle increased load, but, since load per replica also increases slightly, also consider increasing CPU/memory limits):
   * [elasticsearch](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/es-controller.yaml)
-* Increase memory and CPU limits sligthly for each of the following addons, if used, along with the size of cluster (there is one replica per node but CPU/memory usage increases slightly along with cluster load/size as well):
+* Increase memory and CPU limits slightly for each of the following addons, if used, along with the size of cluster (there is one replica per node but CPU/memory usage increases slightly along with cluster load/size as well):
   * [FluentD with ElasticSearch Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-es/fluentd-es.yaml)
   * [FluentD with GCP Plugin](http://releases.k8s.io/HEAD/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml)
 

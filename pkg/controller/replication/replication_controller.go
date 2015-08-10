@@ -139,7 +139,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 				}
 				rm.enqueueController(cur)
 			},
-			// This will enter the sync loop and no-op, becuase the controller has been deleted from the store.
+			// This will enter the sync loop and no-op, because the controller has been deleted from the store.
 			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
 			// way of achieving this is by performing a `stop` operation on the controller.
 			DeleteFunc: rm.enqueueController,

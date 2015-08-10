@@ -409,7 +409,7 @@ func TestMountExternalVolumes(t *testing.T) {
 	}
 	podVolumes, err := kubelet.mountExternalVolumes(&pod)
 	if err != nil {
-		t.Errorf("Expected sucess: %v", err)
+		t.Errorf("Expected success: %v", err)
 	}
 	expectedPodVolumes := []string{"vol1"}
 	if len(expectedPodVolumes) != len(podVolumes) {

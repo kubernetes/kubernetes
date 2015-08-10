@@ -277,7 +277,7 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 // Pop blocks until an item is added to the queue, and then returns it.  If
 // multiple items are ready, they are returned in the order in which they were
 // added/updated. The item is removed from the queue (and the store) before it
-// is returned, so if you don't succesfully process it, you need to add it back
+// is returned, so if you don't successfully process it, you need to add it back
 // with AddIfNotPresent().
 //
 // Pop returns a 'Deltas', which has a complete list of all the things

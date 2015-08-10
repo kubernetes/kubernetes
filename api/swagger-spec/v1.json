@@ -11429,7 +11429,7 @@
      },
      "lastTimestamp": {
       "type": "string",
-      "description": "the time at which the most recent occurance of this event was recorded"
+      "description": "the time at which the most recent occurrence of this event was recorded"
      },
      "count": {
       "type": "integer",
@@ -11985,7 +11985,7 @@
      },
      "hostPath": {
       "$ref": "v1.HostPathVolumeSource",
-      "description": "a HostPath provisioned by a developer or tester; for develment use only; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
+      "description": "a HostPath provisioned by a developer or tester; for development use only; see http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
      },
      "glusterfs": {
       "$ref": "v1.GlusterfsVolumeSource",

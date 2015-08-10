@@ -22,7 +22,7 @@ limitations under the License.
 //   plugin-name/<other-files>
 //   where, 'executable' has the following requirements:
 //     - should have exec permissions
-//     - should give non-zero exit code on failure, and zero on sucess
+//     - should give non-zero exit code on failure, and zero on success
 //     - the arguments will be <action> <pod_namespace> <pod_name> <docker_id_of_infra_container>
 //       whereupon, <action> will be one of:
 //         - init, called when the kubelet loads the plugin

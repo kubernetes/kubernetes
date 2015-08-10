@@ -40,6 +40,6 @@ type RangeRegistry interface {
 	// or an error if the allocation could not be retrieved.
 	Get() (*api.RangeAllocation, error)
 	// CreateOrUpdate should create or update the provide allocation, unless a conflict
-	// has occured since the item was last created.
+	// has occurred since the item was last created.
 	CreateOrUpdate(*api.RangeAllocation) error
 }

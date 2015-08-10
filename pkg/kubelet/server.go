@@ -686,11 +686,11 @@ type StatsRequest struct {
 	NumStats int `json:"num_stats,omitempty"`
 
 	// Start time for which to query information.
-	// If ommitted, the beginning of time is assumed.
+	// If omitted, the beginning of time is assumed.
 	Start time.Time `json:"start,omitempty"`
 
 	// End time for which to query information.
-	// If ommitted, current time is assumed.
+	// If omitted, current time is assumed.
 	End time.Time `json:"end,omitempty"`
 
 	// Whether to also include information from subcontainers.

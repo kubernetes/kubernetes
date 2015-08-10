@@ -57,7 +57,7 @@ def file_passes(filename, extension, ref, regexs):
         if p.search(d):
             return False
 
-    # Replace all occurances of the regex "2015|2014" with "YEAR"
+    # Replace all occurrences of the regex "2015|2014" with "YEAR"
     p = regexs["date"]
     for i, d in enumerate(data):
         (data[i], found) = p.subn('YEAR', d)

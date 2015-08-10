@@ -296,7 +296,7 @@ function kube-push-internal {
     local)
       kube-push-local;;
     *)
-      echo "The only known push methods are \"release\" to use the relase tarball or \"local\" to use the binaries built by make. KUBE_PUSH is set \"$KUBE_PUSH\"" >&2
+      echo "The only known push methods are \"release\" to use the release tarball or \"local\" to use the binaries built by make. KUBE_PUSH is set \"$KUBE_PUSH\"" >&2
       return 1;;
   esac
 }

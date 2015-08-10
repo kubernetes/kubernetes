@@ -36,7 +36,7 @@ var (
 )
 
 // ExtendedPodLister: SimpleModeler needs to be able to check for a pod's
-// existance in addition to listing the pods.
+// existence in addition to listing the pods.
 type ExtendedPodLister interface {
 	algorithm.PodLister
 	Exists(pod *api.Pod) (bool, error)

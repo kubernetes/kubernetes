@@ -318,7 +318,7 @@ func validateEvent(actualEvent *api.Event, expectedEvent *api.Event, t *testing.
 	}
 	if actualEvent.FirstTimestamp.Equal(actualEvent.LastTimestamp) {
 		if expectCompression {
-			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurance of the event, but were different. Actual Event: %#v", actualEvent.FirstTimestamp, actualEvent.LastTimestamp, *actualEvent)
+			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurrence of the event, but were different. Actual Event: %#v", actualEvent.FirstTimestamp, actualEvent.LastTimestamp, *actualEvent)
 		}
 	} else {
 		if !expectCompression {
