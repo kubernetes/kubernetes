@@ -143,7 +143,7 @@ func (util *RBDUtil) persistRBD(rbd rbdBuilder, mnt string) error {
 	return nil
 }
 
-func (util *RBDUtil) loadRBD(rbd *rbd, mnt string) error {
+func (util *RBDUtil) loadRBD(builder *rbdBuilder, mnt string) error {
 	file := path.Join(mnt, "rbd.json")
 	fp, err := os.Open(file)
 	if err != nil {
@@ -152,7 +152,7 @@ func (util *RBDUtil) loadRBD(rbd *rbd, mnt string) error {
 	defer fp.Close()
 
 	decoder := json.NewDecoder(fp)
-	if err = decoder.Decode(rbd); err != nil {
+	if err = decoder.Decode(builder); err != nil {
 		return fmt.Errorf("rbd: decode err: %v.", err)
 	}
 
@@ -173,7 +173,7 @@ func (util *RBDUtil) defencing(c rbdCleaner) error {
 		return nil
 	}
 
-	return util.rbdLock(rbdBuilder{rbd: c.rbd}, false)
+	return util.rbdLock(*c.rbdBuilder, false)
 }
 
 func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
@@ -262,7 +262,7 @@ func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
 		}
 
 		// load ceph and image/pool info to remove fencing
-		if err := util.loadRBD(c.rbd, mntPath); err == nil {
+		if err := util.loadRBD(c.rbdBuilder, mntPath); err == nil {
 			// remove rbd lock
 			util.defencing(c)
 		}
