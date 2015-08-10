@@ -12531,6 +12531,10 @@
       "type": "boolean",
       "description": "Use the host's pid namespace. Optional: Default to false."
      },
+     "hostIPC": {
+      "type": "boolean",
+      "description": "Use the host's ipc namespace. Optional: Default to false."
+     },
      "imagePullSecrets": {
       "type": "array",
       "items": {
