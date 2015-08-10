@@ -144,6 +144,7 @@ type RESTMapping struct {
 // consumers of Kubernetes compatible REST APIs as defined in docs/api-conventions.md.
 type RESTMapper interface {
 	VersionAndKindForResource(resource string) (defaultVersion, kind string, err error)
+	GroupForResource(resource string) (string, error)
 	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)

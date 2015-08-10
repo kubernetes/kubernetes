@@ -89,7 +89,7 @@ func ServeImageOrFail(f *Framework, test string, image string) {
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
 		By("Cleaning up the replication controller")
-		rcReaper, err := kubectl.ReaperFor("ReplicationController", f.Client)
+		rcReaper, err := kubectl.ReaperFor("ReplicationController", f.Client, nil)
 		if err != nil {
 			Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}

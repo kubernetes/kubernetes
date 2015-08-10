@@ -55,7 +55,7 @@ func init() {
 
 	ignoredKinds := util.NewStringSet()
 
-	RESTMapper = api.NewDefaultRESTMapper(Versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
+	RESTMapper = api.NewDefaultRESTMapper("experimental", Versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(RESTMapper)
 }
 

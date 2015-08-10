@@ -40,13 +40,3 @@ func GetVersion(w io.Writer, kubeClient client.Interface) {
 func GetClientVersion(w io.Writer) {
 	fmt.Fprintf(w, "Client Version: %#v\n", version.Get())
 }
-
-func GetApiVersions(w io.Writer, kubeClient client.Interface) {
-	apiVersions, err := kubeClient.ServerAPIVersions()
-	if err != nil {
-		fmt.Printf("Couldn't get available api versions from server: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Fprintf(w, "Available Server Api Versions: %#v\n", *apiVersions)
-}

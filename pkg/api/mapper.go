@@ -33,11 +33,12 @@ func RegisterRESTMapper(m meta.RESTMapper) {
 	RESTMapper = append(RESTMapper.(meta.MultiRESTMapper), m)
 }
 
-func NewDefaultRESTMapper(versions []string, interfacesFunc meta.VersionInterfacesFunc, importPathPrefix string,
-	ignoredKinds, rootScoped util.StringSet) *meta.DefaultRESTMapper {
+func NewDefaultRESTMapper(group string, versions []string, interfacesFunc meta.VersionInterfacesFunc,
+	importPathPrefix string, ignoredKinds, rootScoped util.StringSet) *meta.DefaultRESTMapper {
 
-	mapper := meta.NewDefaultRESTMapper(versions, interfacesFunc)
-	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources.
+	mapper := meta.NewDefaultRESTMapper(group, versions, interfacesFunc)
+	// enumerate all supported versions, get the kinds, and register with the mapper how to address
+	// our resources.
 	for _, version := range versions {
 		for kind, oType := range Scheme.KnownTypes(version) {
 			// TODO: Remove import path prefix check.

@@ -190,7 +190,7 @@ func RCFromManifest(fileName string) *api.ReplicationController {
 
 // StopRC stops the rc via kubectl's stop library
 func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
-	reaper, err := kubectl.ReaperFor("ReplicationController", restClient)
+	reaper, err := kubectl.ReaperFor("ReplicationController", restClient, nil)
 	if err != nil || reaper == nil {
 		return err
 	}
