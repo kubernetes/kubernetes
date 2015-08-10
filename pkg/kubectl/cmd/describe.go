@@ -56,6 +56,9 @@ $ kubectl describe pods/nginx
 // Describe a pod using the data in pod.json.
 $ kubectl describe -f pod.json
 
+// Describe all pods
+$ kubectl describe pods
+
 // Describe pods by label name=myLabel
 $ kubectl describe po -l name=myLabel
 
@@ -100,7 +103,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, filenames...).
 		SelectorParam(selector).
-		ResourceTypeOrNameArgs(false, args...).
+		ResourceTypeOrNameArgs(true, args...).
 		Flatten().
 		Do()
 	err = r.Err()
