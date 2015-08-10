@@ -30,14 +30,24 @@ type FakeLocks struct {
 	Namespace string
 }
 
-func (c *FakeLocks) List(selector labels.Selector) (*api.LimitRangeList, error) {
+func (c *FakeLocks) Create(lock *api.Lock) (*api.Lock, error) {
+        obj, err := c.Fake.Invokes(FakeAction{Action: "create-lock"}, &api.Lock{})
+        return obj.(*api.Lock), err
+}
+
+func (c *FakeLocks) List(selector labels.Selector) (*api.LockList, error) {
 	obj, err := c.Fake.Invokes(FakeAction{Action: "list-locks"}, &api.LockList{})
 	return obj.(*api.LockList), err
 }
 
-func (c *FakeLocks) Get(name string) (*api.LimitRange, error) {
+func (c *FakeLocks) Get(name string) (*api.Lock, error) {
 	obj, err := c.Fake.Invokes(FakeAction{Action: "get-lock", Value: name}, &api.Lock{})
 	return obj.(*api.Lock), err
+}
+
+func (c *FakeLocks) Update(lock *api.Lock) (*api.Lock, error) {
+        obj, err := c.Fake.Invokes(FakeAction{Action: "update-lock", Value: lock.Name}, &api.Lock{})
+        return obj.(*api.Lock), err
 }
 
 func (c *FakeLocks) Delete(name string) error {

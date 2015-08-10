@@ -180,3 +180,7 @@ func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 	return &FakeComponentStatuses{Fake: c}
 }
+
+func (c *Fake) Locks(namespace string) client.LockInterface {
+	return &FakeLocks{Fake: c, Namespace: namespace}
+}
