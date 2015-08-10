@@ -62,7 +62,7 @@ The basic auth file format is implemented in `plugin/pkg/auth/authenticator/pass
 and is a csv file with 3 columns: password, user name, user id.
 
 When using basic authentication from an http client, the apiserver expects an `Authorization` header
-with a value of `Basic BASE64ENCODEDUSER:PASSWORD`.
+with a value of `Basic BASE64ENCODED(USER:PASSWORD)`.
 
 ## Plugin Development
 
