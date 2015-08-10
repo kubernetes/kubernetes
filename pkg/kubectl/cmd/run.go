@@ -61,7 +61,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", "run/v1", "The name of the API generator to use.  Default is 'run-controller/v1'.")
+	cmd.Flags().String("generator", "", "The name of the API generator to use.  Default is 'run/v1' if --restart=Always, otherwise the default is 'run-pod/v1'.")
 	cmd.Flags().String("image", "", "The image for the container to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
@@ -73,6 +73,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
 	cmd.Flags().Bool("tty", false, "Allocated a TTY for each container in the pod.  Because -t is currently shorthand for --template, -t is not supported for --tty. This shorthand is deprecated and we expect to adopt -t for --tty soon.")
 	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--interactive' is set, in which case the default is true.")
+	cmd.Flags().String("restart", "Always", "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, only the Pod is created and --replicas must be 1.  Default 'Always'")
 	return cmd
 }
 
@@ -105,10 +106,24 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		return err
 	}
 
+	restartPolicy, err := getRestartPolicy(cmd, interactive)
+	if err != nil {
+		return err
+	}
+	if restartPolicy != api.RestartPolicyAlways && replicas != 1 {
+		return cmdutil.UsageError(cmd, fmt.Sprintf("--restart=%s requires that --repliacs=1, found %d", restartPolicy, replicas))
+	}
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
+	if len(generatorName) == 0 {
+		if restartPolicy == api.RestartPolicyAlways {
+			generatorName = "run/v1"
+		} else {
+			generatorName = "run-pod/v1"
+		}
+	}
 	generator, found := f.Generator(generatorName)
 	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generator))
+		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generatorName))
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
@@ -119,14 +134,20 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		return err
 	}
 
-	controller, err := generator.Generate(params)
+	obj, err := generator.Generate(params)
 	if err != nil {
 		return err
 	}
 
 	inline := cmdutil.GetFlagString(cmd, "overrides")
 	if len(inline) > 0 {
-		controller, err = cmdutil.Merge(controller, inline, "ReplicationController")
+		var objType string
+		if restartPolicy == api.RestartPolicyAlways {
+			objType = "ReplicationController"
+		} else {
+			objType = "Pod"
+		}
+		obj, err = cmdutil.Merge(obj, inline, objType)
 		if err != nil {
 			return err
 		}
@@ -134,7 +155,11 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 
 	// TODO: extract this flag to a central location, when such a location exists.
 	if !cmdutil.GetFlagBool(cmd, "dry-run") {
-		controller, err = client.ReplicationControllers(namespace).Create(controller.(*api.ReplicationController))
+		if restartPolicy == api.RestartPolicyAlways {
+			obj, err = client.ReplicationControllers(namespace).Create(obj.(*api.ReplicationController))
+		} else {
+			obj, err = client.Pods(namespace).Create(obj.(*api.Pod))
+		}
 		if err != nil {
 			return err
 		}
@@ -168,9 +193,13 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			return err
 		}
 		opts.Client = client
-		return handleAttach(client, controller.(*api.ReplicationController), opts)
+		if restartPolicy == api.RestartPolicyAlways {
+			return handleAttachReplicationController(client, obj.(*api.ReplicationController), opts)
+		} else {
+			return handleAttachPod(client, obj.(*api.Pod), opts)
+		}
 	}
-	return f.PrintObject(cmd, controller, cmdOut)
+	return f.PrintObject(cmd, obj, cmdOut)
 }
 
 func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) error {
@@ -197,7 +226,7 @@ func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer) error {
 	}
 }
 
-func handleAttach(c *client.Client, controller *api.ReplicationController, opts *AttachOptions) error {
+func handleAttachReplicationController(c *client.Client, controller *api.ReplicationController, opts *AttachOptions) error {
 	var pods *api.PodList
 	for pods == nil || len(pods.Items) == 0 {
 		var err error
@@ -210,7 +239,10 @@ func handleAttach(c *client.Client, controller *api.ReplicationController, opts 
 		}
 	}
 	pod := &pods.Items[0]
+	return handleAttachPod(c, pod, opts)
+}
 
+func handleAttachPod(c *client.Client, pod *api.Pod, opts *AttachOptions) error {
 	if err := waitForPodRunning(c, pod, opts.Out); err != nil {
 		return err
 	}
@@ -218,4 +250,25 @@ func handleAttach(c *client.Client, controller *api.ReplicationController, opts 
 	opts.PodName = pod.Name
 	opts.Namespace = pod.Namespace
 	return opts.Run()
+}
+
+func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, error) {
+	restart := cmdutil.GetFlagString(cmd, "restart")
+	if len(restart) == 0 {
+		if interactive {
+			return api.RestartPolicyOnFailure, nil
+		} else {
+			return api.RestartPolicyAlways, nil
+		}
+	}
+	switch api.RestartPolicy(restart) {
+	case api.RestartPolicyAlways:
+		return api.RestartPolicyAlways, nil
+	case api.RestartPolicyOnFailure:
+		return api.RestartPolicyOnFailure, nil
+	case api.RestartPolicyNever:
+		return api.RestartPolicyNever, nil
+	default:
+		return "", cmdutil.UsageError(cmd, fmt.Sprintf("invalid restart policy: %s", restart))
+	}
 }
