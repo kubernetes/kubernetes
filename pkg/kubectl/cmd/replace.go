@@ -34,7 +34,9 @@ import (
 const (
 	replace_long = `Replace a resource by filename or stdin.
 
-JSON and YAML formats are accepted.
+JSON and YAML formats are accepted. If replacing an existing resource, the
+complete resource spec must be provided. This can be obtained by
+$ kubectl get TYPE NAME -o yaml
 
 Please refer to the models in https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html to find if a field is mutable.`
 	replace_example = `// Replace a pod using the data in pod.json.
@@ -42,6 +44,9 @@ $ kubectl replace -f ./pod.json
 
 // Replace a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl replace -f -
+
+// Update a single-container pod's image version (tag) to v4
+kubectl get pod mypod -o yaml | sed 's/\(image: myimage\):.*$/\1:v4/' | kubectl replace -f -
 
 // Force replace, delete and then re-create the resource
 kubectl replace --force -f ./pod.json`

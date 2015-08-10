@@ -16,7 +16,9 @@ kubectl replace \- Replace a resource by filename or stdin.
 Replace a resource by filename or stdin.
 
 .PP
-JSON and YAML formats are accepted.
+JSON and YAML formats are accepted. If replacing an existing resource, the
+complete resource spec must be provided. This can be obtained by
+$ kubectl get TYPE NAME \-o yaml
 
 .PP
 Please refer to the models in 
@@ -161,6 +163,9 @@ $ kubectl replace \-f ./pod.json
 
 // Replace a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl replace \-f \-
+
+// Update a single\-container pod's image version (tag) to v4
+kubectl get pod mypod \-o yaml | sed 's/\\(image: myimage\\):.*$/\\1:v4/' | kubectl replace \-f \-
 
 // Force replace, delete and then re\-create the resource
 kubectl replace \-\-force \-f ./pod.json
