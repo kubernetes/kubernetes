@@ -40,7 +40,7 @@ with [replication controllers](../../docs/user-guide/replication-controller.md).
 because multicast discovery will not find the other pod IPs needed to form a cluster. This
 image detects other Elasticsearch [pods](../../docs/user-guide/pods.md) running in a specified [namespace](../../docs/user-guide/namespaces.md) with a given
 label selector. The detected instances are used to form a list of peer hosts which
-are used as part of the unicast discovery mechansim for Elasticsearch. The detection
+are used as part of the unicast discovery mechanism for Elasticsearch. The detection
 of the peer nodes is done by a program which communicates with the Kubernetes API
 server to get a list of matching Elasticsearch pods. To enable authenticated
 communication this image needs a [secret](../../docs/user-guide/secrets.md) to be mounted at `/etc/apiserver-secret`

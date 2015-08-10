@@ -25,7 +25,7 @@ Looks open enough :).
 
 1. Now, you can start this pod, like so `kubectl create -f contrib/prometheus/prometheus-all.json`.  This ReplicationController will maintain both prometheus, the server, as well as promdash, the visualization tool.  You can then configure promdash, and next time you restart the pod - you're configuration will be remain (since the promdash directory was mounted as a local docker volume).
 
-1. Finally, you can simply access localhost:3000, which will have promdash running.  Then, add the prometheus server (locahost:9090)to as a promdash server, and create a dashboard according to the promdash directions.
+1. Finally, you can simply access localhost:3000, which will have promdash running.  Then, add the prometheus server (localhost:9090)to as a promdash server, and create a dashboard according to the promdash directions.
 
 ## Prometheus 
 
@@ -52,14 +52,14 @@ This is a v1 api based, containerized prometheus ReplicationController, which sc
 
 1. Use kubectl to handle auth & proxy the kubernetes API locally, emulating the old KUBERNETES_RO service.
 
-1. The list of services to be monitored is passed as a command line aguments in
+1. The list of services to be monitored is passed as a command line arguments in
 the yaml file.
 
 1. The startup scripts assumes that each service T will have
 2 environment variables set ```T_SERVICE_HOST``` and ```T_SERVICE_PORT``` 
 
 1. Each can be configured manually in yaml file if you want to monitor something
-that is not a regular Kubernetes service.  For example, you can add comma delimted
+that is not a regular Kubernetes service.  For example, you can add comma delimited
 endpoints which can be scraped like so...
 ```
 - -t
@@ -77,7 +77,7 @@ at port 9090.
 # TODO
 
 - We should publish this image into the kube/ namespace.
-- Possibly use postgre or mysql as a promdash database.
+- Possibly use Postgres or mysql as a promdash database.
 - stop using kubectl to make a local proxy faking the old RO port and build in
   real auth capabilities.
 

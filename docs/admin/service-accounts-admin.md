@@ -84,7 +84,7 @@ TokenController runs as part of controller-manager. It acts asynchronously. It:
 - observes serviceAccount creation and creates a corresponding Secret to allow API access.
 - observes serviceAccount deletion and deletes all corresponding ServiceAccountToken Secrets
 - observes secret addition, and ensures the referenced ServiceAccount exists, and adds a token to the secret if needed
-- observes secret deleteion and removes a reference from the corresponding ServiceAccount if needed
+- observes secret deletion and removes a reference from the corresponding ServiceAccount if needed
 
 #### To create additional API tokens
 

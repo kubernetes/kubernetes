@@ -89,7 +89,7 @@ The web front end provides users an interface for watching pet store transaction
 
 To generate those transactions, you can use the bigpetstore data generator.  Alternatively, you could just write a
 
-shell script which calls "curl localhost:3000/k8petstore/rpush/blahblahblah" over and over again :).  But thats not nearly
+shell script which calls "curl localhost:3000/k8petstore/rpush/blahblahblah" over and over again :).  But that's not nearly
 
 as fun, and its not a good test of a real world scenario where payloads scale and have lots of information content.
 

@@ -74,7 +74,7 @@ parameters as follows:
     ```
 
     NOTE: The above is specifically for GRUB2.
-    You can check the command line parameters passed to your kenel by looking at the
+    You can check the command line parameters passed to your kernel by looking at the
     output of /proc/cmdline:
 
     ```console

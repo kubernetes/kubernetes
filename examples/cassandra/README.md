@@ -244,7 +244,7 @@ spec:
 [Download example](cassandra-controller.yaml)
 <!-- END MUNGE: EXAMPLE cassandra-controller.yaml -->
 
-Most of this replication controller definition is identical to the Cassandra pod definition above, it simply gives the resplication controller a recipe to use when it creates new Cassandra pods.  The other differentiating parts are the ```selector``` attribute which contains the controller's selector query, and the ```replicas``` attribute which specifies the desired number of replicas, in this case 1.
+Most of this replication controller definition is identical to the Cassandra pod definition above, it simply gives the replication controller a recipe to use when it creates new Cassandra pods.  The other differentiating parts are the ```selector``` attribute which contains the controller's selector query, and the ```replicas``` attribute which specifies the desired number of replicas, in this case 1.
 
 Create this controller:
 

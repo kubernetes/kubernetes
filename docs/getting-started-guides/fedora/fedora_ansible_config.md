@@ -187,7 +187,7 @@ cd ~/kubernetes/contrib/ansible/
 
 That's all there is to it.  It's really that easy.  At this point you should have a functioning Kubernetes cluster.
 
-**Show kubernets nodes**
+**Show kubernetes nodes**
 
 Run the following on the kube-master:
 

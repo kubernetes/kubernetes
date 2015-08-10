@@ -657,7 +657,7 @@ This pod mounts several node file system directories using the  `hostPath` volum
   authenticate external services, such as a cloud provider.
   - This is not required if you do not use a cloud provider (e.g. bare-metal).
 - The `/srv/kubernetes` mount allows the apiserver to read certs and credentials stored on the
-  node disk.  These could instead be stored on a persistend disk, such as a GCE PD, or baked into the image.
+  node disk.  These could instead be stored on a persistent disk, such as a GCE PD, or baked into the image.
 - Optionally, you may want to mount `/var/log` as well and redirect output there (not shown in template).
   - Do this if you prefer your logs to be accessible from the root filesystem with tools like journalctl.
 

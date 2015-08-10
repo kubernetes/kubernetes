@@ -58,7 +58,7 @@ A [Probe](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1
 
 * `ExecAction`: executes a specified command inside the container expecting on success that the command exits with status code 0.
 * `TCPSocketAction`: performs a tcp check against the container's IP address on a specified port expecting on success that the port is open.
-* `HTTPGetAction`: performs an HTTP Get againsts the container's IP address on a specified port and path expecting on success that the response has a status code greater than or equal to 200 and less than 400.
+* `HTTPGetAction`: performs an HTTP Get against the container's IP address on a specified port and path expecting on success that the response has a status code greater than or equal to 200 and less than 400.
 
 Each probe will have one of three results:
 

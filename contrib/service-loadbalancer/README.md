@@ -191,7 +191,7 @@ $ mysql -u root -ppassword --host 104.197.63.17 --port 3306 -e 'show databases;'
 ### Troubleshooting:
 - If you can curl or netcat the endpoint from the pod (with kubectl exec) and not from the node, you have not specified hostport and containerport.
 - If you can hit the ips from the node but not from your machine outside the cluster, you have not opened firewall rules for the right network.
-- If you can't hit the ips from within the container, either haproxy or the service_loadbalacer script is not runing.
+- If you can't hit the ips from within the container, either haproxy or the service_loadbalacer script is not running.
   1. Use ps in the pod
   2. sudo restart haproxy in the pod
   3. cat /etc/haproxy/haproxy.cfg in the pod

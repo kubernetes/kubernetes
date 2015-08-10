@@ -61,7 +61,7 @@ Here are some key points:
 * **Application-centric management**:
     Raises the level of abstraction from running an OS on virtual hardware to running an application on an OS using logical resources. This provides the simplicity of PaaS with the flexibility of IaaS and enables you to run much more than just [12-factor apps](http://12factor.net/).
 * **Dev and Ops separation of concerns**:
-    Provides separatation of build and deployment; therefore, decoupling applications from infrastructure.
+    Provides separation of build and deployment; therefore, decoupling applications from infrastructure.
 * **Agile application creation and deployment**:
     Increased ease and efficiency of container image creation compared to VM image use.
 * **Continuous development, integration, and deployment**:

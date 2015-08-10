@@ -238,8 +238,8 @@ Address 1: 10.0.116.146
 ## Securing the Service
 
 Till now we have only accessed the nginx server from within the cluster. Before exposing the Service to the internet, you want to make sure the communication channel is secure. For this, you will need:
-* Self signed certificates for https (unless you already have an identitiy certificate)
-* An nginx server configured to use the cretificates
+* Self signed certificates for https (unless you already have an identity certificate)
+* An nginx server configured to use the certificates
 * A [secret](secrets.md) that makes the certificates accessible to pods
 
 You can acquire all these from the [nginx https example](../../examples/https-nginx/README.md), in short:

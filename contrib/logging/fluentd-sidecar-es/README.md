@@ -1,5 +1,5 @@
 # Collecting log files from within containers with Fluentd and sending them to Elasticsearch.
-*Note that this only works for clusters with an Elastisearch service. If your cluster is logging to Google Cloud Logging instead (e.g. if you're using Container Engine), see [this guide](/contrib/logging/fluentd-sidecar-gcp/) instead.*
+*Note that this only works for clusters with an ElasticSearch service. If your cluster is logging to Google Cloud Logging instead (e.g. if you're using Container Engine), see [this guide](/contrib/logging/fluentd-sidecar-gcp/) instead.*
 
 This directory contains the source files needed to make a Docker image that collects log files from arbitrary files within a container using [Fluentd](http://www.fluentd.org/) and sends them to the cluster's Elasticsearch service.
 The image is designed to be used as a sidecar container as part of a pod.

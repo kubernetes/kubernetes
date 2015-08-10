@@ -223,7 +223,7 @@ frontend-z9oxo   1/1       Running   0          41s
 
 ## Exposing the app to the outside world
 
-There is no native Azure load-ballancer support in Kubernets 1.0, however here is how you can expose the Guestbook app to the Internet.
+There is no native Azure load-balancer support in Kubernetes 1.0, however here is how you can expose the Guestbook app to the Internet.
 
 ```
 ./expose_guestbook_app_port.sh ./output/kube_1c1496016083b4_ssh_conf
