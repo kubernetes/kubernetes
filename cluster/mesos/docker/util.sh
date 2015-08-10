@@ -26,6 +26,7 @@ set -o pipefail
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 provider_root="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}"
+compose_file="${provider_root}/docker-compose.yml"
 
 source "${provider_root}/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
@@ -184,10 +185,11 @@ function kube-up {
   echo "Creating admin basic auth user" 1>&2
   cluster::mesos::docker::create_basic_user "admin" "admin" > "${apiserver_certs_dir}/basic-users"
 
+  # log dump on failure
+  trap 'cluster::mesos::docker::dump_logs' ERR
+
   echo "Starting ${KUBERNETES_PROVIDER} cluster" 1>&2
-  pushd "${provider_root}" > /dev/null
-  docker-compose up -d
-  popd > /dev/null
+  docker-compose -f "${compose_file}" up -d
 
   detect-master
   detect-minions
@@ -228,11 +230,9 @@ function validate-cluster {
 # Delete a kubernetes cluster
 function kube-down {
   echo "Stopping ${KUBERNETES_PROVIDER} cluster" 1>&2
-  pushd "${provider_root}" > /dev/null
   # Since restoring a stopped cluster is not yet supported, use the nuclear option
-  docker-compose kill
-  docker-compose rm -f
-  popd > /dev/null
+  docker-compose -f "${compose_file}" kill
+  docker-compose -f "${compose_file}" rm -f
 }
 
 function test-setup {
@@ -292,4 +292,13 @@ function cluster::mesos::docker::addon_status {
   local phase=$("${kubectl}" get pods --namespace=kube-system -l k8s-app=${pod_name} -o template --template="{{(index .items 0).status.phase}}" 2>/dev/null)
   phase="${phase:-Unknown}"
   echo "${phase}"
+}
+
+function cluster::mesos::docker::dump_logs {
+  local log_dir="${provider_root}/logs"
+  echo "Dumping logs to '${log_dir}'" 1>&2
+  mkdir -p "${log_dir}"
+  while read name; do
+    docker logs "${name}" &> "${log_dir}/${name}.log"
+  done < <(docker-compose -f "${compose_file}" ps -q | xargs docker inspect --format '{{.Name}}')
 }
