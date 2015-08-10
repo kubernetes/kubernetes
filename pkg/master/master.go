@@ -33,6 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
+<<<<<<< HEAD
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -76,6 +77,51 @@ import (
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 
+=======
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/componentstatus"
+	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
+	endpointsetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/lock"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	nodeetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
+	namespaceetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace/etcd"
+	pvetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolume/etcd"
+	pvcetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
+	podtemplateetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/podtemplate/etcd"
+	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
+	secretetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
+	etcdallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
+	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
+>>>>>>> ROOFMONKEY/ha-api
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
@@ -453,6 +499,8 @@ func (m *Master) init(c *Config) {
 	registry := etcd.NewRegistry(c.DatabaseStorage, m.endpointRegistry)
 	m.serviceRegistry = registry
 
+	lockRegistry := lock.NewEtcdRegistry(c.DatabaseStorage)
+
 	var serviceClusterIPRegistry service.RangeRegistry
 	serviceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(m.serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
@@ -495,6 +543,7 @@ func (m *Master) init(c *Config) {
 		"events":                 event.NewStorage(eventRegistry),
 
 		"limitRanges":                   limitrange.NewStorage(limitRangeRegistry),
+		"locks":                         lock.NewStorage(lockRegistry),
 		"resourceQuotas":                resourceQuotaStorage,
 		"resourceQuotas/status":         resourceQuotaStatusStorage,
 		"namespaces":                    namespaceStorage,
