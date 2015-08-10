@@ -2085,3 +2085,129 @@ func TestGetPodStatusSortedContainers(t *testing.T) {
 		}
 	}
 }
+
+func TestVerifyNonRoot(t *testing.T) {
+	dm, fakeDocker := newTestDockerManager()
+
+	// setup test cases.
+	var rootUid int64 = 0
+	var nonRootUid int64 = 1
+
+	tests := map[string]struct {
+		container     *api.Container
+		inspectImage  *docker.Image
+		expectedError string
+	}{
+		// success cases
+		"non-root runAsUser": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &nonRootUid,
+				},
+			},
+		},
+		"numeric non-root image user": {
+			container: &api.Container{},
+			inspectImage: &docker.Image{
+				Config: &docker.Config{
+					User: "1",
+				},
+			},
+		},
+		"numeric non-root image user with gid": {
+			container: &api.Container{},
+			inspectImage: &docker.Image{
+				Config: &docker.Config{
+					User: "1:2",
+				},
+			},
+		},
+
+		// failure cases
+		"root runAsUser": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &rootUid,
+				},
+			},
+			expectedError: "container's runAsUser breaks non-root policy",
+		},
+		"non-numeric image user": {
+			container: &api.Container{},
+			inspectImage: &docker.Image{
+				Config: &docker.Config{
+					User: "foo",
+				},
+			},
+			expectedError: "unable to validate image is non-root, non-numeric user",
+		},
+		"numeric root image user": {
+			container: &api.Container{},
+			inspectImage: &docker.Image{
+				Config: &docker.Config{
+					User: "0",
+				},
+			},
+			expectedError: "container has no runAsUser and image will run as root",
+		},
+		"numeric root image user with gid": {
+			container: &api.Container{},
+			inspectImage: &docker.Image{
+				Config: &docker.Config{
+					User: "0:1",
+				},
+			},
+			expectedError: "container has no runAsUser and image will run as root",
+		},
+		"nil image in inspect": {
+			container:     &api.Container{},
+			expectedError: "unable to inspect image",
+		},
+		"nil config in image inspect": {
+			container:     &api.Container{},
+			inspectImage:  &docker.Image{},
+			expectedError: "unable to inspect image",
+		},
+	}
+
+	for k, v := range tests {
+		fakeDocker.Image = v.inspectImage
+		err := dm.verifyNonRoot(v.container)
+		if v.expectedError == "" && err != nil {
+			t.Errorf("%s had unexpected error %v", k, err)
+		}
+		if v.expectedError != "" && !strings.Contains(err.Error(), v.expectedError) {
+			t.Errorf("%s expected error %s but received %s", k, v.expectedError, err.Error())
+		}
+	}
+}
+
+func TestGetUidFromUser(t *testing.T) {
+	tests := map[string]struct {
+		input  string
+		expect string
+	}{
+		"no gid": {
+			input:  "0",
+			expect: "0",
+		},
+		"uid/gid": {
+			input:  "0:1",
+			expect: "0",
+		},
+		"empty input": {
+			input:  "",
+			expect: "",
+		},
+		"multiple spearators": {
+			input:  "1:2:3",
+			expect: "1",
+		},
+	}
+	for k, v := range tests {
+		actual := getUidFromUser(v.input)
+		if actual != v.expect {
+			t.Errorf("%s failed.  Expected %s but got %s", k, v.expect, actual)
+		}
+	}
+}

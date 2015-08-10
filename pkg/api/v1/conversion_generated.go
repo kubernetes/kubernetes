@@ -2002,6 +2002,7 @@ func convert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityContext, 
 	} else {
 		out.RunAsUser = nil
 	}
+	out.RunAsNonRoot = in.RunAsNonRoot
 	return nil
 }
 
@@ -4344,6 +4345,7 @@ func convert_v1_SecurityContext_To_api_SecurityContext(in *SecurityContext, out 
 	} else {
 		out.RunAsUser = nil
 	}
+	out.RunAsNonRoot = in.RunAsNonRoot
 	return nil
 }
 

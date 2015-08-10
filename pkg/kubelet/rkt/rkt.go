@@ -852,6 +852,8 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 			continue
 		}
 
+		// TODO: check for non-root image directives.  See ../docker/manager.go#SyncPod
+
 		// TODO(yifan): Take care of host network change.
 		containerChanged := c.Hash != 0 && c.Hash != expectedHash
 		if containerChanged {
