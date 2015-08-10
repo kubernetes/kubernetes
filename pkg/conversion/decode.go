@@ -50,7 +50,16 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, version,
 // s.InternalVersion type before being returned. Decode will not decode
 // objects without version set unless InternalVersion is also "".
 func (s *Scheme) Decode(data []byte) (interface{}, error) {
-	obj, version, kind, err := s.DecodeToVersionedObject(data)
+	return s.DecodeToVersion(data, s.InternalVersion)
+}
+
+// DecodeToVersion converts a JSON string back into a pointer to an api object.
+// Deduces the type based upon the fields added by the MetaInsertionFactory
+// technique. The object will be converted, if necessary, into the versioned
+// type before being returned. Decode will not decode objects without version
+// set unless version is also "".
+func (s *Scheme) DecodeToVersion(data []byte, version string) (interface{}, error) {
+	obj, sourceVersion, kind, err := s.DecodeToVersionedObject(data)
 	if err != nil {
 		return nil, err
 	}
@@ -60,12 +69,12 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	}
 
 	// Convert if needed.
-	if s.InternalVersion != version {
-		objOut, err := s.NewObject(s.InternalVersion, kind)
+	if version != sourceVersion {
+		objOut, err := s.NewObject(version, kind)
 		if err != nil {
 			return nil, err
 		}
-		flags, meta := s.generateConvertMeta(version, s.InternalVersion, obj)
+		flags, meta := s.generateConvertMeta(sourceVersion, version, obj)
 		if err := s.converter.Convert(obj, objOut, flags, meta); err != nil {
 			return nil, err
 		}

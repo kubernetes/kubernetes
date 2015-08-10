@@ -37,6 +37,7 @@ type ObjectCodec interface {
 // Decoder defines methods for deserializing API objects into a given type
 type Decoder interface {
 	Decode(data []byte) (Object, error)
+	DecodeToVersion(data []byte, version string) (Object, error)
 	DecodeInto(data []byte, obj Object) error
 	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, kind, version string) error
 }
