@@ -27,4 +27,13 @@ func init() {
 	addDeepCopyFuncs()
 	addConversionFuncs()
 	addDefaultingFuncs()
+	addKnownTypes()
 }
+
+// Adds the list of known types to api.Scheme.
+func addKnownTypes() {
+	api.Scheme.AddKnownTypes("v1", &Scale{}, &ReplicationControllerDummy{})
+}
+
+func (*Scale) IsAnAPIObject()                      {}
+func (*ReplicationControllerDummy) IsAnAPIObject() {}

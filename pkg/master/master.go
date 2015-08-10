@@ -55,6 +55,7 @@ import (
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	"k8s.io/kubernetes/pkg/registry/etcd"
 	"k8s.io/kubernetes/pkg/registry/event"
+	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/limitrange"
 	"k8s.io/kubernetes/pkg/registry/minion"
 	nodeetcd "k8s.io/kubernetes/pkg/registry/minion/etcd"
@@ -777,7 +778,13 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 
 // expapi returns the resources and codec for the experimental api
 func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
-	storage := map[string]rest.Storage{}
+
+	controllerStorage := expcontrolleretcd.NewStorage(c.DatabaseStorage)
+	storage := map[string]rest.Storage{
+		strings.ToLower("replicationControllers"):        controllerStorage.ReplicationController,
+		strings.ToLower("replicationControllers/scaler"): controllerStorage.Scale,
+	}
+
 	return &apiserver.APIGroupVersion{
 		Root: m.expAPIPrefix,
 

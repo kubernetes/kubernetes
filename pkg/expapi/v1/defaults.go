@@ -16,4 +16,5 @@ limitations under the License.
 
 package v1
 
-func addDefaultingFuncs() {}
+func addDefaultingFuncs() {
+}

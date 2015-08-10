@@ -16,4 +16,19 @@ limitations under the License.
 
 package expapi
 
-func init() {}
+import (
+	"k8s.io/kubernetes/pkg/api"
+)
+
+func init() {
+	// Register the API.
+	addKnownTypes()
+}
+
+// Adds the list of known types to api.Scheme.
+func addKnownTypes() {
+	api.Scheme.AddKnownTypes("", &Scale{}, &ReplicationControllerDummy{})
+}
+
+func (*Scale) IsAnAPIObject()                      {}
+func (*ReplicationControllerDummy) IsAnAPIObject() {}
