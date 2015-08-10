@@ -5,5 +5,5 @@
 {"user":"kubelet",  "readonly": true, "resource": "services"}
 {"user":"kubelet",  "readonly": true, "resource": "endpoints"}
 {"user":"kubelet", "resource": "events"}
-{"user":"alice", "ns": "projectCaribou"}
-{"user":"bob", "readonly": true, "ns": "projectCaribou"}
+{"user":"alice", "namespace": "projectCaribou"}
+{"user":"bob", "readonly": true, "namespace": "projectCaribou"}

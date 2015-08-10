@@ -111,7 +111,7 @@ To permit an action Policy with an unset namespace applies regardless of namespa
  1. Alice can do anything: `{"user":"alice"}`
  2. Kubelet can read any pods: `{"user":"kubelet", "resource": "pods", "readonly": true}`
  3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`
- 4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "ns": "projectCaribou"}`
+ 4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "namespace": "projectCaribou"}`
 
 [Complete file example](http://releases.k8s.io/HEAD/pkg/auth/authorizer/abac/example_policy_file.jsonl)
 
