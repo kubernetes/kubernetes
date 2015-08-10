@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -101,7 +103,7 @@ var _ = Describe("Services", func() {
 		_, err := c.Services(ns).Create(service)
 		Expect(err).NotTo(HaveOccurred())
 
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 
 		var names []string
 		defer func() {
@@ -115,25 +117,25 @@ var _ = Describe("Services", func() {
 		addEndpointPodOrFail(c, ns, name1, labels, []api.ContainerPort{{ContainerPort: 80}})
 		names = append(names, name1)
 
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{name1: {80}})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name1: {80}})
 
 		name2 := "test2"
 		addEndpointPodOrFail(c, ns, name2, labels, []api.ContainerPort{{ContainerPort: 80}})
 		names = append(names, name2)
 
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{name1: {80}, name2: {80}})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name1: {80}, name2: {80}})
 
 		err = c.Pods(ns).Delete(name1, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{name2}
 
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{name2: {80}})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name2: {80}})
 
 		err = c.Pods(ns).Delete(name2, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{}
 
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 	})
 
 	It("should serve multiport endpoints from pods", func() {
@@ -175,7 +177,7 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 		port1 := 100
 		port2 := 101
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 
 		var names []string
 		defer func() {
@@ -201,35 +203,35 @@ var _ = Describe("Services", func() {
 		podname1 := "podname1"
 		addEndpointPodOrFail(c, ns, podname1, labels, containerPorts1)
 		names = append(names, podname1)
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{podname1: {port1}})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}})
 
 		podname2 := "podname2"
 		addEndpointPodOrFail(c, ns, podname2, labels, containerPorts2)
 		names = append(names, podname2)
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{podname1: {port1}, podname2: {port2}})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}, podname2: {port2}})
 
 		podname3 := "podname3"
 		addEndpointPodOrFail(c, ns, podname3, labels, append(containerPorts1, containerPorts2...))
 		names = append(names, podname3)
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{podname1: {port1}, podname2: {port2}, podname3: {port1, port2}})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}, podname2: {port2}, podname3: {port1, port2}})
 
 		err = c.Pods(ns).Delete(podname1, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{podname2, podname3}
 
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{podname2: {port2}, podname3: {port1, port2}})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname2: {port2}, podname3: {port1, port2}})
 
 		err = c.Pods(ns).Delete(podname2, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{podname3}
 
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{podname3: {port1, port2}})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname3: {port1, port2}})
 
 		err = c.Pods(ns).Delete(podname3, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{}
 
-		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{})
+		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 	})
 
 	It("should be able to up and down services", func() {
@@ -1022,60 +1024,82 @@ func validateUniqueOrFail(s []string) {
 	}
 }
 
-func getPortsByIp(subsets []api.EndpointSubset) map[string][]int {
-	m := make(map[string][]int)
-	for _, ss := range subsets {
+func getContainerPortsByPodUID(endpoints *api.Endpoints) PortsByPodUID {
+	m := PortsByPodUID{}
+	for _, ss := range endpoints.Subsets {
 		for _, port := range ss.Ports {
 			for _, addr := range ss.Addresses {
-				Logf("Found IP %v and port %v", addr.IP, port.Port)
-				if _, ok := m[addr.IP]; !ok {
-					m[addr.IP] = make([]int, 0)
+				containerPort := port.Port
+				hostPort := port.Port
+
+				// use endpoint annotations to recover the container port in a Mesos setup
+				// compare contrib/mesos/pkg/service/endpoints_controller.syncService
+				if providerIs("mesos/docker") {
+					key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
+					containerPortString := endpoints.Annotations[key]
+					if containerPortString == "" {
+						continue
+					}
+					var err error
+					containerPort, err = strconv.Atoi(containerPortString)
+					if err != nil {
+						continue
+					}
+					Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, containerPortString)
 				}
-				m[addr.IP] = append(m[addr.IP], port.Port)
+
+				Logf("Found pod %v, host port %d and container port %d", addr.TargetRef.UID, hostPort, containerPort)
+				if _, ok := m[addr.TargetRef.UID]; !ok {
+					m[addr.TargetRef.UID] = make([]int, 0)
+				}
+				m[addr.TargetRef.UID] = append(m[addr.TargetRef.UID], containerPort)
 			}
 		}
 	}
 	return m
 }
 
-func translatePodNameToIpOrFail(c *client.Client, ns string, expectedEndpoints map[string][]int) map[string][]int {
-	portsByIp := make(map[string][]int)
+type PortsByPodName map[string][]int
+type PortsByPodUID map[types.UID][]int
+
+func translatePodNameToUIDOrFail(c *client.Client, ns string, expectedEndpoints PortsByPodName) PortsByPodUID {
+	portsByUID := make(PortsByPodUID)
 
 	for name, portList := range expectedEndpoints {
 		pod, err := c.Pods(ns).Get(name)
 		if err != nil {
 			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
-		portsByIp[pod.Status.PodIP] = portList
+		portsByUID[pod.ObjectMeta.UID] = portList
 		By(fmt.Sprintf(""))
 	}
-	By(fmt.Sprintf("successfully translated pod names to ips: %v -> %v on namespace %s", expectedEndpoints, portsByIp, ns))
-	return portsByIp
+	By(fmt.Sprintf("successfully translated pod names to UIDs: %v -> %v on namespace %s", expectedEndpoints, portsByUID, ns))
+	return portsByUID
 }
 
-func validatePortsOrFail(endpoints map[string][]int, expectedEndpoints map[string][]int) {
+func validatePortsOrFail(endpoints PortsByPodUID, expectedEndpoints PortsByPodUID) {
 	if len(endpoints) != len(expectedEndpoints) {
 		// should not happen because we check this condition before
 		Failf("invalid number of endpoints got %v, expected %v", endpoints, expectedEndpoints)
 	}
-	for ip := range expectedEndpoints {
-		if _, ok := endpoints[ip]; !ok {
-			Failf("endpoint %v not found", ip)
+	for podUID := range expectedEndpoints {
+		if _, ok := endpoints[podUID]; !ok {
+			Failf("endpoint %v not found", podUID)
 		}
-		if len(endpoints[ip]) != len(expectedEndpoints[ip]) {
-			Failf("invalid list of ports for ip %v. Got %v, expected %v", ip, endpoints[ip], expectedEndpoints[ip])
+		if len(endpoints[podUID]) != len(expectedEndpoints[podUID]) {
+			Failf("invalid list of ports for uid %v. Got %v, expected %v", podUID, endpoints[podUID], expectedEndpoints[podUID])
 		}
-		sort.Ints(endpoints[ip])
-		sort.Ints(expectedEndpoints[ip])
-		for index := range endpoints[ip] {
-			if endpoints[ip][index] != expectedEndpoints[ip][index] {
-				Failf("invalid list of ports for ip %v. Got %v, expected %v", ip, endpoints[ip], expectedEndpoints[ip])
+		sort.Ints(endpoints[podUID])
+		sort.Ints(expectedEndpoints[podUID])
+		for index := range endpoints[podUID] {
+			if endpoints[podUID][index] != expectedEndpoints[podUID][index] {
+				Failf("invalid list of ports for uid %v. Got %v, expected %v", podUID, endpoints[podUID], expectedEndpoints[podUID])
 			}
 		}
 	}
 }
 
-func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, expectedEndpoints map[string][]int) {
+func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, expectedEndpoints PortsByPodName) {
 	By(fmt.Sprintf("Waiting up to %v for service %s in namespace %s to expose endpoints %v", serviceStartTimeout, serviceName, namespace, expectedEndpoints))
 	for start := time.Now(); time.Since(start) < serviceStartTimeout; time.Sleep(5 * time.Second) {
 		endpoints, err := c.Endpoints(namespace).Get(serviceName)
@@ -1085,16 +1109,17 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 		}
 		Logf("Found endpoints %v", endpoints)
 
-		portsByIp := getPortsByIp(endpoints.Subsets)
-		Logf("Found ports by ip %v", portsByIp)
+		portsByPodUID := getContainerPortsByPodUID(endpoints)
+		Logf("Found port by pod UID %v", portsByPodUID)
 
-		if len(portsByIp) == len(expectedEndpoints) {
-			expectedPortsByIp := translatePodNameToIpOrFail(c, namespace, expectedEndpoints)
-			validatePortsOrFail(portsByIp, expectedPortsByIp)
+		expectedPortsByPodUID := translatePodNameToUIDOrFail(c, namespace, expectedEndpoints)
+		if len(portsByPodUID) == len(expectedEndpoints) {
+			validatePortsOrFail(portsByPodUID, expectedPortsByPodUID)
 			By(fmt.Sprintf("Successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, time.Since(start)))
 			return
 		}
-		Logf("Unexpected number of endpoints: found %v, expected %v (%v elapsed, ignoring for 5s)", portsByIp, expectedEndpoints, time.Since(start))
+
+		Logf("Unexpected number of endpoints: found %v, expected %v (%v elapsed, ignoring for 5s)", portsByPodUID, expectedEndpoints, time.Since(start))
 	}
 	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, serviceStartTimeout)
 }

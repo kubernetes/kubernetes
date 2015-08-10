@@ -348,12 +348,15 @@ var _ = Describe("Kubectl client", func() {
 					endpoints, err := c.Endpoints(ns).Get(name)
 					Expect(err).NotTo(HaveOccurred())
 
-					ipToPort := getPortsByIp(endpoints.Subsets)
-					if len(ipToPort) != 1 {
-						Logf("No IP found, retrying")
+					uidToPort := getContainerPortsByPodUID(endpoints)
+					if len(uidToPort) == 0 {
+						Logf("No endpoint found, retrying")
 						continue
 					}
-					for _, port := range ipToPort {
+					if len(uidToPort) > 1 {
+						Fail("To many endpoints found")
+					}
+					for _, port := range uidToPort {
 						if port[0] != redisPort {
 							Failf("Wrong endpoint port: %d", port[0])
 						}

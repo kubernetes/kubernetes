@@ -30,4 +30,5 @@ const (
 	PortMappingKeyFormat     = PortMappingKeyPrefix + "%s_%d"
 	PortNameMappingKeyPrefix = "k8s.mesosphere.io/portName_"
 	PortNameMappingKeyFormat = PortNameMappingKeyPrefix + "%s_%s"
+	ContainerPortKeyFormat   = "k8s.mesosphere.io/containerPort_%s_%s_%d"
 )
