@@ -84,6 +84,10 @@ Required:
 Optional:
 - [Virtual Box](https://www.virtualbox.org/wiki/Downloads) - x86 hardware virtualizer
   - Required by Boot2Docker and Docker Machine
+- [Golang](https://golang.org/doc/install) - Go programming language
+  - Required to build Kubernetes locally
+- [Make](https://en.wikipedia.org/wiki/Make_(software))  - Utility for building executables from source
+  - Required to build Kubernetes locally with make
 
 #### Install on Mac (Homebrew)
 
@@ -109,6 +113,9 @@ means to get the latest versions.
 
 It is recommended to use Ubuntu, simply because it best supports AUFS, used by docker to mount volumes. Alternate file
 systems may not fully support docker-in-docker.
+
+In order to build Kubernetes, the current user must be in a docker group with sudo privileges.
+See the docker docs for [instructions](https://docs.docker.com/installation/ubuntulinux/#create-a-docker-group).
 
 
 #### Boot2Docker Config (Mac)
@@ -154,40 +161,35 @@ host machine (mac).
 
 1. Build binaries
 
-    ```
-    KUBERNETES_CONTRIB=mesos hack/build-go.sh
-    ```
+    You'll need to build kubectl (CLI) for your local architecture and operating system and the rest of the server binaries for linux/amd64.
 
-    Alternatively, you can use `make`, if make is installed.
-
-    Unless you're on linux, you'll also need to build the binaries for linux/amd64 (for the docker containers):
+    Building a new release covers both cases:
 
     ```
-    KUBERNETES_CONTRIB=mesos build/run.sh hack/build-go.sh
+    KUBERNETES_CONTRIB=mesos build/release.sh
     ```
 
-    Breakdown:
-    - `KUBERNETES_CONTRIB=mesos` - enables building of the contrib/mesos binaries
-    - `build/run.sh` - executes a command in the build container
-    - `build-go.sh` - builds the Go binaries for the current architecture (linux/amd64 when in a docker container)
+    For developers, it may be faster to [build locally](#build-locally).
 
 1. [Optional] Build docker images
 
-    The following docker images are built as part of `./cluster/kube-up.sh`, but it may make sense to build them manually
-    the first time because it may take a while. In the future some of these may be hosted publicly, but you will always
-    need to at least rebuild the Kubernetes-Mesos image when using locally built binaries.
+    The following docker images are built as part of `./cluster/kube-up.sh`, but it may make sense to build them manually the first time because it may take a while.
 
-    Test image includes all the dependencies required for running e2e tests.
+    1. Test image includes all the dependencies required for running e2e tests.
 
-    ```
-    ./cluster/mesos/docker/test/build.sh
-    ```
+        ```
+        ./cluster/mesos/docker/test/build.sh
+        ```
 
-    Kubernetes-Mesos image includes the compiled linux binaries.
+        In the future, this image may be available to download. It doesn't contain anything specific to the current release, except its build dependencies.
 
-    ```
-    ./cluster/mesos/docker/km/build.sh
-    ```
+    1. Kubernetes-Mesos image includes the compiled linux binaries.
+
+        ```
+        ./cluster/mesos/docker/km/build.sh
+        ```
+
+        This image needs to be built every time you recompile the server binaries.
 
 1. [Optional] Configure Mesos resources
 
@@ -296,6 +298,30 @@ ex: `./cluster/kubectl.sh get pods`
     ```
     docker run -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/docker:/var/lib/docker --rm martin/docker-cleanup-volumes
     ```
+
+### Build Locally
+
+The steps above tell you how to build in a container, for minimal local dependencies. But if you have Go and Make installed you can build locally much faster:
+
+```
+KUBERNETES_CONTRIB=mesos make
+```
+
+However, if you're not on linux, you'll still need to compile the linux/amd64 server binaries:
+
+```
+KUBERNETES_CONTRIB=mesos build/run.sh hack/build-go.sh
+```
+
+The above two steps should be significantly faster than cross-compiling a whole new release for every supported platform (which is what `./build/release.sh` does).
+
+Breakdown:
+
+- `KUBERNETES_CONTRIB=mesos` - enables building of the contrib/mesos binaries
+- `hack/build-go.sh` - builds the Go binaries for the current architecture (linux/amd64 when in a docker container)
+- `make` - delegates to `hack/build-go.sh`
+- `build/run.sh` - executes a command in the build container
+- `build/release.sh` - cross compiles Kubernetes for all supported architectures and operating systems (slow)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
