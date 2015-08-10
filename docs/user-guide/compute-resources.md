@@ -185,26 +185,30 @@ on the pod you are interested in:
 
 ```console
 [12:54:41] $ ./cluster/kubectl.sh describe pod simmemleak-hra99
-Name:               simmemleak-hra99
-Namespace:          default
-Image(s):           saadali/simmemleak
-Node:               kubernetes-minion-tf0f/10.240.216.66
-Labels:             name=simmemleak
-Status:             Running
+Name:                           simmemleak-hra99
+Namespace:                      default
+Image(s):                       saadali/simmemleak
+Node:                           kubernetes-minion-tf0f/10.240.216.66
+Labels:                         name=simmemleak
+Status:                         Running
 Reason:             
 Message:            
-IP:             10.244.2.75
-Replication Controllers:    simmemleak (1/1 replicas created)
+IP:                             10.244.2.75
+Replication Controllers:        simmemleak (1/1 replicas created)
 Containers:
   simmemleak:
     Image:  saadali/simmemleak
     Limits:
-      cpu:      100m
-      memory:       50Mi
-    State:      Running
-      Started:      Tue, 07 Jul 2015 12:54:41 -0700
-    Ready:      False
-    Restart Count:  5
+      cpu:                      100m
+      memory:                   50Mi
+    State:                      Running
+      Started:                  Tue, 07 Jul 2015 12:54:41 -0700
+    Last Termination State:     Terminated
+      Exit Code:                1
+      Started:                  Fri, 07 Jul 2015 12:54:30 -0700
+      Finished:                 Fri, 07 Jul 2015 12:54:33 -0700
+    Ready:                      False
+    Restart Count:              5
 Conditions:
   Type      Status
   Ready     False 
@@ -219,9 +223,7 @@ Events:
 
 The `Restart Count:  5` indicates that the `simmemleak` container in this pod was terminated and restarted 5 times.
 
-Once [#10861](http://issue.k8s.io/10861) is resolved the reason for the termination of the last container will also be printed in this output.
-
-Until then you can call `get pod` with the `-o template -t ...` option to fetch the status of previously terminated containers:
+You can call `get pod` with the `-o template -t ...` option to fetch the status of previously terminated containers:
 
 ```console
 [13:59:01] $ ./cluster/kubectl.sh  get pod -o template -t '{{range.status.containerStatuses}}{{"Container Name: "}}{{.name}}{{"\r\nLastState: "}}{{.lastState}}{{end}}'  simmemleak-60xbc

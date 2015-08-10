@@ -172,6 +172,29 @@ func TestDescribeContainers(t *testing.T) {
 			},
 			expectedElements: []string{"test", "State", "Terminated", "Ready", "True", "Restart Count", "7", "Image", "image", "Reason", "potato", "Started", "Finished", "Exit Code", "2"},
 		},
+		// Last Terminated
+		{
+			container: api.Container{Name: "test", Image: "image"},
+			status: api.ContainerStatus{
+				Name: "test",
+				State: api.ContainerState{
+					Running: &api.ContainerStateRunning{
+						StartedAt: util.NewTime(time.Now()),
+					},
+				},
+				LastTerminationState: api.ContainerState{
+					Terminated: &api.ContainerStateTerminated{
+						StartedAt:  util.NewTime(time.Now().Add(time.Second * 3)),
+						FinishedAt: util.NewTime(time.Now()),
+						Reason:     "crashing",
+						ExitCode:   3,
+					},
+				},
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Terminated", "Ready", "True", "Restart Count", "7", "Image", "image", "Started", "Finished", "Exit Code", "2", "crashing", "3"},
+		},
 		// No state defaults to waiting.
 		{
 			container: api.Container{Name: "test", Image: "image"},

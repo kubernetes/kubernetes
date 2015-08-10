@@ -500,33 +500,10 @@ func describeContainers(pod *api.Pod, out io.Writer) {
 			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
 		}
 
-		switch {
-		case state.Running != nil:
-			fmt.Fprintf(out, "    State:\tRunning\n")
-			fmt.Fprintf(out, "      Started:\t%v\n", state.Running.StartedAt.Time.Format(time.RFC1123Z))
-		case state.Waiting != nil:
-			fmt.Fprintf(out, "    State:\tWaiting\n")
-			if state.Waiting.Reason != "" {
-				fmt.Fprintf(out, "      Reason:\t%s\n", state.Waiting.Reason)
-			}
-		case state.Terminated != nil:
-			fmt.Fprintf(out, "    State:\tTerminated\n")
-			if state.Terminated.Reason != "" {
-				fmt.Fprintf(out, "      Reason:\t%s\n", state.Terminated.Reason)
-			}
-			if state.Terminated.Message != "" {
-				fmt.Fprintf(out, "      Message:\t%s\n", state.Terminated.Message)
-			}
-			fmt.Fprintf(out, "      Exit Code:\t%d\n", state.Terminated.ExitCode)
-			if state.Terminated.Signal > 0 {
-				fmt.Fprintf(out, "      Signal:\t%d\n", state.Terminated.Signal)
-			}
-			fmt.Fprintf(out, "      Started:\t%s\n", state.Terminated.StartedAt.Time.Format(time.RFC1123Z))
-			fmt.Fprintf(out, "      Finished:\t%s\n", state.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
-		default:
-			fmt.Fprintf(out, "    State:\tWaiting\n")
+		describeStatus("State", state, out)
+		if status.LastTerminationState.Terminated != nil {
+			describeStatus("Last Termination State", status.LastTerminationState, out)
 		}
-
 		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
 		fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
 		fmt.Fprintf(out, "    Variables:\n")
@@ -553,6 +530,35 @@ func envValueFrom(pod *api.Pod, e api.EnvVar) string {
 	}
 
 	return valueFrom
+}
+
+func describeStatus(stateName string, state api.ContainerState, out io.Writer) {
+	switch {
+	case state.Running != nil:
+		fmt.Fprintf(out, "    %s:\tRunning\n", stateName)
+		fmt.Fprintf(out, "      Started:\t%v\n", state.Running.StartedAt.Time.Format(time.RFC1123Z))
+	case state.Waiting != nil:
+		fmt.Fprintf(out, "    %s:\tWaiting\n", stateName)
+		if state.Waiting.Reason != "" {
+			fmt.Fprintf(out, "      Reason:\t%s\n", state.Waiting.Reason)
+		}
+	case state.Terminated != nil:
+		fmt.Fprintf(out, "    %s:\tTerminated\n", stateName)
+		if state.Terminated.Reason != "" {
+			fmt.Fprintf(out, "      Reason:\t%s\n", state.Terminated.Reason)
+		}
+		if state.Terminated.Message != "" {
+			fmt.Fprintf(out, "      Message:\t%s\n", state.Terminated.Message)
+		}
+		fmt.Fprintf(out, "      Exit Code:\t%d\n", state.Terminated.ExitCode)
+		if state.Terminated.Signal > 0 {
+			fmt.Fprintf(out, "      Signal:\t%d\n", state.Terminated.Signal)
+		}
+		fmt.Fprintf(out, "      Started:\t%s\n", state.Terminated.StartedAt.Time.Format(time.RFC1123Z))
+		fmt.Fprintf(out, "      Finished:\t%s\n", state.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
+	default:
+		fmt.Fprintf(out, "    %s:\tWaiting\n", stateName)
+	}
 }
 
 func printBool(value bool) string {
