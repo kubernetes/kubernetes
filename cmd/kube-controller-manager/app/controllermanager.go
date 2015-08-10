@@ -56,7 +56,7 @@ import (
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
 	Port                    int
-	Address                 util.IP
+	Address                 net.IP
 	CloudProvider           string
 	CloudConfigFile         string
 	ConcurrentEndpointSyncs int
@@ -78,7 +78,7 @@ type CMServer struct {
 	RootCAFile              string
 
 	ClusterName       string
-	ClusterCIDR       util.IPNet
+	ClusterCIDR       net.IPNet
 	AllocateNodeCIDRs bool
 	EnableProfiling   bool
 
@@ -90,7 +90,7 @@ type CMServer struct {
 func NewCMServer() *CMServer {
 	s := CMServer{
 		Port:                    ports.ControllerManagerPort,
-		Address:                 util.IP(net.ParseIP("127.0.0.1")),
+		Address:                 net.ParseIP("127.0.0.1"),
 		ConcurrentEndpointSyncs: 5,
 		ConcurrentRCSyncs:       5,
 		ServiceSyncPeriod:       5 * time.Minute,
@@ -108,7 +108,7 @@ func NewCMServer() *CMServer {
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
 func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
-	fs.Var(&s.Address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.IPVar(&s.Address, "address", s.Address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
@@ -137,7 +137,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
-	fs.Var(&s.ClusterCIDR, "cluster-cidr", "CIDR Range for Pods in cluster.")
+	fs.IPNetVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")
 	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
@@ -197,7 +197,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	nodeController := nodecontroller.NewNodeController(cloud, kubeClient,
 		s.PodEvictionTimeout, nodecontroller.NewPodEvictor(util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst)),
-		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, (*net.IPNet)(&s.ClusterCIDR), s.AllocateNodeCIDRs)
+		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, &s.ClusterCIDR, s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod)
 
 	serviceController := servicecontroller.New(cloud, kubeClient, s.ClusterName)
@@ -211,7 +211,7 @@ func (s *CMServer) Run(_ []string) error {
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
 		} else {
-			routeController := routecontroller.New(routes, kubeClient, s.ClusterName, (*net.IPNet)(&s.ClusterCIDR))
+			routeController := routecontroller.New(routes, kubeClient, s.ClusterName, &s.ClusterCIDR)
 			routeController.Run(s.NodeSyncPeriod)
 		}
 	}

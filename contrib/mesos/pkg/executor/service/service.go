@@ -96,7 +96,7 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 	} else {
 		k.RootDirectory = pwd // mesos sandbox dir
 	}
-	k.Address = util.IP(net.ParseIP(defaultBindingAddress()))
+	k.Address = net.ParseIP(defaultBindingAddress())
 	k.ShutdownFD = -1 // indicates unspecified FD
 
 	return k
@@ -404,7 +404,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 	dconfig := bindings.DriverConfig{
 		Executor:         exec,
 		HostnameOverride: ks.HostnameOverride,
-		BindingAddress:   net.IP(ks.Address),
+		BindingAddress:   ks.Address,
 	}
 	if driver, err := bindings.NewMesosExecutorDriver(dconfig); err != nil {
 		log.Fatalf("failed to create executor driver: %v", err)
@@ -427,7 +427,7 @@ type kubeletExecutor struct {
 	*kubelet.Kubelet
 	initialize      sync.Once
 	driver          bindings.ExecutorDriver
-	address         util.IP
+	address         net.IP
 	dockerClient    dockertools.DockerInterface
 	hks             hyperkube.Interface
 	kubeletFinished chan struct{}   // closed once kubelet.Run() returns
