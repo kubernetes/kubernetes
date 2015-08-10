@@ -878,10 +878,33 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 			fmt.Fprintf(out, "ExternalID:\t%s\n", node.Spec.ExternalID)
 		}
 		fmt.Fprintf(out, "Pods:\t(%d in total)\n", len(pods))
-		fmt.Fprint(out, "  Namespace\tName\n")
+		fmt.Fprint(out, "  Namespace\tName\t\tCPU(milliCPU)\t\tMemory(bytes)\n")
+		totalMilliCPU := int64(0)
+		totalMemory := int64(0)
+		fractionPodCPU := float64(0)
+		fractionPodMemory := float64(0)
+		fractionTotalCPU := float64(0)
+		fractionTotalMemory := float64(0)
 		for _, pod := range pods {
-			fmt.Fprintf(out, "  %s\t%s\n", pod.Namespace, pod.Name)
+			podTotalMilliCPU := int64(0)
+			podTotalMemory := int64(0)
+
+			for ix := range pod.Spec.Containers {
+				limits := pod.Spec.Containers[ix].Resources.Limits
+				podTotalMilliCPU += limits.Cpu().MilliValue()
+				podTotalMemory += limits.Memory().Value()
+			}
+			totalMilliCPU += podTotalMilliCPU
+			totalMemory += podTotalMemory
+			fractionPodCPU = float64(podTotalMilliCPU) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
+			fractionPodMemory = float64(podTotalMemory) / float64(node.Status.Capacity.Memory().Value()) * 100
+			fmt.Fprintf(out, "  %s\t%s\t\t%d (%d%% of total)\t\t%d (%d%% of total)\n", pod.Namespace, pod.Name, podTotalMilliCPU, int64(fractionPodCPU), podTotalMemory, int64(fractionPodMemory))
 		}
+		fmt.Fprint(out, "TotalResourceLimits:\n")
+		fractionTotalCPU = float64(totalMilliCPU) / float64(node.Status.Capacity.Cpu().MilliValue()) * 100
+		fractionTotalMemory = float64(totalMemory) / float64(node.Status.Capacity.Memory().Value()) * 100
+		fmt.Fprintf(out, "  CPU(milliCPU):\t\t%d (%d%% of total)\n", totalMilliCPU, int64(fractionTotalCPU))
+		fmt.Fprintf(out, "  Memory(bytes):\t\t%d (%d%% of total)\n", totalMemory, int64(fractionTotalMemory))
 		if events != nil {
 			DescribeEvents(events, out)
 		}

@@ -1580,19 +1580,19 @@ func checkHostPortConflicts(pods []*api.Pod) (fitting []*api.Pod, notFitting []*
 	return
 }
 
-// checkCapacityExceeded detects pods that exceeds node's resources.
-func (kl *Kubelet) checkCapacityExceeded(pods []*api.Pod) (fitting []*api.Pod, notFitting []*api.Pod) {
+// checkSufficientfFreeResources detects pods that exceeds node's resources.
+func (kl *Kubelet) checkSufficientfFreeResources(pods []*api.Pod) (fitting []*api.Pod, notFittingCPU, notFittingMemory []*api.Pod) {
 	info, err := kl.GetCachedMachineInfo()
 	if err != nil {
 		glog.Errorf("error getting machine info: %v", err)
-		return pods, nil
+		return pods, nil, nil
 	}
 
 	// Respect the pod creation order when resolving conflicts.
 	sort.Sort(podsByCreationTime(pods))
 
 	capacity := CapacityFromMachineInfo(info)
-	return predicates.CheckPodsExceedingCapacity(pods, capacity)
+	return predicates.CheckPodsExceedingFreeResources(pods, capacity)
 }
 
 // handleOutOfDisk detects if pods can't fit due to lack of disk space.
@@ -1685,14 +1685,22 @@ func (kl *Kubelet) handleNotFittingPods(pods []*api.Pod) []*api.Pod {
 			Reason:  reason,
 			Message: "Pod cannot be started due to node selector mismatch"})
 	}
-	fitting, notFitting = kl.checkCapacityExceeded(fitting)
-	for _, pod := range notFitting {
-		reason := "CapacityExceeded"
-		kl.recorder.Eventf(pod, reason, "Cannot start the pod due to exceeded capacity.")
+	fitting, notFittingCPU, notFittingMemory := kl.checkSufficientfFreeResources(fitting)
+	for _, pod := range notFittingCPU {
+		reason := "InsufficientFreeCPU"
+		kl.recorder.Eventf(pod, reason, "Cannot start the pod due to insufficient free CPU.")
 		kl.statusManager.SetPodStatus(pod, api.PodStatus{
 			Phase:   api.PodFailed,
 			Reason:  reason,
-			Message: "Pod cannot be started due to exceeded capacity"})
+			Message: "Pod cannot be started due to insufficient free CPU"})
+	}
+	for _, pod := range notFittingMemory {
+		reason := "InsufficientFreeMemory"
+		kl.recorder.Eventf(pod, reason, "Cannot start the pod due to insufficient free memory.")
+		kl.statusManager.SetPodStatus(pod, api.PodStatus{
+			Phase:   api.PodFailed,
+			Reason:  reason,
+			Message: "Pod cannot be started due to insufficient free memory"})
 	}
 	return fitting
 }
