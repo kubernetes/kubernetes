@@ -576,8 +576,6 @@ _kubectl_port-forward()
     two_word_flags+=("-p")
 
     must_have_one_flag=()
-    must_have_one_flag+=("--pod=")
-    must_have_one_flag+=("-p")
     must_have_one_noun=()
 }
 
