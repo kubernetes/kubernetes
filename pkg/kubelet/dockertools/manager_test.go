@@ -54,40 +54,6 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 	return nil, f.err
 }
 
-// TODO: Find a better way to mock the runtime hooks so that we don't have to
-// duplicate the code here.
-type fakeRuntimeHooks struct {
-	recorder record.EventRecorder
-}
-
-var _ kubecontainer.RuntimeHooks = &fakeRuntimeHooks{}
-
-func newFakeRuntimeHooks(recorder record.EventRecorder) kubecontainer.RuntimeHooks {
-	return &fakeRuntimeHooks{
-		recorder: recorder,
-	}
-}
-
-func (fr *fakeRuntimeHooks) ShouldPullImage(pod *api.Pod, container *api.Container, imagePresent bool) bool {
-	if container.ImagePullPolicy == api.PullNever {
-		return false
-	}
-	if container.ImagePullPolicy == api.PullAlways ||
-		(container.ImagePullPolicy == api.PullIfNotPresent && (!imagePresent)) {
-		return true
-	}
-
-	return false
-}
-
-func (fr *fakeRuntimeHooks) ReportImagePulling(pod *api.Pod, container *api.Container) {
-	fr.recorder.Eventf(nil, "Pulling", fmt.Sprintf("%s:%s:%s", pod.Name, container.Name, container.Image))
-}
-
-func (fr *fakeRuntimeHooks) ReportImagePulled(pod *api.Pod, container *api.Container, pullError error) {
-	fr.recorder.Eventf(nil, "Pulled", fmt.Sprintf("%s:%s:%s", pod.Name, container.Name, container.Image))
-}
-
 type fakeOptionGenerator struct{}
 
 var _ kubecontainer.RunContainerOptionsGenerator = &fakeOptionGenerator{}
@@ -113,7 +79,6 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
 	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	runtimeHooks := newFakeRuntimeHooks(fakeRecorder)
 	optionGenerator := &fakeOptionGenerator{}
 	dockerManager := NewFakeDockerManager(
 		fakeDocker,
@@ -126,8 +91,7 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 		kubecontainer.FakeOS{},
 		networkPlugin,
 		optionGenerator,
-		fakeHTTPClient,
-		runtimeHooks)
+		fakeHTTPClient)
 
 	return dockerManager, fakeDocker
 }
@@ -945,7 +909,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
 	dm.podInfraContainerImage = "pod_infra_image"
-	puller := dm.puller.(*FakeDockerPuller)
+	puller := dm.dockerPuller.(*FakeDockerPuller)
 	puller.HasImages = []string{}
 	dm.podInfraContainerImage = "pod_infra_image"
 	fakeDocker.ContainerList = []docker.APIContainers{}
@@ -1306,7 +1270,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 func TestSyncPodWithPullPolicy(t *testing.T) {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 	dm, fakeDocker := newTestDockerManager()
-	puller := dm.puller.(*FakeDockerPuller)
+	puller := dm.dockerPuller.(*FakeDockerPuller)
 	puller.HasImages = []string{"existing_one", "want:latest"}
 	dm.podInfraContainerImage = "pod_infra_image"
 	fakeDocker.ContainerList = []docker.APIContainers{}
@@ -1333,22 +1297,21 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 	fakeDocker.Lock()
 
 	eventSet := []string{
-		"Pulling foo:POD:pod_infra_image",
-		"Pulled foo:POD:pod_infra_image",
-		"Pulling foo:bar:pull_always_image",
-		"Pulled foo:bar:pull_always_image",
-		"Pulling foo:bar2:pull_if_not_present_image",
-		"Pulled foo:bar2:pull_if_not_present_image",
-		`Pulled Container image "existing_one" already present on machine`,
-		`Pulled Container image "want:latest" already present on machine`,
+		`pulling Pulling image "pod_infra_image"`,
+		`pulled Successfully pulled image "pod_infra_image"`,
+		`pulling Pulling image "pull_always_image"`,
+		`pulled Successfully pulled image "pull_always_image"`,
+		`pulling Pulling image "pull_if_not_present_image"`,
+		`pulled Successfully pulled image "pull_if_not_present_image"`,
+		`pulled Container image "existing_one" already present on machine`,
+		`pulled Container image "want:latest" already present on machine`,
 	}
 
-	runtimeHooks := dm.runtimeHooks.(*fakeRuntimeHooks)
-	recorder := runtimeHooks.recorder.(*record.FakeRecorder)
+	recorder := dm.recorder.(*record.FakeRecorder)
 
 	var actualEvents []string
 	for _, ev := range recorder.Events {
-		if strings.HasPrefix(ev, "Pull") {
+		if strings.HasPrefix(ev, "pull") {
 			actualEvents = append(actualEvents, ev)
 		}
 	}
@@ -1699,7 +1662,7 @@ func TestGetPodPullImageFailureReason(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
 	// Initialize the FakeDockerPuller so that it'd try to pull non-existent
 	// images.
-	puller := dm.puller.(*FakeDockerPuller)
+	puller := dm.dockerPuller.(*FakeDockerPuller)
 	puller.HasImages = []string{}
 	// Inject the pull image failure error.
 	failureReason := "pull image faiulre"

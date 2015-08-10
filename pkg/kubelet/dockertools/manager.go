@@ -89,9 +89,13 @@ type DockerManager struct {
 	//      means that some entries may be recycled before a pod has been
 	//      deleted.
 	reasonCache stringCache
-	// TODO(yifan): Record the pull failure so we can  eliminate the image checking
+	// TODO(yifan): Record the pull failure so we can eliminate the image checking
 	// in GetPodStatus()?
-	puller DockerPuller
+	// Lower level docker image puller.
+	dockerPuller DockerPuller
+
+	// wrapped image puller.
+	imagePuller kubecontainer.ImagePuller
 
 	// Root of the Docker runtime.
 	dockerRoot string
@@ -110,9 +114,6 @@ type DockerManager struct {
 
 	// Runner of lifecycle events.
 	runner kubecontainer.HandlerRunner
-
-	// Hooks injected into the container runtime.
-	runtimeHooks kubecontainer.RuntimeHooks
 
 	// Handler used to execute commands in containers.
 	execHandler ExecHandler
@@ -138,7 +139,6 @@ func NewDockerManager(
 	networkPlugin network.NetworkPlugin,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubeletTypes.HttpGetter,
-	runtimeHooks kubecontainer.RuntimeHooks,
 	execHandler ExecHandler,
 	oomAdjuster *oom.OomAdjuster,
 	procFs procfs.ProcFsInterface) *DockerManager {
@@ -183,19 +183,19 @@ func NewDockerManager(
 		machineInfo:            machineInfo,
 		podInfraContainerImage: podInfraContainerImage,
 		reasonCache:            reasonCache,
-		puller:                 newDockerPuller(client, qps, burst),
+		dockerPuller:           newDockerPuller(client, qps, burst),
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
 		prober:                 nil,
 		generator:              generator,
-		runtimeHooks:           runtimeHooks,
 		execHandler:            execHandler,
 		oomAdjuster:            oomAdjuster,
 		procFs:                 procFs,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
+	dm.imagePuller = kubecontainer.NewImagePuller(recorder, dm)
 
 	return dm
 }
@@ -829,12 +829,12 @@ func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
 // TODO(vmarmol): Consider unexporting.
 // PullImage pulls an image from network to local storage.
 func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, secrets []api.Secret) error {
-	return dm.puller.Pull(image.Image, secrets)
+	return dm.dockerPuller.Pull(image.Image, secrets)
 }
 
 // IsImagePresent checks whether the container image is already in the local storage.
 func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	return dm.puller.IsImagePresent(image.Image)
+	return dm.dockerPuller.IsImagePresent(image.Image)
 }
 
 // Removes the specified image.
@@ -1368,7 +1368,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 	}
 
 	// No pod secrets for the infra container.
-	if err := dm.pullImage(pod, container, nil); err != nil {
+	if err := dm.imagePuller.PullImage(pod, container, nil); err != nil {
 		return "", err
 	}
 
@@ -1525,33 +1525,6 @@ func (dm *DockerManager) clearReasonCache(pod *api.Pod, container *api.Container
 	dm.reasonCache.Remove(pod.UID, container.Name)
 }
 
-// Pull the image for the specified pod and container.
-func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error {
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-	}
-	spec := kubecontainer.ImageSpec{Image: container.Image}
-	present, err := dm.IsImagePresent(spec)
-	if err != nil {
-		if ref != nil {
-			dm.recorder.Eventf(ref, "Failed", "Failed to inspect image %q: %v", container.Image, err)
-		}
-		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
-	}
-	if !dm.runtimeHooks.ShouldPullImage(pod, container, present) {
-		if present && ref != nil {
-			dm.recorder.Eventf(ref, "Pulled", "Container image %q already present on machine", container.Image)
-		}
-		return nil
-	}
-
-	dm.runtimeHooks.ReportImagePulling(pod, container)
-	err = dm.PullImage(spec, pullSecrets)
-	dm.runtimeHooks.ReportImagePulled(pod, container, err)
-	return err
-}
-
 // Sync the running pod to match the specified desired pod.
 func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error {
 	start := time.Now()
@@ -1612,7 +1585,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
 		glog.V(4).Infof("Creating container %+v in pod %v", container, podFullName)
-		err := dm.pullImage(pod, container, pullSecrets)
+		err := dm.imagePuller.PullImage(pod, container, pullSecrets)
 		dm.updateReasonCache(pod, container, err)
 		if err != nil {
 			glog.Warningf("Failed to pull image %q from pod %q and container %q: %v", container.Image, kubecontainer.GetPodFullName(pod), container.Name, err)

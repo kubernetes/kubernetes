@@ -162,8 +162,7 @@ func TestRunOnce(t *testing.T) {
 		kubecontainer.FakeOS{},
 		kb.networkPlugin,
 		kb,
-		nil,
-		newKubeletRuntimeHooks(kb.recorder))
+		nil)
 
 	pods := []*api.Pod{
 		{
