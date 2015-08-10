@@ -63,7 +63,8 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 			volumeTestCleanup(c, config)
 		}()
 
-		serverIP := startVolumeServer(c, config)
+		pod := startVolumeServer(c, config)
+		serverIP := pod.Status.PodIP
 		Logf("NFS server IP address: %v", serverIP)
 
 		pv := makePersistentVolume(serverIP)

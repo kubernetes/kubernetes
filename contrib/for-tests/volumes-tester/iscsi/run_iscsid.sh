@@ -16,46 +16,26 @@
 
 function start()
 {
-
-    # prepare /etc/exports
-    for i in "$@"; do
-        # fsid=0: needed for NFSv4
-        echo "$i *(rw,fsid=0,no_root_squash)" >> /etc/exports
-        echo "Serving $i"
-    done
-
-    mount -t nfsd nfds /proc/fs/nfsd
-
-    # -N 2 -N 3: disable NFSv2+3
-    # -V 4.x: enable NFSv4
-    /usr/sbin/rpc.mountd -N 2 -N 3 -V 4 -V 4.1
-
-    /usr/sbin/exportfs -r
-    /usr/sbin/rpc.nfsd -N 2 -N 3 -V 4 -V 4.1 2
-
-    echo "NFS started"
+    targetcli restoreconfig
+    iscsid
+    echo "iscsid started"
 }
 
 function stop()
 {
-    echo "Stopping NFS"
+    echo "Stopping iscsid"
 
-    /usr/sbin/rpc.nfsd 0
-    /usr/sbin/exportfs -au
-    /usr/sbin/exportfs -f
+    kill $( cat /var/run/iscsid.pid )
+    targetcli clearconfig confirm=True
 
-    kill $( pidof rpc.mountd )
-    umount /proc/fs/nfsd
-    echo > /etc/exports
+    echo "iscsid stopped"
     exit 0
 }
 
 
 trap stop TERM
+start
 
-start "$@"
-
-# Ugly hack to do nothing and wait for SIGTERM
 while true; do
-    read
+    sleep 5
 done
