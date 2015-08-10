@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -283,19 +282,14 @@ func LogSymlink(containerLogsDir, podFullName, containerName, dockerId string) s
 	return path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s.%s", podFullName, containerName, dockerId, LogSuffix))
 }
 
-// Get a docker endpoint, either from the string passed in, or $DOCKER_HOST environment variables
-func getDockerEndpoint(dockerEndpoint string) string {
-	var endpoint string
+// Get a *docker.Client, either using the endpoint passed in, or using
+// DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT path per their spec
+func getDockerClient(dockerEndpoint string) (*docker.Client, error) {
 	if len(dockerEndpoint) > 0 {
-		endpoint = dockerEndpoint
-	} else if len(os.Getenv("DOCKER_HOST")) > 0 {
-		endpoint = os.Getenv("DOCKER_HOST")
-	} else {
-		endpoint = "unix:///var/run/docker.sock"
+		glog.Infof("Connecting to docker on %s", dockerEndpoint)
+		return docker.NewClient(dockerEndpoint)
 	}
-	glog.Infof("Connecting to docker on %s", endpoint)
-
-	return endpoint
+	return docker.NewClientFromEnv()
 }
 
 func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
@@ -304,7 +298,7 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 			VersionInfo: docker.Env{"ApiVersion=1.18"},
 		}
 	}
-	client, err := docker.NewClient(getDockerEndpoint(dockerEndpoint))
+	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
