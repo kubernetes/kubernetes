@@ -18,8 +18,10 @@ package util
 
 import (
 	"encoding/json"
+	"math"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/google/gofuzz"
 )
 
@@ -44,6 +46,31 @@ func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.L
 // Now returns the current local time.
 func Now() Time {
 	return Time{time.Now()}
+}
+
+// TimeFormatter returns human readable tiem format unless machine_readable is set to ture.
+func TimeFormatter(t time.Time, machine_readable bool) string {
+	if machine_readable {
+		return t.Format(time.RFC1123Z)
+	}
+	magnitudes := []humanize.Magnitude{
+		humanize.NewMagitude(1, "now", 1),
+		humanize.NewMagitude(2, "1s %s", 1),
+		humanize.NewMagitude(humanize.Minute, "s %s", 1),
+		humanize.NewMagitude(2*humanize.Minute, "1m %s", 1),
+		humanize.NewMagitude(humanize.Hour, "%dm %s", humanize.Minute),
+		humanize.NewMagitude(2*humanize.Hour, "1h %s", 1),
+		humanize.NewMagitude(humanize.Day, "%dh %s", humanize.Hour),
+		humanize.NewMagitude(2*humanize.Day, "1D %s", 1),
+		humanize.NewMagitude(humanize.Month, "%dD %s", humanize.Day),
+		humanize.NewMagitude(2*humanize.Month, "1M %s", 1),
+		humanize.NewMagitude(humanize.Year, "%dM %s", humanize.Month),
+		humanize.NewMagitude(18*humanize.Month, "1Y %s", 1),
+		humanize.NewMagitude(2*humanize.Year, "2Y %s", 1),
+		humanize.NewMagitude(math.MaxInt64, "%dY %s", humanize.Year),
+	}
+	format := humanize.NewCustomFormat(magnitudes, "", "later")
+	return humanize.CustomTime(t, format)
 }
 
 // IsZero returns true if the value is nil or time is zero.

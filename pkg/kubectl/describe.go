@@ -40,7 +40,7 @@ import (
 // if the output could not be generated. Implementors typically
 // abstract the retrieval of the named object from a remote server.
 type Describer interface {
-	Describe(namespace, name string) (output string, err error)
+	Describe(namespace, name string, machine_readable bool) (output string, err error)
 }
 
 // ObjectDescriber is an interface for displaying arbitrary objects with extra
@@ -127,7 +127,7 @@ type NamespaceDescriber struct {
 	client.Interface
 }
 
-func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
+func (d *NamespaceDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	ns, err := d.Namespaces().Get(name)
 	if err != nil {
 		return "", err
@@ -258,7 +258,7 @@ type LimitRangeDescriber struct {
 	client.Interface
 }
 
-func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
+func (d *LimitRangeDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	lr := d.LimitRanges(namespace)
 
 	limitRange, err := lr.Get(name)
@@ -325,7 +325,7 @@ type ResourceQuotaDescriber struct {
 	client.Interface
 }
 
-func (d *ResourceQuotaDescriber) Describe(namespace, name string) (string, error) {
+func (d *ResourceQuotaDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	rq := d.ResourceQuotas(namespace)
 
 	resourceQuota, err := rq.Get(name)
@@ -366,7 +366,7 @@ type PodDescriber struct {
 	client.Interface
 }
 
-func (d *PodDescriber) Describe(namespace, name string) (string, error) {
+func (d *PodDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	rc := d.ReplicationControllers(namespace)
 	pc := d.Pods(namespace)
 
@@ -379,7 +379,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		if err2 == nil && len(events.Items) > 0 {
 			return tabbedString(func(out io.Writer) error {
 				fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
-				DescribeEvents(events, out)
+				DescribeEvents(events, out, machine_readable)
 				return nil
 			})
 		}
@@ -399,10 +399,10 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	return describePod(pod, rcs, events)
+	return describePod(pod, rcs, events, machine_readable)
 }
 
-func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.EventList) (string, error) {
+func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.EventList, machine_readable bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pod.Namespace)
@@ -425,7 +425,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 			}
 		}
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, out, machine_readable)
 		}
 		return nil
 	})
@@ -435,7 +435,7 @@ type PersistentVolumeDescriber struct {
 	client.Interface
 }
 
-func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, error) {
+func (d *PersistentVolumeDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	c := d.PersistentVolumes()
 
 	pv, err := c.Get(name)
@@ -462,7 +462,7 @@ type PersistentVolumeClaimDescriber struct {
 	client.Interface
 }
 
-func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (string, error) {
+func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	c := d.PersistentVolumeClaims(namespace)
 
 	pvc, err := c.Get(name)
@@ -569,7 +569,7 @@ type ReplicationControllerDescriber struct {
 	client.Interface
 }
 
-func (d *ReplicationControllerDescriber) Describe(namespace, name string) (string, error) {
+func (d *ReplicationControllerDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	rc := d.ReplicationControllers(namespace)
 	pc := d.Pods(namespace)
 
@@ -585,10 +585,10 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 
 	events, _ := d.Events(namespace).Search(controller)
 
-	return describeReplicationController(controller, events, running, waiting, succeeded, failed)
+	return describeReplicationController(controller, events, running, waiting, succeeded, failed, machine_readable)
 }
 
-func describeReplicationController(controller *api.ReplicationController, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeReplicationController(controller *api.ReplicationController, events *api.EventList, running, waiting, succeeded, failed int, machine_readable bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", controller.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", controller.Namespace)
@@ -602,7 +602,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, out, machine_readable)
 		}
 		return nil
 	})
@@ -613,7 +613,7 @@ type SecretDescriber struct {
 	client.Interface
 }
 
-func (d *SecretDescriber) Describe(namespace, name string) (string, error) {
+func (d *SecretDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	c := d.Secrets(namespace)
 
 	secret, err := c.Get(name)
@@ -652,7 +652,7 @@ type ServiceDescriber struct {
 	client.Interface
 }
 
-func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
+func (d *ServiceDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	c := d.Services(namespace)
 
 	service, err := c.Get(name)
@@ -663,7 +663,7 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	endpoints, _ := d.Endpoints(namespace).Get(name)
 	events, _ := d.Events(namespace).Search(service)
 
-	return describeService(service, endpoints, events)
+	return describeService(service, endpoints, events, machine_readable)
 }
 
 func buildIngressString(ingress []api.LoadBalancerIngress) string {
@@ -682,7 +682,7 @@ func buildIngressString(ingress []api.LoadBalancerIngress) string {
 	return buffer.String()
 }
 
-func describeService(service *api.Service, endpoints *api.Endpoints, events *api.EventList) (string, error) {
+func describeService(service *api.Service, endpoints *api.Endpoints, events *api.EventList, machine_readable bool) (string, error) {
 	if endpoints == nil {
 		endpoints = &api.Endpoints{}
 	}
@@ -712,7 +712,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		}
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, out, machine_readable)
 		}
 		return nil
 	})
@@ -723,7 +723,7 @@ type ServiceAccountDescriber struct {
 	client.Interface
 }
 
-func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, error) {
+func (d *ServiceAccountDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	c := d.ServiceAccounts(namespace)
 
 	serviceAccount, err := c.Get(name)
@@ -803,7 +803,7 @@ type NodeDescriber struct {
 	client.Interface
 }
 
-func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
+func (d *NodeDescriber) Describe(namespace, name string, machine_readable bool) (string, error) {
 	mc := d.Nodes()
 	node, err := mc.Get(name)
 	if err != nil {
@@ -832,10 +832,10 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 		events, _ = d.Events("").Search(ref)
 	}
 
-	return describeNode(node, pods, events)
+	return describeNode(node, pods, events, machine_readable)
 }
 
-func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (string, error) {
+func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList, machine_readable bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(node.Labels))
@@ -906,13 +906,13 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 		fmt.Fprintf(out, "  CPU(milliCPU):\t\t%d (%d%% of total)\n", totalMilliCPU, int64(fractionTotalCPU))
 		fmt.Fprintf(out, "  Memory(bytes):\t\t%d (%d%% of total)\n", totalMemory, int64(fractionTotalMemory))
 		if events != nil {
-			DescribeEvents(events, out)
+			DescribeEvents(events, out, machine_readable)
 		}
 		return nil
 	})
 }
 
-func DescribeEvents(el *api.EventList, w io.Writer) {
+func DescribeEvents(el *api.EventList, w io.Writer, machine_readable bool) {
 	if len(el.Items) == 0 {
 		fmt.Fprint(w, "No events.")
 		return
@@ -921,8 +921,8 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tReason\tMessage\n")
 	for _, e := range el.Items {
 		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\n",
-			e.FirstTimestamp.Time.Format(time.RFC1123Z),
-			e.LastTimestamp.Time.Format(time.RFC1123Z),
+			util.TimeFormatter(e.FirstTimestamp.Time, machine_readable),
+			util.TimeFormatter(e.LastTimestamp.Time, machine_readable),
 			e.Count,
 			e.Source,
 			e.InvolvedObject.FieldPath,

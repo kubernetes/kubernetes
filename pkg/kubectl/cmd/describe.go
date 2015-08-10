@@ -79,11 +79,13 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to a file containing the resource to describe"
 	kubectl.AddJsonFilenameFlag(cmd, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().Bool("machine-readable", false, "If present, print some information more precisely in a machine-readable format.")
 	return cmd
 }
 
 func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
+	machine_readable := cmdutil.GetFlagBool(cmd, "machine-readable")
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -112,7 +114,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	infos, err := r.Infos()
 	if err != nil {
 		if apierrors.IsNotFound(err) && len(args) == 2 {
-			return DescribeMatchingResources(mapper, typer, f, cmdNamespace, args[0], args[1], out, err)
+			return DescribeMatchingResources(mapper, typer, machine_readable, f, cmdNamespace, args[0], args[1], out, err)
 		}
 		allErrs = append(allErrs, err)
 	}
@@ -124,7 +126,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			allErrs = append(allErrs, err)
 			continue
 		}
-		s, err := describer.Describe(info.Namespace, info.Name)
+		s, err := describer.Describe(info.Namespace, info.Name, machine_readable)
 		if err != nil {
 			allErrs = append(allErrs, err)
 			continue
@@ -135,7 +137,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	return errors.NewAggregate(allErrs)
 }
 
-func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, f *cmdutil.Factory, namespace, rsrc, prefix string, out io.Writer, originalError error) error {
+func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, machine_readable bool, f *cmdutil.Factory, namespace, rsrc, prefix string, out io.Writer, originalError error) error {
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(true, rsrc).
@@ -159,7 +161,7 @@ func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper
 		info := infos[ix]
 		if strings.HasPrefix(info.Name, prefix) {
 			isFound = true
-			s, err := describer.Describe(info.Namespace, info.Name)
+			s, err := describer.Describe(info.Namespace, info.Name, machine_readable)
 			if err != nil {
 				return err
 			}

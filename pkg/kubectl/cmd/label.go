@@ -68,6 +68,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().String("resource-version", "", "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
+	cmd.Flags().Bool("machine-readable", false, "If present, print some information more precisely in a machine-readable format.")
 	return cmd
 }
 
