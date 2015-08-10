@@ -1,3 +1,17 @@
+// Copyright 2015 The appc Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package types
 
 import (
@@ -20,6 +34,26 @@ func TestLabels(t *testing.T) {
 			"",
 		},
 		{
+			`[{"name": "os", "value": "linux"}, {"name": "arch", "value": "arm64"}]`,
+			`bad arch "arm64" for linux`,
+		},
+		{
+			`[{"name": "os", "value": "linux"}, {"name": "arch", "value": "aarch64_be"}]`,
+			"",
+		},
+		{
+			`[{"name": "os", "value": "linux"}, {"name": "arch", "value": "arm64_be"}]`,
+			`bad arch "arm64_be" for linux`,
+		},
+		{
+			`[{"name": "os", "value": "linux"}, {"name": "arch", "value": "arm"}]`,
+			`bad arch "arm" for linux`,
+		},
+		{
+			`[{"name": "os", "value": "linux"}, {"name": "arch", "value": "armv6l"}]`,
+			"",
+		},
+		{
 			`[{"name": "os", "value": "linux"}, {"name": "arch", "value": "armv7l"}]`,
 			"",
 		},
@@ -38,10 +72,6 @@ func TestLabels(t *testing.T) {
 		{
 			`[{"name": "os", "value": "freebsd"}, {"name": "arch", "value": "armv7b"}]`,
 			`bad arch "armv7b" for freebsd`,
-		},
-		{
-			`[{"name": "os", "value": "linux"}, {"name": "arch", "value": "arm"}]`,
-			`bad arch "arm" for linux`,
 		},
 		{
 			`[{"name": "name"}]`,

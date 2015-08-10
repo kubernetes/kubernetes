@@ -15,42 +15,34 @@
 package types
 
 import (
-	"encoding/json"
-	"errors"
-	"path/filepath"
+	"testing"
 )
 
-type Exec []string
-
-type exec Exec
-
-func (e Exec) assertValid() error {
-	if len(e) < 1 {
-		return errors.New(`Exec cannot be empty`)
+func TestGoodPort(t *testing.T) {
+	p := Port{
+		Port:  32456,
+		Count: 100,
 	}
-	if !filepath.IsAbs(e[0]) {
-		return errors.New(`Exec[0] must be absolute path`)
+	if err := p.assertValid(); err != nil {
+		t.Errorf("good port assertion failed: %v", err)
 	}
-	return nil
 }
 
-func (e Exec) MarshalJSON() ([]byte, error) {
-	if err := e.assertValid(); err != nil {
-		return nil, err
+func TestBadPort(t *testing.T) {
+	p := Port{
+		Port: 88888,
 	}
-	return json.Marshal(exec(e))
+	if p.assertValid() == nil {
+		t.Errorf("bad port asserted valid")
+	}
 }
 
-func (e *Exec) UnmarshalJSON(data []byte) error {
-	var je exec
-	err := json.Unmarshal(data, &je)
-	if err != nil {
-		return err
+func TestBadRange(t *testing.T) {
+	p := Port{
+		Port:  32456,
+		Count: 45678,
 	}
-	ne := Exec(je)
-	if err := ne.assertValid(); err != nil {
-		return err
+	if p.assertValid() == nil {
+		t.Errorf("bad port range asserted valid")
 	}
-	*e = ne
-	return nil
 }
