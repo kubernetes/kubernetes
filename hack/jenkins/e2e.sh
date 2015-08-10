@@ -95,7 +95,9 @@ GCE_DEFAULT_SKIP_TESTS=(
 
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
-GCE_FLAKY_TESTS=()
+GCE_FLAKY_TESTS=(
+    "ResourceUsage"
+    )
 
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
@@ -105,6 +107,7 @@ GCE_PARALLEL_SKIP_TESTS=(
     "Nodes\sNetwork"
     "Nodes\sResize"
     "MaxPods"
+    "ResourceUsage"
     "SchedulerPredicates"
     "Services.*restarting"
     "Shell.*services"
