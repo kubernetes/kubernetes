@@ -594,6 +594,7 @@ func (r *runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 	}
 
 	// TODO handle pod.Spec.HostPID
+	// TODO handle pod.Spec.HostIPC
 
 	units := []*unit.UnitOption{
 		newUnitOption(unitKubernetesSection, unitRktID, uuid),

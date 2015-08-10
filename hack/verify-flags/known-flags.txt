@@ -107,6 +107,7 @@ deployment-controller-sync-period
 hostname-override
 host-network-sources
 host-pid-sources
+host-ipc-sources
 http-check-frequency
 http-port
 ignore-not-found

@@ -60,6 +60,16 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 
+	if pod.Spec.HostIPC {
+		allowed, err := allowHostIPC(pod)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf("pod with UID %q specified host ipc, but is disallowed", pod.UID)
+		}
+	}
+
 	if !capabilities.Get().AllowPrivileged {
 		for _, container := range pod.Spec.Containers {
 			if securitycontext.HasPrivilegedRequest(&container) {
@@ -91,6 +101,20 @@ func allowHostPID(pod *api.Pod) (bool, error) {
 		return false, err
 	}
 	for _, source := range capabilities.Get().PrivilegedSources.HostPIDSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Determined whether the specified pod is allowed to use host ipc
+func allowHostIPC(pod *api.Pod) (bool, error) {
+	podSource, err := getPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostIPCSources {
 		if source == podSource {
 			return true, nil
 		}
