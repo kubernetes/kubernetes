@@ -14,32 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Sourcable temp directory functions
+# Generates root certificate authority crt and key.
+# Writes to <out_dir> (use docker volume or docker export to retrieve files).
+# Params:
+#   out_dir  - dir to write crt and key to
 
 set -o errexit
 set -o nounset
 set -o pipefail
+set -o errtrace
 
-# Runs the supplied command string in a temporary workspace directory.
-function cluster::mesos::docker::run_in_temp_dir {
-  prefix="$1"
-  shift
-  cmd="$@"
+source "util-ssl.sh"
 
-  # create temp WORKSPACE dir in current dir to avoid permission issues of TMPDIR on mac os x
-  local -r workspace=$(env TMPDIR=$(pwd) mktemp -d -t "${prefix}-XXXXXX")
-  echo "Workspace created: ${workspace}" 1>&2
+out_dir="${1:-}"
+[ -z "${out_dir}" ] && echo "No out_dir supplied (param 1)" && exit 1
 
-  cleanup() {
-    rm -rf "${workspace}"
-    echo "Workspace deleted: ${workspace}" 1>&2
-  }
-  trap 'cleanup' EXIT
-
-  pushd "${workspace}" > /dev/null
-  (${cmd}) || return $?
-  popd > /dev/null
-
-  trap - EXIT
-  cleanup
-}
+cluster::mesos::docker::create_root_certificate_authority "${out_dir}"

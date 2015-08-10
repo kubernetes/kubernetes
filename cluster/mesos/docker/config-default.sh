@@ -36,3 +36,28 @@ DNS_REPLICAS=1
 
 # Optional: Deploy cluster web interface.
 ENABLE_CLUSTER_UI=true
+
+# Timeout (in seconds) to wait for ssl certs to be generated
+KUBE_KEYGEN_TIMEOUT="${KUBE_KEYGEN_TIMEOUT:-60}"
+
+# Timeout (in seconds) to wait for Etcd to come up
+MESOS_DOCKER_ETCD_TIMEOUT="${MESOS_DOCKER_ETCD_TIMEOUT:-60}"
+
+# Timeout (in seconds) to wait for the Mesos Master to come up
+MESOS_DOCKER_MESOS_TIMEOUT="${MESOS_DOCKER_MESOS_TIMEOUT:-60}"
+
+# Timeout (in seconds) to wait for the API Server to come up
+MESOS_DOCKER_API_TIMEOUT="${MESOS_DOCKER_API_TIMEOUT:-180}"
+
+# Timeout (in seconds) to wait for each addon to come up
+MESOS_DOCKER_ADDON_TIMEOUT="${MESOS_DOCKER_ADDON_TIMEOUT:-180}"
+
+# Path to directory to dump logs to in case of kube-up failure.
+# If using docker-machine or boot2docker, should be under /Users (which is mounted from the host into the docker vm).
+# If running in a container, $HOME should be resolved outside of the container.
+MESOS_DOCKER_LOG_DIR="${MESOS_DOCKER_LOG_DIR:-${HOME}/tmp/kubernetes/log}"
+
+# Path to directory to store SSL certs/keys/tokens.
+# If using docker-machine or boot2docker, should be under /Users (which is mounted from the host into the docker vm).
+# If running in a container, $HOME should be resolved outside of the container.
+MESOS_DOCKER_AUTH_DIR="${MESOS_DOCKER_AUTH_DIR:-${HOME}/tmp/kubernetes/auth}"
