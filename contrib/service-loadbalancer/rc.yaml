@@ -19,7 +19,7 @@ spec:
       nodeSelector:
         role: loadbalancer
       containers:
-      - image: gcr.io/google_containers/servicelb:0.1
+      - image: bprashanth/servicelb:0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
