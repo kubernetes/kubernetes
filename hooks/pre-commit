@@ -60,8 +60,8 @@ files_need_description=()
 # Check API schema definitions for field descriptions
 for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
   # Check for files with fields without description tags
-  descriptionless=$("${KUBE_HOOKS_DIR}/description.sh" "${file}")
-  if [[ "$descriptionless" -eq "0" ]]; then
+  descriptionless=$(hack/verify-description.sh "${file}")
+  if [[ "$descriptionless" != "" ]]; then
     files_need_description+=("${file}")
   fi
 done
@@ -141,3 +141,5 @@ if [[ "${exit_code}" != 0 ]]; then
   echo "${red}Aborting commit${reset}"
 fi
 exit ${exit_code}
+
+# ex: ts=2 sw=2 et filetype=sh
