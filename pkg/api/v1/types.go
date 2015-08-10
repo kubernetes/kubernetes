@@ -609,7 +609,7 @@ const (
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
 	// Required: Port to connect to.
-	Port util.IntOrString `json:"port" description:"number of name of the port to access on the container; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"`
+	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"`
 }
 
 // ExecAction describes a "run in container" action.
