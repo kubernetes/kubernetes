@@ -273,7 +273,7 @@ func setIsolators(app *appctypes.App, c *api.Container) error {
 		r.request = quantity.String()
 		resources[name] = r
 	}
-	var acName appctypes.ACName
+	var acName appctypes.ACIdentifier
 	for name, res := range resources {
 		switch name {
 		case api.ResourceCPU:
@@ -412,10 +412,14 @@ func (r *runtime) makePodManifest(pod *api.Pod) (*appcschema.PodManifest, error)
 			return nil, err
 		}
 
+		name, err := appctypes.SanitizeACName(c.Name)
+		if err != nil {
+			return nil, err
+		}
+		appName := appctypes.MustACName(name)
+
 		manifest.Apps = append(manifest.Apps, appcschema.RuntimeApp{
-			// TODO(yifan): We should allow app name to be different with
-			// image name. See https://github.com/coreos/rkt/pull/640.
-			Name:  imgManifest.Name,
+			Name:  *appName,
 			Image: appcschema.RuntimeImage{ID: *hash},
 			App:   imgManifest.App,
 		})
