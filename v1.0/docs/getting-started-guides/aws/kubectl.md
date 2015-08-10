@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Install and configure kubectl
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -38,7 +39,9 @@ ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

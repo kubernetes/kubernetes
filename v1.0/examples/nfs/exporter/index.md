@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: NFS-exporter container
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -18,7 +19,9 @@ Usage::
     docker run -d --name nfs --privileged jsafrane/nfsexporter /path/to/share /path/to/share2 ...
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

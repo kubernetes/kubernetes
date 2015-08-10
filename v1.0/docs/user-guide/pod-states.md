@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: The life of a pod
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -113,7 +114,9 @@ If a node dies or is disconnected from the rest of the cluster, some entity with
      * If running under a controller, pod will be recreated elsewhere
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

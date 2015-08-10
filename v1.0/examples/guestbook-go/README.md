@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Guestbook Example
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -309,7 +310,9 @@ Tip: To turn down your Kubernetes cluster, follow the corresponding instructions
 [Getting Started Guides](../../docs/getting-started-guides/) that you previously used to create your cluster.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

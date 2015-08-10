@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: api-reference/operations
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -7,6 +8,10 @@ layout: docwithnav
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 <!-- needed for gh-pages to render html files when imported -->
 {% include operations.html %}
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

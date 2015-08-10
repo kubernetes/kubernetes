@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Authorization Plugins
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -115,7 +116,9 @@ same or similar arguments.  Developers should then consider the interaction betw
 caching and revocation of permissions.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

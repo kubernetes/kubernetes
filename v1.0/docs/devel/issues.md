@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: GitHub Issues for the Kubernetes Project
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -26,7 +27,9 @@ Definitions
 * untriaged - anything without a priority/X label will be considered untriaged
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

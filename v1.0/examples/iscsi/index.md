@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Step 1. Setting up iSCSI target and iSCSI initiator
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -91,7 +92,9 @@ Run *docker inspect* and I found the Containers mounted the host directory into 
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

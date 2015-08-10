@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Getting started with Kubernetes on Mesos
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -396,7 +397,9 @@ Future work will add instructions to this guide to enable support for Kubernetes
 [13]: ../../contrib/mesos/README.md
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Example: Distributed task queues with Celery, RabbitMQ and Flower
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -287,7 +288,9 @@ Point your internet browser to the appropriate flower-service address, port 5555
 If you click on the tab called "Tasks", you should see an ever-growing list of tasks called "celery_conf.add" which the run\_tasks.py script is dispatching.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

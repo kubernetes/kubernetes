@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Resource Quota
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -177,7 +178,9 @@ Any action that consumes those resources can be tweaked, or can pick up namespac
 meet your end goal.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Labels
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -124,7 +125,9 @@ Pods (and other objects) may belong to multiple sets simultaneously, which enabl
 Concerning API: we may extend such filtering to DELETE operations in the future.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

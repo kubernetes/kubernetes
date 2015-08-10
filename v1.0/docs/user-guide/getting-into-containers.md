@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Using kubectl exec to check the environment variables of a container
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -91,7 +92,9 @@ root@storage:/data#
 This gets you a terminal.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

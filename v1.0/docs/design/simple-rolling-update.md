@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Simple rolling update
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -109,7 +110,9 @@ then `foo-next` is synthesized using the pattern `<controller-name>-<hash-of-nex
       * Goto Rollout with `foo` and `foo-next` trading places.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Diagrams for Cloud Logging Blog Article
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -9,7 +10,9 @@ layout: docwithnav
 # Diagrams for Cloud Logging Blog Article
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

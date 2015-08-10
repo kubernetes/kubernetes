@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Logging Conventions
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -33,7 +34,9 @@ The following conventions for the glog levels to use.  [glog](http://godoc.org/g
 As per the comments, the practical default level is V(2).  Developers and QE environments may wish to run at V(3) or V(4). If you wish to change the log level, you can pass in `-v=X` where X is the desired maximum level to log.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

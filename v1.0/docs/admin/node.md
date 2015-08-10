@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Node
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -250,7 +251,9 @@ API object can be found at: [Node API
 object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/v1.0.1/docs/api-reference/definitions.html#_v1_node).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

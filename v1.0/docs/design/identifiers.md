@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Identifiers and Names in Kubernetes
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -100,7 +101,9 @@ objectives.
       1. This may correspond to Docker's container ID.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

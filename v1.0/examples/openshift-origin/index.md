@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: OpenShift Origin example
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -191,7 +192,9 @@ $ osc --help
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

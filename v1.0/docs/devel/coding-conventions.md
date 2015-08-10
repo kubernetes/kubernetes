@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: devel/coding-conventions
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -13,7 +14,9 @@ Coding style advice for contributors
     - https://gist.github.com/lavalamp/4bd23295a9f32706a48f
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

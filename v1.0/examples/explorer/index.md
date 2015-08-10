@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: explorer/README
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -138,7 +139,9 @@ Error: &lt;*&gt;lookup elasticsearch-logging: no such host
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

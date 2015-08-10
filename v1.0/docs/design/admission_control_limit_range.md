@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Admission control plugin: LimitRanger
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -150,7 +151,9 @@ To make a **LimitRangeItem** more restrictive, we will intend to add these addit
 See the [example of Limit Range](../user-guide/limitrange/) for more information.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

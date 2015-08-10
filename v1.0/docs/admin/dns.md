@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: DNS Integration with Kubernetes
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -46,7 +47,9 @@ time.
 See [the docs for the DNS cluster addon](http://releases.k8s.io/v1.0.1/cluster/addons/dns/README.md).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

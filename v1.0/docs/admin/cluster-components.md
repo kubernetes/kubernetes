@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes Cluster Admin Guide: Cluster Components
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -122,7 +123,9 @@ network rules on the host and performing connection forwarding.
 running.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

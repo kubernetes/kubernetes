@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Releasing Kubernetes
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -321,7 +322,9 @@ by plain mortals (in a perfect world PR/issue's title would be enough but often
 it is just too cryptic/geeky/domain-specific that it isn't).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

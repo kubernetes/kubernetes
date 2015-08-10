@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: So you want to change the API?
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -364,7 +365,9 @@ the change gets in. If you are unsure, ask. Also make sure that the change gets 
 TODO(smarterclayton): write this.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

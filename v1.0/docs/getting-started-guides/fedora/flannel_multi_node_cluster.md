@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes multiple nodes cluster with flannel on Fedora
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -221,7 +222,9 @@ PING 18.16.90.4 (18.16.90.4) 56(84) bytes of data.
 * Now Kubernetes multi-node cluster is set up with overlay networking set up by flannel.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

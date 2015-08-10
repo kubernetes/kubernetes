@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: etcd
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -55,7 +56,9 @@ curl -fs -X PUT "http://${host}:${port}/v2/keys/_test"
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

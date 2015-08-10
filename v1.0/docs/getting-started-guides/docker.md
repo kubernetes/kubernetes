@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Running Kubernetes locally via Docker
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -139,7 +140,9 @@ the cluster, you need to first kill the kubelet container, and then any other co
 You may use `docker ps -a | awk '{print $1}' | xargs docker kill`, note this removes _all_ containers running under Docker, so use with caution.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

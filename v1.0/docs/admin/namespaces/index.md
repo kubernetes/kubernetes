@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes Namespaces
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -283,7 +284,9 @@ As the policy support in Kubernetes evolves, we will extend this scenario to sho
 authorization rules for each namespace.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

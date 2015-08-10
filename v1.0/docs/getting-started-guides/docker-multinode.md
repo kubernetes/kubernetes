@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Running Multi-Node Kubernetes Using Docker
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -67,7 +68,9 @@ Once your cluster has been created you can [test it out](docker-multinode/testin
 For more complete applications, please look in the [examples directory](../../examples/)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

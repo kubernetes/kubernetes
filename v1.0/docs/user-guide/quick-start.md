@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes User Guide: Managing Applications: Quick start
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -90,7 +91,9 @@ services/my-nginx
 [Learn about how to configure common container parameters, such as commands and environment variables.](configuring-containers.html)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: The Kubernetes resource model
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -248,7 +249,9 @@ This is the amount of time a container spends accessing disk, including actuator
   * Compressible? yes
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

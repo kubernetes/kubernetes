@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Secrets example
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -74,7 +75,9 @@ $ kubectl logs secret-test-pod
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

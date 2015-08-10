@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: kubectl-container/README
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -25,7 +26,9 @@ a drop-in replacement for the old no-auth KUBERNETES_RO service. The other
 containers in your pod will find the proxy apparently serving on localhost.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

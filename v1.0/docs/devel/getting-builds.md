@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Getting Kubernetes Builds
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -34,7 +35,9 @@ gsutil ls gs://kubernetes-release/release                 # list all official re
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

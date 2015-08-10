@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes Documentation: releases.k8s.io/v1.0.1
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -35,7 +36,9 @@ You should also check the [known issues](user-guide/known-issues.html) for the r
 * To report a security issue, see [Reporting a Security Issue](reporting-security-issues.html).
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Storm example
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -194,7 +195,9 @@ Make sure the Nimbus Pod is running.
 ```kubectl create -f storm-worker-controller.json```
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: kubeconfig files
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -177,7 +178,9 @@ $ kubectl config use-context federal-context
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

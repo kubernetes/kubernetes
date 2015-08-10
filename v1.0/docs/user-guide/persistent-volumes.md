@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Persistent Volumes and Claims
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -206,7 +207,9 @@ spec:
 {% endhighlight %}
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes User Guide: Managing Applications: Connecting applications
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -440,7 +441,9 @@ $ curl https://104.197.68.43 -k
 [Learn about more Kubernetes features that will help you run containers reliably in production.](production-pods.html)
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Getting started with Juju
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -244,7 +245,9 @@ MAAS (bare metal) | TBD
 GCE               | TBD
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

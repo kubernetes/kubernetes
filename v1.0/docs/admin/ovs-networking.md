@@ -1,5 +1,6 @@
 ---
 layout: docwithnav
+title: Kubernetes OpenVSwitch GRE/VxLAN networking
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -22,7 +23,9 @@ Also, an OVS bridge is created(obr0) and added as a port to the kbr0 bridge. All
 Routing rules enable any 10.244.0.0/16 target to become reachable via the OVS bridge connected with the tunnels.
 
 
+<!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
