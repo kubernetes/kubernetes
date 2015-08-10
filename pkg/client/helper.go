@@ -188,7 +188,7 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 	}
 	apiVersions, err := client.ServerAPIVersions()
 	if err != nil {
-		return "", fmt.Errorf("couldn't read version from server: %v\n", err)
+		return "", fmt.Errorf("couldn't read version from server: %v", err)
 	}
 	serverVersions := util.StringSet{}
 	for _, v := range apiVersions.Versions {
