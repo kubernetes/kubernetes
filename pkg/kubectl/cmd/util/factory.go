@@ -49,7 +49,7 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory struct {
-	clients    *clientCache
+	clients    *ClientCache
 	flags      *pflag.FlagSet
 	generators map[string]kubectl.Generator
 
