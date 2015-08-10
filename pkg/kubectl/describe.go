@@ -927,8 +927,8 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tReason\tMessage\n")
 	for _, e := range el.Items {
 		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\n",
-			e.FirstTimestamp.Time.Format(time.RFC1123Z),
-			e.LastTimestamp.Time.Format(time.RFC1123Z),
+			translateTimestamp(e.FirstTimestamp),
+			translateTimestamp(e.LastTimestamp),
 			e.Count,
 			e.Source,
 			e.InvolvedObject.FieldPath,

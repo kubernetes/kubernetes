@@ -850,8 +850,8 @@ func printEvent(event *api.Event, w io.Writer, withNamespace bool, wide bool, co
 	}
 	if _, err := fmt.Fprintf(
 		w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s",
-		event.FirstTimestamp.Time.Format(time.RFC1123Z),
-		event.LastTimestamp.Time.Format(time.RFC1123Z),
+		translateTimestamp(event.FirstTimestamp),
+		translateTimestamp(event.LastTimestamp),
 		event.Count,
 		event.InvolvedObject.Name,
 		event.InvolvedObject.Kind,
