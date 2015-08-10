@@ -32,11 +32,9 @@ __L7 load balancing of Http services__: The load balancer controller automatical
 
 __L4 loadbalancing of Tcp services__: Since one needs to specify ports at pod creation time (kubernetes doesn't currently support port ranges), a single loadbalancer is tied to a set of preconfigured node ports, and hence a set of TCP services it can expose. The load balancer controller will dynamically add rules for each configured TCP service as it pops into existence. However, each "new" (unspecified in the tcpServices section of the loadbalancer.json) service will need you to open up a new container-host port pair for traffic. You can achieve this by creating a new loadbalancer pod with the `targetPort` set to the name of your service, and that service specified in the tcpServices map of the new loadbalancer.
 
-
 ### Cross-cluster loadbalancing
 
-Still trying this out.
-
+On cloud providers that offer a private ip range for all instances on a network, you can setup multiple clusters in different availability zones, on the same network, and loadbalancer services across these zones. On GCE for example, every instance is a member of a single network. A network performs the same function that a router does: it defines the network range and gateway IP address, handles communication between instances, and serves as a gateway between instances and other networks. On such networks the endpoints of a service in one cluster are visible in all other clusters in the same network, so you can setup an edge loadbalancer that watches a kubernetes master of another cluster for services. Such a deployment allows you to fallback to a different AZ during times of duress or planned downtime (eg: database update).
 
 ### Examples
 
@@ -186,6 +184,95 @@ $ mysql -u root -ppassword --host 104.197.63.17 --port 3306 -e 'show databases;'
 | mysql              |
 | performance_schema |
 +--------------------+
+```
+
+
+#### Cross-cluster loadbalancing
+
+First setup your 2 clusters, and a kubeconfig secret as described in the [sharing clusters example] (../../examples/sharing-clusters/README.md). We will create a loadbalancer in our first cluster (US) and have it publish the services from the second cluster (EU). This is the entire modified loadbalancer manifest:
+
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: service-loadbalancer
+  labels:
+    app: service-loadbalancer
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    app: service-loadbalancer
+    version: v1
+  template:
+    metadata:
+      labels:
+        app: service-loadbalancer
+        version: v1
+    spec:
+      volumes:
+      # token from the eu cluster, must already exist
+      # and match the name of the volume using in container
+      - name: eu-config
+        secret:
+          secretName: kubeconfig
+      nodeSelector:
+        role: loadbalancer
+      containers:
+      - image: gcr.io/google_containers/servicelb:0.1
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        name: haproxy
+        ports:
+        # All http services
+        - containerPort: 80
+          hostPort: 80
+          protocol: TCP
+        # nginx https
+        - containerPort: 443
+          hostPort: 8080
+          protocol: TCP
+        # mysql
+        - containerPort: 3306
+          hostPort: 3306
+          protocol: TCP
+        # haproxy stats
+        - containerPort: 1936
+          hostPort: 1936
+          protocol: TCP
+        resources: {}
+        args:
+        - --tcp-services=mysql:3306,nginxsvc:443
+        - --use-kubernetes-cluster-service=false
+        # use-kubernetes-cluster-service=false in conjunction with the
+        # kube/config will force the service-loadbalancer to watch for
+        # services form the eu cluster.
+        volumeMounts:
+        - mountPath: /.kube
+          name: eu-config
+        env:
+        - name: KUBECONFIG
+          value: /.kube/config
+```
+
+Note that it is essentially the same as the rc.yaml checked into the service-loadbalancer directory expect that it consumes the kubeconfig secret as an extra KUBECONFIG environment variable.
+
+```cmd
+$ kubectl config use-context <us-clustername>
+$ kubectl create -f rc.yaml
+$ kubectl get pods -o wide
+service-loadbalancer-5o2p4   1/1       Running   0          13m       kubernetes-minion-5jtd
+$ kubectl get node kubernetes-minion-5jtd -o json | grep -i externalip -A 2
+                "type": "ExternalIP",
+                "address": "104.197.81.116"
+$ curl http://104.197.81.116/nginxsvc
+Europe
 ```
 
 ### Troubleshooting:
