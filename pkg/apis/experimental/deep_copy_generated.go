@@ -461,6 +461,7 @@ func deepCopy_api_PodSpec(in api.PodSpec, out *api.PodSpec, c *conversion.Cloner
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
 	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {

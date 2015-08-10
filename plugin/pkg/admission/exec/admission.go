@@ -94,10 +94,9 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host pid"))
 	}
 
-	//TODO uncomment when this feature lands https://github.com/kubernetes/kubernetes/pull/12470
-	//	if d.hostIPC && pod.Spec.HostIPC {
-	//		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host ipc"))
-	//	}
+	if d.hostIPC && pod.Spec.HostIPC {
+		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host ipc"))
+	}
 
 	if d.privileged && isPrivileged(pod) {
 		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a privileged container"))

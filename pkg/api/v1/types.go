@@ -1204,6 +1204,9 @@ type PodSpec struct {
 	// Use the host's pid namespace.
 	// Optional: Default to false.
 	HostPID bool `json:"hostPID,omitempty"`
+	// Use the host's ipc namespace.
+	// Optional: Default to false.
+	HostIPC bool `json:"hostIPC,omitempty"`
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use. For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
