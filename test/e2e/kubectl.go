@@ -72,8 +72,8 @@ var _ = Describe("Kubectl client", func() {
 		c, err = loadClient()
 		expectNoError(err)
 		testingNs, err = createTestingNS("kubectl", c)
-		ns = testingNs.Name
 		Expect(err).NotTo(HaveOccurred())
+		ns = testingNs.Name
 	})
 
 	AfterEach(func() {
