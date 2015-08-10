@@ -122,6 +122,22 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "Services.*release.*load\sbalancer"
     )
 
+# Tests that should not run on soak cluster.
+GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
+    "Density.*30\spods"
+    "Elasticsearch"
+    "Etcd.*SIGKILL"
+    "external\sload\sbalancer"    
+    "identically\snamed\sservices"
+    "network\spartition"
+    "Reboot"
+    "Resize"
+    "Restart"
+    "Services.*Type\sgoes\sfrom"
+    "Services.*nodeport\ssettings"
+    "Skipped"
+    )
+
 # Define environment variables based on the Jenkins project name.
 case ${JOB_NAME} in
   # Runs all non-flaky tests on GCE, sequentially.
@@ -199,7 +215,7 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="e2e-reboot"}
-    : ${GINKGO_TEST_ARGS:=" --ginkgo.focus=Reboot"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Reboot"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
@@ -216,6 +232,19 @@ case ${JOB_NAME} in
     MINION_SIZE="n1-standard-2"
     MINION_DISK_SIZE="50GB"
     NUM_MINIONS="100"
+    ;;
+
+  # Runs tests on GCE soak cluster.
+  kubernetes-soak-continuous-e2e-gce)
+    : ${E2E_CLUSTER_NAME:="gce-soak-weekly"}
+    : ${E2E_DOWN:="false"}
+    : ${E2E_NETWORK:="gce-soak-weekly"}
+    : ${E2E_UP:="false"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
+    : ${PROJECT:="kubernetes-jenkins"}
     ;;
 
   # Runs a subset of tests on GCE in parallel. Run against all pending PRs.
