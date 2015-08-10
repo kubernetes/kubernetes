@@ -847,6 +847,56 @@ func convert_api_LocalObjectReference_To_v1_LocalObjectReference(in *api.LocalOb
 	return nil
 }
 
+func convert_api_Lock_To_v1_Lock(in *api.Lock, out *Lock, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.Lock))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_LockSpec_To_v1_LockSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_LockList_To_v1_LockList(in *api.LockList, out *LockList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LockList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Lock, len(in.Items))
+		for i := range in.Items {
+			if err := convert_api_Lock_To_v1_Lock(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_api_LockSpec_To_v1_LockSpec(in *api.LockSpec, out *LockSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LockSpec))(in)
+	}
+	out.HeldBy = in.HeldBy
+	out.LeaseTime = in.LeaseTime
+	out.AcquiredTime = in.AcquiredTime
+	out.RenewTime = in.RenewTime
+	return nil
+}
+
 func convert_api_NFSVolumeSource_To_v1_NFSVolumeSource(in *api.NFSVolumeSource, out *NFSVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.NFSVolumeSource))(in)
@@ -3097,6 +3147,56 @@ func convert_v1_LocalObjectReference_To_api_LocalObjectReference(in *LocalObject
 	return nil
 }
 
+func convert_v1_Lock_To_api_Lock(in *Lock, out *api.Lock, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Lock))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_LockSpec_To_api_LockSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_LockList_To_api_LockList(in *LockList, out *api.LockList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LockList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]api.Lock, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_Lock_To_api_Lock(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_LockSpec_To_api_LockSpec(in *LockSpec, out *api.LockSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LockSpec))(in)
+	}
+	out.HeldBy = in.HeldBy
+	out.LeaseTime = in.LeaseTime
+	out.AcquiredTime = in.AcquiredTime
+	out.RenewTime = in.RenewTime
+	return nil
+}
+
 func convert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *api.NFSVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NFSVolumeSource))(in)
@@ -4571,6 +4671,9 @@ func init() {
 		convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
 		convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		convert_api_LocalObjectReference_To_v1_LocalObjectReference,
+		convert_api_LockList_To_v1_LockList,
+		convert_api_LockSpec_To_v1_LockSpec,
+		convert_api_Lock_To_v1_Lock,
 		convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		convert_api_NamespaceList_To_v1_NamespaceList,
 		convert_api_NamespaceSpec_To_v1_NamespaceSpec,
@@ -4683,6 +4786,9 @@ func init() {
 		convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress,
 		convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		convert_v1_LocalObjectReference_To_api_LocalObjectReference,
+		convert_v1_LockList_To_api_LockList,
+		convert_v1_LockSpec_To_api_LockSpec,
+		convert_v1_Lock_To_api_Lock,
 		convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1_NamespaceList_To_api_NamespaceList,
 		convert_v1_NamespaceSpec_To_api_NamespaceSpec,
