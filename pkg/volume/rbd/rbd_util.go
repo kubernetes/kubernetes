@@ -155,7 +155,7 @@ func (util *RBDUtil) loadRBD(builder *rbdBuilder, mnt string) error {
 	if err = decoder.Decode(builder); err != nil {
 		return fmt.Errorf("rbd: decode err: %v.", err)
 	}
-	
+
 	return nil
 }
 
