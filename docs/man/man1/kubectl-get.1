@@ -32,6 +32,10 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with \-\-namespace.
 
 .PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to get from a server.
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for get
 
@@ -187,6 +191,9 @@ $ kubectl get replicationcontroller web
 
 # List a single pod in JSON output format.
 $ kubectl get \-o json pod web\-pod\-13je7
+
+# List a pod identified by type and name specified in "pod.yaml" in JSON output format.
+$ kubectl get \-f pod.yaml \-o json
 
 # Return only the phase value of the specified pod.
 $ kubectl get \-o template web\-pod\-13je7 \-\-template={{.status.phase}} \-\-api\-version=v1
