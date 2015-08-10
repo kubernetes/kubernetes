@@ -93,5 +93,20 @@ func (e *EndpointRegistry) UpdateEndpoints(ctx api.Context, endpoints *api.Endpo
 }
 
 func (e *EndpointRegistry) DeleteEndpoints(ctx api.Context, name string) error {
-	return fmt.Errorf("unimplemented!")
+	// TODO: support namespaces in this mock
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	if e.Err != nil {
+		return e.Err
+	}
+	if e.Endpoints != nil {
+		var newList []api.Endpoints
+		for _, endpoint := range e.Endpoints.Items {
+			if endpoint.Name != name {
+				newList = append(newList, endpoint)
+			}
+		}
+		e.Endpoints.Items = newList
+	}
+	return nil
 }

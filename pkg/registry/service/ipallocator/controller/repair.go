@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util"
@@ -94,7 +96,7 @@ func (c *Repair) RunOnce() error {
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	list, err := c.registry.ListServices(ctx)
+	list, err := c.registry.ListServices(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
