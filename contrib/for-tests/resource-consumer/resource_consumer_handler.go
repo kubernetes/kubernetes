@@ -77,10 +77,11 @@ func (handler ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, q
 			http.Error(w, incorrectFunctionArgument, http.StatusBadRequest)
 			return
 		}
-		ConsumeCPU(milicores, durationSec)
+		go ConsumeCPU(milicores, durationSec)
 		fmt.Fprintln(w, consumeCPUAddress[1:])
 		fmt.Fprintln(w, milicores, milicoresQuery)
 		fmt.Fprintln(w, durationSec, durationSecQuery)
+
 	}
 
 }
@@ -101,6 +102,7 @@ func (handler ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, q
 			return
 		}
 		ConsumeMem(megabytes, durationSec)
+		fmt.Fprintln(w, "Warning: not implemented!")
 		fmt.Fprintln(w, consumeMemAddress[1:])
 		fmt.Fprintln(w, megabytes, megabytesQuery)
 		fmt.Fprintln(w, durationSec, durationSecQuery)
@@ -109,5 +111,6 @@ func (handler ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, q
 
 func (handler ResourceConsumerHandler) handleGetCurrentStatus(w http.ResponseWriter) {
 	GetCurrentStatus()
+	fmt.Fprintln(w, "Warning: not implemented!")
 	fmt.Fprint(w, getCurrentStatusAddress[1:])
 }

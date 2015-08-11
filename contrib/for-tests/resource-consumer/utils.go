@@ -17,12 +17,20 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"log"
+	"os/exec"
 )
+
+const consumeCPUBinary = "./consume-cpu/consume-cpu"
 
 func ConsumeCPU(milicores int, durationSec int) {
 	log.Printf("ConsumeCPU milicores: %v, durationSec: %v", milicores, durationSec)
-	// not implemented
+	// creating new consume cpu process
+	arg1 := fmt.Sprintf("-milicores=%d", milicores)
+	arg2 := fmt.Sprintf("-duration-sec=%d", durationSec)
+	consumeCPU := exec.Command(consumeCPUBinary, arg1, arg2)
+	consumeCPU.Start()
 }
 
 func ConsumeMem(megabytes int, durationSec int) {
