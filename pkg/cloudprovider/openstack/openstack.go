@@ -622,6 +622,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		Protocol:     "TCP",
 		ProtocolPort: ports[0].Port, //TODO: need to handle multi-port
 		PoolID:       pool.ID,
+		SubnetID:     lb.opts.SubnetId,
 		Persistence:  persistence,
 	}
 	if externalIP != nil {
