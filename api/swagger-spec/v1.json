@@ -5909,7 +5909,7 @@
         "allowMultiple": false
        },
        {
-        "type": "",
+        "type": "string",
         "paramType": "query",
         "name": "command",
         "description": "Command is the remote command to execute. argv array. Not executed within a shell.",
@@ -5987,7 +5987,7 @@
         "allowMultiple": false
        },
        {
-        "type": "",
+        "type": "string",
         "paramType": "query",
         "name": "command",
         "description": "Command is the remote command to execute. argv array. Not executed within a shell.",
