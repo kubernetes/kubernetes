@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Identifiers and Names in Kubernetes
+title: "Identifiers and Names in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

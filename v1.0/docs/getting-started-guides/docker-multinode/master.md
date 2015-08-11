@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Installing a Kubernetes Master Node via Docker
+title: "Installing a Kubernetes Master Node via Docker"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

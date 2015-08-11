@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Design Overview
+title: "Kubernetes Design Overview"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

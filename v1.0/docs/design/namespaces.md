@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Namespaces
+title: "Namespaces"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

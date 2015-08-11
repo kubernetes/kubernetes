@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: So you want to change the API?
+title: "So you want to change the API?"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

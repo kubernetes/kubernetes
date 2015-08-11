@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kube-scheduler
+title: "kube-scheduler"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

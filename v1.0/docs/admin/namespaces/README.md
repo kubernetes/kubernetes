@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Namespaces
+title: "Kubernetes Namespaces"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

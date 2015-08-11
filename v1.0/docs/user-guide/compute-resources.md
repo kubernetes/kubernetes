@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Compute Resources
+title: "Compute Resources"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -123,7 +123,7 @@ To determine if a container cannot be scheduled or is being killed due to resour
 
 The resource usage of a pod is reported as part of the Pod status.
 
-If [optional monitoring](http://releases.k8s.io/v1.0.1/cluster/addons/cluster-monitoring/README.md) is configured for your cluster,
+If [optional monitoring](http://releases.k8s.io/v1.0.3/cluster/addons/cluster-monitoring/README.md) is configured for your cluster,
 then pod resource usage can be retrieved from the monitoring system.
 
 ## Troubleshooting

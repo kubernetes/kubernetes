@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Development Guide
+title: "Development Guide"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -11,7 +11,7 @@ title: Development Guide
 
 # Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/v1.0.1/build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/v1.0.3/build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -344,7 +344,7 @@ The conformance test runs a subset of the e2e-tests against a manually-created c
 require support for up/push/down and other operations.  To run a conformance test, you need to know the
 IP of the master for your cluster and the authorization arguments to use.  The conformance test is
 intended to run against a cluster at a specific binary release of Kubernetes.
-See [conformance-test.sh](http://releases.k8s.io/v1.0.1/hack/conformance-test.sh).
+See [conformance-test.sh](http://releases.k8s.io/v1.0.3/hack/conformance-test.sh).
 
 ## Testing out flaky tests
 

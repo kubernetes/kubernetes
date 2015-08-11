@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started with libvirt CoreOS
+title: "Getting started with libvirt CoreOS"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

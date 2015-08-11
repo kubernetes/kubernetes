@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Reliable, Scalable Redis on Kubernetes
+title: "Reliable, Scalable Redis on Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

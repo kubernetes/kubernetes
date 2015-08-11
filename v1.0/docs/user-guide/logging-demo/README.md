@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Elasticsearch/Kibana Logging Demonstration
+title: "Elasticsearch/Kibana Logging Demonstration"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

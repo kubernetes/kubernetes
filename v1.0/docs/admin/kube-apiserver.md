@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kube-apiserver
+title: "kube-apiserver"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

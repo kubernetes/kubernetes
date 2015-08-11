@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Known Issues
+title: "Known Issues"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

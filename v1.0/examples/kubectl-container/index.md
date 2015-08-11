@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl-container/README
+title: "kubectl-container/README"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

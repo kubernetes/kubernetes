@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Rolling update example
+title: "Rolling update example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Proposal - Admission Control
+title: "Kubernetes Proposal - Admission Control"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

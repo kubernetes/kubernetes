@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl logs
+title: "kubectl logs"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Building and releasing Guestbook Image
+title: "Building and releasing Guestbook Image"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

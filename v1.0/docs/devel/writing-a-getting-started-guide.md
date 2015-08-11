@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Writing a Getting Started Guide
+title: "Writing a Getting Started Guide"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

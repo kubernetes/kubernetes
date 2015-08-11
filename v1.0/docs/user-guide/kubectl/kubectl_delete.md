@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl delete
+title: "kubectl delete"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

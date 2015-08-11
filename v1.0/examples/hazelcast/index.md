@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Cloud Native Deployments of Hazelcast using Kubernetes
+title: "Cloud Native Deployments of Hazelcast using Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

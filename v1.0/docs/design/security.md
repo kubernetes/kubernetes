@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Security in Kubernetes
+title: "Security in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

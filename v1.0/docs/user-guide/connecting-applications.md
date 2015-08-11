@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes User Guide: Managing Applications: Connecting applications
+title: "Kubernetes User Guide: Managing Applications: Connecting applications"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -149,7 +149,7 @@ You should now be able to curl the nginx Service on `10.0.116.146:80` from any n
 
 ## Accessing the Service
 
-Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](http://releases.k8s.io/v1.0.1/cluster/addons/dns/README.md).
+Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS. The former works out of the box while the latter requires the [kube-dns cluster addon](http://releases.k8s.io/v1.0.3/cluster/addons/dns/README.md).
 
 ### Environment Variables
 
@@ -194,7 +194,7 @@ kube-dns   <none>       k8s-app=kube-dns     10.0.0.10   53/UDP
 {% endraw %}
 {% endhighlight %}
 
-If it isn’t running, you can [enable it](http://releases.k8s.io/v1.0.1/cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived ip (nginxsvc), and a dns server that has assigned a name to that ip (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
+If it isn’t running, you can [enable it](http://releases.k8s.io/v1.0.3/cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived ip (nginxsvc), and a dns server that has assigned a name to that ip (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
 
 {% highlight yaml %}
 {% raw %}

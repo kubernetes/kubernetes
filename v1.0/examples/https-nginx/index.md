@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Nginx https service
+title: "Nginx https service"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

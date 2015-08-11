@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: devel/coding-conventions
+title: "devel/coding-conventions"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

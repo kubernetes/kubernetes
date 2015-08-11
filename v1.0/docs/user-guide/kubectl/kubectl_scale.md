@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl scale
+title: "kubectl scale"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Testing your Kubernetes cluster.
+title: "Testing your Kubernetes cluster."
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

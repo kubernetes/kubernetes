@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes DNS example
+title: "Kubernetes DNS example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

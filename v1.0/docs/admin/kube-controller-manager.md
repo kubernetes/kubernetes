@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kube-controller-manager
+title: "kube-controller-manager"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Instrumenting Kubernetes with a new metric
+title: "Instrumenting Kubernetes with a new metric"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

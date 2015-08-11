@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Example of NFS volume
+title: "Example of NFS volume"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

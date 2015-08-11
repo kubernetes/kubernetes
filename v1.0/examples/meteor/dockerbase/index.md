@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Building the meteor-kubernetes base image
+title: "Building the meteor-kubernetes base image"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started with vSphere
+title: "Getting started with vSphere"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

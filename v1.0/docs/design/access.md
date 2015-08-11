@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: K8s Identity and Access Management Sketch
+title: "K8s Identity and Access Management Sketch"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: How to Use it?
+title: "How to Use it?"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

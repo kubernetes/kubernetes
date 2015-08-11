@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes OpenVSwitch GRE/VxLAN networking
+title: "Kubernetes OpenVSwitch GRE/VxLAN networking"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

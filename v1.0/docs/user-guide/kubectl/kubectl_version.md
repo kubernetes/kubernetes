@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl version
+title: "kubectl version"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

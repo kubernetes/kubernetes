@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Phabricator example
+title: "Phabricator example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

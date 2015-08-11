@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubeconfig files
+title: "kubeconfig files"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

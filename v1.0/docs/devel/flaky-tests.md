@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Hunting flaky tests in Kubernetes
+title: "Hunting flaky tests in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

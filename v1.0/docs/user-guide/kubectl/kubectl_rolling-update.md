@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl rolling-update
+title: "kubectl rolling-update"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

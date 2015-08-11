@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Images
+title: "Images"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

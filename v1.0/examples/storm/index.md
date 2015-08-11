@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Storm example
+title: "Storm example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

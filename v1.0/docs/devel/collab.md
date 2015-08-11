@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: On Collaborative Development
+title: "On Collaborative Development"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

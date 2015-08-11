@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Creating a Kubernetes Cluster
+title: "Creating a Kubernetes Cluster"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

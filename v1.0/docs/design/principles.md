@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Design Principles
+title: "Design Principles"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

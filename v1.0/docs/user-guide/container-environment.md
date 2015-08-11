@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Container Environment
+title: "Kubernetes Container Environment"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -61,7 +61,7 @@ FOO_SERVICE_PORT=<the port the service is running on>
 {% endraw %}
 {% endhighlight %}
 
-Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](http://releases.k8s.io/v1.0.1/cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
+Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](http://releases.k8s.io/v1.0.3/cluster/addons/dns/) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
 
 ## Container Hooks
 

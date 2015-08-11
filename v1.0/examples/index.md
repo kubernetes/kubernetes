@@ -1,13 +1,13 @@
 ---
 layout: docwithnav
-title: Kubernetes Examples: releases.k8s.io/v1.0.1
+title: "Kubernetes Examples: releases.k8s.io/v1.0.3"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Kubernetes Examples: releases.k8s.io/v1.0.1
+# Kubernetes Examples: releases.k8s.io/v1.0.3
 
 This directory contains a number of different examples of how to run
 applications with Kubernetes.

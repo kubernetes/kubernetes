@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Node
+title: "Node"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -176,7 +176,7 @@ If your cluster runs short on resources you can easily add more machines to it i
 
 ```
 {% raw %}
-gcloud preview managed-instance-groups --zone compute-zone resize my-cluster-minon-group --new-size 42
+gcloud compute instance-groups managed --zone compute-zone resize my-cluster-minon-group --new-size 42
 {% endraw %}
 ```
 

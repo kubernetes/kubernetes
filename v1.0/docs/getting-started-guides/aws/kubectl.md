@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Install and configure kubectl
+title: "Install and configure kubectl"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -14,10 +14,10 @@ title: Install and configure kubectl
 {% highlight bash %}
 {% raw %}
 ### Darwin
-wget https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/darwin/amd64/kubectl
+wget https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl
 
 ### Linux
-wget https://storage.googleapis.com/kubernetes-release/release/v0.19.3/bin/linux/amd64/kubectl
+wget https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl
 {% endraw %}
 {% endhighlight %}
 
@@ -37,7 +37,6 @@ mv kubectl /usr/local/bin/
 ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
 {% endraw %}
 {% endhighlight %}
-
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->
 <!-- TAG IS_VERSIONED -->

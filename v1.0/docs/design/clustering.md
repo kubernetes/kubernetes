@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Clustering in Kubernetes
+title: "Clustering in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Connecting to applications: kubectl proxy and apiserver proxy
+title: "Connecting to applications: kubectl proxy and apiserver proxy"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

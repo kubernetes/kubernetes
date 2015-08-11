@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Working with Resources
+title: "Working with Resources"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

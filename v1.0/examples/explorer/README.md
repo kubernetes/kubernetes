@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: explorer/README
+title: "explorer/README"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Building
+title: "Building"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

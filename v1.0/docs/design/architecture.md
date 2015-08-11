@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes architecture
+title: "Kubernetes architecture"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

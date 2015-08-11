@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Connecting to applications: kubectl port-forward
+title: "Connecting to applications: kubectl port-forward"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

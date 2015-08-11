@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Running Kubernetes locally via Docker
+title: "Running Kubernetes locally via Docker"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

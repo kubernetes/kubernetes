@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Containers with Kubernetes
+title: "Containers with Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes API client libraries
+title: "Kubernetes API client libraries"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -11,7 +11,7 @@ title: Kubernetes API client libraries
 
 ### Supported
 
-   * [Go](http://releases.k8s.io/v1.0.1/pkg/client/)
+   * [Go](http://releases.k8s.io/v1.0.3/pkg/client/)
 
 ### User Contributed
 

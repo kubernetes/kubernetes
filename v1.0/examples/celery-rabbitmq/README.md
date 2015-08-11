@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Example: Distributed task queues with Celery, RabbitMQ and Flower
+title: "Example: Distributed task queues with Celery, RabbitMQ and Flower"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

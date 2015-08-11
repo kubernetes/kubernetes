@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: The Kubernetes resource model
+title: "The Kubernetes resource model"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

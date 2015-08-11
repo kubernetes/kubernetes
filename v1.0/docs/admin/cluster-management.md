@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Cluster Management
+title: "Cluster Management"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

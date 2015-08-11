@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Run Kubernetes with rkt
+title: "Run Kubernetes with rkt"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Using kubectl exec to check the environment variables of a container
+title: "Using kubectl exec to check the environment variables of a container"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

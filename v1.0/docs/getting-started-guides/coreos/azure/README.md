@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes on Azure with CoreOS and Weave
+title: "Kubernetes on Azure with CoreOS and Weave"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

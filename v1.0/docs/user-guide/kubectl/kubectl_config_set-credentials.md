@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl config set-credentials
+title: "kubectl config set-credentials"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

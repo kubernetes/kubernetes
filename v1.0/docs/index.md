@@ -1,13 +1,13 @@
 ---
 layout: docwithnav
-title: Kubernetes Documentation: releases.k8s.io/v1.0.1
+title: "Kubernetes Documentation: releases.k8s.io/v1.0.3"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Kubernetes Documentation: releases.k8s.io/v1.0.1
+# Kubernetes Documentation: releases.k8s.io/v1.0.3
 
 * The [User's guide](user-guide/README.html) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.

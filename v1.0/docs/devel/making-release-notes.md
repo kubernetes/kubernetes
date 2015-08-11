@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Making release notes
+title: "Making release notes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

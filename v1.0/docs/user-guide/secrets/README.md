@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Secrets example
+title: "Secrets example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

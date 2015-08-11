@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: CoreOS Multinode Cluster
+title: "CoreOS Multinode Cluster"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

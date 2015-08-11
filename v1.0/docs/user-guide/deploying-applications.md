@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes User Guide: Managing Applications: Deploying continuously running applications
+title: "Kubernetes User Guide: Managing Applications: Deploying continuously running applications"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on CoreOS
+title: "Getting started on CoreOS"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

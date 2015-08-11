@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl expose
+title: "kubectl expose"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

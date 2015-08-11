@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Diagrams for Cloud Logging Blog Article
+title: "Diagrams for Cloud Logging Blog Article"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

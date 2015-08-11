@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes User Guide: Managing Applications: Managing deployments
+title: "Kubernetes User Guide: Managing Applications: Managing deployments"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

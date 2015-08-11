@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Persistent Volumes and Claims
+title: "Persistent Volumes and Claims"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
