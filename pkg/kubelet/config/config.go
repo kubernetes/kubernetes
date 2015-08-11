@@ -327,7 +327,7 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 			name := bestPodIdentString(pod)
 			err := utilerrors.NewAggregate(errlist)
 			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, name, source, err)
-			recorder.Eventf(pod, "failedValidation", "Error validating pod %s from %s, ignoring: %v", name, source, err)
+			recorder.Eventf(pod, "FailedValidation", "Error validating pod %s from %s, ignoring: %v", name, source, err)
 			continue
 		}
 		filtered = append(filtered, pod)
