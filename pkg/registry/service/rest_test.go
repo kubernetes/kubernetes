@@ -569,6 +569,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	for _, ip := range testIPs {
 		if !rest.serviceIPs.(*ipallocator.Range).Has(net.ParseIP(ip)) {
 			testIP = ip
+			break
 		}
 	}
 
@@ -687,9 +688,18 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		t.Errorf("Expected port 6503, but got %v", updated_service.Spec.Ports[0].Port)
 	}
 
+	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
+	testIP := ""
+	for _, ip := range testIPs {
+		if !rest.serviceIPs.(*ipallocator.Range).Has(net.ParseIP(ip)) {
+			testIP = ip
+			break
+		}
+	}
+
 	update = deepCloneService(created_service)
 	update.Spec.Ports[0].Port = 6503
-	update.Spec.ClusterIP = "1.2.3.76" // error
+	update.Spec.ClusterIP = testIP // Error: Cluster IP is immutable
 
 	_, _, err := rest.Update(ctx, update)
 	if err == nil || !errors.IsInvalid(err) {
