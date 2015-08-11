@@ -27,6 +27,9 @@ export KUBE_MASTER_IP="10.245.1.2"
 export INSTANCE_PREFIX="kubernetes"
 export MASTER_NAME="${INSTANCE_PREFIX}-master"
 
+# Should the master serve as a node
+REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
+
 # Map out the IPs, names and container subnets of each minion
 export MINION_IP_BASE="10.245.1."
 MINION_CONTAINER_SUBNET_BASE="10.246"
