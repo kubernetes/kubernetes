@@ -149,7 +149,7 @@ NAMESPACE     NAME                  CLUSTER_IP       EXTERNAL_IP       PORT(S)  
 default       kubernetes            10.0.0.1         <none>            443/TCP       <none>                 1d
 kube-system   kube-dns              10.0.0.2         <none>            53/TCP,53/UDP k8s-app=kube-dns       1d
 kube-system   kube-ui               10.0.0.3         <none>            80/TCP        k8s-app=kube-ui        1d
-...                                                                                                                                                            8086/TCP
+...
 ```
 
 Similarly, you can take a look at the set of [pods](../user-guide/pods.md) that were created during cluster startup.
