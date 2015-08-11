@@ -19,19 +19,15 @@ limitations under the License.
 //
 // typical usage is to copy a Pod manifest from a staging directory into the kubelet's directory, for example:
 //   podmaster --etcd-servers=http://127.0.0.1:4001 --key=scheduler --source-file=/kubernetes/kube-scheduler.manifest --dest-file=/manifests/kube-scheduler.manifest
-package main
+package controller
 
 import (
-	"io/ioutil"
-	"os"
 	"strings"
 	"time"
 
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
-	"github.com/spf13/pflag"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 )
 
 type Config struct {
@@ -71,11 +67,11 @@ func (c *Config) leaseAndUpdateLoop(etcdClient *etcd.Client) {
 // returns true if we have the lease, and an error if one occurs.
 // TODO: use the master election utility once it is merged in.
 func (c *Config) acquireOrRenewLease(etcdClient *etcd.Client) (bool, error) {
-	result, err := etcdClient.Get(c.key, false, false)
+	result, err := etcdClient.Get(c.Key, false, false)
 	if err != nil {
 		if etcdstorage.IsEtcdNotFound(err) {
 			// there is no current master, try to become master, create will fail if the key already exists
-			_, err := etcdClient.Create(c.key, c.whoami, c.ttl)
+			_, err := etcdClient.Create(c.Key, c.whoami, c.ttl)
 			if err != nil {
 				return false, err
 			}
@@ -88,7 +84,7 @@ func (c *Config) acquireOrRenewLease(etcdClient *etcd.Client) (bool, error) {
 		glog.Infof("key already exists, we are the master (%s)", result.Node.Value)
 		// we extend our lease @ 1/2 of the existing TTL, this ensures the master doesn't flap around
 		if result.Node.Expiration.Sub(time.Now()) < time.Duration(c.ttl/2)*time.Second {
-			_, err := etcdClient.CompareAndSwap(c.key, c.whoami, c.ttl, c.whoami, result.Node.ModifiedIndex)
+			_, err := etcdClient.CompareAndSwap(c.Key, c.whoami, c.ttl, c.whoami, result.Node.ModifiedIndex)
 			if err != nil {
 				return false, err
 			}
@@ -100,8 +96,7 @@ func (c *Config) acquireOrRenewLease(etcdClient *etcd.Client) (bool, error) {
 	return false, nil
 }
 
-// update enacts the policy, copying a file if we are the master, and it doesn't exist.
-// deleting a file if we aren't the master and it does.
+// Update acts on the current state of the lease.
 func (c *Config) update(master bool) error {
 	switch {
 	case master && !c.Running():
@@ -115,7 +110,7 @@ func (c *Config) update(master bool) error {
 }
 
 func RunLease(c *Config) {
-	machines := strings.Split(c.etcdServers, ",")
+	machines := strings.Split(c.EtcdServers, ",")
 	etcdClient := etcd.NewClient(machines)
 
 	go c.leaseAndUpdateLoop(etcdClient)
