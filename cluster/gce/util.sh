@@ -1032,10 +1032,11 @@ function prepare-push() {
     # being used, create a temp one, then delete the old one and recreate it once again.
     create-node-instance-template "tmp"
 
-    gcloud compute instance-groups managed --zone "${ZONE}" \
-      set-template "${NODE_INSTANCE_PREFIX}-group" \
-      --project "${PROJECT}" \
-      --template "${NODE_INSTANCE_PREFIX}-template-tmp" || true;
+    gcloud compute instance-groups managed \
+      set-instance-template "${NODE_INSTANCE_PREFIX}-group" \
+      --template "${NODE_INSTANCE_PREFIX}-template-tmp" \
+      --zone "${ZONE}" \
+      --project "${PROJECT}" || true;
 
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
@@ -1044,10 +1045,11 @@ function prepare-push() {
 
     create-node-instance-template
 
-    gcloud compute instance-groups managed --zone "${ZONE}" \
-      set-template "${NODE_INSTANCE_PREFIX}-group" \
-      --project "${PROJECT}" \
-      --template "${NODE_INSTANCE_PREFIX}-template" || true;
+    gcloud compute instance-groups managed \
+      set-instance-template "${NODE_INSTANCE_PREFIX}-group" \
+      --template "${NODE_INSTANCE_PREFIX}-template" \
+      --zone "${ZONE}" \
+      --project "${PROJECT}" || true;
 
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
