@@ -535,6 +535,21 @@ func deepCopy_api_ExecAction(in ExecAction, out *ExecAction, c *conversion.Clone
 	return nil
 }
 
+func deepCopy_api_FCVolumeSource(in FCVolumeSource, out *FCVolumeSource, c *conversion.Cloner) error {
+	if in.TargetWWNs != nil {
+		out.TargetWWNs = make([]string, len(in.TargetWWNs))
+		for i := range in.TargetWWNs {
+			out.TargetWWNs[i] = in.TargetWWNs[i]
+		}
+	} else {
+		out.TargetWWNs = nil
+	}
+	out.Lun = in.Lun
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func deepCopy_api_GCEPersistentDiskVolumeSource(in GCEPersistentDiskVolumeSource, out *GCEPersistentDiskVolumeSource, c *conversion.Cloner) error {
 	out.PDName = in.PDName
 	out.FSType = in.FSType
@@ -1231,6 +1246,7 @@ func deepCopy_api_PersistentVolumeSource(in PersistentVolumeSource, out *Persist
 	} else {
 		out.ISCSI = nil
 	}
+<<<<<<< HEAD
 	if in.Cinder != nil {
 		out.Cinder = new(CinderVolumeSource)
 		if err := deepCopy_api_CinderVolumeSource(*in.Cinder, out.Cinder, c); err != nil {
@@ -1246,6 +1262,15 @@ func deepCopy_api_PersistentVolumeSource(in PersistentVolumeSource, out *Persist
 		}
 	} else {
 		out.CephFS = nil
+=======
+	if in.FC != nil {
+		out.FC = new(FCVolumeSource)
+		if err := deepCopy_api_FCVolumeSource(*in.FC, out.FC, c); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
+>>>>>>> support fibre channel volume
 	}
 	return nil
 }
@@ -2162,6 +2187,7 @@ func deepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 	} else {
 		out.RBD = nil
 	}
+<<<<<<< HEAD
 	if in.Cinder != nil {
 		out.Cinder = new(CinderVolumeSource)
 		if err := deepCopy_api_CinderVolumeSource(*in.Cinder, out.Cinder, c); err != nil {
@@ -2185,6 +2211,15 @@ func deepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 		}
 	} else {
 		out.DownwardAPI = nil
+=======
+	if in.FC != nil {
+		out.FC = new(FCVolumeSource)
+		if err := deepCopy_api_FCVolumeSource(*in.FC, out.FC, c); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
+>>>>>>> support fibre channel volume
 	}
 	return nil
 }
@@ -2253,6 +2288,7 @@ func init() {
 		deepCopy_api_EventList,
 		deepCopy_api_EventSource,
 		deepCopy_api_ExecAction,
+		deepCopy_api_FCVolumeSource,
 		deepCopy_api_GCEPersistentDiskVolumeSource,
 		deepCopy_api_GitRepoVolumeSource,
 		deepCopy_api_GlusterfsVolumeSource,

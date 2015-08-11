@@ -12080,6 +12080,7 @@
       "$ref": "v1.ISCSIVolumeSource",
       "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin."
      },
+<<<<<<< HEAD
      "cinder": {
       "$ref": "v1.CinderVolumeSource",
       "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
@@ -12087,6 +12088,11 @@
      "cephfs": {
       "$ref": "v1.CephFSVolumeSource",
       "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime"
+=======
+     "fc": {
+      "$ref": "v1.FCVolumeSource",
+      "description": "Fibre Channel disk attached to host machine on demand; see http://releases.k8s.io/HEAD/examples/fibre_channel/README.md"
+>>>>>>> support fibre channel volume
      },
      "accessModes": {
       "type": "array",
@@ -12308,6 +12314,7 @@
      }
     }
    },
+<<<<<<< HEAD
    "v1.CinderVolumeSource": {
     "id": "v1.CinderVolumeSource",
     "description": "CinderVolumeSource represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet.",
@@ -12337,10 +12344,22 @@
     ],
     "properties": {
      "monitors": {
+=======
+   "v1.FCVolumeSource": {
+    "id": "v1.FCVolumeSource",
+    "required": [
+     "targetWWNs",
+     "lun",
+     "fsType"
+    ],
+    "properties": {
+     "targetWWNs": {
+>>>>>>> support fibre channel volume
       "type": "array",
       "items": {
        "type": "string"
       },
+<<<<<<< HEAD
       "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
      },
      "user": {
@@ -12358,6 +12377,22 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it"
+=======
+      "description": "FC target wwns"
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32",
+      "description": "FC target lun number"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "file system type to mount, such as ext4, xfs, ntfs"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "read-only if true, read-write otherwise (false or unspecified)"
+>>>>>>> support fibre channel volume
      }
     }
    },
@@ -12555,6 +12590,7 @@
      "rbd": {
       "$ref": "v1.RBDVolumeSource",
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md"
+<<<<<<< HEAD
      },
      "cinder": {
       "$ref": "v1.CinderVolumeSource",
@@ -12567,6 +12603,12 @@
      "downwardAPI": {
       "$ref": "v1.DownwardAPIVolumeSource",
       "description": "DownwardAPI represents downward API about the pod that should populate this volume"
+=======
+    },
+     "fc": {
+      "$ref": "v1.FCVolumeSource",
+      "description": "Fibre Channel disk attached to host machine on demand; see http://releases.k8s.io/HEAD/examples/fibre_channel/README.md"
+>>>>>>> support fibre channel volume
      }
     }
    },

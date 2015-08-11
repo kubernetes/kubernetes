@@ -621,6 +621,24 @@ func convert_api_ExecAction_To_v1_ExecAction(in *api.ExecAction, out *ExecAction
 	return nil
 }
 
+func convert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource, out *FCVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.FCVolumeSource))(in)
+	}
+	if in.TargetWWNs != nil {
+		out.TargetWWNs = make([]string, len(in.TargetWWNs))
+		for i := range in.TargetWWNs {
+			out.TargetWWNs[i] = in.TargetWWNs[i]
+		}
+	} else {
+		out.TargetWWNs = nil
+	}
+	out.Lun = in.Lun
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func convert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource(in *api.GCEPersistentDiskVolumeSource, out *GCEPersistentDiskVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.GCEPersistentDiskVolumeSource))(in)
@@ -1420,6 +1438,7 @@ func convert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api.Per
 	} else {
 		out.ISCSI = nil
 	}
+<<<<<<< HEAD
 	if in.Cinder != nil {
 		out.Cinder = new(CinderVolumeSource)
 		if err := convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
@@ -1435,6 +1454,15 @@ func convert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api.Per
 		}
 	} else {
 		out.CephFS = nil
+=======
+	if in.FC != nil {
+		out.FC = new(FCVolumeSource)
+		if err := convert_api_FCVolumeSource_To_v1_FCVolumeSource(in.FC, out.FC, s); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
+>>>>>>> support fibre channel volume
 	}
 	return nil
 }
@@ -2403,6 +2431,7 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *Volu
 	} else {
 		out.RBD = nil
 	}
+<<<<<<< HEAD
 	if in.Cinder != nil {
 		out.Cinder = new(CinderVolumeSource)
 		if err := convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
@@ -2426,6 +2455,15 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *Volu
 		}
 	} else {
 		out.DownwardAPI = nil
+=======
+	if in.FC != nil {
+		out.FC = new(FCVolumeSource)
+		if err := convert_api_FCVolumeSource_To_v1_FCVolumeSource(in.FC, out.FC, s); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
+>>>>>>> support fibre channel volume
 	}
 	return nil
 }
@@ -3022,6 +3060,24 @@ func convert_v1_ExecAction_To_api_ExecAction(in *ExecAction, out *api.ExecAction
 	} else {
 		out.Command = nil
 	}
+	return nil
+}
+
+func convert_v1_FCVolumeSource_To_api_FCVolumeSource(in *FCVolumeSource, out *api.FCVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*FCVolumeSource))(in)
+	}
+	if in.TargetWWNs != nil {
+		out.TargetWWNs = make([]string, len(in.TargetWWNs))
+		for i := range in.TargetWWNs {
+			out.TargetWWNs[i] = in.TargetWWNs[i]
+		}
+	} else {
+		out.TargetWWNs = nil
+	}
+	out.Lun = in.Lun
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -3824,6 +3880,7 @@ func convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Persist
 	} else {
 		out.ISCSI = nil
 	}
+<<<<<<< HEAD
 	if in.Cinder != nil {
 		out.Cinder = new(api.CinderVolumeSource)
 		if err := convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
@@ -3839,6 +3896,15 @@ func convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Persist
 		}
 	} else {
 		out.CephFS = nil
+=======
+	if in.FC != nil {
+		out.FC = new(api.FCVolumeSource)
+		if err := convert_v1_FCVolumeSource_To_api_FCVolumeSource(in.FC, out.FC, s); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
+>>>>>>> support fibre channel volume
 	}
 	return nil
 }
@@ -4807,6 +4873,7 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.Volu
 	} else {
 		out.RBD = nil
 	}
+<<<<<<< HEAD
 	if in.Cinder != nil {
 		out.Cinder = new(api.CinderVolumeSource)
 		if err := convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
@@ -4830,6 +4897,15 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.Volu
 		}
 	} else {
 		out.DownwardAPI = nil
+=======
+	if in.FC != nil {
+		out.FC = new(api.FCVolumeSource)
+		if err := convert_v1_FCVolumeSource_To_api_FCVolumeSource(in.FC, out.FC, s); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
+>>>>>>> support fibre channel volume
 	}
 	return nil
 }
@@ -4866,6 +4942,7 @@ func init() {
 		convert_api_EventSource_To_v1_EventSource,
 		convert_api_Event_To_v1_Event,
 		convert_api_ExecAction_To_v1_ExecAction,
+		convert_api_FCVolumeSource_To_v1_FCVolumeSource,
 		convert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource,
 		convert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource,
 		convert_api_GlusterfsVolumeSource_To_v1_GlusterfsVolumeSource,
@@ -4983,6 +5060,7 @@ func init() {
 		convert_v1_EventSource_To_api_EventSource,
 		convert_v1_Event_To_api_Event,
 		convert_v1_ExecAction_To_api_ExecAction,
+		convert_v1_FCVolumeSource_To_api_FCVolumeSource,
 		convert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource,
 		convert_v1_GitRepoVolumeSource_To_api_GitRepoVolumeSource,
 		convert_v1_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource,
