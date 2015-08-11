@@ -252,6 +252,8 @@ type VolumeSource struct {
 
 	// DownwardAPI represents downward API about the pod that should populate this volume
 	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty"`
+	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
+	FC *FCVolumeSource `json:"fc,omitempty"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -302,6 +304,8 @@ type PersistentVolumeSource struct {
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty"`
+	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
+	FC *FCVolumeSource `json:"fc,omitempty"`
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
@@ -703,6 +707,22 @@ type ISCSIVolumeSource struct {
 	FSType string `json:"fsType"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// A Fibre Channel Disk can only be mounted as read/write once.
+type FCVolumeSource struct {
+	// Required: FC target world wide names (WWNs)
+	TargetWWNs []string `json:"targetWWNs"`
+	// Required: FC target lun number
+	Lun *int `json:"lun"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `json:"fsType"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 

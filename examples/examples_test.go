@@ -340,6 +340,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"cephfs":             &api.Pod{},
 			"cephfs-with-secret": &api.Pod{},
 		},
+		"../examples/fibre_channel": {
+			"fc": &api.Pod{},
+		},
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{

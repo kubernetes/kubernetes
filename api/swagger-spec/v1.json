@@ -12123,6 +12123,10 @@
       "$ref": "v1.CephFSVolumeSource",
       "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime"
      },
+     "fc": {
+      "$ref": "v1.FCVolumeSource",
+      "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod."
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -12396,6 +12400,37 @@
      }
     }
    },
+   "v1.FCVolumeSource": {
+    "id": "v1.FCVolumeSource",
+    "description": "A Fibre Channel Disk can only be mounted as read/write once.",
+    "required": [
+     "targetWWNs",
+     "lun",
+     "fsType"
+    ],
+    "properties": {
+     "targetWWNs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Required: FC target world wide names (WWNs)"
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Required: FC target lun number"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\""
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -12610,6 +12645,10 @@
      "downwardAPI": {
       "$ref": "v1.DownwardAPIVolumeSource",
       "description": "DownwardAPI represents downward API about the pod that should populate this volume"
+     },
+     "fc": {
+      "$ref": "v1.FCVolumeSource",
+      "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod."
      }
     }
    },

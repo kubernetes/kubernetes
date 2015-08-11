@@ -390,6 +390,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateDownwardAPIVolumeSource(source.DownwardAPI).Prefix("downwardApi")...)
 	}
+	if source.FC != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateFCVolumeSource(source.FC).Prefix("fc")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -426,6 +430,25 @@ func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource) errs.ValidationErro
 	}
 	if iscsi.Lun < 0 || iscsi.Lun > 255 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("lun", iscsi.Lun, ""))
+	}
+	return allErrs
+}
+
+func validateFCVolumeSource(fc *api.FCVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(fc.TargetWWNs) < 1 {
+		allErrs = append(allErrs, errs.NewFieldRequired("targetWWNs"))
+	}
+	if fc.FSType == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("fsType"))
+	}
+
+	if fc.Lun == nil {
+		allErrs = append(allErrs, errs.NewFieldRequired("lun"))
+	} else {
+		if *fc.Lun < 0 || *fc.Lun > 255 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("lun", fc.Lun, ""))
+		}
 	}
 	return allErrs
 }
@@ -623,6 +646,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	if pv.Spec.Cinder != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateCinderVolumeSource(pv.Spec.Cinder).Prefix("cinder")...)
+	}
+	if pv.Spec.FC != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateFCVolumeSource(pv.Spec.FC).Prefix("fc")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))

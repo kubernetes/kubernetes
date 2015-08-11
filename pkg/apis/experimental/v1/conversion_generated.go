@@ -288,6 +288,29 @@ func convert_api_ExecAction_To_v1_ExecAction(in *api.ExecAction, out *v1.ExecAct
 	return nil
 }
 
+func convert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource, out *v1.FCVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.FCVolumeSource))(in)
+	}
+	if in.TargetWWNs != nil {
+		out.TargetWWNs = make([]string, len(in.TargetWWNs))
+		for i := range in.TargetWWNs {
+			out.TargetWWNs[i] = in.TargetWWNs[i]
+		}
+	} else {
+		out.TargetWWNs = nil
+	}
+	if in.Lun != nil {
+		out.Lun = new(int)
+		*out.Lun = *in.Lun
+	} else {
+		out.Lun = nil
+	}
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func convert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource(in *api.GCEPersistentDiskVolumeSource, out *v1.GCEPersistentDiskVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.GCEPersistentDiskVolumeSource))(in)
@@ -774,6 +797,14 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *v1.V
 	} else {
 		out.DownwardAPI = nil
 	}
+	if in.FC != nil {
+		out.FC = new(v1.FCVolumeSource)
+		if err := convert_api_FCVolumeSource_To_v1_FCVolumeSource(in.FC, out.FC, s); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
+	}
 	return nil
 }
 
@@ -1034,6 +1065,29 @@ func convert_v1_ExecAction_To_api_ExecAction(in *v1.ExecAction, out *api.ExecAct
 	} else {
 		out.Command = nil
 	}
+	return nil
+}
+
+func convert_v1_FCVolumeSource_To_api_FCVolumeSource(in *v1.FCVolumeSource, out *api.FCVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.FCVolumeSource))(in)
+	}
+	if in.TargetWWNs != nil {
+		out.TargetWWNs = make([]string, len(in.TargetWWNs))
+		for i := range in.TargetWWNs {
+			out.TargetWWNs[i] = in.TargetWWNs[i]
+		}
+	} else {
+		out.TargetWWNs = nil
+	}
+	if in.Lun != nil {
+		out.Lun = new(int)
+		*out.Lun = *in.Lun
+	} else {
+		out.Lun = nil
+	}
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -1522,6 +1576,14 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *api.V
 		}
 	} else {
 		out.DownwardAPI = nil
+	}
+	if in.FC != nil {
+		out.FC = new(api.FCVolumeSource)
+		if err := convert_v1_FCVolumeSource_To_api_FCVolumeSource(in.FC, out.FC, s); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
 	}
 	return nil
 }
@@ -2572,6 +2634,7 @@ func init() {
 		convert_api_EnvVarSource_To_v1_EnvVarSource,
 		convert_api_EnvVar_To_v1_EnvVar,
 		convert_api_ExecAction_To_v1_ExecAction,
+		convert_api_FCVolumeSource_To_v1_FCVolumeSource,
 		convert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource,
 		convert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource,
 		convert_api_GlusterfsVolumeSource_To_v1_GlusterfsVolumeSource,
@@ -2643,6 +2706,7 @@ func init() {
 		convert_v1_EnvVarSource_To_api_EnvVarSource,
 		convert_v1_EnvVar_To_api_EnvVar,
 		convert_v1_ExecAction_To_api_ExecAction,
+		convert_v1_FCVolumeSource_To_api_FCVolumeSource,
 		convert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource,
 		convert_v1_GitRepoVolumeSource_To_api_GitRepoVolumeSource,
 		convert_v1_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource,

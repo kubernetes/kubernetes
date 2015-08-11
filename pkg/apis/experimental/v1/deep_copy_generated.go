@@ -291,6 +291,26 @@ func deepCopy_v1_ExecAction(in v1.ExecAction, out *v1.ExecAction, c *conversion.
 	return nil
 }
 
+func deepCopy_v1_FCVolumeSource(in v1.FCVolumeSource, out *v1.FCVolumeSource, c *conversion.Cloner) error {
+	if in.TargetWWNs != nil {
+		out.TargetWWNs = make([]string, len(in.TargetWWNs))
+		for i := range in.TargetWWNs {
+			out.TargetWWNs[i] = in.TargetWWNs[i]
+		}
+	} else {
+		out.TargetWWNs = nil
+	}
+	if in.Lun != nil {
+		out.Lun = new(int)
+		*out.Lun = *in.Lun
+	} else {
+		out.Lun = nil
+	}
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func deepCopy_v1_GCEPersistentDiskVolumeSource(in v1.GCEPersistentDiskVolumeSource, out *v1.GCEPersistentDiskVolumeSource, c *conversion.Cloner) error {
 	out.PDName = in.PDName
 	out.FSType = in.FSType
@@ -767,6 +787,14 @@ func deepCopy_v1_VolumeSource(in v1.VolumeSource, out *v1.VolumeSource, c *conve
 		}
 	} else {
 		out.DownwardAPI = nil
+	}
+	if in.FC != nil {
+		out.FC = new(v1.FCVolumeSource)
+		if err := deepCopy_v1_FCVolumeSource(*in.FC, out.FC, c); err != nil {
+			return err
+		}
+	} else {
+		out.FC = nil
 	}
 	return nil
 }
@@ -1308,6 +1336,7 @@ func init() {
 		deepCopy_v1_EnvVar,
 		deepCopy_v1_EnvVarSource,
 		deepCopy_v1_ExecAction,
+		deepCopy_v1_FCVolumeSource,
 		deepCopy_v1_GCEPersistentDiskVolumeSource,
 		deepCopy_v1_GitRepoVolumeSource,
 		deepCopy_v1_GlusterfsVolumeSource,
