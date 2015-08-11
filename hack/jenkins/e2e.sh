@@ -151,6 +151,8 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}
     : ${PROJECT:="k8s-jkns-e2e-gce"}
+    # Override GCE default for cluster size autoscaling purposes.
+    ENABLE_CLUSTER_MONITORING="googleinfluxdb"
     ;;
 
   # Runs only the examples tests on GCE.
