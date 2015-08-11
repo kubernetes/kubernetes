@@ -83,3 +83,124 @@ func compareContexts(name string, ex, ac *api.SELinuxOptions, t *testing.T) {
 		t.Errorf("%v: expected level: %v, got: %v", name, e, a)
 	}
 }
+
+func TestHaRootUID(t *testing.T) {
+	var nonRoot int64 = 1
+	var root int64 = 0
+
+	tests := map[string]struct {
+		container *api.Container
+		expect    bool
+	}{
+		"nil sc": {
+			container: &api.Container{SecurityContext: nil},
+		},
+		"nil runAsuser": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: nil,
+				},
+			},
+		},
+		"runAsUser non-root": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &nonRoot,
+				},
+			},
+		},
+		"runAsUser root": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &root,
+				},
+			},
+			expect: true,
+		},
+	}
+
+	for k, v := range tests {
+		actual := HasRootUID(v.container)
+		if actual != v.expect {
+			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
+		}
+	}
+}
+
+func TestHasRunAsUser(t *testing.T) {
+	var runAsUser int64 = 0
+
+	tests := map[string]struct {
+		container *api.Container
+		expect    bool
+	}{
+		"nil sc": {
+			container: &api.Container{SecurityContext: nil},
+		},
+		"nil runAsUser": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: nil,
+				},
+			},
+		},
+		"valid runAsUser": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &runAsUser,
+				},
+			},
+			expect: true,
+		},
+	}
+
+	for k, v := range tests {
+		actual := HasRunAsUser(v.container)
+		if actual != v.expect {
+			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
+		}
+	}
+}
+
+func TestHasRootRunAsUser(t *testing.T) {
+	var nonRoot int64 = 1
+	var root int64 = 0
+
+	tests := map[string]struct {
+		container *api.Container
+		expect    bool
+	}{
+		"nil sc": {
+			container: &api.Container{SecurityContext: nil},
+		},
+		"nil runAsuser": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: nil,
+				},
+			},
+		},
+		"runAsUser non-root": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &nonRoot,
+				},
+			},
+		},
+		"runAsUser root": {
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &root,
+				},
+			},
+			expect: true,
+		},
+	}
+
+	for k, v := range tests {
+		actual := HasRootRunAsUser(v.container)
+		if actual != v.expect {
+			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
+		}
+	}
+}

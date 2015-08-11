@@ -66,3 +66,24 @@ func ParseSELinuxOptions(context string) (*api.SELinuxOptions, error) {
 		Level: fields[3],
 	}, nil
 }
+
+// HasNonRootUID returns true if the runAsUser is set and is greater than 0.
+func HasRootUID(container *api.Container) bool {
+	if container.SecurityContext == nil {
+		return false
+	}
+	if container.SecurityContext.RunAsUser == nil {
+		return false
+	}
+	return *container.SecurityContext.RunAsUser == 0
+}
+
+// HasRunAsUser determines if the sc's runAsUser field is set.
+func HasRunAsUser(container *api.Container) bool {
+	return container.SecurityContext != nil && container.SecurityContext.RunAsUser != nil
+}
+
+// HasRootRunAsUser returns true if the run as user is set and it is set to 0.
+func HasRootRunAsUser(container *api.Container) bool {
+	return HasRunAsUser(container) && HasRootUID(container)
+}

@@ -1619,6 +1619,15 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			continue
 		}
 
+		if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot {
+			err := dm.verifyNonRoot(container)
+			dm.updateReasonCache(pod, container, err)
+			if err != nil {
+				glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), container.Name, err)
+				continue
+			}
+		}
+
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
 		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode)
@@ -1634,4 +1643,63 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	}
 
 	return nil
+}
+
+// verifyNonRoot returns an error if the container or image will run as the root user.
+func (dm *DockerManager) verifyNonRoot(container *api.Container) error {
+	if securitycontext.HasRunAsUser(container) {
+		if securitycontext.HasRootRunAsUser(container) {
+			return fmt.Errorf("container's runAsUser breaks non-root policy")
+		}
+		return nil
+	}
+
+	imgRoot, err := dm.isImageRoot(container.Image)
+	if err != nil {
+		return err
+	}
+	if imgRoot {
+		return fmt.Errorf("container has no runAsUser and image will run as root")
+	}
+
+	return nil
+}
+
+// isImageRoot returns true if the user directive is not set on the image, the user is set to 0
+// or the user is set to root.  If there is an error inspecting the image this method will return
+// false and return the error.
+func (dm *DockerManager) isImageRoot(image string) (bool, error) {
+	img, err := dm.client.InspectImage(image)
+	if err != nil {
+		return false, err
+	}
+	if img == nil || img.Config == nil {
+		return false, fmt.Errorf("unable to inspect image %s, nil Config", image)
+	}
+
+	user := getUidFromUser(img.Config.User)
+	// if no user is defined container will run as root
+	if user == "" {
+		return true, nil
+	}
+	// do not allow non-numeric user directives
+	uid, err := strconv.Atoi(user)
+	if err != nil {
+		return false, fmt.Errorf("unable to validate image is non-root, non-numeric user (%s) is not allowed", user)
+	}
+	// user is numeric, check for 0
+	return uid == 0, nil
+}
+
+// getUidFromUser splits the uid out of a uid:gid string.
+func getUidFromUser(id string) string {
+	if id == "" {
+		return id
+	}
+	// split instances where the id may contain uid:gid
+	if strings.Contains(id, ":") {
+		return strings.Split(id, ":")[0]
+	}
+	// no gid, just return the id
+	return id
 }

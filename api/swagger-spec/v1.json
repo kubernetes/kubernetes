@@ -12782,6 +12782,10 @@
       "type": "integer",
       "format": "int64",
       "description": "the user id that runs the first process in the container; see http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"
+     },
+     "runAsNonRoot": {
+      "type": "boolean",
+      "description": "indicates the container must be run as a non-root user either by specifying the runAsUser or in the image specification"
      }
     }
    },
