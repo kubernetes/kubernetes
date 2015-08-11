@@ -20,3 +20,6 @@ NUM_MINIONS=2
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/vagrant/config-default.sh"
+
+# Do not register the master kubelet during testing
+REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}

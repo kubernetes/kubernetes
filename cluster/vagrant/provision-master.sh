@@ -172,20 +172,20 @@ if [[ ! -f "${known_tokens_file}" ]]; then
   cat > "${kubelet_kubeconfig_file}" << EOF
 apiVersion: v1
 kind: Config
-users:
-- name: kubelet
-  user:
-    token: ${KUBELET_TOKEN}
 clusters:
-- name: local
-  cluster:
+- cluster:
     insecure-skip-tls-verify: true
+  name: local
 contexts:
-  - context:
+- context:
     cluster: local
     user: kubelet
   name: service-account-context
 current-context: service-account-context
+users:
+- name: kubelet
+  user:
+    token: ${KUBELET_TOKEN}
 EOF
 )
 
@@ -199,20 +199,20 @@ EOF
   cat > "${kube_proxy_kubeconfig_file}" << EOF
 apiVersion: v1
 kind: Config
-users:
-- name: kube-proxy
-  user:
-    token: ${KUBE_PROXY_TOKEN}
 clusters:
-- name: local
-  cluster:
-     insecure-skip-tls-verify: true
+- cluster:
+    insecure-skip-tls-verify: true
+  name: local
 contexts:
 - context:
     cluster: local
     user: kube-proxy
   name: service-account-context
 current-context: service-account-context
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
 EOF
 )
 
