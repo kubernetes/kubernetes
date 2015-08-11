@@ -17,12 +17,15 @@ limitations under the License.
 package lifecycle
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // TestAdmission
@@ -36,14 +39,37 @@ func TestAdmission(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
-	store := cache.NewStore(cache.IndexFuncToKeyFuncAdapter(cache.MetaNamespaceIndexFunc))
+
+	reactFunc := func(action testclient.Action) (runtime.Object, error) {
+		switch {
+		case action.Matches("get", "namespaces"):
+			if getAction, ok := action.(testclient.GetAction); ok && getAction.GetName() == namespaceObj.Name {
+				return namespaceObj, nil
+			}
+		case action.Matches("list", "namespaces"):
+			return &api.NamespaceList{Items: []api.Namespace{*namespaceObj}}, nil
+
+		}
+
+		return nil, fmt.Errorf("No result for action %v", action)
+	}
+
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	store.Add(namespaceObj)
-	mockClient := &testclient.Fake{}
+	fakeWatch := watch.NewFake()
+	mockClient := &testclient.Fake{Watch: fakeWatch, ReactFn: reactFunc}
 	lfhandler := NewLifecycle(mockClient).(*lifecycle)
 	lfhandler.store = store
 	handler := admission.NewChainHandler(lfhandler)
 	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespaceObj.Namespace},
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespaceObj.Name},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image"}},
+		},
+	}
+	badPod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "456", Namespace: "doesnotexist"},
 		Spec: api.PodSpec{
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
@@ -88,4 +114,19 @@ func TestAdmission(t *testing.T) {
 		t.Errorf("Did not expect an error %v", err)
 	}
 
+	// verify create/update/delete of object in non-existant namespace throws error
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an aerror that objects cannot be created in non-existant namespaces", err)
+	}
+
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Update, nil))
+	if err == nil {
+		t.Errorf("Expected an aerror that objects cannot be updated in non-existant namespaces", err)
+	}
+
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Delete, nil))
+	if err == nil {
+		t.Errorf("Expected an aerror that objects cannot be deleted in non-existant namespaces", err)
+	}
 }
