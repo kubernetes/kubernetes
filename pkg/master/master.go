@@ -55,7 +55,7 @@ import (
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	"k8s.io/kubernetes/pkg/registry/event"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
-	"k8s.io/kubernetes/pkg/registry/limitrange"
+	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/minion"
 	nodeetcd "k8s.io/kubernetes/pkg/registry/minion/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
@@ -433,7 +433,7 @@ func (m *Master) init(c *Config) {
 	podTemplateStorage := podtemplateetcd.NewREST(c.DatabaseStorage)
 
 	eventRegistry := event.NewEtcdRegistry(c.DatabaseStorage, uint64(c.EventTTL.Seconds()))
-	limitRangeRegistry := limitrange.NewEtcdRegistry(c.DatabaseStorage)
+	limitRangeStorage := limitrangeetcd.NewStorage(c.DatabaseStorage)
 
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.DatabaseStorage)
 	secretStorage := secretetcd.NewStorage(c.DatabaseStorage)
@@ -494,7 +494,7 @@ func (m *Master) init(c *Config) {
 		"nodes/status":           nodeStatusStorage,
 		"events":                 event.NewStorage(eventRegistry),
 
-		"limitRanges":                   limitrange.NewStorage(limitRangeRegistry),
+		"limitRanges":                   limitRangeStorage,
 		"resourceQuotas":                resourceQuotaStorage,
 		"resourceQuotas/status":         resourceQuotaStatusStorage,
 		"namespaces":                    namespaceStorage,
