@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes multiple nodes cluster with flannel on Fedora
+title: "Kubernetes multiple nodes cluster with flannel on Fedora"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

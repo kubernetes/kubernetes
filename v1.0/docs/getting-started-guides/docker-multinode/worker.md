@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Adding a Kubernetes worker node via Docker.
+title: "Adding a Kubernetes worker node via Docker."
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

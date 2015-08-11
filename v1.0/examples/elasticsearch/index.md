@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Elasticsearch for Kubernetes
+title: "Elasticsearch for Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

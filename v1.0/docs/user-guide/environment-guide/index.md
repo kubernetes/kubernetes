@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Environment Guide Example
+title: "Environment Guide Example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

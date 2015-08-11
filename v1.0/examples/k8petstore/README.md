@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Welcome to k8PetStore
+title: "Welcome to k8PetStore"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

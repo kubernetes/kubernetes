@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Profiling Kubernetes
+title: "Profiling Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

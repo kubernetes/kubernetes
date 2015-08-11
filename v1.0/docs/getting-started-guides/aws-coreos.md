@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on Amazon EC2 with CoreOS
+title: "Getting started on Amazon EC2 with CoreOS"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

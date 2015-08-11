@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Cluster Federation   
+title: "Kubernetes Cluster Federation   "
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

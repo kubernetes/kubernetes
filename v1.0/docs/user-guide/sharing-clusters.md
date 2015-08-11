@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Sharing Cluster Access
+title: "Sharing Cluster Access"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

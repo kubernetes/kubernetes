@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Configuring Kubernetes on Fedora via Ansible
+title: "Configuring Kubernetes on Fedora via Ansible"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

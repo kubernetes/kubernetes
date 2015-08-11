@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Logging Conventions
+title: "Logging Conventions"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: The life of a pod
+title: "The life of a pod"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Replication Controller
+title: "Replication Controller"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

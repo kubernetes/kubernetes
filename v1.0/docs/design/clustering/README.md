@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Building with Docker
+title: "Building with Docker"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

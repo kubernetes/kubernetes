@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl proxy
+title: "kubectl proxy"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

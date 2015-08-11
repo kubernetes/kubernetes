@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Step 1. Setting up iSCSI target and iSCSI initiator
+title: "Step 1. Setting up iSCSI target and iSCSI initiator"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Resource Quota
+title: "Resource Quota"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

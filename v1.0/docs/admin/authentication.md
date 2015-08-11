@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Authentication Plugins
+title: "Authentication Plugins"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

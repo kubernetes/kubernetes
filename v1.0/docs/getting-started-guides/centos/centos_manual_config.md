@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on CentOS
+title: "Getting started on CentOS"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

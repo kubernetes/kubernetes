@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Abstract
+title: "Abstract"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

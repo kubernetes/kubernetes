@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Spark example
+title: "Spark example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

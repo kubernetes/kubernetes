@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl patch
+title: "kubectl patch"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

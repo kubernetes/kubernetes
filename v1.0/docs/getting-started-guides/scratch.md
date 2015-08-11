@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started from Scratch
+title: "Getting started from Scratch"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -213,7 +213,7 @@ You have several choices for Kubernetes images:
 
 For etcd, you can:
 - Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.0.12`
-- Use images hosted on [Docker Hub](https://registry.hub.docker.com/u/coreos/etcd/) or [quay.io](https://registry.hub.docker.com/u/coreos/etcd/)
+- Use images hosted on [Docker Hub](https://registry.hub.docker.com/u/coreos/etcd/) or [quay.io](https://quay.io/repository/coreos/etcd/)
 - Use etcd binary included in your OS distro.
 - Build your own image
   - You can do: `cd kubernetes/cluster/images/etcd; make`
@@ -845,7 +845,7 @@ At this point you should be able to run through one of the basic examples, such 
 
 ### Running the Conformance Test
 
-You may want to try to run the [Conformance test](http://releases.k8s.io/v1.0.1/hack/conformance-test.sh).  Any failures may give a hint as to areas that need more attention.
+You may want to try to run the [Conformance test](http://releases.k8s.io/v1.0.3/hack/conformance-test.sh).  Any failures may give a hint as to areas that need more attention.
 
 ### Networking
 

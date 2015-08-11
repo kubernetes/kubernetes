@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Downward API example
+title: "Downward API example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

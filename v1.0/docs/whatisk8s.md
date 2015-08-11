@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: What is Kubernetes? 
+title: "What is Kubernetes? "
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Meteor on Kuberenetes
+title: "Meteor on Kuberenetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

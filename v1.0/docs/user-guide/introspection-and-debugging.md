@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes User Guide: Managing Applications: Application Introspection and Debugging
+title: "Kubernetes User Guide: Managing Applications: Application Introspection and Debugging"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

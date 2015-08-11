@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Admission control plugin: LimitRanger
+title: "Admission control plugin: LimitRanger"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

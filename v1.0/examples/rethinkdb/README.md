@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: RethinkDB Cluster on Kubernetes
+title: "RethinkDB Cluster on Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

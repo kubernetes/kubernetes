@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on oVirt
+title: "Getting started on oVirt"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

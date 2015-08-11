@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: How to generate the bps-data-generator container #
+title: "How to generate the bps-data-generator container #"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on Rackspace
+title: "Getting started on Rackspace"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

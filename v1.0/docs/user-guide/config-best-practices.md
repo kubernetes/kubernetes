@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Tips and tricks when working with config
+title: "Tips and tricks when working with config"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

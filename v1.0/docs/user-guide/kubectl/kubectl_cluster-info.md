@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl cluster-info
+title: "kubectl cluster-info"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

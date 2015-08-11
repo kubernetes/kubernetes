@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: etcd
+title: "etcd"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -31,7 +31,7 @@ to reduce downtime in case of corruption.
 ## Default configuration
 
 The default setup scripts use kubelet's file-based static pods feature to run etcd in a
-[pod](http://releases.k8s.io/v1.0.1/cluster/saltbase/salt/etcd/etcd.manifest). This manifest should only
+[pod](http://releases.k8s.io/v1.0.3/cluster/saltbase/salt/etcd/etcd.manifest). This manifest should only
 be run on master VMs. The default location that kubelet scans for manifests is
 `/etc/kubernetes/manifests/`.
 

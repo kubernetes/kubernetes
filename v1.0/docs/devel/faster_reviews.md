@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: How to get faster PR reviews
+title: "How to get faster PR reviews"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

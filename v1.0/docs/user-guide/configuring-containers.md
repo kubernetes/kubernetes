@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes User Guide: Managing Applications: Configuring and launching containers
+title: "Kubernetes User Guide: Managing Applications: Configuring and launching containers"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

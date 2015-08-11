@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Bare Metal CoreOS with Kubernetes (OFFLINE)
+title: "Bare Metal CoreOS with Kubernetes (OFFLINE)"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

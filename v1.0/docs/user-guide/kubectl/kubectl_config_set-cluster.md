@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl config set-cluster
+title: "kubectl config set-cluster"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: My Service is not working - how to debug
+title: "My Service is not working - how to debug"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

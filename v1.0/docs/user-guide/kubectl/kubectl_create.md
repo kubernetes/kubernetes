@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl create
+title: "kubectl create"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

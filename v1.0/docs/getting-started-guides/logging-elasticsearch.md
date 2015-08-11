@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Cluster Level Logging with Elasticsearch and Kibana
+title: "Cluster Level Logging with Elasticsearch and Kibana"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

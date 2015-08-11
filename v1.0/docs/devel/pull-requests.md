@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Pull Request Process
+title: "Pull Request Process"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

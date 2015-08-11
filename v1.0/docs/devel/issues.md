@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: GitHub Issues for the Kubernetes Project
+title: "GitHub Issues for the Kubernetes Project"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

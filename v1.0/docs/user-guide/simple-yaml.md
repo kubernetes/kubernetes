@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started with config files.
+title: "Getting started with config files."
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

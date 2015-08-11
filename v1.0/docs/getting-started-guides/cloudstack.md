@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on CloudStack
+title: "Getting started on CloudStack"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

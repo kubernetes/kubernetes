@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Resource Usage Monitoring in Kubernetes
+title: "Resource Usage Monitoring in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

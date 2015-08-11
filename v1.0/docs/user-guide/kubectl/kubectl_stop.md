@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl stop
+title: "kubectl stop"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

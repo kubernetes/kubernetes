@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Labels
+title: "Labels"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Deployment On Bare-metal Ubuntu Nodes with Calico Networking
+title: "Kubernetes Deployment On Bare-metal Ubuntu Nodes with Calico Networking"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

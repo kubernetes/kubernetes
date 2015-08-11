@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Developer Guide
+title: "Kubernetes Developer Guide"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

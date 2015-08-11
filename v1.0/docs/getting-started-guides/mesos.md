@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started with Kubernetes on Mesos
+title: "Getting started with Kubernetes on Mesos"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: OpenShift Origin example
+title: "OpenShift Origin example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

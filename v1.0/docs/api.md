@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: The Kubernetes API
+title: "The Kubernetes API"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

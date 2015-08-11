@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started with Vagrant
+title: "Getting started with Vagrant"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

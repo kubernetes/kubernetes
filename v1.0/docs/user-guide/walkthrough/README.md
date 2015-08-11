@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes 101 - Kubectl CLI and Pods
+title: "Kubernetes 101 - Kubectl CLI and Pods"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes User Guide: Managing Applications: Prerequisites
+title: "Kubernetes User Guide: Managing Applications: Prerequisites"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

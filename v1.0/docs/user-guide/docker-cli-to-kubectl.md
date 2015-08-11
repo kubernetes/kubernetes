@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl for docker users
+title: "kubectl for docker users"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

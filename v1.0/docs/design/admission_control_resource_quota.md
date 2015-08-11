@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Admission control plugin: ResourceQuota
+title: "Admission control plugin: ResourceQuota"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

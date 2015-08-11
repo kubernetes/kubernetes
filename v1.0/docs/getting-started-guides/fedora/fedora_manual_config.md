@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on Fedora
+title: "Getting started on Fedora"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Running Multi-Node Kubernetes Using Docker
+title: "Running Multi-Node Kubernetes Using Docker"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

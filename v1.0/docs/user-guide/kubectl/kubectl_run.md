@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl run
+title: "kubectl run"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

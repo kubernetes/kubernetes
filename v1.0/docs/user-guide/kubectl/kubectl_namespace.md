@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl namespace
+title: "kubectl namespace"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Cluster Admin Guide
+title: "Kubernetes Cluster Admin Guide"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

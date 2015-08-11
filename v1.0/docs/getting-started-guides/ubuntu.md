@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Kubernetes Deployment On Bare-metal Ubuntu Nodes
+title: "Kubernetes Deployment On Bare-metal Ubuntu Nodes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

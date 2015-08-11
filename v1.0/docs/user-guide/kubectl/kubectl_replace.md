@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl replace
+title: "kubectl replace"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on Google Compute Engine
+title: "Getting started on Google Compute Engine"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
@@ -66,7 +66,7 @@ wget -q -O - https://get.k8s.io | bash
 
 Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster.
 
-By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.html), while `heapster` provides [monitoring](http://releases.k8s.io/v1.0.1/cluster/addons/cluster-monitoring/README.md) services.
+By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](logging.html), while `heapster` provides [monitoring](http://releases.k8s.io/v1.0.3/cluster/addons/cluster-monitoring/README.md) services.
 
 The script run by the commands above creates a cluster with the name/prefix "kubernetes". It defines one specific cluster config, so you can't run it more than once.
 

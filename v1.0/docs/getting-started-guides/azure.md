@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started on Microsoft Azure
+title: "Getting started on Microsoft Azure"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

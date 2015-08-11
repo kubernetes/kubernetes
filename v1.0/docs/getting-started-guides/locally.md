@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started locally
+title: "Getting started locally"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

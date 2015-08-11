@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Running your first containers in Kubernetes
+title: "Running your first containers in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

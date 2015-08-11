@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: aws_ebs/README
+title: "aws_ebs/README"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

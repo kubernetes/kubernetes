@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Releasing Kubernetes
+title: "Releasing Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

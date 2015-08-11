@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: High Availability of Scheduling and Controller Components in Kubernetes
+title: "High Availability of Scheduling and Controller Components in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

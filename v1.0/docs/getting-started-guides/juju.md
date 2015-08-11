@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Getting started with Juju
+title: "Getting started with Juju"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

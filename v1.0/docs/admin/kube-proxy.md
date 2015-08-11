@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kube-proxy
+title: "kube-proxy"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

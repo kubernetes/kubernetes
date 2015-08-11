@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Cloud Native Deployments of Cassandra using Kubernetes
+title: "Cloud Native Deployments of Cassandra using Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

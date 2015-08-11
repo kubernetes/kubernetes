@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Guestbook Example
+title: "Guestbook Example"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

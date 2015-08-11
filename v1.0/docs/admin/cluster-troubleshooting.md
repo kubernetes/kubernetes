@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Cluster Troubleshooting
+title: "Cluster Troubleshooting"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

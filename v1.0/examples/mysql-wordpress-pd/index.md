@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Persistent Installation of MySQL and WordPress on Kubernetes
+title: "Persistent Installation of MySQL and WordPress on Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

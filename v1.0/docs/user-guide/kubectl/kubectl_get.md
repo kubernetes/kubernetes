@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: kubectl get
+title: "kubectl get"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Variable expansion in pod command, args, and env
+title: "Variable expansion in pod command, args, and env"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 

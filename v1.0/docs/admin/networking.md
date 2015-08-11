@@ -1,6 +1,6 @@
 ---
 layout: docwithnav
-title: Networking in Kubernetes
+title: "Networking in Kubernetes"
 ---
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
