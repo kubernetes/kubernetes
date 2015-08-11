@@ -27,21 +27,7 @@ type FlagSet interface {
 	BoolVar(p *bool, name string, value bool, usage string)
 	UintVar(p *uint, name string, value uint, usage string)
 	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
-	Float32Var(p *float32, name string, value float32, usage string)
 	IntVar(p *int, name string, value int, usage string)
-}
-
-// BindClientConfigFlags registers a standard set of CLI flags for connecting to a Kubernetes API server.
-// TODO this method is superseded by pkg/client/clientcmd/client_builder.go
-func BindClientConfigFlags(flags FlagSet, config *Config) {
-	flags.StringVar(&config.Host, "master", config.Host, "The address of the Kubernetes API server")
-	flags.StringVar(&config.Version, "api_version", config.Version, "The API version to use when talking to the server")
-	flags.BoolVar(&config.Insecure, "insecure_skip_tls_verify", config.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
-	flags.StringVar(&config.CertFile, "client_certificate", config.CertFile, "Path to a client key file for TLS.")
-	flags.StringVar(&config.KeyFile, "client_key", config.KeyFile, "Path to a client key file for TLS.")
-	flags.StringVar(&config.CAFile, "certificate_authority", config.CAFile, "Path to a cert. file for the certificate authority.")
-	flags.Float32Var(&config.QPS, "max_outgoing_qps", config.QPS, "Maximum number of queries per second that could be issued by this client.")
-	flags.IntVar(&config.Burst, "max_outgoing_burst", config.Burst, "Maximum throttled burst")
 }
 
 func BindKubeletClientConfigFlags(flags FlagSet, config *KubeletConfig) {

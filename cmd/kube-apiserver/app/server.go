@@ -306,7 +306,6 @@ func (s *APIServer) Run(_ []string) error {
 	// This takes preference over api/all, if specified.
 	enableExp := s.getRuntimeConfigValue("experimental/v1", false)
 
-	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 		Version: s.StorageVersion,
