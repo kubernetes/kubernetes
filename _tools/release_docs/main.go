@@ -70,7 +70,7 @@ func processFile(prefix, filename string) error {
 		return err
 	}
 
-	_, err = f.WriteString(fmt.Sprintf("---\nlayout: docwithnav\ntitle: %s\n---\n", title))
+	_, err = f.WriteString(fmt.Sprintf("---\nlayout: docwithnav\ntitle: %q\n---\n", title))
 	if err != nil {
 		return err
 	}
