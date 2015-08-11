@@ -35,7 +35,7 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-var fuzzIters = flag.Int("fuzz_iters", 20, "How many fuzzing iterations to do.")
+var fuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
 
 func fuzzInternalObject(t *testing.T, forVersion string, item runtime.Object, seed int64) runtime.Object {
 	apitesting.FuzzerFor(t, forVersion, rand.NewSource(seed)).Fuzz(item)

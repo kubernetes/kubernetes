@@ -63,8 +63,8 @@ The kube-apiserver takes the following OPTIONAL arguments to enable admission co
 
 | Option | Behavior |
 | ------ | -------- |
-| admission_control | Comma-delimited, ordered list of admission control choices to invoke prior to modifying or deleting an object. |
-| admission_control_config_file | File with admission control configuration parameters to boot-strap plug-in. |
+| admission-control | Comma-delimited, ordered list of admission control choices to invoke prior to modifying or deleting an object. |
+| admission-control-config-file | File with admission control configuration parameters to boot-strap plug-in. |
 
 An **AdmissionControl** plug-in is an implementation of the following interface:
 
