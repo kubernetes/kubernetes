@@ -155,6 +155,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
 	deleter, isDeleter := storage.(rest.Deleter)
 	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
+	collectionDeleter, isCollectionDeleter := storage.(rest.CollectionDeleter)
 	updater, isUpdater := storage.(rest.Updater)
 	patcher, isPatcher := storage.(rest.Patcher)
 	watcher, isWatcher := storage.(rest.Watcher)
@@ -276,6 +277,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// Add actions at the resource path: /api/apiVersion/resource
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer}, isCollectionDeleter)
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
@@ -312,6 +314,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer}, isCollectionDeleter)
 		// DEPRECATED
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
@@ -506,6 +509,21 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 			}
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "DELETECOLLECTION": // Delete a collection of resources.
+			doc := "delete all " + kind
+			if hasSubresource {
+				doc = "delete all " + subresource + " of a " + kind
+			}
+			route := ws.DELETE(action.Path).To(DeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit)).
+				Filter(m).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("delete"+namespaced+kind+strings.Title(subresource)).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Writes(versionedStatus).
+				Returns(http.StatusOK, "OK", versionedStatus)
 			addParams(route, action.Params)
 			ws.Route(route)
 		// TODO: deprecated

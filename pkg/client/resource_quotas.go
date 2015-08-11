@@ -33,6 +33,7 @@ type ResourceQuotaInterface interface {
 	List(selector labels.Selector) (*api.ResourceQuotaList, error)
 	Get(name string) (*api.ResourceQuota, error)
 	Delete(name string) error
+	DeleteAll() error
 	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
@@ -70,6 +71,11 @@ func (c *resourceQuotas) Get(name string) (result *api.ResourceQuota, err error)
 // Delete takes the name of the resourceQuota, and returns an error if one occurs
 func (c *resourceQuotas) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("resourceQuotas").Name(name).Do().Error()
+}
+
+// Deletes all resourceQuotas
+func (c *resourceQuotas) DeleteAll() error {
+	return c.r.Delete().Namespace(c.ns).Resource("resourceQuotas").Do().Error()
 }
 
 // Create takes the representation of a resourceQuota.  Returns the server's representation of the resourceQuota, and an error, if it occurs.

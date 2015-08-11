@@ -126,6 +126,8 @@ KUBELET_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet"
 
+ADMISSION_CONTROL=NamespaceAutoProvision
+
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
 KUBE_API_VERSIONS="v1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
@@ -445,6 +447,8 @@ runTests() {
   kubectl create "${kube_flags[@]}" --namespace=other -f docs/admin/limitrange/valid-pod.yaml
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Post-condition: there are now 2 namespaces (default and other)
+  kube::test::get_object_assert namespaces "{{range.items}}{{$id_field}}:{{end}}" 'default:other:'
 
   ### Delete POD valid-pod in specific namespace
   # Pre-condition: valid-pod POD is running
@@ -453,7 +457,6 @@ runTests() {
   kubectl delete "${kube_flags[@]}" pod --namespace=other valid-pod
   # Post-condition: no POD is running
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
-
 
   #################
   # Pod templates #
@@ -478,7 +481,6 @@ runTests() {
   kubectl delete podtemplate nginx "${kube_flags[@]}"
   # Post-condition: No templates exist
   kube::test::get_object_assert podtemplate "{{range.items}}{{.metadata.name}}:{{end}}" ''
-
 
   ############
   # Services #

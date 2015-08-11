@@ -85,3 +85,8 @@ func (s *storage) DeletePod(ctx api.Context, podID string) error {
 	_, err := s.Delete(ctx, podID, nil)
 	return err
 }
+
+func (s *storage) DeleteAllPods(ctx api.Context) error {
+	_, err := s.DeleteCollection(ctx)
+	return err
+}

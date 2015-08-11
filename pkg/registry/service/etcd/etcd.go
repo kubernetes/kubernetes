@@ -56,6 +56,9 @@ func NewStorage(s storage.Interface) *REST {
 		UpdateStrategy: rest.Services,
 
 		Storage: s,
+		DeleteCollectionFunc: func(ctx api.Context) (runtime.Object, error) {
+			return etcdgeneric.DeleteCollectionPerNamespaceFunc(func() runtime.Object { return &api.ServiceList{} })(ctx, s, prefix)
+		},
 	}
 	return &REST{store}
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package event
+package limitrange
 
 import (
 	"k8s.io/kubernetes/pkg/api"
@@ -29,27 +29,23 @@ type registry struct {
 	*etcdgeneric.Etcd
 }
 
-// NewEtcdRegistry returns a registry which will store Events in the given
-// EtcdStorage. ttl is the time that Events will be retained by the system.
-func NewEtcdRegistry(s storage.Interface, ttl uint64) generic.Registry {
-	prefix := "/events"
+// NewEtcdRegistry returns a registry which will store LimitRange in the given storage
+func NewEtcdRegistry(s storage.Interface) generic.Registry {
+	prefix := "/limitranges"
 	return registry{
 		Etcd: &etcdgeneric.Etcd{
-			NewFunc:      func() runtime.Object { return &api.Event{} },
-			NewListFunc:  func() runtime.Object { return &api.EventList{} },
-			EndpointName: "events",
+			NewFunc:      func() runtime.Object { return &api.LimitRange{} },
+			NewListFunc:  func() runtime.Object { return &api.LimitRangeList{} },
+			EndpointName: "limitranges",
 			KeyRootFunc: func(ctx api.Context) string {
 				return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 			},
 			KeyFunc: func(ctx api.Context, id string) (string, error) {
 				return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
 			},
-			TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
-				return ttl, nil
-			},
 			Storage: s,
 			DeleteCollectionFunc: func(ctx api.Context) (runtime.Object, error) {
-				return etcdgeneric.DeleteCollectionPerNamespaceFunc(func() runtime.Object { return &api.EventList{} })(ctx, s, prefix)
+				return etcdgeneric.DeleteCollectionPerNamespaceFunc(func() runtime.Object { return &api.LimitRangeList{} })(ctx, s, prefix)
 			},
 		},
 	}

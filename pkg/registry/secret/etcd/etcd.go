@@ -51,6 +51,9 @@ func NewStorage(s storage.Interface) *REST {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return secret.Matcher(label, field)
 		},
+		DeleteCollectionFunc: func(ctx api.Context) (runtime.Object, error) {
+			return etcdgeneric.DeleteCollectionPerNamespaceFunc(func() runtime.Object { return &api.SecretList{} })(ctx, s, prefix)
+		},
 		EndpointName: "secrets",
 
 		Storage: s,

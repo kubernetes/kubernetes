@@ -185,6 +185,16 @@ func TestResourceQuotaDelete(t *testing.T) {
 	c.Validate(t, nil, err)
 }
 
+func TestResourceQuotaDeleteAll(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getResourceQuotasResoureName(), ns, ""), Query: buildQueryValues(nil)},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().ResourceQuotas(ns).DeleteAll()
+	c.Validate(t, nil, err)
+}
+
 func TestResourceQuotaWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{

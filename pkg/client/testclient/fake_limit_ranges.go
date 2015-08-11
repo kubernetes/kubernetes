@@ -48,6 +48,11 @@ func (c *FakeLimitRanges) List(label labels.Selector) (*api.LimitRangeList, erro
 	return obj.(*api.LimitRangeList), err
 }
 
+func (c *FakeLimitRanges) DeleteAll() error {
+	_, err := c.Fake.Invokes(NewDeleteAllAction("limitranges", c.Namespace), &api.LimitRange{})
+	return err
+}
+
 func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (*api.LimitRange, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction("limitranges", c.Namespace, limitRange), limitRange)
 	if obj == nil {

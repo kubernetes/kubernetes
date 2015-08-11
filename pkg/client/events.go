@@ -41,6 +41,7 @@ type EventInterface interface {
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
 	Delete(name string) error
+	DeleteAll() error
 	// Returns the appropriate field selector based on the API version being used to communicate with the server.
 	// The returned field selector can be used with List and Watch to filter desired events.
 	GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector
@@ -166,6 +167,15 @@ func (e *events) Delete(name string) error {
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Name(name).
+		Do().
+		Error()
+}
+
+// Delete all existing events.
+func (e *events) DeleteAll() error {
+	return e.client.Delete().
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Resource("events").
 		Do().
 		Error()
 }

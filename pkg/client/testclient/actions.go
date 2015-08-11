@@ -119,6 +119,14 @@ func NewDeleteAction(resource, namespace, name string) DeleteActionImpl {
 	return action
 }
 
+func NewDeleteAllAction(resource, namespace string) DeleteAllActionImpl {
+	action := DeleteAllActionImpl{}
+	action.Verb = "delete-all"
+	action.Resource = resource
+	action.Namespace = namespace
+	return action
+}
+
 func NewRootWatchAction(resource string, label labels.Selector, field fields.Selector, resourceVersion string) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
@@ -184,6 +192,10 @@ type UpdateAction interface {
 type DeleteAction interface {
 	Action
 	GetName() string
+}
+
+type DeleteAllAction interface {
+	Action
 }
 
 type WatchAction interface {
@@ -267,6 +279,10 @@ type DeleteActionImpl struct {
 
 func (a DeleteActionImpl) GetName() string {
 	return a.Name
+}
+
+type DeleteAllActionImpl struct {
+	ActionImpl
 }
 
 type WatchActionImpl struct {

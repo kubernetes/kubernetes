@@ -33,6 +33,7 @@ type PodInterface interface {
 	List(label labels.Selector, field fields.Selector) (*api.PodList, error)
 	Get(name string) (*api.Pod, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteAll() error
 	Create(pod *api.Pod) (*api.Pod, error)
 	Update(pod *api.Pod) (*api.Pod, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -79,6 +80,11 @@ func (c *pods) Delete(name string, options *api.DeleteOptions) error {
 		return err
 	}
 	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(body).Do().Error()
+}
+
+// Removes all pods under the current namespace
+func (c *pods) DeleteAll() error {
+	return c.r.Delete().Namespace(c.ns).Resource("pods").Do().Error()
 }
 
 // Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.

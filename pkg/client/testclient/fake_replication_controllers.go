@@ -71,6 +71,11 @@ func (c *FakeReplicationControllers) Delete(name string) error {
 	return err
 }
 
+func (c *FakeReplicationControllers) DeleteAll() error {
+	_, err := c.Fake.Invokes(NewDeleteAllAction("replicationcontrollers", c.Namespace), &api.ReplicationController{})
+	return err
+}
+
 func (c *FakeReplicationControllers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Invokes(NewWatchAction("replicationcontrollers", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, nil

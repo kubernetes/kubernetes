@@ -120,6 +120,11 @@ func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
 	return obj.(*api.EventList), err
 }
 
+func (c *FakeEvents) DeleteAll() error {
+	_, err := c.Fake.Invokes(NewDeleteAllAction("events", c.Namespace), &api.Event{})
+	return err
+}
+
 func (c *FakeEvents) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
 	action := GenericActionImpl{}
 	action.Verb = "get-field-selector"

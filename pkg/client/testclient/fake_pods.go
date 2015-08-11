@@ -48,6 +48,11 @@ func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodL
 	return obj.(*api.PodList), err
 }
 
+func (c *FakePods) DeleteAll() error {
+	_, err := c.Fake.Invokes(NewDeleteAllAction("pods", c.Namespace), &api.Pod{})
+	return err
+}
+
 func (c *FakePods) Create(pod *api.Pod) (*api.Pod, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction("pods", c.Namespace, pod), pod)
 	if obj == nil {

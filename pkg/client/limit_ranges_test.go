@@ -199,6 +199,16 @@ func TestLimitRangeDelete(t *testing.T) {
 	c.Validate(t, nil, err)
 }
 
+func TestLimitRangeDeleteAll(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, ""), Query: buildQueryValues(nil)},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().LimitRanges(ns).DeleteAll()
+	c.Validate(t, nil, err)
+}
+
 func TestLimitRangeWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{

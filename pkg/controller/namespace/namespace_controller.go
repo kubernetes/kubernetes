@@ -165,7 +165,7 @@ func deleteAllContent(kubeClient client.Interface, namespace string, before util
 	if err != nil {
 		return estimate, err
 	}
-	estimate, err = deletePods(kubeClient, namespace, before)
+	err = deletePods(kubeClient, namespace)
 	if err != nil {
 		return estimate, err
 	}
@@ -250,142 +250,64 @@ func syncNamespace(kubeClient client.Interface, namespace api.Namespace) (err er
 }
 
 func deleteLimitRanges(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.LimitRanges(ns).List(labels.Everything())
-	if err != nil {
+	if err := kubeClient.LimitRanges(ns).DeleteAll(); err != nil {
 		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.LimitRanges(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }
 
 func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
-	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(labels.Everything())
-	if err != nil {
+	if err := kubeClient.ResourceQuotas(ns).DeleteAll(); err != nil {
 		return err
-	}
-	for i := range resourceQuotas.Items {
-		err := kubeClient.ResourceQuotas(ns).Delete(resourceQuotas.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }
 
 func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ServiceAccounts(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
+	if err := kubeClient.ServiceAccounts(ns).DeleteAll(); err != nil {
 		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.ServiceAccounts(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }
 
 func deleteServices(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Services(ns).List(labels.Everything())
-	if err != nil {
+	if err := kubeClient.Services(ns).DeleteAll(); err != nil {
 		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.Services(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }
 
 func deleteReplicationControllers(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ReplicationControllers(ns).List(labels.Everything())
-	if err != nil {
+	if err := kubeClient.ReplicationControllers(ns).DeleteAll(); err != nil {
 		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.ReplicationControllers(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }
 
-func deletePods(kubeClient client.Interface, ns string, before util.Time) (int64, error) {
-	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return 0, err
+func deletePods(kubeClient client.Interface, ns string) error {
+	if err := kubeClient.Pods(ns).DeleteAll(); err != nil {
+		return err
 	}
-	expired := util.Now().After(before.Time)
-	var deleteOptions *api.DeleteOptions
-	if expired {
-		deleteOptions = api.NewDeleteOptions(0)
-	}
-	estimate := int64(0)
-	for i := range items.Items {
-		if items.Items[i].Spec.TerminationGracePeriodSeconds != nil {
-			grace := *items.Items[i].Spec.TerminationGracePeriodSeconds
-			if grace > estimate {
-				estimate = grace
-			}
-		}
-		err := kubeClient.Pods(ns).Delete(items.Items[i].Name, deleteOptions)
-		if err != nil && !errors.IsNotFound(err) {
-			return 0, err
-		}
-	}
-	if expired {
-		estimate = 0
-	}
-	return estimate, nil
+	return nil
 }
 
 func deleteEvents(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Events(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
+	if err := kubeClient.Events(ns).DeleteAll(); err != nil {
 		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.Events(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }
 
 func deleteSecrets(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Secrets(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
+	if err := kubeClient.Secrets(ns).DeleteAll(); err != nil {
 		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.Secrets(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }
 
 func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.PersistentVolumeClaims(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
+	if err := kubeClient.PersistentVolumeClaims(ns).DeleteAll(); err != nil {
 		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.PersistentVolumeClaims(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }

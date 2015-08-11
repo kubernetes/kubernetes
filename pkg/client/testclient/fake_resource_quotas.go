@@ -48,6 +48,11 @@ func (c *FakeResourceQuotas) List(label labels.Selector) (*api.ResourceQuotaList
 	return obj.(*api.ResourceQuotaList), err
 }
 
+func (c *FakeResourceQuotas) DeleteAll() error {
+	_, err := c.Fake.Invokes(NewDeleteAllAction("resourcequotas", c.Namespace), &api.ResourceQuota{})
+	return err
+}
+
 func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction("resourcequotas", c.Namespace, resourceQuota), resourceQuota)
 	if obj == nil {

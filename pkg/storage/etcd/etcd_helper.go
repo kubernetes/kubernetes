@@ -160,6 +160,7 @@ func (h *etcdHelper) Set(key string, obj, out runtime.Object, ttl uint64) error 
 func (h *etcdHelper) Delete(key string, out runtime.Object) error {
 	key = h.prefixEtcdKey(key)
 	if _, err := conversion.EnforcePtr(out); err != nil {
+		fmt.Printf("%v", err)
 		panic("unable to convert output object to pointer")
 	}
 

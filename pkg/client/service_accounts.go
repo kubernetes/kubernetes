@@ -31,6 +31,7 @@ type ServiceAccountsInterface interface {
 	Create(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error)
 	Update(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error)
 	Delete(name string) error
+	DeleteAll() error
 	List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error)
 	Get(name string) (*api.ServiceAccount, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -107,6 +108,15 @@ func (s *serviceAccounts) Delete(name string) error {
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
 		Name(name).
+		Do().
+		Error()
+}
+
+// DeleteAll deletes all serviceAccounts.
+func (s *serviceAccounts) DeleteAll() error {
+	return s.client.Delete().
+		Namespace(s.namespace).
+		Resource("serviceAccounts").
 		Do().
 		Error()
 }

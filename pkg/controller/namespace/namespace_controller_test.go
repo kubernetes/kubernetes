@@ -91,13 +91,15 @@ func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 	}
 	// TODO: Reuse the constants for all these strings from testclient
 	expectedActionSet := util.NewStringSet(
-		strings.Join([]string{"list", "replicationcontrollers", ""}, "-"),
-		strings.Join([]string{"list", "services", ""}, "-"),
-		strings.Join([]string{"list", "pods", ""}, "-"),
-		strings.Join([]string{"list", "resourcequotas", ""}, "-"),
-		strings.Join([]string{"list", "secrets", ""}, "-"),
-		strings.Join([]string{"list", "limitranges", ""}, "-"),
-		strings.Join([]string{"list", "events", ""}, "-"),
+		strings.Join([]string{"delete-all", "serviceaccounts", ""}, "-"),
+		strings.Join([]string{"delete-all", "replicationcontrollers", ""}, "-"),
+		strings.Join([]string{"delete-all", "secrets", ""}, "-"),
+		strings.Join([]string{"delete-all", "resourcequotas", ""}, "-"),
+		strings.Join([]string{"delete-all", "events", ""}, "-"),
+		strings.Join([]string{"delete-all", "services", ""}, "-"),
+		strings.Join([]string{"delete-all", "pods", ""}, "-"),
+		strings.Join([]string{"delete-all", "persistentvolumeclaims", ""}, "-"),
+		strings.Join([]string{"delete-all", "limitranges", ""}, "-"),
 		strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
 		strings.Join([]string{"delete", "namespaces", ""}, "-"),
 	)

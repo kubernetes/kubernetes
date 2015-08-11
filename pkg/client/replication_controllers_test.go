@@ -134,6 +134,16 @@ func TestDeleteController(t *testing.T) {
 	c.Validate(t, nil, err)
 }
 
+func TestDeleteAllControllers(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getRCResourceName(), ns, ""), Query: buildQueryValues(nil)},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().ReplicationControllers(ns).DeleteAll()
+	c.Validate(t, nil, err)
+}
+
 func TestCreateController(t *testing.T) {
 	ns := api.NamespaceDefault
 	requestController := &api.ReplicationController{

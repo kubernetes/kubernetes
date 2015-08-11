@@ -50,6 +50,9 @@ func NewStorage(s storage.Interface) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return persistentvolumeclaim.MatchPersistentVolumeClaim(label, field)
 		},
+		DeleteCollectionFunc: func(ctx api.Context) (runtime.Object, error) {
+			return etcdgeneric.DeleteCollectionPerNamespaceFunc(func() runtime.Object { return &api.PersistentVolumeClaimList{} })(ctx, s, prefix)
+		},
 		EndpointName: "persistentvolumeclaims",
 
 		Storage: s,

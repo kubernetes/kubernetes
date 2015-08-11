@@ -126,6 +126,13 @@ func (w GracefulDeleteAdapter) Delete(ctx api.Context, name string, options *api
 	return w.Deleter.Delete(ctx, name)
 }
 
+// An object that can delete a collection of RESTful resources.
+type CollectionDeleter interface {
+	// Deletes all resources of a certain type.
+	// It will return a status object containing information about the deletion.
+	DeleteCollection(ctx api.Context) (runtime.Object, error)
+}
+
 // Creater is an object that can create an instance of a RESTful object.
 type Creater interface {
 	// New returns an empty object that can be used with Create after request data has been put into it.
@@ -194,6 +201,7 @@ type StandardStorage interface {
 	CreaterUpdater
 	GracefulDeleter
 	Watcher
+	CollectionDeleter
 }
 
 // Redirector know how to return a remote resource's location.
