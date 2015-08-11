@@ -103,7 +103,19 @@ net.ipv4.ip_forward:
 {% set override_deb_sha1='81abef31dd2c616883a61f85bfb294d743b1c889' %}
 {% set override_docker_ver='1.7.1' %}
 
+# Comment out below logic for master branch, so that we can upgrade GCE cluster
+# to docker 1.7.1 by default.
+#
+# TODO(dchen1107): For release 1.1, we want to fall back to
+# ContainerVM installed docker by set override_deb, override_deb_sha1 and
+# override_docker_ver back to '' for gce cloud provider.
+
 {% if override_docker_ver != '' %}
+purge-old-docker-package:
+  pkg.removed:
+    - pkgs:
+      - lxc-docker-1.6.2
+
 /var/cache/docker-install/{{ override_deb }}:
   file.managed:
     - source: {{ storage_base }}{{ override_deb }}
