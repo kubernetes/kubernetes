@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/volumeclaimbinder"
 )
 
 func init() {

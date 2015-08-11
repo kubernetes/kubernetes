@@ -32,6 +32,7 @@ import (
 	kendpoint "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
+	"k8s.io/kubernetes/pkg/controller/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/controller/route"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/volumeclaimbinder"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
 	kmendpoint "k8s.io/kubernetes/contrib/mesos/pkg/service"
