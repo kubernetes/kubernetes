@@ -144,12 +144,8 @@ function kube-up() {
     "--num-nodes=${NUM_MINIONS}"
     "--network=${NETWORK}"
     "--scopes=${MINION_SCOPES}"
+    "--cluster-version=${CLUSTER_API_VERSION}"
   )
-  if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
-    create_args+=("--cluster-version=${CLUSTER_API_VERSION:-}")
-  else
-    create_args+=("--cluster-api-version=${CLUSTER_API_VERSION:-}")
-  fi
 
   # Bring up the cluster.
   "${GCLOUD}" "${CMD_GROUP}" container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
