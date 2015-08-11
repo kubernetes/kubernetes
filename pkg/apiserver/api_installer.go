@@ -807,7 +807,7 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 				if docable, ok := obj.(documentable); ok {
 					desc = docable.SwaggerDoc()[jsonName]
 				}
-				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.Name())))
+				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
 			}
 		}
 	}
@@ -822,11 +822,15 @@ func typeToJSON(typeName string) string {
 		return "boolean"
 	case "uint8", "int", "int32", "int64", "uint32", "uint64":
 		return "integer"
-	case "byte":
-		return "string"
 	case "float64", "float32":
 		return "number"
 	case "unversioned.Time":
+		return "string"
+	case "byte":
+		return "string"
+	case "[]string":
+		// TODO: Fix this when go-restful supports a way to specify an array query param:
+		// https://github.com/emicklei/go-restful/issues/225
 		return "string"
 	default:
 		return typeName
