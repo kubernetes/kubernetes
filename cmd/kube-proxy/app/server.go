@@ -31,12 +31,14 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 
@@ -46,16 +48,17 @@ import (
 
 // ProxyServer contains configures and runs a Kubernetes proxy server
 type ProxyServer struct {
-	BindAddress        net.IP
-	HealthzPort        int
-	HealthzBindAddress net.IP
-	OOMScoreAdj        int
-	ResourceContainer  string
-	Master             string
-	Kubeconfig         string
-	PortRange          util.PortRange
-	Recorder           record.EventRecorder
-	HostnameOverride   string
+	BindAddress         net.IP
+	HealthzPort         int
+	HealthzBindAddress  net.IP
+	OOMScoreAdj         int
+	ResourceContainer   string
+	Master              string
+	Kubeconfig          string
+	PortRange           util.PortRange
+	Recorder            record.EventRecorder
+	HostnameOverride    string
+	ForceUserspaceProxy bool
 	// Reference to this node.
 	nodeRef *api.ObjectReference
 }
@@ -82,6 +85,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
+	fs.BoolVar(&s.ForceUserspaceProxy, "legacy-userspace-proxy", true, "Use the legacy userspace proxy (instead of the pure iptables proxy).")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
@@ -137,20 +141,47 @@ func (s *ProxyServer) Run(_ []string) error {
 	serviceConfig := config.NewServiceConfig()
 	endpointsConfig := config.NewEndpointsConfig()
 
-	protocol := iptables.ProtocolIpv4
+	protocol := utiliptables.ProtocolIpv4
 	if s.BindAddress.To4() == nil {
-		protocol = iptables.ProtocolIpv6
+		protocol = utiliptables.ProtocolIpv6
 	}
-	loadBalancer := userspace.NewLoadBalancerRR()
-	proxier, err := userspace.NewProxier(loadBalancer, s.BindAddress, iptables.New(exec.New(), protocol), s.PortRange)
+
+	var proxier proxy.ProxyProvider
+	var endpointsHandler config.EndpointsConfigHandler
+
+	// guaranteed false on error, error only necessary for debugging
+	shouldUseIptables, err := iptables.ShouldUseIptablesProxier()
 	if err != nil {
-		glog.Fatalf("Unable to create proxer: %v", err)
+		glog.Errorf("Can't determine whether to use iptables or userspace, using userspace proxier: %v", err)
+	}
+	if !s.ForceUserspaceProxy && shouldUseIptables {
+		glog.V(2).Info("Using iptables Proxier.")
+
+		proxierIptables, err := iptables.NewProxier(utiliptables.New(exec.New(), protocol))
+		if err != nil {
+			glog.Fatalf("Unable to create proxier: %v", err)
+		}
+		proxier = proxierIptables
+		endpointsHandler = proxierIptables
+	} else {
+		glog.V(2).Info("Using userspace Proxier.")
+		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
+		// our config.EndpointsConfigHandler.
+		loadBalancer := userspace.NewLoadBalancerRR()
+		// set EndpointsConfigHandler to our loadBalancer
+		endpointsHandler = loadBalancer
+
+		proxierUserspace, err := userspace.NewProxier(loadBalancer, s.BindAddress, utiliptables.New(exec.New(), protocol), s.PortRange)
+		if err != nil {
+			glog.Fatalf("Unable to create proxer: %v", err)
+		}
+		proxier = proxierUserspace
 	}
 
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)
-	// And wire loadBalancer to handle changes to endpoints to services
-	endpointsConfig.RegisterHandler(loadBalancer)
+	// And wire endpointsHandler to handle changes to endpoints to services
+	endpointsConfig.RegisterHandler(endpointsHandler)
 
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers

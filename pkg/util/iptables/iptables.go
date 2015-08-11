@@ -399,7 +399,7 @@ func makeFullArgs(table Table, chain Chain, args ...string) []string {
 
 // Checks if iptables has the "-C" flag
 func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
-	vstring, err := getIptablesVersionString(exec)
+	vstring, err := GetIptablesVersionString(exec)
 	if err != nil {
 		return false, err
 	}
@@ -412,7 +412,7 @@ func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
 	return iptablesHasCheckCommand(v1, v2, v3), nil
 }
 
-// getIptablesVersion returns the first three components of the iptables version.
+// extractIptablesVersion returns the first three components of the iptables version.
 // e.g. "iptables v1.3.66" would return (1, 3, 66, nil)
 func extractIptablesVersion(str string) (int, int, int, error) {
 	versionMatcher := regexp.MustCompile("v([0-9]+)\\.([0-9]+)\\.([0-9]+)")
@@ -439,24 +439,21 @@ func extractIptablesVersion(str string) (int, int, int, error) {
 	return v1, v2, v3, nil
 }
 
-// Runs "iptables --version" to get the version string
-func getIptablesVersionString(exec utilexec.Interface) (string, error) {
+// GetIptablesVersionString runs "iptables --version" to get the version string,
+// then matches for vX.X.X e.g. if "iptables --version" outputs: "iptables v1.3.66"
+// then it would would return "v1.3.66", nil
+func GetIptablesVersionString(exec utilexec.Interface) (string, error) {
 	// this doesn't access mutable state so we don't need to use the interface / runner
 	bytes, err := exec.Command(cmdIptables, "--version").CombinedOutput()
 	if err != nil {
 		return "", err
 	}
-	return string(bytes), nil
-}
-
-// GetIptablesVersion returns the major minor and patch version of iptables
-// which will all be zero in case of error, and any error encountered.
-func GetIptablesVersion(exec utilexec.Interface) (int, int, int, error) {
-	s, err := getIptablesVersionString(exec)
-	if err != nil {
-		return 0, 0, 0, err
+	versionMatcher := regexp.MustCompile("v[0-9]+\\.[0-9]+\\.[0-9]+")
+	match := versionMatcher.FindStringSubmatch(string(bytes))
+	if match == nil {
+		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
 	}
-	return extractIptablesVersion(s)
+	return match[0], nil
 }
 
 // Checks if an iptables version is after 1.4.11, when --check was added
