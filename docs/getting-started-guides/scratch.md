@@ -212,7 +212,7 @@ A Kubernetes binary release includes all the Kubernetes binaries as well as the 
 You can use a Kubernetes binary release (recommended) or build your Kubernetes binaries following the instructions in the
 [Developer Documentation](../devel/README.md).  Only using a binary release is covered in this guide.
 
-Download the [latest binary release](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest) and unzip it.
+Download the [latest binary release](https://releases.k8s.io/latest) and unzip it.
 Then locate `./kubernetes/server/kubernetes-server-linux-amd64.tar.gz` and unzip *that*.
 Then, within the second set of unzipped files, locate `./kubernetes/server/bin`, which contains
 all the necessary binaries.
@@ -226,7 +226,7 @@ we recommend that you run these as containers, so you need an image to be built.
 You have several choices for Kubernetes images:
 - Use images hosted on Google Container Registry (GCR):
   - e.g `gcr.io/google_containers/hyperkube:$TAG`, where `TAG` is the latest
-    release tag, which can be found on the [latest releases page](https://github.com/GoogleCloudPlatform/kubernetes/releases/latest).
+    release tag, which can be found on the [latest releases page](https://releases.k8s.io/latest).
   - Ensure $TAG is the same tag as the release tag you are using for kubelet and kube-proxy.
   - The [hyperkube](../../cmd/hyperkube/) binary is an all in one binary
     - `hyperkube kubelet ...` runs the kublet, `hyperkube apiserver ...` runs an apiserver, etc.

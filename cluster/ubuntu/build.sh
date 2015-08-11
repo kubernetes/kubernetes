@@ -58,7 +58,7 @@ echo "Download kubernetes release ..."
 K8S_VERSION=${K8S_VERSION:-"1.0.1"}
 
 if [ ! -f kubernetes.tar.gz ] ; then
-  curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${K8S_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
+  curl -L https://releases.k8s.io/download/v${K8S_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
   tar xzf kubernetes.tar.gz
 fi
 pushd kubernetes/server

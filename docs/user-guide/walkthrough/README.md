@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 For Kubernetes 101, we will cover kubectl, pods, volumes, and multiple containers
 
-In order for the kubectl usage examples to work, make sure you have an examples directory locally, either from [a release](https://github.com/GoogleCloudPlatform/kubernetes/releases) or [the source](https://github.com/GoogleCloudPlatform/kubernetes).
+In order for the kubectl usage examples to work, make sure you have an examples directory locally, either from [a release](https://releases.k8s.io) or [the source](https://github.com/GoogleCloudPlatform/kubernetes).
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->

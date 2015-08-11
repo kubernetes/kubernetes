@@ -26,7 +26,7 @@ Kubernetes builds upon a [decade and a half of experience at Google running prod
 However, initial development was done on GCE and so our instructions and scripts are built around that.  If you make it work on other infrastructure please let us know and contribute instructions/code.
 
 ### Kubernetes is ready for Production!
-With the [1.0.1 release](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v1.0.1) Kubernetes is ready to serve your production workloads.
+With the [1.0.1 release](http://changelog.k8s.io/v1.0.1) Kubernetes is ready to serve your production workloads.
 
 
 ## Concepts

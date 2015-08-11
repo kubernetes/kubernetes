@@ -137,7 +137,7 @@ configuration on it's own
 ## Installing the kubectl outside of kubernetes master machine
 
 Download the Kubernetes release from:
-https://github.com/GoogleCloudPlatform/kubernetes/releases and extract
+https://releases.k8s.io and extract
 the release, you can then just directly use the cli binary at
 ./kubernetes/platforms/linux/amd64/kubectl
 

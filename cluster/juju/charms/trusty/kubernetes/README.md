@@ -69,7 +69,7 @@ For more information on the recommended bundle deployment, see the
 #### Post Deployment
 
 To interact with the kubernetes environment, either build or
-[download](https://github.com/GoogleCloudPlatform/kubernetes/releases) the
+[download](https://releases.k8s.io) the
 [kubectl](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
 binary (available in the releases binary tarball) and point it to the master with :
 
@@ -97,7 +97,7 @@ to interact with the environment.
 - [Kubernetes github project](https://github.com/GoogleCloudPlatform/kubernetes)
 - [Kubernetes issue tracker](https://github.com/GoogleCloudPlatform/kubernetes/issues)
 - [Kubernetes Documenation](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs)
-- [Kubernetes releases](https://github.com/GoogleCloudPlatform/kubernetes/releases)
+- [Kubernetes releases](https://releases.k8s.io)
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/juju/charms/trusty/kubernetes/README.md?pixel)]()

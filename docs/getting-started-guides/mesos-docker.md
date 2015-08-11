@@ -156,7 +156,7 @@ host machine (mac).
     ```
 
     By default, that will get you the bleeding edge of master branch.
-    You may want a [release branch](https://github.com/GoogleCloudPlatform/kubernetes/releases) instead,
+    You may want a [release branch](https://releases.k8s.io) instead,
     if you have trouble with master.
 
 1. Build binaries

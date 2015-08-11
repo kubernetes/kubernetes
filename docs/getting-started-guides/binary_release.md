@@ -37,7 +37,7 @@ You can either build a release from sources or download a pre-built release.  If
 
 ### Prebuilt Binary Release
 
-The list of binary releases is available for download from the [GitHub Kubernetes repo release page](https://github.com/GoogleCloudPlatform/kubernetes/releases).
+The list of binary releases is available for download from the [GitHub Kubernetes repo release page](https://releases.k8s.io).
 
 Download the latest release and unpack this tar file on Linux or OS X, cd to the created `kubernetes/` directory, and then follow the getting started guide for your cloud.
 
