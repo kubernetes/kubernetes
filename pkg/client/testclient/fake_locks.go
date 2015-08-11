@@ -17,10 +17,10 @@ limitations under the License.
 package testclient
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeLocks implements LockInterface. Meant to be embedded into a struct to get a default
@@ -31,8 +31,8 @@ type FakeLocks struct {
 }
 
 func (c *FakeLocks) Create(lock *api.Lock) (*api.Lock, error) {
-        obj, err := c.Fake.Invokes(FakeAction{Action: "create-lock"}, &api.Lock{})
-        return obj.(*api.Lock), err
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-lock"}, &api.Lock{})
+	return obj.(*api.Lock), err
 }
 
 func (c *FakeLocks) List(selector labels.Selector) (*api.LockList, error) {
@@ -46,8 +46,8 @@ func (c *FakeLocks) Get(name string) (*api.Lock, error) {
 }
 
 func (c *FakeLocks) Update(lock *api.Lock) (*api.Lock, error) {
-        obj, err := c.Fake.Invokes(FakeAction{Action: "update-lock", Value: lock.Name}, &api.Lock{})
-        return obj.(*api.Lock), err
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-lock", Value: lock.Name}, &api.Lock{})
+	return obj.(*api.Lock), err
 }
 
 func (c *FakeLocks) Delete(name string) error {
