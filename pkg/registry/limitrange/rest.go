@@ -17,137 +17,61 @@ limitations under the License.
 package limitrange
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
-// REST provides the RESTStorage access patterns to work with LimitRange objects.
-type REST struct {
-	registry generic.Registry
+type limitrangeStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
 }
 
-// NewStorage returns a new REST. You must use a registry created by
-// NewEtcdRegistry unless you're testing.
-func NewStorage(registry generic.Registry) *REST {
-	return &REST{
-		registry: registry,
-	}
+// Strategy is the default logic that applies when creating and updating
+// LimitRange objects via the REST API.
+var Strategy = limitrangeStrategy{api.Scheme, api.SimpleNameGenerator}
+
+func (limitrangeStrategy) NamespaceScoped() bool {
+	return true
 }
 
-// Create a LimitRange object
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	limitRange, ok := obj.(*api.LimitRange)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-
-	if !api.ValidNamespace(ctx, &limitRange.ObjectMeta) {
-		return nil, errors.NewConflict("limitRange", limitRange.Namespace, fmt.Errorf("LimitRange.Namespace does not match the provided context"))
-	}
-
+func (limitrangeStrategy) PrepareForCreate(obj runtime.Object) {
+	limitRange := obj.(*api.LimitRange)
 	if len(limitRange.Name) == 0 {
 		limitRange.Name = string(util.NewUUID())
 	}
-
-	if errs := validation.ValidateLimitRange(limitRange); len(errs) > 0 {
-		return nil, errors.NewInvalid("limitRange", limitRange.Name, errs)
-	}
-	api.FillObjectMetaSystemFields(ctx, &limitRange.ObjectMeta)
-
-	err := rs.registry.CreateWithName(ctx, limitRange.Name, limitRange)
-	if err != nil {
-		return nil, err
-	}
-	return rs.registry.Get(ctx, limitRange.Name)
 }
 
-// Update updates a LimitRange object.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	limitRange, ok := obj.(*api.LimitRange)
-	if !ok {
-		return nil, false, fmt.Errorf("invalid object type")
-	}
-
-	if !api.ValidNamespace(ctx, &limitRange.ObjectMeta) {
-		return nil, false, errors.NewConflict("limitRange", limitRange.Namespace, fmt.Errorf("LimitRange.Namespace does not match the provided context"))
-	}
-
-	oldObj, err := rs.registry.Get(ctx, limitRange.Name)
-	if err != nil {
-		return nil, false, err
-	}
-
-	editLimitRange := oldObj.(*api.LimitRange)
-
-	// set the editable fields on the existing object
-	editLimitRange.Labels = limitRange.Labels
-	editLimitRange.ResourceVersion = limitRange.ResourceVersion
-	editLimitRange.Annotations = limitRange.Annotations
-	editLimitRange.Spec = limitRange.Spec
-
-	if errs := validation.ValidateLimitRange(editLimitRange); len(errs) > 0 {
-		return nil, false, errors.NewInvalid("limitRange", editLimitRange.Name, errs)
-	}
-
-	if err := rs.registry.UpdateWithName(ctx, editLimitRange.Name, editLimitRange); err != nil {
-		return nil, false, err
-	}
-	out, err := rs.registry.Get(ctx, editLimitRange.Name)
-	return out, false, err
+func (limitrangeStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
-// Delete deletes the LimitRange with the specified name
-func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	_, ok := obj.(*api.LimitRange)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-	return rs.registry.Delete(ctx, name, nil)
+func (limitrangeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+	limitRange := obj.(*api.LimitRange)
+	return validation.ValidateLimitRange(limitRange)
 }
 
-// Get gets a LimitRange with the specified name
-func (rs *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	limitRange, ok := obj.(*api.LimitRange)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-	return limitRange, err
+func (limitrangeStrategy) AllowCreateOnUpdate() bool {
+	return true
 }
 
-func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
+func (limitrangeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	limitRange := obj.(*api.LimitRange)
+	return validation.ValidateLimitRange(limitRange)
+}
+
+func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
+func MatchLimitRange(label labels.Selector, field fields.Selector) generic.Matcher {
+	return &generic.SelectionPredicate{label, field, getAttrs}
+}
+
+func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
 	return labels.Set{}, fields.Set{}, nil
-}
-
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
-}
-
-func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
-}
-
-// New returns a new api.LimitRange
-func (*REST) New() runtime.Object {
-	return &api.LimitRange{}
-}
-
-func (*REST) NewList() runtime.Object {
-	return &api.LimitRangeList{}
 }

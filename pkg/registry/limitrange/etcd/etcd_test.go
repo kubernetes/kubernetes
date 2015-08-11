@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package limitrange
+package etcd
 
 import (
 	"reflect"
@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -35,18 +34,18 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func NewTestLimitRangeEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Registry) {
+func NewTestLimitRangeStorage(t *testing.T) (*tools.FakeEtcdClient, *REST) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
 	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
-	return f, NewEtcdRegistry(s)
+	return f, NewStorage(s)
 }
 
 func TestLimitRangeCreate(t *testing.T) {
 	limitRange := &api.LimitRange{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "abc",
-			Namespace: "foo",
+			Name:      "foo",
+			Namespace: "default",
 		},
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
@@ -111,14 +110,24 @@ func TestLimitRangeCreate(t *testing.T) {
 	}
 
 	for name, item := range table {
-		fakeClient, registry := NewTestLimitRangeEtcdRegistry(t)
+		fakeClient, storage := NewTestLimitRangeStorage(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.CreateWithName(ctx, key, item.toCreate)
+		_, err := storage.Create(ctx, item.toCreate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
 
-		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
+		received := fakeClient.Data[path]
+		var limitRange api.LimitRange
+		if err := testapi.Codec().DecodeInto([]byte(received.R.Node.Value), &limitRange); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		// Unset CreationTimestamp and UID which are set automatically by infrastructure.
+		limitRange.ObjectMeta.CreationTimestamp = util.Time{}
+		limitRange.ObjectMeta.UID = ""
+		received.R.Node.Value = runtime.EncodeOrDie(testapi.Codec(), &limitRange)
+
+		if e, a := item.expect, received; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
