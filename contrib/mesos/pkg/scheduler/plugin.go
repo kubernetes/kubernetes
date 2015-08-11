@@ -198,8 +198,12 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 	oemCt := pod.Spec.Containers
 	pod.Spec.Containers = append([]api.Container{}, oemCt...) // (shallow) clone before mod
 
-	annotateForExecutorOnSlave(&pod, machine)
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+
 	task.SaveRecoveryInfo(pod.Annotations)
+	pod.Annotations[annotation.BindingHostKey] = task.Spec.AssignedSlave
 
 	for _, entry := range task.Spec.PortMap {
 		oemPorts := pod.Spec.Containers[entry.ContainerIdx].Ports
@@ -233,29 +237,13 @@ type kubeScheduler struct {
 	defaultContainerMemLimit mresource.MegaBytes
 }
 
-// annotatedForExecutor checks whether a pod is assigned to a Mesos slave, and
-// possibly already launched. It can, but doesn't have to be scheduled already
-// in the sense of kubernetes, i.e. the NodeName field might still be empty.
-func annotatedForExecutor(pod *api.Pod) bool {
-	_, ok := pod.ObjectMeta.Annotations[annotation.BindingHostKey]
-	return ok
-}
-
-// annotateForExecutorOnSlave sets the BindingHostKey annotation which
-// marks the pod to be processed by the scheduler and launched as a Mesos
-// task. The executor on the slave will to the final binding to finish the
-// scheduling in the kubernetes sense.
-func annotateForExecutorOnSlave(pod *api.Pod, slave string) {
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	} else {
-		oemAnn := pod.Annotations
-		pod.Annotations = make(map[string]string)
-		for k, v := range oemAnn {
-			pod.Annotations[k] = v
-		}
-	}
-	pod.Annotations[annotation.BindingHostKey] = slave
+// recoverAssignedSlave recovers the assigned Mesos slave from a pod by searching
+// the BindingHostKey. For tasks in the registry of the scheduler, the same
+// value is stored in T.Spec.AssignedSlave. Before launching, the BindingHostKey
+// annotation is added and the executor will eventually persist that to the
+// apiserver on binding.
+func recoverAssignedSlave(pod *api.Pod) string {
+	return pod.Annotations[annotation.BindingHostKey]
 }
 
 // Schedule implements the Scheduler interface of Kubernetes.
@@ -462,7 +450,7 @@ func (q *queuer) Run(done <-chan struct{}) {
 			}
 
 			pod := p.(*Pod)
-			if annotatedForExecutor(pod.Pod) {
+			if recoverAssignedSlave(pod.Pod) != "" {
 				log.V(3).Infof("dequeuing pod for scheduling: %v", pod.Pod.Name)
 				q.dequeue(pod.GetUID())
 			} else {
@@ -511,7 +499,7 @@ func (q *queuer) yield() *api.Pod {
 			log.Warningf("yield unable to understand pod object %+v, will skip: %v", pod, err)
 		} else if !q.podUpdates.Poll(podName, queue.POP_EVENT) {
 			log.V(1).Infof("yield popped a transitioning pod, skipping: %+v", pod)
-		} else if annotatedForExecutor(pod) {
+		} else if recoverAssignedSlave(pod) != "" {
 			// should never happen if enqueuePods is filtering properly
 			log.Warningf("yield popped an already-scheduled pod, skipping: %+v", pod)
 		} else {
@@ -801,25 +789,27 @@ func (s *schedulingPlugin) scheduleOne() {
 //      host="..." |  host="..."    ; perhaps no updates to process?
 //
 // TODO(jdef) this needs an integration test
-func (s *schedulingPlugin) reconcilePod(oldPod api.Pod) {
-	log.V(1).Infof("reconcile pod %v", oldPod.Name)
-	ctx := api.WithNamespace(api.NewDefaultContext(), oldPod.Namespace)
-	pod, err := s.client.Pods(api.NamespaceValue(ctx)).Get(oldPod.Name)
+func (s *schedulingPlugin) reconcileTask(t *podtask.T) {
+	log.V(1).Infof("reconcile pod %v, assigned to slave %q", t.Pod.Name, t.Spec.AssignedSlave)
+	ctx := api.WithNamespace(api.NewDefaultContext(), t.Pod.Namespace)
+	pod, err := s.client.Pods(api.NamespaceValue(ctx)).Get(t.Pod.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// attempt to delete
-			if err = s.deleter.deleteOne(&Pod{Pod: &oldPod}); err != nil && err != noSuchPodErr && err != noSuchTaskErr {
-				log.Errorf("failed to delete pod: %v: %v", oldPod.Name, err)
+			if err = s.deleter.deleteOne(&Pod{Pod: &t.Pod}); err != nil && err != noSuchPodErr && err != noSuchTaskErr {
+				log.Errorf("failed to delete pod: %v: %v", t.Pod.Name, err)
 			}
 		} else {
 			//TODO(jdef) other errors should probably trigger a retry (w/ backoff).
 			//For now, drop the pod on the floor
-			log.Warning("aborting reconciliation for pod %v: %v", oldPod.Name, err)
+			log.Warning("aborting reconciliation for pod %v: %v", t.Pod.Name, err)
 		}
 		return
 	}
-	if oldPod.Spec.NodeName != pod.Spec.NodeName {
-		if annotatedForExecutor(pod) {
+
+	log.Infof("pod %v scheduled on %q according to apiserver", pod.Name, pod.Spec.NodeName)
+	if t.Spec.AssignedSlave != pod.Spec.NodeName {
+		if pod.Spec.NodeName == "" {
 			// pod is unscheduled.
 			// it's possible that we dropped the pod in the scheduler error handler
 			// because of task misalignment with the pod (task.Has(podtask.Launched) == true)

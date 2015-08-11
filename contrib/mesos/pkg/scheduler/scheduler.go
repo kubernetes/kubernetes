@@ -102,7 +102,7 @@ func (self *slaveStorage) getSlave(slaveId string) (*Slave, bool) {
 type PluginInterface interface {
 	// the apiserver may have a different state for the pod than we do
 	// so reconcile our records, but only for this one pod
-	reconcilePod(api.Pod)
+	reconcileTask(*podtask.T)
 
 	// execute the Scheduling plugin, should start a go routine and return immediately
 	Run(<-chan struct{})
@@ -432,7 +432,7 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 	case mesos.TaskState_TASK_FAILED:
 		if task, _ := k.taskRegistry.UpdateStatus(taskStatus); task != nil {
 			if task.Has(podtask.Launched) && !task.Has(podtask.Bound) {
-				go k.plugin.reconcilePod(task.Pod)
+				go k.plugin.reconcileTask(task)
 				return
 			}
 		} else {
