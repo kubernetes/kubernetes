@@ -34,17 +34,22 @@ find_files() {
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
       \) -prune \
-    \) -name '*.go'
+    \) -wholename '*pkg/api/v*/types.go'
 }
 
-files=`find_files | egrep "pkg/api/v.[^/]*/types\.go"`
+if [[ $# -eq 0 ]]; then
+  files=`find_files | egrep "pkg/api/v.[^/]*/types\.go"`
+else
+  files=("${@}")
+fi
 
-for file in $files
-do
-    if [[ "$("${KUBE_ROOT}/hooks/description.sh" "${file}")" -eq "0" ]]; then
-      echo "API file is missing the required field descriptions: ${file}"
-      result=1
-    fi
+for file in $files; do
+  if grep json: "${file}" | grep -v // | grep -v ,inline | grep -v -q description: ; then
+    echo "API file is missing the required field descriptions: ${file}"
+    result=1
+  fi
 done
 
 exit ${result}
+
+# ex: ts=2 sw=2 et filetype=sh

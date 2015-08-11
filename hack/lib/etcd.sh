@@ -19,7 +19,6 @@
 kube::etcd::start() {
   local host=${ETCD_HOST:-127.0.0.1}
   local port=${ETCD_PORT:-4001}
-  local testhost=${ETCD_PUBLIC_HOST:-localhost}
 
   which etcd >/dev/null || {
     kube::log::usage "etcd must be in your PATH"

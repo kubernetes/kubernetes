@@ -14,13 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Print 1 if the file in $1 is not in need of additional field descriptions, 0 otherwise.
-FILE="$1"
+set -o errexit
+set -o nounset
+set -o pipefail
 
-if grep json: "${FILE}" | grep -v // | grep -v ,inline | grep -v -q description: ; then
-  echo "0"
-else
-  echo "1"
-fi
-exit 0
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::golang::setup_env
+
+"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman cmd/genbashcomp cmd/mungedocs
+
+"${KUBE_ROOT}/hack/after-build/update-generated-docs.sh" "$@"
+
+# ex: ts=2 sw=2 et filetype=sh

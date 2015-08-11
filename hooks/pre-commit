@@ -4,8 +4,6 @@ readonly reset=$(tput sgr0)
 readonly   red=$(tput bold; tput setaf 1)
 readonly green=$(tput bold; tput setaf 2)
 
-KUBE_HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
-
 exit_code=0
 
 echo -ne "Checking that it builds... "
@@ -41,31 +39,13 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for files that need boilerplate... "
-files_need_boilerplate=()
-boiler="${KUBE_HOOKS_DIR}/boilerplate.py"
-# Check for go files without the required boilerplate.
-if [[ ${#files[@]} -gt 0 ]]; then
-  files_need_boilerplate+=($("${boiler}" "go" "${files[@]}"))
-fi
-
-# Check for sh files without the required boilerplate.
-files=($(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v -e "third_party" -e "Godeps"))
-if [[ ${#files[@]} -gt 0 ]]; then
-  files_need_boilerplate+=($("${boiler}" "sh" "${files[@]}"))
-fi
-
-# Check for py files without the required boilerplate.
-files=($(git diff --cached --name-only --diff-filter ACM | grep "\.py" | grep -v -e "third_party" -e "Godeps"))
-if [[ ${#files} -gt 0 ]]; then
-  files_need_boilerplate+=($("${boiler}" "py" "${files[@]}"))
-fi
-
-if [[ "${#files_need_boilerplate[@]}" -ne 0 ]]; then
+out=($(hack/verify-boilerplate.sh))
+if [[ $? -ne 0 ]]; then
   echo "${red}ERROR!"
   echo "Some files are missing the required boilerplate header"
   echo "from hooks/boilerplate.txt:"
-  for file in "${files_need_boilerplate[@]}"; do
-    echo "  ${file}"
+  for f in "${out[@]}"; do
+    echo "  ${f}"
   done
   exit_code=1
 else
@@ -78,8 +58,8 @@ files_need_description=()
 # Check API schema definitions for field descriptions
 for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
   # Check for files with fields without description tags
-  descriptionless=$("${KUBE_HOOKS_DIR}/description.sh" "${file}")
-  if [[ "$descriptionless" -eq "0" ]]; then
+  descriptionless=$(hack/after-build/verify-description.sh "${file}")
+  if [[ "$descriptionless" != "" ]]; then
     files_need_description+=("${file}")
   fi
 done
@@ -98,7 +78,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for links in API descriptions... "
-if ! hack/verify-linkcheck.sh > /dev/null; then
+if ! hack/after-build/verify-linkcheck.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some links in pkg/api/.*types.go are outdated. They require a manual fix."
   exit_code=1
@@ -108,11 +88,11 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for docs that need updating... "
-if ! hack/verify-gendocs.sh > /dev/null; then
+if ! hack/after-build/verify-generated-docs.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some docs are out of sync between CLI and markdown."
   echo "To regenerate docs, run:"
-  echo "  hack/run-gendocs.sh"
+  echo "  hack/update-generated-docs.sh"
   exit_code=1
 else
   echo "${green}OK"
@@ -120,7 +100,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for conversions that need updating... "
-if ! hack/verify-generated-conversions.sh > /dev/null; then
+if ! hack/after-build/verify-generated-conversions.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some conversions functions need regeneration."
   echo "To regenerate conversions, run:"
@@ -132,7 +112,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for deep-copies that need updating... "
-if ! hack/verify-generated-deep-copies.sh > /dev/null; then
+if ! hack/after-build/verify-generated-deep-copies.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some deep-copy functions need regeneration."
   echo "To regenerate deep-copies, run:"
@@ -144,7 +124,7 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for swagger spec that need updating... "
-if ! hack/verify-swagger-spec.sh > /dev/null; then
+if ! hack/after-build/verify-swagger-spec.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Swagger spec needs to be updated."
   echo "To regenerate the spec, run:"
@@ -159,3 +139,5 @@ if [[ "${exit_code}" != 0 ]]; then
   echo "${red}Aborting commit${reset}"
 fi
 exit ${exit_code}
+
+# ex: ts=2 sw=2 et filetype=sh

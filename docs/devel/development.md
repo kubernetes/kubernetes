@@ -345,7 +345,7 @@ See [conformance-test.sh](http://releases.k8s.io/HEAD/hack/conformance-test.sh).
 ## Regenerating the CLI documentation
 
 ```sh
-hack/run-gendocs.sh
+hack/update-generated-docs.sh
 ```
 
 

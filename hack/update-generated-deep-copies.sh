@@ -23,53 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-function result_file_name() {
-	local version=$1
-	if [ "${version}" == "api" ]; then
-		echo "pkg/api/deep_copy_generated.go"
-	else
-		echo "pkg/api/${version}/deep_copy_generated.go"
-	fi
-}
+"${KUBE_ROOT}/hack/build-go.sh" cmd/gendeepcopy
 
-function generate_version() {
-	local version=$1
-	local TMPFILE="/tmp/deep_copy_generated.$(date +%s).go"
+"${KUBE_ROOT}/hack/after-build/update-generated-deep-copies.sh" "$@"
 
-	echo "Generating for version ${version}"
-
-	sed 's/YEAR/2015/' hooks/boilerplate.go.txt > $TMPFILE
-	cat >> $TMPFILE <<EOF
-package ${version}
-
-// AUTO-GENERATED FUNCTIONS START HERE
-EOF
-
-	GOPATH=$(godep path):$GOPATH go run cmd/gendeepcopy/deep_copy.go -v ${version} -f - -o "${version}=" >>  $TMPFILE
-
-	cat >> $TMPFILE <<EOF
-// AUTO-GENERATED FUNCTIONS END HERE
-EOF
-
-	gofmt -w -s $TMPFILE
-	mv $TMPFILE `result_file_name ${version}`
-}
-
-function generate_deep_copies() {
-  local versions="api v1"
-  # To avoid compile errors, remove the currently existing files.
-  for ver in ${versions}; do
-    rm -f `result_file_name ${ver}`
-  done
-  apiVersions=""
-  for ver in ${versions}; do
-    # Ensure that the version being processed is registered by setting
-    # KUBE_API_VERSIONS.
-    if [ "${ver}" != "api" ]; then
-      apiVersions="${ver}"
-    fi
-    KUBE_API_VERSIONS="${apiVersions}" generate_version "${ver}"
-  done
-}
-
-generate_deep_copies
+# ex: ts=2 sw=2 et filetype=sh

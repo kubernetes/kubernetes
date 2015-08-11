@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +18,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+linkcheck=$(kube::util::find-binary "linkcheck")
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/kube-apiserver
-
-"${KUBE_ROOT}/hack/after-build/verify-swagger-spec.sh" "$@"
+TYPEROOT="${KUBE_ROOT}/pkg/api/"
+"${linkcheck}" "--root-dir=${TYPEROOT}" "--repo-root=${KUBE_ROOT}" "--file-suffix=types.go" "--prefix=http://releases.k8s.io/HEAD" && ret=0 || ret=$?
+if [[ $ret -eq 1 ]]; then
+  echo "links in ${TYPEROOT} is out of date."
+  exit 1
+fi
+if [[ $ret -gt 1 ]]; then
+  echo "Error running linkcheck"
+  exit 1
+fi
 
 # ex: ts=2 sw=2 et filetype=sh

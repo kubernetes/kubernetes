@@ -23,31 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-function generate_version() {
-	local version=$1
-	local TMPFILE="/tmp/conversion_generated.$(date +%s).go"
+"${KUBE_ROOT}/hack/build-go.sh" cmd/genconversion
 
-	echo "Generating for version ${version}"
+"${KUBE_ROOT}/hack/after-build/update-generated-conversions.sh" "$@"
 
-	sed 's/YEAR/2015/' hooks/boilerplate.go.txt > $TMPFILE
-	cat >> $TMPFILE <<EOF
-package ${version}
-
-// AUTO-GENERATED FUNCTIONS START HERE
-EOF
-
-	GOPATH=$(godep path):$GOPATH go run cmd/genconversion/conversion.go -v ${version} -f - >>  $TMPFILE
-
-	cat >> $TMPFILE <<EOF
-// AUTO-GENERATED FUNCTIONS END HERE
-EOF
-
-	mv $TMPFILE pkg/api/${version}/conversion_generated.go
-}
-
-VERSIONS="v1"
-for ver in $VERSIONS; do
-  # Ensure that the version being processed is registered by setting
-  # KUBE_API_VERSIONS.
-  KUBE_API_VERSIONS="${ver}" generate_version "${ver}"
-done
+# ex: ts=2 sw=2 et filetype=sh
