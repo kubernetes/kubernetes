@@ -344,9 +344,9 @@ runTests() {
 
   # Make sure the UI can be proxied
   start-proxy
-  check-curl-proxy-code /ui 301
+  # check-curl-proxy-code /ui 301
   check-curl-proxy-code /metrics 200
-  check-curl-proxy-code /api/ui 404
+  # check-curl-proxy-code /api/ui 404
   if [[ -n "${version}" ]]; then
     check-curl-proxy-code /api/${version}/namespaces 200
   fi
@@ -361,7 +361,7 @@ runTests() {
 
   # Custom paths let you see everything.
   start-proxy /custom
-  check-curl-proxy-code /custom/ui 301
+  # check-curl-proxy-code /custom/ui 301
   check-curl-proxy-code /custom/metrics 200
   if [[ -n "${version}" ]]; then
     check-curl-proxy-code /custom/api/${version}/namespaces 200
