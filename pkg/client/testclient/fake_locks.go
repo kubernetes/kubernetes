@@ -31,31 +31,43 @@ type FakeLocks struct {
 }
 
 func (c *FakeLocks) Create(lock *api.Lock) (*api.Lock, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-lock"}, &api.Lock{})
+	obj, err := c.Fake.Invokes(NewCreateAction("locks", c.Namespace, lock), lock)
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.Lock), err
 }
 
-func (c *FakeLocks) List(selector labels.Selector) (*api.LockList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-locks"}, &api.LockList{})
+func (c *FakeLocks) List(label labels.Selector) (*api.LockList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("locks", c.Namespace, label, nil), &api.LockList{})
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.LockList), err
 }
 
 func (c *FakeLocks) Get(name string) (*api.Lock, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-lock", Value: name}, &api.Lock{})
+	obj, err := c.Fake.Invokes(NewGetAction("locks", c.Namespace, name), &api.Lock{})
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.Lock), err
 }
 
 func (c *FakeLocks) Update(lock *api.Lock) (*api.Lock, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-lock", Value: lock.Name}, &api.Lock{})
+	obj, err := c.Fake.Invokes(NewUpdateAction("locks", c.Namespace, lock), lock)
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.Lock), err
 }
 
 func (c *FakeLocks) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-lock", Value: name}, &api.Lock{})
+	_, err := c.Fake.Invokes(NewDeleteAction("locks", c.Namespace, name), &api.Lock{})
 	return err
 }
 
 func (c *FakeLocks) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-lock", Value: resourceVersion})
+	c.Fake.Invokes(NewWatchAction("locks", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, nil
 }
