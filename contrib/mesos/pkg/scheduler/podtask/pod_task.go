@@ -163,7 +163,7 @@ func (t *T) FillFromDetails(details *mesos.Offer) error {
 
 	t.Spec = Spec{
 		SlaveID:       details.GetSlaveId().GetValue(),
-		AssignedSlave: *details.Hostname,
+		AssignedSlave: details.GetHostname(),
 		CPU:           cpu,
 		Memory:        mem,
 	}
