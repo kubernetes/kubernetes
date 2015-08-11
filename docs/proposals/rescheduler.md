@@ -37,6 +37,8 @@ Documentation for other releases can be found at
 
 July 2015
 
+## Introduction and definition
+
 A rescheduler is an agent that proactively causes currently-running
 Pods to be moved, so as to optimize some objective function for
 goodness of the layout of Pods in the cluster. (The objective function
@@ -45,25 +47,70 @@ collection of ad-hoc rules, but in principle there is an objective
 function. Implicitly an objective function is described by the
 scheduler's predicate and priority functions.) It might be triggered
 to run every N minutes, or whenever some event happens that is known
-to make the objective function worse (for example, whenever a Pod goes
+to make the objective function worse (for example, whenever any Pod goes
 PENDING for a long time.)
 
-A rescheduler is useful because without a rescheduler, scheduling
-decisions are only made at the time Pods are created. But as the
-cluster layout changes over time, free "holes" are often produced that
-were not available when a Pod was initially scheduled. These holes are
-produced by run-to-completion Pods terminating, empty nodes being
-added by a node auto-scaler, etc. Moving already-running Pods into
-these holes may lead to a better cluster layout. A rescheduler might
-not just exploit existing holes, but also create holes by evicting
-Pods (assuming it knows they can reschedule elsewhere), as in free
-space defragmentation.
+## Motivation and use cases
 
-[Although alluded to above, it's worth emphasizing that rescheduling
-is the only way to make use of new nodes added by a cluster
-auto-scaler (unless Pods were already PENDING; but even then, it's
-likely advantageous to put more than just the previously PENDING Pods
-on the new nodes.)]
+A rescheduler is useful because without a rescheduler, scheduling
+decisions are only made at the time Pods are created. But later on,
+the state of the cell may have changed in some way such that it would
+be better to move the Pod to another node.
+
+There are two categories of movements a rescheduler might trigger: coalescing
+and spreading.
+
+### Coalesce Pods
+
+This is the most common use case. Cluster layout changes over time. For
+example, run-to-completion Pods terminate, producing free space in their wake, but that space
+is fragmented. This fragmentation might prevent a PENDING Pod from scheduling
+(there are enough free resource for the Pod in aggregate across the cluster,
+but not on any single node). A rescheduler can coalesce free space like a
+disk defragmenter, thereby producing enough free space on a node for a PENDING
+Pod to schedule. In some cases it can do this just by moving Pods into existing
+holes, but often it will need to evict (and reschedule) running Pods in order to
+create a large enough hole.
+
+A second use case for a rescheduler to coalesce pods is when it becomes possible
+to support the running Pods on a fewer number of nodes. The rescheduler can
+gradually move Pods off of some set of nodes to make those nodes empty so
+that they can then be shut down/removed. More specifically,
+the system could do a simulation to see whether after removing a node from the
+cluster, will the Pods that were on that node be able to reschedule,
+either directly or with the help of the rescheduler; if the answer is
+yes, then you can safely auto-scale down (assuming services will still
+meeting their application-level SLOs).
+
+### Spread Pods
+
+The main use cases for spreading Pods revolve around relieving congestion on (a) highly
+utilized node(s). For example, some process might suddenly start receiving a significantly
+above-normal amount of external requests, leading to starvation of best-effort
+Pods on the node. We can use the rescheduler to move the best-effort Pods off of the
+node. (They are likely to have generous eviction SLOs, so are more likely to be movable
+than the Pod that is experiencing the higher load, but in principle we might move either.)
+Or even before any node becomes overloaded, we might proactively re-spread Pods from nodes
+with high-utilization, to give them some buffer against future utilization spikes. In either
+case, the nodes we move the Pods onto might have been in the system for a long time or might
+have been added by the cluster auto-scaler specifically to allow the rescheduler to
+rebalance utilization.
+
+A second spreading use case is to separate antagnosits.
+Sometimes the processes running in two different Pods on the same node
+may have unexpected antagonistic
+behavior towards one another. A system component might monitor for such
+antagonism and ask the rescheduler to move one of the antagonists to a new node.
+
+### Ranking the use cases
+
+The vast majority of users probably only care about rescheduling for three scenarios:
+
+1. Move Pods around to get a PENDING Pod to schedule
+1. Redistribute Pods onto new nodes added by a cluster auto-scaler when ther are no PENDING Pods
+1. Move Pods around when CPU starvation is detected on a node
+
+## Design considerations and design space
 
 Because rescheduling is disruptive--it causes one or more
 already-running Pods to die when they otherwise wouldn't--a key
@@ -94,36 +141,14 @@ A key design question for a Rescheduler is how much knowledge it needs about the
 * If it is going to run continuously in the background to optimize cluster layout but is still only going to kill Pods, then it still needs to know the predicate functions for the reason mentioned above. In principle it doesn't need to know the priority functions; it could just randomly kill Pods and rely on the regular scheduler to put them back in better places. However, this is a rather inexact approach. Thus it is useful for the rescheduler to know the priority functions, or at least some subset of them, so it can be sure that an action it takes will actually improve the cluster layout.
 * If it is going to run continuously in the background to optimize cluster layout and is going to act as a scheduler rather than just killing Pods, then it needs to know the predicate functions and some compatible (but not necessarily identical) priority functions  One example of a case where "compatible but not identical" might be useful is if the main scheduler(s) has a very simple scheduling policy optimized for low scheduling latency, and the Rescheduler having a more sophisticated/optimal scheduling policy that requires more computation time. The main thing to avoid is for the scheduler(s) and rescheduler to have incompatible priority functions, as this will cause them to "fight" (though it still can't lead to an infinite loop, since the scheduler(s) only ever touches a Pod once).
 
-The vast majority of users probably only care about rescheduling for three scenarios:
+## Appendix: Integrating rescheduler with cluster auto-scaler (scale up)
 
-1. Redistribute Pods onto new nodes added by a cluster auto-scaler
-1. Move Pods around to get a PENDING Pod to schedule
-1. Move Pods around when CPU starvation is detected on a node
-
-**Addendum: How a rescheduler might trigger cluster auto-scaling (to
-scale up).** Instead of moving Pods around to free up space, it might
-just add a new node (and then move some Pods onto the new node). More
-generally, it might be useful to integrate the rescheduler and cluster
-auto-scaler. For scaling up the cluster a reasonable workflow might
-be:
+For scaling up the cluster, a reasonable workflow might be:
 1. pod horizontal auto-scaler decides to add one or more Pods to a service, based on the metrics it is observing
 1. the Pod goes PENDING due to lack of a suitable node with sufficient resources
 1. rescheduler notices the PENDING Pod and determines that the Pod cannot schedule just by rearranging existing Pods (while respecting SLOs)
 1. rescheduler triggers cluster auto-scaler to add a node of the appropriate type for the PENDING Pod
 1. the PENDING Pod schedules onto the new node (and possibly the rescheduler also moves other Pods onto that node)
-
-**Addendum: Role of simulation.** Things like knowing what will be the
-effect of different rearrangements of Pods requires a form of
-simulation of the scheduling algorithm (see also discussion in
-previous entry about what the rescheduler needs to know about the
-predicate and priority functions of the cluster's scheduler(s)). For
-cluster auto-scaling down, you could do a
-simulation to see whether after removing a node from the cluster, will
-the Pods that were on that node be able to reschedule, either directly
-or with the help of the rescheduler; if the answer is yes, then you
-can safely auto-scale down (assuming services will still meeting their
-application-level SLOs).
-
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/rescheduler.md?pixel)]()
