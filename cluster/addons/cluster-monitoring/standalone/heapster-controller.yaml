@@ -29,3 +29,4 @@ spec:
           command:
             - /heapster
             - --source=kubernetes:''
+            - --use_model=true

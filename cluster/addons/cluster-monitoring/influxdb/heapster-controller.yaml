@@ -30,3 +30,4 @@ spec:
             - /heapster
             - --source=kubernetes:''
             - --sink=influxdb:http://monitoring-influxdb:8086
+            - --use_model=true
