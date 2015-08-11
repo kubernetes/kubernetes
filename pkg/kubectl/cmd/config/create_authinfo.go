@@ -28,19 +28,17 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type createAuthInfoOptions struct {
-	configAccess      ConfigAccess
-	name              string
-	authPath          util.StringFlag
-	clientCertificate util.StringFlag
-	clientKey         util.StringFlag
-	token             util.StringFlag
-	username          util.StringFlag
-	password          util.StringFlag
-	embedCertData     util.BoolFlag
+	configAccess  ConfigAccess
+	name          string
+	certPath      string
+	keyPath       string
+	token         string
+	username      string
+	password      string
+	embedCertData bool
 }
 
 var create_authinfo_long = fmt.Sprintf(`Sets a user entry in kubeconfig
@@ -77,28 +75,31 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Co
 		Long:    create_authinfo_long,
 		Example: create_authinfo_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if !options.complete(cmd) {
-				return
-			}
-
-			err := options.run()
+			err := options.run(cmd, args)
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
 			}
 		},
 	}
 
-	cmd.Flags().Var(&options.clientCertificate, clientcmd.FlagCertFile, "path to "+clientcmd.FlagCertFile+" for the user entry in kubeconfig")
-	cmd.Flags().Var(&options.clientKey, clientcmd.FlagKeyFile, "path to "+clientcmd.FlagKeyFile+" for the user entry in kubeconfig")
-	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
-	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in kubeconfig")
-	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
-	cmd.Flags().Var(&options.embedCertData, clientcmd.FlagEmbedCerts, "embed client cert/key for the user entry in kubeconfig")
+	cmd.Flags().StringVar(&options.certPath, clientcmd.FlagCertFile, "", "path to "+clientcmd.FlagCertFile+" for the user entry in kubeconfig")
+	cmd.Flags().StringVar(&options.keyPath, clientcmd.FlagKeyFile, "", "path to "+clientcmd.FlagKeyFile+" for the user entry in kubeconfig")
+	cmd.Flags().StringVar(&options.token, clientcmd.FlagBearerToken, "", clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
+	cmd.Flags().StringVar(&options.username, clientcmd.FlagUsername, "", clientcmd.FlagUsername+" for the user entry in kubeconfig")
+	cmd.Flags().StringVar(&options.password, clientcmd.FlagPassword, "", clientcmd.FlagPassword+" for the user entry in kubeconfig")
+	cmd.Flags().BoolVar(&options.embedCertData, clientcmd.FlagEmbedCerts, false, "embed client cert/key for the user entry in kubeconfig")
 
 	return cmd
 }
 
-func (o createAuthInfoOptions) run() error {
+func (o createAuthInfoOptions) run(cmd *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		cmd.Help()
+		return nil
+	}
+
+	o.name = args[0]
+
 	err := o.validate()
 	if err != nil {
 		return err
@@ -113,7 +114,7 @@ func (o createAuthInfoOptions) run() error {
 	if !exists {
 		startingStanza = clientcmdapi.NewAuthInfo()
 	}
-	authInfo := o.modifyAuthInfo(*startingStanza)
+	authInfo := o.modifyAuthInfo(cmd, *startingStanza)
 	config.AuthInfos[o.name] = &authInfo
 
 	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
@@ -124,14 +125,14 @@ func (o createAuthInfoOptions) run() error {
 }
 
 // authInfo builds an AuthInfo object from the options
-func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo) clientcmdapi.AuthInfo {
+func (o *createAuthInfoOptions) modifyAuthInfo(cmd *cobra.Command, existingAuthInfo clientcmdapi.AuthInfo) clientcmdapi.AuthInfo {
 	modifiedAuthInfo := existingAuthInfo
 
 	var setToken, setBasic bool
 
-	if o.clientCertificate.Provided() {
-		certPath := o.clientCertificate.Value()
-		if o.embedCertData.Value() {
+	if cmd.Flags().Changed(clientcmd.FlagCertFile) {
+		certPath := o.certPath
+		if o.embedCertData {
 			modifiedAuthInfo.ClientCertificateData, _ = ioutil.ReadFile(certPath)
 			modifiedAuthInfo.ClientCertificate = ""
 		} else {
@@ -142,13 +143,13 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 			}
 		}
 	}
-	if o.clientKey.Provided() {
-		keyPath := o.clientKey.Value()
-		if o.embedCertData.Value() {
+	if cmd.Flags().Changed(clientcmd.FlagKeyFile) {
+		keyPath := o.keyPath
+		if o.embedCertData {
 			modifiedAuthInfo.ClientKeyData, _ = ioutil.ReadFile(keyPath)
 			modifiedAuthInfo.ClientKey = ""
 		} else {
-			keyPath, _ = filepath.Abs(keyPath)
+			keyPath, _ := filepath.Abs(keyPath)
 			modifiedAuthInfo.ClientKey = keyPath
 			if len(modifiedAuthInfo.ClientKey) > 0 {
 				modifiedAuthInfo.ClientKeyData = nil
@@ -156,17 +157,18 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 		}
 	}
 
-	if o.token.Provided() {
-		modifiedAuthInfo.Token = o.token.Value()
+	if cmd.Flags().Changed(clientcmd.FlagBearerToken) {
+		modifiedAuthInfo.Token = o.token
 		setToken = len(modifiedAuthInfo.Token) > 0
 	}
 
-	if o.username.Provided() {
-		modifiedAuthInfo.Username = o.username.Value()
+	if cmd.Flags().Changed(clientcmd.FlagUsername) {
+		modifiedAuthInfo.Username = o.username
 		setBasic = setBasic || len(modifiedAuthInfo.Username) > 0
 	}
-	if o.password.Provided() {
-		modifiedAuthInfo.Password = o.password.Value()
+
+	if cmd.Flags().Changed(clientcmd.FlagPassword) {
+		modifiedAuthInfo.Password = o.password
 		setBasic = setBasic || len(modifiedAuthInfo.Password) > 0
 	}
 
@@ -184,34 +186,23 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	return modifiedAuthInfo
 }
 
-func (o *createAuthInfoOptions) complete(cmd *cobra.Command) bool {
-	args := cmd.Flags().Args()
-	if len(args) != 1 {
-		cmd.Help()
-		return false
-	}
-
-	o.name = args[0]
-	return true
-}
-
 func (o createAuthInfoOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("You must specify a non-empty user name")
 	}
 	methods := []string{}
-	if len(o.token.Value()) > 0 {
+	if o.token != "" {
 		methods = append(methods, fmt.Sprintf("--%v", clientcmd.FlagBearerToken))
 	}
-	if len(o.username.Value()) > 0 || len(o.password.Value()) > 0 {
+	if o.username != "" || o.password != "" {
 		methods = append(methods, fmt.Sprintf("--%v/--%v", clientcmd.FlagUsername, clientcmd.FlagPassword))
 	}
 	if len(methods) > 1 {
 		return fmt.Errorf("You cannot specify more than one authentication method at the same time: %v", strings.Join(methods, ", "))
 	}
-	if o.embedCertData.Value() {
-		certPath := o.clientCertificate.Value()
-		keyPath := o.clientKey.Value()
+	if o.embedCertData {
+		certPath := o.certPath
+		keyPath := o.keyPath
 		if certPath == "" && keyPath == "" {
 			return fmt.Errorf("You must specify a --%s or --%s to embed", clientcmd.FlagCertFile, clientcmd.FlagKeyFile)
 		}

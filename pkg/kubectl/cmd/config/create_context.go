@@ -25,15 +25,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 type createContextOptions struct {
 	configAccess ConfigAccess
 	name         string
-	cluster      util.StringFlag
-	authInfo     util.StringFlag
-	namespace    util.StringFlag
+	cluster      string
+	authInfo     string
+	namespace    string
 }
 
 const (
@@ -52,25 +51,28 @@ func NewCmdConfigSetContext(out io.Writer, configAccess ConfigAccess) *cobra.Com
 		Long:    create_context_long,
 		Example: create_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if !options.complete(cmd) {
+			if len(args) != 1 {
+				cmd.Help()
 				return
 			}
 
-			err := options.run()
+			err := options.run(cmd, args)
 			if err != nil {
 				fmt.Printf("%v\n", err)
 			}
 		},
 	}
 
-	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in kubeconfig")
-	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in kubeconfig")
-	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in kubeconfig")
+	cmd.Flags().StringVar(&options.cluster, clientcmd.FlagClusterName, "", clientcmd.FlagClusterName+" for the context entry in kubeconfig")
+	cmd.Flags().StringVar(&options.authInfo, clientcmd.FlagAuthInfoName, "", clientcmd.FlagAuthInfoName+" for the context entry in kubeconfig")
+	cmd.Flags().StringVar(&options.namespace, clientcmd.FlagNamespace, "", clientcmd.FlagNamespace+" for the context entry in kubeconfig")
 
 	return cmd
 }
 
-func (o createContextOptions) run() error {
+func (o createContextOptions) run(cmd *cobra.Command, args []string) error {
+	o.name = args[0]
+
 	err := o.validate()
 	if err != nil {
 		return err
@@ -85,7 +87,7 @@ func (o createContextOptions) run() error {
 	if !exists {
 		startingStanza = clientcmdapi.NewContext()
 	}
-	context := o.modifyContext(*startingStanza)
+	context := o.modifyContext(cmd, *startingStanza)
 	config.Contexts[o.name] = &context
 
 	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
@@ -95,31 +97,20 @@ func (o createContextOptions) run() error {
 	return nil
 }
 
-func (o *createContextOptions) modifyContext(existingContext clientcmdapi.Context) clientcmdapi.Context {
+func (o *createContextOptions) modifyContext(cmd *cobra.Command, existingContext clientcmdapi.Context) clientcmdapi.Context {
 	modifiedContext := existingContext
 
-	if o.cluster.Provided() {
-		modifiedContext.Cluster = o.cluster.Value()
+	if cmd.Flags().Changed(clientcmd.FlagClusterName) {
+		modifiedContext.Cluster = o.cluster
 	}
-	if o.authInfo.Provided() {
-		modifiedContext.AuthInfo = o.authInfo.Value()
+	if cmd.Flags().Changed(clientcmd.FlagAuthInfoName) {
+		modifiedContext.AuthInfo = o.authInfo
 	}
-	if o.namespace.Provided() {
-		modifiedContext.Namespace = o.namespace.Value()
+	if cmd.Flags().Changed(clientcmd.FlagNamespace) {
+		modifiedContext.Namespace = o.namespace
 	}
 
 	return modifiedContext
-}
-
-func (o *createContextOptions) complete(cmd *cobra.Command) bool {
-	args := cmd.Flags().Args()
-	if len(args) != 1 {
-		cmd.Help()
-		return false
-	}
-
-	o.name = args[0]
-	return true
 }
 
 func (o createContextOptions) validate() error {

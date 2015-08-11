@@ -89,8 +89,8 @@ type KubeletServer struct {
 	MinimumGCAge                   time.Duration
 	MaxPerPodContainerCount        int
 	MaxContainerCount              int
-	AuthPath                       util.StringFlag // Deprecated -- use KubeConfig instead
-	KubeConfig                     util.StringFlag
+	AuthPath                       string // Deprecated -- use KubeConfig instead
+	KubeConfig                     string
 	CadvisorPort                   uint
 	HealthzPort                    int
 	HealthzBindAddress             net.IP
@@ -163,8 +163,8 @@ func NewKubeletServer() *KubeletServer {
 		MinimumGCAge:                1 * time.Minute,
 		MaxPerPodContainerCount:     2,
 		MaxContainerCount:           100,
-		AuthPath:                    util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
-		KubeConfig:                  util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+		AuthPath:                    "/var/lib/kubelet/kubernetes_auth", // deprecated
+		KubeConfig:                  "/var/lib/kubelet/kubeconfig",
 		CadvisorPort:                4194,
 		HealthzPort:                 10248,
 		HealthzBindAddress:          net.ParseIP("127.0.0.1"),
@@ -188,6 +188,11 @@ func NewKubeletServer() *KubeletServer {
 		DockerExecHandlerName:       "native",
 	}
 }
+
+const (
+	authPathFlagName   = "auth-path"
+	kubeconfigFlagName = "kubeconfig"
+)
 
 // AddFlags adds flags for a specific KubeletServer to the specified FlagSet
 func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
@@ -221,9 +226,9 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.MinimumGCAge, "minimum-container-ttl-duration", s.MinimumGCAge, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.IntVar(&s.MaxPerPodContainerCount, "maximum-dead-containers-per-container", s.MaxPerPodContainerCount, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 2.")
 	fs.IntVar(&s.MaxContainerCount, "maximum-dead-containers", s.MaxContainerCount, "Maximum number of old instances of a containers to retain globally.  Each container takes up some disk space.  Default: 100.")
-	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
+	fs.StringVar(&s.AuthPath, authPathFlagName, s.AuthPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
-	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
+	fs.StringVar(&s.KubeConfig, kubeconfigFlagName, s.KubeConfig, "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
 	fs.UintVar(&s.CadvisorPort, "cadvisor-port", s.CadvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.IPVar(&s.HealthzBindAddress, "healthz-bind-address", s.HealthzBindAddress, "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
@@ -454,7 +459,7 @@ func (s *KubeletServer) InitializeTLS() (*kubelet.TLSOptions, error) {
 }
 
 func (s *KubeletServer) authPathClientConfig(useDefaults bool) (*client.Config, error) {
-	authInfo, err := clientauth.LoadFromFile(s.AuthPath.Value())
+	authInfo, err := clientauth.LoadFromFile(s.AuthPath)
 	if err != nil && !useDefaults {
 		return nil, err
 	}
@@ -477,7 +482,7 @@ func (s *KubeletServer) authPathClientConfig(useDefaults bool) (*client.Config, 
 
 func (s *KubeletServer) kubeconfigClientConfig() (*client.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
 }
 
@@ -488,13 +493,19 @@ func (s *KubeletServer) kubeconfigClientConfig() (*client.Config, error) {
 // fall back to the default auth (none) without an error.
 // TODO(roberthbailey): Remove support for --auth-path
 func (s *KubeletServer) createClientConfig() (*client.Config, error) {
-	if s.KubeConfig.Provided() && s.AuthPath.Provided() {
-		return nil, fmt.Errorf("cannot specify both --kubeconfig and --auth-path")
-	}
-	if s.KubeConfig.Provided() {
-		return s.kubeconfigClientConfig()
-	} else if s.AuthPath.Provided() {
-		return s.authPathClientConfig(false)
+	authPathFlag := pflag.Lookup(authPathFlagName)
+	kubeconfigFlag := pflag.Lookup(kubeconfigFlagName)
+	if authPathFlag != nil && kubeconfigFlag != nil {
+		if authPathFlag.Changed && kubeconfigFlag.Changed {
+			return nil, fmt.Errorf("cannot specify both --kubeconfig and --auth-path")
+		}
+		if kubeconfigFlag.Changed {
+			return s.kubeconfigClientConfig()
+		} else if authPathFlag.Changed {
+			return s.authPathClientConfig(false)
+		}
+	} else {
+		glog.Warningf("Unable to find flags %s and %s, trying kubeconfig and then authconfig", authPathFlagName, kubeconfigFlagName)
 	}
 	// Try the kubeconfig default first, falling back to the auth path default.
 	clientConfig, err := s.kubeconfigClientConfig()
