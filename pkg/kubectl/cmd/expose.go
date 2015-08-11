@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -37,6 +37,9 @@ re-use the labels from the resource it exposes.`
 	expose_example = `// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose rc nginx --port=80 --target-port=8000
 
+# Creates a service for a replication controller identified by type and name specified in "nginx-controller.yaml", which serves on port 80 and connects to the containers on port 8000.
+$ kubectl expose -f nginx-controller.yaml --port=80 --target-port=8000
+
 // Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
 $ kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
 
@@ -46,7 +49,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream`
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "expose TYPE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--type=type]",
+		Use:     "expose (-f FILENAME | TYPE NAME) --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--type=type]",
 		Short:   "Take a replicated application and expose it as Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
@@ -71,11 +74,14 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("name", "", "The name for the newly created object.")
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
+
+	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	return cmd
 }
 
 func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	namespace, _, err := f.DefaultNamespace()
+	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -84,14 +90,11 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
 	err = r.Err()
-	if err != nil {
-		return err
-	}
-	mapping, err := r.ResourceMapping()
 	if err != nil {
 		return err
 	}
@@ -103,6 +106,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return fmt.Errorf("multiple resources provided: %v", args)
 	}
 	info := infos[0]
+	mapping := info.ResourceMapping()
 
 	// Get the input object
 	client, err := f.RESTClient(mapping)
@@ -201,6 +205,5 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			return err
 		}
 	}
-
 	return f.PrintObject(cmd, object, out)
 }
