@@ -303,12 +303,13 @@ func (nc *NodeController) monitorNodeStatus() error {
 				if _, err := instances.ExternalID(node.Name); err != nil && err == cloudprovider.InstanceNotFound {
 					glog.Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
 					nc.recordNodeEvent(node.Name, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
+					if err := nc.deletePods(node.Name); err != nil {
+						glog.Errorf("Unable to delete pods from node %s: %v", node.Name, err)
+						continue
+					}
 					if err := nc.kubeClient.Nodes().Delete(node.Name); err != nil {
 						glog.Errorf("Unable to delete node %s: %v", node.Name, err)
 						continue
-					}
-					if err := nc.deletePods(node.Name); err != nil {
-						glog.Errorf("Unable to delete pods from node %s: %v", node.Name, err)
 					}
 				}
 			}
