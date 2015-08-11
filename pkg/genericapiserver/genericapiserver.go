@@ -744,6 +744,12 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	// Install REST handlers for all the versions in this group.
 	apiVersions := []string{}
 	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+		// Don't serve any versions other than v1 from the legacy group
+		// TODO: plumb API-enabled versions here, so we can choose to enable/disable particular versions in an API group
+		if apiGroupInfo.IsLegacyGroup && groupVersion.Group == "" && groupVersion.Version != "v1" {
+			continue
+		}
+
 		apiVersions = append(apiVersions, groupVersion.Version)
 
 		apiGroupVersion, err := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)

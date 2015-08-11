@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1beta3"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -404,6 +405,8 @@ func isReplicasDefaulted(info *resource.Info) bool {
 	}
 	switch t := info.VersionedObject.(type) {
 	case *v1.ReplicationController:
+		return t.Spec.Replicas == nil
+	case *v1beta3.ReplicationController:
 		return t.Spec.Replicas == nil
 	}
 	return false
