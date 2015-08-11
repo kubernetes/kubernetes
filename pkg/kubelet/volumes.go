@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"path"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
@@ -83,7 +82,7 @@ func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID, mou
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
-		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spew.Sprintf("%#v", *spec), err)
+		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name, err)
 	}
 	if plugin == nil {
 		// Not found but not an error
@@ -91,9 +90,9 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, 
 	}
 	builder, err := plugin.NewBuilder(spec, pod, opts, mounter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate volume plugin for %s: %v", spew.Sprintf("%#v", *spec), err)
+		return nil, fmt.Errorf("failed to instantiate volume plugin for %s: %v", spec.Name, err)
 	}
-	glog.V(3).Infof("Used volume plugin %q for %s", plugin.Name(), spew.Sprintf("%#v", *spec))
+	glog.V(3).Infof("Used volume plugin %q for %s", plugin.Name(), spec.Name)
 	return builder, nil
 }
 
