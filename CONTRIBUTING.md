@@ -11,7 +11,7 @@ Please fill out either the individual or corporate Contributor License Agreement
 
 Follow either of the two links above to access the appropriate CLA and instructions for how to sign and return it. Once we receive it, we'll be able to accept your pull requests.
 
-***NOTE***: Only original source code from you and other people that have signed the CLA can be accepted into the main repository. This policy does not apply to [third_party](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/third_party).
+***NOTE***: Only original source code from you and other people that have signed the CLA can be accepted into the main repository. This policy does not apply to [third_party](http://code.k8s.io/third_party).
 
 ## Contributing A Patch
 

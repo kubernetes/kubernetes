@@ -190,7 +190,7 @@ Send us pull requests!  We'll send you a cookie if they include tests and docs.
 More information about the
 [Kubernetes project](https://github.com/GoogleCloudPlatform/kubernetes)
 or check out the
-[Kubernetes Documentation](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs)
+[Kubernetes Documentation](http://code.k8s.io/docs)
 for more details about the Kubernetes concepts and terminology.
 
 Having a problem? Check the [Kubernetes issues database](https://github.com/GoogleCloudPlatform/kubernetes/issues)

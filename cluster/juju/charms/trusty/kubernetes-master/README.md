@@ -97,7 +97,7 @@ to interact with the environment.
 
 - [Kubernetes github project](https://github.com/GoogleCloudPlatform/kubernetes)
 - [Kubernetes issue tracker](https://github.com/GoogleCloudPlatform/kubernetes/issues)
-- [Kubernetes Documenation](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs)
+- [Kubernetes Documenation](http://code.k8s.io/docs)
 - [Kubernetes releases](https://releases.k8s.io)
 
 
