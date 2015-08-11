@@ -39,6 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
+// Clear terminated pods from etcd after 4 days.
+var ttlForTerminatedPods uint64 = 4 * 24 * 3600
+
 // PodStorage includes storage for pods and all sub resources
 type PodStorage struct {
 	Pod         *REST
@@ -73,6 +76,19 @@ func NewStorage(s storage.Interface, k client.ConnectionInfoGetter) PodStorage {
 		},
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return pod.MatchPod(label, field)
+		},
+		TTLFunc: func(obj runtime.Object, existing uint64, update bool) (uint64, error) {
+			// Let the existing TTL be, if there is one.
+			if existing > 0 {
+				return existing, nil
+			}
+			// Set a TTL to GC terminated (succeeded/failed) pods.
+			pod := obj.(*api.Pod)
+			if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+				return ttlForTerminatedPods, nil
+			}
+			// No ttl.
+			return 0, nil
 		},
 		EndpointName: "pods",
 

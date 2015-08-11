@@ -49,10 +49,10 @@ func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
 	return fakeEtcdClient, etcdStorage
 }
 
-func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *tools.FakeEtcdClient, storage.Interface) {
+func newStorage(t *testing.T) (PodStorage, *tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
 	storage := NewStorage(etcdStorage, nil)
-	return storage.Pod, storage.Binding, storage.Status, fakeEtcdClient, etcdStorage
+	return storage, fakeEtcdClient, etcdStorage
 }
 
 func validNewPod() *api.Pod {
@@ -88,8 +88,8 @@ func validChangedPod() *api.Pod {
 }
 
 func TestStorage(t *testing.T) {
-	storage, _, _, _, _ := newStorage(t)
-	pod.NewRegistry(storage)
+	storage, _, _ := newStorage(t)
+	pod.NewRegistry(storage.Pod)
 }
 
 func TestCreate(t *testing.T) {
@@ -663,7 +663,8 @@ func TestDeletePod(t *testing.T) {
 
 // TestEtcdGetDifferentNamespace ensures same-name pods in different namespaces do not clash
 func TestEtcdGetDifferentNamespace(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 
 	ctx1 := api.NewDefaultContext()
 	ctx2 := api.WithNamespace(api.NewContext(), "other")
@@ -704,7 +705,8 @@ func TestEtcdGetDifferentNamespace(t *testing.T) {
 }
 
 func TestEtcdGet(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	key, _ := registry.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
@@ -720,7 +722,8 @@ func TestEtcdGet(t *testing.T) {
 }
 
 func TestEtcdGetNotFound(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	key, _ := registry.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
@@ -737,7 +740,9 @@ func TestEtcdGetNotFound(t *testing.T) {
 }
 
 func TestEtcdCreate(t *testing.T) {
-	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
+	bindingRegistry := storage.Binding
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 	key, _ := registry.KeyFunc(ctx, "foo")
@@ -781,7 +786,9 @@ func TestEtcdCreate(t *testing.T) {
 // Ensure that when scheduler creates a binding for a pod that has already been deleted
 // by the API server, API server returns not-found error.
 func TestEtcdCreateBindingNoPod(t *testing.T) {
-	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
+	bindingRegistry := storage.Binding
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
@@ -818,7 +825,8 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 }
 
 func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	fakeClient.TestIndex = true
 	pod := validNewPod()
 	pod.Namespace = ""
@@ -830,7 +838,8 @@ func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 }
 
 func TestEtcdCreateAlreadyExisting(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	key, _ := registry.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
@@ -849,7 +858,9 @@ func TestEtcdCreateAlreadyExisting(t *testing.T) {
 }
 
 func TestEtcdCreateWithContainersNotFound(t *testing.T) {
-	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
+	bindingRegistry := storage.Binding
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 	key, _ := registry.KeyFunc(ctx, "foo")
@@ -897,7 +908,9 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 }
 
 func TestEtcdCreateWithConflict(t *testing.T) {
-	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
+	bindingRegistry := storage.Binding
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 	key, _ := registry.KeyFunc(ctx, "foo")
@@ -934,7 +947,9 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 }
 
 func TestEtcdCreateWithExistingContainers(t *testing.T) {
-	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
+	bindingRegistry := storage.Binding
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 	key, _ := registry.KeyFunc(ctx, "foo")
@@ -975,7 +990,9 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 }
 
 func TestEtcdCreateBinding(t *testing.T) {
-	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
+	bindingRegistry := storage.Binding
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
@@ -1046,7 +1063,8 @@ func TestEtcdCreateBinding(t *testing.T) {
 }
 
 func TestEtcdUpdateNotFound(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
@@ -1073,7 +1091,8 @@ func TestEtcdUpdateNotFound(t *testing.T) {
 }
 
 func TestEtcdUpdateNotScheduled(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
@@ -1098,7 +1117,8 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 }
 
 func TestEtcdUpdateScheduled(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
@@ -1161,7 +1181,9 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 }
 
 func TestEtcdUpdateStatus(t *testing.T) {
-	registry, _, status, fakeClient, etcdStorage := newStorage(t)
+	storage, fakeClient, etcdStorage := newStorage(t)
+	registry := storage.Pod
+	status := storage.Status
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
@@ -1233,7 +1255,8 @@ func TestEtcdUpdateStatus(t *testing.T) {
 }
 
 func TestEtcdDeletePod(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
@@ -1256,7 +1279,8 @@ func TestEtcdDeletePod(t *testing.T) {
 }
 
 func TestEtcdDeletePodMultipleContainers(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 	key, _ := registry.KeyFunc(ctx, "foo")
@@ -1279,7 +1303,8 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 }
 
 func TestEtcdEmptyList(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	key := registry.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)
@@ -1303,7 +1328,8 @@ func TestEtcdEmptyList(t *testing.T) {
 }
 
 func TestEtcdListNotFound(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	key := registry.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)
@@ -1322,7 +1348,8 @@ func TestEtcdListNotFound(t *testing.T) {
 }
 
 func TestEtcdList(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	key := registry.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)
@@ -1363,7 +1390,8 @@ func TestEtcdList(t *testing.T) {
 }
 
 func TestEtcdWatchPods(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	watching, err := registry.Watch(ctx,
 		labels.Everything(),
@@ -1390,7 +1418,8 @@ func TestEtcdWatchPods(t *testing.T) {
 }
 
 func TestEtcdWatchPodsMatch(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	watching, err := registry.Watch(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
@@ -1429,7 +1458,8 @@ func TestEtcdWatchPodsMatch(t *testing.T) {
 }
 
 func TestEtcdWatchPodsNotMatch(t *testing.T) {
-	registry, _, _, fakeClient, _ := newStorage(t)
+	storage, fakeClient, _ := newStorage(t)
+	registry := storage.Pod
 	ctx := api.NewDefaultContext()
 	watching, err := registry.Watch(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
@@ -1462,5 +1492,53 @@ func TestEtcdWatchPodsNotMatch(t *testing.T) {
 		t.Error("unexpected result from result channel")
 	case <-time.After(time.Millisecond * 100):
 		// expected case
+	}
+}
+
+func TestTTLFunc(t *testing.T) {
+	storage, _, _ := newStorage(t)
+	registry := storage.Pod
+	testCases := []struct {
+		pod         *api.Pod
+		existingTTL uint64
+		expectedTTL uint64
+	}{
+		{
+			// Pending Pod
+			&api.Pod{
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
+			}, 0, 0},
+		{
+			// Failed Pod
+			&api.Pod{
+				Status: api.PodStatus{
+					Phase: api.PodFailed,
+				},
+			}, 0, ttlForTerminatedPods},
+		{
+			// Succeeded Pod
+			&api.Pod{
+				Status: api.PodStatus{
+					Phase: api.PodSucceeded,
+				},
+			}, 0, ttlForTerminatedPods},
+		{
+			// Pod with existing TTL
+			&api.Pod{
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
+			}, 10, 10},
+	}
+	for _, item := range testCases {
+		ttl, err := registry.TTLFunc(item.pod, item.existingTTL, false)
+		if err != nil {
+			t.Errorf("unexpected error: %s", err)
+		}
+		if ttl != item.expectedTTL {
+			t.Errorf("unexpected ttl: %v, expected: %v", ttl, item.expectedTTL)
+		}
 	}
 }
