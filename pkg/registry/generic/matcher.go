@@ -17,11 +17,9 @@ limitations under the License.
 package generic
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // AttrFunc returns label and field sets for List or Watch to compare against, or an error.
@@ -123,19 +121,6 @@ var (
 
 // DecoratorFunc can mutate the provided object prior to being returned.
 type DecoratorFunc func(obj runtime.Object) error
-
-// Registry knows how to store & list any runtime.Object. Can be used for
-// any object types which don't require special features from the storage
-// layer.
-// DEPRECATED: replace with direct implementation of RESTStorage
-type Registry interface {
-	ListPredicate(api.Context, Matcher) (runtime.Object, error)
-	CreateWithName(ctx api.Context, id string, obj runtime.Object) error
-	UpdateWithName(ctx api.Context, id string, obj runtime.Object) error
-	Get(ctx api.Context, id string) (runtime.Object, error)
-	Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error)
-	WatchPredicate(ctx api.Context, m Matcher, resourceVersion string) (watch.Interface, error)
-}
 
 // FilterList filters any list object that conforms to the api conventions,
 // provided that 'm' works with the concrete type of list. d is an optional
