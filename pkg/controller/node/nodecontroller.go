@@ -163,7 +163,7 @@ func (nc *NodeController) deletePods(nodeID string) error {
 	if err != nil {
 		return err
 	}
-	nc.recordNodeEvent(nodeID, fmt.Sprintf("Deleting all Pods from Node %v.", nodeID))
+	nc.recordNodeEvent(nodeID, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeID))
 	for _, pod := range pods.Items {
 		// Defensive check, also needed for tests.
 		if pod.Spec.NodeName != nodeID {
@@ -214,7 +214,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 	for _, node := range nodes.Items {
 		if !nc.knownNodeSet.Has(node.Name) {
 			glog.V(1).Infof("NodeController observed a new Node: %#v", node)
-			nc.recordNodeEvent(node.Name, fmt.Sprintf("Registered Node %v in NodeController", node.Name))
+			nc.recordNodeEvent(node.Name, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", node.Name))
 			nc.knownNodeSet.Insert(node.Name)
 		}
 	}
@@ -228,7 +228,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 		deleted := nc.knownNodeSet.Difference(observedSet)
 		for node := range deleted {
 			glog.V(1).Infof("NodeController observed a Node deletion: %v", node)
-			nc.recordNodeEvent(node, fmt.Sprintf("Removing Node %v from NodeController", node))
+			nc.recordNodeEvent(node, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", node))
 			nc.deleteNode(node)
 			nc.knownNodeSet.Delete(node)
 		}
@@ -302,7 +302,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				}
 				if _, err := instances.ExternalID(node.Name); err != nil && err == cloudprovider.InstanceNotFound {
 					glog.Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
-					nc.recordNodeEvent(node.Name, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
+					nc.recordNodeEvent(node.Name, "DeleteingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
 					if err := nc.deletePods(node.Name); err != nil {
 						glog.Errorf("Unable to delete pods from node %s: %v", node.Name, err)
 						continue
@@ -347,7 +347,7 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 	}
 }
 
-func (nc *NodeController) recordNodeEvent(nodeName string, event string) {
+func (nc *NodeController) recordNodeEvent(nodeName string, reason string, event string) {
 	ref := &api.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
@@ -355,7 +355,7 @@ func (nc *NodeController) recordNodeEvent(nodeName string, event string) {
 		Namespace: "",
 	}
 	glog.V(2).Infof("Recording %s event message for node %s", event, nodeName)
-	nc.recorder.Eventf(ref, event, "Node %s event: %s", nodeName, event)
+	nc.recorder.Eventf(ref, reason, "Node %s event: %s", nodeName, event)
 }
 
 func (nc *NodeController) recordNodeStatusChange(node *api.Node, new_status string) {

@@ -51,9 +51,10 @@ type EventRecorder interface {
 	// Event constructs an event from the given information and puts it in the queue for sending.
 	// 'object' is the object this event is about. Event will make a reference-- or you may also
 	// pass a reference to the object directly.
-	// 'reason' is the reason this event is generated. 'reason' should be short and unique; it will
-	// be used to automate handling of events, so imagine people writing switch statements to
-	// handle them. You want to make that easy.
+	// 'reason' is the reason this event is generated. 'reason' should be short and unique; it
+	// should be in UpperCamelCase format (starting with a capital letter). "reason" will be used
+	// to automate handling of events, so imagine people writing switch statements to handle them.
+	// You want to make that easy.
 	// 'message' is intended to be human readable.
 	//
 	// The resulting event will be created in the same namespace as the reference object.
