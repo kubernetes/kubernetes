@@ -61,7 +61,7 @@ func (r *ScaleREST) New() runtime.Object {
 func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	rc, err := (*r.registry).GetController(ctx, name)
 	if err != nil {
-		return nil, errors.NewNotFound("scaler", name)
+		return nil, errors.NewNotFound("scale", name)
 	}
 	return &expapi.Scale{
 		ObjectMeta: api.ObjectMeta{
@@ -83,18 +83,18 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scaler, ok := obj.(*expapi.Scale)
+	scale, ok := obj.(*expapi.Scale)
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
-	rc, err := (*r.registry).GetController(ctx, scaler.Name)
+	rc, err := (*r.registry).GetController(ctx, scale.Name)
 	if err != nil {
-		return nil, false, errors.NewNotFound("scaler", scaler.Name)
+		return nil, false, errors.NewNotFound("scale", scale.Name)
 	}
-	rc.Spec.Replicas = scaler.Spec.Replicas
+	rc.Spec.Replicas = scale.Spec.Replicas
 	rc, err = (*r.registry).UpdateController(ctx, rc)
 	if err != nil {
-		return nil, false, errors.NewConflict("scaler", scaler.Name, err)
+		return nil, false, errors.NewConflict("scale", scale.Name, err)
 	}
 	return &expapi.Scale{
 		ObjectMeta: api.ObjectMeta{

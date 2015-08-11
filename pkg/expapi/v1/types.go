@@ -38,10 +38,10 @@ type Scale struct {
 	v1.TypeMeta   `json:",inline"`
 	v1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
 
-	// Spec defines the behavior of the scaler.
-	Spec ScaleSpec `json:"spec,omitempty" description:"specification of the desired behavior of the scaler; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+	// Spec defines the behavior of the scale.
+	Spec ScaleSpec `json:"spec,omitempty" description:"specification of the desired behavior of the scale; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
 
-	// Status represents the current status of the scaler.
+	// Status represents the current status of the scale.
 	Status ScaleStatus `json:"status,omitempty" description:"most recently observed status of the service; populated by the system, read-only; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
 }
 
