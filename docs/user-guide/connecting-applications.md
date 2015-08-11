@@ -133,8 +133,9 @@ Check your Service:
 
 ```console
 $ kubectl get svc
-NAME         LABELS        SELECTOR    IP(S)          PORT(S)
-nginxsvc     app=nginx     app=nginx   10.0.116.146   80/TCP
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
+kubernetes   10.179.240.1     <none>            443/TCP                <none>       8d
+nginxsvc     10.179.252.126   122.222.183.144   80/TCP,81/TCP,82/TCP   run=nginx2   11m
 ```
 
 As mentioned previously, a Service is backed by a group of pods. These pods are exposed through `endpoints`. The Service's selector will be evaluated continuously and the results will be POSTed to an Endpoints object also named `nginxsvc`. When a pod dies, it is automatically removed from the endpoints, and new pods matching the Service’s selector will automatically get added to the endpoints. Check the endpoints, and note that the IPs are the same as the pods created in the first step:
@@ -195,9 +196,8 @@ Kubernetes offers a DNS cluster addon Service that uses skydns to automatically 
 
 ```console
 $ kubectl get services kube-dns --namespace=kube-system
-NAME       LABELS       SELECTOR             IP(S)       PORT(S)
-kube-dns   <none>       k8s-app=kube-dns     10.0.0.10   53/UDP
-                                                         53/TCP
+NAME       CLUSTER_IP      EXTERNAL_IP   PORT(S)         SELECTOR           AGE
+kube-dns   10.179.240.10   <none>        53/UDP,53/TCP   k8s-app=kube-dns   8d
 ```
 
 If it isn’t running, you can [enable it](http://releases.k8s.io/HEAD/cluster/addons/dns/README.md#how-do-i-configure-it). The rest of this section will assume you have a Service with a long lived IP (nginxsvc), and a dns server that has assigned a name to that IP (the kube-dns cluster addon), so you can talk to the Service from any pod in your cluster using standard methods (e.g. gethostbyname). Let’s create another pod to test this:
@@ -412,17 +412,17 @@ Lets now recreate the Service to use a cloud load balancer, just change the `Typ
 ```console
 $ kubectl delete rc, svc -l app=nginx
 $ kubectl create -f ./nginx-app.yaml
-$ kubectl get svc -o json | grep -i ingress -A 5
-                    "ingress": [
-                        {
-                            "ip": "104.197.68.43"
-                        }
-                    ]
-                }
-$ curl https://104.197.68.43 -k
+$ kubectl get svc nginxsvc
+NAME      CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
+nginxsvc  10.179.252.126   162.222.184.144   80/TCP,81/TCP,82/TCP   run=nginx2   13m
+
+$ curl https://162.22.184.144 -k
 ...
 <title>Welcome to nginx!</title>
 ```
+
+The IP address in the `EXTERNAL_IP` column is the one that is available on the public internet.  The `CLUSTER_IP` is only available inside your
+cluster/private cloud network.
 
 ## What's next?
 

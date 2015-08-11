@@ -391,11 +391,9 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// |NAMESPACE   NAME      LABELS               SELECTOR   IP(S)      PORT(S)    AGE       L1|
-	// |ns1         svc1      l1=value             s=magic    10.1.1.1   53/UDP     10y       value|
-	// |                                                                 53/TCP     |
-	// |ns2         svc2      l1=dolla-bill-yall   s=kazam    10.1.1.2   80/TCP     10y       dolla-bill-yall|
-	// |                                                                 8080/TCP   |
+	// |NAMESPACE   NAME      CLUSTER_IP   EXTERNAL_IP   PORT(S)           SELECTOR   AGE       L1|
+	// |ns1         svc1      10.1.1.1     unknown       53/UDP,53/TCP     s=magic    10y       value|
+	// |ns2         svc2      10.1.1.2     unknown       80/TCP,8080/TCP   s=kazam    10y       dolla-bill-yall|
 	// ||
 }
 

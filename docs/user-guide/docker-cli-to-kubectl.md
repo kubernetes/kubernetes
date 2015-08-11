@@ -74,8 +74,6 @@ CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR        REPLICAS
 nginx-app    nginx-app      nginx      run=nginx-app   1
 # expose a port through with a service
 $ kubectl expose rc nginx-app --port=80 --name=nginx-http
-NAME         LABELS          SELECTOR        IP(S)     PORT(S)
-nginx-http   run=nginx-app   run=nginx-app             80/TCP
 ```
 
 With kubectl, we create a [replication controller](replication-controller.md) which will make sure that N pods are running nginx (where N is the number of replicas stated in the spec, which defaults to 1). We also create a [service](services.md) with a selector that matches the replication controller's selector. See the [Quick start](quick-start.md) for more information.

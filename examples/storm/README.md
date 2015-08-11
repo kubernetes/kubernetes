@@ -91,11 +91,11 @@ zookeeper   1/1       Running   0          43s
 
 ### Check to see if ZooKeeper is accessible
 
-```sh
+```console
 $ kubectl get services
-NAME                LABELS                                    SELECTOR            IP(S)               PORT(S)
-kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
+NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+zookeeper         10.254.139.141   <none>            2181/TCP      name=zookeeper         10m
+kubernetes        10.0.0.2         <none>            443/TCP       <none>                 1d
 
 $ echo ruok | nc 10.254.139.141 2181; echo
 imok

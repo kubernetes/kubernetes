@@ -247,10 +247,12 @@ $ kubectl create -f examples/phabricator/phabricator-service.json
 phabricator
 ```
 
-To play with the service itself, find the external IP of the load balancer:
+To play with the service itself, find the `EXTERNAL_IP` of the load balancer:
 
-```sh
-$ kubectl get services phabricator -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}{{"\n"}}'
+```console
+$ kubectl get services phabricator
+NAME                  CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
+phabricator           10.0.0.2         1.2.3.4           8080/TCP      ...                    ...
 ```
 
 and then visit port 80 of that IP address.

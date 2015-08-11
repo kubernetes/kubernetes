@@ -67,8 +67,8 @@ kubectl expose rc nginx --port=80
 This should print:
 
 ```console
-NAME      LABELS    SELECTOR              IP          PORT(S)
-nginx     <none>    run=nginx             <ip-addr>   80/TCP
+NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
+nginx        10.179.240.1     <none>            80/TCP                 run=nginx    8d
 ```
 
 Hit the webserver:
