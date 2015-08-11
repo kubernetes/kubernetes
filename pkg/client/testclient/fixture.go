@@ -76,8 +76,6 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 		default:
 			return nil, fmt.Errorf("no reaction implemented for %s", action)
 		}
-
-		return nil, nil
 	}
 }
 
@@ -175,7 +173,7 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 			status.Details.Kind = kind
 		}
 		if status.Status != api.StatusSuccess {
-			return nilValue, &errors.StatusError{*status}
+			return nilValue, &errors.StatusError{ErrStatus: *status}
 		}
 	}
 

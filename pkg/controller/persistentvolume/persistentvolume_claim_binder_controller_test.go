@@ -183,7 +183,7 @@ func TestBindingWithExamples(t *testing.T) {
 	pv, err := client.PersistentVolumes().Get("any")
 	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimRecycle
 	if err != nil {
-		t.Error("Unexpected error getting PV from client: %v", err)
+		t.Errorf("Unexpected error getting PV from client: %v", err)
 	}
 
 	claim, error := client.PersistentVolumeClaims("ns").Get("any")
@@ -285,7 +285,7 @@ func TestMissingFromIndex(t *testing.T) {
 
 	pv, err := client.PersistentVolumes().Get("any")
 	if err != nil {
-		t.Error("Unexpected error getting PV from client: %v", err)
+		t.Errorf("Unexpected error getting PV from client: %v", err)
 	}
 
 	claim, error := client.PersistentVolumeClaims("ns").Get("any")

@@ -18,6 +18,7 @@ package aws_cloud
 
 import (
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -68,7 +69,7 @@ func (s *AWSCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error
 		}
 		instanceName := orEmpty(instance.PrivateDNSName)
 		routeName := clusterName + "-" + destinationCIDR
-		routes = append(routes, &cloudprovider.Route{routeName, instanceName, destinationCIDR})
+		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetInstance: instanceName, DestinationCIDR: destinationCIDR})
 	}
 
 	return routes, nil

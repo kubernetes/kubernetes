@@ -78,11 +78,11 @@ func TestModeler(t *testing.T) {
 	}
 
 	for _, item := range table {
-		q := &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+		q := &cache.StoreToPodLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
 		for _, pod := range item.queuedPods {
 			q.Store.Add(pod)
 		}
-		s := &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+		s := &cache.StoreToPodLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
 		for _, pod := range item.scheduledPods {
 			s.Store.Add(pod)
 		}

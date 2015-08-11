@@ -314,7 +314,7 @@ func TestDumpReaderToFile(t *testing.T) {
 	}
 	data, err := ioutil.ReadFile(tempFile.Name())
 	if err != nil {
-		t.Errorf("error when reading %s: %v", tempFile, err)
+		t.Errorf("error when reading %s: %v", tempFile.Name(), err)
 	}
 	stringData := string(data)
 	if stringData != testString {

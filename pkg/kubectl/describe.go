@@ -452,8 +452,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 		} else {
 			fmt.Fprintf(out, "Claim:\t%s\n", "")
 		}
-		fmt.Fprintf(out, "Reclaim Policy:\t%d\n", pv.Spec.PersistentVolumeReclaimPolicy)
-		fmt.Fprintf(out, "Message:\t%d\n", pv.Status.Message)
+		fmt.Fprintf(out, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
+		fmt.Fprintf(out, "Message:\t%s\n", pv.Status.Message)
 		return nil
 	})
 }
@@ -473,8 +473,8 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
-		fmt.Fprintf(out, "Status:\t%d\n", pvc.Status.Phase)
-		fmt.Fprintf(out, "Volume:\t%d\n", pvc.Spec.VolumeName)
+		fmt.Fprintf(out, "Status:\t%v\n", pvc.Status.Phase)
+		fmt.Fprintf(out, "Volume:\t%s\n", pvc.Spec.VolumeName)
 
 		return nil
 	})

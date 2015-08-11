@@ -80,7 +80,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
 	if builder == nil {
-		t.Errorf("Got a nil Builder: %v")
+		t.Error("Got a nil Builder")
 	}
 
 	path := builder.GetPath()
@@ -111,7 +111,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
 	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner: %v")
+		t.Error("Got a nil Cleaner")
 	}
 
 	if err := cleaner.TearDown(); err != nil {

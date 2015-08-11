@@ -476,12 +476,12 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 	for _, host := range hosts {
 		link := makeComparableHostPath(gce.zone, host)
 		if !existing.Has(link) {
-			toAdd = append(toAdd, &compute.InstanceReference{link})
+			toAdd = append(toAdd, &compute.InstanceReference{Instance: link})
 		}
 		existing.Delete(link)
 	}
 	for link := range existing {
-		toRemove = append(toRemove, &compute.InstanceReference{link})
+		toRemove = append(toRemove, &compute.InstanceReference{Instance: link})
 	}
 
 	if len(toAdd) > 0 {
@@ -778,7 +778,7 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 		}
 
 		target := path.Base(r.NextHopInstance)
-		routes = append(routes, &cloudprovider.Route{r.Name, target, r.DestRange})
+		routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetInstance: target, DestinationCIDR: r.DestRange})
 	}
 	return routes, nil
 }

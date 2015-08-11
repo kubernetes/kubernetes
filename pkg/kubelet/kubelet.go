@@ -177,7 +177,7 @@ func NewMainKubelet(
 		}
 		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
 	}
-	serviceLister := &cache.StoreToServiceLister{serviceStore}
+	serviceLister := &cache.StoreToServiceLister{Store: serviceStore}
 
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
@@ -194,7 +194,7 @@ func NewMainKubelet(
 		}
 		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
 	}
-	nodeLister := &cache.StoreToNodeLister{nodeStore}
+	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}
 
 	// TODO: get the real minion object of ourself,
 	// and use the real minion name and UID.
@@ -1234,7 +1234,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 
 		podStatus = pod.Status
-		podStatus.StartTime = &util.Time{start}
+		podStatus.StartTime = &util.Time{Time: start}
 		kl.statusManager.SetPodStatus(pod, podStatus)
 		glog.V(3).Infof("Not generating pod status for new pod %q", podFullName)
 	} else {

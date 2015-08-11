@@ -188,7 +188,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		pod,
 		&mounter,
 		&mountDetector,
-		volume.VolumeOptions{config.rootContext},
+		volume.VolumeOptions{RootContext: config.rootContext},
 		fakeChconRnr)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
@@ -288,7 +288,7 @@ func TestPluginBackCompat(t *testing.T) {
 		Name: "vol1",
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{""}, nil)
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""}, nil)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}

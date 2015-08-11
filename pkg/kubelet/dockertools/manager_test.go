@@ -487,7 +487,7 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 	}
 	podString, err := testapi.Codec().Encode(pod)
 	if err != nil {
-		t.Errorf("unexpected error: %v")
+		t.Errorf("unexpected error: %v", err)
 	}
 	containers := []docker.APIContainers{
 		{
@@ -838,7 +838,7 @@ func TestProbeContainer(t *testing.T) {
 		}
 		result, err := manager.prober.Probe(&api.Pod{}, api.PodStatus{}, test.testContainer, dc.ID, dc.Created)
 		if test.expectError && err == nil {
-			t.Error("[%d] Expected error but no error was returned.", i)
+			t.Errorf("[%d] Expected error but no error was returned.", i)
 		}
 		if !test.expectError && err != nil {
 			t.Errorf("[%d] Didn't expect error but got: %v", i, err)

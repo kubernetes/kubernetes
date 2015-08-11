@@ -1267,7 +1267,7 @@ func testNotReachable(ip string, port int) {
 			Logf("Expecting %s to be unreachable but was reachable and got an error reading response: %v", url, err)
 			return false, nil
 		}
-		Logf("Able to reach service %s when should no longer have been reachable, status:%d and body: %s", url, resp.Status, string(body))
+		Logf("Able to reach service %s when should no longer have been reachable, status: %q and body: %s", url, resp.Status, string(body))
 		return false, nil
 	})
 	Expect(err).NotTo(HaveOccurred(), "Error waiting for %s", desc)

@@ -76,16 +76,16 @@ func (mode RedirectMode) Redirect(nonblock, changemode bool, fd FileDescriptor, 
 		// Opens file in read-only, non-blocking mode. Returns a valid fd number if it succeeds, or -1 (and sets errno) if it fails.
 		fdr, e2 := open(name, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
 		if e2 != nil {
-			return nil, &os.PathError{"open_read", name, e2}
+			return nil, &os.PathError{Op: "open_read", Path: name, Err: e2}
 		}
 		fd2, e = open(name, flags, 0666)
 		fd_close(fdr)
 	}
 	if e != nil {
-		return nil, &os.PathError{"open", name, e}
+		return nil, &os.PathError{Op: "open", Path: name, Err: e}
 	}
 	if e = fd_move(fd, fd2); e != nil {
-		return nil, &os.PathError{"fd_move", name, e}
+		return nil, &os.PathError{Op: "fd_move", Path: name, Err: e}
 	}
 	if changemode {
 		if nonblock {
@@ -94,7 +94,7 @@ func (mode RedirectMode) Redirect(nonblock, changemode bool, fd FileDescriptor, 
 			e = ndelay_on(fd)
 		}
 		if e != nil {
-			return nil, &os.PathError{"ndelay", name, e}
+			return nil, &os.PathError{Op: "ndelay", Path: name, Err: e}
 		}
 	}
 	return os.NewFile(uintptr(fd2), name), nil

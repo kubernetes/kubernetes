@@ -298,7 +298,7 @@ Loop:
 				params[i].Known = true
 				params[i].Value, err = strconv.Atoi(value[i])
 				if err != nil {
-					return fmt.Errorf("array index %s is not a number", params[i].Value)
+					return fmt.Errorf("array index %s is not a number", value[i])
 				}
 			}
 		} else {

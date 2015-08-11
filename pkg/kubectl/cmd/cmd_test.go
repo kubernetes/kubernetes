@@ -267,7 +267,7 @@ func ExamplePrintReplicationControllerWithNamespace() {
 			Name:              "foo",
 			Namespace:         "beep",
 			Labels:            map[string]string{"foo": "bar"},
-			CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: util.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
@@ -308,7 +308,7 @@ func ExamplePrintPodWithWideFormat() {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "test1",
-			CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: util.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: api.PodSpec{
 			Containers: make([]api.Container, 2),
@@ -345,7 +345,7 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 				ObjectMeta: api.ObjectMeta{
 					Name:              "svc1",
 					Namespace:         "ns1",
-					CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: util.Time{Time: time.Now().AddDate(-10, 0, 0)},
 					Labels: map[string]string{
 						"l1": "value",
 					},
@@ -366,7 +366,7 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 				ObjectMeta: api.ObjectMeta{
 					Name:              "svc2",
 					Namespace:         "ns2",
-					CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: util.Time{Time: time.Now().AddDate(-10, 0, 0)},
 					Labels: map[string]string{
 						"l1": "dolla-bill-yall",
 					},

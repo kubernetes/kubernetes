@@ -1187,7 +1187,7 @@ func TestWatch(t *testing.T) {
 
 		encoder := watchjson.NewEncoder(w, latest.Codec)
 		for _, item := range table {
-			if err := encoder.Encode(&watch.Event{item.t, item.obj}); err != nil {
+			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)
 			}
 			flusher.Flush()

@@ -265,5 +265,4 @@ func (s *CMServer) Run(_ []string) error {
 	).Run()
 
 	select {}
-	return nil
 }

@@ -164,10 +164,10 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// Setup modeler so we control the contents of all 3 stores: assumed,
 	// scheduled and queued
 	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	scheduledPodLister := &cache.StoreToPodLister{scheduledPodStore}
+	scheduledPodLister := &cache.StoreToPodLister{Store: scheduledPodStore}
 
 	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
-	queuedPodLister := &cache.StoreToPodLister{queuedPodStore}
+	queuedPodLister := &cache.StoreToPodLister{Store: queuedPodStore}
 
 	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
 
@@ -176,11 +176,11 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// all entries inserted with fakeTime will expire.
 	ttl := 30 * time.Second
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{fakeTime}
-	ttlPolicy := &cache.TTLPolicy{ttl, fakeClock}
+	fakeClock := &util.FakeClock{Time: fakeTime}
+	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	assumedPodsStore := cache.NewFakeExpirationStore(
 		cache.MetaNamespaceKeyFunc, nil, ttlPolicy, fakeClock)
-	modeler.assumedPods = &cache.StoreToPodLister{assumedPodsStore}
+	modeler.assumedPods = &cache.StoreToPodLister{Store: assumedPodsStore}
 
 	// Port is the easiest way to cause a fit predicate failure
 	podPort := 8080
@@ -314,9 +314,9 @@ func (fr *FakeRateLimiter) Accept() {
 
 func TestSchedulerRateLimitsBinding(t *testing.T) {
 	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	scheduledPodLister := &cache.StoreToPodLister{scheduledPodStore}
+	scheduledPodLister := &cache.StoreToPodLister{Store: scheduledPodStore}
 	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
-	queuedPodLister := &cache.StoreToPodLister{queuedPodStore}
+	queuedPodLister := &cache.StoreToPodLister{Store: queuedPodStore}
 	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
 
 	algo := NewGenericScheduler(

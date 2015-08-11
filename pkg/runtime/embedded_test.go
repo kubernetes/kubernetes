@@ -153,7 +153,7 @@ func TestEmbeddedObject(t *testing.T) {
 	outer := &EmbeddedTest{
 		ID: "outer",
 		Object: runtime.EmbeddedObject{
-			&EmbeddedTest{
+			Object: &EmbeddedTest{
 				ID: "inner",
 			},
 		},
@@ -212,7 +212,7 @@ func TestDeepCopyOfEmbeddedObject(t *testing.T) {
 	original := &EmbeddedTest{
 		ID: "outer",
 		Object: runtime.EmbeddedObject{
-			&EmbeddedTest{
+			Object: &EmbeddedTest{
 				ID: "inner",
 			},
 		},

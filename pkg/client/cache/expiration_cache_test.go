@@ -17,10 +17,11 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/kubernetes/pkg/util"
 	"reflect"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestTTLExpirationBasic(t *testing.T) {
@@ -111,7 +112,7 @@ func TestTTLPolicy(t *testing.T) {
 	exactlyOnTTL := fakeTime.Add(-ttl)
 	expiredTime := fakeTime.Add(-(ttl + 1))
 
-	policy := TTLPolicy{ttl, &util.FakeClock{fakeTime}}
+	policy := TTLPolicy{ttl, &util.FakeClock{Time: fakeTime}}
 	fakeTimestampedEntry := &timestampedEntry{obj: struct{}{}, timestamp: exactlyOnTTL}
 	if policy.IsExpired(fakeTimestampedEntry) {
 		t.Errorf("TTL cache should not expire entries exactly on ttl")

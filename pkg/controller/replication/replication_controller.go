@@ -177,7 +177,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
 	// TODO: Hack. We can't cleanly shutdown the event recorder, so benchmarks
 	// need to pass in a fake.
-	rm.podControl = controller.RealPodControl{rm.kubeClient, recorder}
+	rm.podControl = controller.RealPodControl{KubeClient: rm.kubeClient, Recorder: recorder}
 }
 
 // Run begins watching and syncing.

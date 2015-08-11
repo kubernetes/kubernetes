@@ -73,7 +73,7 @@ func TestRecycler(t *testing.T) {
 	}
 	recycler, err := plug.NewRecycler(spec)
 	if err != nil {
-		t.Error("Failed to make a new Recyler: %v", err)
+		t.Errorf("Failed to make a new Recyler: %v", err)
 	}
 	if recycler.GetPath() != spec.PersistentVolumeSource.NFS.Path {
 		t.Errorf("Expected %s but got %s", spec.PersistentVolumeSource.NFS.Path, recycler.GetPath())
@@ -184,7 +184,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 func TestPluginVolume(t *testing.T) {
 	vol := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{"localhost", "/tmp", false}},
+		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/tmp", ReadOnly: false}},
 	}
 	doTestPlugin(t, volume.NewSpecFromVolume(vol))
 }
@@ -196,7 +196,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				NFS: &api.NFSVolumeSource{"localhost", "/tmp", false},
+				NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/tmp", ReadOnly: false},
 			},
 		},
 	}

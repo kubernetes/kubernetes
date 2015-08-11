@@ -86,7 +86,7 @@ func (w *WatchCache) Add(obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	event := watch.Event{watch.Added, object}
+	event := watch.Event{Type: watch.Added, Object: object}
 
 	f := func(obj runtime.Object) error { return w.store.Add(obj) }
 	return w.processEvent(event, resourceVersion, f)
@@ -97,7 +97,7 @@ func (w *WatchCache) Update(obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	event := watch.Event{watch.Modified, object}
+	event := watch.Event{Type: watch.Modified, Object: object}
 
 	f := func(obj runtime.Object) error { return w.store.Update(obj) }
 	return w.processEvent(event, resourceVersion, f)
@@ -108,7 +108,7 @@ func (w *WatchCache) Delete(obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	event := watch.Event{watch.Deleted, object}
+	event := watch.Event{Type: watch.Deleted, Object: object}
 
 	f := func(obj runtime.Object) error { return w.store.Delete(obj) }
 	return w.processEvent(event, resourceVersion, f)

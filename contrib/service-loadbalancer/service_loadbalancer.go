@@ -125,11 +125,11 @@ type service struct {
 // loadBalancerConfig represents loadbalancer specific configuration. Eventually
 // kubernetes will have an api for l7 loadbalancing.
 type loadBalancerConfig struct {
-	Name      string `json: "name", description: Name of the load balancer, eg: haproxy.`
-	ReloadCmd string `json: "reloadCmd", description: command used to reload the load balancer.`
-	Config    string `json: "config", description: path to loadbalancers configuration file.`
-	Template  string `json: "template", "template for the load balancer config."`
-	Algorithm string `json: "algorithm", description: loadbalancing algorithm.`
+	Name      string `json:"name" description:"Name of the load balancer, eg: haproxy."`
+	ReloadCmd string `json:"reloadCmd" description:"command used to reload the load balancer."`
+	Config    string `json:"config" description:"path to loadbalancers configuration file."`
+	Template  string `json:"template" description:"template for the load balancer config."`
+	Algorithm string `json:"algorithm" description:"loadbalancing algorithm."`
 }
 
 // write writes the configuration file, will write to stdout if dryRun == true

@@ -12323,7 +12323,8 @@
      },
      "activeDeadlineSeconds": {
       "type": "integer",
-      "format": "int64"
+      "format": "int64",
+      "description": "optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers; value must be a positive integer"
      },
      "dnsPolicy": {
       "type": "string",

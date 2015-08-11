@@ -38,7 +38,7 @@ func TestEnvVarsToMap(t *testing.T) {
 	varMap := EnvVarsToMap(vars)
 
 	if e, a := len(vars), len(varMap); e != a {
-		t.Error("Unexpected map length; expected: %v, got %v", e, a)
+		t.Errorf("Unexpected map length; expected: %d, got %d", e, a)
 	}
 
 	if a := varMap["foo"]; a != "bar" {

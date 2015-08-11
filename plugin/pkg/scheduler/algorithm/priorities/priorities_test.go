@@ -140,11 +140,11 @@ func TestZeroLimit(t *testing.T) {
 		for _, hp := range list {
 			if test.test == "test priority of larger pod with machine with zero-limit pod" {
 				if hp.Score == expectedPriority {
-					t.Error("%s: expected non-%d for all priorities, got list %#v", expectedPriority, list)
+					t.Errorf("%s: expected non-%d for all priorities, got list %#v", test.test, expectedPriority, list)
 				}
 			} else {
 				if hp.Score != expectedPriority {
-					t.Errorf("%s: expected %d for all priorities, got list %#v", expectedPriority, list)
+					t.Errorf("%s: expected %d for all priorities, got list %#v", test.test, expectedPriority, list)
 				}
 			}
 		}

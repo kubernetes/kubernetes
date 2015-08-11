@@ -588,7 +588,7 @@ func (dm *DockerManager) runContainer(
 	if len(containerHostname) > hostnameMaxLen {
 		containerHostname = containerHostname[:hostnameMaxLen]
 	}
-	namespacedName := types.NamespacedName{pod.Namespace, pod.Name}
+	namespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 	labels := map[string]string{
 		"io.kubernetes.pod.name": namespacedName.String(),
 	}
@@ -1041,7 +1041,7 @@ func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin
 		return err
 	}
 	if !container.State.Running {
-		return fmt.Errorf("container not running (%s)", container)
+		return fmt.Errorf("container not running (%s)", container.ID)
 	}
 
 	return dm.execHandler.ExecInContainer(dm.client, container, cmd, stdin, stdout, stderr, tty)
@@ -1086,7 +1086,7 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	}
 
 	if !container.State.Running {
-		return fmt.Errorf("container not running (%s)", container)
+		return fmt.Errorf("container not running (%s)", container.ID)
 	}
 
 	containerPid := container.State.Pid
@@ -1531,7 +1531,7 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container, pullS
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
-	spec := kubecontainer.ImageSpec{container.Image}
+	spec := kubecontainer.ImageSpec{Image: container.Image}
 	present, err := dm.IsImagePresent(spec)
 	if err != nil {
 		if ref != nil {

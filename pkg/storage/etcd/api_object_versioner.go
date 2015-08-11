@@ -37,7 +37,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Ti
 		return err
 	}
 	if expiration != nil {
-		objectMeta.DeletionTimestamp = &util.Time{*expiration}
+		objectMeta.DeletionTimestamp = &util.Time{Time: *expiration}
 	}
 	versionString := ""
 	if resourceVersion != 0 {

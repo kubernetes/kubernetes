@@ -273,14 +273,13 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 
 		// if ClusterIP is "None" or empty, skip proxying
 		if !api.IsServiceIPSet(service) {
-			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", types.NamespacedName{service.Namespace, service.Name}, service.Spec.ClusterIP)
+			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, service.Spec.ClusterIP)
 			continue
 		}
 
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
-
-			serviceName := proxy.ServicePortName{types.NamespacedName{service.Namespace, service.Name}, servicePort.Name}
+			serviceName := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: servicePort.Name}
 			activeServices[serviceName] = true
 			serviceIP := net.ParseIP(service.Spec.ClusterIP)
 			info, exists := proxier.getServiceInfo(serviceName)

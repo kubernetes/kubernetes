@@ -200,7 +200,7 @@ func TestSort(t *testing.T) {
 
 	for i, expected := range []string{"gce-pd-1", "gce-pd-5", "gce-pd-10"} {
 		if string(volumes[i].UID) != expected {
-			t.Error("Incorrect ordering of persistent volumes.  Expected %s but got %s", expected, volumes[i].UID)
+			t.Errorf("Incorrect ordering of persistent volumes.  Expected %s but got %s", expected, volumes[i].UID)
 		}
 	}
 
@@ -211,7 +211,7 @@ func TestSort(t *testing.T) {
 
 	for i, expected := range []string{"nfs-1", "nfs-5", "nfs-10"} {
 		if string(volumes[i].UID) != expected {
-			t.Error("Incorrect ordering of persistent volumes.  Expected %s but got %s", expected, volumes[i].UID)
+			t.Errorf("Incorrect ordering of persistent volumes.  Expected %s but got %s", expected, volumes[i].UID)
 		}
 	}
 }

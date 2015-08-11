@@ -121,7 +121,7 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if currentSize != -1 && len(infos) > 1 {
 		return fmt.Errorf("cannot use --current-replicas with multiple controllers")
 	}
-	precondition := &kubectl.ScalePrecondition{currentSize, resourceVersion}
+	precondition := &kubectl.ScalePrecondition{Size: currentSize, ResourceVersion: resourceVersion}
 	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
 	var waitForReplicas *kubectl.RetryParams
 	if timeout := cmdutil.GetFlagDuration(cmd, "timeout"); timeout != 0 {

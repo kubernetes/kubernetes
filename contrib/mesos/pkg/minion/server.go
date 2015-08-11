@@ -214,7 +214,7 @@ func (ms *MinionServer) launchHyperkubeServer(server string, args *[]string, log
 	}
 	close(ch)
 	if err := cmd.Wait(); err != nil {
-		log.Error("%v exited with error: %v", server, err)
+		log.Errorf("%v exited with error: %v", server, err)
 		err = fmt.Errorf("%v exited with error: %v", server, err)
 		return err
 	}

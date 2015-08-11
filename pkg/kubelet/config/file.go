@@ -66,7 +66,7 @@ func (s *sourceFile) extractFromPath() error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{[]*api.Pod{}, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{Pods: []*api.Pod{}, Op: kubelet.SET, Source: kubelet.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -76,14 +76,14 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{Pods: pods, Op: kubelet.SET, Source: kubelet.FileSource}
 
 	case statInfo.Mode().IsRegular():
 		pod, err := s.extractFromFile(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{Pods: []*api.Pod{pod}, Op: kubelet.SET, Source: kubelet.FileSource}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")

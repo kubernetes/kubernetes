@@ -42,7 +42,7 @@ type Build struct {
 type Job struct {
 	Result    string `json:"result"`
 	ID        string `json:"id"`
-	Timestamp int    `json:timestamp`
+	Timestamp int    `json:"timestamp"`
 }
 
 func (j *JenkinsClient) request(path string) ([]byte, error) {

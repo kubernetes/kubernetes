@@ -84,7 +84,7 @@ type reaperFake struct {
 }
 
 func (c *reaperFake) Pods(namespace string) client.PodInterface {
-	pods := &testclient.FakePods{c.Fake, namespace}
+	pods := &testclient.FakePods{Fake: c.Fake, Namespace: namespace}
 	if c.noSuchPod {
 		return &noSuchPod{pods}
 	}
@@ -92,7 +92,7 @@ func (c *reaperFake) Pods(namespace string) client.PodInterface {
 }
 
 func (c *reaperFake) Services(namespace string) client.ServiceInterface {
-	services := &testclient.FakeServices{c.Fake, namespace}
+	services := &testclient.FakeServices{Fake: c.Fake, Namespace: namespace}
 	if c.noDeleteService {
 		return &noDeleteService{services}
 	}

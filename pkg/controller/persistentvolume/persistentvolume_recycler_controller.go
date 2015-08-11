@@ -135,7 +135,7 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 	// blocks until completion
 	err = volRecycler.Recycle()
 	if err != nil {
-		glog.Errorf("PersistentVolume[%s] failed recycling: %+v", err)
+		glog.Errorf("PersistentVolume[%s] failed recycling: %+v", pv.Name, err)
 		pv.Status.Message = fmt.Sprintf("Recycling error: %s", err)
 		nextPhase = api.VolumeFailed
 	} else {
