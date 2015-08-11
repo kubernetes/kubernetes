@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Describer generates output for the named resource or an error
@@ -443,6 +444,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 		return "", err
 	}
 
+	storage := pv.Spec.Capacity[api.ResourceStorage]
+
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pv.Labels))
@@ -453,6 +456,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 			fmt.Fprintf(out, "Claim:\t%s\n", "")
 		}
 		fmt.Fprintf(out, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
+		fmt.Fprintf(out, "Access Modes:\t%s\n", volume.GetAccessModesAsString(pv.Spec.AccessModes))
+		fmt.Fprintf(out, "Capacity:\t%s\n", storage.String())
 		fmt.Fprintf(out, "Message:\t%s\n", pv.Status.Message)
 		return nil
 	})
@@ -470,12 +475,24 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
+	labels := formatLabels(pvc.Labels)
+	storage := pvc.Spec.Resources.Requests[api.ResourceStorage]
+	capacity := ""
+	accessModes := ""
+	if pvc.Spec.VolumeName != "" {
+		accessModes = volume.GetAccessModesAsString(pvc.Status.AccessModes)
+		storage = pvc.Status.Capacity[api.ResourceStorage]
+		capacity = storage.String()
+	}
+
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
 		fmt.Fprintf(out, "Status:\t%v\n", pvc.Status.Phase)
 		fmt.Fprintf(out, "Volume:\t%s\n", pvc.Spec.VolumeName)
-
+		fmt.Fprintf(out, "Labels:\t%s\n", labels)
+		fmt.Fprintf(out, "Capacity:\t%s\n", capacity)
+		fmt.Fprintf(out, "Access Modes:\t%s\n", accessModes)
 		return nil
 	})
 }
