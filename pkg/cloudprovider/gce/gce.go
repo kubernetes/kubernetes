@@ -456,6 +456,7 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 // This is kind of hacky, but the managed instance group adds 4 random chars and a hyphen
 // to the base name.
 func (gce *GCECloud) computeHostTag(host string) string {
+	host = strings.SplitN(host, ".", 2)[0]
 	return host[:len(host)-5]
 }
 
