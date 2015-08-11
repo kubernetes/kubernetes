@@ -136,32 +136,11 @@ func TestDelete(t *testing.T) {
 	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
 }
 
-func TestEtcdGet(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	autoscaler := validNewHorizontalPodAutoscaler("foo3")
-	name := autoscaler.Name
-	key, _ := registry.KeyFunc(ctx, name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), autoscaler), 0)
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var autoscalerOut expapi.HorizontalPodAutoscaler
-	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &autoscalerOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	obj, err := registry.Get(ctx, name)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	got := obj.(*expapi.HorizontalPodAutoscaler)
-	autoscaler.ObjectMeta.ResourceVersion = got.ObjectMeta.ResourceVersion
-	if e, a := autoscaler, got; !api.Semantic.DeepEqual(*e, *a) {
-		t.Errorf("Unexpected autoscaler: %#v, expected %#v", e, a)
-	}
+func TestGet(t *testing.T) {
+	storage, fakeEtcdClient, _ := newStorage(t)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	autoscaler := validNewHorizontalPodAutoscaler("foo")
+	test.TestGet(autoscaler)
 }
 
 func TestEmptyList(t *testing.T) {

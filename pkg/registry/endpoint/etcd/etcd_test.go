@@ -154,34 +154,10 @@ func TestEtcdListEndpoints(t *testing.T) {
 }
 
 func TestEtcdGetEndpoints(t *testing.T) {
-	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	endpoints := validNewEndpoints()
-	name := endpoints.Name
-	key, _ := storage.KeyFunc(ctx, name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, endpoints), 0)
-
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var endpointsOut api.Endpoints
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &endpointsOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	obj, err := storage.Get(ctx, name)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	got := obj.(*api.Endpoints)
-
-	endpoints.ObjectMeta.ResourceVersion = got.ObjectMeta.ResourceVersion
-	if e, a := endpoints, got; !api.Semantic.DeepEqual(*e, *a) {
-		t.Errorf("Unexpected endpoints: %#v, expected %#v", e, a)
-	}
+	test.TestGet(endpoints)
 }
 
 func TestListEmptyEndpointsList(t *testing.T) {

@@ -149,34 +149,10 @@ func TestEtcdListPersistentVolumes(t *testing.T) {
 }
 
 func TestEtcdGetPersistentVolumes(t *testing.T) {
-	ctx := api.NewContext()
 	storage, _, fakeClient, _ := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	persistentVolume := validNewPersistentVolume("foo")
-	name := persistentVolume.Name
-	key, _ := storage.KeyFunc(ctx, name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, persistentVolume), 0)
-
-	response, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var persistentVolumeOut api.PersistentVolume
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &persistentVolumeOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	obj, err := storage.Get(ctx, name)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	got := obj.(*api.PersistentVolume)
-
-	persistentVolume.ObjectMeta.ResourceVersion = got.ObjectMeta.ResourceVersion
-	if e, a := persistentVolume, got; !api.Semantic.DeepEqual(*e, *a) {
-		t.Errorf("Unexpected persistentVolume: %#v, expected %#v", e, a)
-	}
+	test.TestGet(persistentVolume)
 }
 
 func TestListEmptyPersistentVolumesList(t *testing.T) {

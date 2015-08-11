@@ -136,7 +136,7 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	result := f.Data[key]
 	if result.R == nil {
 		if _, ok := f.expectNotFoundGetSet[key]; !ok {
-			f.t.Fatalf("data for %s was not defined prior to invoking Get", key)
+			f.t.Logf("data for %s was not defined prior to invoking Get", key)
 		}
 		return &etcd.Response{}, f.NewError(EtcdErrorCodeNotFound)
 	}
