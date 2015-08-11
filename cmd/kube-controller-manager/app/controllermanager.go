@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
+	"k8s.io/kubernetes/pkg/controller/persistentvolume"
 	replicationControllerPkg "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/controller/route"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/volumeclaimbinder"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
