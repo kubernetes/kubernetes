@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package event
+package etcd
 
 import (
 	"reflect"
@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -36,22 +35,24 @@ import (
 
 var testTTL uint64 = 60
 
-func NewTestEventEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Registry) {
+func NewTestEventStorage(t *testing.T) (*tools.FakeEtcdClient, *REST) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
 
 	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
-	return f, NewEtcdRegistry(s, testTTL)
+	return f, NewStorage(s, testTTL)
 }
 
 func TestEventCreate(t *testing.T) {
 	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Reason:     "forTesting",
+		ObjectMeta:     api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		Reason:         "forTesting",
+		InvolvedObject: api.ObjectReference{Name: "bar", Namespace: api.NamespaceDefault},
 	}
 	eventB := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Reason:     "forTesting",
+		ObjectMeta:     api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		Reason:         "forTesting",
+		InvolvedObject: api.ObjectReference{Name: "bar", Namespace: api.NamespaceDefault},
 	}
 
 	nodeWithEventA := tools.EtcdResponseWithError{
@@ -100,14 +101,24 @@ func TestEventCreate(t *testing.T) {
 	}
 
 	for name, item := range table {
-		fakeClient, registry := NewTestEventEtcdRegistry(t)
+		fakeClient, storage := NewTestEventStorage(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.CreateWithName(ctx, key, item.toCreate)
+		_, err := storage.Create(ctx, item.toCreate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
 
-		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
+		// nullify fields set by infrastructure
+		received := fakeClient.Data[path]
+		var event api.Event
+		if err := testapi.Codec().DecodeInto([]byte(received.R.Node.Value), &event); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		event.ObjectMeta.CreationTimestamp = util.Time{}
+		event.ObjectMeta.UID = ""
+		received.R.Node.Value = runtime.EncodeOrDie(testapi.Codec(), &event)
+
+		if e, a := item.expect, received; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
@@ -115,16 +126,19 @@ func TestEventCreate(t *testing.T) {
 
 func TestEventUpdate(t *testing.T) {
 	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Reason:     "forTesting",
+		ObjectMeta:     api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		Reason:         "forTesting",
+		InvolvedObject: api.ObjectReference{Name: "foo", Namespace: api.NamespaceDefault},
 	}
 	eventB := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: api.NamespaceDefault},
-		Reason:     "for testing again",
+		ObjectMeta:     api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		Reason:         "for testing again",
+		InvolvedObject: api.ObjectReference{Name: "foo", Namespace: api.NamespaceDefault},
 	}
 	eventC := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "pan", Namespace: api.NamespaceDefault, ResourceVersion: "1"},
-		Reason:     "for testing again something else",
+		ObjectMeta:     api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault, ResourceVersion: "1"},
+		Reason:         "for testing again something else",
+		InvolvedObject: api.ObjectReference{Name: "foo", Namespace: api.NamespaceDefault},
 	}
 
 	nodeWithEventA := tools.EtcdResponseWithError{
@@ -203,14 +217,24 @@ func TestEventUpdate(t *testing.T) {
 	}
 
 	for name, item := range table {
-		fakeClient, registry := NewTestEventEtcdRegistry(t)
+		fakeClient, storage := NewTestEventStorage(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.UpdateWithName(ctx, key, item.toUpdate)
+		_, _, err := storage.Update(ctx, item.toUpdate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
 
-		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
+		// nullify fields set by infrastructure
+		received := fakeClient.Data[path]
+		var event api.Event
+		if err := testapi.Codec().DecodeInto([]byte(received.R.Node.Value), &event); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		event.ObjectMeta.CreationTimestamp = util.Time{}
+		event.ObjectMeta.UID = ""
+		received.R.Node.Value = runtime.EncodeOrDie(testapi.Codec(), &event)
+
+		if e, a := item.expect, received; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectGoPrintDiff(e, a))
 		}
 	}
