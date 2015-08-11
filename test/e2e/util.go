@@ -501,7 +501,7 @@ func deleteTestingNS(c *client.Client) error {
 		for _, ns := range namespaces.Items {
 			if strings.HasPrefix(ns.ObjectMeta.Name, "e2e-tests-") {
 				if ns.Status.Phase == api.NamespaceActive {
-					return fmt.Errorf("Namespace %s is active", ns)
+					return fmt.Errorf("Namespace %s is active", ns.ObjectMeta.Name)
 				}
 				terminating++
 			}
@@ -511,6 +511,51 @@ func deleteTestingNS(c *client.Client) error {
 		}
 	}
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
+}
+
+// deleteNS deletes the provided namespace, waits for it to be completely deleted, and then checks
+// whether there are any pods remaining in a non-terminating state.
+func deleteNS(c *client.Client, namespace string) error {
+	if err := c.Namespaces().Delete(namespace); err != nil {
+		return err
+	}
+
+	err := wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
+		if _, err := c.Namespaces().Get(namespace); err != nil {
+			if apierrs.IsNotFound(err) {
+				return true, nil
+			}
+			Logf("Error while waiting for namespace to be terminated: %v", err)
+			return false, nil
+		}
+		return false, nil
+	})
+
+	// check for pods that were not deleted
+	remaining := []string{}
+	missingTimestamp := false
+	if pods, perr := c.Pods(namespace).List(labels.Everything(), fields.Everything()); perr == nil {
+		for _, pod := range pods.Items {
+			Logf("Pod %s %s on node %s remains, has deletion timestamp %s", namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+			remaining = append(remaining, pod.Name)
+			if pod.DeletionTimestamp == nil {
+				missingTimestamp = true
+			}
+		}
+	}
+
+	// a timeout occured
+	if err != nil {
+		if missingTimestamp {
+			return fmt.Errorf("namespace %s was not deleted within limit: %v, some pods were not marked with a deletion timestamp, pods remaining: %v", namespace, err, remaining)
+		}
+		return fmt.Errorf("namespace %s was not deleted within limit: %v, pods remaining: %v", namespace, err, remaining)
+	}
+	// pods were not deleted but the namespace was deleted
+	if len(remaining) > 0 {
+		return fmt.Errorf("pods remained within namespace %s after deletion: %v", namespace, remaining)
+	}
+	return nil
 }
 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
@@ -549,12 +594,10 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 				if ci.State.Terminated.ExitCode == 0 {
 					By("Saw pod success")
 					return true, nil
-				} else {
-					return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Terminated)
 				}
-			} else {
-				Logf("Nil State.Terminated for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
+				return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Terminated)
 			}
+			Logf("Nil State.Terminated for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
 		}
 		return false, nil
 	})
@@ -963,7 +1006,7 @@ func tryKill(cmd *exec.Cmd) {
 func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
-	defer c.Pods(ns).Delete(pod.Name, nil)
+	defer c.Pods(ns).Delete(pod.Name, api.NewDeleteOptions(0))
 	if _, err := c.Pods(ns).Create(pod); err != nil {
 		Failf("Failed to create pod: %v", err)
 	}
@@ -1247,6 +1290,13 @@ func RunRC(config RCConfig) error {
 	}
 
 	if oldRunning != config.Replicas {
+		if pods, err := config.Client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything()); err == nil {
+			for _, pod := range pods.Items {
+				Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+			}
+		} else {
+			Logf("Can't list pod debug info: %v", err)
+		}
 		return fmt.Errorf("Only %d pods started out of %d", oldRunning, config.Replicas)
 	}
 	return nil

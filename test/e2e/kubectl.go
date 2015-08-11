@@ -78,7 +78,7 @@ var _ = Describe("Kubectl client", func() {
 
 	AfterEach(func() {
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})
@@ -470,7 +470,7 @@ var _ = Describe("Kubectl client", func() {
 					}
 				}
 				if !found {
-					Failf("Added annation not found")
+					Failf("Added annotation not found")
 				}
 			})
 		})

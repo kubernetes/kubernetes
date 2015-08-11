@@ -246,14 +246,11 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("deleting the pod")
-		podClient.Delete(pod.Name, nil)
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
-		if err != nil {
+		if err := podClient.Delete(pod.Name, nil); err != nil {
 			Failf("Failed to delete pod: %v", err)
 		}
-		Expect(len(pods.Items)).To(Equal(0))
 
-		By("veryfying pod deletion was observed")
+		By("verifying pod deletion was observed")
 		deleted := false
 		timeout := false
 		timer := time.After(podStartTimeout)
@@ -270,6 +267,12 @@ var _ = Describe("Pods", func() {
 		if !deleted {
 			Fail("Failed to observe pod deletion")
 		}
+
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to list pods to verify deletion: %v", err))
+		}
+		Expect(len(pods.Items)).To(Equal(0))
 	})
 
 	It("should be updated", func() {

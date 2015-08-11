@@ -64,7 +64,7 @@ var _ = Describe("Services", func() {
 	AfterEach(func() {
 		for _, ns := range namespaces {
 			By(fmt.Sprintf("Destroying namespace %v", ns))
-			if err := c.Namespaces().Delete(ns); err != nil {
+			if err := deleteNS(c, ns); err != nil {
 				Failf("Couldn't delete namespace %s: %s", ns, err)
 			}
 		}
@@ -1120,6 +1120,14 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 		}
 
 		Logf("Unexpected number of endpoints: found %v, expected %v (%v elapsed, ignoring for 5s)", portsByPodUID, expectedEndpoints, time.Since(start))
+	}
+
+	if pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything()); err == nil {
+		for _, pod := range pods.Items {
+			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+		}
+	} else {
+		Logf("Can't list pod debug info: %v", err)
 	}
 	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, serviceStartTimeout)
 }
