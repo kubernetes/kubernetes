@@ -58,14 +58,14 @@ Specifying a name that already exists will merge new fields on top of existing v
   Bearer token and basic auth are mutually exclusive.
 `, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
-const create_authinfo_example = `// Set only the "client-key" field on the "cluster-admin"
-// entry, without touching other values:
+const create_authinfo_example = `# Set only the "client-key" field on the "cluster-admin"
+# entry, without touching other values:
 $ kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
 
-// Set basic auth for the "cluster-admin" entry
+# Set basic auth for the "cluster-admin" entry
 $ kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
 
-// Embed client certificate data in the "cluster-admin" entry
+# Embed client certificate data in the "cluster-admin" entry
 $ kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
 
 func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Command {

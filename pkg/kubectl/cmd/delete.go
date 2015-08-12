@@ -41,19 +41,19 @@ Only one type of the arguments may be specified: filenames, resources and names,
 Note that the delete command does NOT do resource version checks, so if someone
 submits an update to a resource right when you submit a delete, their update
 will be lost along with the rest of the resource.`
-	delete_example = `// Delete a pod using the type and name specified in pod.json.
+	delete_example = `# Delete a pod using the type and name specified in pod.json.
 $ kubectl delete -f ./pod.json
 
-// Delete a pod based on the type and name in the JSON passed into stdin.
+# Delete a pod based on the type and name in the JSON passed into stdin.
 $ cat pod.json | kubectl delete -f -
 
-// Delete pods and services with label name=myLabel.
+# Delete pods and services with label name=myLabel.
 $ kubectl delete pods,services -l name=myLabel
 
-// Delete a pod with UID 1234-56-7890-234234-456456.
+# Delete a pod with UID 1234-56-7890-234234-456456.
 $ kubectl delete pod 1234-56-7890-234234-456456
 
-// Delete all pods
+# Delete all pods
 $ kubectl delete pods --all`
 )
 

@@ -43,10 +43,10 @@ const (
 	view_long = `displays Merged kubeconfig settings or a specified kubeconfig file.
 
 You can use --output=template --template=TEMPLATE to extract specific values.`
-	view_example = `// Show Merged kubeconfig settings.
+	view_example = `# Show Merged kubeconfig settings.
 $ kubectl config view
 
-// Get the password for the e2e user
+# Get the password for the e2e user
 $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'`
 )
 

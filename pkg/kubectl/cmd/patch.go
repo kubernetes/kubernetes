@@ -33,10 +33,10 @@ JSON and YAML formats are accepted.
 
 Please refer to the models in https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html to find if a field is mutable.`
 	patch_example = `
-// Partially update a node using strategic merge patch
+# Partially update a node using strategic merge patch
 kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 
-// Update a container's image; spec.containers[*].name is required because it's a merge key
+# Update a container's image; spec.containers[*].name is required because it's a merge key
 kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'`
 )
 
