@@ -154,9 +154,9 @@ Also you can run Kubernetes [guest-example](../../examples/guestbook/) to build 
 
 #### Deploy addons
 
-After the previous parts, you will have a working k8s cluster, this part will teach you how to deploy addons like dns onto the existing cluster.
+After the previous parts, you will have a working k8s cluster, this part will teach you how to deploy addons like DNS and UI onto the existing cluster.
 
-The configuration of dns is configured in cluster/ubuntu/config-default.sh.
+The configuration of DNS is configured in cluster/ubuntu/config-default.sh.
 
 ```sh
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
@@ -172,7 +172,13 @@ The `DNS_SERVER_IP` is defining the ip of dns server which must be in the `SERVI
 
 The `DNS_REPLICAS` describes how many dns pod running in the cluster.
 
-After all the above variable have been set. Just type the below command
+Further, if you want to deploy UI addon, you should also modify the configuration file as follows:
+
+```sh
+ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
+```
+
+After all the above variable have been set, just type the below command.
 
 ```console
 $ cd cluster/ubuntu
@@ -180,7 +186,7 @@ $ cd cluster/ubuntu
 $ KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh
 ```
 
-After some time, you can use `$ kubectl get pods` to see the dns pod is running in the cluster. Done!
+After some time, you can use `$ kubectl get pods --namespace=kube-system` to see the DNS and UI pods are running in the cluster. Done!
 
 #### On going
 

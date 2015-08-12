@@ -20,15 +20,70 @@ set -e
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "config-default.sh"
-if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
-  echo "Deploying DNS on kubernetes"
+KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+
+function init {
+  echo "Creating kube-system namespace..."
+  # use kubectl to create kube-system namespace
+  NAMESPACE=`eval "${KUBECTL} get namespaces | grep kube-system | cat"`
+
+  if [ ! "$NAMESPACE" ]; then
+    ${KUBECTL} create -f namespace.yaml 
+    echo "The namespace 'kube-system' is successfully created."
+  else
+    echo "The namespace 'kube-system' is already there. Skipping."
+  fi 
+
+  echo
+}
+
+function deploy_dns {
+  echo "Deploying DNS on Kubernetes"
   sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" > skydns-rc.yaml
   sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" > skydns-svc.yaml
-  
-  # use kubectl to create kube-system namespace
-  "${KUBE_ROOT}/cluster/kubectl.sh" create -f namespace.yaml
-  # use kubectl to create skydns rc and service
-  "${KUBE_ROOT}/cluster/kubectl.sh" --namespace=kube-system create -f skydns-rc.yaml
-  "${KUBE_ROOT}/cluster/kubectl.sh" --namespace=kube-system create -f skydns-svc.yaml
+
+  KUBEDNS=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat"`
+      
+  if [ ! "$KUBEDNS" ]; then
+    # use kubectl to create skydns rc and service
+    ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
+    ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+
+    echo "Kube-dns rc and service is successfully deployed."
+  else
+    echo "Kube-dns rc and service is already deployed. Skipping."
+  fi
+
+  echo
+}
+
+function deploy_ui {
+  echo "Deploying Kubernetes UI..."
+
+  KUBEUI=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-ui | cat"`
+
+  if [ ! "$KUBEUI" ]; then
+    # use kubectl to create kube-ui rc and service
+    ${KUBECTL} --namespace=kube-system create \
+        -f ${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-rc.yaml
+    ${KUBECTL} --namespace=kube-system create \
+        -f ${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-svc.yaml
+
+    echo "Kube-ui rc and service is successfully deployed."
+  else
+    echo "Kube-ui rc and service is already deployed. Skipping."
+  fi
+
+  echo
+}
+
+init
+
+if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
+  deploy_dns
+fi
+
+if [ "${ENABLE_CLUSTER_UI}" == true ]; then
+  deploy_ui
 fi
 
