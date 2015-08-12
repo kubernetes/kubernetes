@@ -1,5 +1,6 @@
 FROM scratch
 MAINTAINER Ewa Socala <socaa@google.com>
-ADD resource-consumer /resource-consumer
+ADD consumer /consumer
+ADD consume-cpu /consume-cpu
 EXPOSE 8080
-ENTRYPOINT ["/resource-consumer"]
+ENTRYPOINT ["/consumer"]
