@@ -57,15 +57,8 @@
 				$('html, body').animate({scrollTop: 0}, 500);
 			} 
 			if(!$(clickedon).hasClass('active')) {//Animate navigation menu to open/close and highlight item
-				if(!$(clickedon).parent().hasClass('haschild')){
-					if(!$(clickedon).parent().parent().parent().find('a').hasClass('active')){
-						menu_ul.filter(':visible').slideUp('normal');
-					}
-				}
-				else{
-					if(!$(clickedon).parent().find('a').hasClass('active')){
-						menu_ul.filter(':visible').slideUp('normal');
-					}
+				if($(clickedon).parents('li.haschild').length === 0 || $(clickedon).parents('li').find('a.active').length === 0){
+					menu_ul.filter(':visible').slideUp('normal');
 				}
 	            $('.menu a').removeClass('active');
 	            $(clickedon).addClass('active').next().stop(true,true).slideDown('normal');
