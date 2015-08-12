@@ -378,8 +378,8 @@ func (s *ServiceController) createExternalLoadBalancer(service *api.Service) err
 		return err
 	}
 	name := s.loadBalancerName(service)
-	if len(service.Spec.DeprecatedPublicIPs) > 0 {
-		for _, publicIP := range service.Spec.DeprecatedPublicIPs {
+	if len(service.Spec.ExternalIPs) > 0 {
+		for _, publicIP := range service.Spec.ExternalIPs {
 			// TODO: Make this actually work for multiple IPs by using different
 			// names for each. For now, we'll just create the first and break.
 			status, err := s.balancer.EnsureTCPLoadBalancer(name, s.zone.Region, net.ParseIP(publicIP),
@@ -477,11 +477,11 @@ func needsUpdate(oldService *api.Service, newService *api.Service) bool {
 	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
-	if len(oldService.Spec.DeprecatedPublicIPs) != len(newService.Spec.DeprecatedPublicIPs) {
+	if len(oldService.Spec.ExternalIPs) != len(newService.Spec.ExternalIPs) {
 		return true
 	}
-	for i := range oldService.Spec.DeprecatedPublicIPs {
-		if oldService.Spec.DeprecatedPublicIPs[i] != newService.Spec.DeprecatedPublicIPs[i] {
+	for i := range oldService.Spec.ExternalIPs {
+		if oldService.Spec.ExternalIPs[i] != newService.Spec.ExternalIPs[i] {
 			return true
 		}
 	}

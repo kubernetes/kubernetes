@@ -13430,12 +13430,12 @@
       "type": "string",
       "description": "type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services"
      },
-     "deprecatedPublicIPs": {
+     "externalIPs": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "deprecated. externally visible IPs (e.g. load balancers) that should be proxied to this service"
+      "description": "externally visible IPs (e.g. load balancers) that should be proxied to this service"
      },
      "sessionAffinity": {
       "type": "string",

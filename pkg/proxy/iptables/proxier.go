@@ -130,7 +130,7 @@ type serviceInfo struct {
 	stickyMaxAgeSeconds int
 	endpoints           []string
 	// Deprecated, but required for back-compat (including e2e)
-	deprecatedPublicIPs []string
+	externalIPs []string
 }
 
 // returns a new serviceInfo struct
@@ -236,7 +236,7 @@ func (proxier *Proxier) sameConfig(info *serviceInfo, service *api.Service, port
 	if !info.clusterIP.Equal(net.ParseIP(service.Spec.ClusterIP)) {
 		return false
 	}
-	if !ipsEqual(info.deprecatedPublicIPs, service.Spec.DeprecatedPublicIPs) {
+	if !ipsEqual(info.externalIPs, service.Spec.ExternalIPs) {
 		return false
 	}
 	if !api.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
@@ -318,7 +318,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			info.port = servicePort.Port
 			info.protocol = servicePort.Protocol
 			info.nodePort = servicePort.NodePort
-			info.deprecatedPublicIPs = service.Spec.DeprecatedPublicIPs
+			info.externalIPs = service.Spec.ExternalIPs
 			// Deep-copy in case the service instance changes
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.sessionAffinityType = service.Spec.SessionAffinity
@@ -556,7 +556,7 @@ func (proxier *Proxier) syncProxyRules() error {
 			"-j", string(svcChain))
 
 		// Capture externalIPs.
-		for _, externalIP := range info.deprecatedPublicIPs {
+		for _, externalIP := range info.externalIPs {
 			args := []string{
 				"-A", string(iptablesServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf("\"%s external IP\"", name.String()),
@@ -564,10 +564,23 @@ func (proxier *Proxier) syncProxyRules() error {
 				"-d", fmt.Sprintf("%s/32", externalIP),
 				"--dport", fmt.Sprintf("%d", info.port),
 			}
-			// We have to SNAT packets from external IPs.
+			// We have to SNAT packets to external IPs.
 			writeLine(rulesLines, append(args,
 				"-j", "MARK", "--set-xmark", fmt.Sprintf("%s/0xffffffff", iptablesMasqueradeMark))...)
-			writeLine(rulesLines, append(args,
+
+			// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
+			// nor from a local process to be forwarded to the service.
+			// This rule roughly translates to "all traffic from off-machine".
+			// This is imperfect in the face of network plugins that might not use a bridge, but we can revisit that later.
+			externalTrafficOnlyArgs := append(args,
+				"-m", "physdev", "!", "--physdev-is-in",
+				"-m", "addrtype", "!", "--src-type", "LOCAL")
+			writeLine(rulesLines, append(externalTrafficOnlyArgs,
+				"-j", string(svcChain))...)
+			dstLocalOnlyArgs := append(args, "-m", "addrtype", "--dst-type", "LOCAL")
+			// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
+			// This covers cases like GCE load-balancers which get added to the local routing table.
+			writeLine(rulesLines, append(dstLocalOnlyArgs,
 				"-j", string(svcChain))...)
 		}
 

@@ -585,8 +585,14 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 func getServiceExternalIP(svc *api.Service) string {
 	switch svc.Spec.Type {
 	case api.ServiceTypeClusterIP:
+		if len(svc.Spec.ExternalIPs) > 0 {
+			return strings.Join(svc.Spec.ExternalIPs, ",")
+		}
 		return "<none>"
 	case api.ServiceTypeNodePort:
+		if len(svc.Spec.ExternalIPs) > 0 {
+			return strings.Join(svc.Spec.ExternalIPs, ",")
+		}
 		return "nodes"
 	case api.ServiceTypeLoadBalancer:
 		ingress := svc.Status.LoadBalancer.Ingress
@@ -595,6 +601,9 @@ func getServiceExternalIP(svc *api.Service) string {
 			if ingress[i].IP != "" {
 				result = append(result, ingress[i].IP)
 			}
+		}
+		if len(svc.Spec.ExternalIPs) > 0 {
+			result = append(result, svc.Spec.ExternalIPs...)
 		}
 		return strings.Join(result, ",")
 	}

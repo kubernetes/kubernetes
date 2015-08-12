@@ -49,7 +49,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream`
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "expose (-f FILENAME | TYPE NAME) --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--type=type]",
+		Use:     "expose (-f FILENAME | TYPE NAME) --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type]",
 		Short:   "Take a replicated application and expose it as Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
@@ -70,7 +70,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
 	cmd.Flags().String("container-port", "", "Synonym for --target-port")
 	cmd.Flags().String("target-port", "", "Name or number for the port on the container that the service should direct traffic to. Optional.")
-	cmd.Flags().String("public-ip", "", "Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.")
+	cmd.Flags().String("external-ip", "", "External IP address to set for the service. The service can be accessed by this IP in addition to its generated service IP.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("name", "", "The name for the newly created object.")
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
