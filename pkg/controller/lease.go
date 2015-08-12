@@ -22,12 +22,10 @@ limitations under the License.
 package controller
 
 import (
-	"strings"
-	"time"
-
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client"
+	"time"
 )
 
 type Config struct {
@@ -40,12 +38,13 @@ type Config struct {
 	Running     func() bool
 	Lease       func() bool
 	Unlease     func() bool
+	Cli         *client.Client
 }
 
 // runs the election loop. never returns.
-func (c *Config) leaseAndUpdateLoop(etcdClient *etcd.Client) {
+func (c *Config) leaseAndUpdateLoop() {
 	for {
-		master, err := c.acquireOrRenewLease(etcdClient)
+		master, err := c.acquireOrRenewLease()
 		if err != nil {
 			glog.Errorf("Error in master election: %v", err)
 			if uint64(time.Now().Sub(c.lastLease).Seconds()) < c.ttl {
@@ -66,34 +65,43 @@ func (c *Config) leaseAndUpdateLoop(etcdClient *etcd.Client) {
 // acquireOrRenewLease either races to acquire a new master lease, or update the existing master's lease
 // returns true if we have the lease, and an error if one occurs.
 // TODO: use the master election utility once it is merged in.
-func (c *Config) acquireOrRenewLease(etcdClient *etcd.Client) (bool, error) {
-	result, err := etcdClient.Get(c.Key, false, false)
+func (c *Config) acquireOrRenewLease() (bool, error) {
+	//TODO It seems that for the type of leasing done by daemons for HA, we
+	//should put locks in the default NS.  Confirm this or create a new NS for HA locks.
+	ilock := c.Cli.Locks(api.NamespaceDefault)
+	acquiredLock, err := ilock.Get(c.Key)
+	//No lock exists, lets create one if possible.
 	if err != nil {
-		if etcdstorage.IsEtcdNotFound(err) {
-			// there is no current master, try to become master, create will fail if the key already exists
-			_, err := etcdClient.Create(c.Key, c.whoami, c.ttl)
-			if err != nil {
-				return false, err
-			}
+		//return false, err
+
+		acquiredLock, err = ilock.Create(
+			&api.Lock{
+				ObjectMeta: api.ObjectMeta{
+					Name:      c.Key,
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.LockSpec{
+					HeldBy:    c.whoami,
+					LeaseTime: c.ttl,
+				},
+			})
+		if err != nil {
+			glog.Infof("Lock was unsuccessfully created %v", acquiredLock)
 			c.lastLease = time.Now()
-			return true, nil
+			return false, err
 		}
+	}
+
+	// UPDATE will fail if another node has the lock.  In any case, if an UPDATE fails,
+	// we cannot take the lock, so the result is the same - return false and return error details.
+	_, err = ilock.Update(acquiredLock)
+	if err != nil {
+		glog.Infof("Acquire lock failed.  We don't have the lock, master is %v", acquiredLock)
 		return false, err
 	}
-	if result.Node.Value == c.whoami {
-		glog.Infof("key already exists, we are the master (%s)", result.Node.Value)
-		// we extend our lease @ 1/2 of the existing TTL, this ensures the master doesn't flap around
-		if result.Node.Expiration.Sub(time.Now()) < time.Duration(c.ttl/2)*time.Second {
-			_, err := etcdClient.CompareAndSwap(c.Key, c.whoami, c.ttl, c.whoami, result.Node.ModifiedIndex)
-			if err != nil {
-				return false, err
-			}
-		}
-		c.lastLease = time.Now()
-		return true, nil
-	}
-	glog.Infof("key already exists, the master is %s, sleeping.", result.Node.Value)
-	return false, nil
+
+	glog.Infof("Acquired lock successfully.  We are the master, yipppeee!")
+	return true, nil
 }
 
 // Update acts on the current state of the lease.
@@ -110,10 +118,8 @@ func (c *Config) update(master bool) error {
 }
 
 func RunLease(c *Config) {
-	machines := strings.Split(c.EtcdServers, ",")
-	etcdClient := etcd.NewClient(machines)
 
-	go c.leaseAndUpdateLoop(etcdClient)
+	go c.leaseAndUpdateLoop()
 
 	glog.Infof("running lease update loop ")
 }

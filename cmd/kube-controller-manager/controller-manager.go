@@ -22,6 +22,9 @@ package main
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	"os"
 	"runtime"
 	"time"
@@ -46,7 +49,7 @@ func isRunning() bool {
 }
 
 func endRC() bool {
-	//glog.Infof("Hard-exiting the replication controller process now !")
+	glog.Infof("Hard-exiting the replication controller process now !")
 
 	//Even though we're exiting, we should set this flag before dying just for completeness.
 	RUNNING = false
@@ -60,6 +63,16 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := app.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
+
+	//We need a kubeconfig in order to use the locking API, so we create it here.
+	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+	if err != nil {
+		glog.Infof("Exiting, couldn't create kube configuration with parameters cfg=%v and master=%v ", s.Kubeconfig, s.Master)
+		os.Exit(1)
+	}
+	kubeClient, err := client.New(kubeconfig)
 
 	util.InitFlags()
 	util.InitLogs()
@@ -77,12 +90,15 @@ func main() {
 	}
 
 	//Acquire a lock before starting.
+	//TODO some of these will change now that implementing robs lock.
+	//we can delete some params...
 	mcfg := controller.Config{
 		EtcdServers: "http://localhost:4001",
 		Key:         "rcLEASE",
 		Running:     isRunning,
 		Lease:       startRC,
-		Unlease:     endRC}
+		Unlease:     endRC,
+		Cli:         kubeClient}
 
 	//This starts a thread that continues running.
 	controller.RunLease(&mcfg)

@@ -44,7 +44,7 @@ type locks struct {
 	ns string
 }
 
-// newLocks returns a lock
+// NewLocks returns a lock
 func newLocks(c *Client, namespace string) *locks {
 	return &locks{
 		r:  c,
