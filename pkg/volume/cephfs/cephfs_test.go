@@ -36,10 +36,10 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/cephfs" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
+	if plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
 }
