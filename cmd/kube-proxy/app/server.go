@@ -25,15 +25,19 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/iptables"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 
 	"github.com/golang/glog"
@@ -50,6 +54,10 @@ type ProxyServer struct {
 	Master             string
 	Kubeconfig         string
 	PortRange          util.PortRange
+	Recorder           record.EventRecorder
+	HostnameOverride   string
+	// Reference to this node.
+	nodeRef *api.ObjectReference
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -73,6 +81,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
+	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
@@ -89,6 +98,41 @@ func (s *ProxyServer) Run(_ []string) error {
 	} else {
 		glog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
 	}
+
+	// define api config source
+	if s.Kubeconfig == "" && s.Master == "" {
+		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
+	}
+
+	// This creates a client, first loading any specified kubeconfig
+	// file, and then overriding the Master flag, if non-empty.
+	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	client, err := client.New(kubeconfig)
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
+
+	// Add event recorder
+	Hostname := nodeutil.GetHostname(s.HostnameOverride)
+	eventBroadcaster := record.NewBroadcaster()
+	s.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kube-proxy", Host: Hostname})
+	eventBroadcaster.StartRecordingToSink(client.Events(""))
+
+	s.nodeRef = &api.ObjectReference{
+		Kind:      "Node",
+		Name:      Hostname,
+		UID:       types.UID(Hostname),
+		Namespace: "",
+	}
+
+	// Birth Cry
+	s.birthCry()
 
 	serviceConfig := config.NewServiceConfig()
 	endpointsConfig := config.NewEndpointsConfig()
@@ -112,25 +156,6 @@ func (s *ProxyServer) Run(_ []string) error {
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
 
-	// define api config source
-	if s.Kubeconfig == "" && s.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
-	}
-
-	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
-	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
-	if err != nil {
-		return err
-	}
-
-	client, err := client.New(kubeconfig)
-	if err != nil {
-		glog.Fatalf("Invalid API configuration: %v", err)
-	}
-
 	config.NewSourceAPI(
 		client,
 		30*time.Second,
@@ -150,4 +175,8 @@ func (s *ProxyServer) Run(_ []string) error {
 	// Just loop forever for now...
 	proxier.SyncLoop()
 	return nil
+}
+
+func (s *ProxyServer) birthCry() {
+	s.Recorder.Eventf(s.nodeRef, "Starting", "Starting kube-proxy.")
 }
