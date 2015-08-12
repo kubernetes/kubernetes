@@ -39,7 +39,7 @@ for APIROOT in ${APIROOTS}; do
 	cp -a "${KUBE_ROOT}/${APIROOT}" "${_tmp}/${APIROOT}"
 done
 
-"${KUBE_ROOT}/hack/update-generated-deep-copies.sh"
+"${KUBE_ROOT}/hack/after-build/update-generated-deep-copies.sh"
 
 for APIROOT in ${APIROOTS}; do
 	TMP_APIROOT="${_tmp}/${APIROOT}"
