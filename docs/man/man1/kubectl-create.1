@@ -136,10 +136,10 @@ JSON and YAML formats are accepted.
 .RS
 
 .nf
-// Create a pod using the data in pod.json.
+# Create a pod using the data in pod.json.
 $ kubectl create \-f ./pod.json
 
-// Create a pod based on the JSON passed into stdin.
+# Create a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl create \-f \-
 
 .fi

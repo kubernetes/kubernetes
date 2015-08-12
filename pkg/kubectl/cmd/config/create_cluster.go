@@ -43,13 +43,13 @@ type createClusterOptions struct {
 const (
 	create_cluster_long = `Sets a cluster entry in kubeconfig.
 Specifying a name that already exists will merge new fields on top of existing values for those fields.`
-	create_cluster_example = `// Set only the server field on the e2e cluster entry without touching other values.
+	create_cluster_example = `# Set only the server field on the e2e cluster entry without touching other values.
 $ kubectl config set-cluster e2e --server=https://1.2.3.4
 
-// Embed certificate authority data for the e2e cluster entry
+# Embed certificate authority data for the e2e cluster entry
 $ kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
 
-// Disable cert checking for the dev cluster entry
+# Disable cert checking for the dev cluster entry
 $ kubectl config set-cluster e2e --insecure-skip-tls-verify=true`
 )
 

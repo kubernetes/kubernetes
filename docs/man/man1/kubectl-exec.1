@@ -141,14 +141,14 @@ Execute a command in a container.
 .RS
 
 .nf
-// get output from running 'date' from pod 123456\-7890, using the first container by default
+# get output from running 'date' from pod 123456\-7890, using the first container by default
 $ kubectl exec 123456\-7890 date
 	
-// get output from running 'date' in ruby\-container from pod 123456\-7890
+# get output from running 'date' in ruby\-container from pod 123456\-7890
 $ kubectl exec 123456\-7890 \-c ruby\-container date
 
-// switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
-// and sends stdout/stderr from 'bash' back to the client
+# switch to raw terminal mode, sends stdin to 'bash' in ruby\-container from pod 123456\-780
+# and sends stdout/stderr from 'bash' back to the client
 $ kubectl exec 123456\-7890 \-c ruby\-container \-i \-t \-\- bash \-il
 
 .fi

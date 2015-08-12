@@ -31,15 +31,15 @@ import (
 
 const (
 	default_port  = 8001
-	proxy_example = `// Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
+	proxy_example = `# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 $ kubectl proxy --port=8011 --www=./local/www/
 
-// Run a proxy to kubernetes apiserver on an arbitrary local port.
-// The chosen port for the server will be output to stdout.
+# Run a proxy to kubernetes apiserver on an arbitrary local port.
+# The chosen port for the server will be output to stdout.
 $ kubectl proxy --port=0
 
-// Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-// This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
+# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
+# This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
 $ kubectl proxy --api-prefix=/k8s-api`
 )
 

@@ -161,16 +161,16 @@ If the resource is scalable it will be scaled to 0 before deletion.
 .RS
 
 .nf
-// Shut down foo.
+# Shut down foo.
 $ kubectl stop replicationcontroller foo
 
-// Stop pods and services with label name=myLabel.
+# Stop pods and services with label name=myLabel.
 $ kubectl stop pods,services \-l name=myLabel
 
-// Shut down the service defined in service.json
+# Shut down the service defined in service.json
 $ kubectl stop \-f service.json
 
-// Shut down all resources in the path/to/resources directory
+# Shut down all resources in the path/to/resources directory
 $ kubectl stop \-f path/to/resources
 
 .fi

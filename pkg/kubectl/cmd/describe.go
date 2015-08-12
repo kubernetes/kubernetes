@@ -47,23 +47,23 @@ Possible resource types include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
 persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota),
 namespaces (ns) or secrets.`
-	describe_example = `// Describe a node
+	describe_example = `# Describe a node
 $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
-// Describe a pod
+# Describe a pod
 $ kubectl describe pods/nginx
 
-// Describe a pod using the data in pod.json.
+# Describe a pod using the data in pod.json.
 $ kubectl describe -f pod.json
 
-// Describe all pods
+# Describe all pods
 $ kubectl describe pods
 
-// Describe pods by label name=myLabel
+# Describe pods by label name=myLabel
 $ kubectl describe po -l name=myLabel
 
-// Describe all pods managed by the 'frontend' replication controller (rc-created pods
-// get the name of the rc as a prefix in the pod the name).
+# Describe all pods managed by the 'frontend' replication controller (rc-created pods
+# get the name of the rc as a prefix in the pod the name).
 $ kubectl describe pods frontend`
 )
 
