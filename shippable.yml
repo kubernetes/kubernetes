@@ -18,7 +18,7 @@ before_install:
   - if [[ $SHIPPABLE_GO_VERSION =~ [0-9].[0-9] ]]; then gvm install go$SHIPPABLE_GO_VERSION; gvm use go$SHIPPABLE_GO_VERSION; fi
   - ./hack/travis/install-etcd.sh 
   - export GOPATH=$SHIPPABLE_GOPATH
-  - mkdir -p /root/workspace/src/k8s.io; mv /root/workspace/src/github.com/GoogleCloudPlatform/kubernetes /root/workspace/src/k8s.io/kubernetes
+  - mkdir -p /root/workspace/src/k8s.io; mv /root/workspace/src/github.com/kubernetes/kubernetes /root/workspace/src/k8s.io/kubernetes
   - export PATH=$GOPATH/bin:./third_party/etcd:$PATH
 
 install:
