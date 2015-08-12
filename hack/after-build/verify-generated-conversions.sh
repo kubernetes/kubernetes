@@ -37,7 +37,7 @@ for APIROOT in ${APIROOTS}; do
 	cp -a "${KUBE_ROOT}/${APIROOT}" "${_tmp}/${APIROOT}"
 done
 
-"${KUBE_ROOT}/hack/update-generated-conversions.sh"
+"${KUBE_ROOT}/hack/after-build/update-generated-conversions.sh"
 for APIROOT in ${APIROOTS}; do
 	TMP_APIROOT="${_tmp}/${APIROOT}"
 	echo "diffing ${APIROOT} against freshly generated conversions"
