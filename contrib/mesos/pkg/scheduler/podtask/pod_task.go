@@ -71,12 +71,13 @@ type T struct {
 }
 
 type Spec struct {
-	SlaveID string
-	CPU     mresource.CPUShares
-	Memory  mresource.MegaBytes
-	PortMap []HostPortMapping
-	Ports   []uint64
-	Data    []byte
+	SlaveID       string
+	AssignedSlave string
+	CPU           mresource.CPUShares
+	Memory        mresource.MegaBytes
+	PortMap       []HostPortMapping
+	Ports         []uint64
+	Data          []byte
 }
 
 // mostly-clone this pod task. the clone will actually share the some fields:
@@ -161,9 +162,10 @@ func (t *T) FillFromDetails(details *mesos.Offer) error {
 	log.V(3).Infof("Recording offer(s) %s/%s against pod %v: cpu: %.2f, mem: %.2f MB", details.Id, t.Pod.Namespace, t.Pod.Name, cpu, mem)
 
 	t.Spec = Spec{
-		SlaveID: details.GetSlaveId().GetValue(),
-		CPU:     cpu,
-		Memory:  mem,
+		SlaveID:       details.GetSlaveId().GetValue(),
+		AssignedSlave: details.GetHostname(),
+		CPU:           cpu,
+		Memory:        mem,
 	}
 
 	// fill in port mapping
@@ -346,8 +348,7 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 		bindTime:   now,
 	}
 	var (
-		offerId  string
-		hostname string
+		offerId string
 	)
 	for _, k := range []string{
 		annotation.BindingHostKey,
@@ -362,7 +363,7 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 		}
 		switch k {
 		case annotation.BindingHostKey:
-			hostname = v
+			t.Spec.AssignedSlave = v
 		case annotation.SlaveIdKey:
 			t.Spec.SlaveID = v
 		case annotation.OfferIdKey:
@@ -375,7 +376,7 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 			t.executor = &mesos.ExecutorInfo{ExecutorId: mutil.NewExecutorID(v)}
 		}
 	}
-	t.Offer = offers.Expired(offerId, hostname, 0)
+	t.Offer = offers.Expired(offerId, t.Spec.AssignedSlave, 0)
 	t.Flags[Launched] = struct{}{}
 	t.Flags[Bound] = struct{}{}
 	return t, true, nil
