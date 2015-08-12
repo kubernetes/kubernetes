@@ -158,6 +158,7 @@ $ km apiserver \
   --port=8888 \
   --cloud-provider=mesos \
   --cloud-config=mesos-cloud.conf \
+  --secure-port=0 \
   --v=1 >apiserver.log 2>&1 &
 
 $ km controller-manager \
