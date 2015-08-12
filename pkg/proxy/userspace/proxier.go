@@ -581,7 +581,7 @@ var iptablesHostNodePortChain iptables.Chain = "KUBE-NODEPORT-HOST"
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
 	// TODO: There is almost certainly room for optimization here.  E.g. If
-	// we knew the service_cluster_ip_range CIDR we could fast-track outbound packets not
+	// we knew the service-cluster-ip-range CIDR we could fast-track outbound packets not
 	// destined for a service. There's probably more, help wanted.
 
 	// Danger - order of these rules matters here:
@@ -601,7 +601,7 @@ func iptablesInit(ipt iptables.Interface) error {
 	// the NodePort would take priority (incorrectly).
 	// This is unlikely (and would only affect outgoing traffic from the cluster to the load balancer, which seems
 	// doubly-unlikely), but we need to be careful to keep the rules in the right order.
-	args := []string{ /* service_cluster_ip_range matching could go here */ }
+	args := []string{ /* service-cluster-ip-range matching could go here */ }
 	args = append(args, "-m", "comment", "--comment", "handle ClusterIPs; NOTE: this must be before the NodePort rules")
 	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerPortalChain); err != nil {
 		return err

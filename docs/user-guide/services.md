@@ -266,7 +266,7 @@ request.  To do this, set the `spec.clusterIP` field. For example, if you
 already have an existing DNS entry that you wish to replace, or legacy systems
 that are configured for a specific IP address and difficult to re-configure.
 The IP address that a user chooses must be a valid IP address and within the
-service_cluster_ip_range CIDR range that is specified by flag to the API
+service-cluster-ip-range CIDR range that is specified by flag to the API
 server.  If the IP address value is invalid, the apiserver returns a 422 HTTP
 status code to indicate that the value is invalid.
 

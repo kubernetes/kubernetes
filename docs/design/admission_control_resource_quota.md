@@ -178,7 +178,7 @@ The **ResourceQuota** plug-in introspects all incoming admission requests.
 To enable the plug-in and support for ResourceQuota, the kube-apiserver must be configured as follows:
 
 ```
-$ kube-apiserver -admission_control=ResourceQuota
+$ kube-apiserver --admission-control=ResourceQuota
 ```
 
 It makes decisions by evaluating the incoming object against all defined **ResourceQuota.Status.Hard** resource limits in the request

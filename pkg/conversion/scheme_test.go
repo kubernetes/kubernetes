@@ -30,7 +30,7 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
+var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
 
 // Test a weird version/kind embedding format.
 type MyWeirdCustomEmbeddedVersionKindField struct {

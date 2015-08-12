@@ -41,7 +41,7 @@ KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 UPDATE_ETCD_OBJECTS_SCRIPT="${KUBE_ROOT}/cluster/update-storage-objects.sh"
 
 function startApiServer() {
-  kube::log::status "Starting kube-apiserver with KUBE_API_VERSIONS: ${KUBE_API_VERSIONS} and runtime_config: ${RUNTIME_CONFIG}"
+  kube::log::status "Starting kube-apiserver with KUBE_API_VERSIONS: ${KUBE_API_VERSIONS} and runtime-config: ${RUNTIME_CONFIG}"
 
   KUBE_API_VERSIONS="${KUBE_API_VERSIONS}" \
     "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \

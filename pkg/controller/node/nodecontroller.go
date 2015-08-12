@@ -65,7 +65,7 @@ type NodeController struct {
 	// sync node status in this case, but will monitor node status updated from kubelet. If
 	// it doesn't receive update for this amount of time, it will start posting "NodeReady==
 	// ConditionUnknown". The amount of time before which NodeController start evicting pods
-	// is controlled via flag 'pod_eviction_timeout'.
+	// is controlled via flag 'pod-eviction-timeout'.
 	// Note: be cautious when changing the constant, it must work with nodeStatusUpdateFrequency
 	// in kubelet. There are several constraints:
 	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where

@@ -137,7 +137,7 @@ If a constraint is not specified for an enumerated resource, it is not enforced 
 To enable the plug-in and support for LimitRange, the kube-apiserver must be configured as follows:
 
 ```console
-$ kube-apiserver -admission_control=LimitRanger
+$ kube-apiserver --admission-control=LimitRanger
 ```
 
 ### Enforcement of constraints
