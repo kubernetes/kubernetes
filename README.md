@@ -1,6 +1,6 @@
 # Kubernetes
 
-[![GoDoc](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes?status.png)](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes) [![Travis](https://travis-ci.org/GoogleCloudPlatform/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes) [![Coverage Status](https://coveralls.io/repos/GoogleCloudPlatform/kubernetes/badge.svg)](https://coveralls.io/r/GoogleCloudPlatform/kubernetes)
+[![GoDoc](http://https://godoc.org/k8s.io/kubernetes?status.png)](http://https://godoc.org/k8s.io/kubernetes) [![Travis](https://travis-ci.org/kubernetes/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes) [![Coverage Status](https://coveralls.io/repos/GoogleCloudPlatform/kubernetes/badge.svg)](https://coveralls.io/r/GoogleCloudPlatform/kubernetes)
 
 ### Are you ...
   * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io)
@@ -8,7 +8,7 @@
 
 <hr>
 
-Kubernetes is an open source system for managing [containerized applications](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Why-Kubernetes%3F#why-containers) across multiple hosts,
+Kubernetes is an open source system for managing [containerized applications](https://github.com/kubernetes/kubernetes/wiki/Why-Kubernetes%3F#why-containers) across multiple hosts,
 providing basic mechanisms for deployment, maintenance, and scaling of applications.
 
 Kubernetes is:
@@ -26,7 +26,7 @@ Kubernetes builds upon a [decade and a half of experience at Google running prod
 However, initial development was done on GCE and so our instructions and scripts are built around that.  If you make it work on other infrastructure please let us know and contribute instructions/code.
 
 ### Kubernetes is ready for Production!
-With the [1.0.1 release](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v1.0.1) Kubernetes is ready to serve your production workloads.
+With the [1.0.1 release](http://changelog.k8s.io/v1.0.1) Kubernetes is ready to serve your production workloads.
 
 
 ## Concepts
@@ -67,7 +67,7 @@ Kubernetes documentation is organized into several categories.
     - in the [Kubernetes User Guide: Managing Applications](docs/user-guide/README.md)
     - the [Kubectl Command Line Interface](docs/user-guide/kubectl/kubectl.md) is a detailed reference on
       the `kubectl` CLI
-    - [User FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
+    - [User FAQ](https://github.com/kubernetes/kubernetes/wiki/User-FAQ)
   - **Cluster administrator documentation**
     - for people who want to create a Kubernetes cluster and administer it
     - in the [Kubernetes Cluster Admin Guide](docs/admin/README.md)
@@ -89,7 +89,7 @@ Kubernetes documentation is organized into several categories.
     - design docs in the [Kubernetes Design Overview](docs/design/README.md) and the [docs/design directory](docs/design/)
     - proposals in the [docs/proposals directory](docs/proposals/)
   - **Wiki/FAQ**
-    - in the [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki)
+    - in the [wiki](https://github.com/kubernetes/kubernetes/wiki)
     - troubleshooting information in the [troubleshooting guide](docs/troubleshooting.md)
 
 ## Community, discussion and support

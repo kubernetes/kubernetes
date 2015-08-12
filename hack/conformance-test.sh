@@ -27,7 +27,7 @@
 #    declare -x KUBE_MASTER_IP="1.2.3.4"
 #  - Make sure only essential pods are running and there are no failed/pending pods.
 #  - Go to a git tree that contains the kubernetes source.
-#    - git clone git://github.com/GoogleCloudPlatform/kubernetes.git
+#    - git clone git://github.com/kubernetes/kubernetes.git
 #  - Checkout the upstream/conformance-test-v1 branch
 #    - git checkout upstream/conformance-test-v1
 #    - The working tree will be in a "detached HEAD" state.

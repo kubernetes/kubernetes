@@ -46,9 +46,9 @@ If your problem isn't answered by any of the guides above, there are variety of 
 ## Questions
 
 We have a number of FAQ pages
-   * [User FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
-   * [Debugging FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Debugging-FAQ)
-   * [Services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ)
+   * [User FAQ](https://github.com/kubernetes/kubernetes/wiki/User-FAQ)
+   * [Debugging FAQ](https://github.com/kubernetes/kubernetes/wiki/Debugging-FAQ)
+   * [Services FAQ](https://github.com/kubernetes/kubernetes/wiki/Services-FAQ)
 
 You may also find the StackOverflow topics relevant
    * [Kubernetes](http://stackoverflow.com/questions/tagged/kubernetes)
@@ -56,7 +56,7 @@ You may also find the StackOverflow topics relevant
 
 ## Bugs and Feature requests
 
-If you have what looks like a bug, or you would like to make a feature request, please use the [Github issue tracking system](https://github.com/GoogleCloudPlatform/kubernetes/issues).
+If you have what looks like a bug, or you would like to make a feature request, please use the [Github issue tracking system](https://github.com/kubernetes/kubernetes/issues).
 
 Before you file an issue, please search existing issues to see if your issue is already covered.
 

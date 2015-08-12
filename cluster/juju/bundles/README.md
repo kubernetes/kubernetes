@@ -54,7 +54,7 @@ For further reading on [Juju Quickstart](https://pypi.python.org/pypi/juju-quick
 ### Using the Kubernetes Client
 
 You'll need the Kubernetes command line client,
-[kubectl](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
+[kubectl](https://github.com/kubernetes/kubernetes/blob/master/docs/kubectl.md)
 to interact with the created cluster.  The kubectl command is
 installed on the kubernetes-master charm. If you want to work with
 the cluster from your computer you will need to install the binary
@@ -74,7 +74,7 @@ You may also `juju ssh kubernetes-master/0` and call kubectl from that
 machine.
 
 See the
-[kubectl documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
+[kubectl documentation](https://github.com/kubernetes/kubernetes/blob/master/docs/kubectl.md)
 for more details of what can be done with the command line tool.
 
 ### Scaling up the cluster
@@ -137,7 +137,7 @@ configuration on it's own
 ## Installing the kubectl outside of kubernetes master machine
 
 Download the Kubernetes release from:
-https://github.com/GoogleCloudPlatform/kubernetes/releases and extract
+https://releases.k8s.io and extract
 the release, you can then just directly use the cli binary at
 ./kubernetes/platforms/linux/amd64/kubectl
 
@@ -155,7 +155,7 @@ And now you can run kubectl on the command line :
     kubectl get mi
 
 See the
-[kubectl documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
+[kubectl documentation](https://github.com/kubernetes/kubernetes/blob/master/docs/kubectl.md)
 for more details of what can be done with the command line tool.
 
 
@@ -188,12 +188,12 @@ Send us pull requests!  We'll send you a cookie if they include tests and docs.
  - [Docker charm on GitHub](https://github.com/chuckbutler/docker-charm)
 
 More information about the
-[Kubernetes project](https://github.com/GoogleCloudPlatform/kubernetes)
+[Kubernetes project](https://github.com/kubernetes/kubernetes)
 or check out the
-[Kubernetes Documentation](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs)
+[Kubernetes Documentation](http://code.k8s.io/docs)
 for more details about the Kubernetes concepts and terminology.
 
-Having a problem? Check the [Kubernetes issues database](https://github.com/GoogleCloudPlatform/kubernetes/issues)
+Having a problem? Check the [Kubernetes issues database](https://github.com/kubernetes/kubernetes/issues)
 for related issues.
 
 

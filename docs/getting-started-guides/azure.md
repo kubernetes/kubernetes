@@ -76,7 +76,7 @@ You can create a virtual network:
 
 Now you're ready.
 
-You can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
+You can download and install the latest Kubernetes release from [this page](https://releases.k8s.io), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
 
     cd kubernetes
     cluster/kube-up.sh

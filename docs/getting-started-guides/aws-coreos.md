@@ -43,7 +43,7 @@ no security tokens, no basic auth). For demonstration purposes only.
 * Cluster bootstrapping using [cloud-config](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/)
 * Cross container networking with [flannel](https://github.com/coreos/flannel#flannel)
 * Auto worker registration with [kube-register](https://github.com/kelseyhightower/kube-register#kube-register)
-* Kubernetes v0.19.3 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.19.3)
+* Kubernetes v0.19.3 [official binaries](http://changelog.k8s.io/v0.19.3)
 
 ## Prerequisites
 

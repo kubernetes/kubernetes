@@ -64,7 +64,7 @@ This document describes how to deploy Kubernetes on ubuntu nodes, including 1 Ku
 
 #### Make *kubernetes* , *etcd* and *flanneld* binaries
 
-First clone the kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
+First clone the kubernetes github repo, `$ git clone https://github.com/kubernetes/kubernetes.git`
 
 then `$ cd kubernetes/cluster/ubuntu`.
 

@@ -91,7 +91,7 @@ sudo mv -f network-environment /etc
 
 ```
 # Get the Kubernetes Source
-wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.20.2/kubernetes.tar.gz
+wget https://releases.k8s.io/download/v0.20.2/kubernetes.tar.gz
 
 # Untar it
 tar -xf kubernetes.tar.gz
@@ -232,7 +232,7 @@ ETCD_AUTHORITY=<MASTER_IP>:4001 calicoctl pool add 192.168.0.0/16
 
 ```
 # Get the Kubernetes Source
-wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.20.2/kubernetes.tar.gz
+wget https://releases.k8s.io/download/v0.20.2/kubernetes.tar.gz
 
 # Untar it
 tar -xf kubernetes.tar.gz

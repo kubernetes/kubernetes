@@ -531,7 +531,7 @@ of which `Pods` they are actually accessing.
 
 Service is a top-level resource in the kubernetes REST API. More details about the
 API object can be found at: [Service API
-object](https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_service).
+object](https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html#_v1_service).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
