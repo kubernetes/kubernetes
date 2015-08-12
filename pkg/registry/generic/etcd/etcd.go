@@ -174,30 +174,6 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object
 	return generic.FilterList(list, m, generic.DecoratorFunc(e.Decorator))
 }
 
-// CreateWithName inserts a new item with the provided name
-// DEPRECATED: use Create instead
-func (e *Etcd) CreateWithName(ctx api.Context, name string, obj runtime.Object) error {
-	key, err := e.KeyFunc(ctx, name)
-	if err != nil {
-		return err
-	}
-	if e.CreateStrategy != nil {
-		if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
-			return err
-		}
-	}
-	ttl, err := e.calculateTTL(obj, 0, false)
-	if err != nil {
-		return err
-	}
-	err = e.Storage.Create(key, obj, nil, ttl)
-	err = etcderr.InterpretCreateError(err, e.EndpointName, name)
-	if err == nil && e.Decorator != nil {
-		err = e.Decorator(obj)
-	}
-	return err
-}
-
 // Create inserts a new item according to the unique key from the object.
 func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	trace := util.NewTrace("Create " + reflect.TypeOf(obj).String())
@@ -236,25 +212,6 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 		}
 	}
 	return out, nil
-}
-
-// UpdateWithName updates the item with the provided name
-// DEPRECATED: use Update instead
-func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) error {
-	key, err := e.KeyFunc(ctx, name)
-	if err != nil {
-		return err
-	}
-	ttl, err := e.calculateTTL(obj, 0, true)
-	if err != nil {
-		return err
-	}
-	err = e.Storage.Set(key, obj, nil, ttl)
-	err = etcderr.InterpretUpdateError(err, e.EndpointName, name)
-	if err == nil && e.Decorator != nil {
-		err = e.Decorator(obj)
-	}
-	return err
 }
 
 // Update performs an atomic update and set of the object. Returns the result of the update
