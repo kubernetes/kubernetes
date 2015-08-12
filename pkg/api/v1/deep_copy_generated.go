@@ -32,6 +32,8 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	if in.Amount != nil {
 		if newVal, err := c.DeepCopy(in.Amount); err != nil {
 			return err
+		} else if newVal == nil {
+			out.Amount = nil
 		} else {
 			out.Amount = newVal.(*inf.Dec)
 		}

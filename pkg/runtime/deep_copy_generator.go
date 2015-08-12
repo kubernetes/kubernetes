@@ -420,6 +420,8 @@ func (g *deepCopyGenerator) writeDeepCopyForPtr(b *buffer, inField reflect.Struc
 			ifStmt := fmt.Sprintf(ifFormat, inField.Name)
 			b.addLine(ifStmt, indent+1)
 			b.addLine("return err\n", indent+2)
+			b.addLine("} else if newVal == nil {\n", indent+1)
+			b.addLine(fmt.Sprintf("out.%s = nil\n", inField.Name), indent+2)
 			b.addLine("} else {\n", indent+1)
 			assignFormat := "out.%s = newVal.(%s)\n"
 			assignStmt := fmt.Sprintf(assignFormat, inField.Name, g.typeName(inField.Type))
@@ -467,6 +469,8 @@ func (g *deepCopyGenerator) writeDeepCopyForSlice(b *buffer, inField reflect.Str
 			ifStmt := fmt.Sprintf(ifFormat, inField.Name)
 			b.addLine(ifStmt, indent+2)
 			b.addLine("return err\n", indent+3)
+			b.addLine("} else if newVal == nil {\n", indent+2)
+			b.addLine(fmt.Sprintf("out.%s[i] = nil\n", inField.Name), indent+3)
 			b.addLine("} else {\n", indent+2)
 			assignFormat := "out.%s[i] = newVal.(%s)\n"
 			assignStmt := fmt.Sprintf(assignFormat, inField.Name, g.typeName(inField.Type.Elem()))
@@ -508,6 +512,8 @@ func (g *deepCopyGenerator) writeDeepCopyForStruct(b *buffer, inType reflect.Typ
 			ifStmt := fmt.Sprintf(ifFormat, inField.Name)
 			b.addLine(ifStmt, indent)
 			b.addLine("return err\n", indent+1)
+			b.addLine("} else if newVal == nil {\n", indent)
+			b.addLine(fmt.Sprintf("out.%s = nil\n", inField.Name), indent+1)
 			b.addLine("} else {\n", indent)
 			copyFormat := "out.%s = newVal.(%s)\n"
 			copyStmt := fmt.Sprintf(copyFormat, inField.Name, g.typeName(inField.Type))

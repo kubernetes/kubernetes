@@ -737,6 +737,8 @@ func deepCopy_api_List(in List, out *List, c *conversion.Cloner) error {
 		for i := range in.Items {
 			if newVal, err := c.DeepCopy(in.Items[i]); err != nil {
 				return err
+			} else if newVal == nil {
+				out.Items[i] = nil
 			} else {
 				out.Items[i] = newVal.(runtime.Object)
 			}
@@ -759,11 +761,15 @@ func deepCopy_api_ListOptions(in ListOptions, out *ListOptions, c *conversion.Cl
 	}
 	if newVal, err := c.DeepCopy(in.LabelSelector); err != nil {
 		return err
+	} else if newVal == nil {
+		out.LabelSelector = nil
 	} else {
 		out.LabelSelector = newVal.(labels.Selector)
 	}
 	if newVal, err := c.DeepCopy(in.FieldSelector); err != nil {
 		return err
+	} else if newVal == nil {
+		out.FieldSelector = nil
 	} else {
 		out.FieldSelector = newVal.(fields.Selector)
 	}
@@ -2125,6 +2131,8 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	if in.Amount != nil {
 		if newVal, err := c.DeepCopy(in.Amount); err != nil {
 			return err
+		} else if newVal == nil {
+			out.Amount = nil
 		} else {
 			out.Amount = newVal.(*inf.Dec)
 		}
