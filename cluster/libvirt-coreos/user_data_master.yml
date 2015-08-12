@@ -6,11 +6,11 @@ coreos:
       command: start
       content: |
         [Unit]
-        After=opt-kubernetes.mount etcd.service
+        After=opt-kubernetes.mount etcd2.service
         ConditionFileIsExecutable=/opt/kubernetes/bin/kube-apiserver
         Description=Kubernetes API Server
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount etcd.service
+        Requires=opt-kubernetes.mount etcd2.service
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-apiserver \
