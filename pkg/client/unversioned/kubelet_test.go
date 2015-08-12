@@ -129,9 +129,9 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 		EnableHttps: true,
 		//Invalid certificate and key path
 		TLSClientConfig: TLSClientConfig{
-			CertFile: "./testdata/mycertinvalid.cer",
-			KeyFile:  "./testdata/mycertinvalid.key",
-			CAFile:   "./testdata/myCA.cer",
+			CertFile: "../testdata/mycertinvalid.cer",
+			KeyFile:  "../testdata/mycertinvalid.key",
+			CAFile:   "../testdata/myCA.cer",
 		},
 	}
 
@@ -149,11 +149,11 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 		Port:        9000,
 		EnableHttps: true,
 		TLSClientConfig: TLSClientConfig{
-			CertFile: "./testdata/mycertvalid.cer",
+			CertFile: "../testdata/mycertvalid.cer",
 			// TLS Configuration, only applies if EnableHttps is true.
-			KeyFile: "./testdata/mycertvalid.key",
+			KeyFile: "../testdata/mycertvalid.key",
 			// TLS Configuration, only applies if EnableHttps is true.
-			CAFile: "./testdata/myCA.cer",
+			CAFile: "../testdata/myCA.cer",
 		},
 	}
 

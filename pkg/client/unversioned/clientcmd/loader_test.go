@@ -28,8 +28,8 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
-	clientcmdlatest "k8s.io/kubernetes/pkg/client/clientcmd/api/latest"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
 )
 
 var (

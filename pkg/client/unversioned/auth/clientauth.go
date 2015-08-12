@@ -68,7 +68,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // Info holds Kubernetes API authorization config.  It is intended
