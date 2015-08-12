@@ -16,12 +16,11 @@ script:
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
   - ./hack/verify-description.sh
-  - PATH=$GOPATH/bin:$PATH ./hack/verify-generated-conversions.sh
-  - PATH=$GOPATH/bin:$PATH ./hack/verify-generated-deep-copies.sh
-  - PATH=$GOPATH/bin:./third_party/etcd:$PATH ./hack/verify-generated-docs.sh
-  - PATH=$GOPATH/bin:./third_party/etcd:$PATH ./hack/verify-swagger-spec.sh
-  - PATH=$GOPATH/bin:./third_party/etcd:$PATH ./hack/verify-linkcheck.sh
-  - godep go test ./cmd/mungedocs
+  - ./hack/verify-generated-conversions.sh
+  - ./hack/verify-generated-deep-copies.sh
+  - ./hack/verify-generated-docs.sh
+  - PATH=./third_party/etcd:$PATH ./hack/verify-swagger-spec.sh
+  - ./hack/verify-linkcheck.sh
 
 notifications:
   irc: "chat.freenode.net#kubernetes-dev"
