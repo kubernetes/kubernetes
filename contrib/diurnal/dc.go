@@ -206,7 +206,7 @@ func (s *Scaler) Stop() error {
 var (
 	counts     = flag.String("counts", "", "replica counts, must have at least one (csv)")
 	times      = flag.String("times", "", "times to set replica counts relative to UTC following ISO 8601 (csv)")
-	userLabels = flag.String("labels", "", "replication controller labels, syntax should follow https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/labels#Parse")
+	userLabels = flag.String("labels", "", "replication controller labels, syntax should follow https://godoc.org/k8s.io/kubernetes/pkg/labels#Parse")
 	startNow   = flag.Bool("now", false, "times are relative to now not 0:00 UTC (for demos)")
 	local      = flag.Bool("local", false, "set to true if running on local machine not within cluster")
 	localPort  = flag.Int("localport", 8001, "port that kubectl proxy is running on (local must be true)")

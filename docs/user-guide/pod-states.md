@@ -54,7 +54,7 @@ A pod containing containers that specify readiness probes will also report the R
 
 ## Container Probes
 
-A [Probe](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#Probe) is a diagnostic performed periodically by the kubelet on a container. Specifically the diagnostic is one of three [Handlers](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#Handler):
+A [Probe](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#Probe) is a diagnostic performed periodically by the kubelet on a container. Specifically the diagnostic is one of three [Handlers](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#Handler):
 
 * `ExecAction`: executes a specified command inside the container expecting on success that the command exits with status code 0.
 * `TCPSocketAction`: performs a tcp check against the container's IP address on a specified port expecting on success that the port is open.
@@ -73,7 +73,7 @@ Currently, the kubelet optionally performs two independent diagnostics on runnin
 
 ## Container Statuses
 
-More detailed information about the current (and previous) container statuses can be found in [ContainerStatuses](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#PodStatus). The information reported depends on the current [ContainerState](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#ContainerState), which may be Waiting, Running, or Terminated.
+More detailed information about the current (and previous) container statuses can be found in [ContainerStatuses](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#PodStatus). The information reported depends on the current [ContainerState](https://godoc.org/k8s.io/kubernetes/pkg/api/v1#ContainerState), which may be Waiting, Running, or Terminated.
 
 ## RestartPolicy
 
