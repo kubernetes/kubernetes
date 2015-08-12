@@ -22,17 +22,17 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 )
 
-func NewClientCache(loader clientcmd.ClientConfig) *clientCache {
-	return &clientCache{
+func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
+	return &ClientCache{
 		clients: make(map[string]*client.Client),
 		configs: make(map[string]*client.Config),
 		loader:  loader,
 	}
 }
 
-// clientCache caches previously loaded clients for reuse, and ensures MatchServerVersion
+// ClientCache caches previously loaded clients for reuse, and ensures MatchServerVersion
 // is invoked only once
-type clientCache struct {
+type ClientCache struct {
 	loader        clientcmd.ClientConfig
 	clients       map[string]*client.Client
 	configs       map[string]*client.Config
@@ -42,7 +42,7 @@ type clientCache struct {
 }
 
 // ClientConfigForVersion returns the correct config for a server
-func (c *clientCache) ClientConfigForVersion(version string) (*client.Config, error) {
+func (c *ClientCache) ClientConfigForVersion(version string) (*client.Config, error) {
 	if c.defaultConfig == nil {
 		config, err := c.loader.ClientConfig()
 		if err != nil {
@@ -73,7 +73,7 @@ func (c *clientCache) ClientConfigForVersion(version string) (*client.Config, er
 
 // ClientForVersion initializes or reuses a client for the specified version, or returns an
 // error if that is not possible
-func (c *clientCache) ClientForVersion(version string) (*client.Client, error) {
+func (c *ClientCache) ClientForVersion(version string) (*client.Client, error) {
 	if client, ok := c.clients[version]; ok {
 		return client, nil
 	}

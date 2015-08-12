@@ -17,12 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -40,7 +41,7 @@ func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunApiVersions(f *cmdutil.Factory, out io.Writer) error {
+func RunApiVersions(f *cmdutil.Factory, w io.Writer) error {
 	if len(os.Args) > 1 && os.Args[1] == "apiversions" {
 		printDeprecationWarning("api-versions", "apiversions")
 	}
@@ -50,6 +51,24 @@ func RunApiVersions(f *cmdutil.Factory, out io.Writer) error {
 		return err
 	}
 
-	kubectl.GetApiVersions(out, client)
+	apiVersions, err := client.ServerAPIVersions()
+	if err != nil {
+		fmt.Printf("Couldn't get available api versions from server: %v\n", err)
+		os.Exit(1)
+	}
+
+	var expAPIVersions *api.APIVersions
+	showExpVersions := false
+	expClient, err := f.ExperimentalClient()
+	if err == nil {
+		expAPIVersions, err = expClient.ServerAPIVersions()
+		showExpVersions = err == nil
+	}
+
+	fmt.Fprintf(w, "Available Server Api Versions: %#v\n", *apiVersions)
+	if showExpVersions {
+		fmt.Fprintf(w, "Available Server Experimental Api Versions: %#v\n", *expAPIVersions)
+	}
+
 	return nil
 }

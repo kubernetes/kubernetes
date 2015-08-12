@@ -76,6 +76,7 @@ type DefaultRESTMapper struct {
 	mapping        map[string]typeMeta
 	reverse        map[typeMeta]string
 	scopes         map[typeMeta]RESTScope
+	group          string
 	versions       []string
 	plurals        map[string]string
 	singulars      map[string]string
@@ -88,10 +89,10 @@ type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
 
 // NewDefaultRESTMapper initializes a mapping between Kind and APIVersion
 // to a resource name and back based on the objects in a runtime.Scheme
-// and the Kubernetes API conventions. Takes a priority list of the versions to
-// search when an object has no default version (set empty to return an error)
+// and the Kubernetes API conventions. Takes a group name, a priority list of the versions
+// to search when an object has no default version (set empty to return an error),
 // and a function that retrieves the correct codec and metadata for a given version.
-func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRESTMapper {
+func NewDefaultRESTMapper(group string, versions []string, f VersionInterfacesFunc) *DefaultRESTMapper {
 	mapping := make(map[string]typeMeta)
 	reverse := make(map[typeMeta]string)
 	scopes := make(map[typeMeta]RESTScope)
@@ -103,6 +104,7 @@ func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRE
 		mapping:        mapping,
 		reverse:        reverse,
 		scopes:         scopes,
+		group:          group,
 		versions:       versions,
 		plurals:        plurals,
 		singulars:      singulars,
@@ -172,6 +174,13 @@ func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (defaultV
 		return "", "", fmt.Errorf("no resource %q has been defined", resource)
 	}
 	return meta.APIVersion, meta.Kind, nil
+}
+
+func (m *DefaultRESTMapper) GroupForResource(resource string) (string, error) {
+	if _, ok := m.mapping[strings.ToLower(resource)]; !ok {
+		return "", fmt.Errorf("no resource %q has been defined", resource)
+	}
+	return m.group, nil
 }
 
 // RESTMapping returns a struct representing the resource path and conversion interfaces a
@@ -285,6 +294,18 @@ func (m MultiRESTMapper) ResourceSingularizer(resource string) (singular string,
 func (m MultiRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
 	for _, t := range m {
 		defaultVersion, kind, err = t.VersionAndKindForResource(resource)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+// GroupForResource provides the Group mappings for the REST resources. This
+// implementation supports multiple REST schemas and returns the first match.
+func (m MultiRESTMapper) GroupForResource(resource string) (group string, err error) {
+	for _, t := range m {
+		group, err = t.GroupForResource(resource)
 		if err == nil {
 			return
 		}
