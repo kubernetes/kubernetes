@@ -31,10 +31,10 @@ type FlagSet interface {
 }
 
 func BindKubeletClientConfigFlags(flags FlagSet, config *KubeletConfig) {
-	flags.BoolVar(&config.EnableHttps, "kubelet_https", config.EnableHttps, "Use https for kubelet connections")
-	flags.UintVar(&config.Port, "kubelet_port", config.Port, "Kubelet port")
-	flags.DurationVar(&config.HTTPTimeout, "kubelet_timeout", config.HTTPTimeout, "Timeout for kubelet operations")
-	flags.StringVar(&config.CertFile, "kubelet_client_certificate", config.CertFile, "Path to a client key file for TLS.")
-	flags.StringVar(&config.KeyFile, "kubelet_client_key", config.KeyFile, "Path to a client key file for TLS.")
-	flags.StringVar(&config.CAFile, "kubelet_certificate_authority", config.CAFile, "Path to a cert. file for the certificate authority.")
+	flags.BoolVar(&config.EnableHttps, "kubelet-https", config.EnableHttps, "Use https for kubelet connections")
+	flags.UintVar(&config.Port, "kubelet-port", config.Port, "Kubelet port")
+	flags.DurationVar(&config.HTTPTimeout, "kubelet-timeout", config.HTTPTimeout, "Timeout for kubelet operations")
+	flags.StringVar(&config.CertFile, "kubelet-client-certificate", config.CertFile, "Path to a client key file for TLS.")
+	flags.StringVar(&config.KeyFile, "kubelet-client-key", config.KeyFile, "Path to a client key file for TLS.")
+	flags.StringVar(&config.CAFile, "kubelet-certificate-authority", config.CAFile, "Path to a cert. file for the certificate authority.")
 }
