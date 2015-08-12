@@ -22,9 +22,12 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/expapi"
+	_ "k8s.io/kubernetes/pkg/expapi/v1"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -32,9 +35,11 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+const pkgBase = "k8s.io/kubernetes/pkg"
+
 var (
 	functionDest = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
-	version      = flag.StringP("version", "v", "v1", "Version for conversion.")
+	groupVersion = flag.StringP("version", "v", "api/v1", "groupPath/version for conversion.")
 )
 
 func main() {
@@ -53,13 +58,20 @@ func main() {
 		funcOut = file
 	}
 
-	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), path.Join("k8s.io/kubernetes/pkg/api", *version))
-	apiShort := generator.AddImport("k8s.io/kubernetes/pkg/api")
-	generator.AddImport("k8s.io/kubernetes/pkg/api/resource")
+	group, version := path.Split(*groupVersion)
+	group = strings.TrimRight(group, "/")
+
+	versionPath := path.Join(pkgBase, group, version)
+	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
+	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
+	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.
-	generator.OverwritePackage(*version, "")
-	for _, knownType := range api.Scheme.KnownTypes(*version) {
-		if err := generator.GenerateConversionsForType(*version, knownType); err != nil {
+	generator.OverwritePackage(version, "")
+	for _, knownType := range api.Scheme.KnownTypes(version) {
+		if !strings.HasPrefix(knownType.PkgPath(), versionPath) {
+			continue
+		}
+		if err := generator.GenerateConversionsForType(version, knownType); err != nil {
 			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}

@@ -24,7 +24,6 @@ import (
 var Codec = runtime.CodecFor(api.Scheme, "v1")
 
 func init() {
-	addDeepCopyFuncs()
 	addConversionFuncs()
 	addDefaultingFuncs()
 	addKnownTypes()
