@@ -680,7 +680,7 @@ func validateEnvVarValueFrom(ev api.EnvVar) errs.ValidationErrorList {
 	return allErrs
 }
 
-var validFieldPathExpressions = util.NewStringSet("metadata.name", "metadata.namespace")
+var validFieldPathExpressions = util.NewStringSet("metadata.name", "metadata.namespace", "status.podIP")
 
 func validateObjectFieldSelector(fs *api.ObjectFieldSelector) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
