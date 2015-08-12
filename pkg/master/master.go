@@ -780,8 +780,8 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 
 	controllerStorage := expcontrolleretcd.NewStorage(c.DatabaseStorage)
 	storage := map[string]rest.Storage{
-		strings.ToLower("replicationControllers"):        controllerStorage.ReplicationController,
-		strings.ToLower("replicationControllers/scaler"): controllerStorage.Scale,
+		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
+		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
 	}
 
 	return &apiserver.APIGroupVersion{

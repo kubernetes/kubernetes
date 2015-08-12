@@ -106,12 +106,12 @@ func TestGet(t *testing.T) {
 	storage := NewStorage(etcdStorage).Scale
 
 	obj, err := storage.Get(api.WithNamespace(api.NewContext(), "test"), "foo")
-	scaler := obj.(*expapi.Scale)
+	scale := obj.(*expapi.Scale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if e, a := expect, scaler; !api.Semantic.DeepEqual(e, a) {
-		t.Errorf("Unexpected scaler: %s", util.ObjectDiff(e, a))
+	if e, a := expect, scale; !api.Semantic.DeepEqual(e, a) {
+		t.Errorf("Unexpected scale: %s", util.ObjectDiff(e, a))
 	}
 }
 
