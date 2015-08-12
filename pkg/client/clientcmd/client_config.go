@@ -26,8 +26,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
+	clientauth "k8s.io/kubernetes/pkg/client/auth"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
-	"k8s.io/kubernetes/pkg/clientauth"
 )
 
 var (

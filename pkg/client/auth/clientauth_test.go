@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clientauth_test
+package auth_test
 
 import (
 	"io/ioutil"
@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/clientauth"
+	clientauth "k8s.io/kubernetes/pkg/client/auth"
 )
 
 func TestLoadFromFile(t *testing.T) {
