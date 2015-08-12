@@ -56,7 +56,7 @@ EOF
 // AUTO-GENERATED FUNCTIONS END HERE
 EOF
 
-	env GOPATH=$(godep path):$GOPATH goimports -w "$TMPFILE"
+	goimports -w "$TMPFILE"
 	mv "$TMPFILE" `result_file_name ${version}`
 }
 
@@ -76,4 +76,4 @@ function generate_deep_copies() {
 
 DEFAULT_VERSIONS="api/ api/v1 expapi/ expapi/v1"
 VERSIONS=${VERSIONS:-$DEFAULT_VERSIONS}
-generate_deep_copies
+generate_deep_copies "$VERSIONS"

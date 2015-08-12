@@ -44,7 +44,7 @@ EOF
 // AUTO-GENERATED FUNCTIONS END HERE
 EOF
 
-	env GOPATH=$(godep path):$GOPATH goimports -w "$TMPFILE"
+	goimports -w "$TMPFILE"
 	mv "$TMPFILE" "pkg/${version}/conversion_generated.go"
 }
 
