@@ -48,7 +48,7 @@ type DeepCopyGenerator interface {
 	AddImport(pkgPath string) string
 
 	// RepackImports creates a stable ordering of import short names
-	RepackImports()
+	RepackImports(exclude util.StringSet)
 
 	// Writes all imports that are necessary for deep-copy function and
 	// their registration.
@@ -205,7 +205,7 @@ func (g *deepCopyGenerator) AddType(inType reflect.Type) error {
 	return g.addAllRecursiveTypes(inType)
 }
 
-func (g *deepCopyGenerator) RepackImports() {
+func (g *deepCopyGenerator) RepackImports(exclude util.StringSet) {
 	var packages []string
 	for key := range g.imports {
 		packages = append(packages, key)
@@ -213,10 +213,11 @@ func (g *deepCopyGenerator) RepackImports() {
 	sort.Strings(packages)
 	g.imports = make(map[string]string)
 	g.shortImports = make(map[string]string)
-
 	g.targetPackage(g.targetPkg)
 	for _, pkg := range packages {
-		g.addImportByPath(pkg)
+		if !exclude.Has(pkg) {
+			g.addImportByPath(pkg)
+		}
 	}
 }
 
