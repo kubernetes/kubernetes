@@ -2323,7 +2323,7 @@ func TestValidateReplicationController(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "metadata.name or metadata.generateName" &&
+				field != "metadata.name" &&
 				field != "metadata.namespace" &&
 				field != "spec.selector" &&
 				field != "spec.template" &&
@@ -2736,7 +2736,7 @@ func TestValidateDaemon(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "metadata.name or metadata.generateName" &&
+				field != "metadata.name" &&
 				field != "metadata.namespace" &&
 				field != "spec.selector" &&
 				field != "spec.template" &&
@@ -2850,11 +2850,11 @@ func TestValidateNode(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			expectedFields := map[string]bool{
-				"metadata.name or metadata.generateName": true,
-				"metadata.labels":                        true,
-				"metadata.annotations":                   true,
-				"metadata.namespace":                     true,
-				"spec.ExternalID":                        true,
+				"metadata.name":        true,
+				"metadata.labels":      true,
+				"metadata.annotations": true,
+				"metadata.namespace":   true,
+				"spec.ExternalID":      true,
 			}
 			if expectedFields[field] == false {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
@@ -3286,7 +3286,7 @@ func TestValidateLimitRange(t *testing.T) {
 	}{
 		"zero-length Name": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
-			"",
+			"name or generateName is required",
 		},
 		"zero-length-namespace": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
@@ -3361,7 +3361,7 @@ func TestValidateResourceQuota(t *testing.T) {
 	}{
 		"zero-length Name": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
-			"",
+			"name or generateName is required",
 		},
 		"zero-length Namespace": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
@@ -3384,7 +3384,7 @@ func TestValidateResourceQuota(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			detail := errs[i].(*errors.ValidationError).Detail
-			if field != "metadata.name" && field != "metadata.name or metadata.generateName" && field != "metadata.namespace" {
+			if field != "metadata.name" && field != "metadata.namespace" {
 				t.Errorf("%s: missing prefix for: %v", k, field)
 			}
 			if detail != v.D {
