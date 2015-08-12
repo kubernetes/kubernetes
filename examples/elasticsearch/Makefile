@@ -1,8 +1,8 @@
 .PHONY: elasticsearch_discovery build push all
 
-TAG = 1.0
+TAG = 1.1
 
-build:
+build:	elasticsearch_discovery
 	docker build -t kubernetes/elasticsearch:$(TAG) .
 
 push:
