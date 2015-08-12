@@ -99,17 +99,23 @@ net.ipv4.ip_forward:
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
 
-{% set override_deb='lxc-docker-1.6.0_1.6.0_amd64.deb' %}
-{% set override_deb_sha1='fdfd749362256877668e13e152d17fe22c64c420' %}
-{% set override_docker_ver='1.6.0' %}
+{% set override_deb='lxc-docker-1.7.1_1.7.1_amd64.deb' %}
+{% set override_deb_sha1='81abef31dd2c616883a61f85bfb294d743b1c889' %}
+{% set override_docker_ver='1.7.1' %}
 
-{% if grains.cloud is defined and grains.cloud == 'gce' %}
-{% set override_deb='' %}
-{% set override_deb_sha1='' %}
-{% set override_docker_ver='' %}
-{% endif %}
+# Comment out below logic for master branch, so that we can upgrade GCE cluster
+# to docker 1.7.1 by default.
+#
+# TODO(dchen1107): For release 1.1, we want to fall back to
+# ContainerVM installed docker by set override_deb, override_deb_sha1 and
+# override_docker_ver back to '' for gce cloud provider.
 
 {% if override_docker_ver != '' %}
+purge-old-docker-package:
+  pkg.removed:
+    - pkgs:
+      - lxc-docker-1.6.2
+
 /var/cache/docker-install/{{ override_deb }}:
   file.managed:
     - source: {{ storage_base }}{{ override_deb }}
@@ -180,6 +186,9 @@ docker:
 {% endif %}
     - watch:
       - file: {{ environment_file }}
+{% if override_docker_ver != '' %}
+      - pkg: lxc-docker-{{ override_docker_ver }}
+{% endif %}
 {% if pillar.get('is_systemd') %}
       - file: {{ pillar.get('systemd_system_path') }}/docker.service
 {% endif %}
@@ -187,5 +196,4 @@ docker:
     - require:
       - pkg: lxc-docker-{{ override_docker_ver }}
 {% endif %}
-
 {% endif %} # end grains.os_family != 'RedHat'
