@@ -191,7 +191,7 @@ func (im *realImageManager) GarbageCollect() error {
 	// Check valid capacity.
 	if capacity == 0 {
 		err := fmt.Errorf("invalid capacity %d on device %q at mount point %q", capacity, fsInfo.Device, fsInfo.Mountpoint)
-		im.recorder.Eventf(im.nodeRef, "invalidDiskCapacity", err.Error())
+		im.recorder.Eventf(im.nodeRef, "InvalidDiskCapacity", err.Error())
 		return err
 	}
 
@@ -207,7 +207,7 @@ func (im *realImageManager) GarbageCollect() error {
 
 		if freed < amountToFree {
 			err := fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d, but freed %d", amountToFree, freed)
-			im.recorder.Eventf(im.nodeRef, "freeDiskSpaceFailed", err.Error())
+			im.recorder.Eventf(im.nodeRef, "FreeDiskSpaceFailed", err.Error())
 			return err
 		}
 	}

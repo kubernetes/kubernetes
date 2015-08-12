@@ -57,9 +57,9 @@ func (kr *kubeletRuntimeHooks) ReportImagePulled(pod *api.Pod, container *api.Co
 	}
 
 	if pullError != nil {
-		kr.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, pullError)
+		kr.recorder.Eventf(ref, "Failed", "Failed to pull image %q: %v", container.Image, pullError)
 	} else {
-		kr.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
+		kr.recorder.Eventf(ref, "Pulled", "Successfully pulled image %q", container.Image)
 	}
 }
 
@@ -69,5 +69,5 @@ func (kr *kubeletRuntimeHooks) ReportImagePulling(pod *api.Pod, container *api.C
 		glog.Errorf("Couldn't make a ref to pod %q, container %q: '%v'", pod.Name, container.Name, err)
 		return
 	}
-	kr.recorder.Eventf(ref, "pulling", "Pulling image %q", container.Image)
+	kr.recorder.Eventf(ref, "Pulling", "Pulling image %q", container.Image)
 }

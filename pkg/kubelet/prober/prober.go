@@ -122,13 +122,13 @@ func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container ap
 		if err != nil {
 			glog.V(1).Infof("Liveness probe for %q errored: %v", ctrName, err)
 			if ok {
-				pb.recorder.Eventf(ref, "unhealthy", "Liveness probe errored: %v", err)
+				pb.recorder.Eventf(ref, "Unhealthy", "Liveness probe errored: %v", err)
 			}
 			return probe.Unknown, err
 		} else { // live != probe.Success
 			glog.V(1).Infof("Liveness probe for %q failed (%v): %s", ctrName, live, output)
 			if ok {
-				pb.recorder.Eventf(ref, "unhealthy", "Liveness probe failed: %s", output)
+				pb.recorder.Eventf(ref, "Unhealthy", "Liveness probe failed: %s", output)
 			}
 			return live, nil
 		}
@@ -162,13 +162,13 @@ func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container a
 		if err != nil {
 			glog.V(1).Infof("readiness probe for %q errored: %v", ctrName, err)
 			if ok {
-				pb.recorder.Eventf(ref, "unhealthy", "Readiness probe errored: %v", err)
+				pb.recorder.Eventf(ref, "Unhealthy", "Readiness probe errored: %v", err)
 			}
 			return
 		} else { // ready != probe.Success
 			glog.V(1).Infof("Readiness probe for %q failed (%v): %s", ctrName, ready, output)
 			if ok {
-				pb.recorder.Eventf(ref, "unhealthy", "Readiness probe failed: %s", output)
+				pb.recorder.Eventf(ref, "Unhealthy", "Readiness probe failed: %s", output)
 			}
 			return
 		}

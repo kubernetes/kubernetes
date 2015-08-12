@@ -645,13 +645,13 @@ func (dm *DockerManager) runContainer(
 	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
 		if ref != nil {
-			dm.recorder.Eventf(ref, "failed", "Failed to create docker container with error: %v", err)
+			dm.recorder.Eventf(ref, "Failed", "Failed to create docker container with error: %v", err)
 		}
 		return "", err
 	}
 
 	if ref != nil {
-		dm.recorder.Eventf(ref, "created", "Created with docker id %v", util.ShortenString(dockerContainer.ID, 12))
+		dm.recorder.Eventf(ref, "Created", "Created with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 	}
 
 	binds := makeMountBindings(opts.Mounts)
@@ -697,13 +697,13 @@ func (dm *DockerManager) runContainer(
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		if ref != nil {
-			dm.recorder.Eventf(ref, "failed",
+			dm.recorder.Eventf(ref, "Failed",
 				"Failed to start with docker id %v with error: %v", util.ShortenString(dockerContainer.ID, 12), err)
 		}
 		return "", err
 	}
 	if ref != nil {
-		dm.recorder.Eventf(ref, "started", "Started with docker id %v", util.ShortenString(dockerContainer.ID, 12))
+		dm.recorder.Eventf(ref, "Started", "Started with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 	}
 	return dockerContainer.ID, nil
 }
@@ -1218,7 +1218,7 @@ func (dm *DockerManager) killContainer(containerID types.UID) error {
 		glog.Warningf("No ref for pod '%v'", ID)
 	} else {
 		// TODO: pass reason down here, and state, or move this call up the stack.
-		dm.recorder.Eventf(ref, "killing", "Killing with docker id %v", util.ShortenString(ID, 12))
+		dm.recorder.Eventf(ref, "Killing", "Killing with docker id %v", util.ShortenString(ID, 12))
 	}
 	return err
 }
@@ -1535,13 +1535,13 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container, pullS
 	present, err := dm.IsImagePresent(spec)
 	if err != nil {
 		if ref != nil {
-			dm.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
+			dm.recorder.Eventf(ref, "Failed", "Failed to inspect image %q: %v", container.Image, err)
 		}
 		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
 	}
 	if !dm.runtimeHooks.ShouldPullImage(pod, container, present) {
 		if present && ref != nil {
-			dm.recorder.Eventf(ref, "pulled", "Container image %q already present on machine", container.Image)
+			dm.recorder.Eventf(ref, "Pulled", "Container image %q already present on machine", container.Image)
 		}
 		return nil
 	}

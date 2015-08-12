@@ -81,11 +81,11 @@ func (fr *fakeRuntimeHooks) ShouldPullImage(pod *api.Pod, container *api.Contain
 }
 
 func (fr *fakeRuntimeHooks) ReportImagePulling(pod *api.Pod, container *api.Container) {
-	fr.recorder.Eventf(nil, "pulling", fmt.Sprintf("%s:%s:%s", pod.Name, container.Name, container.Image))
+	fr.recorder.Eventf(nil, "Pulling", fmt.Sprintf("%s:%s:%s", pod.Name, container.Name, container.Image))
 }
 
 func (fr *fakeRuntimeHooks) ReportImagePulled(pod *api.Pod, container *api.Container, pullError error) {
-	fr.recorder.Eventf(nil, "pulled", fmt.Sprintf("%s:%s:%s", pod.Name, container.Name, container.Image))
+	fr.recorder.Eventf(nil, "Pulled", fmt.Sprintf("%s:%s:%s", pod.Name, container.Name, container.Image))
 }
 
 type fakeOptionGenerator struct{}
@@ -1333,14 +1333,14 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 	fakeDocker.Lock()
 
 	eventSet := []string{
-		"pulling foo:POD:pod_infra_image",
-		"pulled foo:POD:pod_infra_image",
-		"pulling foo:bar:pull_always_image",
-		"pulled foo:bar:pull_always_image",
-		"pulling foo:bar2:pull_if_not_present_image",
-		"pulled foo:bar2:pull_if_not_present_image",
-		`pulled Container image "existing_one" already present on machine`,
-		`pulled Container image "want:latest" already present on machine`,
+		"Pulling foo:POD:pod_infra_image",
+		"Pulled foo:POD:pod_infra_image",
+		"Pulling foo:bar:pull_always_image",
+		"Pulled foo:bar:pull_always_image",
+		"Pulling foo:bar2:pull_if_not_present_image",
+		"Pulled foo:bar2:pull_if_not_present_image",
+		`Pulled Container image "existing_one" already present on machine`,
+		`Pulled Container image "want:latest" already present on machine`,
 	}
 
 	runtimeHooks := dm.runtimeHooks.(*fakeRuntimeHooks)
@@ -1348,7 +1348,7 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 
 	var actualEvents []string
 	for _, ev := range recorder.Events {
-		if strings.HasPrefix(ev, "pull") {
+		if strings.HasPrefix(ev, "Pull") {
 			actualEvents = append(actualEvents, ev)
 		}
 	}
