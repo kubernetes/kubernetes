@@ -30,4 +30,39 @@ mutation (insertion or removal of a dns entry) before giving up and crashing.
 
 `--kubecfg_file`: Path to kubecfg file that contains the master URL and tokens to authenticate with the master.
 
+## Domain Label
+
+It is possible to specify a label in the metadata of a Service definition with
+the name "domain" to control the name of the A record created by kube2dns. Consider
+the following Service definition:
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-service
+  namespace: web
+  labels:
+    domain: example.com
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    name: example-web-server
+```
+
+Normally, kube2dns would create an A record with the following name:
+
+```
+example-service.web.svc.skydns.local.
+```
+
+Because the "domain" label has been specified, the following name is used instead:
+
+```
+example.com.web.svc.skydns.local.
+```
+
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/kube2sky/README.md?pixel)]()

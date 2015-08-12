@@ -157,11 +157,12 @@ func newHeadlessService(namespace, serviceName string) kapi.Service {
 	return service
 }
 
-func newService(namespace, serviceName, clusterIP, portName string, portNumber int) kapi.Service {
+func newService(namespace, serviceName, clusterIP, portName string, portNumber int, labels map[string]string) kapi.Service {
 	service := kapi.Service{
 		ObjectMeta: kapi.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: kapi.ServiceSpec{
 			ClusterIP: clusterIP,
@@ -318,7 +319,7 @@ func TestAddSinglePortService(t *testing.T) {
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
-	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
+	service := newService(testNamespace, testService, "1.2.3.4", "", 0, make(map[string]string))
 	k2s.newService(&service)
 	expectedValue := getHostPort(&service)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
@@ -331,7 +332,7 @@ func TestUpdateSinglePortService(t *testing.T) {
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
-	service := newService(testNamespace, testService, "1.2.3.4", "", 0)
+	service := newService(testNamespace, testService, "1.2.3.4", "", 0, make(map[string]string))
 	k2s.newService(&service)
 	assert.Len(t, ec.writes, 1)
 	newService := service
@@ -348,7 +349,7 @@ func TestDeleteSinglePortService(t *testing.T) {
 	)
 	ec := &fakeEtcdClient{make(map[string]string)}
 	k2s := newKube2Sky(ec)
-	service := newService(testNamespace, testService, "1.2.3.4", "", 80)
+	service := newService(testNamespace, testService, "1.2.3.4", "", 80, make(map[string]string))
 	// Add the service
 	k2s.newService(&service)
 	assert.Len(t, ec.writes, 1)
@@ -366,7 +367,7 @@ func TestServiceWithNamePort(t *testing.T) {
 	k2s := newKube2Sky(ec)
 
 	// create service
-	service := newService(testNamespace, testService, "1.2.3.4", "http1", 80)
+	service := newService(testNamespace, testService, "1.2.3.4", "http1", 80, make(map[string]string))
 	k2s.newService(&service)
 	expectedValue := getHostPort(&service)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
@@ -392,4 +393,36 @@ func TestBuildDNSName(t *testing.T) {
 	assert.Equal(t, expectedDNSName, buildDNSNameString("local.", "cluster", "svc", "ns", "name"))
 	newExpectedDNSName := "00.name.ns.svc.cluster.local."
 	assert.Equal(t, newExpectedDNSName, buildDNSNameString(expectedDNSName, "00"))
+}
+
+func TestServiceWithDomainLabel(t *testing.T) {
+	const (
+		testService   = "testservice"
+		testNamespace = "default"
+	)
+
+	labels := map[string]string{
+		"domain": "example.com",
+	}
+
+	ec := &fakeEtcdClient{make(map[string]string)}
+	k2s := newKube2Sky(ec)
+
+	// Create service
+	service := newService(testNamespace, testService, "1.2.3.4", "http", 80, labels)
+	k2s.newService(&service)
+	values := ec.Get(path.Join(basePath, serviceSubDomain, testNamespace, "com", "example"))
+	require.True(t, len(values) > 0, "entry not found.")
+
+	// update service
+	newService := service
+	newService.ObjectMeta.Labels = map[string]string{"domain": "example2.com"}
+	k2s.updateService(&service, &newService)
+	values = ec.Get(path.Join(basePath, serviceSubDomain, testNamespace, "com", "example2"))
+	require.True(t, len(values) > 0, "entry not found.")
+	assert.Len(t, ec.writes, 2)
+
+	// Delete service
+	k2s.removeService(&service)
+	assert.Empty(t, ec.writes)
 }
