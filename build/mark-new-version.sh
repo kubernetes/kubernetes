@@ -24,11 +24,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 NEW_VERSION=${1-}
 
-fetch_url=$(git remote -v | grep GoogleCloudPlatform/kubernetes.git | grep fetch | awk '{ print $2 }')
-if ! push_url=$(git remote -v | grep GoogleCloudPlatform/kubernetes.git | grep push | awk '{ print $2 }'); then
-  push_url="https://github.com/GoogleCloudPlatform/kubernetes.git"
+fetch_url=$(git remote -v | grep kubernetes/kubernetes.git | grep fetch | awk '{ print $2 }')
+if ! push_url=$(git remote -v | grep kubernetes/kubernetes.git | grep push | awk '{ print $2 }'); then
+  push_url="https://github.com/kubernetes/kubernetes.git"
 fi
-fetch_remote=$(git remote -v | grep GoogleCloudPlatform/kubernetes.git | grep fetch | awk '{ print $1 }')
+fetch_remote=$(git remote -v | grep kubernetes/kubernetes.git | grep fetch | awk '{ print $1 }')
 
 VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
 [[ ${NEW_VERSION} =~ $VERSION_REGEX ]] || {
