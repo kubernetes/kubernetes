@@ -309,10 +309,10 @@ var _ = Describe("Services", func() {
 		}
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
-
 		// Remove iptable rules and make sure they come back.
 		By("Remove iptable rules and make sure they come back")
 		_, _, code, err := SSH(`
+			sudo iptables -t nat -F KUBE-SERVICES || true;
 			sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
 			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
 		if err != nil || code != 0 {
