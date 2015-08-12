@@ -131,6 +131,8 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 	if proxyPorts == nil {
 		proxyPorts = newPortAllocator(util.PortRange{})
 	}
+	glog.V(2).Info("Tearing down pure-iptables proxy rules. Errors here are acceptable.")
+	tearDownIptablesProxierRules(iptables)
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
 		return nil, fmt.Errorf("failed to initialize iptables: %v", err)
@@ -149,6 +151,19 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		hostIP:       hostIP,
 		proxyPorts:   proxyPorts,
 	}, nil
+}
+
+// remove the iptables rules from the pure iptables Proxier
+func tearDownIptablesProxierRules(ipt iptables.Interface) {
+	//TODO: actually tear down all rules and chains.
+	//NOTE: this needs to be kept in sync with the proxy/iptables Proxier's rules.
+	args := []string{"-j", "KUBE-SERVICES"}
+	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, args...); err != nil {
+		glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+	}
+	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, args...); err != nil {
+		glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+	}
 }
 
 // The periodic interval for checking the state of things.
