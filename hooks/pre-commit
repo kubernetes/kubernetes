@@ -53,6 +53,22 @@ else
 fi
 echo "${reset}"
 
+allfiles=($(git diff --cached --name-only --diff-filter ACM | grep -v -e "third_party" -e "Godeps"))
+
+echo -ne "Checking for problems with flag names... "
+invalid_flag_lines=$(hack/verify-flags-underscore.py "${allfiles[@]}")
+if [[ "${invalid_flag_lines:-}" != "" ]]; then
+  echo "${red}ERROR!"
+  echo "There appear to be problems with the following"
+  for line in "${invalid_flag_lines[@]}"; do
+    echo "  ${line}"
+  done
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 echo -ne "Checking for API descriptions... "
 files_need_description=()
 # Check API schema definitions for field descriptions
