@@ -44,7 +44,7 @@ fi
 echo "+++ Versioning documentation and examples"
 
 # Update the docs to match this version.
-HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/\?https://github.com/GoogleCloudPlatform/kubernetes"
+HTML_PREVIEW_PREFIX="https://htmlpreview.github.io/\?https://github.com/kubernetes/kubernetes"
 
 md_dirs=(docs examples)
 md_files=()
