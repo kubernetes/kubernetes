@@ -61,7 +61,7 @@ func NewStorage(s storage.Interface) *REST {
 }
 
 func MatchServices(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{label, field, ServiceAttributes}
+	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: ServiceAttributes}
 }
 
 func ServiceAttributes(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
