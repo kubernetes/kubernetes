@@ -24,6 +24,7 @@ import (
 )
 
 const (
+	badRequest                = "Bad request. Not a POST request"
 	unknownFunction           = "unknown function"
 	incorrectFunctionArgument = "incorrect function argument"
 	notGivenFunctionArgument  = "not given function argument"
@@ -38,20 +39,22 @@ const (
 type ResourceConsumerHandler struct{}
 
 func (handler ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// parsing raw query
-	query, err := url.ParseQuery(req.URL.RawQuery)
-	if err != nil {
+	if req.Method != "POST" {
+		http.Error(w, badRequest, http.StatusBadRequest)
+	}
+	// parsing POST request data and URL data
+	if err := req.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	// handle consumeCPU
 	if req.URL.Path == consumeCPUAddress {
-		handler.handleConsumeCPU(w, query)
+		handler.handleConsumeCPU(w, req.PostForm)
 		return
 	}
 	// handle consumeMem
 	if req.URL.Path == consumeMemAddress {
-		handler.handleConsumeMem(w, query)
+		handler.handleConsumeMem(w, req.PostForm)
 		return
 	}
 	// handle getCurrentStatus
