@@ -42,7 +42,7 @@ Update field(s) of a resource using strategic merge patch
 
 JSON and YAML formats are accepted.
 
-Please refer to the models in https://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/HEAD/docs/api-reference/definitions.html to find if a field is mutable.
+Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html to find if a field is mutable.
 
 ```
 kubectl patch TYPE NAME -p PATCH

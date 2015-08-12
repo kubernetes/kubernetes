@@ -412,7 +412,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
           content: |
             [Unit]
             Description=Kubernetes API Server
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Documentation=https://github.com/kubernetes/kubernetes
             Requires=etcd.service
             After=etcd.service
             [Service]
@@ -432,7 +432,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
           content: |
             [Unit]
             Description=Kubernetes Controller Manager
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Documentation=https://github.com/kubernetes/kubernetes
             Requires=kube-apiserver.service
             After=kube-apiserver.service
             [Service]
@@ -448,7 +448,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
           content: |
             [Unit]
             Description=Kubernetes Scheduler
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Documentation=https://github.com/kubernetes/kubernetes
             Requires=kube-apiserver.service
             After=kube-apiserver.service
             [Service]
@@ -579,7 +579,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
           content: |
             [Unit]
             Description=Kubernetes Proxy
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Documentation=https://github.com/kubernetes/kubernetes
             Requires=setup-network-environment.service
             After=setup-network-environment.service
             [Service]
@@ -595,7 +595,7 @@ On the PXE server make and fill in the variables `vi /var/www/html/coreos/pxe-cl
           content: |
             [Unit]
             Description=Kubernetes Kubelet
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Documentation=https://github.com/kubernetes/kubernetes
             Requires=setup-network-environment.service
             After=setup-network-environment.service
             [Service]

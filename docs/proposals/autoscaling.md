@@ -47,7 +47,7 @@ done automatically based on statistical analysis and thresholds.
 * Provide a concrete proposal for implementing auto-scaling pods within Kubernetes
 * Implementation proposal should be in line with current discussions in existing issues:
     * Scale verb - [1629](http://issue.k8s.io/1629)
-    * Config conflicts - [Config](https://github.com/GoogleCloudPlatform/kubernetes/blob/c7cb991987193d4ca33544137a5cb7d0292cf7df/docs/config.md#automated-re-configuration-processes)
+    * Config conflicts - [Config](https://github.com/kubernetes/kubernetes/blob/c7cb991987193d4ca33544137a5cb7d0292cf7df/docs/config.md#automated-re-configuration-processes)
     * Rolling updates - [1353](http://issue.k8s.io/1353)
     * Multiple scalable types - [1624](http://issue.k8s.io/1624)
 

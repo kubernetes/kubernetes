@@ -48,7 +48,7 @@ Get the Kubernetes source.  If you are simply building a release from source the
 Building a release is simple.
 
 ```bash
-git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+git clone https://github.com/kubernetes/kubernetes.git
 cd kubernetes
 make release
 ```

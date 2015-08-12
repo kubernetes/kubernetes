@@ -151,7 +151,7 @@ host machine (mac).
 1. Checkout source
 
     ```
-    git clone https://github.com/GoogleCloudPlatform/kubernetes
+    git clone https://github.com/kubernetes/kubernetes
     cd kubernetes
     ```
 

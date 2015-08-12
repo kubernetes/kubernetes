@@ -63,7 +63,7 @@ In the next few steps you will be asked to configure these files and host them o
 To get the Kubernetes source, clone the GitHub repo, and build the binaries.
 
 ```
-git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+git clone https://github.com/kubernetes/kubernetes.git
 cd kubernetes
 ./build/release.sh 
 ```
