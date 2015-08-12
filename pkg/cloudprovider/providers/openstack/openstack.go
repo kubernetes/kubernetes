@@ -30,6 +30,7 @@ import (
 	"github.com/rackspace/gophercloud/openstack"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/flavors"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
+	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/members"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/monitors"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/pools"
@@ -70,6 +71,7 @@ func (d *MyDuration) UnmarshalText(text []byte) error {
 
 type LoadBalancerOpts struct {
 	SubnetId          string     `gcfg:"subnet-id"` // required
+	FloatingNetworkId string     `gcfg:"floating-network-id"`
 	LBMethod          string     `gfcg:"lb-method"`
 	CreateMonitor     bool       `gcfg:"create-monitor"`
 	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
@@ -527,6 +529,41 @@ func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.Virtual
 	return &vipList[0], nil
 }
 
+func getFloatingIPByPortID(client *gophercloud.ServiceClient, portID string) (*floatingips.FloatingIP, error) {
+	opts := floatingips.ListOpts{
+		PortID: portID,
+	}
+	pager := floatingips.List(client, opts)
+
+	floatingIPList := make([]floatingips.FloatingIP, 0, 1)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		f, err := floatingips.ExtractFloatingIPs(page)
+		if err != nil {
+			return false, err
+		}
+		floatingIPList = append(floatingIPList, f...)
+		if len(floatingIPList) > 1 {
+			return false, ErrMultipleResults
+		}
+		return true, nil
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	if len(floatingIPList) == 0 {
+		return nil, ErrNotFound
+	} else if len(floatingIPList) > 1 {
+		return nil, ErrMultipleResults
+	}
+
+	return &floatingIPList[0], nil
+}
+
 func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
 	vip, err := getVipByName(lb.network, name)
 	if err == ErrNotFound {
@@ -639,9 +676,30 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 	}
 
 	status := &api.LoadBalancerStatus{}
-	status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}}
+
+	if lb.opts.FloatingNetworkId == "" {
+		status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}}
+
+		return status, nil
+	}
+
+	vipAddr, err := getVipByName(lb.network, name)
+	if err != nil {
+		return nil, err
+	}
+	floatIPOpts := floatingips.CreateOpts{
+		FloatingNetworkID: lb.opts.FloatingNetworkId,
+		PortID:            vipAddr.PortID,
+	}
+	floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
+	if err != nil {
+		return nil, err
+	}
+
+	status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}, {IP: floatIP.FloatingIP}}
 
 	return status, nil
+
 }
 
 func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
@@ -711,6 +769,17 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error 
 	vip, err := getVipByName(lb.network, name)
 	if err != nil && err != ErrNotFound {
 		return err
+	}
+
+	if lb.opts.FloatingNetworkId != "" && vip != nil {
+		floatingIP, err := getFloatingIPByPortID(lb.network, vip.PortID)
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+		error := floatingips.Delete(lb.network, floatingIP.ID).ExtractErr()
+		if error != nil && !isNotFound(error) {
+			return error
+		}
 	}
 
 	// We have to delete the VIP before the pool can be deleted,
