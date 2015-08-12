@@ -62,7 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/clientauth"
+	clientauth "k8s.io/kubernetes/pkg/client/auth"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"

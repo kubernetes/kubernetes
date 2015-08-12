@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 /*
-Package authcfg defines a file format for holding authentication
+Package auth defines a file format for holding authentication
 information needed by clients of Kubernetes.  Typically,
 a Kubernetes cluster will put auth info for the admin in a known
 location when it is created, and will (soon) put it in a known
@@ -47,10 +47,10 @@ Example:
 
     import (
         "pkg/client"
-        "pkg/clientauth"
+        "pkg/client/auth"
     )
 
-    info, err := clientauth.LoadFromFile(filename)
+    info, err := auth.LoadFromFile(filename)
     if err != nil {
       // handle error
     }
@@ -60,7 +60,7 @@ Example:
     client := client.New(clientConfig)
     client.Pods(ns).List()
 */
-package clientauth
+package auth
 
 // TODO: need a way to rotate Tokens.  Therefore, need a way for client object to be reset when the authcfg is updated.
 import (
