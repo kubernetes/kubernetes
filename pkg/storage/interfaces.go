@@ -92,10 +92,6 @@ type Interface interface {
 	// Delete removes the specified key and returns the value that existed at that spot.
 	Delete(key string, out runtime.Object) error
 
-	// RecursiveDelete removes the specified key.
-	// TODO: Get rid of this method and use Delete() instead.
-	RecursiveDelete(key string, recursive bool) error
-
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items passing 'filter' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching

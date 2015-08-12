@@ -176,15 +176,6 @@ func (h *etcdHelper) Delete(key string, out runtime.Object) error {
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) RecursiveDelete(key string, recursive bool) error {
-	key = h.prefixEtcdKey(key)
-	startTime := time.Now()
-	_, err := h.client.Delete(key, recursive)
-	metrics.RecordEtcdRequestLatency("delete", "UNKNOWN", startTime)
-	return err
-}
-
-// Implements storage.Interface.
 func (h *etcdHelper) Watch(key string, resourceVersion uint64, filter storage.FilterFunc) (watch.Interface, error) {
 	key = h.prefixEtcdKey(key)
 	w := newEtcdWatcher(false, nil, filter, h.codec, h.versioner, nil, h)
