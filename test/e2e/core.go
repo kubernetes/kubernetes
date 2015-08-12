@@ -29,7 +29,7 @@ type command struct {
 	component string
 }
 
-func coreDump(dir string) {
+func CoreDump(dir string) {
 	c, err := loadClient()
 	if err != nil {
 		fmt.Printf("Error creating client: %v", err)
