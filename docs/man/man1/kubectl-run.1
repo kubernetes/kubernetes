@@ -23,6 +23,10 @@ Creates a replication controller to manage the created container(s).
     If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '\-i/\-\-interactive' is set, in which case the default is true.
 
 .PP
+\fB\-\-command\fP=false
+    If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.
+
+.PP
 \fB\-\-dry\-run\fP=false
     If true, only print the object that would be sent, without sending it.
 
@@ -206,6 +210,15 @@ $ kubectl run nginx \-\-image=nginx \-\-dry\-run
 
 # Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
 $ kubectl run nginx \-\-image=nginx \-\-overrides='{ "apiVersion": "v1", "spec": { ... } }'
+
+# Start a single instance of nginx and keep it in the foreground, don't restart it if it exits.
+$ kubectl run \-i \-tty nginx \-\-image=nginx \-\-restart=Never
+
+# Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
+$ kubectl run nginx \-\-image=nginx \-\- <arg1> <arg2> ... <argN>
+
+# Start the nginx container using a different command and custom arguments
+$ kubectl run nginx \-\-image=nginx \-\-command \-\- <cmd> <arg1> ... <argN>
 
 .fi
 .RE

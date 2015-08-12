@@ -127,8 +127,8 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
 	params["default-name"] = info.Name
-	if s, found := params["selector"]; !found || len(s) == 0 || cmdutil.GetFlagInt(cmd, "port") < 1 {
-		if len(s) == 0 {
+	if s, found := params["selector"]; !found || kubectl.IsZero(s) || cmdutil.GetFlagInt(cmd, "port") < 1 {
+		if kubectl.IsZero(s) {
 			s, err := f.PodSelectorForObject(inputObject)
 			if err != nil {
 				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find selectors via --selector flag or introspection: %s", err))
@@ -160,7 +160,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if cmdutil.GetFlagBool(cmd, "create-external-load-balancer") {
 		params["create-external-load-balancer"] = "true"
 	}
-	if len(params["labels"]) == 0 {
+	if kubectl.IsZero(params["labels"]) {
 		labels, err := f.LabelsForObject(inputObject)
 		if err != nil {
 			return err
