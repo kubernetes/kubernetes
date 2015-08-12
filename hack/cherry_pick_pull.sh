@@ -136,15 +136,15 @@ gitamcleanup=false
 function make-a-pr() {
   local rel=$(basename ${BRANCH})
   echo "+++ Creating a pull request on github"
-  hub pull-request -F- -h "${GITHUB_USER}:${NEWBRANCH}" -b "GoogleCloudPlatform:${rel}" <<EOF
+  hub pull-request -F- -h "${GITHUB_USER}:${NEWBRANCH}" -b "kubernetes:${rel}" <<EOF
 Automated cherry pick of ${PULLSUBJ}
 
 Cherry pick of ${PULLSUBJ} on ${rel}.
 EOF
 }
 
-if git remote -v | grep ^origin | grep GoogleCloudPlatform/kubernetes.git; then
-  echo "!!! You have 'origin' configured as your GoogleCloudPlatform/kubernetes.git"
+if git remote -v | grep ^origin | grep kubernetes/kubernetes.git; then
+  echo "!!! You have 'origin' configured as your kubernetes/kubernetes.git"
   echo "This isn't normal. Leaving you with push instructions:"
   echo
   echo "+++ First manually push the branch this script created:"

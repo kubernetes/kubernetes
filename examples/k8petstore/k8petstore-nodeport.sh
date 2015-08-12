@@ -20,7 +20,7 @@ echo "WRITING KUBE FILES , will overwrite the jsons, then testing pods. is kube 
 #Args below can be overriden when calling from cmd line.
 #Just send all the args in order.
 #for dev/test you can use:
-#kubectl=$GOPATH/src/github.com/GoogleCloudPlatform/kubernetes/cluster/kubectl.sh"
+#kubectl=$GOPATH/src/github.com/kubernetes/kubernetes/cluster/kubectl.sh"
 kubectl="kubectl"
 VERSION="r.2.8.19"
 _SECONDS=1000          # number of seconds to measure throughput.

@@ -80,7 +80,7 @@ function test_etcd {
 
 function k8petstore {
      ### run K8petstore .  Should work perfectly IFF flannel and so on is setup properly.
-    wget https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/release-0.17/examples/k8petstore/k8petstore.sh
+    wget https://raw.githubusercontent.com/kubernetes/kubernetes/release-0.17/examples/k8petstore/k8petstore.sh
      chmod 777 k8petstore.sh
     ./k8petstore.sh
 }

@@ -19,7 +19,7 @@
 # they are written using the latest API version.
 #
 # Steps to use this script to upgrade the cluster to a new version:
-# https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cluster_management.md#updgrading-to-a-different-api-version
+# https://github.com/kubernetes/kubernetes/blob/master/docs/cluster_management.md#updgrading-to-a-different-api-version
 
 set -o errexit
 set -o nounset
