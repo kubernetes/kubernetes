@@ -1,0 +1,11 @@
+[Unit]
+Description=Network fabric for containers
+Documentation=https://github.com/coreos/flannel
+Requires=etcd.service
+After=etcd.service
+
+[Service]
+EnvironmentFile=/etc/default/flanneld
+ExecStart=/opt/bin/flanneld $FLANNEL_OPTS
+Restart=always
+RestartSec=10

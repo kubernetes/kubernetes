@@ -1,0 +1,11 @@
+[Unit]
+Description=Kubernetes API Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Requires=etcd.service
+After=etcd.service
+
+[Service]
+EnvironmentFile=/etc/default/kube-apiserver
+ExecStart=/opt/bin/kube-apiserver $KUBE_APISERVER_OPTS
+Restart=always
+RestartSec=10

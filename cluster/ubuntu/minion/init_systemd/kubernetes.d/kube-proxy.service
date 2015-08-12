@@ -1,0 +1,11 @@
+[Unit]
+Description=Network fabric for containers
+Documentation=https://github.com/coreos/flannel
+Requires=etcd.service
+After=etcd.service
+
+[Service]
+EnvironmentFile=/etc/default/kube-proxy
+ExecStart=/opt/bin/kube-proxy $KUBE_PROXY_OPTS
+Restart=always
+RestartSec=10
