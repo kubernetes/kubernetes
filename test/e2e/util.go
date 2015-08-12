@@ -125,6 +125,10 @@ type TestContextType struct {
 
 var testContext TestContextType
 
+func SetTestContext(t TestContextType) {
+	testContext = t
+}
+
 type ContainerFailures struct {
 	status   *api.ContainerStateTerminated
 	restarts int

@@ -91,7 +91,7 @@ func TestE2E(t *testing.T) {
 		if err := os.MkdirAll(*reportDir, 0755); err != nil {
 			glog.Errorf("Failed creating report directory: %v", err)
 		}
-		defer coreDump(*reportDir)
+		defer CoreDump(*reportDir)
 	}
 
 	if testContext.Provider == "" {
