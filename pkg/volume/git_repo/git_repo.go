@@ -54,20 +54,20 @@ func (plugin *gitRepoPlugin) Name() string {
 }
 
 func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.GitRepo != nil
+	return spec.Volume != nil && spec.Volume.GitRepo != nil
 }
 
 func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	return &gitRepoVolumeBuilder{
 		gitRepoVolume: &gitRepoVolume{
-			volName: spec.Name,
+			volName: spec.Name(),
 			podUID:  pod.UID,
 			mounter: mounter,
 			plugin:  plugin,
 		},
 		pod:      *pod,
-		source:   spec.VolumeSource.GitRepo.Repository,
-		revision: spec.VolumeSource.GitRepo.Revision,
+		source:   spec.Volume.GitRepo.Repository,
+		revision: spec.Volume.GitRepo.Revision,
 		exec:     exec.New(),
 		opts:     opts,
 	}, nil
@@ -124,8 +124,7 @@ func (b *gitRepoVolumeBuilder) IsReadOnly() bool {
 
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = &volume.Spec{
-	Name:         "not-used",
-	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 }
 
 // SetUpAt creates new directory and clones a git repo.

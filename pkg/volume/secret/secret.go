@@ -56,13 +56,13 @@ func (plugin *secretPlugin) Name() string {
 }
 
 func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.Secret != nil
+	return spec.Volume != nil && spec.Volume.Secret != nil
 }
 
 func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	return &secretVolumeBuilder{
-		secretVolume: &secretVolume{spec.Name, pod.UID, plugin, mounter},
-		secretName:   spec.VolumeSource.Secret.SecretName,
+		secretVolume: &secretVolume{spec.Name(), pod.UID, plugin, mounter},
+		secretName:   spec.Volume.Secret.SecretName,
 		pod:          *pod,
 		opts:         &opts}, nil
 }
@@ -102,8 +102,7 @@ func (b *secretVolumeBuilder) SetUp() error {
 
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = &volume.Spec{
-	Name:         "not-used",
-	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}},
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
 }
 
 func (b *secretVolumeBuilder) getMetaDir() string {

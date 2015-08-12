@@ -52,7 +52,7 @@ func (plugin *cephfsPlugin) Name() string {
 }
 
 func (plugin *cephfsPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.CephFS != nil || spec.PersistentVolumeSource.CephFS != nil
+	return (spec.Volume != nil && spec.Volume.CephFS != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CephFS != nil)
 }
 
 func (plugin *cephfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -99,7 +99,7 @@ func (plugin *cephfsPlugin) newBuilderInternal(spec *volume.Spec, podUID types.U
 	return &cephfsBuilder{
 		cephfs: &cephfs{
 			podUID:      podUID,
-			volName:     spec.Name,
+			volName:     spec.Name(),
 			mon:         cephvs.Monitors,
 			secret:      secret,
 			id:          id,
@@ -125,10 +125,10 @@ func (plugin *cephfsPlugin) newCleanerInternal(volName string, podUID types.UID,
 }
 
 func (plugin *cephfsPlugin) getVolumeSource(spec *volume.Spec) *api.CephFSVolumeSource {
-	if spec.VolumeSource.CephFS != nil {
-		return spec.VolumeSource.CephFS
+	if spec.Volume != nil && spec.Volume.CephFS != nil {
+		return spec.Volume.CephFS
 	} else {
-		return spec.PersistentVolumeSource.CephFS
+		return spec.PersistentVolume.Spec.CephFS
 	}
 }
 
