@@ -39,7 +39,6 @@ This is problematic when default Docker networking has been configured, such as 
 
 The k8sm project has implemented a work-around: service endpoints are terminated at HostIP:HostPort, where the HostIP is the IP address of the Mesos slave and the HostPort is the host port declared in the pod container port specification.
 Host ports that are not defined, or else defined as zero, will automatically be assigned a (host) port resource from a resource offer.
-When using the `controller-manager` provided by this project users should be sure to assign a `name` to each `service.spec.port` object, otherwise errors may reported in the endpoints controller manager regarding non-unique port values (#322).
 
 To disable the work-around and revert to vanilla Kubernetes service endpoint termination:
 
