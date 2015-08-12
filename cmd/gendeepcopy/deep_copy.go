@@ -85,7 +85,7 @@ func main() {
 			glog.Errorf("error while generating deep copy functions for %v: %v", knownType, err)
 		}
 	}
-	generator.RepackImports()
+	generator.RepackImports(util.StringSet{})
 	if err := generator.WriteImports(funcOut); err != nil {
 		glog.Fatalf("error while writing imports: %v", err)
 	}
