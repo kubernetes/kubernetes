@@ -16,6 +16,7 @@ kubectl_delete.md
 kubectl_describe.md
 kubectl_edit.md
 kubectl_exec.md
+kubectl_explain.md
 kubectl_expose.md
 kubectl_get.md
 kubectl_label.md
