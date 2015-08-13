@@ -142,7 +142,21 @@ func (rs *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	return labels.Set{}, fields.Set{}, nil
+	lock, ok := obj.(*api.Lock)
+	if !ok {
+		return nil, nil, errors.NewInternalError(fmt.Errorf("object is not of type lock: %#v", obj))
+	}
+	l := lock.Labels
+	if l == nil {
+		l = labels.Set{}
+	}
+	return l, fields.Set{
+		"metadata.name":  lock.Name,
+		"spec.heldby":    lock.Spec.HeldBy,
+		"spec.duration":  string(lock.Spec.LeaseTime),
+		"spec.atime":     lock.Spec.AcquiredTime,
+		"spec.rtime":     lock.Spec.RenewTime,
+	}, nil
 }
 
 func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
