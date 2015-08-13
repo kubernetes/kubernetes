@@ -16,7 +16,7 @@ limitations under the License.
 
 // A tiny web server that returns 200 on it's healthz endpoint if the command
 // passed in via -cmd exits with 0. Returns 503 otherwise.
-// Usage: exechealthz -port 8080 -period 2s -latency 30s -cmd 'nslookup localhost >/dev/null'
+// Usage: exechealthz -port 8080 -period 2s -latency 30s -cmd 'nslookup localhost >/dev/null' -verbose true
 package main
 
 import (
@@ -40,6 +40,7 @@ var (
 	cmd        = flag.String("cmd", "echo healthz", "Command to run in response to a GET on /healthz. If the given command exits with 0, /healthz will respond with a 200.")
 	period     = flag.Duration("period", 2*time.Second, "Period to run the given cmd in an async worker.")
 	maxLatency = flag.Duration("latency", 30*time.Second, "If the async worker hasn't updated the probe command output in this long, return a 503.")
+	verbose    = flag.Bool("verbose", true, "Print to console at each periodic exec")
 	// prober is the async worker running the cmd, the output of which is used to service /healthz.
 	prober *execWorker
 )
@@ -86,7 +87,9 @@ func (h *execWorker) start() {
 		select {
 		// If the command takes > period, the command runs continuously.
 		case <-ticker.C:
-			log.Printf("Worker running %v", *cmd)
+			if verbose {
+				log.Printf("Worker running %v", *cmd)
+			}
 			output, err := exec.Command("sh", "-c", *cmd).CombinedOutput()
 			ts := time.Now()
 			func() {
