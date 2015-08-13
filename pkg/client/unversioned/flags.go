@@ -29,12 +29,3 @@ type FlagSet interface {
 	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
 	IntVar(p *int, name string, value int, usage string)
 }
-
-func BindKubeletClientConfigFlags(flags FlagSet, config *KubeletConfig) {
-	flags.BoolVar(&config.EnableHttps, "kubelet-https", config.EnableHttps, "Use https for kubelet connections")
-	flags.UintVar(&config.Port, "kubelet-port", config.Port, "Kubelet port")
-	flags.DurationVar(&config.HTTPTimeout, "kubelet-timeout", config.HTTPTimeout, "Timeout for kubelet operations")
-	flags.StringVar(&config.CertFile, "kubelet-client-certificate", config.CertFile, "Path to a client key file for TLS.")
-	flags.StringVar(&config.KeyFile, "kubelet-client-key", config.KeyFile, "Path to a client key file for TLS.")
-	flags.StringVar(&config.CAFile, "kubelet-certificate-authority", config.CAFile, "Path to a cert. file for the certificate authority.")
-}
