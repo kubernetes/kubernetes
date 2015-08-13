@@ -63,7 +63,7 @@ def clone_repository():
     of kubernetes. Subsequently used during upgrades.
     """
 
-    repository = 'https://github.com/GoogleCloudPlatform/kubernetes.git'
+    repository = 'https://github.com/kubernetes/kubernetes.git'
     kubernetes_directory = path('/opt/kubernetes')
     # Since we can not clone twice, check for the directory and remove it.
     if kubernetes_directory.isdir():

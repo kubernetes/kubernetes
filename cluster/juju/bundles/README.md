@@ -12,7 +12,7 @@ containerized applications.
 
 ## Juju TL;DR
 
-The [Juju](https://juju.ubuntu.com) system provides provisioning and
+The [Juju](https://jujucharms.com) system provides provisioning and
 orchestration across a variety of clouds and bare metal. A juju bundle
 describes collection of services and how they interrelate. `juju
 quickstart` allows you to bootstrap a deployment environment and
@@ -23,15 +23,23 @@ deploy a bundle.
 #### Install Juju Quickstart
 
 You will need to
-[install the Juju client](https://juju.ubuntu.com/install/) and
+[install the Juju client](https://jujucharms.com/get-started) and
 `juju-quickstart` as pre-requisites.  To deploy the bundle use
 `juju-quickstart` which runs on Mac OS (`brew install
 juju-quickstart`) or Ubuntu (`apt-get install juju-quickstart`).
 
-### Deploy Kubernetes Bundle
+### Deploy a Kubernetes Bundle
 
-Deploy Kubernetes onto any cloud and orchestrated directly in the Juju
-Graphical User Interface using `juju quickstart`:
+Use the 'juju quickstart' command to deploy a Kubernetes cluster to any cloud
+supported by Juju.  
+
+The charm store version of the Kubernetes bundle can be deployed as folllows:
+
+    juju quickstart u/kubernetes/kubernetes-cluster
+
+> Note: The charm store bundle may be locked to a specific Kubernetes release.
+
+Alternately you could deploy a Kubernetes bundle straight from github or a file:
 
     juju quickstart -i https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml
 
@@ -47,34 +55,37 @@ The command above does few things for you:
 - Orchestrates the relations among the services, and exits.
 
 Now you should have a running Kubernetes. Run `juju status
---format=oneline` to see the address of your kubernetes master.
+--format=oneline` to see the address of your kubernetes-master unit.
 
 For further reading on [Juju Quickstart](https://pypi.python.org/pypi/juju-quickstart)
+
+Go to the [Getting started with Juju guide](https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/juju.md)
+for more information about deploying a development Kubernetes cluster.
 
 ### Using the Kubernetes Client
 
 You'll need the Kubernetes command line client,
-[kubectl](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
+[kubectl](https://github.com/kubernetes/kubernetes/blob/master/docs/user-guide/kubectl/kubectl.md)
 to interact with the created cluster.  The kubectl command is
 installed on the kubernetes-master charm. If you want to work with
 the cluster from your computer you will need to install the binary
-locally (see instructions below).
+locally.
 
 You can access kubectl by a number ways using juju.
 
 via juju run:
 
-    juju run --service kubernetes-master/0 "sudo kubectl get mi"
+    juju run --service kubernetes-master/0 "sudo kubectl get nodes"
 
 via juju ssh:
 
-    juju ssh kubernetes-master/0 -t "sudo kubectl get mi"
+    juju ssh kubernetes-master/0 -t "sudo kubectl get nodes"
 
-You may also `juju ssh kubernetes-master/0` and call kubectl from that
-machine.
+You may also SSH to the kuberentes-master unit (`juju ssh kubernetes-master/0`)
+and call kubectl from the command prompt.
 
 See the
-[kubectl documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
+[kubectl documentation](https://github.com/kubernetes/kubernetes/blob/master/docs/user-guide/kubectl/kubectl.md)
 for more details of what can be done with the command line tool.
 
 ### Scaling up the cluster
@@ -128,16 +139,16 @@ key-value store with an http interface.
 
 Juju has complete documentation with regard to setup, and cloud
 configuration on it's own
-[documentation site](https://juju.ubuntu.com/docs/).
+[documentation site](https://jujucharms.com/docs/).
 
-- [Getting Started](https://juju.ubuntu.com/docs/getting-started.html)
-- [Using Juju](https://juju.ubuntu.com/docs/charms.html)
+- [Getting Started](https://jujucharms.com/docs/stable/getting-started)
+- [Using Juju](https://jujucharms.com/docs/stable/charms)
 
 
-## Installing the kubectl outside of kubernetes master machine
+## Installing the kubectl outside of kubernetes-master unit
 
 Download the Kubernetes release from:
-https://github.com/GoogleCloudPlatform/kubernetes/releases and extract
+https://github.com/kubernetes/kubernetes/releases and extract
 the release, you can then just directly use the cli binary at
 ./kubernetes/platforms/linux/amd64/kubectl
 
@@ -148,14 +159,14 @@ You'll need the address of the kubernetes-master as environment variable :
 Grab the public-address there and export it as KUBERNETES_MASTER
 environment variable :
 
-    export KUBERNETES_MASTER=$(juju status --format=oneline kubernetes-master | cut -d' ' -f3):8080
+    export KUBERNETES_MASTER=$(juju status --format=oneline kubernetes-master | grep kubernetes-master | cut -d' ' -f3):8080
 
 And now you can run kubectl on the command line :
 
-    kubectl get mi
+    kubectl get no
 
 See the
-[kubectl documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md)
+[kubectl documentation](https://github.com/kubernetes/kubernetes/blob/master/docs/user-guide/kubectl/kubectl.md)
 for more details of what can be done with the command line tool.
 
 
@@ -163,16 +174,12 @@ for more details of what can be done with the command line tool.
 
 The kubernetes-bundle is open source and available on github.com.  If
 you want to get started developing on the bundle you can clone it from
-github.  Often you will need the related charms which are also on
-github.
+github.  
 
-    mkdir ~/bundles
-    git clone https://github.com/whitmo/kubernetes-bundle.git ~/bundles/kubernetes-bundle
-    mkdir -p ~/charms/trusty
-    git clone https://github.com/whitmo/kubernetes-charm.git ~/charms/trusty/kubernetes
-    git clone https://github.com/whitmo/kubernetes-master-charm.git ~/charms/trusty/kubernetes-master
+    git clone https://github.com/kubernetes/kubernetes.git
 
-    juju quickstart specs/develop.yaml
+Go to the [Getting started with Juju guide](https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/juju.md)
+for more information about the bundle or charms.
 
 ## How to contribute
 
@@ -181,19 +188,20 @@ Send us pull requests!  We'll send you a cookie if they include tests and docs.
 
 ## Current and Most Complete Information
 
- - [kubernetes-master charm on Github](https://github.com/whitmo/charm-kubernetes-master)
- - [kubernetes charm on GitHub](https://github.com/whitmo/charm-kubernetes)
- - [etcd charm on GitHub](https://github.com/whitmo/etcd-charm)
- - [Flannel charm on GitHub](https://github.com/chuckbutler/docker-flannel-charm)
- - [Docker charm on GitHub](https://github.com/chuckbutler/docker-charm)
+The charms and bundles are in the [kubernetes](https://github.com/kubernetes/kubernetes)
+repository in github.
+
+ - [kubernetes-master charm on Github](https://github.com/kubernetes/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes-master)
+ - [kubernetes charm on GitHub](https://github.com/kubernetes/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes)
+
 
 More information about the
-[Kubernetes project](https://github.com/GoogleCloudPlatform/kubernetes)
+[Kubernetes project](https://github.com/kubernetes/kubernetes)
 or check out the
-[Kubernetes Documentation](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs)
+[Kubernetes Documentation](https://github.com/kubernetes/kubernetes/tree/master/docs)
 for more details about the Kubernetes concepts and terminology.
 
-Having a problem? Check the [Kubernetes issues database](https://github.com/GoogleCloudPlatform/kubernetes/issues)
+Having a problem? Check the [Kubernetes issues database](https://github.com/kubernetes/kubernetes/issues)
 for related issues.
 
 
