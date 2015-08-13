@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// podmaster is a simple utility, it attempts to acquire and maintain a lease-lock from etcd using compare-and-swap.
-// if it is the master, it copies a source file into a destination file.  If it is not the master, it makes sure it is removed.
-//
-// typical usage is to copy a Pod manifest from a staging directory into the kubelet's directory, for example:
-//   podmaster --etcd-servers=http://127.0.0.1:4001 --key=scheduler --source-file=/kubernetes/kube-scheduler.manifest --dest-file=/manifests/kube-scheduler.manifest
+//This utility uses the Lock API in the client to acquire a lock.
+//It provides a uniform and consistent semantics for.
+// - Logging how many times a lease is gained/lost.
+// - Starting/Stopping a daemon (via callbacks).
+// - Logging errors which might occur if a daemon's lease isn't consistent with its running state.
 package controller
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
@@ -29,20 +30,38 @@ import (
 	"time"
 )
 
-type Config struct {
-	EtcdServers string
-	Key         string
-	whoami      string
-	ttl         uint64
-	sleep       time.Duration
-	lastLease   time.Time
-	Running     func() bool
-	Lease       func() bool
-	Unlease     func() bool
-	Cli         *client.Client
+// A program that is running may "use" a lease.
+// This struct has some metadata about that program.
+// It is used for debugging/logging (i.e. print how many times we got the lease)
+// It also is used to track the state of a program (i.e. if lease obtained, Running should be true)
+type LeaseUser struct {
+
+	//Note: In general 'Running' should be 'false' when you first start an HA process, and it should
+	//be flipped to 'true' once you acquire the lock and start up.
+	Running      bool // This is how users verify that their process is running.
+	LeasesGained int  // Number of times lease has been granted.
+	LeasesLost   int  // Number of times the lease was lost.
 }
 
-// runs the election loop. never returns.
+// Configuration options needed for running the lease loop.
+type Config struct {
+	Key       string
+	whoami    string
+	ttl       uint64
+	sleep     time.Duration
+	lastLease time.Time
+	// These two functions return "err" or else nil.
+	// They should also update information in the LeaseUserInfo struct
+	// about the state of the lease owner.
+	LeaseGained   func() bool
+	LeaseLost     func() bool
+	Cli           *client.Client
+	LeaseUserInfo LeaseUser
+}
+
+// leaseAndUpdateLoop runs the loop to acquire a lease.  This will continue trying to get a lease
+// until it succeeds, and then callbacks sent in by the user will be triggered.
+// Likewise, it can give up the lease, in which case the LeaseLost() callbacks will be triggered.
 func (c *Config) leaseAndUpdateLoop() {
 	for {
 		master, err := c.acquireOrRenewLease()
@@ -107,20 +126,28 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 }
 
 // Update acts on the current state of the lease.
+// This method heavily relies on correct implementation of the functions in the Config interface.
 func (c *Config) update(master bool) error {
 	switch {
-	case master && !c.Running():
-		c.Lease()
+	case master && !c.LeaseUserInfo.Running:
+		c.LeaseGained()
+		c.LeaseUserInfo.LeasesGained++
+		if !c.LeaseUserInfo.Running {
+			return fmt.Errorf("Process %v did not update its Running field to TRUE after ACQUIRING the lease!", c)
+		}
 		return nil
-	case !master && c.Running():
-		c.Unlease()
+	case !master && c.LeaseUserInfo.Running:
+		c.LeaseLost()
+		c.LeaseUserInfo.LeasesLost++
+		if !c.LeaseUserInfo.Running {
+			return fmt.Errorf("Process %v did not update its Running field to FALSE after LOSING the lease!", c)
+		}
 		return nil
 	}
 	return nil
 }
 
 func RunLease(c *Config) {
-
 	//set some reasonable defaults.
 	if len(c.whoami) == 0 {
 		hostname, err := os.Hostname()

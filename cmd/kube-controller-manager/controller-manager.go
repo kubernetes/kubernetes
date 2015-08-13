@@ -42,23 +42,6 @@ func init() {
 	healthz.DefaultHealthz()
 }
 
-var RUNNING = false
-
-func isRunning() bool {
-	return RUNNING
-}
-
-func endRC() bool {
-	glog.Infof("Hard-exiting the replication controller process now !")
-
-	//Even though we're exiting, we should set this flag before dying just for completeness.
-	RUNNING = false
-	os.Exit(0)
-
-	//this should never be reached
-	return false
-}
-
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := app.NewCMServer()
@@ -78,9 +61,15 @@ func main() {
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	//HA Function, this function will be called by the lease manager itself.
+	leaseUserInfo := controller.LeaseUser{
+		Running:      false,
+		LeasesGained: 0,
+		LeasesLost:   0,
+	}
+
+	//Functions to start and stop this daemon.
 	startRC := func() bool {
-		RUNNING = true
+		leaseUserInfo.Running = true
 		if err := s.Run(pflag.CommandLine.Args()); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			glog.Infof("EXITING NOW ! Killed")
@@ -89,22 +78,32 @@ func main() {
 		return true
 	}
 
+	endRC := func() bool {
+		glog.Infof("Hard-exiting the replication controller process now !")
+
+		//Even though we're exiting, we should set this flag before dying just for completeness.
+		leaseUserInfo.Running = false
+		os.Exit(0)
+
+		//this should never be reached
+		return true
+	}
+
 	//Acquire a lock before starting.
 	//TODO some of these will change now that implementing robs lock.
 	//we can delete some params...
 	mcfg := controller.Config{
-		EtcdServers: "http://localhost:4001",
-		Key:         "rcLEASE",
-		Running:     isRunning,
-		Lease:       startRC,
-		Unlease:     endRC,
-		Cli:         kubeClient}
+		Key:           "cm-LEASE",
+		LeaseUserInfo: leaseUserInfo,
+		LeaseGained:   startRC,
+		LeaseLost:     endRC,
+		Cli:           kubeClient}
 
 	//This starts a thread that continues running.
 	controller.RunLease(&mcfg)
 
 	for true {
-		glog.Infof("RC is running, active = %v", RUNNING)
+		glog.Infof("CM is running, active = %v", mcfg.LeaseUserInfo.Running)
 		time.Sleep(5 * time.Second)
 	}
 
