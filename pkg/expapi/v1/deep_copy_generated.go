@@ -28,56 +28,6 @@ import (
 	inf "speter.net/go/exp/math/dec/inf"
 )
 
-func deepCopy_api_ListMeta(in api.ListMeta, out *api.ListMeta, c *conversion.Cloner) error {
-	out.SelfLink = in.SelfLink
-	out.ResourceVersion = in.ResourceVersion
-	return nil
-}
-
-func deepCopy_api_ObjectMeta(in api.ObjectMeta, out *api.ObjectMeta, c *conversion.Cloner) error {
-	out.Name = in.Name
-	out.GenerateName = in.GenerateName
-	out.Namespace = in.Namespace
-	out.SelfLink = in.SelfLink
-	out.UID = in.UID
-	out.ResourceVersion = in.ResourceVersion
-	out.Generation = in.Generation
-	if err := deepCopy_util_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
-		return err
-	}
-	if in.DeletionTimestamp != nil {
-		out.DeletionTimestamp = new(util.Time)
-		if err := deepCopy_util_Time(*in.DeletionTimestamp, out.DeletionTimestamp, c); err != nil {
-			return err
-		}
-	} else {
-		out.DeletionTimestamp = nil
-	}
-	if in.Labels != nil {
-		out.Labels = make(map[string]string)
-		for key, val := range in.Labels {
-			out.Labels[key] = val
-		}
-	} else {
-		out.Labels = nil
-	}
-	if in.Annotations != nil {
-		out.Annotations = make(map[string]string)
-		for key, val := range in.Annotations {
-			out.Annotations[key] = val
-		}
-	} else {
-		out.Annotations = nil
-	}
-	return nil
-}
-
-func deepCopy_api_TypeMeta(in api.TypeMeta, out *api.TypeMeta, c *conversion.Cloner) error {
-	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
-	return nil
-}
-
 func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c *conversion.Cloner) error {
 	if in.Amount != nil {
 		if newVal, err := c.DeepCopy(in.Amount); err != nil {
@@ -91,6 +41,12 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 		out.Amount = nil
 	}
 	out.Format = in.Format
+	return nil
+}
+
+func deepCopy_v1_ListMeta(in v1.ListMeta, out *v1.ListMeta, c *conversion.Cloner) error {
+	out.SelfLink = in.SelfLink
+	out.ResourceVersion = in.ResourceVersion
 	return nil
 }
 
@@ -139,10 +95,10 @@ func deepCopy_v1_TypeMeta(in v1.TypeMeta, out *v1.TypeMeta, c *conversion.Cloner
 }
 
 func deepCopy_v1_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
-	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
 	if err := deepCopy_v1_HorizontalPodAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
@@ -152,10 +108,10 @@ func deepCopy_v1_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *Horizo
 }
 
 func deepCopy_v1_HorizontalPodAutoscalerList(in HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, c *conversion.Cloner) error {
-	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
-	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
 		return err
 	}
 	if in.Items != nil {
@@ -257,10 +213,8 @@ func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) erro
 
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		deepCopy_api_ListMeta,
-		deepCopy_api_ObjectMeta,
-		deepCopy_api_TypeMeta,
 		deepCopy_resource_Quantity,
+		deepCopy_v1_ListMeta,
 		deepCopy_v1_ObjectMeta,
 		deepCopy_v1_TypeMeta,
 		deepCopy_v1_HorizontalPodAutoscaler,
