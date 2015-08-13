@@ -1,0 +1,30 @@
+-
+    label: "The Road to Kubernetes 1.0 - Craig Box, Google"
+    url: "http://www.slideshare.net/dataloop/craig-box-google-the-road-to-kubernetes-10"
+-
+    label: "Cluster Management with Kubernetes - Satnam Singh, Google"
+    url: "http://www.slideshare.net/SatnamSingh67/2015-0605-cluster-management-with-kubernetes"
+-
+    label: "Kubernetes & Google Container Engine - GlueCon 2015 - Brendan Burns, Google"
+    url: "http://www.slideshare.net/brendandburns/gluecon-kubernetes"
+-
+    label: "Autoscaling Kubernetes - Jerzy Szczepkowski, Google"
+    url: "http://www.slideshare.net/craigbox/autoscaling-kubernetes"
+-
+    label: "From Docker to Kubernetes: A Developer's Guide to Containers - Mandy White, Google"
+    url: "http://www.slideshare.net/Codemotion/developers-guide-to-containers-mandy-waite"
+-
+    label: "Managed Containers, Open Source, and Google - CloudOpen 2014 - Joe Beda, Google"
+    url: "https://speakerdeck.com/jbeda/managed-containers-open-source-and-google"
+-
+    label: "Containerizing the Cloud with Kubernetes and Docker - Google Cloud Platform Developer Roadshow 2014"
+    url: "https://speakerdeck.com/googlecloudplatform/containerizing-the-cloud-with-kubernetes-and-docker"
+-
+    label: "Managing containerized applications - OSCON 2014 - Brian Grant, Google"
+    url: "https://speakerdeck.com/bgrant0607/managing-containerized-applications"
+-
+    label: "Containers At Scale - GlueCon 2014 - Joe Beda, Google"
+    url: "https://speakerdeck.com/jbeda/containers-at-scale"
+-
+    label: "Kubernetes: What's it do? - Eric Paris, Red Hat"
+    url: "https://people.redhat.com/~eparis/kubernetes/kube.pdf"
