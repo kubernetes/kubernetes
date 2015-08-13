@@ -160,8 +160,10 @@ systemctl start docker
 Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case, we will use the "main" instance of the Docker daemon for the Kubernetes components.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.21.2 /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
+sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
 ```
+
+> Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
 
 ### Also run the service proxy
 
@@ -196,7 +198,7 @@ If all else fails, ask questions on IRC at [#google-containers](http://webchat.f
 
 ### Next steps
 
-Move on to [adding one or more workers](worker.md)
+Move on to [adding one or more workers](worker.md) or [deploy a dns](deployDNS.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
