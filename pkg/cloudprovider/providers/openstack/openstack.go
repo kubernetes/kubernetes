@@ -776,9 +776,11 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error 
 		if err != nil && !isNotFound(err) {
 			return err
 		}
-		error := floatingips.Delete(lb.network, floatingIP.ID).ExtractErr()
-		if error != nil && !isNotFound(error) {
-			return error
+		if floatingIP != nil {
+			error := floatingips.Delete(lb.network, floatingIP.ID).ExtractErr()
+			if error != nil && !isNotFound(error) {
+				return error
+			}
 		}
 	}
 
