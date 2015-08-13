@@ -69,6 +69,7 @@ type Proxier struct {
 	loadBalancer  LoadBalancer
 	mu            sync.Mutex // protects serviceMap
 	serviceMap    map[proxy.ServicePortName]*serviceInfo
+	syncPeriod    time.Duration
 	portMapMutex  sync.Mutex
 	portMap       map[portMapKey]proxy.ServicePortName
 	numProxyLoops int32 // use atomic ops to access this; mostly for testing
@@ -110,7 +111,7 @@ func IsProxyLocked(err error) bool {
 // if iptables fails to update or acquire the initial lock. Once a proxier is
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr util.PortRange) (*Proxier, error) {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr util.PortRange, syncPeriod time.Duration) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
@@ -123,10 +124,10 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 	proxyPorts := newPortAllocator(pr)
 
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
-	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts)
+	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod time.Duration) (*Proxier, error) {
 	// convenient to pass nil for tests..
 	if proxyPorts == nil {
 		proxyPorts = newPortAllocator(util.PortRange{})
@@ -146,6 +147,7 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		loadBalancer: loadBalancer,
 		serviceMap:   make(map[proxy.ServicePortName]*serviceInfo),
 		portMap:      make(map[portMapKey]proxy.ServicePortName),
+		syncPeriod:   syncPeriod,
 		listenIP:     listenIP,
 		iptables:     iptables,
 		hostIP:       hostIP,
@@ -166,12 +168,9 @@ func tearDownIptablesProxierRules(ipt iptables.Interface) {
 	}
 }
 
-// The periodic interval for checking the state of things.
-const syncInterval = 5 * time.Second
-
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
-	t := time.NewTicker(syncInterval)
+	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
 	for {
 		<-t.C
