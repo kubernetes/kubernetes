@@ -37,6 +37,9 @@
 		    $(window).bind('popstate', function (event) {
 				var returnLocation = history.location || document.location;
 				$('.menu a').removeClass('active');
+				if($(this).parents('li.haschild').length === 0 || $(this).parents('li').find('a.active').length === 0){
+					menu_ul.filter(':visible').slideUp('normal');
+				}
 				$('#doccontent').load(returnLocation + ' #doccontent > *');
 				syncmenutourl();
 		       return;
