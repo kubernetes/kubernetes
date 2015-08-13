@@ -298,7 +298,7 @@ gulp.task('config:base', function() {
 gulp.task('config:copy', function() {
   var environment = isProduction ? 'production' : 'development';
   return gulp.src(['shared/config/' + environment + '.json', 'components/**/config/' + environment + '.json'])
-    .pipe(expect({ errorOnFailure: true }, 'shared/config/' + environment + '.json'))
+    .pipe(expect({ errorOnFailure: true, reportUnexpected: false }, 'shared/config/' + environment + '.json'))
     .on("error", handleError)
     .pipe(jsoncombine('generated-config.js',
       function(data) {
