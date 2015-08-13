@@ -96,11 +96,10 @@ def normalize_files(rootdir, files):
     return newfiles
 
 def line_has_bad_flag(line, flagre):
-    m  = flagre.search(line)
-    if not m:
-        return False
-    if "_" in m.group(0):
-        return True
+    results  = flagre.findall(line)
+    for result in results:
+        if "_" in result:
+            return True
     return False
 
 # The list of files might not be the whole repo. If someone only changed a
@@ -155,7 +154,7 @@ def flags_to_re(flags):
     for flag in flags:
         # turn all flag names into regexs which will find both types
         newre = dashRE.sub('[-_]', flag)
-        flagREs.append(newre)
+        flagREs.append("[^\w]" + newre + "[^\w]")
     # turn that list of regex strings into a single large RE
     flagRE = "|".join(flagREs)
     flagRE = re.compile(flagRE)
