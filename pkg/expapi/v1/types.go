@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -65,7 +64,7 @@ type SubresourceReference struct {
 
 // TargetConsumption is an object for specifying target average resource consumption of a particular resource.
 type TargetConsumption struct {
-	Resource api.ResourceName  `json:"resource,omitempty"`
+	Resource v1.ResourceName   `json:"resource,omitempty"`
 	Quantity resource.Quantity `json:"quantity,omitempty"`
 }
 
@@ -85,8 +84,8 @@ type HorizontalPodAutoscalerSpec struct {
 
 // HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.TypeMeta   `json:",inline"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behaviour of autoscaler.
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" description:"specification of the desired behavior of the autoscaler; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
@@ -94,8 +93,8 @@ type HorizontalPodAutoscaler struct {
 
 // HorizontalPodAutoscaler is a collection of pod autoscalers.
 type HorizontalPodAutoscalerList struct {
-	api.TypeMeta `json:",inline"`
-	api.ListMeta `json:"metadata,omitempty"`
+	v1.TypeMeta `json:",inline"`
+	v1.ListMeta `json:"metadata,omitempty"`
 
 	Items []HorizontalPodAutoscaler `json:"items" description:"list of horizontal pod autoscalers"`
 }

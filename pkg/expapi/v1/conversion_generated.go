@@ -26,6 +26,15 @@ import (
 	expapi "k8s.io/kubernetes/pkg/expapi"
 )
 
+func convert_api_ListMeta_To_v1_ListMeta(in *api.ListMeta, out *v1.ListMeta, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ListMeta))(in)
+	}
+	out.SelfLink = in.SelfLink
+	out.ResourceVersion = in.ResourceVersion
+	return nil
+}
+
 func convert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *v1.ObjectMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ObjectMeta))(in)
@@ -72,6 +81,15 @@ func convert_api_TypeMeta_To_v1_TypeMeta(in *api.TypeMeta, out *v1.TypeMeta, s c
 	}
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
+	return nil
+}
+
+func convert_v1_ListMeta_To_api_ListMeta(in *v1.ListMeta, out *api.ListMeta, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.ListMeta))(in)
+	}
+	out.SelfLink = in.SelfLink
+	out.ResourceVersion = in.ResourceVersion
 	return nil
 }
 
@@ -124,6 +142,65 @@ func convert_v1_TypeMeta_To_api_TypeMeta(in *v1.TypeMeta, out *api.TypeMeta, s c
 	return nil
 }
 
+func convert_expapi_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in *expapi.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.HorizontalPodAutoscaler))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_expapi_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_expapi_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList(in *expapi.HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.HorizontalPodAutoscalerList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]HorizontalPodAutoscaler, len(in.Items))
+		for i := range in.Items {
+			if err := convert_expapi_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_expapi_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(in *expapi.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.HorizontalPodAutoscalerSpec))(in)
+	}
+	if in.ScaleRef != nil {
+		out.ScaleRef = new(SubresourceReference)
+		if err := convert_expapi_SubresourceReference_To_v1_SubresourceReference(in.ScaleRef, out.ScaleRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.ScaleRef = nil
+	}
+	out.MinCount = in.MinCount
+	out.MaxCount = in.MaxCount
+	if err := convert_expapi_TargetConsumption_To_v1_TargetConsumption(&in.Target, &out.Target, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_expapi_ReplicationControllerDummy_To_v1_ReplicationControllerDummy(in *expapi.ReplicationControllerDummy, out *ReplicationControllerDummy, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.ReplicationControllerDummy))(in)
@@ -173,6 +250,88 @@ func convert_expapi_ScaleStatus_To_v1_ScaleStatus(in *expapi.ScaleStatus, out *S
 		}
 	} else {
 		out.Selector = nil
+	}
+	return nil
+}
+
+func convert_expapi_SubresourceReference_To_v1_SubresourceReference(in *expapi.SubresourceReference, out *SubresourceReference, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.SubresourceReference))(in)
+	}
+	out.Kind = in.Kind
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	out.APIVersion = in.APIVersion
+	out.Subresource = in.Subresource
+	return nil
+}
+
+func convert_expapi_TargetConsumption_To_v1_TargetConsumption(in *expapi.TargetConsumption, out *TargetConsumption, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.TargetConsumption))(in)
+	}
+	out.Resource = v1.ResourceName(in.Resource)
+	if err := s.Convert(&in.Quantity, &out.Quantity, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_HorizontalPodAutoscaler_To_expapi_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *expapi.HorizontalPodAutoscaler, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*HorizontalPodAutoscaler))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_HorizontalPodAutoscalerSpec_To_expapi_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_HorizontalPodAutoscalerList_To_expapi_HorizontalPodAutoscalerList(in *HorizontalPodAutoscalerList, out *expapi.HorizontalPodAutoscalerList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*HorizontalPodAutoscalerList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]expapi.HorizontalPodAutoscaler, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_HorizontalPodAutoscaler_To_expapi_HorizontalPodAutoscaler(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_HorizontalPodAutoscalerSpec_To_expapi_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *expapi.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*HorizontalPodAutoscalerSpec))(in)
+	}
+	if in.ScaleRef != nil {
+		out.ScaleRef = new(expapi.SubresourceReference)
+		if err := convert_v1_SubresourceReference_To_expapi_SubresourceReference(in.ScaleRef, out.ScaleRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.ScaleRef = nil
+	}
+	out.MinCount = in.MinCount
+	out.MaxCount = in.MaxCount
+	if err := convert_v1_TargetConsumption_To_expapi_TargetConsumption(&in.Target, &out.Target, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -230,19 +389,54 @@ func convert_v1_ScaleStatus_To_expapi_ScaleStatus(in *ScaleStatus, out *expapi.S
 	return nil
 }
 
+func convert_v1_SubresourceReference_To_expapi_SubresourceReference(in *SubresourceReference, out *expapi.SubresourceReference, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*SubresourceReference))(in)
+	}
+	out.Kind = in.Kind
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	out.APIVersion = in.APIVersion
+	out.Subresource = in.Subresource
+	return nil
+}
+
+func convert_v1_TargetConsumption_To_expapi_TargetConsumption(in *TargetConsumption, out *expapi.TargetConsumption, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*TargetConsumption))(in)
+	}
+	out.Resource = api.ResourceName(in.Resource)
+	if err := s.Convert(&in.Quantity, &out.Quantity, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
+		convert_api_ListMeta_To_v1_ListMeta,
 		convert_api_ObjectMeta_To_v1_ObjectMeta,
 		convert_api_TypeMeta_To_v1_TypeMeta,
+		convert_expapi_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList,
+		convert_expapi_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec,
+		convert_expapi_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler,
 		convert_expapi_ReplicationControllerDummy_To_v1_ReplicationControllerDummy,
 		convert_expapi_ScaleSpec_To_v1_ScaleSpec,
 		convert_expapi_ScaleStatus_To_v1_ScaleStatus,
 		convert_expapi_Scale_To_v1_Scale,
+		convert_expapi_SubresourceReference_To_v1_SubresourceReference,
+		convert_expapi_TargetConsumption_To_v1_TargetConsumption,
+		convert_v1_HorizontalPodAutoscalerList_To_expapi_HorizontalPodAutoscalerList,
+		convert_v1_HorizontalPodAutoscalerSpec_To_expapi_HorizontalPodAutoscalerSpec,
+		convert_v1_HorizontalPodAutoscaler_To_expapi_HorizontalPodAutoscaler,
+		convert_v1_ListMeta_To_api_ListMeta,
 		convert_v1_ObjectMeta_To_api_ObjectMeta,
 		convert_v1_ReplicationControllerDummy_To_expapi_ReplicationControllerDummy,
 		convert_v1_ScaleSpec_To_expapi_ScaleSpec,
 		convert_v1_ScaleStatus_To_expapi_ScaleStatus,
 		convert_v1_Scale_To_expapi_Scale,
+		convert_v1_SubresourceReference_To_expapi_SubresourceReference,
+		convert_v1_TargetConsumption_To_expapi_TargetConsumption,
 		convert_v1_TypeMeta_To_api_TypeMeta,
 	)
 	if err != nil {
