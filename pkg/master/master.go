@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
+	helloetcd "k8s.io/kubernetes/pkg/registry/expapi/hello/etcd"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/minion"
@@ -784,6 +785,7 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
 		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
 		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
+		"hellos": helloetcd.NewStorage(c.ExpDatabaseStorage),
 	}
 	return &apiserver.APIGroupVersion{
 		Root: m.apiPrefix,

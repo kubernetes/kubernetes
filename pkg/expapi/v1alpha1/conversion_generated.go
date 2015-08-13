@@ -143,6 +143,44 @@ func convert_v1_TypeMeta_To_api_TypeMeta(in *v1.TypeMeta, out *api.TypeMeta, s c
 	return nil
 }
 
+func convert_expapi_Hello_To_v1alpha1_Hello(in *expapi.Hello, out *Hello, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.Hello))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.Text = in.Text
+	out.Text2 = in.Text2
+	return nil
+}
+
+func convert_expapi_HelloList_To_v1alpha1_HelloList(in *expapi.HelloList, out *HelloList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*expapi.HelloList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Hello, len(in.Items))
+		for i := range in.Items {
+			if err := convert_expapi_Hello_To_v1alpha1_Hello(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func convert_expapi_HorizontalPodAutoscaler_To_v1alpha1_HorizontalPodAutoscaler(in *expapi.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.HorizontalPodAutoscaler))(in)
@@ -274,6 +312,44 @@ func convert_expapi_TargetConsumption_To_v1alpha1_TargetConsumption(in *expapi.T
 	out.Resource = v1.ResourceName(in.Resource)
 	if err := s.Convert(&in.Quantity, &out.Quantity, 0); err != nil {
 		return err
+	}
+	return nil
+}
+
+func convert_v1alpha1_Hello_To_expapi_Hello(in *Hello, out *expapi.Hello, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Hello))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.Text = in.Text
+	out.Text2 = in.Text2
+	return nil
+}
+
+func convert_v1alpha1_HelloList_To_expapi_HelloList(in *HelloList, out *expapi.HelloList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*HelloList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]expapi.Hello, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1alpha1_Hello_To_expapi_Hello(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -418,6 +494,8 @@ func init() {
 		convert_api_ListMeta_To_v1_ListMeta,
 		convert_api_ObjectMeta_To_v1_ObjectMeta,
 		convert_api_TypeMeta_To_v1_TypeMeta,
+		convert_expapi_HelloList_To_v1alpha1_HelloList,
+		convert_expapi_Hello_To_v1alpha1_Hello,
 		convert_expapi_HorizontalPodAutoscalerList_To_v1alpha1_HorizontalPodAutoscalerList,
 		convert_expapi_HorizontalPodAutoscalerSpec_To_v1alpha1_HorizontalPodAutoscalerSpec,
 		convert_expapi_HorizontalPodAutoscaler_To_v1alpha1_HorizontalPodAutoscaler,
@@ -430,6 +508,8 @@ func init() {
 		convert_v1_ListMeta_To_api_ListMeta,
 		convert_v1_ObjectMeta_To_api_ObjectMeta,
 		convert_v1_TypeMeta_To_api_TypeMeta,
+		convert_v1alpha1_HelloList_To_expapi_HelloList,
+		convert_v1alpha1_Hello_To_expapi_Hello,
 		convert_v1alpha1_HorizontalPodAutoscalerList_To_expapi_HorizontalPodAutoscalerList,
 		convert_v1alpha1_HorizontalPodAutoscalerSpec_To_expapi_HorizontalPodAutoscalerSpec,
 		convert_v1alpha1_HorizontalPodAutoscaler_To_expapi_HorizontalPodAutoscaler,

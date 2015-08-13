@@ -95,6 +95,38 @@ func deepCopy_v1_TypeMeta(in v1.TypeMeta, out *v1.TypeMeta, c *conversion.Cloner
 	return nil
 }
 
+func deepCopy_v1alpha1_Hello(in Hello, out *Hello, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.Text = in.Text
+	out.Text2 = in.Text2
+	return nil
+}
+
+func deepCopy_v1alpha1_HelloList(in HelloList, out *HelloList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Hello, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1alpha1_Hello(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_v1alpha1_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -218,6 +250,8 @@ func init() {
 		deepCopy_v1_ListMeta,
 		deepCopy_v1_ObjectMeta,
 		deepCopy_v1_TypeMeta,
+		deepCopy_v1alpha1_Hello,
+		deepCopy_v1alpha1_HelloList,
 		deepCopy_v1alpha1_HorizontalPodAutoscaler,
 		deepCopy_v1alpha1_HorizontalPodAutoscalerList,
 		deepCopy_v1alpha1_HorizontalPodAutoscalerSpec,

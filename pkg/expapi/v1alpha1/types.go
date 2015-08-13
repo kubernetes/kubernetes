@@ -98,3 +98,18 @@ type HorizontalPodAutoscalerList struct {
 
 	Items []HorizontalPodAutoscaler `json:"items" description:"list of horizontal pod autoscalers"`
 }
+
+type Hello struct {
+	v1.TypeMeta   `json:",inline"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
+
+	Text  string `json:"text,omitempty"`
+	Text2 string `json:"test,omitempty"`
+}
+
+type HelloList struct {
+	v1.TypeMeta `json:",inline"`
+	v1.ListMeta `json:"metadata,omitempty"`
+
+	Items []Hello `json:"items,omitempty"`
+}
