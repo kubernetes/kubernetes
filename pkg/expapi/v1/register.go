@@ -24,15 +24,22 @@ import (
 var Codec = runtime.CodecFor(api.Scheme, "v1")
 
 func init() {
-	addConversionFuncs()
-	addDefaultingFuncs()
 	addKnownTypes()
+	addDefaultingFuncs()
+	addConversionFuncs()
 }
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("v1", &Scale{}, &ReplicationControllerDummy{})
+	api.Scheme.AddKnownTypes("v1",
+		&HorizontalPodAutoscaler{},
+		&HorizontalPodAutoscalerList{},
+		&ReplicationControllerDummy{},
+		&Scale{},
+	)
 }
 
-func (*Scale) IsAnAPIObject()                      {}
-func (*ReplicationControllerDummy) IsAnAPIObject() {}
+func (*HorizontalPodAutoscaler) IsAnAPIObject()     {}
+func (*HorizontalPodAutoscalerList) IsAnAPIObject() {}
+func (*ReplicationControllerDummy) IsAnAPIObject()  {}
+func (*Scale) IsAnAPIObject()                       {}

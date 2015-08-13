@@ -77,6 +77,8 @@ import (
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 
+	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
+
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
@@ -777,11 +779,13 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 
 // expapi returns the resources and codec for the experimental api
 func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
-
 	controllerStorage := expcontrolleretcd.NewStorage(c.DatabaseStorage)
+	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.DatabaseStorage)
+
 	storage := map[string]rest.Storage{
 		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
 		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
+		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
 	}
 
 	return &apiserver.APIGroupVersion{
