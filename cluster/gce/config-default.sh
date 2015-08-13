@@ -46,6 +46,7 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/16}"
 MINION_SCOPES="${MINION_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-false}"
+KUBELET_PORT="${KUBELET_PORT:-10250}"
 
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL="${POLL_SLEEP_INTERVAL:-3}"
