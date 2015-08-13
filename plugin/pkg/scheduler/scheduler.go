@@ -116,7 +116,7 @@ func (s *Scheduler) scheduleOne() {
 		s.config.BindPodsRateLimiter.Accept()
 	}
 
-	glog.V(3).Infof("Attempting to schedule: %v", pod)
+	glog.V(3).Infof("Attempting to schedule: %+v", pod)
 	start := time.Now()
 	defer func() {
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
@@ -124,7 +124,7 @@ func (s *Scheduler) scheduleOne() {
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
-		glog.V(1).Infof("Failed to schedule: %v", pod)
+		glog.V(1).Infof("Failed to schedule: %+v", pod)
 		s.config.Recorder.Eventf(pod, "FailedScheduling", "%v", err)
 		s.config.Error(pod, err)
 		return
@@ -144,7 +144,7 @@ func (s *Scheduler) scheduleOne() {
 		err := s.config.Binder.Bind(b)
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		if err != nil {
-			glog.V(1).Infof("Failed to bind pod: %v", err)
+			glog.V(1).Infof("Failed to bind pod: %+v", err)
 			s.config.Recorder.Eventf(pod, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.Error(pod, err)
 			return
