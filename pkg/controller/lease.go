@@ -56,7 +56,7 @@ type Config struct {
 	LeaseGained   func() bool
 	LeaseLost     func() bool
 	Cli           *client.Client
-	LeaseUserInfo LeaseUser
+	LeaseUserInfo *LeaseUser
 }
 
 // leaseAndUpdateLoop runs the loop to acquire a lease.  This will continue trying to get a lease

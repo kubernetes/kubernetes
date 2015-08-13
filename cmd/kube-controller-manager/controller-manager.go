@@ -94,7 +94,7 @@ func main() {
 	//we can delete some params...
 	mcfg := controller.Config{
 		Key:           "cm-LEASE",
-		LeaseUserInfo: leaseUserInfo,
+		LeaseUserInfo: &leaseUserInfo,
 		LeaseGained:   startRC,
 		LeaseLost:     endRC,
 		Cli:           kubeClient}
