@@ -287,18 +287,10 @@ gulp.task('styles:app', function() {
       .on("error", handleError);
 });
 
-gulp.task('config', gulpsync.sync(['config:base', 'config:copy']));
-
-gulp.task('config:base', function() {
-  return stringSrc('generated-config.js', 'angular.module("kubernetesApp.config", [])' +
-                                              '\n' +
-                                              '.constant("ENV", {})').pipe(gulp.dest(source.config.dest));
-});
-
-gulp.task('config:copy', function() {
+gulp.task('config', function() {
   var environment = isProduction ? 'production' : 'development';
   return gulp.src(['shared/config/' + environment + '.json', 'components/**/config/' + environment + '.json'])
-    .pipe(expect({ errorOnFailure: true }, 'shared/config/' + environment + '.json'))
+    .pipe(expect({ errorOnFailure: true, reportUnexpected: false }, 'shared/config/' + environment + '.json'))
     .on("error", handleError)
     .pipe(jsoncombine('generated-config.js',
       function(data) {
