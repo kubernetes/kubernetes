@@ -23,7 +23,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/emicklei/go-restful/swagger"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -47,6 +50,7 @@ type Interface interface {
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
+	SwaggerSchemaInterface
 	Experimental() ExperimentalInterface
 }
 
@@ -172,6 +176,49 @@ func (c *Client) ValidateComponents() (*api.ComponentStatusList, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &api.ComponentStatusList{Items: statuses}, nil
+}
+
+// SwaggerSchemaInterface has a method to retrieve the swagger schema. Used in
+// client.Interface
+type SwaggerSchemaInterface interface {
+	SwaggerSchema(version string) (*swagger.ApiDeclaration, error)
+}
+
+// SwaggerSchema retrieves and parses the swagger API schema the server supports.
+func (c *Client) SwaggerSchema(version string) (*swagger.ApiDeclaration, error) {
+	if version == "" {
+		version = latest.GroupOrDie("").Version
+	}
+
+	vers, err := c.ServerAPIVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	// This check also takes care the case that kubectl is newer than the running endpoint
+	if stringDoesntExistIn(version, vers.Versions) {
+		return nil, fmt.Errorf("API version: %s is not supported by the server. Use one of: %v", version, vers.Versions)
+	}
+
+	body, err := c.Get().AbsPath("/swaggerapi/api/" + version).Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var schema swagger.ApiDeclaration
+	err = json.Unmarshal(body, &schema)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	return &schema, nil
+}
+
+func stringDoesntExistIn(str string, slice []string) bool {
+	for _, s := range slice {
+		if s == str {
+			return false
+		}
+	}
+	return true
 }
 
 // IsTimeout tests if this is a timeout error in the underlying transport.
