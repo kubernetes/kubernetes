@@ -1105,6 +1105,22 @@ _kubectl_version()
     must_have_one_noun=()
 }
 
+_kubectl_explain()
+{
+    last_command="kubectl_explain"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--recursive")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+}
+
 _kubectl()
 {
     last_command="kubectl"
@@ -1133,6 +1149,7 @@ _kubectl()
     commands+=("cluster-info")
     commands+=("api-versions")
     commands+=("version")
+    commands+=("explain")
 
     flags=()
     two_word_flags=()
