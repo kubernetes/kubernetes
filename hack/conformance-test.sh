@@ -23,8 +23,6 @@
 #    cluster to be tested, and with suitable auth setting.
 #  - Specify the location of that kubeconfig with, e.g.:
 #    declare -x KUBECONFIG="$HOME/.kube/config"
-#  - Specify the location of the master with, e.g.:
-#    declare -x KUBE_MASTER_IP="1.2.3.4"
 #  - Make sure only essential pods are running and there are no failed/pending pods.
 #  - Go to a git tree that contains the kubernetes source.
 #    - git clone git://github.com/kubernetes/kubernetes.git
@@ -65,8 +63,7 @@
 
 
 : ${KUBECONFIG:?"Must set KUBECONFIG before running conformance test."}
-: ${KUBE_MASTER_IP:?"Must set KUBE_MASTER_IP before running conformance test."}
-echo "Conformance test using ${KUBECONFIG} against master at ${KUBE_MASTER_IP}"
+echo "Conformance test using current-context of ${KUBECONFIG}"
 echo -n "Conformance test run date:"
 date
 echo -n "Conformance test SHA:"
