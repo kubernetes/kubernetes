@@ -36,6 +36,7 @@ Getting started with libvirt CoreOS
 **Table of Contents**
 
 - [Highlights](#highlights)
+- [Warnings about `libvirt-coreos` use case](#warnings-about-libvirt-coreos-use-case)
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
 - [Interacting with your Kubernetes cluster with the `kube-*` scripts.](#interacting-with-your-kubernetes-cluster-with-the-kube--scripts)
@@ -51,6 +52,30 @@ Getting started with libvirt CoreOS
 * Super-fast cluster boot-up (few seconds instead of several minutes for vagrant)
 * Reduced disk usage thanks to [COW](https://en.wikibooks.org/wiki/QEMU/Images#Copy_on_write)
 * Reduced memory footprint thanks to [KSM](https://www.kernel.org/doc/Documentation/vm/ksm.txt)
+
+### Warnings about `libvirt-coreos` use case
+
+The primary goal of the `libvirt-coreos` cluster provider is to deploy a multi-node Kubernetes cluster on local VMs as fast as possible and to be as light as possible in term of resources used.
+
+In order to achieve that goal, its deployment is very different from the “standard production deployment” method used on other providers. This was done on purpose in order to implement some optimizations made possible by the fact that we know that all VMs will be running on the same physical machine.
+
+The `libvirt-coreos` cluster provider doesn’t aim at being production look-alike.
+
+Another difference is that no security is enforced on `libvirt-coreos` at all. For example,
+
+* Kube API server is reachable via a clear-text connection (no SSL);
+* Kube API server requires no credentials;
+* etcd access is not protected;
+* Kubernetes secrets are not protected as securely as they are on production environments;
+* etc.
+
+So, an k8s application developer should not validate its interaction with Kubernetes on `libvirt-coreos` because he might technically succeed in doing things that are prohibited on a production environment like:
+
+* un-authenticated access to Kube API server;
+* Access to Kubernetes private data structures inside etcd;
+* etc.
+
+On the other hand, `libvirt-coreos` might be useful for people investigating low level implementation of Kubernetes because debugging techniques like sniffing the network traffic or introspecting the etcd content are easier on `libvirt-coreos` than on a production deployment.
 
 ### Prerequisites
 
