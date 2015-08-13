@@ -59,8 +59,8 @@ type ProxyServer struct {
 	Recorder            record.EventRecorder
 	HostnameOverride    string
 	ForceUserspaceProxy bool
-	// Reference to this node.
-	nodeRef *api.ObjectReference
+	SyncPeriod          time.Duration
+	nodeRef             *api.ObjectReference // Reference to this node.
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -71,6 +71,7 @@ func NewProxyServer() *ProxyServer {
 		HealthzBindAddress: net.ParseIP("127.0.0.1"),
 		OOMScoreAdj:        qos.KubeProxyOomScoreAdj,
 		ResourceContainer:  "/kube-proxy",
+		SyncPeriod:         5 * time.Second,
 	}
 }
 
@@ -86,6 +87,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.BoolVar(&s.ForceUserspaceProxy, "legacy-userspace-proxy", true, "Use the legacy userspace proxy (instead of the pure iptables proxy).")
+	fs.DurationVar(&s.SyncPeriod, "iptables-sync-period", 5*time.Second, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
@@ -157,7 +159,7 @@ func (s *ProxyServer) Run(_ []string) error {
 	if !s.ForceUserspaceProxy && shouldUseIptables {
 		glog.V(2).Info("Using iptables Proxier.")
 
-		proxierIptables, err := iptables.NewProxier(utiliptables.New(exec.New(), protocol))
+		proxierIptables, err := iptables.NewProxier(utiliptables.New(exec.New(), protocol), s.SyncPeriod)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
@@ -171,7 +173,7 @@ func (s *ProxyServer) Run(_ []string) error {
 		// set EndpointsConfigHandler to our loadBalancer
 		endpointsHandler = loadBalancer
 
-		proxierUserspace, err := userspace.NewProxier(loadBalancer, s.BindAddress, utiliptables.New(exec.New(), protocol), s.PortRange)
+		proxierUserspace, err := userspace.NewProxier(loadBalancer, s.BindAddress, utiliptables.New(exec.New(), protocol), s.PortRange, s.SyncPeriod)
 		if err != nil {
 			glog.Fatalf("Unable to create proxer: %v", err)
 		}

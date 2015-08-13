@@ -108,6 +108,7 @@ func newServiceInfo(service proxy.ServicePortName) *serviceInfo {
 type Proxier struct {
 	mu                          sync.Mutex // protects serviceMap
 	serviceMap                  map[proxy.ServicePortName]*serviceInfo
+	syncPeriod                  time.Duration
 	iptables                    utiliptables.Interface
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
@@ -121,12 +122,13 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, syncPeriod time.Duration) (*Proxier, error) {
 	glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
 	// remove iptables rules/chains from the userspace Proxier
 	tearDownUserspaceIptables(ipt)
 	return &Proxier{
 		serviceMap: make(map[proxy.ServicePortName]*serviceInfo),
+		syncPeriod: syncPeriod,
 		iptables:   ipt,
 	}, nil
 }
@@ -205,12 +207,9 @@ func ipsEqual(lhs, rhs []string) bool {
 	return true
 }
 
-// How often we sync iptables
-const syncIntervalIptables = 5 * time.Second
-
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
-	t := time.NewTicker(syncIntervalIptables)
+	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
 	for {
 		<-t.C

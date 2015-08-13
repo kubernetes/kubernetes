@@ -118,6 +118,7 @@ image-gc-low-threshold
 insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
+iptables-sync-period
 jenkins-host
 jenkins-jobs
 km-path
