@@ -134,8 +134,6 @@ contrib/ansible/group_vars/all.yml:kube_service_addresses: 10.254.0.0/16
 hooks/pre-commit:invalid_flag_lines=$(hack/verify-flags-underscore.py "${allfiles[@]}")
 hooks/pre-commit:if [[ "${invalid_flag_lines:-}" != "" ]]; then
 hooks/pre-commit:  for line in "${invalid_flag_lines[@]}"; do
-www/master/gulpfile.js:        var _file_contents = 'app.constant("manifestRoutes", ' + output_sections + ');\n';
-www/master/gulpfile.js:        stringSrc("sections.js", _file_contents).pipe(gulp.dest("js"));
 examples/nfs/README.md:allow_privileged: true
 examples/openshift-origin/README.md:allow_privileged: true
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
@@ -505,8 +503,9 @@ cluster/vagrant/provision-master.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" 
 cluster/vagrant/provision-master.sh:  service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-master.sh:  enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-master.sh:  admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
-cluster/libvirt-coreos/user_data.yml:    addr: ${public_ip}:4001
-cluster/libvirt-coreos/user_data.yml:    peer-addr: ${public_ip}:7001
+cluster/libvirt-coreos/user_data.yml:    advertise-client-urls: http://${public_ip}:2379
+cluster/libvirt-coreos/user_data.yml:    initial-advertise-peer-urls: http://${public_ip}:2380
+cluster/libvirt-coreos/user_data.yml:    listen-peer-urls: http://${public_ip}:2380
 cluster/libvirt-coreos/user_data.yml:        Address=${public_ip}/24
 cluster/libvirt-coreos/util.sh:        public_ip=$MASTER_IP
 cluster/libvirt-coreos/util.sh:      public_ip=${MINION_IPS[$i]}
