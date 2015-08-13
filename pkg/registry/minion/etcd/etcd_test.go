@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
@@ -211,23 +210,10 @@ func TestEtcdListNodesMatch(t *testing.T) {
 }
 
 func TestEtcdGetNode(t *testing.T) {
-	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	node := validNewNode()
-	key, _ := storage.KeyFunc(ctx, node.Name)
-	key = etcdtest.AddPrefix(key)
-
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, node), 0)
-	nodeObj, err := storage.Get(ctx, node.Name)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	got := nodeObj.(*api.Node)
-
-	node.ObjectMeta.ResourceVersion = got.ObjectMeta.ResourceVersion
-	if e, a := node, got; !api.Semantic.DeepEqual(*e, *a) {
-		t.Errorf("Unexpected node: %#v, expected %#v", e, a)
-	}
+	test.TestGet(node)
 }
 
 func TestEtcdUpdateEndpoints(t *testing.T) {
@@ -257,23 +243,6 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	node.ObjectMeta.ResourceVersion = nodeOut.ObjectMeta.ResourceVersion
 	if !api.Semantic.DeepEqual(node, &nodeOut) {
 		t.Errorf("Unexpected node: %#v, expected %#v", &nodeOut, node)
-	}
-}
-
-func TestEtcdGetNodeNotFound(t *testing.T) {
-	ctx := api.NewContext()
-	storage, fakeClient := newStorage(t)
-	key := etcdtest.AddPrefix("minions/foo")
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
-	_, err := storage.Get(ctx, "foo")
-
-	if !errors.IsNotFound(err) {
-		t.Errorf("Unexpected error returned: %#v", err)
 	}
 }
 

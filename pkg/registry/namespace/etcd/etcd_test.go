@@ -284,32 +284,10 @@ func TestNamespaceDecode(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	expect := validNewNamespace()
-	expect.Status.Phase = api.NamespaceActive
 	storage, fakeEtcdClient, _ := newStorage(t)
-	ctx := api.NewContext()
-	key, err := storage.Etcd.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	if err != nil {
-		t.Fatalf("unexpected key error: %v", err)
-	}
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, expect),
-			},
-		},
-	}
-	obj, err := storage.Get(api.NewContext(), "foo")
-	namespace := obj.(*api.Namespace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expect.Status.Phase = api.NamespaceActive
-	if e, a := expect, namespace; !api.Semantic.DeepEqual(e, a) {
-		t.Errorf("Unexpected namespace: %s", util.ObjectDiff(e, a))
-	}
+	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	namespace := validNewNamespace()
+	test.TestGet(namespace)
 }
 
 func TestDeleteNamespace(t *testing.T) {

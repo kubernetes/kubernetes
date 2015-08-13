@@ -314,30 +314,6 @@ func TestResourceQuotaDecode(t *testing.T) {
 	}
 }
 
-func TestGet(t *testing.T) {
-	expect := validNewResourceQuota()
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage, _ := NewStorage(etcdStorage)
-	key := "/resourcequotas/test/foo"
-	key = etcdtest.AddPrefix(key)
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, expect),
-			},
-		},
-	}
-	obj, err := storage.Get(api.WithNamespace(api.NewContext(), "test"), "foo")
-	resourcequota := obj.(*api.ResourceQuota)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if e, a := expect, resourcequota; !api.Semantic.DeepEqual(e, a) {
-		t.Errorf("Unexpected resourcequota: %s", util.ObjectDiff(e, a))
-	}
-}
-
 func TestDeleteResourceQuota(t *testing.T) {
 	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
 	fakeEtcdClient.ChangeIndex = 1
@@ -366,79 +342,12 @@ func TestDeleteResourceQuota(t *testing.T) {
 	}
 }
 
-// TestEtcdGetDifferentNamespace ensures same-name resourcequotas in different namespaces do not clash
-func TestEtcdGetDifferentNamespace(t *testing.T) {
-	registry, _, fakeClient, _ := newStorage(t)
-
-	ctx1 := api.NewDefaultContext()
-	ctx2 := api.WithNamespace(api.NewContext(), "other")
-
-	key1, _ := registry.KeyFunc(ctx1, "foo")
-	key2, _ := registry.KeyFunc(ctx2, "foo")
-
-	key1 = etcdtest.AddPrefix(key1)
-	key2 = etcdtest.AddPrefix(key2)
-
-	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Namespace: "default", Name: "foo"}}), 0)
-	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Namespace: "other", Name: "foo"}}), 0)
-
-	obj, err := registry.Get(ctx1, "foo")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	resourcequota1 := obj.(*api.ResourceQuota)
-	if resourcequota1.Name != "foo" {
-		t.Errorf("Unexpected resourcequota: %#v", resourcequota1)
-	}
-	if resourcequota1.Namespace != "default" {
-		t.Errorf("Unexpected resourcequota: %#v", resourcequota1)
-	}
-
-	obj, err = registry.Get(ctx2, "foo")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	resourcequota2 := obj.(*api.ResourceQuota)
-	if resourcequota2.Name != "foo" {
-		t.Errorf("Unexpected resourcequota: %#v", resourcequota2)
-	}
-	if resourcequota2.Namespace != "other" {
-		t.Errorf("Unexpected resourcequota: %#v", resourcequota2)
-	}
-
-}
-
 func TestEtcdGet(t *testing.T) {
-	registry, _, fakeClient, _ := newStorage(t)
-	ctx := api.NewDefaultContext()
-	key, _ := registry.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
-	obj, err := registry.Get(ctx, "foo")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	resourcequota := obj.(*api.ResourceQuota)
-	if resourcequota.Name != "foo" {
-		t.Errorf("Unexpected resourcequota: %#v", resourcequota)
-	}
-}
-
-func TestEtcdGetNotFound(t *testing.T) {
-	registry, _, fakeClient, _ := newStorage(t)
-	ctx := api.NewDefaultContext()
-	key, _ := registry.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
-	_, err := registry.Get(ctx, "foo")
-	if !errors.IsNotFound(err) {
-		t.Errorf("Unexpected error returned: %#v", err)
-	}
+	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
+	storage, _ := NewStorage(etcdStorage)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	resourcequota := validNewResourceQuota()
+	test.TestGet(resourcequota)
 }
 
 func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
