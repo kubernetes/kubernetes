@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
+	"os"
 	"time"
 )
 
@@ -72,7 +73,6 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 	acquiredLock, err := ilock.Get(c.Key)
 	//No lock exists, lets create one if possible.
 	if err != nil {
-		//return false, err
 
 		acquiredLock, err = ilock.Create(
 			&api.Lock{
@@ -86,9 +86,11 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 				},
 			})
 		if err != nil {
-			glog.Infof("Lock was unsuccessfully created %v", acquiredLock)
+			glog.Errorf("Lock was NOT created, ERROR = %v", err)
 			c.lastLease = time.Now()
 			return false, err
+		} else {
+			glog.Errorf("Lock created successfully %v !", acquiredLock)
 		}
 	}
 
@@ -96,11 +98,11 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 	// we cannot take the lock, so the result is the same - return false and return error details.
 	_, err = ilock.Update(acquiredLock)
 	if err != nil {
-		glog.Infof("Acquire lock failed.  We don't have the lock, master is %v", acquiredLock)
+		glog.Errorf("Acquire lock failed.  We don't have the lock, master is %v", acquiredLock)
 		return false, err
 	}
 
-	glog.Infof("Acquired lock successfully.  We are the master, yipppeee!")
+	glog.Errorf("Acquired lock successfully.  We are the master, yipppeee!")
 	return true, nil
 }
 
@@ -118,6 +120,20 @@ func (c *Config) update(master bool) error {
 }
 
 func RunLease(c *Config) {
+
+	//set some reasonable defaults.
+	if len(c.whoami) == 0 {
+		hostname, err := os.Hostname()
+		if err != nil {
+			glog.Fatalf("Failed to get hostname: %v", err)
+		}
+		c.whoami = hostname
+		glog.Infof("--whoami is empty, defaulting to %s", c.whoami)
+	}
+	if c.ttl < 1 {
+		c.ttl = 30
+		glog.Infof("Set default to 30 seconds for lease time to live")
+	}
 
 	go c.leaseAndUpdateLoop()
 
