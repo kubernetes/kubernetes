@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"

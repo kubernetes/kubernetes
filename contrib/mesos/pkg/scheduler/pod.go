@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 )
 
 // wrapper for the k8s pod type so that we can define additional methods on a "pod"

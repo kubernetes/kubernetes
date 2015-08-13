@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func TestPatchObject(t *testing.T) {
