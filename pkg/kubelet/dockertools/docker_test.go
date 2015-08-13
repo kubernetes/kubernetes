@@ -100,7 +100,7 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 	util.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s_%s", podName, podNamespace)
-	name := BuildDockerName(KubeletContainerName{podFullName, types.UID(podUID), container.Name}, container)
+	_, name := BuildDockerName(KubeletContainerName{podFullName, types.UID(podUID), container.Name}, container)
 	returned, hash, err := ParseDockerName(name)
 	if err != nil {
 		t.Errorf("Failed to parse Docker container name %q: %v", name, err)

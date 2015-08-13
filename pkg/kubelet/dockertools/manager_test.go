@@ -844,7 +844,7 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 
 // runSyncPod is a helper function to retrieve the running pods from the fake
 // docker client and runs SyncPod for the given pod.
-func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod) {
+func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *util.Backoff) {
 	runningPods, err := dm.GetPods(false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -855,7 +855,10 @@ func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, p
 		t.Errorf("unexpected error: %v", err)
 	}
 	fakeDocker.ClearCalls()
-	err = dm.SyncPod(pod, runningPod, *podStatus, []api.Secret{})
+	if backOff == nil {
+		backOff = util.NewBackOff(time.Second, time.Minute)
+	}
+	err = dm.SyncPod(pod, runningPod, *podStatus, []api.Secret{}, backOff)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -878,7 +881,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
 		"create", "start", "inspect_container",
@@ -926,7 +929,7 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
@@ -978,7 +981,7 @@ func TestSyncPodWithPodInfraCreatesContainer(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Inspect pod infra container (but does not create)"
@@ -1017,7 +1020,7 @@ func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Kill the container since pod infra container is not running.
@@ -1090,7 +1093,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Check the pod infra container.
@@ -1144,7 +1147,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Check the pod infra container.
@@ -1202,7 +1205,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Check the pod infra container.
@@ -1259,7 +1262,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Check the pod infra contianer.
@@ -1292,7 +1295,7 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	fakeDocker.Lock()
 
@@ -1456,7 +1459,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 		fakeDocker.ContainerMap = containerMap
 		pod.Spec.RestartPolicy = tt.policy
 
-		runSyncPod(t, dm, fakeDocker, pod)
+		runSyncPod(t, dm, fakeDocker, pod, nil)
 
 		// 'stop' is because the pod infra container is killed when no container is running.
 		verifyCalls(t, fakeDocker, tt.calls)
@@ -1575,7 +1578,7 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 			},
 		}
 
-		runSyncPod(t, dm, fakeDocker, pod)
+		runSyncPod(t, dm, fakeDocker, pod, nil)
 
 		// Check if we can retrieve the pod status.
 		status, err := dm.GetPodStatus(pod)
@@ -1599,6 +1602,123 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 		}
 		if err := fakeDocker.AssertStopped(tt.stopped); err != nil {
 			t.Errorf("%d: %v", i, err)
+		}
+	}
+}
+
+func TestSyncPodBackoff(t *testing.T) {
+	var fakeClock = &util.FakeClock{Time: time.Now()}
+	startTime := fakeClock.Now()
+
+	dm, fakeDocker := newTestDockerManager()
+	containers := []api.Container{
+		{Name: "good"},
+		{Name: "bad"},
+	}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "podfoo",
+			Namespace: "nsnew",
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	containerList := []docker.APIContainers{
+		// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
+		{
+			// pod infra container
+			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_podfoo_nsnew_12345678_0"},
+			ID:    "9876",
+		},
+		{
+			Names: []string{"/k8s_good." + strconv.FormatUint(kubecontainer.HashContainer(&containers[0]), 16) + "_podfoo_nsnew_12345678_0"},
+			ID:    "1234",
+		},
+	}
+
+	exitedAPIContainers := []docker.APIContainers{
+		{
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+			Names: []string{"/k8s_bad." + strconv.FormatUint(kubecontainer.HashContainer(&containers[1]), 16) + "_podfoo_nsnew_12345678_0"},
+			ID:    "5678",
+		},
+	}
+	stableId := "k8s_bad." + strconv.FormatUint(kubecontainer.HashContainer(&containers[1]), 16) + "_podfoo_nsnew_12345678"
+	containerMap := map[string]*docker.Container{
+		"9876": {
+			ID:         "9876",
+			Name:       "POD",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+			State: docker.State{
+				StartedAt: startTime,
+				Running:   true,
+			},
+		},
+		"1234": {
+			ID:         "1234",
+			Name:       "good",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+			State: docker.State{
+				StartedAt: startTime,
+				Running:   true,
+			},
+		},
+		"5678": {
+			ID:         "5678",
+			Name:       "bad",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+			State: docker.State{
+				ExitCode:   42,
+				StartedAt:  startTime,
+				FinishedAt: fakeClock.Now(),
+			},
+		},
+	}
+
+	startCalls := []string{"inspect_container", "create", "start", "inspect_container"}
+	backOffCalls := []string{"inspect_container"}
+	tests := []struct {
+		tick      int
+		backoff   int
+		killDelay int
+		result    []string
+	}{
+		{1, 1, 1, startCalls},
+		{2, 2, 2, startCalls},
+		{3, 2, 3, backOffCalls},
+		{4, 4, 4, startCalls},
+		{5, 4, 5, backOffCalls},
+		{6, 4, 6, backOffCalls},
+		{7, 4, 7, backOffCalls},
+		{8, 8, 129, startCalls},
+		{130, 1, 0, startCalls},
+	}
+
+	backOff := util.NewBackOff(time.Second, time.Minute)
+	backOff.Clock = fakeClock
+	for _, c := range tests {
+		fakeDocker.ContainerMap = containerMap
+		fakeDocker.ExitedContainerList = exitedAPIContainers
+		fakeDocker.ContainerList = containerList
+		fakeClock.Time = startTime.Add(time.Duration(c.tick) * time.Second)
+
+		runSyncPod(t, dm, fakeDocker, pod, backOff)
+		verifyCalls(t, fakeDocker, c.result)
+
+		if backOff.Get(stableId) != time.Duration(c.backoff)*time.Second {
+			t.Errorf("At tick %s expected backoff=%s got=%s", time.Duration(c.tick)*time.Second, time.Duration(c.backoff)*time.Second, backOff.Get(stableId))
+		}
+
+		if len(fakeDocker.Created) > 0 {
+			// pretend kill the container
+			fakeDocker.Created = nil
+			containerMap["5678"].State.FinishedAt = startTime.Add(time.Duration(c.killDelay) * time.Second)
 		}
 	}
 }
@@ -1639,7 +1759,7 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 	// Check if we can retrieve the pod status.
 	status, err := dm.GetPodStatus(pod)
 	if err != nil {
@@ -1695,7 +1815,7 @@ func TestGetPodPullImageFailureReason(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 	// Check if we can retrieve the pod status.
 	status, err := dm.GetPodStatus(pod)
 	if err != nil {
@@ -1839,7 +1959,7 @@ func TestSyncPodWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Check the pod infra container.
@@ -1902,7 +2022,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Check the pod infra container.
@@ -1969,7 +2089,7 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
 		"create", "start", "inspect_container",
@@ -2007,7 +2127,7 @@ func TestSyncPodWithHostNetwork(t *testing.T) {
 		},
 	}
 
-	runSyncPod(t, dm, fakeDocker, pod)
+	runSyncPod(t, dm, fakeDocker, pod, nil)
 
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
