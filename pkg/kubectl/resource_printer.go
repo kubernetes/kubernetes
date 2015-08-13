@@ -376,6 +376,9 @@ func shortHumanDuration(d time.Duration) string {
 // translateTimestamp returns the elapsed time since timestamp in
 // human-readable approximation.
 func translateTimestamp(timestamp util.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
 	return shortHumanDuration(time.Now().Sub(timestamp.Time))
 }
 

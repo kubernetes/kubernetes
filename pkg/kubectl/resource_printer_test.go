@@ -1097,3 +1097,26 @@ func TestPrintPodWithLabels(t *testing.T) {
 		buf.Reset()
 	}
 }
+
+type stringTestList []struct {
+	name, got, exp string
+}
+
+func TestTranslateTimestamp(t *testing.T) {
+	tl := stringTestList{
+		{"now", translateTimestamp(util.Time{Time: time.Now()}), "0s"},
+		{"unknown", translateTimestamp(util.Time{}), "<unknown>"},
+		{"30 seconds ago", translateTimestamp(util.Time{Time: time.Now().Add(-3e10)}), "30s"},
+		{"5 minutes ago", translateTimestamp(util.Time{Time: time.Now().Add(-3e11)}), "5m"},
+		{"an hour ago", translateTimestamp(util.Time{Time: time.Now().Add(-6e12)}), "1h"},
+		{"2 days ago", translateTimestamp(util.Time{Time: time.Now().AddDate(0, 0, -2)}), "2d"},
+		{"months ago", translateTimestamp(util.Time{Time: time.Now().AddDate(0, -3, 0)}), "92d"},
+		{"10 years ago", translateTimestamp(util.Time{Time: time.Now().AddDate(-10, 0, 0)}), "10y"},
+	}
+	for _, test := range tl {
+		if test.got != test.exp {
+			t.Errorf("On %v, expected '%v', but got '%v'",
+				test.name, test.exp, test.got)
+		}
+	}
+}
