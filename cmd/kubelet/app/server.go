@@ -70,7 +70,7 @@ type KubeletServer struct {
 	AllowPrivileged                bool
 	APIServerList                  []string
 	AuthPath                       util.StringFlag // Deprecated -- use KubeConfig instead
-	CadvisorPort                   uint
+	CAdvisorPort                   uint
 	CertDirectory                  string
 	CgroupRoot                     string
 	CloudConfigFile                string
@@ -156,7 +156,7 @@ func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
 		Address:                     net.ParseIP("0.0.0.0"),
 		AuthPath:                    util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
-		CadvisorPort:                4194,
+		CAdvisorPort:                4194,
 		CertDirectory:               "/var/run/kubernetes",
 		CgroupRoot:                  "",
 		ConfigureCBR0:               false,
@@ -234,7 +234,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
-	fs.UintVar(&s.CadvisorPort, "cadvisor-port", s.CadvisorPort, "The port of the localhost cAdvisor endpoint")
+	fs.UintVar(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.IPVar(&s.HealthzBindAddress, "healthz-bind-address", s.HealthzBindAddress, "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")
@@ -322,7 +322,7 @@ func (s *KubeletServer) KubeletConfig() (*KubeletConfig, error) {
 	return &KubeletConfig{
 		Address:                   s.Address,
 		AllowPrivileged:           s.AllowPrivileged,
-		CadvisorInterface:         nil, // launches background processes, not set here
+		CAdvisorInterface:         nil, // launches background processes, not set here
 		CgroupRoot:                s.CgroupRoot,
 		Cloud:                     nil, // cloud provider might start background processes
 		ClusterDNS:                s.ClusterDNS,
@@ -407,12 +407,12 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 		kcfg.Cloud = cloud
 	}
 
-	if kcfg.CadvisorInterface == nil {
-		ca, err := cadvisor.New(s.CadvisorPort)
+	if kcfg.CAdvisorInterface == nil {
+		ca, err := cadvisor.New(s.CAdvisorPort)
 		if err != nil {
 			return err
 		}
-		kcfg.CadvisorInterface = ca
+		kcfg.CAdvisorInterface = ca
 	}
 
 	util.ReallyCrash = s.ReallyCrashForTesting
@@ -585,7 +585,7 @@ func SimpleKubelet(client *client.Client,
 	}
 	kcfg := KubeletConfig{
 		Address:                   net.ParseIP(address),
-		CadvisorInterface:         cadvisorInterface,
+		CAdvisorInterface:         cadvisorInterface,
 		CgroupRoot:                "",
 		Cloud:                     cloud,
 		ConfigFile:                configFilePath,
@@ -745,7 +745,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	Address                        net.IP
 	AllowPrivileged                bool
-	CadvisorInterface              cadvisor.Interface
+	CAdvisorInterface              cadvisor.Interface
 	CgroupRoot                     string
 	Cloud                          cloudprovider.Interface
 	ClusterDNS                     net.IP
@@ -821,6 +821,10 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		MaxContainers:      kc.MaxContainerCount,
 	}
 
+	daemonEndpoints := &api.NodeDaemonEndpoints{
+		KubeletEndpoint: api.DaemonEndpoint{Port: int(kc.Port)},
+	}
+
 	pc = makePodSourceConfig(kc)
 	k, err = kubelet.NewMainKubelet(
 		kc.Hostname,
@@ -846,7 +850,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.NetworkPluginName,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
-		kc.CadvisorInterface,
+		kc.CAdvisorInterface,
 		kc.ImageGCPolicy,
 		kc.DiskSpacePolicy,
 		kc.Cloud,
@@ -865,7 +869,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.MaxPods,
 		kc.DockerExecHandler,
 		kc.ResolverConfig,
-		kc.CPUCFSQuota)
+		kc.CPUCFSQuota,
+		daemonEndpoints)
 
 	if err != nil {
 		return nil, nil, err
