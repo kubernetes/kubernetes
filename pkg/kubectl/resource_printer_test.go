@@ -102,6 +102,13 @@ func TestPrinter(t *testing.T) {
 	//test inputs
 	simpleTest := &TestPrintType{"foo"}
 	podTest := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	podListTest := &api.PodList{
+		Items: []api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
+		},
+	}
+	emptyListTest := &api.PodList{}
 	testapi, err := api.Scheme.ConvertToVersion(podTest, testapi.Version())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -119,6 +126,8 @@ func TestPrinter(t *testing.T) {
 		{"test template", "template", "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}",
 			podTest, "foo"},
 		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "foo"},
+		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, "foo bar"},
+		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, ""},
 		{"test name", "name", "", podTest, "/foo\n"},
 		{"emits versioned objects", "template", "{{.kind}}", testapi, "Pod"},
 	}
@@ -132,7 +141,7 @@ func TestPrinter(t *testing.T) {
 			t.Errorf("unexpected error: %#v", err)
 		}
 		if buf.String() != test.Expect {
-			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String(), buf.String())
+			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String())
 		}
 	}
 
