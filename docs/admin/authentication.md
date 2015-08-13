@@ -64,6 +64,15 @@ and is a csv file with 3 columns: password, user name, user id.
 When using basic authentication from an http client, the apiserver expects an `Authorization` header
 with a value of `Basic BASE64ENCODED(USER:PASSWORD)`.
 
+**Keystone authentication** is enabled by passing the `--experimental-keystone-url=<AuthURL>`
+option to the apiserver during startup. The plugin is implemented in
+`plugin/pkg/auth/authenticator/request/keystone/keystone.go`.
+For details on how to use keystone to manage projects and users, refer to the
+[Keystone documentation](http://docs.openstack.org/developer/keystone/). Please note that
+this plugin is still experimental which means it is subject to changes.
+Please refer to the [discussion](https://github.com/GoogleCloudPlatform/kubernetes/pull/11798#issuecomment-129655212)
+and the [blueprint](https://github.com/GoogleCloudPlatform/kubernetes/issues/11626) for more details
+
 ## Plugin Development
 
 We plan for the Kubernetes API server to issue tokens
