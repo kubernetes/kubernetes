@@ -28,7 +28,7 @@ set -o pipefail
 # CERT_DIR - where to place the finished certs
 # CERT_GROUP - who the group owner of the cert files should be
 
-cert_ip="${MASTER_IP:="${1}"}"
+cert_ip="${1:-$MASTER_IP}"
 master_name="${MASTER_NAME:="kubernetes"}"
 service_range="${SERVICE_CLUSTER_IP_RANGE:="10.0.0.0/16"}"
 dns_domain="${DNS_DOMAIN:="cluster.local"}"
