@@ -67,7 +67,7 @@ func (eventStrategy) AllowUnconditionalUpdate() bool {
 }
 
 func MatchEvent(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{label, field, getAttrs}
+	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: getAttrs}
 }
 
 func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
