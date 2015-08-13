@@ -100,17 +100,11 @@ type ContainerCommandRunner interface {
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 }
 
-// Customizable hooks injected into container runtimes.
-type RuntimeHooks interface {
-	// Determines whether the runtime should pull the specified container's image.
-	ShouldPullImage(pod *api.Pod, container *api.Container, imagePresent bool) bool
-
-	// Runs when we start to pull an image.
-	ReportImagePulling(pod *api.Pod, container *api.Container)
-
-	// Runs after an image is pulled reporting its status. Error may be nil
-	// for a successful pull.
-	ReportImagePulled(pod *api.Pod, container *api.Container, err error)
+// ImagePuller wraps Runtime.PullImage() to pull a container image.
+// It will check the presence of the image, and report the 'image pulling',
+// 'image pulled' events correspondingly.
+type ImagePuller interface {
+	PullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error
 }
 
 // Pod is a group of containers, with the status of the pod.

@@ -300,7 +300,6 @@ func NewMainKubelet(
 			klet.networkPlugin,
 			klet,
 			klet.httpClient,
-			newKubeletRuntimeHooks(recorder),
 			dockerExecHandler,
 			oomAdjuster,
 			procFs)
