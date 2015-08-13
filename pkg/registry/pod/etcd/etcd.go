@@ -59,8 +59,19 @@ type REST struct {
 	proxyTransport http.RoundTripper
 }
 
+// Defined in pkg/registry/node/etcd/etcd.go
+type HostLocator interface {
+	HostKubeletPort(pod *api.Pod, ctx api.Context) (int, error)
+}
+
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(s storage.Interface, useCacher bool, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper) PodStorage {
+func NewStorage(
+	s storage.Interface,
+	hostLocator HostLocator,
+	useCacher bool,
+	k client.ConnectionInfoGetter,
+	proxyTransport http.RoundTripper,
+) PodStorage {
 	prefix := "/pods"
 
 	storageInterface := s
@@ -110,11 +121,11 @@ func NewStorage(s storage.Interface, useCacher bool, k client.ConnectionInfoGett
 		Pod:         &REST{store, proxyTransport},
 		Binding:     &BindingREST{store: store},
 		Status:      &StatusREST{store: &statusStore},
-		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
+		Log:         &podrest.LogREST{Store: store, HostLocator: hostLocator, KubeletConn: k},
 		Proxy:       &ProxyREST{store: store, proxyTransport: proxyTransport},
-		Exec:        &ExecREST{store: store, kubeletConn: k},
-		Attach:      &AttachREST{store: store, kubeletConn: k},
-		PortForward: &PortForwardREST{store: store, kubeletConn: k},
+		Exec:        &ExecREST{store: store, hostLocator: hostLocator, kubeletConn: k},
+		Attach:      &AttachREST{store: store, hostLocator: hostLocator, kubeletConn: k},
+		PortForward: &PortForwardREST{store: store, hostLocator: hostLocator, kubeletConn: k},
 	}
 }
 
@@ -262,6 +273,7 @@ var upgradeableMethods = []string{"GET", "POST"}
 type AttachREST struct {
 	store       *etcdgeneric.Etcd
 	kubeletConn client.ConnectionInfoGetter
+	hostLocator HostLocator
 }
 
 // Implement Connecter
@@ -278,10 +290,14 @@ func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object, 
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.AttachLocation(r.store, r.kubeletConn, ctx, name, attachOpts)
+	location, transport, err := pod.AttachLocation(r.store, r.kubeletConn, ctx, name, attachOpts, r.hostLocator)
 	if err != nil {
 		return nil, err
 	}
+	if location.Host == "" {
+		return nil, fmt.Errorf("Empty location.Host in %#v", location)
+	}
+
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
@@ -300,6 +316,7 @@ func (r *AttachREST) ConnectMethods() []string {
 type ExecREST struct {
 	store       *etcdgeneric.Etcd
 	kubeletConn client.ConnectionInfoGetter
+	hostLocator HostLocator
 }
 
 // Implement Connecter
@@ -316,10 +333,14 @@ func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object, re
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.ExecLocation(r.store, r.kubeletConn, ctx, name, execOpts)
+	location, transport, err := pod.ExecLocation(r.store, r.kubeletConn, ctx, name, execOpts, r.hostLocator)
 	if err != nil {
 		return nil, err
 	}
+	if location.Host == "" {
+		return nil, fmt.Errorf("Empty location.Host in %#v", location)
+	}
+
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
@@ -337,6 +358,7 @@ func (r *ExecREST) ConnectMethods() []string {
 // TODO: move me into pod/rest - I'm generic to store type via ResourceGetter
 type PortForwardREST struct {
 	store       *etcdgeneric.Etcd
+	hostLocator HostLocator
 	kubeletConn client.ConnectionInfoGetter
 }
 
@@ -360,10 +382,14 @@ func (r *PortForwardREST) ConnectMethods() []string {
 
 // Connect returns a handler for the pod portforward proxy
 func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	location, transport, err := pod.PortForwardLocation(r.store, r.kubeletConn, ctx, name)
+	location, transport, err := pod.PortForwardLocation(r.store, r.kubeletConn, ctx, name, r.hostLocator)
 	if err != nil {
 		return nil, err
 	}
+	if location.Host == "" {
+		return nil, fmt.Errorf("Empty location.Host in %#v", location)
+	}
+
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
