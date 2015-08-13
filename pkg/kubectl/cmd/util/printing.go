@@ -32,6 +32,7 @@ func AddPrinterFlags(cmd *cobra.Command) {
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
 	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
 	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]")
+	cmd.Flags().String("sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
 }
 
 // AddOutputFlagsForMutation adds output related flags to a command. Used by mutations only.
@@ -86,5 +87,21 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 		outputFormat = "template"
 	}
 
-	return kubectl.GetPrinter(outputFormat, templateFile)
+	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile)
+	if err != nil {
+		return nil, generic, err
+	}
+
+	return maybeWrapSortingPrinter(cmd, printer), generic, nil
+}
+
+func maybeWrapSortingPrinter(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {
+	sorting := GetFlagString(cmd, "sort-by")
+	if len(sorting) != 0 {
+		return &kubectl.SortingPrinter{
+			Delegate:  printer,
+			SortField: fmt.Sprintf("{%s}", sorting),
+		}
+	}
+	return printer
 }
