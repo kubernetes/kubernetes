@@ -432,11 +432,135 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 					c.Status)
 			}
 		}
+		describeVolumes(pod.Spec.Volumes, out)
 		if events != nil {
 			DescribeEvents(events, out)
 		}
 		return nil
 	})
+}
+
+func describeVolumes(volumes []api.Volume, out io.Writer) {
+	if volumes == nil || len(volumes) == 0 {
+		fmt.Fprint(out, "No volumes.\n")
+		return
+	}
+	fmt.Fprint(out, "Volumes:\n")
+	for _, volume := range volumes {
+		fmt.Fprintf(out, "  %v:\n", volume.Name)
+		switch {
+		case volume.VolumeSource.HostPath != nil:
+			printHostPathVolumeSource(volume.VolumeSource.HostPath, out)
+		case volume.VolumeSource.EmptyDir != nil:
+			printEmptyDirVolumeSource(volume.VolumeSource.EmptyDir, out)
+		case volume.VolumeSource.GCEPersistentDisk != nil:
+			printGCEPersistentDiskVolumeSource(volume.VolumeSource.GCEPersistentDisk, out)
+		case volume.VolumeSource.AWSElasticBlockStore != nil:
+			printAWSElasticBlockStoreVolumeSource(volume.VolumeSource.AWSElasticBlockStore, out)
+		case volume.VolumeSource.GitRepo != nil:
+			printGitRepoVolumeSource(volume.VolumeSource.GitRepo, out)
+		case volume.VolumeSource.Secret != nil:
+			printSecretVolumeSource(volume.VolumeSource.Secret, out)
+		case volume.VolumeSource.NFS != nil:
+			printNFSVolumeSource(volume.VolumeSource.NFS, out)
+		case volume.VolumeSource.ISCSI != nil:
+			printISCSIVolumeSource(volume.VolumeSource.ISCSI, out)
+		case volume.VolumeSource.Glusterfs != nil:
+			printGlusterfsVolumeSource(volume.VolumeSource.Glusterfs, out)
+		case volume.VolumeSource.PersistentVolumeClaim != nil:
+			printPersistentVolumeClaimVolumeSource(volume.VolumeSource.PersistentVolumeClaim, out)
+		case volume.VolumeSource.RBD != nil:
+			printRBDVolumeSource(volume.VolumeSource.RBD, out)
+		default:
+			fmt.Fprintf(out, "  <Volume Type Not Found>\n")
+		}
+	}
+}
+
+func printHostPathVolumeSource(hostPath *api.HostPathVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tHostPath (bare host directory volume)\n"+
+		"    Path:\t%v\n", hostPath.Path)
+}
+
+func printEmptyDirVolumeSource(emptyDir *api.EmptyDirVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
+		"    Medium:\t%v\n", emptyDir.Medium)
+}
+
+func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tGCEPersistentDisk (a Persistent Disk resource in Google Compute Engine)\n"+
+		"    PDName:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    Partition:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		gce.PDName, gce.FSType, gce.Partition, gce.ReadOnly)
+}
+
+func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tAWSElasticBlockStore (a Persistent Disk resource in AWS)\n"+
+		"    VolumeID:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    Partition:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		aws.VolumeID, aws.FSType, aws.Partition, aws.ReadOnly)
+}
+
+func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tGitRepo (a volume that is pulled from git when the pod is created)\n"+
+		"    Repository:\t%v\n"+
+		"    Revision:\t%v\n",
+		git.Repository, git.Revision)
+}
+
+func printSecretVolumeSource(secret *api.SecretVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tSecret (a secret that should populate this volume)\n"+
+		"    SecretName:\t%v\n", secret.SecretName)
+}
+
+func printNFSVolumeSource(nfs *api.NFSVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tNFS (an NFS mount that lasts the lifetime of a pod)\n"+
+		"    Server:\t%v\n"+
+		"    Path:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		nfs.Server, nfs.Path, nfs.ReadOnly)
+}
+
+func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
+		"    TargetPortal:\t%v\n"+
+		"    IQN:\t%v\n"+
+		"    Lun:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.FSType, iscsi.ReadOnly)
+}
+
+func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
+		"    EndpointsName:\t%v\n"+
+		"    Path:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		glusterfs.EndpointsName, glusterfs.Path, glusterfs.ReadOnly)
+}
+
+func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tPersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)\n"+
+		"    ClaimName:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		claim.ClaimName, claim.ReadOnly)
+}
+
+func printRBDVolumeSource(rbd *api.RBDVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
+		"    CephMonitors:\t%v\n"+
+		"    RBDImage:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    RBDPool:\t%v\n"+
+		"    RadosUser:\t%v\n"+
+		"    Keyring:\t%v\n"+
+		"    SecretRef:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
 type PersistentVolumeDescriber struct {
@@ -631,6 +755,9 @@ func describeReplicationController(controller *api.ReplicationController, events
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(controller.Labels))
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		if controller.Spec.Template != nil {
+			describeVolumes(controller.Spec.Template.Spec.Volumes, out)
+		}
 		if events != nil {
 			DescribeEvents(events, out)
 		}
