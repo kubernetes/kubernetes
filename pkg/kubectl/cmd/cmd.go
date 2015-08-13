@@ -114,7 +114,7 @@ func NewKubectlCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *co
 		Short: "kubectl controls the Kubernetes cluster manager",
 		Long: `kubectl controls the Kubernetes cluster manager.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
+Find more information at https://github.com/kubernetes/kubernetes.`,
 		Run: runHelp,
 		BashCompletionFunction: bash_completion_func,
 	}
