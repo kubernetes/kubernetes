@@ -94,7 +94,7 @@ start_k8s(){
 
     sleep 5
     # Set flannel net config
-    docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+    docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.12 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
 
     # iface may change to a private network interface, eth0 is for default
     flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run --restart=always -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.0 /opt/bin/flanneld -iface="eth0")
@@ -135,7 +135,7 @@ start_k8s(){
     sleep 5
 
     # Start kubelet & proxy, then start master components as pods
-    docker run --net=host --privileged -d -v /sys:/sys:ro -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
+    docker run --net=host --privileged --restart=always -d -v /sys:/sys:ro -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
     docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://127.0.0.1:8080 --v=2   
 }
 
