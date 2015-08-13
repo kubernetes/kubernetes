@@ -147,6 +147,15 @@ func (s *Server) InstallDefaultHandlers() {
 
 	ws = new(restful.WebService)
 	ws.
+		Path("/nodeStats").
+		Produces(restful.MIME_JSON)
+	ws.Route(ws.GET("").
+		To(s.getNodeStats).
+		Operation("getNodeStats"))
+	s.restfulCont.Add(ws)
+
+	ws = new(restful.WebService)
+	ws.
 		Path("/spec/").
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
@@ -806,4 +815,8 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
+}
+
+func (s *Server) getNodeStats(request *restful.Request, response *restful.Response) {
+	return
 }
