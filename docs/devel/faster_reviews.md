@@ -187,6 +187,9 @@ things you can do that might help kick a stalled process along:
    * Ping the assignee by email (many of us have email addresses that are well
      published or are the same as our GitHub handle @google.com or @redhat.com).
 
+   * Ping the [team](https://github.com/orgs/kubernetes/teams) (via @team-name)
+     that works in the area you're submitting code.
+
 If you think you have fixed all the issues in a round of review, and you haven't
 heard back, you should ping the reviewer (assignee) on the comment stream with a
 "please take another look" (PTAL) or similar comment indicating you are done and
