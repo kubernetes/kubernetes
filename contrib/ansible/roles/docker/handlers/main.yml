@@ -1,3 +1,10 @@
 ---
 - name: restart docker
   service: name=docker state=restarted
+  notify:
+    - Save iptables rules
+
+# We need to make sure iptables will remember the DOCKER
+# chain if/when it gets restarted.
+- name: Save iptables rules
+  command: service iptables save
