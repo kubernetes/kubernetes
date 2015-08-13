@@ -44,7 +44,16 @@ $ kubectl run nginx --image=nginx --replicas=5
 $ kubectl run nginx --image=nginx --dry-run
 
 # Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
-$ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'`
+$ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
+
+# Start a single instance of nginx and keep it in the foreground, don't restart it if it exits.
+$ kubectl run -i -tty nginx --image=nginx --restart=Never
+
+# Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
+$ kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
+
+# Start the nginx container using a different command and custom arguments
+$ kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>`
 )
 
 func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -74,6 +83,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	cmd.Flags().Bool("tty", false, "Allocated a TTY for each container in the pod.  Because -t is currently shorthand for --template, -t is not supported for --tty. This shorthand is deprecated and we expect to adopt -t for --tty soon.")
 	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--interactive' is set, in which case the default is true.")
 	cmd.Flags().String("restart", "Always", "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, only the Pod is created and --replicas must be 1.  Default 'Always'")
+	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	return cmd
 }
 
@@ -82,7 +92,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		printDeprecationWarning("run", "run-container")
 	}
 
-	if len(args) != 1 {
+	if len(args) == 0 {
 		return cmdutil.UsageError(cmd, "NAME is required for run")
 	}
 
@@ -128,7 +138,9 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
 	params["name"] = args[0]
-
+	if len(args) > 1 {
+		params["args"] = args[1:]
+	}
 	err = kubectl.ValidateParams(names, params)
 	if err != nil {
 		return err

@@ -25,12 +25,12 @@ import (
 
 func TestGenerate(t *testing.T) {
 	tests := []struct {
-		params    map[string]string
+		params    map[string]interface{}
 		expected  *api.ReplicationController
 		expectErr bool
 	}{
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
@@ -61,7 +61,74 @@ func TestGenerate(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"port":     "-1",
+				"args":     []string{"bar", "baz", "blah"},
+			},
+			expected: &api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"run": "foo"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"run": "foo"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "foo",
+									Image: "someimage",
+									Args:  []string{"bar", "baz", "blah"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"port":     "-1",
+				"args":     []string{"bar", "baz", "blah"},
+				"command":  "true",
+			},
+			expected: &api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"run": "foo"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"run": "foo"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:    "foo",
+									Image:   "someimage",
+									Command: []string{"bar", "baz", "blah"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
@@ -97,7 +164,7 @@ func TestGenerate(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
@@ -135,7 +202,7 @@ func TestGenerate(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
@@ -145,7 +212,7 @@ func TestGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
@@ -193,12 +260,12 @@ func TestGenerate(t *testing.T) {
 
 func TestGeneratePod(t *testing.T) {
 	tests := []struct {
-		params    map[string]string
+		params    map[string]interface{}
 		expected  *api.Pod
 		expectErr bool
 	}{
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":  "foo",
 				"image": "someimage",
 				"port":  "-1",
@@ -221,7 +288,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":  "foo",
 				"image": "someimage",
 				"port":  "80",
@@ -249,7 +316,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
 				"port":     "80",
@@ -279,7 +346,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
 				"hostport": "80",
@@ -288,7 +355,7 @@ func TestGeneratePod(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			params: map[string]string{
+			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",

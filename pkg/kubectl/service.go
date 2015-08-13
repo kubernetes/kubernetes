@@ -32,7 +32,7 @@ func (ServiceGeneratorV1) ParamNames() []GeneratorParam {
 	return paramNames()
 }
 
-func (ServiceGeneratorV1) Generate(params map[string]string) (runtime.Object, error) {
+func (ServiceGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
 	params["port-name"] = "default"
 	return generate(params)
 }
@@ -43,7 +43,7 @@ func (ServiceGeneratorV2) ParamNames() []GeneratorParam {
 	return paramNames()
 }
 
-func (ServiceGeneratorV2) Generate(params map[string]string) (runtime.Object, error) {
+func (ServiceGeneratorV2) Generate(params map[string]interface{}) (runtime.Object, error) {
 	return generate(params)
 }
 
@@ -65,7 +65,15 @@ func paramNames() []GeneratorParam {
 	}
 }
 
-func generate(params map[string]string) (runtime.Object, error) {
+func generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	params := map[string]string{}
+	for key, value := range genericParams {
+		strVal, isString := value.(string)
+		if !isString {
+			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
+		}
+		params[key] = strVal
+	}
 	selectorString, found := params["selector"]
 	if !found || len(selectorString) == 0 {
 		return nil, fmt.Errorf("'selector' is a required parameter.")

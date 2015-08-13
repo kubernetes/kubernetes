@@ -37,6 +37,8 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"hostport", false},
 		{"stdin", false},
 		{"tty", false},
+		{"command", false},
+		{"args", false},
 	}
 }
 
@@ -64,7 +66,25 @@ func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
 	return &spec, nil
 }
 
-func (BasicReplicationController) Generate(params map[string]string) (runtime.Object, error) {
+func (BasicReplicationController) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args := []string{}
+	val, found := genericParams["args"]
+	if found {
+		var isArray bool
+		args, isArray = val.([]string)
+		if !isArray {
+			return nil, fmt.Errorf("expected []string, found: %v", val)
+		}
+		delete(genericParams, "args")
+	}
+	params := map[string]string{}
+	for key, value := range genericParams {
+		strVal, isString := value.(string)
+		if !isString {
+			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
+		}
+		params[key] = strVal
+	}
 	name, found := params["name"]
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
@@ -95,6 +115,18 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 	if err != nil {
 		return nil, err
 	}
+	if len(args) > 0 {
+		command, err := GetBool(params, "command", false)
+		if err != nil {
+			return nil, err
+		}
+		if command {
+			podSpec.Containers[0].Command = args
+		} else {
+			podSpec.Containers[0].Args = args
+		}
+	}
+
 	controller := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
@@ -164,10 +196,30 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"stdin", false},
 		{"tty", false},
 		{"restart", false},
+		{"command", false},
+		{"args", false},
 	}
 }
 
-func (BasicPod) Generate(params map[string]string) (runtime.Object, error) {
+func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args := []string{}
+	val, found := genericParams["args"]
+	if found {
+		var isArray bool
+		args, isArray = val.([]string)
+		if !isArray {
+			return nil, fmt.Errorf("expected []string, found: %v", val)
+		}
+		delete(genericParams, "args")
+	}
+	params := map[string]string{}
+	for key, value := range genericParams {
+		strVal, isString := value.(string)
+		if !isString {
+			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
+		}
+		params[key] = strVal
+	}
 	name, found := params["name"]
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
@@ -217,6 +269,17 @@ func (BasicPod) Generate(params map[string]string) (runtime.Object, error) {
 			DNSPolicy:     api.DNSClusterFirst,
 			RestartPolicy: restartPolicy,
 		},
+	}
+	if len(args) > 0 {
+		command, err := GetBool(params, "command", false)
+		if err != nil {
+			return nil, err
+		}
+		if command {
+			pod.Spec.Containers[0].Command = args
+		} else {
+			pod.Spec.Containers[0].Args = args
+		}
 	}
 	if err := updatePodPorts(params, &pod.Spec); err != nil {
 		return nil, err

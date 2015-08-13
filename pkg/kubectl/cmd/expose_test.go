@@ -30,16 +30,50 @@ import (
 
 func TestRunExposeService(t *testing.T) {
 	tests := []struct {
-		name     string
-		args     []string
-		ns       string
-		calls    map[string]string
-		input    runtime.Object
-		flags    map[string]string
-		output   runtime.Object
-		expected string
-		status   int
+		name        string
+		args        []string
+		ns          string
+		calls       map[string]string
+		input       runtime.Object
+		flags       map[string]string
+		output      runtime.Object
+		expected    string
+		status      int
+		podSelector string
 	}{
+		{
+			name: "expose-service-from-service-no-selector",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			podSelector: "app=go",
+			flags:       map[string]string{"protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "12", Labels: map[string]string{"svc": "test"}},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Name:     "default",
+							Protocol: api.Protocol("UDP"),
+							Port:     14,
+						},
+					},
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			status: 200,
+		},
 		{
 			name: "expose-service-from-service",
 			args: []string{"service", "baz"},
@@ -194,6 +228,8 @@ func TestRunExposeService(t *testing.T) {
 			}),
 		}
 		tf.Namespace = test.ns
+		f.PodSelectorForObject = func(obj runtime.Object) (string, error) { return test.podSelector, nil }
+
 		buf := bytes.NewBuffer([]byte{})
 
 		cmd := NewCmdExposeService(f, buf)

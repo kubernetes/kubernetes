@@ -636,6 +636,7 @@ _kubectl_run()
     flags_completion=()
 
     flags+=("--attach")
+    flags+=("--command")
     flags+=("--dry-run")
     flags+=("--generator=")
     flags+=("--help")
