@@ -83,7 +83,12 @@ function verify-prereqs {
 
   if [ -z "${provider_found}" ]; then
     if [ -n "${VAGRANT_DEFAULT_PROVIDER}" ]; then
-      echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider, please fix and retry."
+      echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider."
+      echo "Possible reasons could be: "
+      echo -e "\t- vmrun utility is not in your path"
+      echo -e "\t- Vagrant plugin was not found."
+      echo -e "\t- VAGRANT_DEFAULT_PROVIDER is set, but not found."
+      echo "Please fix and retry."
     else
       echo "Can't find the necessary components for any viable vagrant providers (e.g., virtualbox), please fix and retry."
     fi
