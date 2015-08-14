@@ -31,7 +31,6 @@ import (
 	//	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	//"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/healthz"
-	lease "k8s.io/kubernetes/pkg/tools/ha"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"os"
@@ -75,7 +74,7 @@ func main() {
 	}
 
 	//This starts a thread that continues running.
-	lease.RunHA(s.Kubeconfig, s.Master, startRC, endRC, "ha.cm.lock")
+	ha.RunHA(s.Kubeconfig, s.Master, startRC, endRC, "ha.cm.lock")
 
 	for true {
 		glog.Infof("CM lease loop is running...")

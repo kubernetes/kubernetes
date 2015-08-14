@@ -123,6 +123,7 @@ func (c *Config) leaseAndUpdateLoop() {
 		if err := c.update(master); err != nil {
 			glog.Errorf("Error updating files: %v", err)
 		}
+		glog.Infof("Sleep!")
 		time.Sleep(c.sleep)
 	}
 }
