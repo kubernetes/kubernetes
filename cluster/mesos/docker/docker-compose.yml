@@ -13,7 +13,7 @@ etcd:
     --initial-cluster-state new
 mesosmaster1:
   hostname: mesosmaster1
-  image: mesosphere/mesos:0.22.0-1.0.ubuntu1404
+  image: mesosphere/mesos:0.23.0-1.0.ubuntu1404
   entrypoint: [ "mesos-master" ]
   ports: [ "5050:5050" ]
   environment:
