@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
+	"github.com/appc/cni"
 )
 
 const (
@@ -71,6 +72,10 @@ const (
 	kubernetesPodLabel                    = "io.kubernetes.pod.data"
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
+
+	EnvCNIPath = "CNI_PATH"
+	EnvNetDir  = "NETCONFPATH"
+	DefaultNetDir = "/etc/cni/net.d"
 )
 
 // DockerManager implements the Runtime interface.
@@ -1680,7 +1685,44 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 		// Call the networking plugin
 		if err == nil {
-			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
+//			netdir := os.Getenv(EnvNetDir)
+//			if netdir == "" {
+//				netdir = DefaultNetDir
+//			}
+//
+//			// TODO-PAT: use k8s plugin to specify net.
+//			netconf, err := loadNetConf(netdir, "calico")
+//			if err != nil {
+//				exit(err)
+//			}
+			netConfPath := path.Join(DefaultNetDir, dm.networkPlugin.Name())
+			glog.V(5).Infof("Loading network config file %v", netConfPath)
+			netconf, err := cni.ConfFromFile(netConfPath)
+			glog.V(5).Infof("Got network config %v", netconf)
+
+			cninet := &cni.CNIConfig{
+				Path: strings.Split(os.Getenv(EnvCNIPath), ":"),
+			}
+
+			inspectResult, err := dm.client.InspectContainer(string(podInfraContainerID))
+
+			if err != nil {
+				return err
+			}
+
+			pid := inspectResult.State.Pid
+			netns := fmt.Sprintf("/proc/%v/ns/net", pid)
+			glog.V(5).Infof("Got netns path %v", netns)
+
+			rt := &cni.RuntimeConf{
+				ContainerID: "cni",
+				NetNS:       netns,
+				IfName:      "eth0",
+				Args:        fmt.Sprintf("POD_NAMESPACE=%v;POD_NAME=%v;POD_INFRA_CONTAINER_ID=%v", pod.Namespace, pod.Name, podInfraContainerID),
+			}
+
+			_, err = cninet.AddNetwork(netconf, rt)
+//			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
 		}
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
