@@ -1,43 +1,9 @@
-test/e2e/secrets.go:							"--file_content=/etc/secret-volume/data-1",
-test/e2e/secrets.go:							"--file_mode=/etc/secret-volume/data-1"},
 test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
 test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
 test/e2e/es_cluster_logging.go:		Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
-test/e2e/host_path.go:			fmt.Sprintf("--fs_type=%v", volumePath),
-test/e2e/host_path.go:			fmt.Sprintf("--file_mode=%v", volumePath),
-test/e2e/host_path.go:			fmt.Sprintf("--fs_type=%v", volumePath),
-test/e2e/host_path.go:			fmt.Sprintf("--file_mode=%v", filePath),
-test/e2e/service_accounts.go:							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountTokenKey),
-test/e2e/service_accounts.go:							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountRootCAKey),
-test/e2e/empty_dir.go:		fmt.Sprintf("--fs_type=%v", volumePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--file_perm=%v", volumePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--fs_type=%v", volumePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--new_file_0644=%v", filePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--file_perm=%v", filePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--fs_type=%v", volumePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--new_file_0666=%v", filePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--file_perm=%v", filePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--fs_type=%v", volumePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--new_file_0777=%v", filePath),
-test/e2e/empty_dir.go:		fmt.Sprintf("--file_perm=%v", filePath),
-test/soak/serve_hostnames/serve_hostnames.go:	podsPerNode    = flag.Int("pods_per_node", 1, "Number of serve_hostname pods per node")
-test/soak/serve_hostnames/serve_hostnames.go:	upTo           = flag.Int("up_to", 1, "Number of iterations or -1 for no limit")
-test/soak/serve_hostnames/serve_hostnames.go:	maxPar         = flag.Int("max_par", 500, "Maximum number of queries in flight")
-test/soak/serve_hostnames/serve_hostnames.go:	gke            = flag.String("gke_context", "", "Target GKE cluster with context gke_{project}_{zone}_{cluster-name}")
-test/soak/serve_hostnames/README.md:The number of iterations to perform for issuing queries can be changed from the default of 1 to some higher value e.g. `--up_to=3` and the number of pods per node can also be changed e.g. `--pods_per_node=2`:
-test/soak/serve_hostnames/README.md:$ ./serve_hostnames --up_to=3 --pods_per_node=2
-test/soak/serve_hostnames/README.md:For a soak test use `--up_to=-1` which will loop indefinitely.
-test/soak/cauldron/cauldron-rc.yaml:        args: ["--up_to=-1"]
-test/soak/cauldron/cauldron.go:	podsPerNode    = flag.Int("pods_per_node", 1, "Number of serve_hostname pods per node")
-test/soak/cauldron/cauldron.go:	upTo           = flag.Int("up_to", 1, "Number of iterations or -1 for no limit")
-test/soak/cauldron/cauldron.go:	maxPar         = flag.Int("max_in_flight", 100, "Maximum number of queries in flight")
 pkg/kubelet/qos/memory_policy_test.go:	lowOomScoreAdj  int // The max oom_score_adj score the container should be assigned.
 pkg/kubelet/qos/memory_policy_test.go:	highOomScoreAdj int // The min oom_score_adj score the container should be assigned.
 pkg/kubelet/qos/memory_policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOomScoreAdj, test.highOomScoreAdj, oomScoreAdj)
-pkg/kubectl/cmd/util/factory_test.go:	factory.flags.Bool("valid_flag", false, "bool value")
-pkg/kubectl/cmd/util/factory_test.go:	if factory.flags.Lookup("valid_flag").Name != "valid-flag" {
-pkg/kubectl/cmd/util/factory_test.go:		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.flags.Lookup("valid_flag").Name)
-pkg/util/logs.go:var logFlushFreq = pflag.Duration("log_flush_frequency", 5*time.Second, "Maximum number of seconds between log flushes")
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
 pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
 pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
@@ -45,19 +11,10 @@ pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to read oom_score_adj: %v"
 pkg/util/oom/oom_linux.go:			err = fmt.Errorf("failed to set oom_score_adj to %d: %v", oomScoreAdj, writeErr)
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
 pkg/cloudprovider/providers/vagrant/vagrant_test.go:		testSaltMinionsResponse = []byte(`{ "return": [{"kubernetes-minion-1": {"kernel": "Linux", "domain": "", "zmqversion": "3.2.4", "kernelrelease": "3.11.10-301.fc20.x86_64", "pythonpath": ["/usr/bin", "/usr/lib64/python27.zip", "/usr/lib64/python2.7", "/usr/lib64/python2.7/plat-linux2", "/usr/lib64/python2.7/lib-tk", "/usr/lib64/python2.7/lib-old", "/usr/lib64/python2.7/lib-dynload", "/usr/lib64/python2.7/site-packages", "/usr/lib/python2.7/site-packages"], "etcd_servers": "10.245.1.2", "ip_interfaces": {"lo": ["127.0.0.1"], "docker0": ["172.17.42.1"], "enp0s8": ["10.245.2.2"], "p2p1": ["10.0.2.15"]}, "shell": "/bin/sh", "mem_total": 491, "saltversioninfo": [2014, 1, 7], "osmajorrelease": ["20"], "node_ip": "10.245.2.2", "id": "kubernetes-minion-1", "osrelease": "20", "ps": "ps -efH", "server_id": 1005530826, "num_cpus": 1, "hwaddr_interfaces": {"lo": "00:00:00:00:00:00", "docker0": "56:84:7a:fe:97:99", "enp0s8": "08:00:27:17:c5:0f", "p2p1": "08:00:27:96:96:e1"}, "virtual": "VirtualBox", "osfullname": "Fedora", "master": "kubernetes-master", "ipv4": ["10.0.2.15", "10.245.2.2", "127.0.0.1", "172.17.42.1"], "ipv6": ["::1", "fe80::a00:27ff:fe17:c50f", "fe80::a00:27ff:fe96:96e1"], "cpu_flags": ["fpu", "vme", "de", "pse", "tsc", "msr", "pae", "mce", "cx8", "apic", "sep", "mtrr", "pge", "mca", "cmov", "pat", "pse36", "clflush", "mmx", "fxsr", "sse", "sse2", "syscall", "nx", "rdtscp", "lm", "constant_tsc", "rep_good", "nopl", "pni", "monitor", "ssse3", "lahf_lm"], "localhost": "kubernetes-minion-1", "lsb_distrib_id": "Fedora", "fqdn_ip4": ["127.0.0.1"], "fqdn_ip6": [], "nodename": "kubernetes-minion-1", "saltversion": "2014.1.7", "saltpath": "/usr/lib/python2.7/site-packages/salt", "pythonversion": [2, 7, 5, "final", 0], "host": "kubernetes-minion-1", "os_family": "RedHat", "oscodename": "Heisenbug", "defaultencoding": "UTF-8", "osfinger": "Fedora-20", "roles": ["kubernetes-pool"], "num_gpus": 1, "cpu_model": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz", "fqdn": "kubernetes-minion-1", "osarch": "x86_64", "cpuarch": "x86_64", "gpus": [{"model": "VirtualBox Graphics Adapter", "vendor": "unknown"}], "path": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin", "os": "Fedora", "defaultlanguage": "en_US"}}]}`)
-contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&fsTypePath, "fs_type", "", "Path to print the fs type for")
-contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
-contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
-contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
-contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
-contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
-contrib/for-tests/mount-tester/mt.go:	flag.StringVar(&newFilePath0777, "new_file_0777", "", "Path to write to and read from with perm 0777")
-contrib/mesos/pkg/controllermanager/controllermanager.go:	fs.BoolVar(&s.UseHostPortEndpoints, "host_port_endpoints", s.UseHostPortEndpoints, "Map service endpoints to hostIP:hostPort instead of podIP:containerPort. Default true.")
 contrib/mesos/docs/ha.md:- `--km_path` or else (`--executor_path` and `--proxy_path`) should reference non-local-file URI's and must be identical across schedulers.
 contrib/mesos/docs/ha.md:$ ./bin/km scheduler ... --mesos_master=zk://zk1:2181,zk2:2181/mesos --ha --km_path=hdfs:///km
 contrib/mesos/docs/ha.md:- `--auth_path`
 contrib/mesos/docs/ha.md:- `--km_path`
-contrib/mesos/docs/issues.md:* execute the k8sm controller-manager with `-host_port_endpoints=false`
 contrib/prometheus/README.md:http://service_address:service_port/metrics.
 contrib/ansible/vagrant/Vagrantfile:$num_nodes = (ENV['NUM_NODES'] || 2).to_i
 contrib/ansible/vagrant/Vagrantfile:  $num_nodes.times do |i|
@@ -100,21 +57,12 @@ examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
 examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
 examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
 examples/elasticsearch/README.md:"cluster_name" : "mytunes-db",
-cmd/kube-controller-manager/app/controllermanager.go:	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
-hack/parallel-e2e.sh:    go run hack/e2e.go -test --test_args="--ginkgo.noColor" "${@:-}" -down 2>&1 | tee ${cluster_dir}/e2e.log &
-hack/e2e.go:	testArgs         = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-hack/e2e.go:	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
-hack/upgrade-e2e-test.sh:go run "$(dirname $0)/e2e.go" -build -up -v -test -test_args='--ginkgo.focus=Skipped.*Cluster\supgrade.*gce-upgrade' -check_version_skew=false
-hack/upgrade-e2e-test.sh:    go run "$(dirname $0)/e2e.go" -v -version="" -test -check_version_skew=false
-hack/jenkins/e2e.sh:    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}" && exitcode=0 || exitcode=$?
 hack/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 hack/lib/logging.sh:      echo "  $i: ${source_file}:${source_lineno} ${funcname}(...)" >&2
 hack/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
 hack/lib/logging.sh:  echo "!!! Error in ${source_file}:${source_line}" >&2
-docs/devel/development.md:go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
 docs/devel/README.md:* **Admission Control Plugins** ([admission_control](../design/admission_control.md))
 docs/user-guide/accessing-the-cluster.md:	 "cluster_name" : "kubernetes_logging",
-docs/user-guide/secrets/secret-pod.yaml:      command: [ "/mt", "--file_content=/etc/secret-volume/data-1" ]
 docs/design/admission_control.md:[here](http://releases.k8s.io/release-1.0/docs/design/admission_control.md).
 docs/design/admission_control.md:[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control.md?pixel)]()
 docs/admin/salt.md:  etcd_servers: $MASTER_IP
@@ -124,14 +72,11 @@ docs/admin/salt.md:`etcd_servers` | (Optional) Comma-delimited list of IP addres
 docs/admin/salt.md:`hostname_override` | (Optional) Mapped to the kubelet hostname-override
 docs/admin/admission-controllers.md:The Kubernetes API server supports a flag, `admission_control` that takes a comma-delimited,
 docs/getting-started-guides/mesos.md:Identify your Mesos master: depending on your Mesos installation this is either a `host:port` like `mesos_master:5050` or a ZooKeeper URL like `zk://zookeeper:2181/mesos`.
-docs/getting-started-guides/mesos.md:- add `--kube_master_url=${KUBERNETES_MASTER}` parameter to the kube2sky container command.
-docs/getting-started-guides/mesos.md:"s,\(command = \"/kube2sky\"\),\\1\\"$'\n'"        - --kube_master_url=${KUBERNETES_MASTER},;"\
 docs/getting-started-guides/logging-elasticsearch.md:  "cluster_name" : "kubernetes-logging",
 docs/getting-started-guides/aws/cloudformation-template.json:          "    etcd_servers: http://localhost:2379\n",
 docs/getting-started-guides/aws/cloudformation-template.json:          "    etcd_servers: http://localhost:2379\n",
 docs/getting-started-guides/aws/cloud-configs/master.yaml:    etcd_servers: http://localhost:2379
 docs/getting-started-guides/aws/cloud-configs/node.yaml:    etcd_servers: http://localhost:2379
-docs/getting-started-guides/coreos/azure/addons/skydns-rc.yaml:        - -kube_master_url=http://kube-00:8080
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:  var cloud_config = cloud_config_creator(x, conf);
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:    if (cloud_config instanceof Array) {
 docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config[n];
@@ -213,7 +158,6 @@ cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest: 
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set root_ca_file = "" -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:   {% set root_ca_file = "--root-ca-file=/srv/kubernetes/ca.crt" -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + cloud_provider  + " " + cloud_config + service_account_key + pillar['log_level'] + " " + root_ca_file -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:# test_args has to be kept at the end, so they'll overwrite any prior configuration
 cluster/saltbase/salt/kube-proxy/default:  {% set api_servers = "--master=http://" + ips[0][0] -%}
 cluster/saltbase/salt/kube-proxy/default:  {% set api_servers_with_port = api_servers + ":7080" -%}
 cluster/saltbase/salt/kube-proxy/default:  {% if grains.api_servers is defined -%}
@@ -221,11 +165,6 @@ cluster/saltbase/salt/kube-proxy/default:    {% set api_servers = "--master=http
 cluster/saltbase/salt/kube-proxy/default:    {% set api_servers = "--master=https://" + ips[0][0] -%}
 cluster/saltbase/salt/kube-proxy/default:     {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/default:    {% set api_servers_with_port = api_servers + ":6443" -%}
-cluster/saltbase/salt/kube-proxy/default:{% set test_args = "" -%}
-cluster/saltbase/salt/kube-proxy/default:  {% set test_args=pillar['kubeproxy_test_args'] %}
-cluster/saltbase/salt/kube-proxy/default:# test_args has to be kept at the end, so they'll overwrite any prior configuration
-cluster/saltbase/salt/kube-proxy/default:DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{kubeconfig}} {{pillar['log_level']}} {{test_args}}"
-cluster/saltbase/salt/kube-scheduler/kube-scheduler.manifest:# test_args has to be kept at the end, so they'll overwrite any prior configuration
 cluster/saltbase/salt/kubelet/default:{% if grains.api_servers is defined -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + grains.apiservers -%}
@@ -255,9 +194,6 @@ cluster/saltbase/salt/kubelet/default:  {% set cgroup_root = "--cgroup-root=/" -
 cluster/saltbase/salt/kubelet/default:  {% set cgroup_root = "--cgroup-root=docker" -%}
 cluster/saltbase/salt/kubelet/default:{% set pod_cidr = "" %}
 cluster/saltbase/salt/kubelet/default:  {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
-cluster/saltbase/salt/kubelet/default:{% set test_args = "" -%}
-cluster/saltbase/salt/kubelet/default:  {% set test_args=pillar['kubelet_test_args'] %}
-cluster/saltbase/salt/kubelet/default:# test_args has to be kept at the end, so they'll overwrite any prior configuration
 cluster/saltbase/salt/kubelet/default:DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{test_args}}"
 cluster/saltbase/salt/generate-cert/make-cert.sh:mkdir -p "$cert_dir"
 cluster/saltbase/salt/generate-cert/make-cert.sh:  -keyout "${cert_dir}/server.key" -out "${cert_dir}/server.cert"
@@ -276,15 +212,7 @@ cluster/saltbase/salt/generate-cert/make-ca-cert.sh:chmod 660 "${cert_dir}/serve
 cluster/saltbase/salt/monit/monit_watcher.sh:# Apply oom_score_adj: -901 to processes
 cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
 cluster/saltbase/salt/kube-addons/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
-cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
-cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
-cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
-cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
-cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
-cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
-cluster/saltbase/salt/kube-addons/init.sls:    - file_mode: 644
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
-cluster/saltbase/salt/kube-admission-controls/init.sls:    - file_mode: 644
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_provider = "" -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_config = "" -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
@@ -321,7 +249,6 @@ cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if grains.runtim
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest: {% set runtime_config = "--runtime-config=" + grains.runtime_config -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:# test_args has to be kept at the end, so they'll overwrite any prior configuration
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:                 "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:        "containerPort": {{secure_port}},
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:        "hostPort": {{secure_port}}},{
@@ -339,20 +266,7 @@ cluster/libvirt-coreos/user_data.yml:    listen-peer-urls: http://${public_ip}:2
 cluster/libvirt-coreos/user_data.yml:        Address=${public_ip}/24
 cluster/libvirt-coreos/util.sh:        public_ip=$MASTER_IP
 cluster/libvirt-coreos/util.sh:      public_ip=${MINION_IPS[$i]}
-cluster/addons/dns/kube2sky/kube2sky.go:	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
-cluster/addons/dns/kube2sky/kube2sky.go:	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
-cluster/addons/dns/kube2sky/kube2sky.go:	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
-cluster/addons/dns/kube2sky/kube2sky.go:// etcd_mutation_timeout.
-cluster/addons/dns/kube2sky/kube2sky.go:		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterURL, err)
-cluster/addons/dns/kube2sky/kube2sky.go:		return "", fmt.Errorf("invalid --kube_master_url specified %s", *argKubeMasterURL)
-cluster/addons/dns/kube2sky/kube2sky.go:	// If the user specified --kube_master_url, expand env vars and verify it.
-cluster/addons/dns/kube2sky/kube2sky.go:		// Only --kube_master_url was provided.
-cluster/addons/dns/kube2sky/kube2sky.go:		//  1) --kube_master_url and --kubecfg_file
-cluster/addons/dns/kube2sky/README.md:`-etcd_mutation_timeout`: For how long the application will keep retrying etcd 
-cluster/addons/dns/kube2sky/README.md:`--kube_master_url`: URL of kubernetes master. Required if `--kubecfg_file` is not set.
-cluster/addons/dns/kube2sky/README.md:`--kubecfg_file`: Path to kubecfg file that contains the master URL and tokens to authenticate with the master.
 cluster/addons/cluster-monitoring/README.md:Heapster enables monitoring of Kubernetes Clusters using [cAdvisor](https://github.com/google/cadvisor). The kubelet will communicate with an instance of cAdvisor running on localhost and proxy container stats to Heapster. Kubelet will attempt to connect to cAdvisor on port 4194 by default but this port can be configured with kubelet's `-cadvisor_port` run flag. Detailed information about heapster can be found [here](https://github.com/GoogleCloudPlatform/heapster).
 cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
-cluster/mesos/docker/util.sh:# go run hack/e2e.go -v -test -check_version_skew=false
 cluster/mesos/docker/km/build.sh:if [ -z "$km_path" ]; then
 cluster/mesos/docker/km/build.sh:kube_bin_path=$(dirname ${km_path})
