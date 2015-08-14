@@ -35,6 +35,7 @@ spec:
             - --align_stats
             - --poll_duration=2m
             - --stats_resolution=1m
+            - --use_model=true
           volumeMounts:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
