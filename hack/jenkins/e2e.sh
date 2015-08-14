@@ -102,6 +102,7 @@ GCE_FLAKY_TESTS=(
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
     ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}}
+    "Autoscaling"
     "Etcd"
     "NetworkingNew"
     "Nodes\sNetwork"
@@ -127,6 +128,7 @@ GCE_PARALLEL_FLAKY_TESTS=(
 
 # Tests that should not run on soak cluster.
 GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
+    "Autoscaling"
     "Density.*30\spods"
     "Elasticsearch"
     "Etcd.*SIGKILL"
@@ -139,6 +141,10 @@ GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
     "Services.*Type\sgoes\sfrom"
     "Services.*nodeport\ssettings"
     "Skipped"
+    )
+
+GCE_RELEASE_SKIP_TESTS=(
+    "Autoscaling"
     )
 
 # Define environment variables based on the Jenkins project name.
@@ -283,6 +289,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gce-release"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}

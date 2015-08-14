@@ -21,29 +21,43 @@ import (
 	"os/exec"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util"
+
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Autoscaling", func() {
 	f := NewFramework("autoscaling")
+	var nodeCount int
+	var coresPerNode int
 
 	BeforeEach(func() {
-		// Ensure cluster size is equal to 1.
-		expectNoError(waitForClusterSize(f.Client, 1))
+		SkipUnlessProviderIs("gce")
+
+		nodes, err := f.Client.Nodes().List(labels.Everything(), fields.Everything())
+		expectNoError(err)
+		nodeCount = len(nodes.Items)
+		Expect(nodeCount).NotTo(BeZero())
+		res := nodes.Items[0].Status.Capacity[api.ResourceCPU]
+		coresPerNode = int((&res).MilliValue() / 1000)
 	})
 
 	AfterEach(func() {
 		cleanUpAutoscaler()
 	})
 
-	It("[Skipped] [Autoscaling] should scale cluster size based on cpu utilization", func() {
-		setUpAutoscaler("cpu/node_utilization", 0.8, 1, 10)
+	It("[Autoscaling] should scale cluster size based on cpu utilization", func() {
+		setUpAutoscaler("cpu/node_utilization", 0.7, nodeCount, nodeCount+1)
 
-		ConsumeCpu(f, "cpu-utilization", 1)
-		expectNoError(waitForClusterSize(f.Client, 2))
+		ConsumeCpu(f, "cpu-utilization", nodeCount*coresPerNode)
+		expectNoError(waitForClusterSize(f.Client, nodeCount+1))
 
 		StopConsuming(f, "cpu-utilization")
-		expectNoError(waitForClusterSize(f.Client, 1))
+		expectNoError(waitForClusterSize(f.Client, nodeCount))
 	})
 
 	It("[Skipped] [Autoscaling] should scale cluster size based on cpu reservation", func() {
@@ -77,7 +91,7 @@ var _ = Describe("Autoscaling", func() {
 	})
 })
 
-func setUpAutoscaler(metric string, target float64, min, max int64) {
+func setUpAutoscaler(metric string, target float64, min, max int) {
 	// TODO integrate with kube-up.sh script once it will support autoscaler setup.
 	By("Setting up autoscaler to scale based on " + metric)
 	_, err := exec.Command("gcloud", "preview", "autoscaler",
@@ -100,7 +114,28 @@ func cleanUpAutoscaler() {
 	expectNoError(err)
 }
 
+func CreateService(f *Framework, name string) {
+	By("Running sevice" + name)
+	service := &api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{
+				"name": name,
+			},
+			Ports: []api.ServicePort{{
+				Port:       8080,
+				TargetPort: util.NewIntOrStringFromInt(8080),
+			}},
+		},
+	}
+	_, err := f.Client.Services(f.Namespace.Name).Create(service)
+	Expect(err).NotTo(HaveOccurred())
+}
+
 func ConsumeCpu(f *Framework, id string, cores int) {
+	CreateService(f, id)
 	By(fmt.Sprintf("Running RC which consumes %v cores", cores))
 	config := &RCConfig{
 		Client:    f.Client,
@@ -157,6 +192,9 @@ func ReserveMemory(f *Framework, id string, gigabytes int) {
 }
 
 func StopConsuming(f *Framework, id string) {
+	By("Stopping service " + id)
+	err := f.Client.Services(f.Namespace.Name).Delete(id)
+	Expect(err).NotTo(HaveOccurred())
 	By("Stopping RC " + id)
 	expectNoError(DeleteRC(f.Client, f.Namespace.Name, id))
 }
