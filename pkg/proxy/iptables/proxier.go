@@ -48,12 +48,16 @@ import (
 // features are backported in various distros and this could get pretty hairy.
 // However iptables-1.4.0 was released 2007-Dec-22 and appears to have every feature we use,
 // so this seems prefectly reasonable for now.
-const (
-	IPTABLES_MIN_VERSION string = "1.4.0"
-)
+const IPTABLES_MIN_VERSION string = "1.4.0"
 
 // the services chain
-var iptablesServicesChain utiliptables.Chain = "KUBE-SERVICES"
+const iptablesServicesChain utiliptables.Chain = "KUBE-SERVICES"
+
+// the nodeports chain
+const iptablesNodePortsChain utiliptables.Chain = "KUBE-NODEPORTS"
+
+// the mark we apply to traffic needing SNAT
+const iptablesMasqueradeMark = "0x4d415351"
 
 // ShouldUseIptablesProxier returns true if we should use the iptables Proxier instead of
 // the userspace Proxier.
@@ -411,16 +415,37 @@ func (proxier *Proxier) syncProxyRules() error {
 	}
 	glog.V(4).Infof("Syncing iptables rules.")
 
-	// ensure main chain and rule connecting to output
-	args := []string{"-j", string(iptablesServicesChain)}
-	if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, iptablesServicesChain); err != nil {
-		return err
+	// Ensure main chains and rules are installed.
+	inputChains := []utiliptables.Chain{utiliptables.ChainOutput, utiliptables.ChainPrerouting}
+	// Link the services chain.
+	for _, chain := range inputChains {
+		if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, iptablesServicesChain); err != nil {
+			return err
+		}
+		comment := "kubernetes service portals; must be before nodeports"
+		args := []string{"-m", "comment", "--comment", comment, "-j", string(iptablesServicesChain)}
+		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, chain, args...); err != nil {
+			return err
+		}
 	}
-	if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, utiliptables.ChainOutput, args...); err != nil {
-		return err
+	// Link the nodeports chain.
+	for _, chain := range inputChains {
+		if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, iptablesNodePortsChain); err != nil {
+			return err
+		}
+		comment := "kubernetes service nodeports; must be after portals"
+		args := []string{"-m", "comment", "--comment", comment, "-m", "addrtype", "--dst-type", "LOCAL", "-j", string(iptablesNodePortsChain)}
+		if _, err := proxier.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, chain, args...); err != nil {
+			return err
+		}
 	}
-	if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, utiliptables.ChainPrerouting, args...); err != nil {
-		return err
+	// Link the output rules.
+	{
+		comment := "kubernetes service traffic requiring SNAT"
+		args := []string{"-m", "comment", "--comment", comment, "-m", "mark", "--mark", iptablesMasqueradeMark, "-j", "MASQUERADE"}
+		if _, err := proxier.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
+			return err
+		}
 	}
 
 	// Get iptables-save output so we can check for existing chains and rules.
