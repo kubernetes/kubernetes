@@ -164,7 +164,7 @@ def flags_to_re(flags):
         # turn all flag names into regexs which will find both types
         newre = dashRE.sub('[-_]', flag)
         # only match if there is not a leading or trailing alphanumeric character
-        flagREs.append("[^\w]" + newre + "[^\w]")
+        flagREs.append("[^\w${]" + newre + "[^\w]")
     # turn that list of regex strings into a single large RE
     flagRE = "|".join(flagREs)
     flagRE = re.compile(flagRE)

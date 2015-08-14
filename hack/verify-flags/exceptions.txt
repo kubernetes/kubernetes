@@ -15,8 +15,6 @@ cluster/vagrant/provision-minion.sh:  hostname_override: '$(echo "$MINION_IP" | 
 cluster/addons/cluster-monitoring/README.md:Heapster enables monitoring of Kubernetes Clusters using [cAdvisor](https://github.com/google/cadvisor). The kubelet will communicate with an instance of cAdvisor running on localhost and proxy container stats to Heapster. Kubelet will attempt to connect to cAdvisor on port 4194 by default but this port can be configured with kubelet's `-cadvisor_port` run flag. Detailed information about heapster can be found [here](https://github.com/GoogleCloudPlatform/heapster).
 cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
 cluster/aws/templates/salt-minion.sh:  hostname_override: "${HOSTNAME_OVERRIDE}"
-cluster/mesos/docker/km/build.sh:if [ -z "$km_path" ]; then
-cluster/mesos/docker/km/build.sh:kube_bin_path=$(dirname ${km_path})
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cluster_name = "" -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cluster_cidr = "" -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set allocate_node_cidrs = "" -%}
@@ -74,20 +72,6 @@ cluster/saltbase/salt/kubelet/default:  {% set pod_cidr = "--pod-cidr=" + grains
 cluster/saltbase/salt/kubelet/default:DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{test_args}}"
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
 cluster/saltbase/salt/monit/monit_watcher.sh:# Apply oom_score_adj: -901 to processes
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:mkdir -p "$cert_dir"
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:    cp -p pki/issued/$cert_ip.crt "${cert_dir}/server.cert" > /dev/null 2>&1
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:    cp -p pki/private/$cert_ip.key "${cert_dir}/server.key" > /dev/null 2>&1
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:    cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:    cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:cp -p pki/ca.crt "${cert_dir}/ca.crt"
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:chgrp $cert_group "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.crt"
-cluster/saltbase/salt/generate-cert/make-ca-cert.sh:chmod 660 "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.crt"
-cluster/saltbase/salt/generate-cert/make-cert.sh:mkdir -p "$cert_dir"
-cluster/saltbase/salt/generate-cert/make-cert.sh:  -keyout "${cert_dir}/server.key" -out "${cert_dir}/server.cert"
-cluster/saltbase/salt/generate-cert/make-cert.sh:chgrp $cert_group "${cert_dir}/server.key" "${cert_dir}/server.cert"
-cluster/saltbase/salt/generate-cert/make-cert.sh:chmod 660 "${cert_dir}/server.key" "${cert_dir}/server.cert"
 cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_provider = "" -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_config = "" -%}
@@ -126,8 +110,6 @@ cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest: {% set runtime_con
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:                 "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:        "containerPort": {{secure_port}},
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:        "hostPort": {{secure_port}}},{
 cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    for k in ('etcd_servers',):
 cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['etcd_servers'] = ",".join([
 cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['bind_address'] = "127.0.0.1"
@@ -181,18 +163,12 @@ cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        'http:/
 cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
 cluster/libvirt-coreos/util.sh:        public_ip=$MASTER_IP
 cluster/libvirt-coreos/util.sh:      public_ip=${MINION_IPS[$i]}
-cluster/libvirt-coreos/user_data.yml:    advertise-client-urls: http://${public_ip}:2379
-cluster/libvirt-coreos/user_data.yml:    initial-advertise-peer-urls: http://${public_ip}:2380
-cluster/libvirt-coreos/user_data.yml:    listen-peer-urls: http://${public_ip}:2380
-cluster/libvirt-coreos/user_data.yml:        Address=${public_ip}/24
 cluster/gce/configure-vm.sh:  cloud_config: /etc/gce.conf
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
 cluster/gce/coreos/helper.sh:# cloud_config yaml file should be passed
 hack/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
-hack/lib/logging.sh:      echo "  $i: ${source_file}:${source_lineno} ${funcname}(...)" >&2
 hack/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
-hack/lib/logging.sh:  echo "!!! Error in ${source_file}:${source_line}" >&2
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
 pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
 pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
