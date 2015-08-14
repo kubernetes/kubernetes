@@ -143,10 +143,12 @@ func TestDeleteObjectNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	options := &DeleteOptions{
+		Filenames: []string{"../../../examples/guestbook/redis-master-controller.yaml"},
+	}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
-	err := RunDelete(f, buf, cmd, []string{})
+	err := RunDelete(f, buf, cmd, []string{}, options)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -218,7 +220,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 	cmd.Flags().Set("ignore-not-found", "false")
 	cmd.Flags().Set("output", "name")
 
-	err := RunDelete(f, buf, cmd, []string{"services"})
+	err := RunDelete(f, buf, cmd, []string{"services"}, &DeleteOptions{})
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -321,11 +323,12 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	options := &DeleteOptions{
+		Filenames: []string{"../../../examples/guestbook/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"},
+	}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
-	err := RunDelete(f, buf, cmd, []string{})
+	err := RunDelete(f, buf, cmd, []string{}, options)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}

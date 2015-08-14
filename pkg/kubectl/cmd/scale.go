@@ -29,6 +29,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/errors"
 )
 
+// ScaleOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type ScaleOptions struct {
+	Filenames []string
+}
+
 const (
 	scale_long = `Set a new size for a Replication Controller.
 
@@ -51,6 +57,8 @@ $ kubectl scale --replicas=5 rc/foo rc/bar`
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
 func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &ScaleOptions{}
+
 	cmd := &cobra.Command{
 		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		// resize is deprecated
@@ -61,7 +69,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-			err := RunScale(f, out, cmd, args, shortOutput)
+			err := RunScale(f, out, cmd, args, shortOutput, options)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -73,12 +81,12 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddOutputFlagsForMutation(cmd)
 
 	usage := "Filename, directory, or URL to a file identifying the replication controller to set a new size"
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	return cmd
 }
 
 // RunScale executes the scaling
-func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool) error {
+func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *ScaleOptions) error {
 	if len(os.Args) > 1 && os.Args[1] == "resize" {
 		printDeprecationWarning("scale", "resize")
 	}
@@ -97,7 +105,7 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
+		FilenameParam(enforceNamespace, options.Filenames...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()

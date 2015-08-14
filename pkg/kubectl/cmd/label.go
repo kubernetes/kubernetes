@@ -30,6 +30,12 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
+// LabelOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type LabelOptions struct {
+	Filenames []string
+}
+
 const (
 	label_long = `Update the labels on a resource.
 
@@ -57,13 +63,15 @@ $ kubectl label pods foo bar-`
 )
 
 func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &LabelOptions{}
+
 	cmd := &cobra.Command{
 		Use:     "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   "Update the labels on a resource",
 		Long:    fmt.Sprintf(label_long, util.LabelValueMaxLength),
 		Example: label_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunLabel(f, out, cmd, args)
+			err := RunLabel(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -73,7 +81,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().String("resource-version", "", "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "Filename, directory, or URL to a file identifying the resource to update the labels"
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	return cmd
 }
 
@@ -138,7 +146,7 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 	return nil
 }
 
-func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *LabelOptions) error {
 	resources, labelArgs := []string{}, []string{}
 	first := true
 	for _, s := range args {
@@ -155,8 +163,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			return cmdutil.UsageError(cmd, "all resources must be specified before label changes: %s", s)
 		}
 	}
-	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
-	if len(resources) < 1 && len(filenames) == 0 {
+	if len(resources) < 1 && len(options.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(labelArgs) < 1 {
@@ -181,7 +188,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, filenames...).
+		FilenameParam(enforceNamespace, options.Filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(all, resources...).
 		Flatten().

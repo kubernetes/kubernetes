@@ -27,6 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
+// PatchOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type PatchOptions struct {
+	Filenames []string
+}
+
 const (
 	patch_long = `Update field(s) of a resource using strategic merge patch
 
@@ -45,6 +51,8 @@ kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve
 )
 
 func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &PatchOptions{}
+
 	cmd := &cobra.Command{
 		Use:     "patch (-f FILENAME | TYPE NAME) -p PATCH",
 		Short:   "Update field(s) of a resource by stdin.",
@@ -53,7 +61,7 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-			err := RunPatch(f, out, cmd, args, shortOutput)
+			err := RunPatch(f, out, cmd, args, shortOutput, options)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -62,11 +70,11 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddOutputFlagsForMutation(cmd)
 
 	usage := "Filename, directory, or URL to a file identifying the resource to update"
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	return cmd
 }
 
-func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool) error {
+func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *PatchOptions) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -81,7 +89,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, cmdutil.GetFlagStringSlice(cmd, "filename")...).
+		FilenameParam(enforceNamespace, options.Filenames...).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
