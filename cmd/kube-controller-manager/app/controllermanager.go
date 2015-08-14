@@ -172,6 +172,13 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
+	heartbeat := component.Start(
+		kubeClient.ComponentsClient(),
+		5*time.Second,
+		api.ComponentControllerManager,
+		kubeconfig.Host,
+	)
+
 	go func() {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
@@ -277,21 +284,15 @@ func (s *CMServer) Run(_ []string) error {
 	// horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, expClient)
 	// horizontalPodAutoscalerController.Run(s.NodeSyncPeriod)
 
-	heartbeat, errCh := component.Start(
-		kubeClient.ComponentsClient(),
-		5*time.Second,
-		api.ComponentControllerManager,
-		kubeconfig.Host,
-	)
-	go func() {
-		//TODO(karlkfi): change state smarter
-		heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
-			Type:   api.ComponentRunningHealthy,
-			Status: api.ConditionTrue,
-		})
-	}()
-	//TODO(karlkfi): change state on error
-	for err = range errCh {
+	// Assume that if we made it this far the controller-manager is healthy.
+	// TODO(karlkfi): Handle phase/condition transitions based on an aggregate controller state.
+	// TODO(karlkfi): Extract each controller to its own component, so they can each manage their own heatbeat and state transitions.
+	heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
+		Type:   api.ComponentRunningHealthy,
+		Status: api.ConditionTrue,
+	})
+
+	for err = range heartbeat.Watch() {
 		glog.Errorf("Heartbeat Error: %s", err)
 	}
 

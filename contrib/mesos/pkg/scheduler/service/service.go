@@ -141,6 +141,7 @@ type SchedulerServer struct {
 
 	executable  string // path to the binary running this service
 	client      client.Interface
+	heartbeat   component.HeartBeat
 	driver      bindings.SchedulerDriver
 	driverMutex sync.RWMutex
 	mux         *http.ServeMux
@@ -572,26 +573,19 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 		errCh <- doFailover()
 	})
 
-	heartbeat, heartbeatErrCh := component.Start(
-		s.client.ComponentsClient(),
-		5*time.Second,
-		api.ComponentScheduler,
-		s.URI(""),
-	)
-	go func() {
-		//TODO(karlkfi): change state smarter
-		heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
-			Type:   api.ComponentRunningHealthy,
-			Status: api.ConditionTrue,
-		})
-	}()
-	//TODO(karlkfi): change state on error
+	// Assume that if we made it this far the controller-manager is healthy.
+	// TODO(karlkfi): Handle phase/condition transitions for errors or dependency state changes.
+	s.heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
+		Type:   api.ComponentRunningHealthy,
+		Status: api.ConditionTrue,
+	})
 
+	heartbeatErrCh := s.heartbeat.Watch()
 	var firstErr error
 	for {
 		select {
-		case err, ok := <-errCh:
-			if ok {
+		case err, open := <-errCh:
+			if open {
 				log.Errorf("Scheduler Error: %s", err)
 				// Only allow one error (per old code)
 				// TODO: make the writer close, not the reader
@@ -602,10 +596,10 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 			} else {
 				log.Error("Scheduler Exited")
 				errCh = nil // skip this case in the future
-				heartbeat.Stop()
+				s.heartbeat.Stop()
 			}
-		case err, ok := <-heartbeatErrCh:
-			if ok {
+		case err, open := <-heartbeatErrCh:
+			if open {
 				log.Errorf("Heartbeat Error: %s", err)
 				// multiple errors allowed. heartbeat closes channel on exit
 				if firstErr == nil {
@@ -673,6 +667,14 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatalf("Unable to make apiserver client: %v", err)
 	}
 	s.client = client
+
+	heartbeat := component.Start(
+		s.client.ComponentsClient(),
+		5*time.Second,
+		api.ComponentScheduler,
+		s.URI(""),
+	)
+	s.heartbeat = heartbeat
 
 	if s.ReconcileCooldown < defaultReconcileCooldown {
 		s.ReconcileCooldown = defaultReconcileCooldown

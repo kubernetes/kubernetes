@@ -27,25 +27,31 @@ import (
 type HeartBeat interface {
 	// Transition changes the component's current phase
 	Transition(api.ComponentPhase, api.ComponentCondition)
+	// Watch returns a new read-only buffered error channel that will be closed when the heartbeat stops.
+	// The returned channel may receive zero or more errors before closing.
+	// When the HeartBeat is stopped or dies the channel will be closed.
+	Watch() <-chan error
 	// Stop terminates continuous heart beating.
 	Stop()
 }
 
 type heartbeat struct {
 	componentsClient client.ComponentsClient
-	errCh            chan error
-	ticker           *time.Ticker
-	componentBuffer  chan api.Component
+	// channel to send errors to
+	errCh chan error
+	// channel to add new watchers
+	watchCh         chan chan error
+	ticker          *time.Ticker
+	componentBuffer chan api.Component
 }
 
 // Start registers a new component and initiates continuous heart beating (component updates).
-// The returned channel may receive zero or more errors before closing.
-// When the HeartBeat is stopped or dies the channel will be closed.
-// Phase initialized to Pending, use Transition(phase) to change to Running or Stopped.
-func Start(componentsClient client.ComponentsClient, period time.Duration, t api.ComponentType, location string) (HeartBeat, <-chan error) {
+// Phase defaults to Pending.
+func Start(componentsClient client.ComponentsClient, period time.Duration, t api.ComponentType, location string) HeartBeat {
 	hb := &heartbeat{
 		componentsClient: componentsClient,
 		errCh:            make(chan error, 1),
+		watchCh:          make(chan chan error),
 		ticker:           time.NewTicker(period),
 		componentBuffer:  make(chan api.Component, 1),
 	}
@@ -62,15 +68,54 @@ func Start(componentsClient client.ComponentsClient, period time.Duration, t api
 		},
 	}
 
+	go errorHandler(hb.errCh, hb.watchCh)
+
 	// initial registration blocks
 	err := hb.create()
 	if err != nil {
 		hb.kill(err)
-		return nil, hb.errCh
+		return nil
 	}
 
 	go hb.run()
-	return hb, hb.errCh
+	return hb
+}
+
+// errorHandler propegates errors sent to errCh to a list of watchers.
+// New watchers can be registered by sending a new buffered errCh over the watchCh channel.
+// This function exclusively owns the watcher list to avoid concurrent access.
+// Most heartbeat users will only have one watcher, but watchCh and errCh may be closed before they start watching.
+func errorHandler(errCh chan error, watchCh chan chan error) {
+	watchers := make([]chan error, 1)
+	for {
+		select {
+		case err, open := <-errCh:
+			if !open {
+				// stop accepting new watchers
+				close(watchCh)
+				// propagate closure to watchers
+				for _, errCh := range watchers {
+					close(errCh)
+				}
+				errCh = nil
+			} else {
+				// propagate errors to watchers
+				for _, errCh := range watchers {
+					errCh <- err
+				}
+			}
+		case watcher, open := <-watchCh:
+			if !open {
+				watchCh = nil
+			} else {
+				watchers = append(watchers, watcher)
+			}
+		}
+
+		if errCh == nil && watchCh == nil {
+			break
+		}
+	}
 }
 
 func (hb *heartbeat) Transition(phase api.ComponentPhase, condition api.ComponentCondition) {
@@ -82,11 +127,22 @@ func (hb *heartbeat) Transition(phase api.ComponentPhase, condition api.Componen
 	//TODO(karlkfi): immediately do an update?
 }
 
+func (hb *heartbeat) Watch() <-chan error {
+	errCh := make(chan error, 1)
+	// will block util errorHandler pics it up
+	// will panic if heartbeat has already been stopped
+	hb.watchCh <- errCh
+	return errCh
+}
+
 func (hb *heartbeat) Stop() {
+	// will do nothing if heartbeat has already been stopped
 	close(hb.errCh)
 }
 
 func (hb *heartbeat) kill(err error) {
+	// will block util errorHandler pics it up
+	// will panic if heartbeat has already been stopped
 	hb.errCh <- err
 	hb.Stop()
 }
@@ -118,6 +174,7 @@ func (hb *heartbeat) update(_ time.Time) error {
 }
 
 // updateBuffer updates the buffered component in a synchronized way
+// TODO(karlkfi) replace this complexity with a pipeline goroutine that owns the current component state.
 func (hb *heartbeat) updateBuffer(updater func(api.Component) (api.Component, error)) error {
 	component := <-hb.componentBuffer
 	defer func() { hb.componentBuffer <- component }()
