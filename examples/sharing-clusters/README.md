@@ -212,7 +212,7 @@ eu-minion-7wz7   kubernetes.io/hostname=eu-minion-7wz7   Ready
 eu-minion-loh2   kubernetes.io/hostname=eu-minion-loh2   Ready
 ```
 
-For a more advanced example of sharing clusters, see the [service-loadbalancer](../../contrib/service-loadbalancer/README.md)
+For a more advanced example of sharing clusters, see the [service-loadbalancer](https://github.com/kubernetes/contrib/tree/master/service-loadbalancer/README.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
