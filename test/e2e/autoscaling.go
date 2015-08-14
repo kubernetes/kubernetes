@@ -50,7 +50,7 @@ var _ = Describe("Autoscaling", func() {
 		cleanUpAutoscaler()
 	})
 
-	It("[Autoscaling] should scale cluster size based on cpu utilization", func() {
+	It("[Skipped] [Autoscaling] should scale cluster size based on cpu utilization", func() {
 		setUpAutoscaler("cpu/node_utilization", 0.7, nodeCount, nodeCount+1)
 
 		ConsumeCpu(f, "cpu-utilization", nodeCount*coresPerNode)
