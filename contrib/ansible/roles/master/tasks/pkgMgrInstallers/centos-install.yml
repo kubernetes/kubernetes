@@ -1,8 +1,0 @@
----
-- name: CentOS | Install kubernetes master
-  yum:
-    pkg=kubernetes-master
-    state=latest
-    enablerepo=virt7-docker-common-candidate
-  notify:
-    - restart daemons
