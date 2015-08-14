@@ -381,6 +381,34 @@ func TestFlagSetParse(t *testing.T) {
 	testParse(NewFlagSet("test", ContinueOnError), t)
 }
 
+func TestChangedHelper(t *testing.T) {
+	f := NewFlagSet("changedtest", ContinueOnError)
+	_ = f.Bool("changed", false, "changed bool")
+	_ = f.Bool("settrue", true, "true to true")
+	_ = f.Bool("setfalse", false, "false to false")
+	_ = f.Bool("unchanged", false, "unchanged bool")
+
+	args := []string{"--changed", "--settrue", "--setfalse=false"}
+	if err := f.Parse(args); err != nil {
+		t.Error("f.Parse() = false after Parse")
+	}
+	if !f.Changed("changed") {
+		t.Errorf("--changed wasn't changed!")
+	}
+	if !f.Changed("settrue") {
+		t.Errorf("--settrue wasn't changed!")
+	}
+	if !f.Changed("setfalse") {
+		t.Errorf("--setfalse wasn't changed!")
+	}
+	if f.Changed("unchanged") {
+		t.Errorf("--unchanged was changed!")
+	}
+	if f.Changed("invalid") {
+		t.Errorf("--invalid was changed!")
+	}
+}
+
 func replaceSeparators(name string, from []string, to string) string {
 	result := name
 	for _, sep := range from {
