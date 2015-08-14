@@ -19,13 +19,15 @@ package component
 import (
 	"fmt"
 	"time"
+	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type HeartBeat interface {
-	// Transition changes the component's current phase
+	// Transition changes the component's current phase (locally)
+	// Future heartbeats will communicate this to the apiserver.
 	Transition(api.ComponentPhase, api.ComponentCondition)
 	// Watch returns a new read-only buffered error channel that will be closed when the heartbeat stops.
 	// The returned channel may receive zero or more errors before closing.
@@ -36,28 +38,20 @@ type HeartBeat interface {
 }
 
 type heartbeat struct {
+	state            *api.Component
+	stateLock        sync.Mutex
 	componentsClient client.ComponentsClient
 	// channel to send errors to
 	errCh chan error
 	// channel to add new watchers
-	watchCh         chan chan error
-	ticker          *time.Ticker
-	componentBuffer chan api.Component
+	watchCh chan chan error
+	ticker  *time.Ticker
 }
 
 // Start registers a new component and initiates continuous heart beating (component updates).
 // Phase defaults to Pending.
-func Start(componentsClient client.ComponentsClient, period time.Duration, t api.ComponentType, location string) HeartBeat {
-	hb := &heartbeat{
-		componentsClient: componentsClient,
-		errCh:            make(chan error, 1),
-		watchCh:          make(chan chan error),
-		ticker:           time.NewTicker(period),
-		componentBuffer:  make(chan api.Component, 1),
-	}
-
-	// init buffer
-	hb.componentBuffer <- api.Component{
+func Start(componentsClient client.ComponentsClient, period time.Duration, t api.ComponentType, location string) (HeartBeat, error) {
+	initialState := &api.Component{
 		Spec: api.ComponentSpec{
 			Type:    t,
 			Address: location,
@@ -68,20 +62,25 @@ func Start(componentsClient client.ComponentsClient, period time.Duration, t api
 		},
 	}
 
-	go errorHandler(hb.errCh, hb.watchCh)
-
-	// initial registration blocks
-	err := hb.create()
+	newState, err := componentsClient.Create(initialState)
 	if err != nil {
-		hb.kill(err)
-		return nil
+		return nil, fmt.Errorf("component create failed (state=%+v): %v", initialState, err)
 	}
 
-	go hb.run()
-	return hb
+	hb := &heartbeat{
+		state:            newState,
+		componentsClient: componentsClient,
+		errCh:            make(chan error, 1),
+		watchCh:          make(chan chan error),
+		ticker:           time.NewTicker(period),
+	}
+
+	go errorHandler(hb.errCh, hb.watchCh)
+	go hb.beat()
+	return hb, nil
 }
 
-// errorHandler propegates errors sent to errCh to a list of watchers.
+// errorHandler propagates errors sent to errCh to a list of watchers.
 // New watchers can be registered by sending a new buffered errCh over the watchCh channel.
 // This function exclusively owns the watcher list to avoid concurrent access.
 // Most heartbeat users will only have one watcher, but watchCh and errCh may be closed before they start watching.
@@ -100,6 +99,7 @@ func errorHandler(errCh chan error, watchCh chan chan error) {
 				errCh = nil
 			} else {
 				// propagate errors to watchers
+				// this could be asynchronous, but the buffer should make it non-blocking
 				for _, errCh := range watchers {
 					errCh <- err
 				}
@@ -119,12 +119,11 @@ func errorHandler(errCh chan error, watchCh chan chan error) {
 }
 
 func (hb *heartbeat) Transition(phase api.ComponentPhase, condition api.ComponentCondition) {
-	hb.updateBuffer(func(component api.Component) (api.Component, error) {
-		component.Status.Phase = phase
-		component.Status.Conditions = append(component.Status.Conditions, condition)
-		return component, nil
-	})
-	//TODO(karlkfi): immediately do an update?
+	hb.stateLock.Lock()
+	defer hb.stateLock.Unlock()
+
+	hb.state.Status.Phase = phase
+	hb.state.Status.Conditions = append(hb.state.Status.Conditions, condition)
 }
 
 func (hb *heartbeat) Watch() <-chan error {
@@ -147,42 +146,22 @@ func (hb *heartbeat) kill(err error) {
 	hb.Stop()
 }
 
-func (hb *heartbeat) run() {
+func (hb *heartbeat) beat() {
 	for now := range hb.ticker.C {
-		hb.update(now)
+		hb.beatOnce(now)
 	}
 }
 
-func (hb *heartbeat) create() error {
-	return hb.updateBuffer(func(component api.Component) (api.Component, error) {
-		newC, err := hb.componentsClient.Create(&component)
-		if err != nil {
-			return component, fmt.Errorf("heartbeat component create failed (component=%+v): %v", component, err)
-		}
-		return *newC, nil
-	})
-}
+// beatOnce sends the current component state as an update to the apiserver
+func (hb *heartbeat) beatOnce(_ time.Time) error {
+	hb.stateLock.Lock()
+	defer hb.stateLock.Unlock()
 
-func (hb *heartbeat) update(_ time.Time) error {
-	return hb.updateBuffer(func(component api.Component) (api.Component, error) {
-		newC, err := hb.componentsClient.Update(&component)
-		if err != nil {
-			return component, fmt.Errorf("heartbeat component update failed (component=%+v): %v", component, err)
-		}
-		return *newC, nil
-	})
-}
-
-// updateBuffer updates the buffered component in a synchronized way
-// TODO(karlkfi) replace this complexity with a pipeline goroutine that owns the current component state.
-func (hb *heartbeat) updateBuffer(updater func(api.Component) (api.Component, error)) error {
-	component := <-hb.componentBuffer
-	defer func() { hb.componentBuffer <- component }()
-	newC, err := updater(component)
+	newState, err := hb.componentsClient.Update(hb.state)
 	if err != nil {
-		// ignore update on error
-		return err
+		return fmt.Errorf("component update failed (state=%+v): %v", hb.state, err)
 	}
-	component = newC
+
+	hb.state = newState
 	return nil
 }

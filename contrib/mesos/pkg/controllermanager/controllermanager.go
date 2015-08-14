@@ -96,12 +96,15 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	heartbeat := component.Start(
+	heartbeat, err := component.Start(
 		kubeClient.ComponentsClient(),
 		5*time.Second,
 		api.ComponentControllerManager,
 		kubeconfig.Host,
 	)
+	if err != nil {
+		glog.Fatalf("Failed to start heartbeat: %v", err)
+	}
 
 	go func() {
 		mux := http.NewServeMux()

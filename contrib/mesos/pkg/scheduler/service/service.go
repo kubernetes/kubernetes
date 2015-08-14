@@ -668,12 +668,15 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 	s.client = client
 
-	heartbeat := component.Start(
+	heartbeat, err := component.Start(
 		s.client.ComponentsClient(),
 		5*time.Second,
 		api.ComponentScheduler,
 		s.URI(""),
 	)
+	if err != nil {
+		log.Fatalf("Failed to start heartbeat: %v", err)
+	}
 	s.heartbeat = heartbeat
 
 	if s.ReconcileCooldown < defaultReconcileCooldown {
