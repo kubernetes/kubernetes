@@ -29,15 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	"os"
-	//"runtime"
 	"time"
-
-	//"github.com/golang/glog"
-	//"k8s.io/kubernetes/cmd/kube-controller-manager/app"
-	//"k8s.io/kubernetes/pkg/controller"
-	//"k8s.io/kubernetes/pkg/healthz"
-	//"k8s.io/kubernetes/pkg/util"
-	//"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 // A program that is running may "use" a lease.
