@@ -108,6 +108,9 @@ def line_has_bad_flag(line, flagre):
         # These are usually yaml definitions
         if result.endswith(":"):
             return False
+         # something common in juju variables...
+        if "template_data[" + result + "]" in line:
+            return False
         return True
     return False
 

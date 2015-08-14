@@ -19,20 +19,10 @@ cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pi
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
 cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['etcd_servers'] = ",".join([
-cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['bind_address'] = "127.0.0.1"
 cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    template_data['etcd_servers'] = ",".join([
-cluster/juju/charms/trusty/kubernetes-master/hooks/etcd-relation-changed:    template_data['bind_address'] = "127.0.0.1"
 cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    template_data['etcd_servers'] = ",".join([
-cluster/juju/charms/trusty/kubernetes-master/hooks/minions-api-relation-changed:    template_data['bind_address'] = "127.0.0.1"
 cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    template_data['etcd_servers'] = ",".join([
-cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    template_data['bind_address'] = "127.0.0.1"
 cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    for k in ('etcd_servers',):
-cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    template_data['etcd_servers'] = ",".join([
-cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    template_data['bind_address'] = "127.0.0.1"
 cluster/juju/charms/trusty/kubernetes-master/files/scheduler.upstart.tmpl:     --address=%(bind_address)s \
 cluster/juju/charms/trusty/kubernetes-master/files/controller-manager.upstart.tmpl:     --address=%(bind_address)s \
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
@@ -40,28 +30,24 @@ cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    etcd_se
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        api_info = api_servers.pop()
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
-cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    template_data['etcd_servers'] = ','.join([
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
 cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
 cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
 cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
 cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        api_info = api_servers.pop()
 cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
-cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:    template_data['etcd_servers'] = ','.join([
 cluster/juju/charms/trusty/kubernetes/hooks/etcd-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
 cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    for k in ('etcd_servers', 'kubeapi_server'):
 cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
 cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
 cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        api_info = api_servers.pop()
 cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
-cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:    template_data['etcd_servers'] = ','.join([
 cluster/juju/charms/trusty/kubernetes/hooks/hooks.py:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
 cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
 cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
 cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    api_servers = get_rel_hosts('api', rels, ('hostname', 'port'))
 cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        api_info = api_servers.pop()
 cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
-cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:    template_data['etcd_servers'] = ','.join([
 cluster/juju/charms/trusty/kubernetes/hooks/api-relation-changed:        'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
 cluster/libvirt-coreos/util.sh:        public_ip=$MASTER_IP
 cluster/libvirt-coreos/util.sh:      public_ip=${MINION_IPS[$i]}
