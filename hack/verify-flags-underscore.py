@@ -95,8 +95,15 @@ def normalize_files(rootdir, files):
 def line_has_bad_flag(line, flagre):
     results  = flagre.findall(line)
     for result in results:
-        if "_" in result:
-            return True
+        if not "_" in result:
+            return False
+        # this should exclude many cases where jinja2 templates use kube flags
+        # as variables, except it uses _ for the variable name
+        if "{% set" + result + "= \"" in line:
+            return False
+        if "pillar[" + result + "]" in line:
+            return False
+        return True
     return False
 
 # The list of files might not be the whole repo. If someone only changed a

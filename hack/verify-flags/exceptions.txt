@@ -15,101 +15,29 @@ cluster/vagrant/provision-minion.sh:  hostname_override: '$(echo "$MINION_IP" | 
 cluster/addons/cluster-monitoring/README.md:Heapster enables monitoring of Kubernetes Clusters using [cAdvisor](https://github.com/google/cadvisor). The kubelet will communicate with an instance of cAdvisor running on localhost and proxy container stats to Heapster. Kubelet will attempt to connect to cAdvisor on port 4194 by default but this port can be configured with kubelet's `-cadvisor_port` run flag. Detailed information about heapster can be found [here](https://github.com/GoogleCloudPlatform/heapster).
 cluster/aws/templates/salt-minion.sh:# We set the hostname_override to the full EC2 private dns name
 cluster/aws/templates/salt-minion.sh:  hostname_override: "${HOSTNAME_OVERRIDE}"
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cluster_name = "" -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cluster_cidr = "" -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set allocate_node_cidrs = "" -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% set cluster_name = "--cluster-name=" + pillar['instance_prefix'] -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar['cluster_cidr'] is defined and pillar['cluster_cidr'] != "" -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% set cluster_cidr = "--cluster-cidr=" + pillar['cluster_cidr'] -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar['allocate_node_cidrs'] is defined -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% set allocate_node_cidrs = "--allocate-node-cidrs=" + pillar['allocate_node_cidrs'] -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cloud_provider = "" -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set cloud_config = "" -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:  {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:    {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set root_ca_file = "" -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:   {% set root_ca_file = "--root-ca-file=/srv/kubernetes/ca.crt" -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + cloud_provider  + " " + cloud_config + service_account_key + pillar['log_level'] + " " + root_ca_file -%}
-cluster/saltbase/salt/kube-proxy/default:  {% set api_servers = "--master=http://" + ips[0][0] -%}
 cluster/saltbase/salt/kube-proxy/default:  {% set api_servers_with_port = api_servers + ":7080" -%}
 cluster/saltbase/salt/kube-proxy/default:  {% if grains.api_servers is defined -%}
-cluster/saltbase/salt/kube-proxy/default:    {% set api_servers = "--master=https://" + grains.api_servers -%}
-cluster/saltbase/salt/kube-proxy/default:    {% set api_servers = "--master=https://" + ips[0][0] -%}
 cluster/saltbase/salt/kube-proxy/default:     {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/default:    {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kube-addons/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
 cluster/saltbase/salt/kubelet/default:{% if grains.api_servers is defined -%}
-cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
-cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + grains.apiservers -%}
-cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + master_ipv4 -%}
-cluster/saltbase/salt/kubelet/default:  {% set api_servers = "--api-servers=https://" + ips[0][0] -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
-cluster/saltbase/salt/kubelet/default:{% set cloud_provider = "" -%}
-cluster/saltbase/salt/kubelet/default:  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
-cluster/saltbase/salt/kubelet/default:{% set manifest_url = "" -%}
-cluster/saltbase/salt/kubelet/default:  {% set manifest_url = "--manifest-url=http://metadata.google.internal/computeMetadata/v1/instance/attributes/google-container-manifest --manifest-url-header=Metadata-Flavor:Google" -%}
-cluster/saltbase/salt/kubelet/default:{% set hostname_override = "" -%}
 cluster/saltbase/salt/kubelet/default:{% if grains.hostname_override is defined -%}
-cluster/saltbase/salt/kubelet/default:  {% set hostname_override = " --hostname-override=" + grains.hostname_override -%}
-cluster/saltbase/salt/kubelet/default:{% set cluster_dns = "" %}
-cluster/saltbase/salt/kubelet/default:{% set cluster_domain = "" %}
-cluster/saltbase/salt/kubelet/default:  {% set cluster_dns = "--cluster-dns=" + pillar['dns_server'] %}
-cluster/saltbase/salt/kubelet/default:  {% set cluster_domain = "--cluster-domain=" + pillar['dns_domain'] %}
-cluster/saltbase/salt/kubelet/default:{% set configure_cbr0 = "" -%}
-cluster/saltbase/salt/kubelet/default:{% if pillar['allocate_node_cidrs'] is defined -%}
-cluster/saltbase/salt/kubelet/default:  {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
-cluster/saltbase/salt/kubelet/default:{% set system_container = "" -%}
-cluster/saltbase/salt/kubelet/default:{% set cgroup_root = "" -%}
-cluster/saltbase/salt/kubelet/default:  {% set system_container = "--system-container=/system" -%}
-cluster/saltbase/salt/kubelet/default:  {% set cgroup_root = "--cgroup-root=/" -%}
-cluster/saltbase/salt/kubelet/default:  {% set cgroup_root = "--cgroup-root=docker" -%}
-cluster/saltbase/salt/kubelet/default:{% set pod_cidr = "" %}
-cluster/saltbase/salt/kubelet/default:  {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
-cluster/saltbase/salt/kubelet/default:DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{test_args}}"
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
 cluster/saltbase/salt/monit/monit_watcher.sh:# Apply oom_score_adj: -901 to processes
 cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_provider = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cloud_config = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:    {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set advertise_address = "" -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if grains.advertise_address is defined -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set advertise_address = "--advertise-address=" + grains.advertise_address -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set cluster_name = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set cluster_name = "--cluster-name=" + pillar['instance_prefix'] -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set bind_address = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set bind_address = "--bind-address=" + grains.publicAddressOverride -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set etcd_servers = "--etcd-servers=http://127.0.0.1:4001" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set service_cluster_ip_range = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if pillar['service_cluster_ip_range'] is defined -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set service_cluster_ip_range = "--service-cluster-ip-range=" + pillar['service_cluster_ip_range'] -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set client_ca_file = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set secure_port = "6443" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set secure_port = "443" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set client_ca_file = "--client-ca-file=/srv/kubernetes/ca.crt" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set token_auth_file = "--token-auth-file=/dev/null" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set basic_auth_file = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set min_request_timeout = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set min_request_timeout = "--min-request-timeout=" + grains.minRequestTimeout -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:    {% set token_auth_file = "--token-auth-file=/srv/kubernetes/known_tokens.csv" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:  {% set basic_auth_file = "--basic-auth-file=/srv/kubernetes/basic_auth.csv" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set admission_control = "" -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if pillar['admission_control'] is defined -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest: {% set admission_control = "--admission-control=" + pillar['admission_control'] -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set runtime_config = "" -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% if grains.runtime_config is defined -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest: {% set runtime_config = "--runtime-config=" + grains.runtime_config -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:                 "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
 cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    for k in ('etcd_servers',):
 cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['etcd_servers'] = ",".join([
 cluster/juju/charms/trusty/kubernetes-master/hooks/network-relation-changed:    template_data['bind_address'] = "127.0.0.1"
@@ -125,7 +53,6 @@ cluster/juju/charms/trusty/kubernetes-master/hooks/hooks.py:    template_data['b
 cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    for k in ('etcd_servers',):
 cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    template_data['etcd_servers'] = ",".join([
 cluster/juju/charms/trusty/kubernetes-master/hooks/config-changed:    template_data['bind_address'] = "127.0.0.1"
-cluster/juju/charms/trusty/kubernetes-master/files/apiserver.upstart.tmpl:     --etcd-servers=%(etcd_servers)s \
 cluster/juju/charms/trusty/kubernetes-master/files/scheduler.upstart.tmpl:     --address=%(bind_address)s \
 cluster/juju/charms/trusty/kubernetes-master/files/controller-manager.upstart.tmpl:     --address=%(bind_address)s \
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
