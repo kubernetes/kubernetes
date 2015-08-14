@@ -48,6 +48,7 @@ import (
 type ProxyHandler struct {
 	prefix                 string
 	storage                map[string]rest.Storage
+	groupVersion           string
 	codec                  runtime.Codec
 	context                api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
@@ -107,7 +108,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.codec, w)
+		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.groupVersion, r.codec, w)
 		return
 	}
 
