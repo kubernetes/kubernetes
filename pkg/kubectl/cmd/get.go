@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -49,6 +48,9 @@ $ kubectl get replicationcontroller web
 
 # List a single pod in JSON output format.
 $ kubectl get -o json pod web-pod-13je7
+
+# List a pod identified by type and name specified in "pod.yaml" in JSON output format.
+$ kubectl get -f pod.yaml -o json
 
 # Return only the phase value of the specified pod.
 $ kubectl get -o template web-pod-13je7 --template={{.status.phase}} --api-version=v1
@@ -83,6 +85,8 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag statements like -L label1 -L label2...")
+	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	return cmd
 }
 
@@ -93,12 +97,14 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	mapper, typer := f.Object()
 
-	cmdNamespace, _, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	if len(args) == 0 {
+	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
+
+	if len(args) == 0 && len(filenames) == 0 {
 		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources, `   * componentstatuses (aka 'cs')
    * endpoints (aka 'ep')
 `)
@@ -110,19 +116,24 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
+			FilenameParam(enforceNamespace, filenames...).
 			SelectorParam(selector).
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
+			Latest().
 			Do()
 		if err != nil {
 			return err
 		}
-
-		mapping, err := r.ResourceMapping()
+		infos, err := r.Infos()
 		if err != nil {
 			return err
 		}
-
+		if len(infos) != 1 {
+			return fmt.Errorf("watch is only supported on a single resource - %d resources were found", len(infos))
+		}
+		info := infos[0]
+		mapping := info.ResourceMapping()
 		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
 		if err != nil {
 			return err
@@ -132,7 +143,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-
 		rv, err := mapping.MetadataAccessor.ResourceVersion(obj)
 		if err != nil {
 			return err
@@ -159,6 +169,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
+		FilenameParam(enforceNamespace, filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
