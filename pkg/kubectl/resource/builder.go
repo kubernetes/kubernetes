@@ -584,6 +584,10 @@ func (b *Builder) visitorResult() *Result {
 			if b.flatten {
 				visitors = NewFlattenListVisitor(visitors, b.mapper)
 			}
+			// must set namespace prior to fetching
+			if b.defaultNamespace {
+				visitors = NewDecoratedVisitor(visitors, SetNamespace(b.namespace))
+			}
 			visitors = NewDecoratedVisitor(visitors, RetrieveLatest)
 		}
 		return &Result{singular: singular, visitor: visitors, sources: b.paths}

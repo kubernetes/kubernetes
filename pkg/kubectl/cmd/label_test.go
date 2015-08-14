@@ -323,6 +323,60 @@ func TestLabelErrors(t *testing.T) {
 	}
 }
 
+func TestLabelForResourceFromFile(t *testing.T) {
+	pods, _, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch req.Method {
+			case "GET":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/cassandra":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			case "PUT":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/cassandra":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			default:
+				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	tf.Namespace = "test"
+	tf.ClientConfig = &client.Config{Version: testapi.Version()}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdLabel(f, buf)
+	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra.yaml")
+
+	cmd.SetOutput(buf)
+	err := RunLabel(f, buf, cmd, []string{"a=b"})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tf.Printer.(*testPrinter).Objects == nil {
+		t.Errorf("unexpected print to default printer")
+	}
+	if !reflect.DeepEqual(tf.Printer.(*testPrinter).Objects[0].(*api.Pod).Labels, map[string]string{"a": "b"}) {
+		t.Errorf("did not set labels: %#v", string(buf.Bytes()))
+	}
+}
+
 func TestLabelMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 

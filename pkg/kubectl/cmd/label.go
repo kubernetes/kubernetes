@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -44,6 +45,9 @@ $ kubectl label --overwrite pods foo status=unhealthy
 # Update all pods in the namespace
 $ kubectl label pods --all status=unhealthy
 
+# Update a pod identified by the type and name in "pod.json"
+$ kubectl label -f pod.json status=unhealthy
+
 # Update pod 'foo' only if the resource is unchanged from version 1.
 $ kubectl label pods foo status=unhealthy --resource-version=1
 
@@ -54,7 +58,7 @@ $ kubectl label pods foo bar-`
 
 func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "label [--overwrite] TYPE NAME KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
+		Use:     "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   "Update the labels on a resource",
 		Long:    fmt.Sprintf(label_long, util.LabelValueMaxLength),
 		Example: label_example,
@@ -68,6 +72,8 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().String("resource-version", "", "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
+	usage := "Filename, directory, or URL to a file identifying the resource to update the labels"
+	kubectl.AddJsonFilenameFlag(cmd, usage)
 	return cmd
 }
 
@@ -149,7 +155,8 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			return cmdutil.UsageError(cmd, "all resources must be specified before label changes: %s", s)
 		}
 	}
-	if len(resources) < 1 {
+	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
+	if len(resources) < 1 && len(filenames) == 0 {
 		return cmdutil.UsageError(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(labelArgs) < 1 {
@@ -161,7 +168,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 
-	cmdNamespace, _, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -170,11 +177,11 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err != nil {
 		return cmdutil.UsageError(cmd, err.Error())
 	}
-
 	mapper, typer := f.Object()
 	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(all, resources...).
 		Flatten().
@@ -185,6 +192,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err := r.Err(); err != nil {
 		return err
 	}
+
 	// only apply resource version locking on a single resource
 	if !one && len(resourceVersion) > 0 {
 		return cmdutil.UsageError(cmd, "--resource-version may only be used with a single resource")
