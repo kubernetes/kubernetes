@@ -33,11 +33,11 @@ Documentation for other releases can be found at
 API Conventions
 ===============
 
-Updated: 4/16/2015
+Updated: 8/12/2015
 
 *This document is oriented at users who want a deeper understanding of the Kubernetes
 API structure, and developers wanting to extend the Kubernetes API.  An introduction to
-using resources with kubectl can be found in (working_with_resources.md).*
+using resources with kubectl can be found in [Working with resources](../user-guide/working-with-resources.md).*
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -65,11 +65,14 @@ using resources with kubectl can be found in (working_with_resources.md).*
   - [Serialization Format](#serialization-format)
   - [Units](#units)
   - [Selecting Fields](#selecting-fields)
+  - [Object references](#object-references)
   - [HTTP Status codes](#http-status-codes)
       - [Success codes](#success-codes)
       - [Error codes](#error-codes)
   - [Response Status Kind](#response-status-kind)
   - [Events](#events)
+  - [Naming conventions](#naming-conventions)
+  - [Label, selector, and annotation conventions](#label-selector-and-annotation-conventions)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -84,7 +87,7 @@ The following terms are defined:
   * Collections - a list of resources of the same type, which may be queryable
   * Elements - an individual resource, addressable via a URL
 
-Each resource typically accepts and returns data of a single kind.  A kind may be accepted or returned by multiple resources that reflect specific use cases. For instance, the kind "pod" is exposed as a "pods" resource that allows end users to create, update, and delete pods, while a separate "pod status" resource (that acts on "pod" kind) allows automated processes to update a subset of the fields in that resource. A "restart" resource might be exposed for a number of different resources to allow the same action to have different results for each object.
+Each resource typically accepts and returns data of a single kind.  A kind may be accepted or returned by multiple resources that reflect specific use cases. For instance, the kind "Pod" is exposed as a "pods" resource that allows end users to create, update, and delete pods, while a separate "pod status" resource (that acts on "Pod" kind) allows automated processes to update a subset of the fields in that resource.
 
 Resource collections should be all lowercase and plural, whereas kinds are CamelCase and singular.
 
@@ -99,7 +102,7 @@ Kinds are grouped into three categories:
 
    An object may have multiple resources that clients can use to perform specific actions that create, update, delete, or get.
 
-   Examples: `Pods`, `ReplicationControllers`, `Services`, `Namespaces`, `Nodes`
+   Examples: `Pod`, `ReplicationController`, `Service`, `Namespace`, `Node`.
 
 2. **Lists** are collections of **resources** of one (usually) or more (occasionally) kinds.
 
@@ -117,9 +120,15 @@ Kinds are grouped into three categories:
 
    Given their limited scope, they have the same set of limited common metadata as lists.
 
-   The "size" action may accept a simple resource that has only a single field as input (the number of things). The "status" kind is returned when errors occur and is not persisted in the system.
+   For instance, the "Status" kind is returned when errors occur and is not persisted in the system.
 
-   Examples: Binding, Status
+   Many simple resources are "subresources", which are rooted at API paths of specific resources. When resources wish to expose alternative actions or views that are closely coupled to a single resource, they should do so using new sub-resources. Common subresources include:
+
+   * `/binding`: Used to bind a resource representing a user request (e.g., Pod, PersistentVolumeClaim) to a cluster infrastructure resource (e.g., Node, PersistentVolume).
+   * `/status`: Used to write just the status portion of a resource. For example, the `/pods` endpoint only allows updates to `metadata` and `spec`, since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted.
+   * `/scale`: Used to read and write the count of a resource in a manner that is independent of the specific resource schema.
+
+   Two additional subresources, `proxy` and `portforward`, provide access to cluster resources as described in [docs/user-guide/accessing-the-cluster.md](../user-guide/accessing-the-cluster.md).
 
 The standard REST verbs (defined below) MUST return singular JSON objects. Some API endpoints may deviate from the strict REST pattern and return resources that are not singular JSON objects, such as streams of JSON objects or unstructured text log data.
 
@@ -147,6 +156,7 @@ Every object kind MUST have the following metadata in a nested object field call
 Every object SHOULD have the following metadata in a nested object field called "metadata":
 
 * resourceVersion: a string that identifies the internal version of this object that can be used by clients to determine when objects have changed. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. (see [concurrency control](#concurrency-control-and-consistency), below, for more details)
+* generation: a sequence number representing a specific generation of the desired state. Set by the system and monotonically increasing, per-resource. May be compared, such as for RAW and WAW consistency.
 * creationTimestamp: a string representing an RFC 3339 date of the date and time an object was created
 * deletionTimestamp: a string representing an RFC 3339 date of the date and time after which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time.
 * labels: a map of string keys and values that can be used to organize and categorize objects (see [docs/user-guide/labels.md](../user-guide/labels.md))
@@ -172,18 +182,38 @@ Objects that contain both spec and status should not contain additional top-leve
 
 ##### Typical status properties
 
-* **phase**: The phase is a simple, high-level summary of the phase of the lifecycle of an object. The phase should progress monotonically. Typical phase values are `Pending` (not yet fully physically realized), `Running` or `Active` (fully realized and active, but not necessarily operating correctly), and `Terminated` (no longer active), but may vary slightly for different types of objects. New phase values should not be added to existing objects in the future. Like other status fields, it must be possible to ascertain the lifecycle phase by observation. Additional details regarding the current phase may be contained in other fields.
-* **conditions**: Conditions represent orthogonal observations of an object's current state. Objects may report multiple conditions, and new types of conditions may be added in the future. Condition status values may be `True`, `False`, or `Unknown`. Unlike the phase, conditions are not expected to be monotonic -- their values may change back and forth. A typical condition type is `Ready`, which indicates the object was believed to be fully operational at the time it was last probed. Conditions may carry additional information, such as the last probe time or last transition time.
+**Conditions** represent the latest available observations of an object's current state. Objects may report multiple conditions, and new types of conditions may be added in the future. Therefore, conditions are represented using a list/slice, where all have similar structure.
 
-TODO(@vishh): Reason and Message.
+The `FooCondition` type for some resource type `Foo` may include a subset of the following fields, but must contain at least `type` and `status` fields:
 
-Phases and conditions are observations and not, themselves, state machines, nor do we define comprehensive state machines for objects with behaviors associated with state transitions. The system is level-based and should assume an Open World. Additionally, new observations and details about these observations may be added over time.
+```golang
+	Type               FooConditionType  `json:"type" description:"type of Foo condition"`
+	Status             ConditionStatus   `json:"status" description:"status of the condition, one of True, False, Unknown"`
+	LastHeartbeatTime  util.Time         `json:"lastHeartbeatTime,omitempty" description:"last time we got an update on a given condition"`
+	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
+	Reason             string            `json:"reason,omitempty" description:"one-word CamelCase reason for the condition's last transition"`
+	Message            string            `json:"message,omitempty" description:"human-readable message indicating details about last transition"`
+```
 
-In order to preserve extensibility, in the future, we intend to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from observations.
+Additional fields may be added in the future.
 
-Note that historical information status (e.g., last transition time, failure counts) is only provided at best effort, and is not guaranteed to not be lost.
+Conditions should be added to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from other observations.
 
-Status information that may be large (especially unbounded in size, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](../design/resources.md#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
+Condition status values may be `True`, `False`, or `Unknown`. The absence of a condition should be interpreted the same as `Unknown`.
+
+In general, condition values may change back and forth, but some condition transitions may be monotonic, depending on the resource and condition type. However, conditions are observations and not, themselves, state machines, nor do we define comprehensive state machines for objects, nor behaviors associated with state transitions. The system is level-based rather than edge-triggered, and should assume an Open World.
+
+A typical oscillating condition type is `Ready`, which indicates the object was believed to be fully operational at the time it was last probed. A possible monotonic condition could be `Succeeded`. A `False` status for `Succeeded` would imply failure. An object that was still active would not have a `Succeeded` condition, or its status would be `Unknown`.
+
+Some resources in the v1 API contain fields called **`phase`**, and associated `message`, `reason`, and other status fields. The pattern of using `phase` is deprecated. Newer API types should use conditions instead. Phase was essentially a state-machine enumeration field, that contradicted [system-design principles](../design/principles.md#control-logic) and hampered evolution, since [adding new enum values breaks backward compatibility](api_changes.md). Rather than encouraging clients to infer implicit properties from phases, we intend to explicitly expose the conditions that clients need to monitor. Conditions also have the benefit that it is possible to create some conditions with uniform meaning across all resource types, while still exposing others that are unique to specific resource types. See [#7856](http://issues.k8s.io/7856) for more details and discussion.
+
+In condition types, and everywhere else they appear in the API, **`Reason`** is intended to be a one-word, CamelCase representation of the category of cause of the current status, and **`Message`** is intended to be a human-readable phrase or sentence, which may contain specific details of the individual occurrence. `Reason` is intended to be used in concise output, such as one-line `kubectl get` output, and in summarizing occurrences of causes, whereas `Message` is intended to be presented to users in detailed status explanations, such as `kubectl describe` output.
+
+Historical information status (e.g., last transition time, failure counts) is only provided with reasonable effort, and is not guaranteed to not be lost.
+
+Status information that may be large (especially proportional in size to collections of other resources, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](../design/resources.md#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
+
+Some resources report the `observedGeneration`, which is the `generation` most recently observed by the component responsible for acting upon changes to the desired state of the resource. This can be used, for instance, to ensure that the reported status reflects the most recent desired status.
 
 #### References to related objects
 
@@ -213,7 +243,7 @@ ports:
     containerPort: 80
 ```
 
-This rule maintains the invariant that all JSON/YAML keys are fields in API objects. The only exceptions are pure maps in the API (currently, labels, selectors, and annotations), as opposed to sets of subobjects.
+This rule maintains the invariant that all JSON/YAML keys are fields in API objects. The only exceptions are pure maps in the API (currently, labels, selectors, annotations, data), as opposed to sets of subobjects.
 
 #### Constants
 
@@ -249,19 +279,7 @@ API resources should use the traditional REST pattern:
 * DELETE /&lt;resourceNamePlural&gt;/&lt;name&gt;  - Delete the single resource with the given name. DeleteOptions may specify gracePeriodSeconds, the optional duration in seconds before the object should be deleted. Individual kinds may declare fields which provide a default grace period, and different kinds may have differing kind-wide default grace periods. A user provided grace period overrides a default grace period, including the zero grace period ("now").
 * PUT /&lt;resourceNamePlural&gt;/&lt;name&gt; - Update or create the resource with the given name with the JSON object provided by the client.
 * PATCH /&lt;resourceNamePlural&gt;/&lt;name&gt; - Selectively modify the specified fields of the resource. See more information [below](#patch).
-
-Kubernetes by convention exposes additional verbs as new root endpoints with singular names. Examples:
-
-* GET /watch/&lt;resourceNamePlural&gt; - Receive a stream of JSON objects corresponding to changes made to any resource of the given kind over time.
-* GET /watch/&lt;resourceNamePlural&gt;/&lt;name&gt; - Receive a stream of JSON objects corresponding to changes made to the named resource of the given kind over time.
-
-These are verbs which change the fundamental type of data returned (watch returns a stream of JSON instead of a single JSON object). Support of additional verbs is not required for all object types.
-
-Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [docs/user-guide/accessing-the-cluster.md](../user-guide/accessing-the-cluster.md).
-
-When resources wish to expose alternative actions that are closely coupled to a single resource, they should do so using new sub-resources. An example is allowing automated processes to update the "status" field of a Pod. The `/pods` endpoint only allows updates to "metadata" and "spec", since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted. Likewise, some actions like "stop" or "scale" are best represented as REST sub-resources that are POSTed to.  The POST action may require a simple kind to be provided if the action requires parameters, or function without a request body.
-
-TODO: more documentation of Watch
+* GET /&lt;resourceNamePlural&gt;&amp;watch=true - Receive a stream of JSON objects corresponding to changes made to any resource of the given kind over time.
 
 ### PATCH operations
 
@@ -423,7 +441,6 @@ APIs may return alternative representations of any resource in response to an Ac
 
 All dates should be serialized as RFC3339 strings.
 
-
 ## Units
 
 Units must either be explicit in the field name (e.g., `timeoutSeconds`), or must be specified as part of the value (e.g., `resource.Quantity`). Which approach is preferred is TBD.
@@ -431,11 +448,16 @@ Units must either be explicit in the field name (e.g., `timeoutSeconds`), or mus
 
 ## Selecting Fields
 
-Some APIs may need to identify which field in a JSON object is invalid, or to reference a value to extract from a separate resource. The current recommendation is to use standard JavaScript syntax for accessing that field, assuming the JSON object was transformed into a JavaScript object.
+Some APIs may need to identify which field in a JSON object is invalid, or to reference a value to extract from a separate resource. The current recommendation is to use standard JavaScript syntax for accessing that field, assuming the JSON object was transformed into a JavaScript object, without the leading dot, such as `metadata.name`.
 
 Examples:
 
-* Find the field "current" in the object "state" in the second item in the array "fields": `fields[0].state.current`
+* Find the field "current" in the object "state" in the second item in the array "fields": `fields[1].state.current`
+
+## Object references
+
+Object references should either be called `fooName` if referring to an object of kind `Foo` by just the name (within the current namespace, if a namespaced resource), or should be called `fooRef`, and should contain a subset of the fields of the `ObjectReference` type.
+
 
 TODO: Plugins, extensions, nested kinds, headers
 
@@ -561,7 +583,7 @@ $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https:/
 
 `message` may contain human-readable description of the error
 
-`reason` may contain a machine-readable description of why this operation is in the `Failure` status. If this value is empty there is no information available. The `reason` clarifies an HTTP status code but does not override it.
+`reason` may contain a machine-readable, one-word, CamelCase description of why this operation is in the `Failure` status. If this value is empty there is no information available. The `reason` clarifies an HTTP status code but does not override it.
 
 `details` may contain extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.
 
@@ -646,7 +668,43 @@ Possible values for the `reason` and `details` fields:
 
 ## Events
 
-TODO: Document events (refer to another doc for details)
+Events are complementary to status information, since they can provide some historical information about status and occurrences in addition to current or previous status. Generate events for situations users or administrators should be alerted about.
+
+Choose a unique, specific, short, CamelCase reason for each event category. For example, `FreeDiskSpaceInvalid` is a good event reason because it is likely to refer to just one situation, but `Started` is not a good reason because it doesn't sufficiently indicate what started, even when combined with other event fields.
+
+`Error creating foo` or `Error creating foo %s` would be appropriate for an event message, with the latter being preferable, since it is more informational.
+
+Accumulate repeated events in the client, especially for frequent events, to reduce data volume, load on the system, and noise exposed to users.
+
+## Naming conventions
+
+* `Minion` has been deprecated in favor of `Node`. Use `Node` where referring to the node resource in the context of the cluster. Use `Host` where referring to properties of the individual physical/virtual system, such as `hostname`, `hostPath`, `hostNetwork`, etc.
+* `FooController` is a deprecated kind naming convention. Name the kind after the thing being controlled instead (e.g., `Job` rather than `JobController`).
+* The name of a field that specifies the time at which `something` occurs should be called `somethingTime`. Do not use `stamp` (e.g., `creationTimestamp`).
+* Do not use abbreviations in the API, except where they are extremely commonly used, such as "id", "args", or "stdin".
+* Acronyms should similarly only be used when extremely commonly known. All letters in the acronym should have the same case, using the appropriate case for the situation. For example, at the beginning of a field name, the acronym should be all lowercase, such as "httpGet". Where used as a constant, all letters should be uppercase, such as "TCP" or "UDP".
+
+## Label, selector, and annotation conventions
+
+Labels are the domain of users. They are intended to facilitate organization and management of API resources using attributes that are meaningful to users, as opposed to meaningful to the system. Think of them as user-created mp3 or email inbox labels, as opposed to the directory structure used by a program to store its data. The former is enables the user to apply an arbitrary ontology, whereas the latter is implementation-centric and inflexible. Users will use labels to select resources to operate on, display label values in CLI/UI columns, etc. Users should always retain full power and flexibility over the label schemas they apply to labels in their namespaces.
+
+However, we should support conveniences for common cases by default. For example, what we now do in ReplicationController is automatically set the RC's selector and labels to the labels in the pod template by default, if they are not already set. That ensures that the selector will match the template, and that the RC can be managed using the same labels as the pods it creates. Note that once we generalize selectors, it won't necessarily be possible to unambiguously generate labels that match an arbitrary selector.
+
+If the user wants to apply additional labels to the pods that it doesn't select upon, such as to facilitate adoption of pods or in the expectation that some label values will change, they can set the selector to a subset of the pod labels. Similarly, the RC's labels could be initialized to a subset of the pod template's labels, or could include additional/different labels.
+
+For disciplined users managing resources within their own namespaces, it's not that hard to consistently apply schemas that ensure uniqueness. One just needs to ensure that at least one value of some label key in common differs compared to all other comparable resources. We could/should provide a verification tool to check that. However, development of conventions similar to the examples in [Labels](../user-guide/labels.md) make uniqueness straightforward. Furthermore, relatively narrowly used namespaces (e.g., per environment, per application) can be used to reduce the set of resources that could potentially cause overlap.
+
+In cases where users could be running misc. examples with inconsistent schemas, or where tooling or components need to programmatically generate new objects to be selected, there needs to be a straightforward way to generate unique label sets. A simple way to ensure uniqueness of the set is to ensure uniqueness of a single label value, such as by using a resource name, uid, resource hash, or generation number.
+
+Problems with uids and hashes, however, include that they have no semantic meaning to the user, are not memorable nor readily recognizable, and are not predictable. Lack of predictability obstructs use cases such as creation of a replication controller from a pod, such as people want to do when exploring the system, bootstrapping a self-hosted cluster, or deletion and re-creation of a new RC that adopts the pods of the previous one, such as to rename it. Generation numbers are more predictable and much clearer, assuming there is a logical sequence. Fortunately, for deployments that's the case. For jobs, use of creation timestamps is common internally. Users should always be able to turn off auto-generation, in order to permit some of the scenarios described above. Note that auto-generated labels will also become one more field that needs to be stripped out when cloning a resource, within a namespace, in a new namespace, in a new cluster, etc., and will need to be ignored around when updating a resource via patch or read-modify-write sequence.
+
+Inclusion of a system prefix in a label key is fairly hostile to UX. A prefix is only necessary in the case that the user cannot choose the label key, in order to avoid collisions with user-defined labels. However, I firmly believe that the user should always be allowed to select the label keys to use on their resources, so it should always be possible to override default label keys.
+
+Therefore, resources supporting auto-generation of unique labels should have a `uniqueLabelKey` field, so that the user could specify the key if they wanted to, but if unspecified, it could be set by default, such as to the resource type, like job, deployment, or replicationController. The value would need to be at least spatially unique, and perhaps temporally unique in the case of job.
+
+Annotations have very different intended usage from labels. We expect them to be primarily generated and consumed by tooling and system extensions. I'm inclined to generalize annotations to permit them to directly store arbitrary json. Rigid names and name prefixes make sense, since they are analogous to API fields.
+
+In fact, experimental API fields, including to represent fields of newer alpha/beta API versions in the older, stable storage version, may be represented as annotations with the prefix `experimental.kubernetes.io/`.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
