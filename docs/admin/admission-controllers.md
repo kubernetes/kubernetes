@@ -79,7 +79,7 @@ support all the features you expect.
 
 ## How do I turn on an admission control plug-in?
 
-The Kubernetes API server supports a flag, `admission_control` that takes a comma-delimited,
+The Kubernetes API server supports a flag, `admission-control` that takes a comma-delimited,
 ordered list of admission control choices to invoke prior to modifying objects in the cluster.
 
 ## What does each plug-in do?

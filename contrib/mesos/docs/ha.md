@@ -34,13 +34,13 @@ In this case, if there are problems launching a replacement scheduler process th
 ##### Command Line Arguments
 
 - `--ha` is required to enable scheduler HA and multi-scheduler leader election.
-- `--km_path` or else (`--executor_path` and `--proxy_path`) should reference non-local-file URI's and must be identical across schedulers.
+- `--km-path` or else (`--executor-path` and `--proxy-path`) should reference non-local-file URI's and must be identical across schedulers.
 
 If you have HDFS installed on your slaves then you can specify HDFS URI locations for the binaries:
 
 ```shell
 $ hdfs dfs -put -f bin/km hdfs:///km
-$ ./bin/km scheduler ... --mesos_master=zk://zk1:2181,zk2:2181/mesos --ha --km_path=hdfs:///km
+$ ./bin/km scheduler ... --mesos-master=zk://zk1:2181,zk2:2181/mesos --ha --km-path=hdfs:///km
 ```
 
 **IMPORTANT:** some command line parameters specified for the scheduler process are passed to the Kubelet-executor and so are subject to compatibility tests:
@@ -54,11 +54,11 @@ The command line parameters that affect the hash calculation are listed below.
 
 - `--allow-privileged`
 - `--api-servers`
-- `--auth_path`
+- `--auth-path`
 - `--cluster_*`
 - `--executor_*`
 - `--kubelet_*`
-- `--km_path`
+- `--km-path`
 - `--profiling`
 - `--proxy_path`
 
