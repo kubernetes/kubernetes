@@ -23,43 +23,6 @@ contrib/mesos/docs/ha.md:- `--km_path` or else (`--executor_path` and `--proxy_p
 contrib/mesos/docs/ha.md:$ ./bin/km scheduler ... --mesos_master=zk://zk1:2181,zk2:2181/mesos --ha --km_path=hdfs:///km
 contrib/mesos/docs/ha.md:- `--auth_path`
 contrib/mesos/docs/ha.md:- `--km_path`
-contrib/prometheus/README.md:http://service_address:service_port/metrics.
-contrib/ansible/vagrant/Vagrantfile:$num_nodes = (ENV['NUM_NODES'] || 2).to_i
-contrib/ansible/vagrant/Vagrantfile:  $num_nodes.times do |i|
-contrib/ansible/roles/flannel/tasks/config.yml:    conf_loc: "/{{ cluster_name }}/network/config"
-contrib/ansible/roles/flannel/templates/flanneld.j2:FLANNEL_ETCD_KEY="/{{ cluster_name }}/network"
-contrib/ansible/roles/kubernetes-addons/files/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
-contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:current-context: proxy-to-{{ cluster_name }}
-contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:    cluster: {{ cluster_name }}
-contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:  name: proxy-to-{{ cluster_name }}
-contrib/ansible/roles/node/templates/proxy.kubeconfig.j2:  name: {{ cluster_name }}
-contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:current-context: kubelet-to-{{ cluster_name }}
-contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:  name: {{ cluster_name }}
-contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:    cluster: {{ cluster_name }}
-contrib/ansible/roles/node/templates/kubelet.kubeconfig.j2:  name: kubelet-to-{{ cluster_name }}
-contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:current-context: scheduler-to-{{ cluster_name }}
-contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:  name: {{ cluster_name }}
-contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:    cluster: {{ cluster_name }}
-contrib/ansible/roles/master/templates/scheduler.kubeconfig.j2:  name: scheduler-to-{{ cluster_name }}
-contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:current-context: kubectl-to-{{ cluster_name }}
-contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:  name: {{ cluster_name }}
-contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:    cluster: {{ cluster_name }}
-contrib/ansible/roles/master/templates/kubectl.kubeconfig.j2:  name: kubectl-to-{{ cluster_name }}
-contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:current-context: controller-manager-to-{{ cluster_name }}
-contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:  name: {{ cluster_name }}
-contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:    cluster: {{ cluster_name }}
-contrib/ansible/roles/master/templates/controller-manager.kubeconfig.j2:  name: controller-manager-to-{{ cluster_name }}
-contrib/ansible/roles/kubernetes/defaults/main.yml:dns_domain: "{{ cluster_name }}"
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:mkdir -p "$cert_dir"
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/ca.crt "${cert_dir}/ca.crt"
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p "pki/issued/${master_name}.crt" "${cert_dir}/server.crt" > /dev/null 2>&1
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p "pki/private/${master_name}.key" "${cert_dir}/server.key" > /dev/null 2>&1
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/issued/kubelet.crt "${cert_dir}/kubelet.crt"
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:cp -p pki/private/kubelet.key "${cert_dir}/kubelet.key"
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:  chgrp "${cert_group}" "${cert_dir}/${cert}"
-contrib/ansible/roles/kubernetes/files/make-ca-cert.sh:  chmod 660 "${cert_dir}/${cert}"
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
 examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
