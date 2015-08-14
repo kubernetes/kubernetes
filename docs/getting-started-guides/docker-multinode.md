@@ -81,7 +81,7 @@ Clone the Kubernetes repo, and run [master.sh](docker-multinode/master.sh) on th
 
 ```sh
 export K8S_VERSION=<your_k8s_version (e.g. 1.0.1)>
-cd kubernetes/cluster/docker-multinode
+cd kubernetes/docs/getting-started-guides/docker-multinode/
 ./master.sh
 ```
 
@@ -98,7 +98,7 @@ Clone the Kubernetes repo, and run [worker.sh](docker-multinode/worker.sh) on th
 ```sh
 export K8S_VERSION=<your_k8s_version (e.g. 1.0.1)>
 export MASTER_IP=<your_master_ip (e.g. 1.2.3.4)>
-cd kubernetes/cluster/docker-multinode
+cd kubernetes/docs/getting-started-guides/docker-multinode/
 ./worker.sh
 ```
 
