@@ -321,9 +321,9 @@ type Secret struct {
 type SecretType string
 
 const (
-    SecretTypeOpaque              SecretType = "Opaque"              // Opaque (arbitrary data; default)
-    SecretTypeKubernetesAuthToken SecretType = "KubernetesAuth"      // Kubernetes auth token
-    SecretTypeDockerRegistryAuth  SecretType = "DockerRegistryAuth"  // Docker registry auth
+    SecretTypeOpaque              SecretType = "Opaque"                                 // Opaque (arbitrary data; default)
+    SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"    // Kubernetes auth token
+    SecretTypeDockercfg           SecretType = "kubernetes.io/dockercfg"                // Docker registry auth
     // FUTURE: other type values
 )
 
