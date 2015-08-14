@@ -1804,3 +1804,26 @@ func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
 	}
 	return allErrs
 }
+
+func ValidateThirdPartyResource(obj *api.ThirdPartyResource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(obj.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
+	}
+	versions := util.StringSet{}
+	for ix := range obj.Versions {
+		version := &obj.Versions[ix]
+		if len(version.Name) == 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", version, "name can not be empty"))
+		}
+		if versions.Has(version.Name) {
+			allErrs = append(allErrs, errs.NewFieldDuplicate("version", version))
+		}
+		versions.Insert(version.Name)
+	}
+	return allErrs
+}
+
+func ValidateSchemaUpdate(oldResource, newResource *api.ThirdPartyResource) errs.ValidationErrorList {
+	return errs.ValidationErrorList{fmt.Errorf("Schema update is not supported.")}
+}

@@ -29,6 +29,12 @@ import (
 	inf "speter.net/go/exp/math/dec/inf"
 )
 
+func deepCopy_api_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.APIGroup = in.APIGroup
+	return nil
+}
+
 func deepCopy_api_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, c *conversion.Cloner) error {
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
@@ -2014,6 +2020,65 @@ func deepCopy_api_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *c
 	return nil
 }
 
+func deepCopy_api_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyResource, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.Description = in.Description
+	if in.Versions != nil {
+		out.Versions = make([]APIVersion, len(in.Versions))
+		for i := range in.Versions {
+			if err := deepCopy_api_APIVersion(in.Versions[i], &out.Versions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Versions = nil
+	}
+	return nil
+}
+
+func deepCopy_api_ThirdPartyResourceData(in ThirdPartyResourceData, out *ThirdPartyResourceData, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Data != nil {
+		out.Data = make([]uint8, len(in.Data))
+		for i := range in.Data {
+			out.Data[i] = in.Data[i]
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
+func deepCopy_api_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ThirdPartyResource, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_api_ThirdPartyResource(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_api_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
@@ -2161,6 +2226,7 @@ func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) erro
 
 func init() {
 	err := Scheme.AddGeneratedDeepCopyFuncs(
+		deepCopy_api_APIVersion,
 		deepCopy_api_AWSElasticBlockStoreVolumeSource,
 		deepCopy_api_Binding,
 		deepCopy_api_Capabilities,
@@ -2276,6 +2342,9 @@ func init() {
 		deepCopy_api_StatusCause,
 		deepCopy_api_StatusDetails,
 		deepCopy_api_TCPSocketAction,
+		deepCopy_api_ThirdPartyResource,
+		deepCopy_api_ThirdPartyResourceData,
+		deepCopy_api_ThirdPartyResourceList,
 		deepCopy_api_TypeMeta,
 		deepCopy_api_Volume,
 		deepCopy_api_VolumeMount,
