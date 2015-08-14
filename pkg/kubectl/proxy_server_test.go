@@ -309,3 +309,16 @@ func TestPathHandling(t *testing.T) {
 		}()
 	}
 }
+
+func TestExtractHost(t *testing.T) {
+	fixtures := map[string]string{
+		"localhost:8085": "localhost",
+		"marmalade":      "marmalade",
+	}
+	for header, expected := range fixtures {
+		host := extractHost(header)
+		if host != expected {
+			t.Fatalf("%s != %s", host, expected)
+		}
+	}
+}
