@@ -103,6 +103,8 @@ def line_has_bad_flag(line, flagre):
             return False
         if "pillar[" + result + "]" in line:
             return False
+        if "grains" + result in line:
+            return False
         return True
     return False
 
