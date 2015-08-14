@@ -137,12 +137,14 @@ In one terminal, run `gcloud compute ssh master --ssh-flag="-L 8080:127.0.0.1:80
 run `gcloud compute ssh master --ssh-flag="-R 8080:127.0.0.1:8080"`.
 
 ### OpenStack
-These instructions are for running on the command line.  Most of this you can also do through the Horizon dashboard. 
-These instructions were tested on the Ice House release on a Metacloud distribution of OpenStack but should be similar if not the same across other versions/distributions of OpenStack. 
 
-####  Make sure you can connect with OpenStack
+These instructions are for running on the command line.  Most of this you can also do through the Horizon dashboard.
+These instructions were tested on the Ice House release on a Metacloud distribution of OpenStack but should be similar if not the same across other versions/distributions of OpenStack.
 
-Make sure the environment variables are set for OpenStack such as: 
+#### Make sure you can connect with OpenStack
+
+Make sure the environment variables are set for OpenStack such as:
+
 ```sh
 OS_TENANT_ID
 OS_PASSWORD
@@ -150,7 +152,9 @@ OS_AUTH_URL
 OS_USERNAME
 OS_TENANT_NAME
 ```
-Test this works with something like: 
+
+Test this works with something like:
+
 ```
 nova list
 ```
@@ -158,7 +162,7 @@ nova list
 #### Get a Suitable CoreOS Image
 
 You'll need a [suitable version of CoreOS image for OpenStack] (https://coreos.com/os/docs/latest/booting-on-openstack.html)
-Once you download that, upload it to glance.  An example is shown below: 
+Once you download that, upload it to glance.  An example is shown below:
 
 ```sh
 glance image-create --name CoreOS723 \
@@ -186,27 +190,32 @@ nova boot \
 --user-data files/master.yaml \
 kube-master
 ```
+
 ```<image_name>``` is the CoreOS image name.  In our example we can use the image we created in the previous step and put in 'CoreOS723'
 
 ```<my_key>``` is the keypair name that you already generated to access the instance.
 
-```<flavor_id>``` is the flavor ID you use to size the instance.  Run ```nova flavor-list``` to get the IDs.  3 on the system this was tested with gives the m1.large size. 
+```<flavor_id>``` is the flavor ID you use to size the instance.  Run ```nova flavor-list``` to get the IDs.  3 on the system this was tested with gives the m1.large size.
 
-The important part is to ensure you have the files/master.yml as this is what will do all the post boot configuration. This path is relevant so we are assuming in this example that you are running the nova command in a directory where there is a subdirectory called files that has the master.yml file in it.  Absolute paths also work. 
+The important part is to ensure you have the files/master.yml as this is what will do all the post boot configuration. This path is relevant so we are assuming in this example that you are running the nova command in a directory where there is a subdirectory called files that has the master.yml file in it.  Absolute paths also work.
 
-Next, assign it a public IP address: 
+Next, assign it a public IP address:
+
 ``` 
 nova floating-ip-list
 ```
-Get an IP address that's free and run: 
+
+Get an IP address that's free and run:
+
 ```
 nova floating-ip-associate kube-master <ip address>
 ```
-where ```<ip address>``` is the IP address that was available from the ```nova floating-ip-list``` command. 
+
+where ```<ip address>``` is the IP address that was available from the ```nova floating-ip-list``` command.
 
 #### Provision Worker Nodes
 
-Edit ```node.yaml``` and replace all instances of ```<master-private-ip>``` with the private IP address of the master node.  You can get this by runnning ```nova show kube-master``` assuming you named your instance kube master.  This is not the floating IP address you just assigned it. 
+Edit ```node.yaml``` and replace all instances of ```<master-private-ip>``` with the private IP address of the master node.  You can get this by runnning ```nova show kube-master``` assuming you named your instance kube master.  This is not the floating IP address you just assigned it.
 
 ```sh
 nova boot \
@@ -217,7 +226,8 @@ nova boot \
 --user-data files/node.yaml \
 minion01
 ```
-This is basically the same as the master nodes but with the node.yaml post-boot script instead of the master.  
+
+This is basically the same as the master nodes but with the node.yaml post-boot script instead of the master.
 
 ### VMware Fusion
 
