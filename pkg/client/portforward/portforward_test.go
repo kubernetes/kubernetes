@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -258,6 +259,10 @@ func TestGetListener(t *testing.T) {
 	for i, testCase := range testCases {
 		expectedListenerPort := "12345"
 		listener, err := pf.getListener(testCase.Protocol, testCase.Hostname, &ForwardedPort{12345, 12345})
+		if err != nil && strings.Contains(err.Error(), "cannot assign requested address") {
+			t.Logf("Can't test #%d: %v", i, err)
+			continue
+		}
 		errorRaised := err != nil
 
 		if testCase.ShouldRaiseError != errorRaised {
