@@ -170,30 +170,27 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	return t.C, t.Stop
 }
 
-func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) {
+// Returns error if ListAndWatch didn't even tried to initialize watch.
+func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	var resourceVersion string
 	resyncCh, cleanup := r.resyncChan()
 	defer cleanup()
 
 	list, err := r.listerWatcher.List()
 	if err != nil {
-		util.HandleError(fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err))
-		return
+		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}
 	meta, err := meta.Accessor(list)
 	if err != nil {
-		util.HandleError(fmt.Errorf("%s: Unable to understand list result %#v", r.name, list))
-		return
+		return fmt.Errorf("%s: Unable to understand list result %#v", r.name, list)
 	}
 	resourceVersion = meta.ResourceVersion()
 	items, err := runtime.ExtractList(list)
 	if err != nil {
-		util.HandleError(fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err))
-		return
+		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
 	}
 	if err := r.syncWith(items, resourceVersion); err != nil {
-		util.HandleError(fmt.Errorf("%s: Unable to sync list result: %v", r.name, err))
-		return
+		return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
 	}
 	r.setLastSyncResourceVersion(resourceVersion)
 
@@ -220,13 +217,13 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) {
 					}
 				}
 			}
-			return
+			return nil
 		}
 		if err := r.watchHandler(w, &resourceVersion, resyncCh, stopCh); err != nil {
 			if err != errorResyncRequested && err != errorStopRequested {
 				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
-			return
+			return nil
 		}
 	}
 }
@@ -277,6 +274,7 @@ loop:
 				util.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 				continue
 			}
+			newResourceVersion := meta.ResourceVersion()
 			switch event.Type {
 			case watch.Added:
 				r.store.Add(event.Object)
@@ -290,8 +288,8 @@ loop:
 			default:
 				util.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 			}
-			*resourceVersion = meta.ResourceVersion()
-			r.setLastSyncResourceVersion(*resourceVersion)
+			*resourceVersion = newResourceVersion
+			r.setLastSyncResourceVersion(newResourceVersion)
 			eventCount++
 		}
 	}

@@ -123,11 +123,18 @@ func objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, er
 	if err != nil {
 		return nil, 0, err
 	}
-	resourceVersion, err := strconv.ParseUint(meta.ResourceVersion(), 10, 64)
+	resourceVersion, err := parseResourceVersion(meta.ResourceVersion())
 	if err != nil {
 		return nil, 0, err
 	}
 	return object, resourceVersion, nil
+}
+
+func parseResourceVersion(resourceVersion string) (uint64, error) {
+	if resourceVersion == "" {
+		return 0, nil
+	}
+	return strconv.ParseUint(resourceVersion, 10, 64)
 }
 
 func (w *WatchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(runtime.Object) error) error {
@@ -186,7 +193,7 @@ func (w *WatchCache) Replace(objs []interface{}) error {
 }
 
 func (w *WatchCache) ReplaceWithVersion(objs []interface{}, resourceVersion string) error {
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	version, err := parseResourceVersion(resourceVersion)
 	if err != nil {
 		return err
 	}
@@ -227,14 +234,14 @@ func (w *WatchCache) GetAllEventsSince(resourceVersion uint64) ([]watch.Event, e
 	if size > 0 {
 		oldest = w.cache[w.startIndex%w.capacity].resourceVersion
 	}
+	if resourceVersion < oldest {
+		return nil, fmt.Errorf("too old resource version: %d (%d)", resourceVersion, oldest)
+	}
 
 	// Binary seatch the smallest index at which resourceVersion is not smaller than
 	// the given one.
 	f := func(i int) bool {
 		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion >= resourceVersion
-	}
-	if size > 0 && resourceVersion < oldest {
-		return nil, fmt.Errorf("too old resource version: %d (%d)", resourceVersion, oldest)
 	}
 	first := sort.Search(size, f)
 	result := make([]watch.Event, size-first)
