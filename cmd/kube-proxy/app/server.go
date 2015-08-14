@@ -240,6 +240,8 @@ func (s *ProxyServer) Run(_ []string) error {
 		}, 5*time.Second, util.NeverStop)
 	}
 
+	ipt.AddReloadFunc(proxier.Sync)
+
 	// Just loop forever for now...
 	proxier.SyncLoop()
 	return nil
