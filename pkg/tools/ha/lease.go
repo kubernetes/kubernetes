@@ -206,8 +206,14 @@ func RunLease(c *Config) {
 	}
 	if c.ttl < 1 {
 		c.ttl = 30
-		glog.Infof("Set default to 30 seconds for lease time to live")
+		glog.Infof("Set default to %v seconds for lease", c.ttl)
 	}
+	if c.sleep < 1 {
+		c.sleep = 5 * time.Second
+		glog.Infof("Set default to %v seconds for sleep", c.sleep)
+	}
+
+	glog.Infof("Config : %v, sleep %v", c, c.sleep)
 
 	go c.leaseAndUpdateLoop()
 
