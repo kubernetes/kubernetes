@@ -1,4 +1,0 @@
-kube_addons_dir: "{{ kube_config_dir }}/addons"
-
-
-local_temp_addon_dir: /tmp/kubernetes/addons

@@ -1,5 +1,0 @@
----
-- include: config.yml
-
-- include: client.yml
-  when: inventory_hostname in groups['masters'] + groups['nodes']
