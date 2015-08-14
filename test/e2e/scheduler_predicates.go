@@ -31,12 +31,24 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// Returns a number of currently running and not running Pods.
+func getPodsNumbers(pods *api.PodList) (runningPods, notRunningPods int) {
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == api.PodRunning {
+			runningPods += 1
+		} else {
+			notRunningPods += 1
+		}
+	}
+	return
+}
+
 // Simplified version of RunRC, that does not create RC, but creates plain Pods and
 // requires passing whole Pod definition, which is needed to test various Scheduler predicates.
 func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, pod api.Pod) {
-	pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	expectNoError(err)
-	podsRunningBefore := len(pods.Items)
+	podsRunningBefore, _ := getPodsNumbers(allPods)
 
 	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%v-%v", podNamePrefix, i)
@@ -82,18 +94,10 @@ func getRequestedCPU(pod api.Pod) int64 {
 	return result
 }
 
-func verifyResult(c *client.Client, podName string, ns string) {
+func verifyResult(c *client.Client, podName string, ns string, oldNotRunning int) {
 	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	expectNoError(err)
-	runningPods := 0
-	notRunningPods := make([]api.Pod, 0)
-	for _, pod := range allPods.Items {
-		if pod.Status.Phase == api.PodRunning {
-			runningPods += 1
-		} else {
-			notRunningPods = append(notRunningPods, pod)
-		}
-	}
+	_, notRunningPods := getPodsNumbers(allPods)
 
 	schedEvents, err := c.Events(ns).List(
 		labels.Everything(),
@@ -102,7 +106,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 			"involvedObject.name":      podName,
 			"involvedObject.namespace": ns,
 			"source":                   "scheduler",
-			"reason":                   "failedScheduling",
+			"reason":                   "FailedScheduling",
 		}.AsSelector())
 	expectNoError(err)
 
@@ -116,9 +120,8 @@ func verifyResult(c *client.Client, podName string, ns string) {
 		}
 	}
 
-	Expect(len(notRunningPods)).To(Equal(1), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
+	Expect(notRunningPods).To(Equal(1+oldNotRunning), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
 	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
-	Expect(notRunningPods[0].Name).To(Equal(podName), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
 }
 
 var _ = Describe("SchedulerPredicates", func() {
@@ -175,9 +178,9 @@ var _ = Describe("SchedulerPredicates", func() {
 			Logf("Node: %v", node)
 		}
 
-		pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		expectNoError(err)
-		currentlyRunningPods := len(pods.Items)
+		currentlyRunningPods, currentlyDeadPods := getPodsNumbers(allPods)
 		podsNeededForSaturation := int(totalPodCapacity) - currentlyRunningPods
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
@@ -224,7 +227,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, ns, currentlyDeadPods)
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacit.
@@ -240,11 +243,16 @@ var _ = Describe("SchedulerPredicates", func() {
 
 		pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 		expectNoError(err)
+		var currentlyDeadPods int
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
 			Expect(found).To(Equal(true))
-			Logf("Pod %v requesting capacity %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
-			nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
+			if pod.Status.Phase == api.PodRunning {
+				Logf("Pod %v requesting capacity %v on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
+				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
+			} else {
+				currentlyDeadPods += 1
+			}
 		}
 
 		var podsNeededForSaturation int
@@ -307,7 +315,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, ns, currentlyDeadPods)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -316,7 +324,11 @@ var _ = Describe("SchedulerPredicates", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		_, err := c.Pods(ns).Create(&api.Pod{
+		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+		expectNoError(err)
+		_, currentlyDeadPods := getPodsNumbers(allPods)
+
+		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind: "Pod",
 			},
@@ -342,6 +354,6 @@ var _ = Describe("SchedulerPredicates", func() {
 		Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, ns, currentlyDeadPods)
 	})
 })
