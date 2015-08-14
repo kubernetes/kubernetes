@@ -19,15 +19,25 @@ limitations under the License.
 // - Logging how many times a lease is gained/lost.
 // - Starting/Stopping a daemon (via callbacks).
 // - Logging errors which might occur if a daemon's lease isn't consistent with its running state.
-package controller
+package ha
 
 import (
 	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	"os"
+	//"runtime"
 	"time"
+
+	//"github.com/golang/glog"
+	//"k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	//"k8s.io/kubernetes/pkg/controller"
+	//"k8s.io/kubernetes/pkg/healthz"
+	//"k8s.io/kubernetes/pkg/util"
+	//"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 // A program that is running may "use" a lease.
@@ -53,10 +63,45 @@ type Config struct {
 	// These two functions return "err" or else nil.
 	// They should also update information in the LeaseUserInfo struct
 	// about the state of the lease owner.
-	LeaseGained   func() bool
-	LeaseLost     func() bool
+	LeaseGained   func(lu *LeaseUser) bool
+	LeaseLost     func(lu *LeaseUser) bool
 	Cli           *client.Client
 	LeaseUserInfo *LeaseUser
+}
+
+// RunHA runs a process in a highly available fashion.
+func RunHA(kubecfg string, master string, start func(l *LeaseUser) bool, stop func(l *LeaseUser) bool, lockName string) {
+
+	//We need a kubeconfig in order to use the locking API, so we create it here.
+	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: master}}).ClientConfig()
+
+	if err != nil {
+		glog.Infof("Exiting, couldn't create kube configuration with parameters cfg=%v and master=%v ", kubecfg, master)
+		os.Exit(1)
+	}
+
+	kubeClient, err := client.New(kubeconfig)
+
+	leaseUserInfo := LeaseUser{
+		Running:      false,
+		LeasesGained: 0,
+		LeasesLost:   0,
+	}
+
+	//Acquire a lock before starting.
+	//TODO some of these will change now that implementing robs lock.
+	//we can delete some params...
+	mcfg := Config{
+		Key:           lockName,
+		LeaseUserInfo: &leaseUserInfo,
+		LeaseGained:   start,
+		LeaseLost:     stop,
+		Cli:           kubeClient}
+
+	RunLease(&mcfg)
+	glog.Infof("Done with starting the lease loop for %v.", lockName)
 }
 
 // leaseAndUpdateLoop runs the loop to acquire a lease.  This will continue trying to get a lease
@@ -130,20 +175,21 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 func (c *Config) update(master bool) error {
 	switch {
 	case master && !c.LeaseUserInfo.Running:
-		c.LeaseGained()
+		c.LeaseGained(c.LeaseUserInfo)
 		c.LeaseUserInfo.LeasesGained++
 		if !c.LeaseUserInfo.Running {
 			return fmt.Errorf("Process %v did not update its Running field to TRUE after ACQUIRING the lease!", c)
 		}
 		return nil
 	case !master && c.LeaseUserInfo.Running:
-		c.LeaseLost()
+		c.LeaseLost(c.LeaseUserInfo)
 		c.LeaseUserInfo.LeasesLost++
 		if !c.LeaseUserInfo.Running {
 			return fmt.Errorf("Process %v did not update its Running field to FALSE after LOSING the lease!", c)
 		}
 		return nil
 	}
+	glog.Infof("Updated, master = %v", master)
 	return nil
 }
 

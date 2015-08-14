@@ -22,20 +22,21 @@ package main
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
-	"os"
-	"runtime"
-	"time"
-
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/tools/ha"
+	//	"k8s.io/kubernetes/pkg/client"
+	//	"k8s.io/kubernetes/pkg/client/clientcmd"
+	//	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	//"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/healthz"
+	lease "k8s.io/kubernetes/pkg/tools/ha"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	"os"
+	"runtime"
+	"time"
 )
 
 func init() {
@@ -47,28 +48,12 @@ func main() {
 	s := app.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 
-	//We need a kubeconfig in order to use the locking API, so we create it here.
-	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
-	if err != nil {
-		glog.Infof("Exiting, couldn't create kube configuration with parameters cfg=%v and master=%v ", s.Kubeconfig, s.Master)
-		os.Exit(1)
-	}
-	kubeClient, err := client.New(kubeconfig)
-
 	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	leaseUserInfo := controller.LeaseUser{
-		Running:      false,
-		LeasesGained: 0,
-		LeasesLost:   0,
-	}
-
 	//Functions to start and stop this daemon.
-	startRC := func() bool {
+	startRC := func(leaseUserInfo *ha.LeaseUser) bool {
 		leaseUserInfo.Running = true
 		if err := s.Run(pflag.CommandLine.Args()); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -78,7 +63,7 @@ func main() {
 		return true
 	}
 
-	endRC := func() bool {
+	endRC := func(leaseUserInfo *ha.LeaseUser) bool {
 		glog.Infof("Hard-exiting the replication controller process now !")
 
 		//Even though we're exiting, we should set this flag before dying just for completeness.
@@ -89,21 +74,11 @@ func main() {
 		return true
 	}
 
-	//Acquire a lock before starting.
-	//TODO some of these will change now that implementing robs lock.
-	//we can delete some params...
-	mcfg := controller.Config{
-		Key:           "cm-LEASE",
-		LeaseUserInfo: &leaseUserInfo,
-		LeaseGained:   startRC,
-		LeaseLost:     endRC,
-		Cli:           kubeClient}
-
 	//This starts a thread that continues running.
-	controller.RunLease(&mcfg)
+	lease.RunHA(s.Kubeconfig, s.Master, startRC, endRC, "ha.cm.lock")
 
 	for true {
-		glog.Infof("CM is running, active = %v", mcfg.LeaseUserInfo.Running)
+		glog.Infof("CM lease loop is running...")
 		time.Sleep(5 * time.Second)
 	}
 
