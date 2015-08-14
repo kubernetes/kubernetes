@@ -22,8 +22,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func AddJsonFilenameFlag(cmd *cobra.Command, usage string) {
-	cmd.Flags().StringSliceP("filename", "f", []string{}, usage)
+func AddJsonFilenameFlag(cmd *cobra.Command, value *[]string, usage string) {
+	cmd.Flags().StringSliceVarP(value, "filename", "f", *value, usage)
 
 	annotations := []string{"json", "yaml", "yml"}
 	cmd.Flags().SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)

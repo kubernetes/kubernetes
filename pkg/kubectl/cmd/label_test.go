@@ -309,7 +309,7 @@ func TestLabelErrors(t *testing.T) {
 		for k, v := range testCase.flags {
 			cmd.Flags().Set(k, v)
 		}
-		err := RunLabel(f, buf, cmd, testCase.args)
+		err := RunLabel(f, buf, cmd, testCase.args, &LabelOptions{})
 		if !testCase.errFn(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
@@ -357,9 +357,11 @@ func TestLabelForResourceFromFile(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra.yaml")
+	options := &LabelOptions{
+		Filenames: []string{"../../../examples/cassandra/cassandra.yaml"},
+	}
 
-	err := RunLabel(f, buf, cmd, []string{"a=b"})
+	err := RunLabel(f, buf, cmd, []string{"a=b"}, options)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -406,7 +408,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	cmd := NewCmdLabel(f, buf)
 	cmd.Flags().Set("all", "true")
 
-	if err := RunLabel(f, buf, cmd, []string{"pods", "a=b"}); err != nil {
+	if err := RunLabel(f, buf, cmd, []string{"pods", "a=b"}, &LabelOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if strings.Count(buf.String(), "labeled") != len(pods.Items) {

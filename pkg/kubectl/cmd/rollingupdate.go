@@ -34,6 +34,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
+// RollingUpdateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// referencing the cmd.Flags()
+type RollingUpdateOptions struct {
+	Filenames []string
+}
+
 const (
 	rollingUpdate_long = `Perform a rolling update of the given ReplicationController.
 
@@ -62,6 +68,8 @@ var (
 )
 
 func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	options := &RollingUpdateOptions{}
+
 	cmd := &cobra.Command{
 		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
 		// rollingupdate is deprecated.
@@ -70,7 +78,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    rollingUpdate_long,
 		Example: rollingUpdate_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunRollingUpdate(f, out, cmd, args)
+			err := RunRollingUpdate(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -78,7 +86,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Duration("poll-interval", pollInterval, `Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().Duration("timeout", timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	usage := "Filename or URL to file to use to create the new replication controller."
-	kubectl.AddJsonFilenameFlag(cmd, usage)
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().String("image", "", "Image to use for upgrading the replication controller.  Can not be used with --filename/-f")
 	cmd.MarkFlagRequired("image")
@@ -90,10 +98,9 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filename, image, oldName string, err error) {
+func validateArguments(cmd *cobra.Command, filenames, args []string) (deploymentKey, filename, image, oldName string, err error) {
 	deploymentKey = cmdutil.GetFlagString(cmd, "deployment-label-key")
 	image = cmdutil.GetFlagString(cmd, "image")
-	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
 	filename = ""
 
 	if len(deploymentKey) == 0 {
@@ -118,11 +125,11 @@ func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filena
 	return deploymentKey, filename, image, args[0], nil
 }
 
-func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *RollingUpdateOptions) error {
 	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}
-	deploymentKey, filename, image, oldName, err := validateArguments(cmd, args)
+	deploymentKey, filename, image, oldName, err := validateArguments(cmd, options.Filenames, args)
 	if err != nil {
 		return err
 	}
