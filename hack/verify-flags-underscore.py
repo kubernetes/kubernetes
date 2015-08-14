@@ -229,7 +229,7 @@ def main():
 
     if len(bad_lines) != 0:
         if not args.skip_exceptions:
-            print("Found illegal 'flag' usage. If this is a false positive add the following line(s) to hack/verify-flags/exceptions.txt:")
+            print("Found illegal 'flag' usage. If these are false positives you should running `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
         for (relname, line) in bad_lines:
             print("%s:%s" % (relname, line))
 
