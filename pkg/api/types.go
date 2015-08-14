@@ -2073,6 +2073,15 @@ const (
 
 	// DockerConfigKey is the key of the required data for SecretTypeDockercfg secrets
 	DockerConfigKey = ".dockercfg"
+
+	// SecretTypeDockerConfigJson contains a dockercfg file that follows the same format rules as ~/.docker/config.json
+	//
+	// Required fields:
+	// - Secret.Data[".dockerconfigjson"] - a serialized ~/.docker/config.json file
+	SecretTypeDockerConfigJson SecretType = "kubernetes.io/dockerconfigjson"
+
+	// DockerConfigJsonKey is the key of the required data for SecretTypeDockerConfigJson secrets
+	DockerConfigJsonKey = ".dockerconfigjson"
 )
 
 type SecretList struct {
