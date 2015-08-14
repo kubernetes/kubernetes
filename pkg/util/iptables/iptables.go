@@ -25,7 +25,9 @@ import (
 	"sync"
 
 	"github.com/coreos/go-semver/semver"
+	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
+	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -64,6 +66,10 @@ type Interface interface {
 	Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error
 	// RestoreAll is the same as Restore except that no table is specified.
 	RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error
+	// AddReloadFunc adds a function to call on iptables reload
+	AddReloadFunc(reloadFunc func())
+	// Destroy cleans up resources used by the Interface
+	Destroy()
 }
 
 type Protocol byte
@@ -118,24 +124,66 @@ const MinWait2Version = "1.4.22"
 type runner struct {
 	mu       sync.Mutex
 	exec     utilexec.Interface
+	dbus     utildbus.Interface
 	protocol Protocol
 	hasCheck bool
 	waitFlag []string
+
+	reloadFuncs []func()
+	signal      chan *godbus.Signal
 }
 
 // New returns a new Interface which will exec iptables.
-func New(exec utilexec.Interface, protocol Protocol) Interface {
+func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
 	vstring, err := GetIptablesVersionString(exec)
 	if err != nil {
 		glog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
 		vstring = MinCheckVersion
 	}
-	return &runner{
+	runner := &runner{
 		exec:     exec,
+		dbus:     dbus,
 		protocol: protocol,
 		hasCheck: getIptablesHasCheckCommand(vstring),
 		waitFlag: getIptablesWaitFlag(vstring),
 	}
+	runner.connectToFirewallD()
+	return runner
+}
+
+// Destroy is part of Interface.
+func (runner *runner) Destroy() {
+	if runner.signal != nil {
+		runner.signal <- nil
+	}
+}
+
+const (
+	firewalldName      = "org.fedoraproject.FirewallD1"
+	firewalldPath      = "/org/fedoraproject/FirewallD1"
+	firewalldInterface = "org.fedoraproject.FirewallD1"
+)
+
+// Connects to D-Bus and listens for FirewallD start/restart. (On non-FirewallD-using
+// systems, this is effectively a no-op; we listen for the signals, but they will never be
+// emitted, so reload() will never be called.)
+func (runner *runner) connectToFirewallD() {
+	bus, err := runner.dbus.SystemBus()
+	if err != nil {
+		glog.V(1).Info("Could not connect to D-Bus system bus: %s", err)
+		return
+	}
+
+	rule := fmt.Sprintf("type='signal',sender='%s',path='%s',interface='%s',member='Reloaded'", firewalldName, firewalldPath, firewalldInterface)
+	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
+
+	rule = fmt.Sprintf("type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus',arg0='%s'", firewalldName)
+	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
+
+	runner.signal = make(chan *godbus.Signal, 10)
+	bus.Signal(runner.signal)
+
+	go runner.dbusSignalHandler(bus)
 }
 
 // EnsureChain is part of Interface.
@@ -471,4 +519,51 @@ func GetIptablesVersionString(exec utilexec.Interface) (string, error) {
 		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
 	}
 	return match[1], nil
+}
+
+// goroutine to listen for D-Bus signals
+func (runner *runner) dbusSignalHandler(bus utildbus.Connection) {
+	firewalld := bus.Object(firewalldName, firewalldPath)
+
+	for s := range runner.signal {
+		if s == nil {
+			// Unregister
+			bus.Signal(runner.signal)
+			return
+		}
+
+		switch s.Name {
+		case "org.freedesktop.DBus.NameOwnerChanged":
+			name := s.Body[0].(string)
+			new_owner := s.Body[2].(string)
+
+			if name != firewalldName || len(new_owner) == 0 {
+				continue
+			}
+
+			// FirewallD startup (specifically the part where it deletes
+			// all existing iptables rules) may not yet be complete when
+			// we get this signal, so make a dummy request to it to
+			// synchronize.
+			firewalld.Call(firewalldInterface+".getDefaultZone", 0)
+
+			runner.reload()
+		case firewalldInterface + ".Reloaded":
+			runner.reload()
+		}
+	}
+}
+
+// AddReloadFunc is part of Interface
+func (runner *runner) AddReloadFunc(reloadFunc func()) {
+	runner.reloadFuncs = append(runner.reloadFuncs, reloadFunc)
+}
+
+// runs all reload funcs to re-sync iptables rules
+func (runner *runner) reload() {
+	glog.V(1).Infof("reloading iptables rules")
+
+	for _, f := range runner.reloadFuncs {
+		f()
+	}
 }

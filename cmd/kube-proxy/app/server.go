@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -105,7 +106,8 @@ func (s *ProxyServer) Run(_ []string) error {
 	// remove iptables rules and exit
 	if s.CleanupAndExit {
 		execer := exec.New()
-		ipt := utiliptables.New(execer, protocol)
+		dbus := utildbus.New()
+		ipt := utiliptables.New(execer, dbus, protocol)
 		encounteredError := userspace.CleanupLeftovers(ipt)
 		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
 		if encounteredError {
@@ -165,6 +167,10 @@ func (s *ProxyServer) Run(_ []string) error {
 	var proxier proxy.ProxyProvider
 	var endpointsHandler config.EndpointsConfigHandler
 
+	execer := exec.New()
+	dbus := utildbus.New()
+	ipt := utiliptables.New(execer, dbus, protocol)
+
 	shouldUseIptables := false
 	if !s.ForceUserspaceProxy {
 		var err error
@@ -178,8 +184,6 @@ func (s *ProxyServer) Run(_ []string) error {
 	if shouldUseIptables {
 		glog.V(2).Info("Using iptables Proxier.")
 
-		execer := exec.New()
-		ipt := utiliptables.New(execer, protocol)
 		proxierIptables, err := iptables.NewProxier(ipt, execer, s.SyncPeriod, s.MasqueradeAll)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
@@ -198,8 +202,6 @@ func (s *ProxyServer) Run(_ []string) error {
 		// set EndpointsConfigHandler to our loadBalancer
 		endpointsHandler = loadBalancer
 
-		execer := exec.New()
-		ipt := utiliptables.New(execer, protocol)
 		proxierUserspace, err := userspace.NewProxier(loadBalancer, s.BindAddress, ipt, s.PortRange, s.SyncPeriod)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
