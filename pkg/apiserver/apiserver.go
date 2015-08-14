@@ -177,7 +177,7 @@ func serviceErrorHandler(requestResolver *APIRequestInfoResolver, apiVersions []
 		}
 	}
 
-	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), codec, response.ResponseWriter)
+	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), latest.GroupVersion, codec, response.ResponseWriter)
 }
 
 // Adds a service to return the supported api versions.
@@ -280,9 +280,14 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 }
 
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.
-func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
+func errorJSON(err error, groupVersion string, codec runtime.Codec, w http.ResponseWriter) int {
 	status := errToAPIStatus(err)
-	writeJSON(status.Code, codec, status, w, true)
+	//write versioned status if using a codec for legacy APIVersion
+	if util.GetGroup(groupVersion) == "" {
+		writeJSON(status.Code, codec, status, w, true)
+	} else {
+		writeRawJSON(status.Code, status, w)
+	}
 	return status.Code
 }
 
