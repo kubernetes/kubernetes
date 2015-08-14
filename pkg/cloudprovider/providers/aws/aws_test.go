@@ -29,7 +29,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 const TestClusterId = "clusterid.test"
@@ -599,78 +598,5 @@ func TestGetRegion(t *testing.T) {
 	}
 	if zone.FailureDomain != "us-west-2e" {
 		t.Errorf("Unexpected FailureDomain: %s", zone.FailureDomain)
-	}
-}
-
-func TestGetResources(t *testing.T) {
-	var instance0 ec2.Instance
-	var instance1 ec2.Instance
-	var instance2 ec2.Instance
-
-	//0
-	instance0.InstanceID = aws.String("m3.medium")
-	instance0.PrivateDNSName = aws.String("m3-medium.ec2.internal")
-	instance0.InstanceType = aws.String("m3.medium")
-	state0 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance0.State = &state0
-
-	//1
-	instance1.InstanceID = aws.String("r3.8xlarge")
-	instance1.PrivateDNSName = aws.String("r3-8xlarge.ec2.internal")
-	instance1.InstanceType = aws.String("r3.8xlarge")
-	state1 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance1.State = &state1
-
-	//2
-	instance2.InstanceID = aws.String("unknown.type")
-	instance2.PrivateDNSName = aws.String("unknown-type.ec2.internal")
-	instance2.InstanceType = aws.String("unknown.type")
-	state2 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance2.State = &state2
-
-	instances := []*ec2.Instance{&instance0, &instance1, &instance2}
-
-	aws1 := mockInstancesResp(instances)
-
-	res1, err1 := aws1.GetNodeResources("m3-medium.ec2.internal")
-	if err1 != nil {
-		t.Errorf("Should not error when instance type found: %v", err1)
-	}
-	e1 := &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(int64(3.0*1000), resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(int64(3.75*1024*1024*1024), resource.BinarySI),
-		},
-	}
-	if !reflect.DeepEqual(e1, res1) {
-		t.Errorf("Expected %v, got %v", e1, res1)
-	}
-
-	res2, err2 := aws1.GetNodeResources("r3-8xlarge.ec2.internal")
-	if err2 != nil {
-		t.Errorf("Should not error when instance type found: %v", err2)
-	}
-	e2 := &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(int64(104.0*1000), resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(int64(244.0*1024*1024*1024), resource.BinarySI),
-		},
-	}
-	if !reflect.DeepEqual(e2, res2) {
-		t.Errorf("Expected %v, got %v", e2, res2)
-	}
-
-	res3, err3 := aws1.GetNodeResources("unknown-type.ec2.internal")
-	if err3 != nil {
-		t.Errorf("Should not error when unknown instance type")
-	}
-	if res3 != nil {
-		t.Errorf("Should return nil resources when unknown instance type")
 	}
 }

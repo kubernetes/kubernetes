@@ -198,11 +198,6 @@ func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 	return f.Zone, f.Err
 }
 
-func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	f.addCall("get-node-resources")
-	return f.NodeResources, f.Err
-}
-
 func (f *FakeCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
