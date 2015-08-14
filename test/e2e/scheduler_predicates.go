@@ -102,7 +102,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 			"involvedObject.name":      podName,
 			"involvedObject.namespace": ns,
 			"source":                   "scheduler",
-			"reason":                   "failedScheduling",
+			"reason":                   "FailedScheduling",
 		}.AsSelector())
 	expectNoError(err)
 
