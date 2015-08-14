@@ -32,6 +32,11 @@
 			"Rev": "c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35"
 		},
 		{
+			"ImportPath": "github.com/appc/cni",
+			"Comment": "v0.1.0-11-g7cf97ca",
+			"Rev": "7cf97ca7800601f3a57fb77487110720ed7083a5"
+		},
+		{
 			"ImportPath": "github.com/appc/spec/schema",
 			"Comment": "v0.6.1-30-gc928a0c",
 			"Rev": "c928a0c907c96034dfc0a69098b2179db5ae7e37"
@@ -104,6 +109,10 @@
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v2.0.0-13-g4cceaf7",
 			"Rev": "4cceaf7283b76f27c4a732b20730dcdb61053bf5"
+		},
+		{
+			"ImportPath": "github.com/coreos/go-iptables/iptables",
+			"Rev": "74b0926558061d3a23824e9c18c9cf9c1b9c11f4"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-semver/semver",
@@ -521,6 +530,14 @@
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
 			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		},
+		{
+			"ImportPath": "github.com/vishvananda/netlink",
+			"Rev": "329b40d4e308deb2abe80dbb1f74078e5ab13164"
+		},
+		{
+			"ImportPath": "github.com/vishvananda/netns",
+			"Rev": "604eaf189ee867d8c147fafc28def2394e878d25"
 		},
 		{
 			"ImportPath": "github.com/xyproto/simpleredis",
