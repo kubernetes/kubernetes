@@ -595,6 +595,25 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 		fmt.Fprintf(out, "Access Modes:\t%s\n", volume.GetAccessModesAsString(pv.Spec.AccessModes))
 		fmt.Fprintf(out, "Capacity:\t%s\n", storage.String())
 		fmt.Fprintf(out, "Message:\t%s\n", pv.Status.Message)
+		fmt.Fprintf(out, "Source:\n")
+
+		switch {
+		case pv.Spec.HostPath != nil:
+			printHostPathVolumeSource(pv.Spec.HostPath, out)
+		case pv.Spec.GCEPersistentDisk != nil:
+			printGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk, out)
+		case pv.Spec.AWSElasticBlockStore != nil:
+			printAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore, out)
+		case pv.Spec.NFS != nil:
+			printNFSVolumeSource(pv.Spec.NFS, out)
+		case pv.Spec.ISCSI != nil:
+			printISCSIVolumeSource(pv.Spec.ISCSI, out)
+		case pv.Spec.Glusterfs != nil:
+			printGlusterfsVolumeSource(pv.Spec.Glusterfs, out)
+		case pv.Spec.RBD != nil:
+			printRBDVolumeSource(pv.Spec.RBD, out)
+		}
+
 		return nil
 	})
 }
