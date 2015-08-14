@@ -493,7 +493,7 @@ function kube-down {
 #  echo
 #  echo "  https://${KUBE_MASTER_IP}"
 # echo
-#  echo "The user name and password to use is located in ~/.kubernetes_auth."
+#  echo "The user name and password to use is located in ${KUBECONFIG:-$DEFAULT_KUBECONFIG}."
 #  echo
 
 #}
