@@ -27,12 +27,27 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+// TODO(wojtek-t): All structure in this file should be private to
+// pkg/storage package. We should remove the reference to WatchCache
+// from Reflector (by changing the Replace method signature in Store
+// interface to take resource version too) and move it under pkg/storage.
+
+// WatchCacheEvent is a single "watch event" that is send to users of
+// WatchCache. Additionally to a typical "watch.Event" it contains
+// the previous value of the object to enable proper filtering in the
+// upper layers.
+type WatchCacheEvent struct {
+	Type       watch.EventType
+	Object     runtime.Object
+	PrevObject runtime.Object
+}
+
 // watchCacheElement is a single "watch event" stored in a cache.
 // It contains the resource version of the object and the object
 // itself.
 type watchCacheElement struct {
 	resourceVersion uint64
-	event           watch.Event
+	watchCacheEvent WatchCacheEvent
 }
 
 // WatchCache implements a Store interface.
@@ -66,8 +81,9 @@ type WatchCache struct {
 	// This handler is run at the end of every successful Replace() method.
 	onReplace func()
 
-	// This handler is run at the end of every Add/Update/Delete method.
-	onEvent func(watch.Event)
+	// This handler is run at the end of every Add/Update/Delete method
+	// and additionally gets the previous value of the object.
+	onEvent func(WatchCacheEvent)
 }
 
 func NewWatchCache(capacity int) *WatchCache {
@@ -140,16 +156,27 @@ func parseResourceVersion(resourceVersion string) (uint64, error) {
 func (w *WatchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(runtime.Object) error) error {
 	w.Lock()
 	defer w.Unlock()
-	if w.onEvent != nil {
-		w.onEvent(event)
+	previous, exists, err := w.store.Get(event.Object)
+	if err != nil {
+		return err
 	}
-	w.updateCache(resourceVersion, event)
+	var prevObject runtime.Object
+	if exists {
+		prevObject = previous.(runtime.Object)
+	} else {
+		prevObject = nil
+	}
+	watchCacheEvent := WatchCacheEvent{event.Type, event.Object, prevObject}
+	if w.onEvent != nil {
+		w.onEvent(watchCacheEvent)
+	}
+	w.updateCache(resourceVersion, watchCacheEvent)
 	w.resourceVersion = resourceVersion
 	return updateFunc(event.Object)
 }
 
 // Assumes that lock is already held for write.
-func (w *WatchCache) updateCache(resourceVersion uint64, event watch.Event) {
+func (w *WatchCache) updateCache(resourceVersion uint64, event WatchCacheEvent) {
 	if w.endIndex == w.startIndex+w.capacity {
 		// Cache is full - remove the oldest element.
 		w.startIndex++
@@ -219,13 +246,13 @@ func (w *WatchCache) SetOnReplace(onReplace func()) {
 	w.onReplace = onReplace
 }
 
-func (w *WatchCache) SetOnEvent(onEvent func(watch.Event)) {
+func (w *WatchCache) SetOnEvent(onEvent func(WatchCacheEvent)) {
 	w.Lock()
 	defer w.Unlock()
 	w.onEvent = onEvent
 }
 
-func (w *WatchCache) GetAllEventsSince(resourceVersion uint64) ([]watch.Event, error) {
+func (w *WatchCache) GetAllEventsSince(resourceVersion uint64) ([]WatchCacheEvent, error) {
 	w.RLock()
 	defer w.RUnlock()
 
@@ -244,9 +271,9 @@ func (w *WatchCache) GetAllEventsSince(resourceVersion uint64) ([]watch.Event, e
 		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion >= resourceVersion
 	}
 	first := sort.Search(size, f)
-	result := make([]watch.Event, size-first)
+	result := make([]WatchCacheEvent, size-first)
 	for i := 0; i < size-first; i++ {
-		result[i] = w.cache[(w.startIndex+first+i)%w.capacity].event
+		result[i] = w.cache[(w.startIndex+first+i)%w.capacity].watchCacheEvent
 	}
 	return result, nil
 }

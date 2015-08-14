@@ -25,7 +25,9 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -284,6 +286,146 @@ func TestWatch(t *testing.T) {
 	for _, test := range testCases {
 		if test.filtered {
 			event := <-initialWatcher.ResultChan()
+			if e, a := test.event, event.Type; e != a {
+				t.Errorf("%v %v", e, a)
+			}
+			// unset fields that are set by the infrastructure
+			obj := event.Object.(*api.Pod)
+			obj.ObjectMeta.ResourceVersion = ""
+			obj.ObjectMeta.CreationTimestamp = util.Time{}
+			if e, a := test.object, obj; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected: %#v, got: %#v", e, a)
+			}
+		}
+	}
+
+	close(fakeClient.WatchResponse)
+}
+
+func TestFiltering(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	prefixedKey := etcdtest.AddPrefix("pods")
+	fakeClient.ExpectNotFoundGet(prefixedKey)
+	cacher := newTestCacher(fakeClient)
+	fakeClient.WaitForWatchCompletion()
+
+	podFoo := makeTestPod("foo")
+	podFoo.ObjectMeta.Labels = map[string]string{"filter": "foo"}
+	podFooFiltered := makeTestPod("foo")
+
+	testCases := []struct {
+		object       *api.Pod
+		etcdResponse *etcd.Response
+		filtered     bool
+		event        watch.EventType
+	}{
+		{
+			object: podFoo,
+			etcdResponse: &etcd.Response{
+				Action: "create",
+				Node: &etcd.Node{
+					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					CreatedIndex:  1,
+					ModifiedIndex: 1,
+				},
+			},
+			filtered: true,
+			event:    watch.Added,
+		},
+		{
+			object: podFooFiltered,
+			etcdResponse: &etcd.Response{
+				Action: "set",
+				Node: &etcd.Node{
+					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFooFiltered)),
+					CreatedIndex:  1,
+					ModifiedIndex: 2,
+				},
+				PrevNode: &etcd.Node{
+					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					CreatedIndex:  1,
+					ModifiedIndex: 1,
+				},
+			},
+			filtered: true,
+			// Deleted, because the new object doesn't match filter.
+			event: watch.Deleted,
+		},
+		{
+			object: podFoo,
+			etcdResponse: &etcd.Response{
+				Action: "set",
+				Node: &etcd.Node{
+					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					CreatedIndex:  1,
+					ModifiedIndex: 3,
+				},
+				PrevNode: &etcd.Node{
+					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFooFiltered)),
+					CreatedIndex:  1,
+					ModifiedIndex: 2,
+				},
+			},
+			filtered: true,
+			// Added, because the previous object didn't match filter.
+			event: watch.Added,
+		},
+		{
+			object: podFoo,
+			etcdResponse: &etcd.Response{
+				Action: "set",
+				Node: &etcd.Node{
+					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					CreatedIndex:  1,
+					ModifiedIndex: 4,
+				},
+				PrevNode: &etcd.Node{
+					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					CreatedIndex:  1,
+					ModifiedIndex: 3,
+				},
+			},
+			filtered: true,
+			event:    watch.Modified,
+		},
+		{
+			object: podFoo,
+			etcdResponse: &etcd.Response{
+				Action: "delete",
+				Node: &etcd.Node{
+					CreatedIndex:  1,
+					ModifiedIndex: 5,
+				},
+				PrevNode: &etcd.Node{
+					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
+					CreatedIndex:  1,
+					ModifiedIndex: 4,
+				},
+			},
+			filtered: true,
+			event:    watch.Deleted,
+		},
+	}
+
+	// Set up Watch for object "podFoo" with label filter set.
+	selector := labels.SelectorFromSet(labels.Set{"filter": "foo"})
+	filter := func(obj runtime.Object) bool {
+		metadata, err := meta.Accessor(obj)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return false
+		}
+		return selector.Matches(labels.Set(metadata.Labels()))
+	}
+	watcher, err := cacher.Watch("pods/ns/foo", 1, filter)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, test := range testCases {
+		fakeClient.WatchResponse <- test.etcdResponse
+		if test.filtered {
+			event := <-watcher.ResultChan()
 			if e, a := test.event, event.Type; e != a {
 				t.Errorf("%v %v", e, a)
 			}
