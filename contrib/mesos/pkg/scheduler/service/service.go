@@ -63,7 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
-	"k8s.io/kubernetes/pkg/heartbeat"
+	"k8s.io/kubernetes/pkg/component"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
@@ -572,7 +572,7 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 		errCh <- doFailover()
 	})
 
-	heart, heartbeatErrCh := heartbeat.Start(
+	heartbeat, heartbeatErrCh := component.Start(
 		s.client.ComponentsClient(),
 		5*time.Second,
 		api.ComponentScheduler,
@@ -580,7 +580,7 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 	)
 	go func() {
 		//TODO(karlkfi): change state smarter
-		heart.Transition(api.ComponentRunning, api.ComponentCondition{
+		heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
 			Type:   api.ComponentRunningHealthy,
 			Status: api.ConditionTrue,
 		})
@@ -602,7 +602,7 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 			} else {
 				log.Error("Scheduler Exited")
 				errCh = nil // skip this case in the future
-				heart.Stop()
+				heartbeat.Stop()
 			}
 		case err, ok := <-heartbeatErrCh:
 			if ok {
