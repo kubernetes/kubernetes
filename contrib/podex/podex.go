@@ -29,6 +29,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -43,12 +44,14 @@ import (
 	goyaml "gopkg.in/yaml.v2"
 )
 
-const usage = "podex [-format=yaml|json] [-type=pod|container] [-id NAME] IMAGES..."
+const usage = "podex [-daemon] [-insecure-registry] [-insecure-skip-verify] [-format=yaml|json] [-type=pod|container] [-name NAME] IMAGES..."
 
 var flManifestFormat = flag.String("format", "yaml", "manifest format to output, `yaml` or `json`")
 var flManifestType = flag.String("type", "pod", "manifest type to output, `pod` or `container`")
 var flManifestName = flag.String("name", "", "manifest name, default to image base name")
 var flDaemon = flag.Bool("daemon", false, "daemon mode")
+var flInsecureRegistry = flag.Bool("insecure-registry", false, "connect to insecure registry")
+var flInsecureSkipVerify = flag.Bool("insecure-skip-verify", false, "skip certificate verify")
 
 func init() {
 	flag.Usage = func() {
@@ -245,6 +248,10 @@ type imageMetadata struct {
 }
 
 func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error) {
+	scheme := "https"
+	if *flInsecureRegistry {
+		scheme = "http"
+	}
 	if host == "" {
 		host = "index.docker.io"
 	}
@@ -254,13 +261,21 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 	if tag == "" {
 		tag = "latest"
 	}
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/v1/repositories/%s/%s/images", host, namespace, repo), nil)
 
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: *flInsecureSkipVerify,
+			},
+		},
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s://%s/v1/repositories/%s/%s/images", scheme, host, namespace, repo), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 	req.Header.Add("X-Docker-Token", "true")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request to %q: %v", host, err)
 	}
@@ -270,12 +285,12 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 
 	endpoints := resp.Header.Get("X-Docker-Endpoints")
 	token := resp.Header.Get("X-Docker-Token")
-	req, err = http.NewRequest("GET", fmt.Sprintf("https://%s/v1/repositories/%s/%s/tags/%s", endpoints, namespace, repo, tag), nil)
+	req, err = http.NewRequest("GET", fmt.Sprintf("%s://%s/v1/repositories/%s/%s/tags/%s", scheme, endpoints, namespace, repo, tag), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 	req.Header.Add("Authorization", "Token "+token)
-	resp, err = http.DefaultClient.Do(req)
+	resp, err = client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error getting image id for %s/%s:%s %v", namespace, repo, tag, err)
 	}
@@ -283,12 +298,12 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 	if err = json.NewDecoder(resp.Body).Decode(&imageID); err != nil {
 		return nil, fmt.Errorf("error decoding image id: %v", err)
 	}
-	req, err = http.NewRequest("GET", fmt.Sprintf("https://%s/v1/images/%s/json", endpoints, imageID), nil)
+	req, err = http.NewRequest("GET", fmt.Sprintf("%s://%s/v1/images/%s/json", scheme, endpoints, imageID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 	req.Header.Add("Authorization", "Token "+token)
-	resp, err = http.DefaultClient.Do(req)
+	resp, err = client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error getting json for image %q: %v", imageID, err)
 	}

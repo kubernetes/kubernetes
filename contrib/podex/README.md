@@ -8,14 +8,19 @@ Manifests can then be edited by a human to match deployment needs.
 
 ## Usage
 ```
-$ podex [-format json|yaml] [-type=pod|container] [-name PODNAME] IMAGES...
+$ podex [-daemon] [-insecure-registry] [-insecure-skip-verify] [-format yaml|json] [-type=pod|container] [-name PODNAME] IMAGES...
 
 ```
 
 ### Options
 - `format`: manifest format to output, `yaml` (default) or `json`
-- `json`: manifest type to output, `pod` (default) or `container`
+- `type`: manifest type to output, `pod` (default) or `container`
 - `name`: manifest name (required with multiple images, optional with single image: default to image base name)
+
+### Flags
+- `daemon`: run in daemon mode
+- `insecure-registry`: connect to insecure registry using HTTP
+- `insecure-skip-verify`: skip registry certificate verify (registry with self-signed certificate)
 
 ### Examples
 ```
