@@ -105,6 +105,9 @@ def line_has_bad_flag(line, flagre):
             return False
         if "grains" + result in line:
             return False
+        # These are usually yaml definitions
+        if result.endswith(":"):
+            return False
         return True
     return False
 
