@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -232,7 +233,6 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedServiceUpdate = true
 
-	glog.V(4).Infof("Received service update notice: %+v", allServices)
 	activeServices := make(map[proxy.ServicePortName]bool) // use a map as a set
 
 	for i := range allServices {
@@ -256,7 +256,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			}
 			if exists {
 				//Something changed.
-				glog.V(4).Infof("Something changed for service %q: removing it", serviceName)
+				glog.V(3).Infof("Something changed for service %q: removing it", serviceName)
 				delete(proxier.serviceMap, serviceName)
 			}
 
@@ -273,7 +273,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			proxier.serviceMap[serviceName] = info
 
-			glog.V(4).Infof("info: %+v", info)
+			glog.V(4).Infof("added serviceInfo(%s): %s", serviceName, spew.Sdump(info))
 		}
 	}
 
@@ -297,7 +297,6 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedEndpointsUpdate = true
 
-	glog.V(4).Infof("Received endpoints update notice: %+v", allEndpoints)
 	registeredEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 
 	// Update endpoints for services.
@@ -348,6 +347,10 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 			// that way we only remove ServicePorts that were not in both.
 			proxier.serviceMap[service].endpoints = nil
 		}
+	}
+
+	if err := proxier.syncProxyRules(); err != nil {
+		glog.Errorf("Failed to sync iptables rules: %v", err)
 	}
 }
 
@@ -409,10 +412,10 @@ func servicePortAndEndpointToServiceChain(s proxy.ServicePortName, protocol stri
 func (proxier *Proxier) syncProxyRules() error {
 	// don't sync rules till we've received services and endpoints
 	if !proxier.haveReceivedEndpointsUpdate || !proxier.haveReceivedServiceUpdate {
-		glog.V(2).Info("not syncing iptables until Services and Endpoints have been received from master")
+		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
 		return nil
 	}
-	glog.V(4).Infof("Syncing iptables rules")
+	glog.V(3).Infof("Syncing iptables rules")
 
 	// Ensure main chains and rules are installed.
 	inputChains := []utiliptables.Chain{utiliptables.ChainOutput, utiliptables.ChainPrerouting}
