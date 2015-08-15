@@ -202,4 +202,4 @@ coreos:
         After=kubernetes-install-rkt.service
         [Service]
         EnvironmentFile=/etc/kube-env
-        ExecStart=/opt/rkt/rkt metadata-service
+        ExecStart=/opt/rkt/rkt/rkt metadata-service
