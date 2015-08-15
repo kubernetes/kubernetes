@@ -30,7 +30,6 @@ GOPATH="${GOPATH}:${KUBE_ROOT}/Godeps/_workspace"
 # TODO: install counterfeiter? use container? https://github.com/maxbrunsfeld/counterfeiter
 # go install github.com/maxbrunsfeld/counterfeiter
 
-GOPATH="${GOPATH}" counterfeiter -o pkg/registry/component/mocks/mocks.go --fake-name MockRegistry pkg/registry/component Registry
 GOPATH="${GOPATH}" counterfeiter -o pkg/probe/http/mocks/mocks.go --fake-name MockHTTPGetter pkg/probe/http HTTPGetter
 GOPATH="${GOPATH}" counterfeiter -o pkg/storage/mocks/mocks.go --fake-name MockInterface pkg/storage Interface
 
