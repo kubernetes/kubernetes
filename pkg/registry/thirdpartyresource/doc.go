@@ -14,15 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
-
-import "k8s.io/kubernetes/pkg/api"
-
-func addDefaultingFuncs() {
-	api.Scheme.AddDefaultingFuncs(
-		func(obj *APIVersion) {
-			if len(obj.APIGroup) == 0 {
-				obj.APIGroup = "experimental"
-			}
-		})
-}
+// Package thirdpartyresource provides Registry interface and its REST
+// implementation for storing ThirdPartyResource api objects.
+package thirdpartyresource

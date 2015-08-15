@@ -36,6 +36,8 @@ func addKnownTypes() {
 		&HorizontalPodAutoscalerList{},
 		&ReplicationControllerDummy{},
 		&Scale{},
+		&ThirdPartyResource{},
+		&ThirdPartyResourceList{},
 	)
 }
 
@@ -43,3 +45,5 @@ func (*HorizontalPodAutoscaler) IsAnAPIObject()     {}
 func (*HorizontalPodAutoscalerList) IsAnAPIObject() {}
 func (*ReplicationControllerDummy) IsAnAPIObject()  {}
 func (*Scale) IsAnAPIObject()                       {}
+func (*ThirdPartyResource) IsAnAPIObject()          {}
+func (*ThirdPartyResourceList) IsAnAPIObject()      {}

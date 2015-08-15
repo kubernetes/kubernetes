@@ -33,6 +33,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
@@ -283,6 +284,7 @@ var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
+var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
@@ -317,6 +319,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
 	h.Handler(componentStatusColumns, printComponentStatus)
 	h.Handler(componentStatusColumns, printComponentStatusList)
+	h.Handler(thirdPartyResourceColumns, printThirdPartyResource)
+	h.Handler(thirdPartyResourceColumns, printThirdPartyResourceList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -1007,6 +1011,29 @@ func printComponentStatus(item *api.ComponentStatus, w io.Writer, withNamespace 
 func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
 		if err := printComponentStatus(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func printThirdPartyResource(rsrc *expapi.ThirdPartyResource, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	versions := make([]string, len(rsrc.Versions))
+	for ix := range rsrc.Versions {
+		version := &rsrc.Versions[ix]
+		versions[ix] = fmt.Sprint("%s/%s", version.APIGroup, version.Name)
+	}
+	versionsString := strings.Join(versions, ",")
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", rsrc.Name, rsrc.Description, versionsString); err != nil {
+		return err
+	}
+	return nil
+}
+
+func printThirdPartyResourceList(list *expapi.ThirdPartyResourceList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, item := range list.Items {
+		if err := printThirdPartyResource(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}

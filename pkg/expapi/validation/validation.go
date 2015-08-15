@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/util"
 	errs "k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
@@ -63,5 +64,28 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscler, oldAutoscaler *expapi.H
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&newAutoscler.ObjectMeta, &oldAutoscaler.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscler.Spec)...)
+	return allErrs
+}
+
+func ValidateThirdPartyResourceUpdate(old, update *expapi.ThirdPartyResource) errs.ValidationErrorList {
+	return ValidateThirdPartyResource(update)
+}
+
+func ValidateThirdPartyResource(obj *expapi.ThirdPartyResource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(obj.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", obj.Name, "name must be non-empty"))
+	}
+	versions := util.StringSet{}
+	for ix := range obj.Versions {
+		version := &obj.Versions[ix]
+		if len(version.Name) == 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", version, "name can not be empty"))
+		}
+		if versions.Has(version.Name) {
+			allErrs = append(allErrs, errs.NewFieldDuplicate("version", version))
+		}
+		versions.Insert(version.Name)
+	}
 	return allErrs
 }
