@@ -384,22 +384,23 @@ func flattenValidEndpoints(endpoints []hostPortPair) []string {
 	return result
 }
 
-// servicePortToServiceChain takes the ServicePortName for a
-// service and returns the associated iptables chain
-// this is computed by hashing (sha256) then encoding to base64 and
-// truncating with the prefix "KUBE-SVC-"
-// We do this because Iptables Chain Names must be <= 28 chars long
-func servicePortToServiceChain(s proxy.ServicePortName) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(s.String()))
+// servicePortToServiceChain takes the ServicePortName for a service and
+// returns the associated iptables chain.  This is computed by hashing (sha256)
+// then encoding to base32 and truncating with the prefix "KUBE-SVC-".  We do
+// this because Iptables Chain Names must be <= 28 chars long, and the longer
+// they are the harder they are to read.
+func servicePortToServiceChain(s proxy.ServicePortName, protocol string) utiliptables.Chain {
+	hash := sha256.Sum256([]byte(s.String() + protocol))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return utiliptables.Chain("KUBE-SVC-" + encoded[:19])
+	return utiliptables.Chain("KUBE-SVC-" + encoded[:16])
 }
 
-// this is the same as servicePortToServiceChain but with the endpoint included essentially
-func servicePortAndEndpointToServiceChain(s proxy.ServicePortName, endpoint string) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(s.String() + "_" + endpoint))
+// This is the same as servicePortToServiceChain but with the endpoint
+// included.
+func servicePortAndEndpointToServiceChain(s proxy.ServicePortName, protocol string, endpoint string) utiliptables.Chain {
+	hash := sha256.Sum256([]byte(s.String() + protocol + endpoint))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return utiliptables.Chain("KUBE-SEP-" + encoded[:19])
+	return utiliptables.Chain("KUBE-SEP-" + encoded[:16])
 }
 
 // This is where all of the iptables-save/restore calls happen.
@@ -480,10 +481,10 @@ func (proxier *Proxier) syncProxyRules() error {
 
 	// Build rules for each service.
 	for name, info := range proxier.serviceMap {
-		protocol := strings.ToLower((string)(info.protocol))
+		protocol := strings.ToLower(string(info.protocol))
 
 		// Create the per-service chain, retaining counters if possible.
-		svcChain := servicePortToServiceChain(name)
+		svcChain := servicePortToServiceChain(name, protocol)
 		if chain, ok := existingChains[svcChain]; ok {
 			writeLine(chainsLines, chain)
 		} else {
@@ -560,7 +561,7 @@ func (proxier *Proxier) syncProxyRules() error {
 		endpointChains := make([]utiliptables.Chain, 0)
 		for _, ep := range info.endpoints {
 			endpoints = append(endpoints, ep)
-			endpointChain := servicePortAndEndpointToServiceChain(name, ep)
+			endpointChain := servicePortAndEndpointToServiceChain(name, protocol, ep)
 			endpointChains = append(endpointChains, endpointChain)
 
 			// Create the endpoint chain, retaining counters if possible.
