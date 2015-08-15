@@ -100,7 +100,7 @@ func (s *CMServer) Run(_ []string) error {
 		kubeClient.ComponentsClient(),
 		5*time.Second,
 		api.ComponentControllerManager,
-		kubeconfig.Host,
+		s.URI(),
 	)
 	if err != nil {
 		glog.Fatalf("Failed to start heartbeat: %v", err)
@@ -230,4 +230,8 @@ func (s *CMServer) createEndpointController(client *client.Client) kmendpoint.En
 	glog.V(2).Infof("Creating podIP:containerPort endpoint controller")
 	stockEndpointController := kendpoint.NewEndpointController(client)
 	return stockEndpointController
+}
+
+func (s *CMServer) URI() string {
+	return fmt.Sprintf("http://%s:%d", s.Address, s.Port)
 }

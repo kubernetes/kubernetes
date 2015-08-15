@@ -176,7 +176,7 @@ func (s *CMServer) Run(_ []string) error {
 		kubeClient.ComponentsClient(),
 		5*time.Second,
 		api.ComponentControllerManager,
-		kubeconfig.Host,
+		s.URI(),
 	)
 	if err != nil {
 		glog.Fatalf("Failed to start heartbeat: %v", err)
@@ -305,4 +305,8 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	return nil
+}
+
+func (s *CMServer) URI() string {
+	return fmt.Sprintf("http://%s:%d", s.Address, s.Port)
 }
