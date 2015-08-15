@@ -19,8 +19,8 @@ package status
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/registry/component"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
@@ -49,21 +49,14 @@ func (updateStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // PrepareForUpdate transfers implied component fields and populates timestamps.
-func (updateStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newC := obj.(*api.Component)
-	oldC := old.(*api.Component)
+func (updateStrategy) PrepareForUpdate(newO, oldO runtime.Object) {
+	component.CreateUpdateStrategy.PrepareForUpdate(newO, oldO)
 
-	// allow some metadata values to be omitted on update
-	newC.CreationTimestamp = oldC.CreationTimestamp
+	component := newO.(*api.Component)
+	old := oldO.(*api.Component)
 
 	// transfer existing spec
-	newC.Spec = oldC.Spec
-
-	now := util.Now()
-	newC.Status.LastUpdateTime = now
-	if newC.Status.Phase != oldC.Status.Phase || !ConditionsMatch(newC.Status.Conditions, oldC.Status.Conditions) {
-		newC.Status.LastTransitionTime = now
-	}
+	component.Spec = old.Spec
 }
 
 // Validate validates an update to an existing component status.

@@ -21,6 +21,7 @@ package app
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -39,9 +40,12 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/component"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
+	componentregistry "k8s.io/kubernetes/pkg/registry/component"
+	componentetcd "k8s.io/kubernetes/pkg/registry/component/etcd"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
@@ -350,6 +354,21 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid experimental storage version or misconfigured etcd: %v", err)
 	}
 
+	//TODO(karlkfi): use componentStorage/componentStatusStorage from Master? This is a duplicate.
+	componentStorage, componentStatusStorage := componentetcd.NewStorage(etcdStorage)
+	componentsClient := componentregistry.NewClient(componentStorage, componentStatusStorage)
+
+	//TODO(karlkfi): heartbeat secure location?
+	heartbeat, err := component.Start(
+		componentsClient,
+		5*time.Second,
+		api.ComponentAPIServer,
+		s.URI(),
+	)
+	if err != nil {
+		glog.Fatalf("Failed to start heartbeat: %v", err)
+	}
+
 	n := s.ServiceClusterIPRange
 
 	// Default to the private server key for service account token signing
@@ -524,6 +543,7 @@ func (s *APIServer) Run(_ []string) error {
 				}
 				time.Sleep(15 * time.Second)
 			}
+			//TODO: heartbeat.Stop()/Kill + return to exit process
 		}()
 	}
 	handler := apiserver.TimeoutHandler(m.InsecureHandler, longRunningTimeout)
@@ -539,7 +559,31 @@ func (s *APIServer) Run(_ []string) error {
 		}
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)
-	glog.Fatal(http.ListenAndServe())
+	go func() {
+		err := http.ListenAndServe()
+		if err != nil {
+			heartbeat.Kill(err)
+		} else {
+			heartbeat.Stop()
+		}
+	}()
+
+	// Assume that if we made it this far the apiserver is healthy.
+	// TODO(karlkfi): Handle phase/condition transitions for errors or dependency state changes.
+	err = heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
+		Type:   api.ComponentRunningHealthy,
+		Status: api.ConditionTrue,
+	})
+	if err != nil {
+		glog.Errorf("Transition to running failed: %v", err)
+		heartbeat.Kill(err)
+	}
+
+	// block until heartbeat is stopped
+	for err = range heartbeat.Watch() {
+		glog.Errorf("Heartbeat Error: %s", err)
+	}
+
 	return nil
 }
 
@@ -556,4 +600,8 @@ func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool
 		return boolValue
 	}
 	return defaultValue
+}
+
+func (s *APIServer) URI() string {
+	return fmt.Sprintf("http://%s:%d", s.InsecureBindAddress, s.InsecurePort)
 }

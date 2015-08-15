@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/component"
 	componentetcd "k8s.io/kubernetes/pkg/registry/component/etcd"
 	"k8s.io/kubernetes/pkg/registry/componentstatuses"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
@@ -215,7 +214,6 @@ type Master struct {
 	// TODO: define the internal typed interface in a way that clients can
 	// also be replaced
 	nodeRegistry              minion.Registry
-	componentRegistry         component.Registry //TODO(karlkfi): delete if unneeded
 	namespaceRegistry         namespace.Registry
 	serviceRegistry           service.Registry
 	endpointRegistry          endpoint.Registry
@@ -455,7 +453,6 @@ func (m *Master) init(c *Config) {
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
 	componentStorage, componentStatusStorage := componentetcd.NewStorage(c.DatabaseStorage)
-	m.componentRegistry = component.NewRegistry(componentStorage)
 
 	componentStatusesStorage := componentstatuses.NewStorage(c.DatabaseStorage, http.DefaultTransport)
 

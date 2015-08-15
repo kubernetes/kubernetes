@@ -205,16 +205,21 @@ func (s *CMServer) Run(_ []string) error {
 	// Assume that if we made it this far the controller-manager is healthy.
 	// TODO(karlkfi): Handle phase/condition transitions based on an aggregate controller state.
 	// TODO(karlkfi): Extract each controller to its own component, so they can each manage their own heatbeat and state transitions.
-	heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
+	err = heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
 		Type:   api.ComponentRunningHealthy,
 		Status: api.ConditionTrue,
 	})
+	if err != nil {
+		glog.Errorf("Transition to running failed: %v", err)
+		heartbeat.Kill(err)
+	}
 
+	// block until heartbeat is stopped
 	for err = range heartbeat.Watch() {
 		glog.Errorf("Heartbeat Error: %s", err)
 	}
 
-	select {}
+	return nil
 }
 
 func (s *CMServer) createEndpointController(client *client.Client) kmendpoint.EndpointController {

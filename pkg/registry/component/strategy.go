@@ -83,9 +83,12 @@ func (createUpdateStrategy) PrepareForUpdate(newO, oldO runtime.Object) {
 	// every update bumps LastUpdateTime
 	component.Status.LastUpdateTime = now
 	// only updates that change the phase bump LastTransitionTime
-	if component.Status.Phase != old.Status.Phase {
+	if component.Status.Phase != old.Status.Phase || !ConditionsMatch(component.Status.Conditions, old.Status.Conditions) {
 		component.Status.LastTransitionTime = now
 	}
+
+	// transfer existing spec
+	//component.Spec = old.Spec
 }
 
 // Validate validates a new component.
@@ -97,4 +100,18 @@ func (createUpdateStrategy) Validate(ctx api.Context, obj runtime.Object) fielde
 // Validate validates an update to an existing component.
 func (createUpdateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateComponentUpdate(old.(*api.Component), obj.(*api.Component))
+}
+
+func ConditionsMatch(a []api.ComponentCondition, b []api.ComponentCondition) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+
+	return true
 }

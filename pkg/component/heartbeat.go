@@ -18,23 +18,27 @@ package component
 
 import (
 	"fmt"
-	"time"
 	"sync"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+
+	"github.com/golang/glog"
 )
 
 type HeartBeat interface {
 	// Transition changes the component's current phase (locally)
 	// Future heartbeats will communicate this to the apiserver.
-	Transition(api.ComponentPhase, api.ComponentCondition)
+	Transition(api.ComponentPhase, api.ComponentCondition) error
 	// Watch returns a new read-only buffered error channel that will be closed when the heartbeat stops.
 	// The returned channel may receive zero or more errors before closing.
 	// When the HeartBeat is stopped or dies the channel will be closed.
 	Watch() <-chan error
-	// Stop terminates continuous heart beating.
+	// Stop terminates continuous heart beating gracefully (e.g. sigterm).
 	Stop()
+	// Kill terminates continuous heart beating with an error.
+	Kill(error)
 }
 
 type heartbeat struct {
@@ -118,12 +122,20 @@ func errorHandler(errCh chan error, watchCh chan chan error) {
 	}
 }
 
-func (hb *heartbeat) Transition(phase api.ComponentPhase, condition api.ComponentCondition) {
+func (hb *heartbeat) Transition(phase api.ComponentPhase, condition api.ComponentCondition) error {
 	hb.stateLock.Lock()
 	defer hb.stateLock.Unlock()
 
 	hb.state.Status.Phase = phase
 	hb.state.Status.Conditions = append(hb.state.Status.Conditions, condition)
+
+	newState, err := hb.componentsClient.Update(hb.state)
+	if err != nil {
+		return fmt.Errorf("component update failed (state=%+v): %v", hb.state, err)
+	}
+
+	hb.state = newState
+	return nil
 }
 
 func (hb *heartbeat) Watch() <-chan error {
@@ -135,15 +147,35 @@ func (hb *heartbeat) Watch() <-chan error {
 }
 
 func (hb *heartbeat) Stop() {
+	err := hb.Transition(api.ComponentTerminated, api.ComponentCondition{
+		Type:   api.ComponentTerminatedCleanly,
+		Status: api.ConditionTrue,
+		// TODO: add condition reason/message
+	})
+	if err != nil {
+		glog.Errorf("Stop transition failed: %v", err)
+	}
+
 	// will do nothing if heartbeat has already been stopped
 	close(hb.errCh)
 }
 
-func (hb *heartbeat) kill(err error) {
+func (hb *heartbeat) Kill(err error) {
+	tErr := hb.Transition(api.ComponentTerminated, api.ComponentCondition{
+		Type:    api.ComponentTerminatedCleanly,
+		Status:  api.ConditionFalse,
+		Reason:  "Error",
+		Message: err.Error(),
+	})
+	if err != nil {
+		glog.Errorf("Kill transition failed: %v", tErr)
+	}
+
 	// will block util errorHandler pics it up
 	// will panic if heartbeat has already been stopped
 	hb.errCh <- err
-	hb.Stop()
+	// will do nothing if heartbeat has already been stopped
+	close(hb.errCh)
 }
 
 func (hb *heartbeat) beat() {

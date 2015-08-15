@@ -39,7 +39,7 @@ type ComponentsClient interface {
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
-// componentClient implements ComponentClient
+// componentClient implements ComponentClient by wrapping a generic Client
 type componentClient struct {
 	r *Client
 }

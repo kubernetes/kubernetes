@@ -292,11 +292,14 @@ func (s *SchedulerServer) serveFrameworkArtifact(path string) (string, string) {
 func (s *SchedulerServer) URI(path string) string {
 	var hostURI string
 	if s.AdvertisedAddress != "" {
-		hostURI = fmt.Sprintf("http://%s/%s", s.AdvertisedAddress, path)
+		hostURI = fmt.Sprintf("http://%s", s.AdvertisedAddress)
 	} else if s.HA && s.HADomain != "" {
-		hostURI = fmt.Sprintf("http://%s.%s:%d/%s", SCHEDULER_SERVICE_NAME, s.HADomain, ports.SchedulerPort, path)
+		hostURI = fmt.Sprintf("http://%s.%s:%d", SCHEDULER_SERVICE_NAME, s.HADomain, ports.SchedulerPort)
 	} else {
-		hostURI = fmt.Sprintf("http://%s:%d/%s", s.Address.String(), s.Port, path)
+		hostURI = fmt.Sprintf("http://%s:%d", s.Address.String(), s.Port)
+	}
+	if path != "" {
+		hostURI = fmt.Sprintf("%s/%s", hostURI, path)
 	}
 	return hostURI
 }
@@ -533,8 +536,6 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 // watch the scheduler process for failover signals and properly handle such. may never return.
 func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterface, handler func() error) error {
 
-	// we only want to return the first error (if any), everyone else can block forever
-	errCh := make(chan error, 1)
 	doFailover := func() error {
 		// we really don't expect handler to return, if it does something went seriously wrong
 		err := handler()
@@ -553,7 +554,13 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 			select {}
 		}
 		var err error
-		defer func() { errCh <- err }()
+		defer func() {
+			if err != nil {
+				s.heartbeat.Kill(err)
+			} else {
+				s.heartbeat.Stop()
+			}
+		}()
 		select {
 		case <-schedulerProcess.Failover():
 			err = doFailover()
@@ -570,53 +577,31 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 			log.V(1).Infof("scheduler process signalled, already failing over")
 			select {}
 		}
-		errCh <- doFailover()
+		err := doFailover()
+		if err != nil {
+			s.heartbeat.Kill(err)
+		} else {
+			s.heartbeat.Stop()
+		}
 	})
 
 	// Assume that if we made it this far the controller-manager is healthy.
 	// TODO(karlkfi): Handle phase/condition transitions for errors or dependency state changes.
-	s.heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
+	err := s.heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
 		Type:   api.ComponentRunningHealthy,
 		Status: api.ConditionTrue,
 	})
-
-	heartbeatErrCh := s.heartbeat.Watch()
-	var firstErr error
-	for {
-		select {
-		case err, open := <-errCh:
-			if open {
-				log.Errorf("Scheduler Error: %s", err)
-				// Only allow one error (per old code)
-				// TODO: make the writer close, not the reader
-				close(errCh)
-				if firstErr == nil {
-					firstErr = err
-				}
-			} else {
-				log.Error("Scheduler Exited")
-				errCh = nil // skip this case in the future
-				s.heartbeat.Stop()
-			}
-		case err, open := <-heartbeatErrCh:
-			if open {
-				log.Errorf("Heartbeat Error: %s", err)
-				// multiple errors allowed. heartbeat closes channel on exit
-				if firstErr == nil {
-					firstErr = err
-				}
-			} else {
-				log.Error("Heartbeat Exited")
-				heartbeatErrCh = nil   // skip this case in the future
-				schedulerProcess.End() // TODO: block on return channel or just wait for errCh to close?
-			}
-		}
-
-		if errCh == nil && heartbeatErrCh == nil {
-			break
-		}
+	if err != nil {
+		log.Errorf("Transition to running failed: %v", err)
+		s.heartbeat.Kill(err)
 	}
-	return firstErr
+
+	// block until heartbeat is stopped
+	for err = range s.heartbeat.Watch() {
+		log.Errorf("Heartbeat Error: %s", err)
+	}
+
+	return nil
 }
 
 func validateLeadershipTransition(desired, current string) {
