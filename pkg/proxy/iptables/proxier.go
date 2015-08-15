@@ -25,7 +25,9 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -60,10 +62,11 @@ const iptablesNodePortsChain utiliptables.Chain = "KUBE-NODEPORTS"
 // the mark we apply to traffic needing SNAT
 const iptablesMasqueradeMark = "0x4d415351"
 
-// ShouldUseIptablesProxier returns true if we should use the iptables Proxier instead of
-// the userspace Proxier.
-// This is determined by the iptables version. It may return an erorr if it fails to get the
-// itpables version without error, in which case it will also return false.
+// ShouldUseIptablesProxier returns true if we should use the iptables Proxier
+// instead of the "classic" userspace Proxier.  This is determined by checking
+// the iptables version and for the existence of kernel features. It may return
+// an error if it fails to get the itpables version without error, in which
+// case it will also return false.
 func ShouldUseIptablesProxier() (bool, error) {
 	exec := utilexec.New()
 	minVersion, err := semver.NewVersion(IPTABLES_MIN_VERSION)
@@ -80,7 +83,38 @@ func ShouldUseIptablesProxier() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return !version.LessThan(*minVersion), nil
+	if version.LessThan(*minVersion) {
+		return false, nil
+	}
+
+	// Check for the required sysctls.  We don't care about the value, just
+	// that it exists.  If this Proxier is chosen, we'll iniialize it as we
+	// need.
+	_, err = getSysctl(sysctlRouteLocalnet)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+const sysctlBase = "/proc/sys"
+const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
+
+func getSysctl(sysctl string) (int, error) {
+	data, err := ioutil.ReadFile(path.Join(sysctlBase, sysctl))
+	if err != nil {
+		return -1, err
+	}
+	val, err := strconv.Atoi(strings.Trim(string(data), " \n"))
+	if err != nil {
+		return -1, err
+	}
+	return val, nil
+}
+
+func setSysctl(sysctl string, newVal int) error {
+	return ioutil.WriteFile(path.Join(sysctlBase, sysctl), []byte(strconv.Itoa(newVal)), 0640)
 }
 
 // internal struct for string service information
@@ -128,6 +162,12 @@ func NewProxier(ipt utiliptables.Interface, syncPeriod time.Duration) (*Proxier,
 	glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
 	// remove iptables rules/chains from the userspace Proxier
 	tearDownUserspaceIptables(ipt)
+
+	// Set the route_localnet sysctl we need for
+	if err := setSysctl(sysctlRouteLocalnet, 1); err != nil {
+		return nil, fmt.Errorf("can't set sysctl route_localnet: %v", err)
+	}
+
 	return &Proxier{
 		serviceMap: make(map[proxy.ServicePortName]*serviceInfo),
 		syncPeriod: syncPeriod,
