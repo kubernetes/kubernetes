@@ -100,6 +100,7 @@ func ShouldUseIptablesProxier() (bool, error) {
 
 const sysctlBase = "/proc/sys"
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
+const sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
 
 func getSysctl(sysctl string) (int, error) {
 	data, err := ioutil.ReadFile(path.Join(sysctlBase, sysctl))
@@ -158,15 +159,24 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, syncPeriod time.Duration) (*Proxier, error) {
-	glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
-	// remove iptables rules/chains from the userspace Proxier
-	tearDownUserspaceIptables(ipt)
+func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration) (*Proxier, error) {
 
 	// Set the route_localnet sysctl we need for
 	if err := setSysctl(sysctlRouteLocalnet, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl route_localnet: %v", err)
+		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
 	}
+
+	// Load the module.  It's OK if this fails (e.g. the module is not present)
+	// because we'll catch the error on the sysctl, which is what we actually
+	// care about.
+	exec.Command("modprobe", "br-netfilter").CombinedOutput()
+	if err := setSysctl(sysctlBridgeCallIptables, 1); err != nil {
+		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+	}
+
+	// No turning back. Remove artifacts that might still exist from the userspace Proxier.
+	glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
+	tearDownUserspaceIptables(ipt)
 
 	return &Proxier{
 		serviceMap: make(map[proxy.ServicePortName]*serviceInfo),
