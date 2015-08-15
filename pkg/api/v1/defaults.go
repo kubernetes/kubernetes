@@ -25,6 +25,11 @@ import (
 
 func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
+		func(obj *APIVersion) {
+			if len(obj.APIGroup) == 0 {
+				obj.APIGroup = "experimental"
+			}
+		},
 		func(obj *ReplicationController) {
 			var labels map[string]string
 			if obj.Spec.Template != nil {
