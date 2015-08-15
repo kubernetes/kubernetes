@@ -121,6 +121,7 @@ controller:
     await-health-check "-t=${MESOS_DOCKER_MESOS_TIMEOUT}" http://mesosmaster1:5050/health &&
     await-health-check "-t=${MESOS_DOCKER_API_TIMEOUT}" http://apiserver:8888/healthz &&
     km controller-manager
+    --address=$(resolveip controller)
     --master=http://apiserver:8888
     --cloud-config=/opt/mesos-cloud.conf
     --service-account-private-key-file=/var/run/kubernetes/auth/service-accounts.key
