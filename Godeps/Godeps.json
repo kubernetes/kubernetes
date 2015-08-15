@@ -552,6 +552,14 @@
 			"Rev": "b5adcc2dcdf009d0391547edc6ecbaff889f5bb9"
 		},
 		{
+			"ImportPath": "golang.org/x/tools/go/ast/astutil",
+			"Rev": "4f50f44d7a3206e9e28b984e023efce2a4a75369"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/imports",
+			"Rev": "4f50f44d7a3206e9e28b984e023efce2a4a75369"
+		},
+		{
 			"ImportPath": "google.golang.org/api/compute/v1",
 			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
 		},

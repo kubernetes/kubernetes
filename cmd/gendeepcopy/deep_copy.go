@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -32,6 +34,7 @@ import (
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
+	"golang.org/x/tools/imports"
 )
 
 const pkgBase = "k8s.io/kubernetes/pkg"
@@ -58,12 +61,24 @@ func main() {
 		funcOut = file
 	}
 
+	data := new(bytes.Buffer)
+
 	group, version := path.Split(*groupVersion)
 	group = strings.TrimRight(group, "/")
 	registerTo := "api.Scheme"
 	if *groupVersion == "api/" {
 		registerTo = "Scheme"
 	}
+	pkgname := group
+	if len(version) != 0 {
+		pkgname = version
+	}
+
+	_, err := data.WriteString(fmt.Sprintf("package %s\n", pkgname))
+	if err != nil {
+		glog.Fatalf("error writing package line: %v", err)
+	}
+
 	versionPath := path.Join(pkgBase, group, version)
 	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, util.NewStringSet("k8s.io/kubernetes"))
 	generator.AddImport(path.Join(pkgBase, "api"))
@@ -86,13 +101,20 @@ func main() {
 		}
 	}
 	generator.RepackImports()
-	if err := generator.WriteImports(funcOut); err != nil {
+	if err := generator.WriteImports(data); err != nil {
 		glog.Fatalf("error while writing imports: %v", err)
 	}
-	if err := generator.WriteDeepCopyFunctions(funcOut); err != nil {
+	if err := generator.WriteDeepCopyFunctions(data); err != nil {
 		glog.Fatalf("error while writing deep copy functions: %v", err)
 	}
-	if err := generator.RegisterDeepCopyFunctions(funcOut, registerTo); err != nil {
+	if err := generator.RegisterDeepCopyFunctions(data, registerTo); err != nil {
 		glog.Fatalf("error while registering deep copy functions: %v", err)
+	}
+	b, err := imports.Process("", data.Bytes(), nil)
+	if err != nil {
+		glog.Fatalf("error while update imports: %v", err)
+	}
+	if _, err := funcOut.Write(b); err != nil {
+		glog.Fatalf("error while writing out the resulting file: %v", err)
 	}
 }

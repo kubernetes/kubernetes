@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -33,6 +34,7 @@ import (
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
+	"golang.org/x/tools/imports"
 )
 
 const pkgBase = "k8s.io/kubernetes/pkg"
@@ -58,8 +60,15 @@ func main() {
 		funcOut = file
 	}
 
+	data := new(bytes.Buffer)
+
 	group, version := path.Split(*groupVersion)
 	group = strings.TrimRight(group, "/")
+
+	_, err := data.WriteString(fmt.Sprintf("package %v\n", version))
+	if err != nil {
+		glog.Fatalf("error writing package line: %v", err)
+	}
 
 	versionPath := path.Join(pkgBase, group, version)
 	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
@@ -76,13 +85,21 @@ func main() {
 		}
 	}
 	generator.RepackImports(util.NewStringSet())
-	if err := generator.WriteImports(funcOut); err != nil {
+	if err := generator.WriteImports(data); err != nil {
 		glog.Fatalf("error while writing imports: %v", err)
 	}
-	if err := generator.WriteConversionFunctions(funcOut); err != nil {
+	if err := generator.WriteConversionFunctions(data); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
 	}
-	if err := generator.RegisterConversionFunctions(funcOut, fmt.Sprintf("%s.Scheme", apiShort)); err != nil {
+	if err := generator.RegisterConversionFunctions(data, fmt.Sprintf("%s.Scheme", apiShort)); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
+	}
+
+	b, err := imports.Process("", data.Bytes(), nil)
+	if err != nil {
+		glog.Fatalf("error while update imports: %v", err)
+	}
+	if _, err := funcOut.Write(b); err != nil {
+		glog.Fatalf("error while writing out the resulting file: %v", err)
 	}
 }
