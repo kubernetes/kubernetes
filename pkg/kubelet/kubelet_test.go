@@ -1187,6 +1187,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 							},
 						},
 					},
+					{
+						Name: "POD_IP",
+						ValueFrom: &api.EnvVarSource{
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: testapi.Version(),
+								FieldPath:  "status.podIP",
+							},
+						},
+					},
 				},
 			},
 			masterServiceNs: "nothing",
@@ -1194,6 +1203,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "POD_NAME", Value: "dapi-test-pod-name"},
 				{Name: "POD_NAMESPACE", Value: "downward-api"},
+				{Name: "POD_IP", Value: "1.2.3.4"},
 			},
 		},
 		{
@@ -1345,6 +1355,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				Name:      "dapi-test-pod-name",
 			},
 		}
+		testPod.Status.PodIP = "1.2.3.4"
 
 		result, err := kl.makeEnvironmentVariables(testPod, tc.container)
 		if err != nil {

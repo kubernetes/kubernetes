@@ -1051,7 +1051,10 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod
 	if err != nil {
 		return "", err
 	}
-
+	switch internalFieldPath {
+	case "status.podIP":
+		return pod.Status.PodIP, nil
+	}
 	return fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
 }
 
