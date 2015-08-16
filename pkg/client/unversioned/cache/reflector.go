@@ -79,10 +79,10 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 
 // NewReflector creates a new Reflector object which will keep the given store up to
 // date with the server's contents for the given resource. Reflector promises to
-// only put things in the store that have the type of expectedType.
-// If resyncPeriod is non-zero, then lists will be executed after every resyncPeriod,
-// so that you can use reflectors to periodically process everything as well as
-// incrementally processing the things that change.
+// only put things in the store that have the type of expectedType, unless expectedType
+// is nil. If resyncPeriod is non-zero, then lists will be executed after every
+// resyncPeriod, so that you can use reflectors to periodically process everything as
+// well as incrementally processing the things that change.
 func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
 	return NewNamedReflector(getDefaultReflectorName(internalPackages...), lw, expectedType, store, resyncPeriod)
 }
@@ -265,7 +265,7 @@ loop:
 			if event.Type == watch.Error {
 				return apierrs.FromObject(event.Object)
 			}
-			if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
+			if e, a := r.expectedType, reflect.TypeOf(event.Object); e != nil && e != a {
 				util.HandleError(fmt.Errorf("%s: expected type %v, but watch event object had type %v", r.name, e, a))
 				continue
 			}
