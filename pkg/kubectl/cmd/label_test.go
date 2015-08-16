@@ -325,10 +325,7 @@ func TestLabelErrors(t *testing.T) {
 
 func TestLabelForResourceFromFile(t *testing.T) {
 	pods, _, _ := testData()
-
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-
 	tf.Client = &client.FakeRESTClient{
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
@@ -355,7 +352,6 @@ func TestLabelForResourceFromFile(t *testing.T) {
 			}
 		}),
 	}
-
 	tf.Namespace = "test"
 	tf.ClientConfig = &client.Config{Version: testapi.Version()}
 
@@ -363,25 +359,18 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	cmd := NewCmdLabel(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/cassandra/cassandra.yaml")
 
-	cmd.SetOutput(buf)
 	err := RunLabel(f, buf, cmd, []string{"a=b"})
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if tf.Printer.(*testPrinter).Objects == nil {
-		t.Errorf("unexpected print to default printer")
-	}
-	if !reflect.DeepEqual(tf.Printer.(*testPrinter).Objects[0].(*api.Pod).Labels, map[string]string{"a": "b"}) {
-		t.Errorf("did not set labels: %#v", string(buf.Bytes()))
+	if !strings.Contains(buf.String(), "labeled") {
+		t.Errorf("did not set labels: %s", buf.String())
 	}
 }
 
 func TestLabelMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
-
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.Client = &client.FakeRESTClient{
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
@@ -412,19 +401,15 @@ func TestLabelMultipleObjects(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &client.Config{Version: testapi.Version()}
+
 	buf := bytes.NewBuffer([]byte{})
-
 	cmd := NewCmdLabel(f, buf)
-
 	cmd.Flags().Set("all", "true")
+
 	if err := RunLabel(f, buf, cmd, []string{"pods", "a=b"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if tf.Printer.(*testPrinter).Objects == nil {
-		t.Errorf("unexpected non print to default printer")
-	}
-	if !reflect.DeepEqual(tf.Printer.(*testPrinter).Objects[0].(*api.Pod).Labels, map[string]string{"a": "b"}) {
-		t.Errorf("did not set labels: %#v", string(buf.Bytes()))
+	if strings.Count(buf.String(), "labeled") != len(pods.Items) {
+		t.Errorf("not all labels are set: %s", buf.String())
 	}
 }
