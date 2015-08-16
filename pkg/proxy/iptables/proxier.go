@@ -16,9 +16,9 @@ limitations under the License.
 
 package iptables
 
-/*
-NOTE: this needs to be tested in e2e since it uses iptables for everything.
-*/
+//
+// NOTE: this needs to be tested in e2e since it uses iptables for everything.
+//
 
 import (
 	"bytes"
@@ -45,13 +45,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 )
 
-// NOTE: IPTABLES_MIN_VERSION is the minimum version of iptables for which we will use the Proxier
-// from this package instead of the userspace Proxier.
-// This is will not be enough, as the version number is somewhat unreliable,
-// features are backported in various distros and this could get pretty hairy.
-// However iptables-1.4.0 was released 2007-Dec-22 and appears to have every feature we use,
-// so this seems prefectly reasonable for now.
-const IPTABLES_MIN_VERSION string = "1.4.0"
+// iptablesMinVersion is the minimum version of iptables for which we will use the Proxier
+// from this package instead of the userspace Proxier.  While most of the
+// features we need were available earlier, the '-C' flag was added more
+// recently.  We use that indirectly in Ensure* functions, and if we don't
+// have it, we have to be extra careful about the exact args we feed in being
+// the same as the args we read back (iptables itself normalizes some args).
+// This is the "new" Proxier, so we require "new" versions of tools.
+const iptablesMinVersion = utiliptables.MinCheckVersion
 
 // the services chain
 const iptablesServicesChain utiliptables.Chain = "KUBE-SERVICES"
@@ -69,7 +70,7 @@ const iptablesMasqueradeMark = "0x4d415351"
 // case it will also return false.
 func ShouldUseIptablesProxier() (bool, error) {
 	exec := utilexec.New()
-	minVersion, err := semver.NewVersion(IPTABLES_MIN_VERSION)
+	minVersion, err := semver.NewVersion(iptablesMinVersion)
 	if err != nil {
 		return false, err
 	}
