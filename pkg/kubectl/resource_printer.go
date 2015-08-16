@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/expapi"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
@@ -500,7 +501,7 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer, withNamespace bool, wid
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
-		formatLabels(pod.Template.Labels),
+		labels.FormatLabels(pod.Template.Labels),
 	); err != nil {
 		return err
 	}
@@ -553,7 +554,7 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
-		formatLabels(controller.Spec.Selector),
+		labels.FormatLabels(controller.Spec.Selector),
 		controller.Spec.Replicas,
 		translateTimestamp(controller.CreationTimestamp),
 	); err != nil {
@@ -643,7 +644,7 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 		internalIP,
 		externalIP,
 		makePortString(svc.Spec.Ports),
-		formatLabels(svc.Spec.Selector),
+		labels.FormatLabels(svc.Spec.Selector),
 		translateTimestamp(svc.CreationTimestamp),
 	); err != nil {
 		return err
@@ -693,7 +694,7 @@ func printNamespace(item *api.Namespace, w io.Writer, withNamespace bool, wide b
 		return fmt.Errorf("namespace is not namespaced")
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", item.Name, formatLabels(item.Labels), item.Status.Phase, translateTimestamp(item.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", item.Name, labels.FormatLabels(item.Labels), item.Status.Phase, translateTimestamp(item.CreationTimestamp)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
@@ -788,7 +789,7 @@ func printNode(node *api.Node, w io.Writer, withNamespace bool, wide bool, showA
 		status = append(status, "SchedulingDisabled")
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", node.Name, formatLabels(node.Labels), strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", node.Name, labels.FormatLabels(node.Labels), strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(node.Labels, columnLabels))
@@ -824,7 +825,7 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace 
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
 		name,
-		formatLabels(pv.Labels),
+		labels.FormatLabels(pv.Labels),
 		aSize, modesStr,
 		pv.Status.Phase,
 		claimRefUID,
@@ -856,7 +857,7 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, wit
 		}
 	}
 
-	labels := formatLabels(pvc.Labels)
+	labels := labels.FormatLabels(pvc.Labels)
 	phase := pvc.Status.Phase
 	storage := pvc.Spec.Resources.Requests[api.ResourceStorage]
 	capacity := ""
