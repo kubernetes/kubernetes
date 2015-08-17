@@ -1,0 +1,34 @@
+{
+	"ImportPath": "github.com/appc/cni",
+	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/coreos/go-iptables/iptables",
+			"Rev": "83dfad0f13fd7310fb3c1cb8563248d8d604b95b"
+		},
+		{
+			"ImportPath": "github.com/coreos/go-systemd/activation",
+			"Comment": "v2-53-g2688e91",
+			"Rev": "2688e91251d9d8e404e86dd8f096e23b2f086958"
+		},
+		{
+			"ImportPath": "github.com/d2g/dhcp4",
+			"Rev": "f0e4d29ff0231dce36e250b2ed9ff08412584bca"
+		},
+		{
+			"ImportPath": "github.com/d2g/dhcp4client",
+			"Rev": "bed07e1bc5b85f69c6f0fd73393aa35ec68ed892"
+		},
+		{
+			"ImportPath": "github.com/vishvananda/netlink",
+			"Rev": "ae3e7dba57271b4e976c4f91637861ee477135e2"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "e11762ca30adc5b39fdbfd8c4250dabeb8e456d3"
+		}
+	]
+}
