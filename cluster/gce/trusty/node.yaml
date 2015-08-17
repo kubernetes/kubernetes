@@ -190,16 +190,16 @@ script
 	# TODO(andyzheng0831): Add health check functionality.
 	. /etc/kube-env
 	/usr/bin/kubelet \
-  	--api_servers=https://${KUBERNETES_MASTER_NAME} \
+  	--api-servers=https://${KUBERNETES_MASTER_NAME} \
 		--enable-debugging-handlers=true \
-		--cloud_provider=gce \
+		--cloud-provider=gce \
 		--config=/etc/kubernetes/manifests \
-		--allow_privileged=false \
+		--allow-privileged=false \
 		--v=2 \
-		--cluster_dns=10.0.0.10 \
-		--cluster_domain=cluster.local \
+		--cluster-dns=10.0.0.10 \
+		--cluster-domain=cluster.local \
 		--configure-cbr0=true \
-		--cgroup_root=/ \
+		--cgroup-root=/ \
 		--system-container=/system
 end script
 
