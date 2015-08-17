@@ -60,7 +60,7 @@ var _ = Describe("Autoscaling", func() {
 		expectNoError(waitForClusterSize(f.Client, nodeCount))
 	})
 
-	It("[Skipped] [Autoscaling] should scale cluster size based on cpu reservation", func() {
+	It("[Skipped] should scale cluster size based on cpu reservation", func() {
 		setUpAutoscaler("cpu/node_reservation", 0.7, 1, 10)
 
 		ReserveCpu(f, "cpu-reservation", 800)
@@ -70,7 +70,7 @@ var _ = Describe("Autoscaling", func() {
 		expectNoError(waitForClusterSize(f.Client, 1))
 	})
 
-	It("[Skipped] [Autoscaling] should scale cluster size based on memory utilization", func() {
+	It("[Skipped] should scale cluster size based on memory utilization", func() {
 		setUpAutoscaler("memory/node_utilization", 0.5, 1, 10)
 
 		ConsumeMemory(f, "memory-utilization", 2)
@@ -80,7 +80,7 @@ var _ = Describe("Autoscaling", func() {
 		expectNoError(waitForClusterSize(f.Client, 1))
 	})
 
-	It("[Skipped] [Autoscaling] should scale cluster size based on memory reservation", func() {
+	It("[Skipped] should scale cluster size based on memory reservation", func() {
 		setUpAutoscaler("memory/node_reservation", 0.5, 1, 10)
 
 		ReserveMemory(f, "memory-reservation", 2)
@@ -138,13 +138,15 @@ func ConsumeCpu(f *Framework, id string, cores int) {
 	CreateService(f, id)
 	By(fmt.Sprintf("Running RC which consumes %v cores", cores))
 	config := &RCConfig{
-		Client:    f.Client,
-		Name:      id,
-		Namespace: f.Namespace.Name,
-		Timeout:   10 * time.Minute,
-		Image:     "jess/stress",
-		Command:   []string{"stress", "-c", "1"},
-		Replicas:  cores,
+		Client:     f.Client,
+		Name:       id,
+		Namespace:  f.Namespace.Name,
+		Timeout:    10 * time.Minute,
+		Image:      "jess/stress",
+		Command:    []string{"stress", "-c", "1"},
+		Replicas:   cores,
+		CpuRequest: 500,
+		CpuLimit:   1000,
 	}
 	expectNoError(RunRC(*config))
 }
