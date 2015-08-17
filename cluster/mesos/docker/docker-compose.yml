@@ -40,6 +40,7 @@ mesosslave1:
   - MESOS_RESOURCES=cpus:4;mem:1280;disk:25600;ports:[21000-21099]
   - MESOS_SWITCH_USER=0
   - MESOS_CONTAINERIZERS=docker,mesos
+  - MESOS_WORK_DIR=/var/tmp/mesos
   - DOCKER_NETWORK_OFFSET=0.0.1.0
   - DOCKER_DAEMON_ARGS=--log-level=error
   links:
@@ -47,7 +48,8 @@ mesosslave1:
   - mesosmaster1
   - "ambassador:apiserver"
   volumes:
-  - /var/tmp/mesosslave1:/var/lib/docker
+  - ${MESOS_DOCKER_WORK_DIR}/mesosslave1/mesos:/var/tmp/mesos
+  - ${MESOS_DOCKER_IMAGE_DIR}/mesosslave1/docker:/var/lib/docker
 mesosslave2:
   hostname: mesosslave2
   privileged: true
@@ -62,6 +64,7 @@ mesosslave2:
   - MESOS_RESOURCES=cpus:4;mem:1280;disk:25600;ports:[21000-21099]
   - MESOS_SWITCH_USER=0
   - MESOS_CONTAINERIZERS=docker,mesos
+  - MESOS_WORK_DIR=/var/tmp/mesos
   - DOCKER_NETWORK_OFFSET=0.0.2.0
   - DOCKER_DAEMON_ARGS=--log-level=error
   links:
@@ -69,7 +72,8 @@ mesosslave2:
   - mesosmaster1
   - "ambassador:apiserver"
   volumes:
-  - /var/tmp/mesosslave2:/var/lib/docker
+  - ${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos:/var/tmp/mesos
+  - ${MESOS_DOCKER_IMAGE_DIR}/mesosslave2/docker:/var/lib/docker
 apiserver:
   hostname: apiserver
   image: mesosphere/kubernetes-mesos
@@ -105,7 +109,7 @@ apiserver:
   - MESOS_DOCKER_MESOS_TIMEOUT
   - KUBE_KEYGEN_TIMEOUT
   volumes:
-  - ${MESOS_DOCKER_AUTH_DIR}:/var/run/kubernetes/auth:ro
+  - ${MESOS_DOCKER_WORK_DIR}/auth:/var/run/kubernetes/auth:ro
   links:
   - etcd
   - mesosmaster1
@@ -131,7 +135,7 @@ controller:
   - MESOS_DOCKER_MESOS_TIMEOUT
   - MESOS_DOCKER_API_TIMEOUT
   volumes:
-  - ${MESOS_DOCKER_AUTH_DIR}:/var/run/kubernetes/auth:ro
+  - ${MESOS_DOCKER_WORK_DIR}/auth:/var/run/kubernetes/auth:ro
   links:
   - mesosmaster1
   - apiserver
@@ -173,6 +177,6 @@ keygen:
   - apiserver
   - /var/run/kubernetes/auth
   volumes:
-  - ${MESOS_DOCKER_AUTH_DIR}:/var/run/kubernetes/auth
+  - ${MESOS_DOCKER_WORK_DIR}/auth:/var/run/kubernetes/auth
   links:
   - apiserver

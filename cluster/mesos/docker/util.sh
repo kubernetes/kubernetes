@@ -33,9 +33,6 @@ source "${provider_root}/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${provider_root}/common/bin/util-ssl.sh"
 
-log_dir="${MESOS_DOCKER_LOG_DIR}"
-auth_dir="${MESOS_DOCKER_AUTH_DIR}"
-
 
 # Run kubernetes scripts inside docker.
 # This bypasses the need to set up network routing when running docker in a VM (e.g. boot2docker).
@@ -119,6 +116,7 @@ function cluster::mesos::docker::run_in_docker_cagen {
 
 # Generate kubeconfig data for the created cluster.
 function create-kubeconfig {
+  local -r auth_dir="${MESOS_DOCKER_WORK_DIR}/auth"
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
   export CONTEXT="${KUBERNETES_PROVIDER}"
@@ -157,7 +155,7 @@ function detect-master {
 
   docker_id=$(docker ps --filter="name=docker_apiserver" --quiet)
   if [[ "${docker_id}" == *'\n'* ]]; then
-    echo "ERROR: Multiple API Servers running in docker" 1>&2
+    echo "ERROR: Multiple API Servers running" 1>&2
     return 1
   fi
 
@@ -175,6 +173,10 @@ function detect-master {
 # but might not have a Kublet running unless a kubernetes task has been scheduled on them.
 function detect-minions {
   docker_ids=$(docker ps --filter="name=docker_mesosslave" --quiet)
+  if [ -z "${docker_ids}" ]; then
+    echo "ERROR: Mesos slave(s) not running" 1>&2
+    return 1
+  fi
   while read -r docker_id; do
     minion_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
     KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
@@ -192,9 +194,11 @@ function verify-prereqs {
 
 # Initialize
 function cluster::mesos::docker::init_auth {
-  local -r auth_dir="$1"
+  local -r auth_dir="${MESOS_DOCKER_WORK_DIR}/auth"
 
   #TODO(karlkfi): reuse existing credentials/certs/keys
+  # Nuke old auth
+  echo "Creating Auth Dir: ${auth_dir}" 1>&2
   mkdir -p "${auth_dir}"
   rm -rf "${auth_dir}"/*
 
@@ -213,7 +217,17 @@ function cluster::mesos::docker::init_auth {
 
 # Instantiate a kubernetes cluster.
 function kube-up {
-  # Nuke logs up front so that we know any existing logs came from the last kube-up
+  # Nuke old mesos-slave workspaces
+  for ((i=1; i <= NUM_MINIONS; i++)) do
+    local work_dir="${MESOS_DOCKER_WORK_DIR}/mesosslave${i}/mesos"
+    echo "Creating Mesos Work Dir: ${work_dir}" 1>&2
+    mkdir -p "${work_dir}"
+    rm -rf "${work_dir}"/*
+  done
+
+  local -r log_dir="${MESOS_DOCKER_WORK_DIR}/log"
+
+  # Nuke old logs
   mkdir -p "${log_dir}"
   rm -rf "${log_dir}"/*
 
@@ -230,7 +244,7 @@ function kube-up {
     "${provider_root}/keygen/build.sh"
   fi
 
-  cluster::mesos::docker::init_auth "${auth_dir}"
+  cluster::mesos::docker::init_auth
 
   # Dump logs on premature exit (errexit triggers exit).
   # Trap EXIT instead of ERR, because ERR can trigger multiple times with errtrace enabled.
@@ -241,7 +255,8 @@ function kube-up {
   export MESOS_DOCKER_MESOS_TIMEOUT="${MESOS_DOCKER_MESOS_TIMEOUT}"
   export MESOS_DOCKER_API_TIMEOUT="${MESOS_DOCKER_API_TIMEOUT}"
   export KUBE_KEYGEN_TIMEOUT="${KUBE_KEYGEN_TIMEOUT}"
-  export MESOS_DOCKER_AUTH_DIR="${MESOS_DOCKER_AUTH_DIR}"
+  export MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR}"
+  export MESOS_DOCKER_IMAGE_DIR="${MESOS_DOCKER_IMAGE_DIR}"
   docker-compose -f "${compose_file}" up -d
 
   # await-health-check requires GNU timeout
@@ -330,7 +345,7 @@ function cluster::mesos::docker::await_ready {
 
 # Prints the status of the kube-system pod specified
 function cluster::mesos::docker::addon_status {
-  local pod_name=$1
+  local pod_name="$1"
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   local phase=$("${kubectl}" get pods --namespace=kube-system -l k8s-app=${pod_name} -o template --template="{{(index .items 0).status.phase}}" 2>/dev/null)
   phase="${phase:-Unknown}"
