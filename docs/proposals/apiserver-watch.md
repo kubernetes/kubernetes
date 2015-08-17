@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/proposals/apiserver_watch.md).
+[here](http://releases.k8s.io/release-1.0/docs/proposals/apiserver-watch.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -107,7 +107,7 @@ need to reimplement few relevant functions (probably just Watch and List).
 Mover, this will not require any changes in other parts of the code.
 This step is about extracting the interface of tools.EtcdHelper.
 
-2. Create a FIFO cache with a given capacity. In its "rolling history windown"
+2. Create a FIFO cache with a given capacity. In its "rolling history window"
 we will store two things:
 
   - the resourceVersion of the object (being an etcdIndex)
@@ -129,28 +129,22 @@ we will store two things:
   We may consider reusing existing structures cache.Store or cache.Indexer
   ("pkg/client/cache") but this is not a hard requirement.
 
-3. Create a new implementation of the EtcdHelper interface, that will internally
-have a single watch open to etcd and will store data received from etcd in the
-FIFO cache. This includes implementing registration of a new watcher that will
-start a new go-routine responsible for iterating over the cache and sending
-appropriately filtered objects to the watcher.
-
-4. Create the new implementation of the API, that will internally have a
+3. Create the new implementation of the API, that will internally have a
 single watch open to etcd and will store the data received from etcd in
 the FIFO cache - this includes implementing registration of a new watcher
 which will start a new go-routine responsible for iterating over the cache
 and sending all the objects watcher is interested in (by applying filtering
 function) to the watcher.
 
-5. Add a support for processing "error too old" from etcd, which will require:
+4. Add a support for processing "error too old" from etcd, which will require:
   - disconnect all the watchers
   - clear the internal cache and relist all objects from etcd
   - start accepting watchers again
 
-6. Enable watch in apiserver for some of the existing resource types - this
+5. Enable watch in apiserver for some of the existing resource types - this
 should require only changes at the initialization level.
 
-7. The next step will be to incorporate some indexing mechanism, but details
+6. The next step will be to incorporate some indexing mechanism, but details
 of it are TBD.
 
 
@@ -180,5 +174,5 @@ the same time, we can introduce an additional etcd event type:
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/apiserver_watch.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/apiserver-watch.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
