@@ -51,9 +51,9 @@ var allowedUsage = resourceUsagePerContainer{
 		MemoryWorkingSetInBytes: 12000000,
 	},
 	"/system": &containerResourceUsage{
-		CPUUsageInCores:         0.015,
+		CPUUsageInCores:         0.02,
 		MemoryUsageInBytes:      100000000,
-		MemoryWorkingSetInBytes: 75000000,
+		MemoryWorkingSetInBytes: 100000000,
 	},
 }
 
