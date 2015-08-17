@@ -75,7 +75,6 @@ function json_val {
 function get_vpc_id {
   $AWS_CMD --output text describe-vpcs \
            --filters Name=tag:Name,Values=kubernetes-vpc \
-                     Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
            --query Vpcs[].VpcId
 }
 
