@@ -19,9 +19,9 @@ limitations under the License.
 package kubectl
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func AddJsonFilenameFlag(cmd *cobra.Command, value *util.StringList, usage string) {

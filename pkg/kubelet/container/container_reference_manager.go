@@ -19,7 +19,7 @@ package container
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // RefManager manages the references for the containers.

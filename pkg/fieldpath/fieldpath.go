@@ -19,7 +19,7 @@ package fieldpath
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/meta"
 )
 
 // ExtractFieldPathAsString extracts the field from the given object

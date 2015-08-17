@@ -19,7 +19,7 @@ package watch
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Interface can be implemented by anything that knows how to watch and report changes.

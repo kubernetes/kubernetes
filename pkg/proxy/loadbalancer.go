@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // LoadBalancer is an interface for distributing incoming requests to service endpoints.

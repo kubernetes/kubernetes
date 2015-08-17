@@ -20,8 +20,8 @@ import (
 	"errors"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/client"
 )
 
 func init() {

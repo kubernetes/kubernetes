@@ -21,11 +21,11 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/controllermanager"
+	"k8s.io/kubernetes/contrib/mesos/pkg/controllermanager"
 
 	"github.com/spf13/pflag"
 )

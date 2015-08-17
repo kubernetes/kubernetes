@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"k8s.io/kubernetes/pkg/clientauth"
 )
 
 func TestLoadFromFile(t *testing.T) {

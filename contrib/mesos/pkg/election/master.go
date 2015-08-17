@@ -19,8 +19,8 @@ package election
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )

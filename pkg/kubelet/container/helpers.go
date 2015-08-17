@@ -20,9 +20,9 @@ import (
 	"hash/adler32"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/expansion"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/third_party/golang/expansion"
 
 	"github.com/golang/glog"
 )

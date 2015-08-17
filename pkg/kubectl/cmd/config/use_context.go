@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 )
 
 type useContextOptions struct {

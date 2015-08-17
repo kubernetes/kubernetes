@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"

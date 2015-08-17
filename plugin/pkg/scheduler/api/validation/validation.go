@@ -19,8 +19,8 @@ package validation
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/util/errors"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 // Validate checks for errors in the Config

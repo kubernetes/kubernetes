@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl"
 
 	"github.com/spf13/cobra"
 )

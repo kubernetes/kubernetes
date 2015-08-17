@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/docker/spdystream"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
 // connection maintains state about a spdystream.Connection and its associated

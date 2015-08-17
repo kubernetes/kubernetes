@@ -19,9 +19,9 @@ package podtask
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 const (

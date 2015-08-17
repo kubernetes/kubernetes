@@ -31,18 +31,18 @@ import (
 	"sync"
 	"time"
 
-	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	kcache "github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	kclientcmd "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	kframework "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
-	kSelector "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	etcd "github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 	skymsg "github.com/skynetservices/skydns/msg"
+	kapi "k8s.io/kubernetes/pkg/api"
+	kclient "k8s.io/kubernetes/pkg/client"
+	kcache "k8s.io/kubernetes/pkg/client/cache"
+	kclientcmd "k8s.io/kubernetes/pkg/client/clientcmd"
+	kframework "k8s.io/kubernetes/pkg/controller/framework"
+	kSelector "k8s.io/kubernetes/pkg/fields"
+	tools "k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 var (

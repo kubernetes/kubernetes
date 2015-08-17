@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/client"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.

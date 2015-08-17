@@ -23,7 +23,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/redirfd"
+	"k8s.io/kubernetes/contrib/mesos/pkg/redirfd"
 )
 
 func main() {

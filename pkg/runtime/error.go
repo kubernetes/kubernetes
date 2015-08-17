@@ -17,7 +17,7 @@ limitations under the License.
 package runtime
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/conversion"
 )
 
 // IsNotRegisteredError returns true if the error indicates the provided

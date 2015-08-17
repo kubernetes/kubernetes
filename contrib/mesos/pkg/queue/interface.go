@@ -19,7 +19,7 @@ package queue
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 type EventType int

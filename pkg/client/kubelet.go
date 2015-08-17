@@ -23,8 +23,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	httprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/http"
+	"k8s.io/kubernetes/pkg/probe"
+	httprobe "k8s.io/kubernetes/pkg/probe/http"
 )
 
 // KubeletClient is an interface for all kubelet functionality

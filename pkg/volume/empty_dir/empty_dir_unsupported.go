@@ -18,7 +18,7 @@ limitations under the License.
 
 package empty_dir
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+import "k8s.io/kubernetes/pkg/util/mount"
 
 // realMountDetector pretends to implement mediumer.
 type realMountDetector struct {
