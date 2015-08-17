@@ -178,7 +178,9 @@ type RCConfig struct {
 	Timeout       time.Duration
 	PodStatusFile *os.File
 	Replicas      int
+	CpuRequest    int64 // millicores
 	CpuLimit      int64 // millicores
+	MemRequest    int64 // bytes
 	MemLimit      int64 // bytes
 
 	// Env vars, set the same for every pod.
@@ -1200,6 +1202,15 @@ func RunRC(config RCConfig) error {
 	}
 	if config.MemLimit > 0 {
 		rc.Spec.Template.Spec.Containers[0].Resources.Limits[api.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
+	}
+	if config.CpuRequest > 0 || config.MemRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{}
+	}
+	if config.CpuRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuRequest, resource.DecimalSI)
+	}
+	if config.MemRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests[api.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
 	}
 
 	_, err := config.Client.ReplicationControllers(config.Namespace).Create(rc)
