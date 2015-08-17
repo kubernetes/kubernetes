@@ -94,7 +94,7 @@ var _ = Describe("Autoscaling", func() {
 func setUpAutoscaler(metric string, target float64, min, max int) {
 	// TODO integrate with kube-up.sh script once it will support autoscaler setup.
 	By("Setting up autoscaler to scale based on " + metric)
-	_, err := exec.Command("gcloud", "preview", "autoscaler",
+	out, err := exec.Command("gcloud", "preview", "autoscaler",
 		"--zone="+testContext.CloudConfig.Zone,
 		"create", "e2e-test-autoscaler",
 		"--project="+testContext.CloudConfig.ProjectID,
@@ -105,13 +105,13 @@ func setUpAutoscaler(metric string, target float64, min, max int) {
 		fmt.Sprintf("--min-num-replicas=%v", min),
 		fmt.Sprintf("--max-num-replicas=%v", max),
 	).CombinedOutput()
-	expectNoError(err)
+	expectNoError(err, "Output: "+string(out))
 }
 
 func cleanUpAutoscaler() {
 	By("Removing autoscaler")
-	_, err := exec.Command("gcloud", "preview", "autoscaler", "--zone="+testContext.CloudConfig.Zone, "delete", "e2e-test-autoscaler").CombinedOutput()
-	expectNoError(err)
+	out, err := exec.Command("gcloud", "preview", "autoscaler", "--zone="+testContext.CloudConfig.Zone, "delete", "e2e-test-autoscaler").CombinedOutput()
+	expectNoError(err, "Output: "+string(out))
 }
 
 func CreateService(f *Framework, name string) {
