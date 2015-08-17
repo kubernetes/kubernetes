@@ -58,3 +58,11 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	}
 	return prefix + "/" + meta.Namespace() + "/" + meta.Name(), nil
 }
+
+func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return prefix + "/" + meta.Name(), nil
+}

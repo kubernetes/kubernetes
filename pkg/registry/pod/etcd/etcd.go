@@ -57,8 +57,24 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(s storage.Interface, k client.ConnectionInfoGetter) PodStorage {
+func NewStorage(s storage.Interface, useCacher bool, k client.ConnectionInfoGetter) PodStorage {
 	prefix := "/pods"
+
+	storageInterface := s
+	if useCacher {
+		config := storage.CacherConfig{
+			CacheCapacity:  1000,
+			Storage:        s,
+			Type:           &api.Pod{},
+			ResourcePrefix: prefix,
+			KeyFunc: func(obj runtime.Object) (string, error) {
+				return storage.NamespaceKeyFunc(prefix, obj)
+			},
+			NewListFunc: func() runtime.Object { return &api.PodList{} },
+		}
+		storageInterface = storage.NewCacher(config)
+	}
+
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
 		NewListFunc: func() runtime.Object { return &api.PodList{} },
@@ -76,7 +92,7 @@ func NewStorage(s storage.Interface, k client.ConnectionInfoGetter) PodStorage {
 		},
 		EndpointName: "pods",
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	statusStore := *store
 

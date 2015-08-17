@@ -32,8 +32,24 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against endpoints.
-func NewREST(s storage.Interface) *REST {
+func NewREST(s storage.Interface, useCacher bool) *REST {
 	prefix := "/services/endpoints"
+
+	storageInterface := s
+	if useCacher {
+		config := storage.CacherConfig{
+			CacheCapacity:  1000,
+			Storage:        s,
+			Type:           &api.Endpoints{},
+			ResourcePrefix: prefix,
+			KeyFunc: func(obj runtime.Object) (string, error) {
+				return storage.NamespaceKeyFunc(prefix, obj)
+			},
+			NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
+		}
+		storageInterface = storage.NewCacher(config)
+	}
+
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Endpoints{} },
 		NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
@@ -54,7 +70,7 @@ func NewREST(s storage.Interface) *REST {
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	return &REST{store}
 }

@@ -33,7 +33,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
-	return NewREST(etcdStorage), fakeClient
+	return NewREST(etcdStorage, false), fakeClient
 }
 
 func validNewEndpoints() *api.Endpoints {

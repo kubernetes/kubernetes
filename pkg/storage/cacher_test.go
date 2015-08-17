@@ -74,7 +74,7 @@ func waitForUpToDateCache(cacher *storage.Cacher, resourceVersion uint64) error 
 	return wait.Poll(10*time.Millisecond, 100*time.Millisecond, ready)
 }
 
-func TestList(t *testing.T) {
+func TestListFromMemory(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	prefixedKey := etcdtest.AddPrefix("pods")
 	fakeClient.ExpectNotFoundGet(prefixedKey)
@@ -149,7 +149,7 @@ func TestList(t *testing.T) {
 	}
 
 	result := &api.PodList{}
-	if err := cacher.List("pods/ns", result); err != nil {
+	if err := cacher.ListFromMemory("pods/ns", result); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if result.ListMeta.ResourceVersion != "5" {
