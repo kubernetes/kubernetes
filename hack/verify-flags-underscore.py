@@ -163,10 +163,12 @@ def get_flags(rootdir, files):
     if len(new_excluded_flags) != 0:
         print("Found a flag declared with an _ but which is not explicitly listed as a valid flag name in hack/verify-flags/excluded-flags.txt")
         print("Are you certain this flag should not have been declared with an - instead?")
+        new_excluded_flags.sort()
         print("%s" % "\n".join(new_excluded_flags))
         sys.exit(1)
     if len(new_flags) != 0:
         print("Found flags in golang files not in the list of known flags. Please add these to hack/verify-flags/known-flags.txt")
+        new_flags.sort()
         print("%s" % "\n".join(new_flags))
         sys.exit(1)
     return list(flags)
@@ -230,6 +232,7 @@ def main():
     if len(bad_lines) != 0:
         if not args.skip_exceptions:
             print("Found illegal 'flag' usage. If these are false positives you should running `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
+        bad_lines.sort()
         for (relname, line) in bad_lines:
             print("%s:%s" % (relname, line))
 
