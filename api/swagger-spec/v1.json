@@ -13446,8 +13446,7 @@
    "v1.ServicePort": {
     "id": "v1.ServicePort",
     "required": [
-     "port",
-     "nodePort"
+     "port"
     ],
     "properties": {
      "name": {
