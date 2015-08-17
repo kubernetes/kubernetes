@@ -144,6 +144,7 @@ func NewMainKubelet(
 	osInterface kubecontainer.OSInterface,
 	cgroupRoot string,
 	containerRuntime string,
+	rktPath string,
 	mounter mount.Interface,
 	dockerDaemonContainer string,
 	systemContainer string,
@@ -304,7 +305,10 @@ func NewMainKubelet(
 			oomAdjuster,
 			procFs)
 	case "rkt":
-		conf := &rkt.Config{InsecureSkipVerify: true}
+		conf := &rkt.Config{
+			Path:               rktPath,
+			InsecureSkipVerify: true,
+		}
 		rktRuntime, err := rkt.New(
 			conf,
 			klet,
