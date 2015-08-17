@@ -1,4 +1,8 @@
-{% set params = "{{pillar['log_level']}}" -%}
+{% set params = "" -%}
+
+{% if pillar['log_level'] is defined -%}
+{% set params = params + " " + pillar['log_level'] -%}
+{% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['scheduler_test_args'] is defined -%}
