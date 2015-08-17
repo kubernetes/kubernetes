@@ -754,10 +754,10 @@ func (s *schedulingPlugin) Run(done <-chan struct{}) {
 // with the Modeler stuff removed since we don't use it because we have mesos.
 func (s *schedulingPlugin) scheduleOne() {
 	pod := s.config.NextPod()
-	log.V(3).Infof("Attempting to schedule: %v", pod)
+	log.V(3).Infof("Attempting to schedule: %+v", pod)
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister) // call kubeScheduler.Schedule
 	if err != nil {
-		log.V(1).Infof("Failed to schedule: %v", pod)
+		log.V(1).Infof("Failed to schedule: %+v", pod)
 		s.config.Recorder.Eventf(pod, "FailedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
@@ -770,7 +770,7 @@ func (s *schedulingPlugin) scheduleOne() {
 		},
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
-		log.V(1).Infof("Failed to bind pod: %v", err)
+		log.V(1).Infof("Failed to bind pod: %+v", err)
 		s.config.Recorder.Eventf(pod, "FailedScheduling", "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return
