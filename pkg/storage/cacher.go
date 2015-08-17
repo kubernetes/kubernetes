@@ -136,13 +136,20 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 
 // Implements Watch (signature from storage.Interface).
 func (c *Cacher) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
-	c.Lock()
-	defer c.Unlock()
-
-	initEvents, err := c.watchCache.GetAllEventsSince(resourceVersion)
+	// We explicitly use thread unsafe version and do locking ourself to ensure that
+	// no new events will be processed in the meantime. The watchCache will be unlocked
+	// on return from this function.
+	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
+	// underlying watchCache is calling processEvent under its lock.
+	c.watchCache.RLock()
+	defer c.watchCache.RUnlock()
+	initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(resourceVersion)
 	if err != nil {
 		return nil, err
 	}
+
+	c.Lock()
+	defer c.Unlock()
 	watcher := newCacheWatcher(initEvents, filterFunction(key, c.keyFunc, filter), forgetWatcher(c, c.watcherIdx))
 	c.watchers[c.watcherIdx] = watcher
 	c.watcherIdx++

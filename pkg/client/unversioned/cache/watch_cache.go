@@ -252,10 +252,7 @@ func (w *WatchCache) SetOnEvent(onEvent func(WatchCacheEvent)) {
 	w.onEvent = onEvent
 }
 
-func (w *WatchCache) GetAllEventsSince(resourceVersion uint64) ([]WatchCacheEvent, error) {
-	w.RLock()
-	defer w.RUnlock()
-
+func (w *WatchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]WatchCacheEvent, error) {
 	size := w.endIndex - w.startIndex
 	oldest := w.resourceVersion
 	if size > 0 {
@@ -276,4 +273,10 @@ func (w *WatchCache) GetAllEventsSince(resourceVersion uint64) ([]WatchCacheEven
 		result[i] = w.cache[(w.startIndex+first+i)%w.capacity].watchCacheEvent
 	}
 	return result, nil
+}
+
+func (w *WatchCache) GetAllEventsSince(resourceVersion uint64) ([]WatchCacheEvent, error) {
+	w.RLock()
+	defer w.RUnlock()
+	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)
 }
