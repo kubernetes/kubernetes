@@ -273,10 +273,6 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
 	flags.AddGoFlagSet(flag.CommandLine)
 
-	// This is necessary as github.com/spf13/cobra doesn't support "global"
-	// pflags currently.  See https://github.com/spf13/cobra/issues/44.
-	flags.AddFlagSet(pflag.CommandLine)
-
 	// Hack for global access to validation flag.
 	// TODO: Refactor out after configuration flag overhaul.
 	if f.flags.Lookup("validate") == nil {
