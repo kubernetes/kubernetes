@@ -239,14 +239,14 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 
 		// if ClusterIP is "None" or empty, skip proxying
 		if !api.IsServiceIPSet(service) {
-			glog.V(3).Infof("Skipping service %s due to portal IP = %q", types.NamespacedName{service.Namespace, service.Name}, service.Spec.ClusterIP)
+			glog.V(3).Infof("Skipping service %s due to portal IP = %q", types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, service.Spec.ClusterIP)
 			continue
 		}
 
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
 
-			serviceName := proxy.ServicePortName{types.NamespacedName{service.Namespace, service.Name}, servicePort.Name}
+			serviceName := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: servicePort.Name}
 			activeServices[serviceName] = true
 			info, exists := proxier.serviceMap[serviceName]
 			if exists && proxier.sameConfig(info, service, servicePort) {
@@ -317,7 +317,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 		}
 
 		for portname := range portsToEndpoints {
-			svcPort := proxy.ServicePortName{types.NamespacedName{svcEndpoints.Namespace, svcEndpoints.Name}, portname}
+			svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}, Port: portname}
 			state, exists := proxier.serviceMap[svcPort]
 			if !exists || state == nil {
 				state = newServiceInfo(svcPort)
