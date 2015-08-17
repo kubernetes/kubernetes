@@ -243,7 +243,6 @@ func (e *endpointController) worker() {
 	}
 }
 
-// HACK(sttts): add annotations to the endpoint about the respective container ports
 func (e *endpointController) syncService(key string) {
 	startTime := time.Now()
 	defer func() {
