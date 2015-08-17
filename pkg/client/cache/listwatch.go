@@ -37,8 +37,13 @@ type ListWatch struct {
 	WatchFunc WatchFunc
 }
 
+// Getter interface knows how to access Get method from RESTClient.
+type Getter interface {
+	Get() *client.Request
+}
+
 // NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
-func NewListWatchFromClient(c *client.Client, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
+func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
 	listFunc := func() (runtime.Object, error) {
 		return c.Get().
 			Namespace(namespace).
