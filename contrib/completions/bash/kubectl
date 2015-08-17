@@ -82,6 +82,12 @@ __handle_filename_extension_flag()
     _filedir "@(${ext})"
 }
 
+__handle_subdirs_in_dir_flag()
+{
+    local dir="$1"
+    pushd "${dir}" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1
+}
+
 __handle_flag()
 {
     __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
