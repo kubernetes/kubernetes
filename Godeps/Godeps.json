@@ -33,8 +33,8 @@
 		},
 		{
 			"ImportPath": "github.com/appc/cni",
-			"Comment": "v0.1.0-11-g7cf97ca",
-			"Rev": "7cf97ca7800601f3a57fb77487110720ed7083a5"
+			"Comment": "v0.1.0-12-g452cd27",
+			"Rev": "452cd2765e982d11ba5d217c84eedffe0c4f390d"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",

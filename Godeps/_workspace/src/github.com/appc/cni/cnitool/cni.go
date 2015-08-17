@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/appc/cni"
@@ -21,51 +19,6 @@ const (
 	CmdDel = "del"
 )
 
-func listConfFiles(dir string) ([]string, error) {
-	// In part, from rkt/networking/podenv.go#listFiles
-	files, err := ioutil.ReadDir(dir)
-	switch {
-	case err == nil: // break
-	case os.IsNotExist(err):
-		return nil, nil
-	default:
-		return nil, err
-	}
-
-	confFiles := []string{}
-	for _, f := range files {
-		if f.IsDir() {
-			continue
-		}
-		if filepath.Ext(f.Name()) == ".conf" {
-			confFiles = append(confFiles, filepath.Join(dir, f.Name()))
-		}
-	}
-	return confFiles, nil
-}
-
-func loadNetConf(dir, name string) (*cni.NetworkConfig, error) {
-	files, err := listConfFiles(dir)
-	switch {
-	case err != nil:
-		return nil, err
-	case files == nil || len(files) == 0:
-		return nil, fmt.Errorf("No net configurations found")
-	}
-	sort.Strings(files)
-
-	for _, confFile := range files {
-		conf, err := cni.ConfFromFile(confFile)
-		if err != nil {
-			return nil, err
-		}
-		if conf.Name == name {
-			return conf, nil
-		}
-	}
-	return nil, fmt.Errorf(`no net configuration with name "%s" in %s`, name, dir)
-}
-
 func main() {
 	if len(os.Args) < 3 {
 		usage()
@@ -76,7 +29,7 @@ func main() {
 	if netdir == "" {
 		netdir = DefaultNetDir
 	}
-	netconf, err := loadNetConf(netdir, os.Args[2])
+	netconf, err := cni.LoadNetConf(netdir, os.Args[2])
 	if err != nil {
 		exit(err)
 	}

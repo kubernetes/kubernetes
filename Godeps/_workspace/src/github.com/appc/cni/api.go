@@ -9,6 +9,8 @@ import (
 
 	"github.com/appc/cni/pkg/invoke"
 	"github.com/appc/cni/pkg/types"
+	"path/filepath"
+	"sort"
 )
 
 type RuntimeConf struct {
@@ -33,6 +35,51 @@ func ConfFromFile(filename string) (*NetworkConfig, error) {
 		return nil, fmt.Errorf("error parsing %s: %s", filename, err)
 	}
 	return conf, nil
+}
+
+func listConfFiles(dir string) ([]string, error) {
+	// In part, from rkt/networking/podenv.go#listFiles
+	files, err := ioutil.ReadDir(dir)
+	switch {
+	case err == nil: // break
+	case os.IsNotExist(err):
+		return nil, nil
+	default:
+		return nil, err
+	}
+
+	confFiles := []string{}
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		if filepath.Ext(f.Name()) == ".conf" {
+			confFiles = append(confFiles, filepath.Join(dir, f.Name()))
+		}
+	}
+	return confFiles, nil
+}
+
+func LoadNetConf(dir, name string) (*NetworkConfig, error) {
+	files, err := listConfFiles(dir)
+	switch {
+	case err != nil:
+		return nil, err
+	case files == nil || len(files) == 0:
+		return nil, fmt.Errorf("No net configurations found")
+	}
+	sort.Strings(files)
+
+	for _, confFile := range files {
+		conf, err := ConfFromFile(confFile)
+		if err != nil {
+			return nil, err
+		}
+		if conf.Name == name {
+			return conf, nil
+		}
+	}
+	return nil, fmt.Errorf(`no net configuration with name "%s" in %s`, name, dir)
 }
 
 type CNI interface {
