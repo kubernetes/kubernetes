@@ -93,29 +93,38 @@ func RunHA(kubecfg string, master string, start func(l *LeaseUser) bool, stop fu
 		Cli:           kubeClient}
 
 	RunLease(&mcfg)
-	glog.Infof("Done with starting the lease loop for %v.", lockName)
+	glog.Infof("zz Done with starting the lease loop for %v.", lockName)
 }
+
+var countsleeps = 0
 
 // leaseAndUpdateLoop runs the loop to acquire a lease.  This will continue trying to get a lease
 // until it succeeds, and then callbacks sent in by the user will be triggered.
 // Likewise, it can give up the lease, in which case the LeaseLost() callbacks will be triggered.
 func (c *Config) leaseAndUpdateLoop() {
 	for {
+		glog.Errorf("zzzz")
 		master, err := c.acquireOrRenewLease()
+		glog.Errorf("zzzz acquired")
 		if err != nil {
-			glog.Errorf("Error in master election: %v", err)
-			if uint64(time.Now().Sub(c.lastLease).Seconds()) < c.ttl {
-				continue
+			glog.Errorf("Error in lock acquisition: %v, looping", err)
+		} else {
+			glog.Errorf("Checking ttl = %v , [[[ last %v ]]]  [[[ now %v ]]],  time difference = %v ", c.ttl, c.lastLease, time.Now(), time.Now().Sub(c.lastLease))
+
+			//We may need to "unset" the master status... if a leasettl expired!
+			//If Location is nil, then time is uninitialized.
+			if !c.lastLease.IsZero() && uint64(time.Now().Sub(c.lastLease).Seconds()) >= c.ttl {
+				glog.Errorf("Too much time has elapsed, giving up lease.")
+				master = false
 			}
-			// Our lease has expired due to our own accounting, pro-actively give it
-			// up, even if we couldn't contact etcd.
-			glog.Infof("Too much time has elapsed, giving up lease.")
-			master = false
+			if err := c.update(master); err != nil {
+				glog.Errorf("Error updating master status %v", err)
+			} else {
+				glog.Errorf("Done updating master status %v", c)
+			}
 		}
-		if err := c.update(master); err != nil {
-			glog.Errorf("Error updating files: %v", err)
-		}
-		glog.Infof("Sleep!")
+		countsleeps++
+		glog.Errorf("..sleep.. %v %v", c.sleep, countsleeps)
 		time.Sleep(c.sleep)
 	}
 }
@@ -142,12 +151,14 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 					LeaseTime: c.ttl,
 				},
 			})
+
 		if err != nil {
 			glog.Errorf("Lock was NOT created, ERROR = %v", err)
-			c.lastLease = time.Now()
 			return false, err
 		} else {
 			glog.Errorf("Lock created successfully %v !", acquiredLock)
+			//Set the time of the lock to "now".
+			c.lastLease = time.Now()
 		}
 	}
 
@@ -159,30 +170,45 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 		return false, err
 	}
 
+	//In the case where the daemon has restarted, and happens to find a lock from etcd - we need to set lease time to now.
+	//Also, in the case that a fresh lock is created, we need to set the lease time to now.
+	if c.lastLease.IsZero() {
+		c.lastLease = time.Now()
+	}
 	glog.Errorf("Acquired lock successfully.  We are the master, yipppeee!")
+
+	//When we return true, this should result in a update to master status.
 	return true, nil
 }
 
 // Update acts on the current state of the lease.
 // This method heavily relies on correct implementation of the functions in the Config interface.
 func (c *Config) update(master bool) error {
+	glog.Errorf("Updating state Lease info and lease gained/lost: master = %v, Leases: gained: %v lost: %v", master, c.LeaseUserInfo.LeasesGained, c.LeaseUserInfo.LeasesLost)
 	switch {
 	case master && !c.LeaseUserInfo.Running:
-		c.LeaseGained(c.LeaseUserInfo)
+		glog.Errorf("master + !running")
+		go c.LeaseGained(c.LeaseUserInfo)
+		time.Sleep(1 * time.Second)
 		c.LeaseUserInfo.LeasesGained++
 		if !c.LeaseUserInfo.Running {
 			return fmt.Errorf("Process %v did not update its Running field to TRUE after ACQUIRING the lease!", c)
+		} else {
+			return nil
 		}
-		return nil
 	case !master && c.LeaseUserInfo.Running:
-		c.LeaseLost(c.LeaseUserInfo)
+		glog.Errorf("!master + running")
+		go c.LeaseLost(c.LeaseUserInfo)
+		time.Sleep(1 * time.Second)
 		c.LeaseUserInfo.LeasesLost++
 		if !c.LeaseUserInfo.Running {
 			return fmt.Errorf("Process %v did not update its Running field to FALSE after LOSING the lease!", c)
+		} else {
+			return nil
 		}
-		return nil
+	default:
+		glog.Errorf("We don't need to do any updating ( Master: %v , Running: %v )", master, c.LeaseUserInfo.Running)
 	}
-	glog.Infof("Updated, master = %v", master)
 	return nil
 }
 
