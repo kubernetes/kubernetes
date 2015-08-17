@@ -73,6 +73,6 @@ cp kubernetes/server/kubernetes/server/bin/kubelet \
 
 cp kubernetes/server/kubernetes/server/bin/kubectl binaries/
 
-rm -rf flannel* kubernetes* etcd*
+#rm -rf flannel* kubernetes* etcd*
 
 echo "Done! All your commands locate in ./binaries dir"

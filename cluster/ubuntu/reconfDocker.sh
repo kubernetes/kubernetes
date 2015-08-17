@@ -50,4 +50,19 @@ source /run/flannel/subnet.env
 
 echo DOCKER_OPTS=\"${DOCKER_OPTS} -H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock \
      --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}\" > /etc/default/docker
+
+function create-newdocker-service() {
+  cat <<EOF > ~/kube/docker.service
+[Service]
+EnvironmentFile=-/etc/default/docker
+ExecStart=
+ExecStart=/usr/bin/docker -d -H fd:// \$DOCKER_OPTS
+EOF
+  sudo mkdir -p /etc/systemd/system/docker.service.d;
+  sudo cp ~/kube/docker.service /etc/systemd/system/docker.service.d;
+  sudo systemctl daemon-reload
+}
+
+create-newdocker-service
+
 sudo service docker restart

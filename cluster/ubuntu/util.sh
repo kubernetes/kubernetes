@@ -370,6 +370,7 @@ done;
 function delete-systemd-service() {
 for f in `sudo ls /lib/systemd/system/kubernetes.d`;
 do
+sudo service $f stop;
 sudo rm /etc/systemd/system/$f;
 done;
 }
@@ -420,6 +421,7 @@ function provision-minion() {
                          create-systemd-service; \
                          sudo systemctl daemon-reload; \
                          sudo service etcd start; \
+                         sudo service flanneld start; \
                          sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh; \
                          sudo service kube-proxy start; \
                          sudo service kubelet start; \
@@ -450,6 +452,7 @@ function provision-masterandminion() {
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
                             sudo systemctl daemon-reload; \
                             sudo service etcd start; \
+                            sudo service flanneld start; \
                             sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh; \
                             sudo service kube-apiserver start; \
                             sudo service kube-controller-manager start; \
@@ -471,7 +474,7 @@ function kube-down {
       ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop && sudo rm -rf /infra*'
       # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
       delete-systemd-service
-      ssh -t $i 'rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; rm -rf ~/kube /lib/systemd/system/kubernetes.d /var/lib/kubelet'
+      ssh -t $i 'sudo rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; sudo rm -rf ~/kube /lib/systemd/system/kubernetes.d /var/lib/kubelet'
     }
   done
   wait
