@@ -17,9 +17,9 @@ limitations under the License.
 package kubelet
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have

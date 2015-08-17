@@ -22,9 +22,9 @@ and deleting pods, replication controllers, services, and minions.
 Most consumers should use the Config object to create a Client:
 
     import (
-    "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-    "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-    "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+    "k8s.io/kubernetes/pkg/client"
+    "k8s.io/kubernetes/pkg/api"
+    "k8s.io/kubernetes/pkg/labels"
     )
     config := &client.Config{
       Host:     "http://localhost:8080",

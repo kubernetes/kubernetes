@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 	docker "github.com/fsouza/go-dockerclient"
 )
 

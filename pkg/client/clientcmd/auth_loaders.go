@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"k8s.io/kubernetes/pkg/clientauth"
 )
 
 // AuthLoaders are used to build clientauth.Info objects.

@@ -25,10 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/master/ports"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/proc"
+	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	util "github.com/mesos/mesos-go/mesosutil"
 )

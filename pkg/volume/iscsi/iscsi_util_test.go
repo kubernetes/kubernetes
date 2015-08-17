@@ -19,7 +19,7 @@ package iscsi
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 func TestGetDevicePrefixRefCount(t *testing.T) {

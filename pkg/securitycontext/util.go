@@ -16,7 +16,7 @@ limitations under the License.
 
 package securitycontext
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+import "k8s.io/kubernetes/pkg/api"
 
 // HasPrivilegedRequest returns the value of SecurityContext.Privileged, taking into account
 // the possibility of nils

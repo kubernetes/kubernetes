@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v2"
 )

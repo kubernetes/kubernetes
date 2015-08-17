@@ -18,7 +18,7 @@ package aws_cloud
 
 import (
 	"fmt"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )

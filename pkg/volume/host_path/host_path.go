@@ -19,11 +19,11 @@ package host_path
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.

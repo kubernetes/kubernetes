@@ -22,7 +22,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.

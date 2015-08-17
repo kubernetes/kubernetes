@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
 

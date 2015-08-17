@@ -17,7 +17,7 @@ limitations under the License.
 package algorithm
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.

@@ -27,7 +27,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/proxy"
+	"k8s.io/kubernetes/pkg/util/proxy"
 )
 
 type SimpleBackendHandler struct {

@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 const email = "foo@bar.com"

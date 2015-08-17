@@ -23,7 +23,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/version"
 	flag "github.com/spf13/pflag"
 )
 

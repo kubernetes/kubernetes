@@ -17,7 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Manages the containers running on a machine.

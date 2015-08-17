@@ -36,9 +36,9 @@ import (
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
 	"github.com/rackspace/gophercloud/pagination"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"github.com/golang/glog"
 )
 

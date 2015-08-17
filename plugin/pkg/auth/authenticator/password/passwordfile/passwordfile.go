@@ -22,7 +22,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 type PasswordAuthenticator struct {

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/proc"
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/runtime"
+	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
+	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	bindings "github.com/mesos/mesos-go/scheduler"

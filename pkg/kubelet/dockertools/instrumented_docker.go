@@ -19,7 +19,7 @@ package dockertools
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	docker "github.com/fsouza/go-dockerclient"
 )
 

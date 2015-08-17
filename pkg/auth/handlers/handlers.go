@@ -19,8 +19,8 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"github.com/golang/glog"
 )
 

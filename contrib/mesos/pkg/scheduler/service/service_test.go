@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/archive"
+	"k8s.io/kubernetes/contrib/mesos/pkg/archive"
 	"github.com/stretchr/testify/assert"
 )
 

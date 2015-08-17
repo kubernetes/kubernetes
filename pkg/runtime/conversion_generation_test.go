@@ -25,11 +25,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	_ "k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/api/v1beta3"
+	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
 )

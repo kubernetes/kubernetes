@@ -19,7 +19,7 @@ package api
 import (
 	stderrs "errors"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"golang.org/x/net/context"
 )
 

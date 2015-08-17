@@ -23,8 +23,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	utilexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
 )
 

@@ -19,8 +19,8 @@ package cache
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Indexer is a storage interface that lets you list objects using multiple indexing functions

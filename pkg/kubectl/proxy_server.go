@@ -25,7 +25,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/client"
 	"github.com/golang/glog"
 )
 

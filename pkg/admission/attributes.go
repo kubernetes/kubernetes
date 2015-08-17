@@ -17,8 +17,8 @@ limitations under the License.
 package admission
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type attributesRecord struct {

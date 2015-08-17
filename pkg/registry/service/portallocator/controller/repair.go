@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/registry/service"
+	"k8s.io/kubernetes/pkg/registry/service/portallocator"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // See ipallocator/controller/repair.go; this is a copy for ports.

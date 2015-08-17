@@ -19,8 +19,8 @@ package v1_test
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	versioned "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api"
+	versioned "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestNodeConversion(t *testing.T) {

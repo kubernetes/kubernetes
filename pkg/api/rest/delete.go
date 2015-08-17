@@ -17,8 +17,8 @@ limitations under the License.
 package rest
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes

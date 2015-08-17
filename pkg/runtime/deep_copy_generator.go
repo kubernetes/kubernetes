@@ -23,8 +23,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // TODO(wojtek-t): As suggested in #8320, we should consider the strategy
@@ -94,7 +94,7 @@ func (g *deepCopyGenerator) addAllRecursiveTypes(inType reflect.Type) error {
 		return nil
 	case reflect.Struct:
 		g.imports.Insert(inType.PkgPath())
-		if !strings.HasPrefix(inType.PkgPath(), "github.com/GoogleCloudPlatform/kubernetes") {
+		if !strings.HasPrefix(inType.PkgPath(), "k8s.io/kubernetes") {
 			return nil
 		}
 		for i := 0; i < inType.NumField(); i++ {
@@ -119,8 +119,8 @@ func (g *deepCopyGenerator) AddType(inType reflect.Type) error {
 
 func (g *deepCopyGenerator) WriteImports(w io.Writer, pkg string) error {
 	var packages []string
-	packages = append(packages, "github.com/GoogleCloudPlatform/kubernetes/pkg/api")
-	packages = append(packages, "github.com/GoogleCloudPlatform/kubernetes/pkg/conversion")
+	packages = append(packages, "k8s.io/kubernetes/pkg/api")
+	packages = append(packages, "k8s.io/kubernetes/pkg/conversion")
 	for key := range g.imports {
 		packages = append(packages, key)
 	}

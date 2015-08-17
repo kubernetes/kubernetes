@@ -23,7 +23,7 @@ import (
 	"os/exec"
 	"time"
 
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )

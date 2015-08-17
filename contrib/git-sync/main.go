@@ -16,7 +16,7 @@ limitations under the License.
 
 // git-sync is a command that pull a git repository to a local directory.
 
-package main // import "github.com/GoogleCloudPlatform/kubernetes/contrib/git-sync"
+package main // import "k8s.io/kubernetes/contrib/git-sync"
 
 import (
 	"flag"

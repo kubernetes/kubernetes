@@ -19,9 +19,9 @@ package v1beta3_test
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	versioned "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	versioned "k8s.io/kubernetes/pkg/api/v1beta3"
 )
 
 func TestResourceQuotaStatusConversion(t *testing.T) {

@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	internal "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	internal "k8s.io/kubernetes/pkg/api"
 )
 
 func TestResourceVersioner(t *testing.T) {

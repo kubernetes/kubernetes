@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 func TestAuthenticateRequest(t *testing.T) {

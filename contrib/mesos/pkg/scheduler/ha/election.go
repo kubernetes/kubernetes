@@ -17,7 +17,7 @@ limitations under the License.
 package ha
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/election"
+	"k8s.io/kubernetes/contrib/mesos/pkg/election"
 	log "github.com/golang/glog"
 )
 

@@ -17,8 +17,8 @@ limitations under the License.
 package client
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // ControllerHasDesiredReplicas returns a condition that will be true iff the desired replica count

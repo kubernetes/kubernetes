@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/service"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
 )
 
 // NewHyperkubeServer creates a new hyperkube Server object that includes the

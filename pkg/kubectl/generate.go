@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime"
 	"github.com/spf13/cobra"
 )
 
