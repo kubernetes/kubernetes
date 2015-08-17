@@ -73,7 +73,7 @@ const (
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
 
-	// TODO-PAT: should this be a constant path? e.g. /opt/cni or /usr/local/cni OR, RKT_NETPLUGIN_PATH=/usr/lib/rkt/plugins/net
+	// TODO-PAT: should this be a constant path? e.g. /opt/cni or /usr/local/cni or RKT_NETPLUGIN_PATH=/usr/lib/rkt/plugins/net
 	EnvCNIPath = "CNI_PATH"
 	EnvNetDir  = "NETCONFPATH"
 	DefaultNetDir = "/etc/cni/net.d"
@@ -1712,8 +1712,9 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			// TODO-PAT: fix log levels and format
 			glog.V(2).Infof("***Calling CNI network plugin '%v'", pluginName)
 
-			netconf, err := cni.LoadNetConf("/etc/net.d/", pluginName)
+			netconf, err := cni.LoadNetConf("/etc/cni/net.d/", pluginName)
 			if err != nil {
+				glog.V(2).Infof("***Error loading network config: '%v'", err)
 				return err
 			}
 			glog.V(2).Infof("***Got network config %v", netconf)
@@ -1724,6 +1725,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 			inspectResult, err := dm.client.InspectContainer(string(podInfraContainerID))
 			if err != nil {
+				glog.V(2).Infof("***Error inspecting container: '%v'", err)
 				return err
 			}
 
