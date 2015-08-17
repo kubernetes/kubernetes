@@ -58,6 +58,9 @@ $ kubectl delete pods --all`
 )
 
 func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	p := kubectl.NewHumanReadablePrinter(false, false, false, []string{})
+	validArgs := p.HandledResources()
+
 	cmd := &cobra.Command{
 		Use:     "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		Short:   "Delete resources by filenames, stdin, resources and names, or by resources and label selector.",
@@ -68,6 +71,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunDelete(f, out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs: validArgs,
 	}
 	usage := "Filename, directory, or URL to a file containing the resource to delete."
 	kubectl.AddJsonFilenameFlag(cmd, usage)
