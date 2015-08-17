@@ -321,7 +321,7 @@ func isInterfaceUp(intf *net.Interface) bool {
 }
 
 //getFinalIP method receives all the IP addrs of a Interface
-//and returns a nil if the address is Loopback , Ipv6  or nil.
+//and returns a nil if the address is Loopback, Ipv6, link-local or nil.
 //It returns a valid IPv4 if an Ipv4 address is found in the array.
 func getFinalIP(addrs []net.Addr) (net.IP, error) {
 	if len(addrs) > 0 {
@@ -334,11 +334,11 @@ func getFinalIP(addrs []net.Addr) (net.IP, error) {
 			//Only IPv4
 			//TODO : add IPv6 support
 			if ip.To4() != nil {
-				if !ip.IsLoopback() {
+				if !ip.IsLoopback() && !ip.IsLinkLocalMulticast() && !ip.IsLinkLocalUnicast() {
 					glog.V(4).Infof("IP found %v", ip)
 					return ip, nil
 				} else {
-					glog.V(4).Infof("Loopback found %v", ip)
+					glog.V(4).Infof("Loopback/link-local found %v", ip)
 				}
 			} else {
 				glog.V(4).Infof("%v is not a valid IPv4 address", ip)
@@ -399,7 +399,9 @@ func chooseHostInterfaceNativeGo() (net.IP, error) {
 					if addrIP, _, err := net.ParseCIDR(addr.String()); err == nil {
 						if addrIP.To4() != nil {
 							ip = addrIP.To4()
-							break
+							if !ip.IsLinkLocalMulticast() && !ip.IsLinkLocalUnicast() {
+								break
+							}
 						}
 					}
 				}
