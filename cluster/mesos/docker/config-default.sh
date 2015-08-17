@@ -52,12 +52,16 @@ MESOS_DOCKER_API_TIMEOUT="${MESOS_DOCKER_API_TIMEOUT:-180}"
 # Timeout (in seconds) to wait for each addon to come up
 MESOS_DOCKER_ADDON_TIMEOUT="${MESOS_DOCKER_ADDON_TIMEOUT:-180}"
 
-# Path to directory to dump logs to in case of kube-up failure.
+# Path to directory on the host to use as the root for multiple docker volumes.
+# ${MESOS_DOCKER_WORK_DIR}/log - storage of component logs (written on deploy failure)
+# ${MESOS_DOCKER_WORK_DIR}/auth - storage of SSL certs/keys/tokens
+# ${MESOS_DOCKER_WORK_DIR}/<component>/mesos - storage of mesos slave work (e.g. task logs)
 # If using docker-machine or boot2docker, should be under /Users (which is mounted from the host into the docker vm).
 # If running in a container, $HOME should be resolved outside of the container.
-MESOS_DOCKER_LOG_DIR="${MESOS_DOCKER_LOG_DIR:-${HOME}/tmp/kubernetes/log}"
+MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR:-${HOME}/tmp/kubernetes}"
 
-# Path to directory to store SSL certs/keys/tokens.
-# If using docker-machine or boot2docker, should be under /Users (which is mounted from the host into the docker vm).
-# If running in a container, $HOME should be resolved outside of the container.
-MESOS_DOCKER_AUTH_DIR="${MESOS_DOCKER_AUTH_DIR:-${HOME}/tmp/kubernetes/auth}"
+# Path to directory to store mesos slave docker-in-docker images & volumes.
+# Usage: ${MESOS_DOCKER_IMAGE_DIR}/<component>/docker
+# Must not be either an AUFS mount or an SMB/CIFS mount.
+# If using docker-machine or boot2docker, should NOT be under /Users (which is mounted from the host into the docker vm).
+MESOS_DOCKER_IMAGE_DIR="${MESOS_DOCKER_IMAGE_DIR:-/var/tmp/kubernetes}"
