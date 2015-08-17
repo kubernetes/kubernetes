@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -33,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/yaml"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	schedulerapilatest "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
-	"github.com/golang/glog"
 )
 
 func validateObject(obj runtime.Object) (errors []error) {

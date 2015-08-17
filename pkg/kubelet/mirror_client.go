@@ -19,10 +19,10 @@ package kubelet
 import (
 	"fmt"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"github.com/golang/glog"
 )
 
 // Mirror client is used to create/delete a mirror pod.

@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
 // Manages policy for diskspace management for disks holding docker images and root fs.

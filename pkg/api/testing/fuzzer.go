@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"testing"
 
+	docker "github.com/fsouza/go-dockerclient"
+	"github.com/google/gofuzz"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/fields"
@@ -29,8 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
-	docker "github.com/fsouza/go-dockerclient"
-	"github.com/google/gofuzz"
 
 	"speter.net/go/exp/math/dec/inf"
 )

@@ -19,9 +19,9 @@ package v1beta3
 import (
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/golang/glog"
 )
 
 func addDefaultingFuncs() {

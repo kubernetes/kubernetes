@@ -17,13 +17,13 @@ limitations under the License.
 package kubelet
 
 import (
+	"github.com/golang/glog"
+	"github.com/google/cadvisor/events"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/golang/glog"
-	"github.com/google/cadvisor/events"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 type OOMWatcher interface {

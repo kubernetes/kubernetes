@@ -30,9 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"github.com/golang/glog"
 )
 
 // PersistentVolumeRecycler is a controller that watches for PersistentVolumes that are released from their claims.

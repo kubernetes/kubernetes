@@ -24,10 +24,10 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/types"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // Specified a policy for garbage collecting containers.

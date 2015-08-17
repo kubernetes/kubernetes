@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	systemd "github.com/coreos/go-systemd/daemon"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	forked "k8s.io/kubernetes/third_party/forked/coreos/go-etcd/etcd"
-	systemd "github.com/coreos/go-systemd/daemon"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"

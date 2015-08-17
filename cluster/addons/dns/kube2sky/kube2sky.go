@@ -31,6 +31,9 @@ import (
 	"sync"
 	"time"
 
+	etcd "github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
+	skymsg "github.com/skynetservices/skydns/msg"
 	kapi "k8s.io/kubernetes/pkg/api"
 	kclient "k8s.io/kubernetes/pkg/client"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
@@ -40,9 +43,6 @@ import (
 	tools "k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
-	etcd "github.com/coreos/go-etcd/etcd"
-	"github.com/golang/glog"
-	skymsg "github.com/skynetservices/skydns/msg"
 )
 
 var (

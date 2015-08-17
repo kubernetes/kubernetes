@@ -23,9 +23,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"github.com/golang/glog"
 )
 
 type RulePosition string

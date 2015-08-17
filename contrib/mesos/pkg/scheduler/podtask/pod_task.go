@@ -22,14 +22,14 @@ import (
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
-	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
-	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/api"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	mutil "github.com/mesos/mesos-go/mesosutil"
+	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
+	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 const (

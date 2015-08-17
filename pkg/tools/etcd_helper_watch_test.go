@@ -21,13 +21,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/watch"
-	"github.com/coreos/go-etcd/etcd"
 )
 
 var versioner = APIObjectVersioner{}

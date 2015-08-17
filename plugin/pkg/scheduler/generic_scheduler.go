@@ -23,11 +23,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"github.com/golang/glog"
 )
 
 type FailedPredicateMap map[string]util.StringSet

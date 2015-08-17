@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"syscall"
 
-	"k8s.io/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // Defined by Linux - the type number for tmpfs mounts.

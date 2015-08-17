@@ -19,6 +19,7 @@ package config
 import (
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/fields"
@@ -26,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
-	"github.com/golang/glog"
 )
 
 // TODO: to use Reflector, need to change the ServicesWatcher to a generic ListerWatcher.

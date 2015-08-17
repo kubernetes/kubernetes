@@ -19,11 +19,11 @@ package kubelet
 import (
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
-	"github.com/golang/glog"
 )
 
 // Pod manager stores and manages access to the pods.

@@ -19,11 +19,11 @@ package kubelet
 import (
 	"fmt"
 
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {

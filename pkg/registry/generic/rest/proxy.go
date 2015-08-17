@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/proxy"
 
-	"k8s.io/kubernetes/third_party/golang/netutil"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/third_party/golang/netutil"
 )
 
 // UpgradeAwareProxyHandler is a handler for proxy requests that may require an upgrade

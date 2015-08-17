@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/watch"
-	"github.com/golang/glog"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.

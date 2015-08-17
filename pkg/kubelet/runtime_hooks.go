@@ -17,10 +17,10 @@ limitations under the License.
 package kubelet
 
 import (
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"github.com/golang/glog"
 )
 
 // Kubelet-specific runtime hooks.

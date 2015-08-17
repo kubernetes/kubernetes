@@ -28,12 +28,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-etcd/etcd"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/coreos/go-etcd/etcd"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/glog"
 )

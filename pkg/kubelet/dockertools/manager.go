@@ -31,6 +31,9 @@ import (
 	"sync"
 	"time"
 
+	docker "github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
+	"github.com/golang/groupcache/lru"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -44,9 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
-	docker "github.com/fsouza/go-dockerclient"
-	"github.com/golang/glog"
-	"github.com/golang/groupcache/lru"
 )
 
 const (

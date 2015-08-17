@@ -17,8 +17,8 @@ limitations under the License.
 package tools
 
 import (
-	"k8s.io/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
+	"k8s.io/kubernetes/pkg/runtime"
 	"time"
 )
 

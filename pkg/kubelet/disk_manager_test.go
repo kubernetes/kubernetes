@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	cadvisorApi "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
 func testPolicy() DiskSpacePolicy {

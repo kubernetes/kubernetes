@@ -23,10 +23,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"io/ioutil"
 	"log"
 )
 

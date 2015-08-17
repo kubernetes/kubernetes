@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorApiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -48,8 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApiv2 "github.com/google/cadvisor/info/v2"
 )
 
 func init() {

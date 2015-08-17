@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
-	"github.com/coreos/go-etcd/etcd"
-	"github.com/golang/glog"
 )
 
 // Master is used to announce the current elected master.

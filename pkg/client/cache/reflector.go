@@ -26,12 +26,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang/glog"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
-	"github.com/golang/glog"
 )
 
 // ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.

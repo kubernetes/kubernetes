@@ -19,8 +19,8 @@ package api
 import (
 	stderrs "errors"
 
-	"k8s.io/kubernetes/pkg/auth/user"
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 // Context carries values across API boundaries.

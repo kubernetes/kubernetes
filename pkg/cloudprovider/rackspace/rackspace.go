@@ -32,10 +32,10 @@ import (
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/flavors"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"github.com/golang/glog"
 )
 
 const ProviderName = "rackspace"

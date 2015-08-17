@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/events"
@@ -33,6 +32,7 @@ import (
 	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type cadvisorClient struct {

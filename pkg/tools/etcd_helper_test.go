@@ -30,13 +30,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-etcd/etcd"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"github.com/coreos/go-etcd/etcd"
-	"github.com/stretchr/testify/assert"
 )
 
 const validEtcdVersion = "etcd 2.0.9"

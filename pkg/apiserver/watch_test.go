@@ -26,13 +26,13 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/websocket"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
-	"golang.org/x/net/websocket"
 )
 
 // watchJSON defines the expected JSON wire equivalent of watch.Event

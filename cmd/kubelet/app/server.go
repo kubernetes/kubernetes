@@ -54,9 +54,9 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 const defaultRootDir = "/var/lib/kubelet"

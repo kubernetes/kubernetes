@@ -27,8 +27,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/rest"
 	"golang.org/x/net/websocket"
+	"k8s.io/kubernetes/pkg/api/rest"
 )
 
 func TestProxy(t *testing.T) {

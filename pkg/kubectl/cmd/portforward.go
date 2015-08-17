@@ -20,12 +20,12 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/client/portforward"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/golang/glog"
-	"github.com/spf13/cobra"
 )
 
 const (

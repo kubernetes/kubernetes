@@ -29,6 +29,13 @@ import (
 	"syscall"
 	"time"
 
+	appcschema "github.com/appc/spec/schema"
+	appctypes "github.com/appc/spec/schema/types"
+	"github.com/coreos/go-systemd/dbus"
+	"github.com/coreos/go-systemd/unit"
+	"github.com/docker/docker/pkg/parsers"
+	docker "github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -37,13 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
-	appcschema "github.com/appc/spec/schema"
-	appctypes "github.com/appc/spec/schema/types"
-	"github.com/coreos/go-systemd/dbus"
-	"github.com/coreos/go-systemd/unit"
-	"github.com/docker/docker/pkg/parsers"
-	docker "github.com/fsouza/go-dockerclient"
-	"github.com/golang/glog"
 )
 
 const (

@@ -22,10 +22,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dgrijalva/jwt-go"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/client/testclient"
-	"github.com/dgrijalva/jwt-go"
 )
 
 const otherPublicKey = `-----BEGIN PUBLIC KEY-----

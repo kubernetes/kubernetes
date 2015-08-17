@@ -25,6 +25,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/docker/docker/pkg/parsers"
+	docker "github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -33,10 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/pkg/parsers"
-	docker "github.com/fsouza/go-dockerclient"
-	"github.com/golang/glog"
 )
 
 const (

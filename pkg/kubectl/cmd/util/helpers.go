@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/evanphx/json-patch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"github.com/evanphx/json-patch"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"

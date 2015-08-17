@@ -19,9 +19,9 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"github.com/golang/glog"
 )
 
 // NewRequestAuthenticator creates an http handler that tries to authenticate the given request as a user, and then

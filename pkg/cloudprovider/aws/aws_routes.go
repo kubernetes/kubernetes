@@ -18,9 +18,9 @@ package aws_cloud
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 func (s *AWSCloud) findRouteTable(clusterName string) (*ec2.RouteTable, error) {

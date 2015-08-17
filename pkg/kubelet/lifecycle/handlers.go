@@ -21,11 +21,11 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/golang/glog"
 )
 
 type HandlerRunner struct {

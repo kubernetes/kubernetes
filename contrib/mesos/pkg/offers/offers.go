@@ -23,14 +23,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/golang/glog"
+	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers/metrics"
 	"k8s.io/kubernetes/contrib/mesos/pkg/proc"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/util"
-	log "github.com/golang/glog"
-	mesos "github.com/mesos/mesos-go/mesosproto"
 )
 
 const (

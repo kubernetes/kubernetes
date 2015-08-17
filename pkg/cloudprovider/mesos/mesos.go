@@ -23,11 +23,11 @@ import (
 	"net"
 	"regexp"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	log "github.com/golang/glog"
 	"github.com/mesos/mesos-go/detector"
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 var (

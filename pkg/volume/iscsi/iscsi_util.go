@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"github.com/golang/glog"
 )
 
 // stat a path, if not exists, retry maxRetries times

@@ -21,10 +21,10 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/cmd/genutils"
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/spf13/cobra"
 )
 
 func main() {

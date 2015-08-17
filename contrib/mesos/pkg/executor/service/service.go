@@ -31,6 +31,9 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/golang/glog"
+	"github.com/kardianos/osext"
+	bindings "github.com/mesos/mesos-go/executor"
 	"k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
@@ -47,9 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
-	log "github.com/golang/glog"
-	"github.com/kardianos/osext"
-	bindings "github.com/mesos/mesos-go/executor"
 
 	"github.com/spf13/pflag"
 )
