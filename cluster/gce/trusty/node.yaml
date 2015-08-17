@@ -43,17 +43,21 @@ script
 
 	# Create the kubelet kubeconfig file.
 	. /etc/kube-env
+	if [ -z "${KUBELET_CA_CERT}" ]; then
+		KUBELET_CA_CERT="${CA_CERT}"
+	fi
 	cat > /var/lib/kubelet/kubeconfig << EOF
 apiVersion: v1
 kind: Config
 users:
 - name: kubelet
   user:
-    token: ${KUBELET_TOKEN}
+    client-certificate-data: ${KUBELET_CERT}
+    client-key-data: ${KUBELET_KEY}
 clusters:
 - name: local
   cluster:
-    insecure-skip-tls-verify: true
+    certificate-authority-data: ${KUBELET_CA_CERT}
 contexts:
 - context:
     cluster: local
@@ -73,7 +77,7 @@ users:
 clusters:
 - name: local
   cluster:
-    insecure-skip-tls-verify: true
+    certificate-authority-data: ${CA_CERT}
 contexts:
 - context:
     cluster: local
@@ -117,6 +121,31 @@ end script
 MIME-Version: 1.0
 Content-Type: text/upstart-job; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-additional-packages.conf"
+
+#upstart-job
+
+description "Install additional packages used by kubernetes"
+
+start on started docker
+
+script
+	# Installation of nsenter through a docker container may be slow. We move it
+	# here to be in parallel with instllation of other packages, so as to reduce
+	# the cluster creation time.
+	if ! which nsenter > /dev/null; then
+		echo "Do not find nsenter. Install it."
+		# Note: this is an easy way to install nsenter, but may not be the fastest way.
+		# In addition, this may not be a trusted source. So, replace it if we have a
+		# better solution.
+		docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+	fi
+end script
+
+--===============6024533374511606659==
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Content-Disposition: attachment; filename="kube-install-minion.conf"
 
 #upstart-job
@@ -127,7 +156,7 @@ start on stopped kube-env
 
 script
 	. /etc/kube-env
-	# If kubelet or kube-proxy is not stalled in the image, pull release binaries and put them in /usr/bin.
+	# If kubelet or kube-proxy is not installed in the image, pull release binaries and put them in /usr/bin.
 	if ! which kubelet > /dev/null || ! which kube-proxy > /dev/null; then
 		cd /tmp
 		k8s_sha1="${SERVER_BINARY_TAR_URL##*/}.sha1"
@@ -190,14 +219,14 @@ script
 	# TODO(andyzheng0831): Add health check functionality.
 	. /etc/kube-env
 	/usr/bin/kubelet \
-  	--api-servers=https://${KUBERNETES_MASTER_NAME} \
+		--api-servers=https://${KUBERNETES_MASTER_NAME} \
 		--enable-debugging-handlers=true \
 		--cloud-provider=gce \
 		--config=/etc/kubernetes/manifests \
 		--allow-privileged=false \
 		--v=2 \
-		--cluster-dns=10.0.0.10 \
-		--cluster-domain=cluster.local \
+		--cluster-dns=${DNS_SERVER_IP} \
+		--cluster-domain=${DNS_DOMAIN} \
 		--configure-cbr0=true \
 		--cgroup-root=/ \
 		--system-container=/system
@@ -241,7 +270,10 @@ Content-Disposition: attachment; filename="kube-docker.conf"
 
 description "Restart docker daemon"
 
-start on started kubelet
+# The condition "stopped kube-install-additional-packages" is to avoid
+# breaking nsenter installation, which is through a docker container.
+# It can be removed if we find a better way to install nsenter.
+start on started kubelet and stopped kube-install-additional-packages
 
 script
 	. /etc/kube-env
