@@ -94,14 +94,11 @@ var _ = Describe("Autoscaling", func() {
 func setUpAutoscaler(metric string, target float64, min, max int) {
 	// TODO integrate with kube-up.sh script once it will support autoscaler setup.
 	By("Setting up autoscaler to scale based on " + metric)
-	out, err := exec.Command("gcloud", "preview", "autoscaler",
-		"--zone="+testContext.CloudConfig.Zone,
-		"create", "e2e-test-autoscaler",
+	out, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "set-autoscaling",
+		testContext.CloudConfig.NodeInstanceGroup,
 		"--project="+testContext.CloudConfig.ProjectID,
-		"--target="+testContext.CloudConfig.NodeInstanceGroup,
-		"--custom-metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/"+metric,
-		fmt.Sprintf("--target-custom-metric-utilization=%v", target),
-		"--custom-metric-utilization-target-type=GAUGE",
+		"--zone="+testContext.CloudConfig.Zone,
+		"--custom-metric-utilization=metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/"+metric+fmt.Sprintf(",utilization-target=%v", target)+",utilization-target-type=GAUGE",
 		fmt.Sprintf("--min-num-replicas=%v", min),
 		fmt.Sprintf("--max-num-replicas=%v", max),
 	).CombinedOutput()
@@ -110,7 +107,11 @@ func setUpAutoscaler(metric string, target float64, min, max int) {
 
 func cleanUpAutoscaler() {
 	By("Removing autoscaler")
-	out, err := exec.Command("gcloud", "preview", "autoscaler", "--zone="+testContext.CloudConfig.Zone, "delete", "e2e-test-autoscaler").CombinedOutput()
+	out, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "stop-autoscaling",
+		testContext.CloudConfig.NodeInstanceGroup,
+		"--project="+testContext.CloudConfig.ProjectID,
+		"--zone="+testContext.CloudConfig.Zone,
+	).CombinedOutput()
 	expectNoError(err, "Output: "+string(out))
 }
 
