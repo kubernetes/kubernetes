@@ -73,6 +73,7 @@ const (
 	kubernetesTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 	kubernetesContainerLabel              = "io.kubernetes.container.name"
 
+	// TODO-PAT: should this be a constant path? e.g. /opt/cni or /usr/local/cni OR, RKT_NETPLUGIN_PATH=/usr/lib/rkt/plugins/net
 	EnvCNIPath = "CNI_PATH"
 	EnvNetDir  = "NETCONFPATH"
 	DefaultNetDir = "/etc/cni/net.d"
@@ -1457,6 +1458,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 	if pod.Spec.HostNetwork {
 		netNamespace = "host"
 	} else {
+		netNamespace = "none"
 		// Docker only exports ports from the pod infra container.  Let's
 		// collect all of the relevant ports and export them.
 		for _, container := range pod.Spec.Containers {
@@ -1695,24 +1697,39 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 //			if err != nil {
 //				exit(err)
 //			}
-			netConfPath := path.Join(DefaultNetDir, dm.networkPlugin.Name())
-			glog.V(5).Infof("Loading network config file %v", netConfPath)
-			netconf, err := cni.ConfFromFile(netConfPath)
-			glog.V(5).Infof("Got network config %v", netconf)
+
+//			netConfPath := path.Join(DefaultNetDir, dm.networkPlugin.Name())
+//			netConfPath := path.Join(DefaultNetDir, "10-k8s-default.conf")
+//
+//			glog.V(2).Infof("***Loading network config file %v", netConfPath)
+//			netconf, err := cni.ConfFromFile(netConfPath)
+
+			pluginName := dm.networkPlugin.Name()
+			if pluginName == "" {
+				// Load CNI config for default Kubernetes networking (with cbr0 bridge).
+				pluginName = "kubernetes-default"
+			}
+			// TODO-PAT: fix log levels and format
+			glog.V(2).Infof("***Calling CNI network plugin '%v'", pluginName)
+
+			netconf, err := cni.LoadNetConf("/etc/net.d/", pluginName)
+			if err != nil {
+				return err
+			}
+			glog.V(2).Infof("***Got network config %v", netconf)
 
 			cninet := &cni.CNIConfig{
 				Path: strings.Split(os.Getenv(EnvCNIPath), ":"),
 			}
 
 			inspectResult, err := dm.client.InspectContainer(string(podInfraContainerID))
-
 			if err != nil {
 				return err
 			}
 
 			pid := inspectResult.State.Pid
 			netns := fmt.Sprintf("/proc/%v/ns/net", pid)
-			glog.V(5).Infof("Got netns path %v", netns)
+			glog.V(2).Infof("***Got netns path %v", netns)
 
 			rt := &cni.RuntimeConf{
 				ContainerID: "cni",
@@ -1721,8 +1738,11 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 				Args:        fmt.Sprintf("POD_NAMESPACE=%v;POD_NAME=%v;POD_INFRA_CONTAINER_ID=%v", pod.Namespace, pod.Name, podInfraContainerID),
 			}
 
-			_, err = cninet.AddNetwork(netconf, rt)
-//			err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
+			glog.V(2).Infof("***About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)
+			res, err := cninet.AddNetwork(netconf, rt)
+
+			glog.V(2).Infof("***Got result / err: %v / %v", res, err)
+			//err = dm.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
 		}
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
