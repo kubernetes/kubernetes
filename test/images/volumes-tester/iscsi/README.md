@@ -11,4 +11,4 @@ Inspired by https://github.com/rvykydal/dockerfile-iscsid
 block.tar.gz is a small ext2 filesystem created by `make block` (run as root!)
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-tests/volumes-tester/iscsi/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/volumes-tester/iscsi/README.md?pixel)]()

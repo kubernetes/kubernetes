@@ -272,7 +272,7 @@ var _ = Describe("Volumes", func() {
 					ReadOnly: true,
 				},
 			}
-			// Must match content of contrib/for-tests/volumes-tester/nfs/index.html
+			// Must match content of test/images/volumes-tester/nfs/index.html
 			testVolumeClient(c, config, volume, "Hello from NFS!")
 		})
 	})
@@ -344,12 +344,12 @@ var _ = Describe("Volumes", func() {
 			volume := api.VolumeSource{
 				Glusterfs: &api.GlusterfsVolumeSource{
 					EndpointsName: config.prefix + "-server",
-					// 'test_vol' comes from contrib/for-tests/volumes-tester/gluster/run_gluster.sh
+					// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 					Path:     "test_vol",
 					ReadOnly: true,
 				},
 			}
-			// Must match content of contrib/for-tests/volumes-tester/gluster/index.html
+			// Must match content of test/images/volumes-tester/gluster/index.html
 			testVolumeClient(c, config, volume, "Hello from GlusterFS!")
 		})
 	})
@@ -389,14 +389,14 @@ var _ = Describe("Volumes", func() {
 			volume := api.VolumeSource{
 				ISCSI: &api.ISCSIVolumeSource{
 					TargetPortal: serverIP + ":3260",
-					// from contrib/for-tests/volumes-tester/iscsi/initiatorname.iscsi
+					// from test/images/volumes-tester/iscsi/initiatorname.iscsi
 					IQN:      "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
 					Lun:      0,
 					FSType:   "ext2",
 					ReadOnly: true,
 				},
 			}
-			// Must match content of contrib/for-tests/volumes-tester/iscsi/block.tar.gz
+			// Must match content of test/images/volumes-tester/iscsi/block.tar.gz
 			testVolumeClient(c, config, volume, "Hello from iSCSI")
 		})
 	})
@@ -443,7 +443,7 @@ var _ = Describe("Volumes", func() {
 					Name: config.prefix + "-secret",
 				},
 				Data: map[string][]byte{
-					// from contrib/for-tests/volumes-tester/rbd/keyring
+					// from test/images/volumes-tester/rbd/keyring
 					"key": []byte("AQDRrKNVbEevChAAEmRC+pW/KBVHxa0w/POILA=="),
 				},
 			}
@@ -473,7 +473,7 @@ var _ = Describe("Volumes", func() {
 					ReadOnly: true,
 				},
 			}
-			// Must match content of contrib/for-tests/volumes-tester/gluster/index.html
+			// Must match content of test/images/volumes-tester/gluster/index.html
 			testVolumeClient(c, config, volume, "Hello from RBD")
 
 		})
