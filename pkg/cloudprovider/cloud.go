@@ -107,8 +107,6 @@ type Instances interface {
 	InstanceID(name string) (string, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
-	// GetNodeResources gets the resources for a particular node
-	GetNodeResources(name string) (*api.NodeResources, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error

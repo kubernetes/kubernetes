@@ -29,12 +29,10 @@ import (
 	os_servers "github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/pagination"
 	"github.com/rackspace/gophercloud/rackspace"
-	"github.com/rackspace/gophercloud/rackspace/compute/v2/flavors"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -141,8 +139,7 @@ func newRackspace(cfg Config) (*Rackspace, error) {
 }
 
 type Instances struct {
-	compute            *gophercloud.ServiceClient
-	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
+	compute *gophercloud.ServiceClient
 }
 
 // Instances returns an implementation of Instances for Rackspace.
@@ -156,38 +153,9 @@ func (os *Rackspace) Instances() (cloudprovider.Instances, bool) {
 		glog.Warningf("Failed to find compute endpoint: %v", err)
 		return nil, false
 	}
-
-	pager := flavors.ListDetail(compute, nil)
-
-	flavor_to_resource := make(map[string]*api.NodeResources)
-	err = pager.EachPage(func(page pagination.Page) (bool, error) {
-		flavorList, err := flavors.ExtractFlavors(page)
-		if err != nil {
-			return false, err
-		}
-		for _, flavor := range flavorList {
-			rsrc := api.NodeResources{
-				Capacity: api.ResourceList{
-					api.ResourceCPU:            *resource.NewMilliQuantity(int64(flavor.VCPUs*1000), resource.DecimalSI),
-					api.ResourceMemory:         resource.MustParse(fmt.Sprintf("%dMi", flavor.RAM)),
-					"openstack.org/disk":       resource.MustParse(fmt.Sprintf("%dG", flavor.Disk)),
-					"openstack.org/rxTxFactor": *resource.NewQuantity(int64(flavor.RxTxFactor*1000), resource.DecimalSI),
-					"openstack.org/swap":       resource.MustParse(fmt.Sprintf("%dMi", flavor.Swap)),
-				},
-			}
-			flavor_to_resource[flavor.ID] = &rsrc
-		}
-		return true, nil
-	})
-	if err != nil {
-		glog.Warningf("Failed to find compute flavors: %v", err)
-		return nil, false
-	}
-
-	glog.V(2).Infof("Found %v compute flavors", len(flavor_to_resource))
 	glog.V(1).Info("Claiming to support Instances")
 
-	return &Instances{compute, flavor_to_resource}, true
+	return &Instances{compute}, true
 }
 
 func (i *Instances) List(name_filter string) ([]string, error) {
@@ -383,32 +351,6 @@ func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 // Implementation of Instances.CurrentNodeName
 func (i *Instances) CurrentNodeName(hostname string) (string, error) {
 	return hostname, nil
-}
-
-func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
-	glog.V(2).Infof("GetNodeResources(%v) called", name)
-
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return nil, err
-	}
-
-	s, ok := srv.Flavor["id"]
-	if !ok {
-		return nil, ErrAttrNotFound
-	}
-	flavId, ok := s.(string)
-	if !ok {
-		return nil, ErrAttrNotFound
-	}
-	rsrc, ok := i.flavor_to_resource[flavId]
-	if !ok {
-		return nil, ErrNotFound
-	}
-
-	glog.V(2).Infof("GetNodeResources(%v) => %v", name, rsrc)
-
-	return rsrc, nil
 }
 
 func (os *Rackspace) Clusters() (cloudprovider.Clusters, bool) {

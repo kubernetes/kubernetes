@@ -271,10 +271,6 @@ func (v *OVirtCloud) List(filter string) ([]string, error) {
 	return instances.ListSortedNames(), nil
 }
 
-func (v *OVirtCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	return nil, nil
-}
-
 // Implementation of Instances.CurrentNodeName
 func (v *OVirtCloud) CurrentNodeName(hostname string) (string, error) {
 	return hostname, nil
