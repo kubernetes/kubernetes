@@ -59,7 +59,10 @@ type Converter struct {
 	defaultingInterfaces map[reflect.Type]interface{}
 
 	// Map from an input type to a function which can apply a key name mapping
-	inputFieldMappingFuncs map[reflect.Type]FieldMappingFunc
+	inputFieldKeyMappingFuncs map[reflect.Type]FieldKeyMappingFunc
+
+	// Map from an input type to a function which can apply a field value mapping
+	inputFieldValueMappingFuncs map[reflect.Type]FieldValueMappingFunc
 
 	// Map from an input type to a set of default conversion flags.
 	inputDefaultFlags map[reflect.Type]FieldMatchingFlags
@@ -84,8 +87,9 @@ func NewConverter() *Converter {
 		structFieldDests:         map[typeNamePair][]typeNamePair{},
 		structFieldSources:       map[typeNamePair][]typeNamePair{},
 
-		inputFieldMappingFuncs: map[reflect.Type]FieldMappingFunc{},
-		inputDefaultFlags:      map[reflect.Type]FieldMatchingFlags{},
+		inputFieldKeyMappingFuncs:   map[reflect.Type]FieldKeyMappingFunc{},
+		inputFieldValueMappingFuncs: map[reflect.Type]FieldValueMappingFunc{},
+		inputDefaultFlags:           map[reflect.Type]FieldMatchingFlags{},
 	}
 	c.RegisterConversionFunc(byteSliceCopy)
 	return c
@@ -126,9 +130,13 @@ type Scope interface {
 	Meta() *Meta
 }
 
-// FieldMappingFunc can convert an input field value into different values, depending on
+// FieldKeyMappingFunc maps input field key into source and destination values, depending on
 // the value of the source or destination struct tags.
-type FieldMappingFunc func(key string, sourceTag, destTag reflect.StructTag) (source string, dest string)
+type FieldKeyMappingFunc func(key string, sourceTag, destTag reflect.StructTag) (source string, dest string)
+
+// FieldValueMappingFunc maps input source and destination values into corresponding values depending on
+// the value of the source and destination struct tags.
+type FieldValueMappingFunc func(sourceValue, destValue reflect.Value, sourceTag, destTag reflect.StructTag) (newSourceValue reflect.Value, newDestValue reflect.Value)
 
 // Meta is supplied by Scheme, when it calls Convert.
 type Meta struct {
@@ -137,7 +145,11 @@ type Meta struct {
 
 	// KeyNameMapping is an optional function which may map the listed key (field name)
 	// into a source and destination value.
-	KeyNameMapping FieldMappingFunc
+	KeyNameMapping FieldKeyMappingFunc
+
+	// ValueMapping is an optional function which may map the fields value
+	// into a source and destination value.
+	ValueMapping FieldValueMappingFunc
 }
 
 // scope contains information about an ongoing conversion.
@@ -367,17 +379,18 @@ func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {
 	return nil
 }
 
-// RegisterInputDefaults registers a field name mapping function, used when converting
-// from maps to structs. Inputs to the conversion methods are checked for this type and a mapping
+// RegisterInputDefaults registers field name and value mapping functions, used when converting
+// from interfaces such as maps or url.Values to structs. Inputs to the conversion methods are checked for this type and a mapping
 // applied automatically if the input matches in. A set of default flags for the input conversion
 // may also be provided, which will be used when no explicit flags are requested.
-func (c *Converter) RegisterInputDefaults(in interface{}, fn FieldMappingFunc, defaultFlags FieldMatchingFlags) error {
+func (c *Converter) RegisterInputDefaults(in interface{}, keyMapper FieldKeyMappingFunc, valueMapper FieldValueMappingFunc, defaultFlags FieldMatchingFlags) error {
 	fv := reflect.ValueOf(in)
 	ft := fv.Type()
 	if ft.Kind() != reflect.Ptr {
 		return fmt.Errorf("expected pointer 'in' argument, got: %v", ft)
 	}
-	c.inputFieldMappingFuncs[ft] = fn
+	c.inputFieldKeyMappingFuncs[ft] = keyMapper
+	c.inputFieldValueMappingFuncs[ft] = valueMapper
 	c.inputDefaultFlags[ft] = defaultFlags
 	return nil
 }
@@ -735,9 +748,15 @@ func (c *Converter) convertKV(skv, dkv kvValue, scope *scope) error {
 		lister = skv
 	}
 
-	var mapping FieldMappingFunc
-	if scope.meta != nil && scope.meta.KeyNameMapping != nil {
-		mapping = scope.meta.KeyNameMapping
+	var keyMapping FieldKeyMappingFunc
+	var valueMapping FieldValueMappingFunc
+	if scope.meta != nil {
+		if scope.meta.KeyNameMapping != nil {
+			keyMapping = scope.meta.KeyNameMapping
+		}
+		if scope.meta.ValueMapping != nil {
+			valueMapping = scope.meta.ValueMapping
+		}
 	}
 
 	for _, key := range lister.keys() {
@@ -751,8 +770,8 @@ func (c *Converter) convertKV(skv, dkv kvValue, scope *scope) error {
 		dtag := dkv.tagOf(key)
 		skey := key
 		dkey := key
-		if mapping != nil {
-			skey, dkey = scope.meta.KeyNameMapping(key, stag, dtag)
+		if keyMapping != nil {
+			skey, dkey = keyMapping(key, stag, dtag)
 		}
 
 		df := dkv.value(dkey)
@@ -767,6 +786,9 @@ func (c *Converter) convertKV(skv, dkv kvValue, scope *scope) error {
 				return scope.errorf("%v not present in src", skey)
 			}
 			continue
+		}
+		if valueMapping != nil {
+			sf, df = valueMapping(sf, df, stag, dtag)
 		}
 		scope.srcStack.top().key = skey
 		scope.srcStack.top().tag = stag

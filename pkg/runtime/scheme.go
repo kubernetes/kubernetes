@@ -234,10 +234,10 @@ func NewScheme() *Scheme {
 	if err := s.raw.AddConversionFuncs(DefaultStringConversions...); err != nil {
 		panic(err)
 	}
-	if err := s.raw.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
+	if err := s.raw.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, nil, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
 		panic(err)
 	}
-	if err := s.raw.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
+	if err := s.raw.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, CSVFieldValueMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
 		panic(err)
 	}
 	return s

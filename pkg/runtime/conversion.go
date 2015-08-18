@@ -38,6 +38,50 @@ func JSONKeyMapper(key string, sourceTag, destTag reflect.StructTag) (string, st
 	return key, key
 }
 
+// Converts the source value from CSV to an array if the dest field has a "csv" tag.
+// Used when mapping a CSV query param to the corresponding []string field.
+func CSVFieldValueMapper(sv, dv reflect.Value, sTag, dTag reflect.StructTag) (reflect.Value, reflect.Value) {
+	// Check if the field has csv tag.
+	jsonTag := dTag.Get("json")
+	if len(jsonTag) == 0 {
+		return sv, dv
+	}
+	tags := strings.Split(jsonTag, ",")
+	hasCSVTag := false
+	for _, tag := range tags {
+		if tag == "csv" {
+			hasCSVTag = true
+		}
+	}
+	if !hasCSVTag {
+		return sv, dv
+	}
+	if sv.Type().String() != "[]string" || dv.Type().String() != "[]string" {
+		return sv, dv
+	}
+
+	// Calculate the number of elements in new slice.
+	newSliceLen := 0
+	for svIndex := 0; svIndex < sv.Len(); svIndex++ {
+		arr := strings.Split(sv.Index(svIndex).String(), ",")
+		newSliceLen += len(arr)
+	}
+	if newSliceLen == sv.Len() {
+		// Splitting didnt have any effect.
+		return sv, dv
+	}
+	newSlice := reflect.MakeSlice(sv.Type(), newSliceLen, newSliceLen)
+	newSliceIndex := 0
+	for svIndex := 0; svIndex < sv.Len(); svIndex++ {
+		arr := strings.Split(sv.Index(svIndex).String(), ",")
+		for i := 0; i < len(arr); i++ {
+			newSlice.Index(newSliceIndex).SetString(arr[i])
+			newSliceIndex++
+		}
+	}
+	return newSlice, dv
+}
+
 // DefaultStringConversions are helpers for converting []string and string to real values.
 var DefaultStringConversions = []interface{}{
 	convertStringSliceToString,

@@ -17,6 +17,7 @@ limitations under the License.
 package runtime_test
 
 import (
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -38,7 +39,8 @@ type ExternalComplex struct {
 	Integer   int    `json:"int"`
 	Integer64 int64  `json:",omitempty"`
 	Int64     int64
-	Bool      bool `json:"bool"`
+	Bool      bool     `json:"bool"`
+	Array     []string `json:"array,csv"`
 }
 
 func (*InternalComplex) IsAnAPIObject() {}
@@ -55,6 +57,16 @@ func TestStringMapConversion(t *testing.T) {
 		errFn    func(error) bool
 		expected runtime.Object
 	}{
+		"array works": {
+			input: map[string][]string{
+				"String":    {"not_used"},
+				"string":    {"value"},
+				"int":       {"1"},
+				"Integer64": {"2"},
+				"array":     {"v1", "v2", "v3"},
+			},
+			expected: &ExternalComplex{String: "value", Integer: 1, Array: []string{"v1", "v2", "v3"}},
+		},
 		"ignores omitempty": {
 			input: map[string][]string{
 				"String":    {"not_used"},
@@ -128,4 +140,48 @@ func TestStringMapConversion(t *testing.T) {
 			t.Errorf("%s: unexpected output: %#v", k, out)
 		}
 	}
+}
+
+func TestUrlQueryToStructConversion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	scheme.Log(t)
+	scheme.AddKnownTypeWithName("", "Complex", &InternalComplex{})
+	scheme.AddKnownTypeWithName("external", "Complex", &ExternalComplex{})
+
+	testCases := map[string]struct {
+		input    url.Values
+		errFn    func(error) bool
+		expected runtime.Object
+	}{
+		"string works": {
+			input:    urlValues("string=value"),
+			expected: &ExternalComplex{String: "value"},
+		},
+		"csv works": {
+			input:    urlValues("array=value,v2,v3"),
+			expected: &ExternalComplex{Array: []string{"value", "v2", "v3"}},
+		},
+		"multiple values work": {
+			input:    urlValues("array=value1&array=value2"),
+			expected: &ExternalComplex{Array: []string{"value1", "value2"}},
+		},
+	}
+
+	for k, tc := range testCases {
+		out := &ExternalComplex{}
+		if err := scheme.Convert(&tc.input, out); (tc.errFn == nil && err != nil) || (tc.errFn != nil && !tc.errFn(err)) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+			continue
+		} else if err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(out, tc.expected) {
+			t.Errorf("%s: unexpected output: %#v", k, out)
+		}
+	}
+}
+
+func urlValues(query string) url.Values {
+	v, _ := url.ParseQuery(query)
+	return v
 }

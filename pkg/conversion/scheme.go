@@ -282,12 +282,12 @@ func (s *Scheme) Recognizes(version, kind string) bool {
 	return ok
 }
 
-// RegisterInputDefaults sets the provided field mapping function and field matching
-// as the defaults for the provided input type.  The fn may be nil, in which case no
+// RegisterInputDefaults sets the provided field key and value mapping functions
+// as the defaults for the provided input type.  The functions may be nil, in which case no
 // mapping will happen by default. Use this method to register a mechanism for handling
 // a specific input type in conversion, such as a map[string]string to structs.
-func (s *Scheme) RegisterInputDefaults(in interface{}, fn FieldMappingFunc, defaultFlags FieldMatchingFlags) error {
-	return s.converter.RegisterInputDefaults(in, fn, defaultFlags)
+func (s *Scheme) RegisterInputDefaults(in interface{}, keyMapper FieldKeyMappingFunc, valueMapper FieldValueMappingFunc, defaultFlags FieldMatchingFlags) error {
+	return s.converter.RegisterInputDefaults(in, keyMapper, valueMapper, defaultFlags)
 }
 
 // Performs a deep copy of the given object.
@@ -369,7 +369,8 @@ func (s *Scheme) generateConvertMeta(srcVersion, destVersion string, in interfac
 	return s.converter.inputDefaultFlags[t], &Meta{
 		SrcVersion:     srcVersion,
 		DestVersion:    destVersion,
-		KeyNameMapping: s.converter.inputFieldMappingFuncs[t],
+		KeyNameMapping: s.converter.inputFieldKeyMappingFuncs[t],
+		ValueMapping:   s.converter.inputFieldValueMappingFuncs[t],
 	}
 }
 
