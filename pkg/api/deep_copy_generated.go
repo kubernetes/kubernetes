@@ -380,6 +380,7 @@ func deepCopy_api_EmptyDirVolumeSource(in EmptyDirVolumeSource, out *EmptyDirVol
 
 func deepCopy_api_EndpointAddress(in EndpointAddress, out *EndpointAddress, c *conversion.Cloner) error {
 	out.IP = in.IP
+	out.Hostname = in.Hostname
 	if in.TargetRef != nil {
 		out.TargetRef = new(ObjectReference)
 		if err := deepCopy_api_ObjectReference(*in.TargetRef, out.TargetRef, c); err != nil {

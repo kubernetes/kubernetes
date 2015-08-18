@@ -1301,14 +1301,16 @@ type EndpointSubset struct {
 	Ports     []EndpointPort
 }
 
-// EndpointAddress is a tuple that describes single IP address.
+// EndpointAddress is a tuple that describes single endpoint address.
 type EndpointAddress struct {
-	// The IP of this endpoint.
-	// TODO: This should allow hostname or IP, see #4447.
-	IP string
+	// The IP of this endpoint, mutually exclusive with Hostname
+	IP string `json:"ip" description:"IP address of the endpoint"`
+
+	// Hostname for this endpoint, you can specify IP or Hostname, but not both.
+	Hostname string `json:"hostname" description:"Hostname for this endpoint"`
 
 	// Optional: The kubernetes object related to the entry point.
-	TargetRef *ObjectReference
+	TargetRef *ObjectReference `json:"targetRef,omitempty" description:"reference to object providing the endpoint"`
 }
 
 // EndpointPort is a tuple that describes a single port.

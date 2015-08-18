@@ -11230,12 +11230,17 @@
    "v1.EndpointAddress": {
     "id": "v1.EndpointAddress",
     "required": [
-     "ip"
+     "ip",
+     "hostname"
     ],
     "properties": {
      "ip": {
       "type": "string",
       "description": "IP address of the endpoint"
+     },
+     "hostname": {
+      "type": "string",
+      "description": "Hostname for this endpoint"
      },
      "targetRef": {
       "$ref": "v1.ObjectReference",
