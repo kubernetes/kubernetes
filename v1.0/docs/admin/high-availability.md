@@ -262,7 +262,7 @@ set the `--apiserver` flag to your replicated endpoint.
 
 ## Vagrant up!
 
-We indeed have an initial proof of concept tester for this, which is available [here](../../examples/high-availability/).
+We indeed have an initial proof of concept tester for this, which is available [here](https://releases.k8s.io/v1.0.1/examples/high-availability).
 
 It implements the major concepts (with a few minor reductions for simplicity), of the podmaster HA implementation alongside a quick smoke test using k8petstore.
 

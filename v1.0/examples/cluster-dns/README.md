@@ -13,7 +13,7 @@ This is a toy example demonstrating how to use kubernetes DNS.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](../../cluster/addons/dns/).
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](https://releases.k8s.io/v1.0.1/cluster/addons/dns).
 
 {% highlight sh %}
 {% raw %}
