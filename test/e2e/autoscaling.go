@@ -54,40 +54,40 @@ var _ = Describe("Autoscaling", func() {
 		setUpAutoscaler("cpu/node_utilization", 0.7, nodeCount, nodeCount+1)
 
 		ConsumeCpu(f, "cpu-utilization", nodeCount*coresPerNode)
-		expectNoError(waitForClusterSize(f.Client, nodeCount+1))
+		expectNoError(waitForClusterSize(f.Client, nodeCount+1, 20*time.Minute))
 
 		StopConsuming(f, "cpu-utilization")
-		expectNoError(waitForClusterSize(f.Client, nodeCount))
+		expectNoError(waitForClusterSize(f.Client, nodeCount, 20*time.Minute))
 	})
 
 	It("[Skipped] should scale cluster size based on cpu reservation", func() {
 		setUpAutoscaler("cpu/node_reservation", 0.7, 1, 10)
 
 		ReserveCpu(f, "cpu-reservation", 800)
-		expectNoError(waitForClusterSize(f.Client, 2))
+		expectNoError(waitForClusterSize(f.Client, 2, 20*time.Minute))
 
 		StopConsuming(f, "cpu-reservation")
-		expectNoError(waitForClusterSize(f.Client, 1))
+		expectNoError(waitForClusterSize(f.Client, 1, 20*time.Minute))
 	})
 
 	It("[Skipped] should scale cluster size based on memory utilization", func() {
 		setUpAutoscaler("memory/node_utilization", 0.5, 1, 10)
 
 		ConsumeMemory(f, "memory-utilization", 2)
-		expectNoError(waitForClusterSize(f.Client, 2))
+		expectNoError(waitForClusterSize(f.Client, 2, 20*time.Minute))
 
 		StopConsuming(f, "memory-utilization")
-		expectNoError(waitForClusterSize(f.Client, 1))
+		expectNoError(waitForClusterSize(f.Client, 1, 20*time.Minute))
 	})
 
 	It("[Skipped] should scale cluster size based on memory reservation", func() {
 		setUpAutoscaler("memory/node_reservation", 0.5, 1, 10)
 
 		ReserveMemory(f, "memory-reservation", 2)
-		expectNoError(waitForClusterSize(f.Client, 2))
+		expectNoError(waitForClusterSize(f.Client, 2, 20*time.Minute))
 
 		StopConsuming(f, "memory-reservation")
-		expectNoError(waitForClusterSize(f.Client, 1))
+		expectNoError(waitForClusterSize(f.Client, 1, 20*time.Minute))
 	})
 })
 
