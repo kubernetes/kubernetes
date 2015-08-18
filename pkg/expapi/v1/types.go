@@ -80,7 +80,7 @@ type HorizontalPodAutoscalerSpec struct {
 	MaxCount int `json:"maxCount" description:"upper limit for the number of pods"`
 	// Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods.
 	// Currently two types of resources are supported: "cpu" and "memory".
-	Target ResourceConsumption `json:"target"	description:"target average consumption of resource that the autoscaler will try to maintain by adjusting the desired number of pods"`
+	Target ResourceConsumption `json:"target" description:"target average consumption of resource that the autoscaler will try to maintain by adjusting the desired number of pods"`
 }
 
 // HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler
