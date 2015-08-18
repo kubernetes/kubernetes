@@ -110,14 +110,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	clients := NewClientCache(clientConfig)
-
-	// Initialize the experimental client (if possible). Failing here is non-fatal, errors
-	// will be returned when an experimental client is explicitly requested.
-	var experimentalClient *client.ExperimentalClient
-	cfg, experimentalClientErr := clientConfig.ClientConfig()
-	if experimentalClientErr == nil {
-		experimentalClient, experimentalClientErr = client.NewExperimental(cfg)
-	}
+	expClients := NewExperimentalClientCache(clientConfig)
 
 	noClientErr := errors.New("could not get client")
 	getBothClients := func(group string, version string) (client *client.Client, expClient *client.ExperimentalClient, err error) {
@@ -126,7 +119,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		case "api":
 			client, err = clients.ClientForVersion(version)
 		case "experimental":
-			expClient, err = experimentalClient, experimentalClientErr
+			expClient, err = expClients.Client()
 		}
 		return
 	}
@@ -146,7 +139,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return clients.ClientForVersion("")
 		},
 		ExperimentalClient: func() (*client.ExperimentalClient, error) {
-			return experimentalClient, experimentalClientErr
+			return expClients.Client()
 		},
 		ClientConfig: func() (*client.Config, error) {
 			return clients.ClientConfigForVersion("")
@@ -164,7 +157,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return client.RESTClient, nil
 			case "experimental":
-				client, err := experimentalClient, experimentalClientErr
+				client, err := expClients.Client()
 				if err != nil {
 					return nil, err
 				}
@@ -260,7 +253,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if err != nil {
 					return nil, err
 				}
-				return &clientSwaggerSchema{client, experimentalClient, api.Scheme}, nil
+				expClient, _ := expClients.Client()
+				return &clientSwaggerSchema{client, expClient, api.Scheme}, nil
 			}
 			return validation.NullSchema{}, nil
 		},
