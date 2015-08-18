@@ -34,6 +34,9 @@ func addKnownTypes() {
 	api.Scheme.AddKnownTypes("v1",
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
+		&Job{},
+		&JobList{},
+		&JobStatusResult{},
 		&ReplicationControllerDummy{},
 		&Scale{},
 		&ThirdPartyResource{},
@@ -43,6 +46,9 @@ func addKnownTypes() {
 
 func (*HorizontalPodAutoscaler) IsAnAPIObject()     {}
 func (*HorizontalPodAutoscalerList) IsAnAPIObject() {}
+func (*Job) IsAnAPIObject()                         {}
+func (*JobList) IsAnAPIObject()                     {}
+func (*JobStatusResult) IsAnAPIObject()             {}
 func (*ReplicationControllerDummy) IsAnAPIObject()  {}
 func (*Scale) IsAnAPIObject()                       {}
 func (*ThirdPartyResource) IsAnAPIObject()          {}

@@ -1,0 +1,19 @@
+kind: Job
+apiVersion: v1
+metadata:
+  name: test-job
+spec:
+  maxParallelism: 1
+  completions: 1
+  selector:
+    name: basic-pod
+  template:
+    metadata:
+      labels:
+        name: test-job
+    spec:
+      restartPolicy: OnFailure
+      containers:
+          name: basic-pod
+          image: "centos:centos7"
+          command: ['bash', '-c', 'echo ok']
