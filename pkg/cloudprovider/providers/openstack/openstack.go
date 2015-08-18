@@ -560,7 +560,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 
 		_, err = members.Create(lb.network, members.CreateOpts{
 			PoolID:       pool.ID,
-			ProtocolPort: ports[0].Port, //TODO: need to handle multi-port
+			ProtocolPort: ports[0].NodePort, //TODO: need to handle multi-port
 			Address:      addr,
 		}).Extract()
 		if err != nil {
