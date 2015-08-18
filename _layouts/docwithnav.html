@@ -31,46 +31,62 @@
 			}
 			return;
 		}
-		syncmenutourl(); //Sync the nav menu on page load
+		syncmenutourl();
 		/* Look for change in page state and load any changes */
 		function loadonstatechange(){
 		    $(window).bind('popstate', function (event) {
 				var returnLocation = history.location || document.location;
 				$('.menu a').removeClass('active');
-				if($(this).parents('li.haschild').length === 0 || $(this).parents('li').find('a.active').length === 0){
+				var curnavitem = findcurnavitem();
+				$('#doccontent').load(returnLocation + ' #doccontent > *');
+				if (curnavitem.hasClass('gentoc')) {//generate the in-page TOC (full page loads)
+					window.location = returnLocation;
+				}
+				if(curnavitem.parents('li.haschild').length === 0 && curnavitem.parents('li').find('a.active').length === 0){ //close sub-menu
 					menu_ul.filter(':visible').slideUp('normal');
 				}
-				$('#doccontent').load(returnLocation + ' #doccontent > *');
 				syncmenutourl();
 		       return;
 		    });
 		}
 		loadonstatechange();
-		/* Load only the doccontent div on click, push state so back/forward browser buttons work, and animate nav menu */
+		/* Load only the doccontent div on click, push state so back/forward browser buttons work, and then animate nav menu */
 	    var menu_ul = $('.menu > li > ul');
 	    $('a').click(function(e) {
 	        e.preventDefault();
 			var clickedon = $(this),
 				href = $(this).attr('href');
-			if (this.host != location.host){//open external links in new tab/window
+			if(href != "#") {//get the absolute url
+				href = this.href;
+			}
+			if(this.host != location.host && href != "javascript:;") {//open external links in new tab/window
 				window.open(href, '_blank');
-			} else if(href != "#"){//check for and skip empty nav menu containers
+			} else if(href != "#" && !clickedon.parents('header').is('#nav') && !clickedon.parents('div').is('#mobile-nav-container')) {//skip empty nav menu containers and any clicks in the banner and banner menu
 				history.pushState(null, null, href);
 				$('#doccontent').load(href + ' #doccontent > *');
-				$('html, body').animate({scrollTop: 0}, 500);
-			} 
-			if(!$(clickedon).hasClass('active')) {//Animate navigation menu to open/close and highlight item
-				if($(clickedon).parents('li.haschild').length === 0 || $(clickedon).parents('li').find('a.active').length === 0){
-					menu_ul.filter(':visible').slideUp('normal');
+				if (clickedon.hasClass('gentoc')){//generate the in-page TOC (full page loads)
+					window.location = href;
 				}
-	            $('.menu a').removeClass('active');
-	            $(clickedon).addClass('active').next().stop(true,true).slideDown('normal');
-	        }else if($(clickedon).hasClass('active') && $(clickedon).parent().hasClass('haschild')){ //slide close the sub-menu
-				$(clickedon).removeClass('active');
-				$(clickedon).next().stop(true,true).slideUp('normal');
-			}	
+				$('html, body').animate({scrollTop: 0}, 500);
+			} else if (href != "#"){ //open links in main menu (full page loads)
+				window.location = href;
+			}
+			animatenav(findcurnavitem());
 		    return false; // don't actually follow the link
 	    });
+		/* Animate navigation menu to open/close and highlight item */
+		function animatenav(anhref){
+			if(!anhref.hasClass('active')) {
+				if(anhref.parents('li.haschild').length === 0 || anhref.parents('li').find('a.active').length === 0){
+					menu_ul.filter(':visible').slideUp('normal');
+				}
+				$('.menu a').removeClass('active');
+				anhref.addClass('active').next().stop(true,true).slideDown('normal');
+			}else if(anhref.hasClass('active') && anhref.parent().hasClass('haschild')){ //close sub-menu
+				anhref.removeClass('active');
+				anhref.next().stop(true,true).slideUp('normal');
+			}
+		}
 	});
 </script>
 {% include docfooter.html %}
