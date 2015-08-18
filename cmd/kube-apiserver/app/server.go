@@ -227,6 +227,10 @@ func (s *APIServer) verifyClusterIPFlags() {
 	if s.ServiceClusterIPRange.IP == nil {
 		glog.Fatal("No --service-cluster-ip-range specified")
 	}
+	var ones, bits = s.ServiceClusterIPRange.Mask.Size()
+	if bits-ones > 20 {
+		glog.Fatal("Specified --service-cluster-ip-range is too large")
+	}
 }
 
 func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta.VersionInterfacesFunc, defaultVersion, storageVersion, pathPrefix string) (etcdStorage storage.Interface, err error) {
