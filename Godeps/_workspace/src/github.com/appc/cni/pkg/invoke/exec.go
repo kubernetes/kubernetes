@@ -29,7 +29,7 @@ func pluginErr(err error, output []byte) error {
 
 // ExecAdd executes IPAM plugin, assuming CNI_COMMAND == ADD.
 // Parses and returns resulting IPConfig
-func ExecPlugin(pluginPath string, netconf []byte, env []string) (*types.Result, error) {
+func ExecPlugin(pluginPath string, netconf []byte, args CNIArgs) (*types.Result, error) {
 	if pluginPath == "" {
 		return nil, fmt.Errorf("could not find %q plugin", filepath.Base(pluginPath))
 	}
@@ -37,7 +37,7 @@ func ExecPlugin(pluginPath string, netconf []byte, env []string) (*types.Result,
 	stdout := &bytes.Buffer{}
 
 	c := exec.Cmd{
-		Env:    env,
+		Env:    args.AsEnv(),
 		Path:   pluginPath,
 		Args:   []string{pluginPath},
 		Stdin:  bytes.NewBuffer(netconf),

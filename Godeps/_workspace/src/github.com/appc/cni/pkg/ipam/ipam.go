@@ -29,14 +29,14 @@ func ExecAdd(plugin string, netconf []byte) (*types.Result, error) {
 	if os.Getenv("CNI_COMMAND") != "ADD" {
 		return nil, fmt.Errorf("CNI_COMMAND is not ADD")
 	}
-	return invoke.ExecPlugin(invoke.Find(plugin), netconf, nil)
+	return invoke.ExecPlugin(invoke.Find(plugin), netconf, invoke.ArgsFromEnv())
 }
 
 func ExecDel(plugin string, netconf []byte) error {
 	if os.Getenv("CNI_COMMAND") != "DEL" {
 		return fmt.Errorf("CNI_COMMAND is not DEL")
 	}
-	_, err := invoke.ExecPlugin(invoke.Find(plugin), netconf, nil)
+	_, err := invoke.ExecPlugin(invoke.Find(plugin), netconf, invoke.ArgsFromEnv())
 	return err
 }
 

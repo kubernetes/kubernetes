@@ -3,7 +3,8 @@
 ## What is CNI?
 
 CNI, the _Container Network Interface_, is a proposed standard for configuring network interfaces for Linux application containers.
-The standard consists of a simple specification for how executable plugins can be used to configure network namespaces.
+The standard consists of a simple specification for how executable plugins can be used to configure network namespaces, and a go library implementing that specification.
+
 The specification itself is contained in [SPEC.md](SPEC.md)
 
 ## Why develop CNI?
@@ -47,6 +48,8 @@ $ cat >/etc/cni/net.d/10-mynet.conf <<EOF
 EOF
 ```
 
+The directory `/etc/cni/net.d` is the default location in which the scripts will look for net configurations.
+
 Next, build the plugins:
 
 ```
@@ -77,6 +80,8 @@ lo        Link encap:Local Loopback
           collisions:0 txqueuelen:0 
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 ```
+
+The environment variable `CNI_PATH` tells the scripts and library where to look for plugins executables.
 
 ## Running a Docker container with network namespace set up by CNI plugins
 

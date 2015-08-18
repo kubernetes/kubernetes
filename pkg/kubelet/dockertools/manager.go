@@ -1695,7 +1695,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 		// TODO-PAT: fix log levels
 		glog.V(2).Infof("Calling CNI network plugin '%v'", pluginName)
 
-		netconf, err := cni.LoadNetConf(DefaultNetDir, pluginName)
+		netconf, err := cni.LoadConf(DefaultNetDir, pluginName)
 		if err != nil {
 			glog.Errorf("Error loading network config: '%v'", err)
 			return err
@@ -1721,7 +1721,11 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			ContainerID: "cni",
 			NetNS:       netns,
 			IfName:      "eth0",
-			Args:        fmt.Sprintf("POD_NAMESPACE=%v;POD_NAME=%v;POD_INFRA_CONTAINER_ID=%v", pod.Namespace, pod.Name, podInfraContainerID),
+			Args:        [][2]string{
+				{"POD_NAMESPACE", pod.Namespace},
+				{"POD_NAME", pod.Name},
+				{"POD_INFRA_CONTAINER_ID", string(podInfraContainerID)},
+			},
 		}
 
 		glog.V(2).Infof("About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)

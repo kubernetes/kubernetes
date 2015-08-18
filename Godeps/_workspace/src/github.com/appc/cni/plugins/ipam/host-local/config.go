@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/appc/cni/pkg/ip"
 	"github.com/appc/cni/pkg/types"
 )
 
@@ -29,7 +28,7 @@ type IPAMConfig struct {
 	Type       string        `json:"type"`
 	RangeStart net.IP        `json:"rangeStart"`
 	RangeEnd   net.IP        `json:"rangeEnd"`
-	Subnet     ip.IPNet      `json:"subnet"`
+	Subnet     types.IPNet   `json:"subnet"`
 	Gateway    net.IP        `json:"gateway"`
 	Routes     []types.Route `json:"routes"`
 }

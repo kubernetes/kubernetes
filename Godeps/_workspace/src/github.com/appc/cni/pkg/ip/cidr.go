@@ -15,22 +15,9 @@
 package ip
 
 import (
-	"encoding/json"
 	"math/big"
 	"net"
 )
-
-// ParseCIDR takes a string like "10.2.3.1/24" and
-// return IPNet with "10.2.3.1" and /24 mask
-func ParseCIDR(s string) (*net.IPNet, error) {
-	ip, ipn, err := net.ParseCIDR(s)
-	if err != nil {
-		return nil, err
-	}
-
-	ipn.IP = ip
-	return ipn, nil
-}
 
 // NextIP returns IP incremented by 1
 func NextIP(ip net.IP) net.IP {
@@ -61,26 +48,4 @@ func Network(ipn *net.IPNet) *net.IPNet {
 		IP:   ipn.IP.Mask(ipn.Mask),
 		Mask: ipn.Mask,
 	}
-}
-
-// like net.IPNet but adds JSON marshalling and unmarshalling
-type IPNet net.IPNet
-
-func (n IPNet) MarshalJSON() ([]byte, error) {
-	return json.Marshal((*net.IPNet)(&n).String())
-}
-
-func (n *IPNet) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-
-	tmp, err := ParseCIDR(s)
-	if err != nil {
-		return err
-	}
-
-	*n = IPNet(*tmp)
-	return nil
 }

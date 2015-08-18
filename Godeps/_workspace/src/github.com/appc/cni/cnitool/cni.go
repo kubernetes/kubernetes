@@ -29,7 +29,7 @@ func main() {
 	if netdir == "" {
 		netdir = DefaultNetDir
 	}
-	netconf, err := cni.LoadNetConf(netdir, os.Args[2])
+	netconf, err := cni.LoadConf(netdir, os.Args[2])
 	if err != nil {
 		exit(err)
 	}
@@ -44,7 +44,6 @@ func main() {
 		ContainerID: "cni",
 		NetNS:       netns,
 		IfName:      "eth0",
-		Args:        "",
 	}
 
 	switch os.Args[1] {

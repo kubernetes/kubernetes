@@ -18,9 +18,41 @@ import (
 	"encoding/json"
 	"net"
 	"os"
-
-	"github.com/appc/cni/pkg/ip"
 )
+
+// like net.IPNet but adds JSON marshalling and unmarshalling
+type IPNet net.IPNet
+
+// ParseCIDR takes a string like "10.2.3.1/24" and
+// return IPNet with "10.2.3.1" and /24 mask
+func ParseCIDR(s string) (*net.IPNet, error) {
+	ip, ipn, err := net.ParseCIDR(s)
+	if err != nil {
+		return nil, err
+	}
+
+	ipn.IP = ip
+	return ipn, nil
+}
+
+func (n IPNet) MarshalJSON() ([]byte, error) {
+	return json.Marshal((*net.IPNet)(&n).String())
+}
+
+func (n *IPNet) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	tmp, err := ParseCIDR(s)
+	if err != nil {
+		return err
+	}
+
+	*n = IPNet(*tmp)
+	return nil
+}
 
 // NetConf describes a network.
 type NetConf struct {
@@ -68,23 +100,23 @@ func (e *Error) Print() error {
 }
 
 // net.IPNet is not JSON (un)marshallable so this duality is needed
-// for our custom ip.IPNet type
+// for our custom IPNet type
 
 // JSON (un)marshallable types
 type ipConfig struct {
-	IP      ip.IPNet `json:"ip"`
-	Gateway net.IP   `json:"gateway,omitempty"`
-	Routes  []Route  `json:"routes,omitempty"`
+	IP      IPNet   `json:"ip"`
+	Gateway net.IP  `json:"gateway,omitempty"`
+	Routes  []Route `json:"routes,omitempty"`
 }
 
 type route struct {
-	Dst ip.IPNet `json:"dst"`
-	GW  net.IP   `json:"gw,omitempty"`
+	Dst IPNet  `json:"dst"`
+	GW  net.IP `json:"gw,omitempty"`
 }
 
 func (c *IPConfig) MarshalJSON() ([]byte, error) {
 	ipc := ipConfig{
-		IP:      ip.IPNet(c.IP),
+		IP:      IPNet(c.IP),
 		Gateway: c.Gateway,
 		Routes:  c.Routes,
 	}
@@ -117,7 +149,7 @@ func (r *Route) UnmarshalJSON(data []byte) error {
 
 func (r *Route) MarshalJSON() ([]byte, error) {
 	rt := route{
-		Dst: ip.IPNet(r.Dst),
+		Dst: IPNet(r.Dst),
 		GW:  r.GW,
 	}
 
