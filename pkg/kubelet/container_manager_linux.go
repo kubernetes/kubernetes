@@ -137,8 +137,6 @@ func newContainerManager(cadvisorInterface cadvisor.Interface, dockerDaemonConta
 		systemContainers = append(systemContainers, newSystemContainer(kubeletContainerName))
 	}
 
-	// TODO(vmarmol): Add Kube-proxy container.
-
 	return &containerManagerImpl{
 		systemContainers: systemContainers,
 	}, nil
