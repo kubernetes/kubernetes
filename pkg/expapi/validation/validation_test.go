@@ -658,3 +658,129 @@ func TestValidateDeployment(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateJob(t *testing.T) {
+	validSelector := map[string]string{"a": "b"}
+	validPodTemplateSpec := api.PodTemplateSpec{
+		ObjectMeta: api.ObjectMeta{
+			Labels: validSelector,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+		},
+	}
+	successCases := []expapi.Job{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: expapi.JobSpec{
+				Selector: validSelector,
+				Template: &validPodTemplateSpec,
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateJob(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	negative := -1
+	errorCases := map[string]expapi.Job{
+		"spec.parallelism:must be non-negative": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: expapi.JobSpec{
+				Parallelism: &negative,
+				Selector:    validSelector,
+				Template:    &validPodTemplateSpec,
+			},
+		},
+		"spec.completions:must be non-negative": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: expapi.JobSpec{
+				Completions: &negative,
+				Selector:    validSelector,
+				Template:    &validPodTemplateSpec,
+			},
+		},
+		"spec.selector:required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: expapi.JobSpec{
+				Selector: map[string]string{},
+				Template: &validPodTemplateSpec,
+			},
+		},
+		"spec.template:required value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: expapi.JobSpec{
+				Selector: validSelector,
+			},
+		},
+		"spec.template.labels:selector does not match template": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: expapi.JobSpec{
+				Selector: validSelector,
+				Template: &api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{"y": "z"},
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicyOnFailure,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+					},
+				},
+			},
+		},
+		"spec.template.spec.restartPolicy:unsupported value": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myjob",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: expapi.JobSpec{
+				Selector: validSelector,
+				Template: &api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: validSelector,
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicyAlways,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+					},
+				},
+			},
+		},
+	}
+
+	for k, v := range errorCases {
+		errs := ValidateJob(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		} else {
+			s := strings.Split(k, ":")
+			err := errs[0].(*errors.ValidationError)
+			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+				t.Errorf("unexpected error: %v, expected: %s", errs[0], k)
+			}
+		}
+	}
+}
