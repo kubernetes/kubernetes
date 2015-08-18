@@ -184,7 +184,7 @@ func (c *Cacher) List(key string, listObj runtime.Object) error {
 	return nil
 }
 
-func (c *Cacher) processEvent(event watch.Event) {
+func (c *Cacher) processEvent(event cache.WatchCacheEvent) {
 	c.Lock()
 	defer c.Unlock()
 	for _, watcher := range c.watchers {
@@ -271,16 +271,16 @@ func (lw *cacherListerWatcher) Watch(resourceVersion string) (watch.Interface, e
 // cacherWatch implements watch.Interface
 type cacheWatcher struct {
 	sync.Mutex
-	input   chan watch.Event
+	input   chan cache.WatchCacheEvent
 	result  chan watch.Event
 	filter  FilterFunc
 	stopped bool
 	forget  func()
 }
 
-func newCacheWatcher(initEvents []watch.Event, filter FilterFunc, forget func()) *cacheWatcher {
+func newCacheWatcher(initEvents []cache.WatchCacheEvent, filter FilterFunc, forget func()) *cacheWatcher {
 	watcher := &cacheWatcher{
-		input:   make(chan watch.Event, 10),
+		input:   make(chan cache.WatchCacheEvent, 10),
 		result:  make(chan watch.Event, 10),
 		filter:  filter,
 		stopped: false,
@@ -310,15 +310,29 @@ func (c *cacheWatcher) stop() {
 	}
 }
 
-func (c *cacheWatcher) add(event watch.Event) {
+func (c *cacheWatcher) add(event cache.WatchCacheEvent) {
 	c.input <- event
 }
 
-func (c *cacheWatcher) process(initEvents []watch.Event) {
+func (c *cacheWatcher) sendWatchCacheEvent(event cache.WatchCacheEvent) {
+	curObjPasses := event.Type != watch.Deleted && c.filter(event.Object)
+	oldObjPasses := false
+	if event.PrevObject != nil {
+		oldObjPasses = c.filter(event.PrevObject)
+	}
+	switch {
+	case curObjPasses && !oldObjPasses:
+		c.result <- watch.Event{watch.Added, event.Object}
+	case curObjPasses && oldObjPasses:
+		c.result <- watch.Event{watch.Modified, event.Object}
+	case !curObjPasses && oldObjPasses:
+		c.result <- watch.Event{watch.Deleted, event.Object}
+	}
+}
+
+func (c *cacheWatcher) process(initEvents []cache.WatchCacheEvent) {
 	for _, event := range initEvents {
-		if c.filter(event.Object) {
-			c.result <- event
-		}
+		c.sendWatchCacheEvent(event)
 	}
 	defer close(c.result)
 	defer c.Stop()
@@ -327,8 +341,6 @@ func (c *cacheWatcher) process(initEvents []watch.Event) {
 		if !ok {
 			return
 		}
-		if c.filter(event.Object) {
-			c.result <- event
-		}
+		c.sendWatchCacheEvent(event)
 	}
 }

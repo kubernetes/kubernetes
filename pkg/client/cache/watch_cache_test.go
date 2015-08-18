@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func makeTestPod(name string, resourceVersion uint64) *api.Pod {
@@ -108,6 +109,34 @@ func TestEvents(t *testing.T) {
 	store := NewWatchCache(5)
 
 	store.Add(makeTestPod("pod", 2))
+
+	// Test for Added event.
+	{
+		_, err := store.GetAllEventsSince(1)
+		if err == nil {
+			t.Errorf("expected error too old")
+		}
+	}
+	{
+		result, err := store.GetAllEventsSince(2)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(result) != 1 {
+			t.Fatalf("unexpected events: %v", result)
+		}
+		if result[0].Type != watch.Added {
+			t.Errorf("unexpected event type: %v", result[0].Type)
+		}
+		pod := makeTestPod("pod", uint64(2))
+		if !api.Semantic.DeepEqual(pod, result[0].Object) {
+			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
+		}
+		if result[0].PrevObject != nil {
+			t.Errorf("unexpected item: %v", result[0].PrevObject)
+		}
+	}
+
 	store.Update(makeTestPod("pod", 3))
 	store.Update(makeTestPod("pod", 4))
 
@@ -127,9 +156,16 @@ func TestEvents(t *testing.T) {
 			t.Fatalf("unexpected events: %v", result)
 		}
 		for i := 0; i < 2; i++ {
+			if result[i].Type != watch.Modified {
+				t.Errorf("unexpected event type: %v", result[i].Type)
+			}
 			pod := makeTestPod("pod", uint64(i+3))
 			if !api.Semantic.DeepEqual(pod, result[i].Object) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
+			}
+			prevPod := makeTestPod("pod", uint64(i+2))
+			if !api.Semantic.DeepEqual(prevPod, result[i].PrevObject) {
+				t.Errorf("unexpected item: %v, expected: %v", result[i].PrevObject, prevPod)
 			}
 		}
 	}
@@ -158,6 +194,30 @@ func TestEvents(t *testing.T) {
 			if !api.Semantic.DeepEqual(pod, result[i].Object) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
+		}
+	}
+
+	// Test for delete event.
+	store.Delete(makeTestPod("pod", uint64(9)))
+
+	{
+		result, err := store.GetAllEventsSince(9)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(result) != 1 {
+			t.Fatalf("unexpected events: %v", result)
+		}
+		if result[0].Type != watch.Deleted {
+			t.Errorf("unexpected event type: %v", result[0].Type)
+		}
+		pod := makeTestPod("pod", uint64(9))
+		if !api.Semantic.DeepEqual(pod, result[0].Object) {
+			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
+		}
+		prevPod := makeTestPod("pod", uint64(8))
+		if !api.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
+			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
 		}
 	}
 }
