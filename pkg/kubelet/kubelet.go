@@ -1283,7 +1283,6 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 }
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull secrets
-// TODO transitively search through the referenced service account to find the required secrets
 // TODO duplicate secrets are being retrieved multiple times and there is no cache.  Creating and using a secret manager interface will make this easier to address.
 func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	pullSecrets := []api.Secret{}
@@ -1291,7 +1290,8 @@ func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
 		secret, err := kl.kubeClient.Secrets(pod.Namespace).Get(secretRef.Name)
 		if err != nil {
-			return nil, err
+			glog.Warningf("Unable to retrieve pull secret %s/%s for %s/%s due to %v.  The image pull may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
+			continue
 		}
 
 		pullSecrets = append(pullSecrets, *secret)
