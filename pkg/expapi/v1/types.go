@@ -363,3 +363,102 @@ type ThirdPartyResourceDataList struct {
 	// Items is the list of ThirdpartyResourceData.
 	Items []ThirdPartyResourceData `json:"items"`
 }
+
+// Job represents the configuration of a single job.
+type Job struct {
+	v1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	v1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is a structure defining the expected behavior of a job.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec JobSpec `json:"spec,omitempty"`
+
+	// Status is a structure describing current status of a job.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Status JobStatus `json:"status,omitempty"`
+}
+
+// JobList is a collection of jobs.
+type JobList struct {
+	v1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	v1.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of Job.
+	Items []Job `json:"items"`
+}
+
+// JobSpec describes how the job execution will look like.
+type JobSpec struct {
+
+	// Parallelism specifies the maximum desired number of pods the job should
+	// run at any given time. The actual number of pods running in steady state will
+	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
+	// i.e. when the work left to do is less than max parallelism.
+	Parallelism *int `json:"parallelism,omitempty"`
+
+	// Completions specifies the desired number of successfully finished pods the
+	// job should be run with. Defaults to 1.
+	Completions *int `json:"completions,omitempty"`
+
+	// Selector is a label query over pods that should match the pod count.
+	Selector map[string]string `json:"selector"`
+
+	// Template is the object that describes the pod that will be created when
+	// executing a job.
+	Template *v1.PodTemplateSpec `json:"template"`
+}
+
+// JobStatus represents the current state of a Job.
+type JobStatus struct {
+
+	// Conditions represent the latest available observations of an object's current state.
+	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// StartTime represents time when the job was acknowledged by the Job Manager.
+	// It is not guaranteed to be set in happens-before order across separate operations.
+	// It is represented in RFC3339 form and is in UTC.
+	StartTime *util.Time `json:"startTime,omitempty"`
+
+	// CompletionTime represents time when the job was completed. It is not guaranteed to
+	// be set in happens-before order across separate operations.
+	// It is represented in RFC3339 form and is in UTC.
+	CompletionTime *util.Time `json:"completionTime,omitempty"`
+
+	// Active is the number of actively running pods.
+	Active int `json:"active,omitempty"`
+
+	// Successful is the number of pods which reached Phase Succeeded.
+	Successful int `json:"successful,omitempty"`
+
+	// Unsuccessful is the number of pods failures, this applies only to jobs
+	// created with RestartPolicyNever, otherwise this value will always be 0.
+	Unsuccessful int `json:"unsuccessful,omitempty"`
+}
+
+type JobConditionType string
+
+// These are valid conditions of a job.
+const (
+	// JobComplete means the job has completed its execution.
+	JobComplete JobConditionType = "Complete"
+)
+
+// JobCondition describes current state of a job.
+type JobCondition struct {
+	// Type of job condition, currently only Complete.
+	Type JobConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status"`
+	// Last time the condition was checked.
+	LastProbeTime util.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transit from one status to another.
+	LastTransitionTime util.Time `json:"lastTransitionTime,omitempty"`
+	// (brief) reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human readable message indicating details about last transition.
+	Message string `json:"message,omitempty"`
+}

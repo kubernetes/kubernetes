@@ -986,6 +986,121 @@ func deepCopy_expapi_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerSta
 	return nil
 }
 
+func deepCopy_expapi_Job(in Job, out *Job, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_expapi_JobSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_expapi_JobStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_expapi_JobCondition(in JobCondition, out *JobCondition, c *conversion.Cloner) error {
+	out.Type = in.Type
+	out.Status = in.Status
+	if err := deepCopy_util_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_util_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func deepCopy_expapi_JobList(in JobList, out *JobList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Job, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_expapi_Job(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_expapi_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) error {
+	if in.Parallelism != nil {
+		out.Parallelism = new(int)
+		*out.Parallelism = *in.Parallelism
+	} else {
+		out.Parallelism = nil
+	}
+	if in.Completions != nil {
+		out.Completions = new(int)
+		*out.Completions = *in.Completions
+	} else {
+		out.Completions = nil
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		out.Template = new(api.PodTemplateSpec)
+		if err := deepCopy_api_PodTemplateSpec(*in.Template, out.Template, c); err != nil {
+			return err
+		}
+	} else {
+		out.Template = nil
+	}
+	return nil
+}
+
+func deepCopy_expapi_JobStatus(in JobStatus, out *JobStatus, c *conversion.Cloner) error {
+	if in.Conditions != nil {
+		out.Conditions = make([]JobCondition, len(in.Conditions))
+		for i := range in.Conditions {
+			if err := deepCopy_expapi_JobCondition(in.Conditions[i], &out.Conditions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
+	if in.StartTime != nil {
+		out.StartTime = new(util.Time)
+		if err := deepCopy_util_Time(*in.StartTime, out.StartTime, c); err != nil {
+			return err
+		}
+	} else {
+		out.StartTime = nil
+	}
+	if in.CompletionTime != nil {
+		out.CompletionTime = new(util.Time)
+		if err := deepCopy_util_Time(*in.CompletionTime, out.CompletionTime, c); err != nil {
+			return err
+		}
+	} else {
+		out.CompletionTime = nil
+	}
+	out.Active = in.Active
+	out.Successful = in.Successful
+	out.Unsuccessful = in.Unsuccessful
+	return nil
+}
+
 func deepCopy_expapi_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1206,6 +1321,11 @@ func init() {
 		deepCopy_expapi_HorizontalPodAutoscalerList,
 		deepCopy_expapi_HorizontalPodAutoscalerSpec,
 		deepCopy_expapi_HorizontalPodAutoscalerStatus,
+		deepCopy_expapi_Job,
+		deepCopy_expapi_JobCondition,
+		deepCopy_expapi_JobList,
+		deepCopy_expapi_JobSpec,
+		deepCopy_expapi_JobStatus,
 		deepCopy_expapi_ReplicationControllerDummy,
 		deepCopy_expapi_ResourceConsumption,
 		deepCopy_expapi_RollingUpdateDeployment,
