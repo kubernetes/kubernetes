@@ -65,7 +65,7 @@ func validNewHorizontalPodAutoscaler(name string) *expapi.HorizontalPodAutoscale
 			},
 			MinCount: 1,
 			MaxCount: 5,
-			Target:   expapi.TargetConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
+			Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 		},
 	}
 }
