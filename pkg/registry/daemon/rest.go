@@ -19,7 +19,6 @@ package daemon
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -92,17 +91,15 @@ func (daemonStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) f
 	return append(validationErrorList, updateErrorList...)
 }
 
+// AllowUnconditionalUpdate is the default update policy for daemon objects.
 func (daemonStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// DaemonToSelectableFields returns a label set that represents the object.
+// DaemonToSelectableFields returns a field set that represents the object.
 func DaemonToSelectableFields(daemon *api.Daemon) fields.Set {
 	return fields.Set{
-		"metadata.name":                 daemon.Name,
-		"status.currentNumberScheduled": strconv.Itoa(daemon.Status.CurrentNumberScheduled),
-		"status.numberMisscheduled":     strconv.Itoa(daemon.Status.NumberMisscheduled),
-		"status.desiredNumberScheduled": strconv.Itoa(daemon.Status.DesiredNumberScheduled),
+		"metadata.name": daemon.Name,
 	}
 }
 

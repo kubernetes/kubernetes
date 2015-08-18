@@ -543,28 +543,11 @@ func TestEtcdWatchControllersFields(t *testing.T) {
 
 	testFieldMap := map[int][]fields.Set{
 		PASS: {
-			{"status.currentNumberScheduled": "2"},
-			{"status.numberMisscheduled": "1"},
-			{"status.desiredNumberScheduled": "4"},
 			{"metadata.name": "foo"},
-			{"status.currentNumberScheduled": "2", "status.numberMisscheduled": "1"},
-			{"status.currentNumberScheduled": "2", "status.desiredNumberScheduled": "4"},
-			{"status.currentNumberScheduled": "2", "metadata.name": "foo"},
-			{"status.desiredNumberScheduled": "4", "metadata.name": "foo"},
-			{"status.currentNumberScheduled": "2", "status.desiredNumberScheduled": "4", "metadata.name": "foo"},
-			{"status.currentNumberScheduled": "2", "status.numberMisscheduled": "1", "status.desiredNumberScheduled": "4"},
-			{"status.currentNumberScheduled": "2", "status.numberMisscheduled": "1", "status.desiredNumberScheduled": "4", "metadata.name": "foo"},
 		},
 		FAIL: {
-			{"status.currentNumberScheduled": "1"},
-			{"status.numberMisscheduled": "0"},
-			{"status.desiredNumberScheduled": "5"},
 			{"metadata.name": "bar"},
 			{"name": "foo"},
-			{"status.replicas": "0"},
-			{"status.currentNumberScheduled": "2", "status.desiredNumberScheduled": "3"},
-			{"status.numberMisscheduled": "3", "status.desiredNumberScheduled": "5"},
-			{"status.currentNumberScheduled": "2", "status.desiredNumberScheduled": "4", "metadata.name": "foox"},
 		},
 	}
 	testEtcdActions := []string{

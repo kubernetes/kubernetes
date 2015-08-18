@@ -18,6 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	kClientLib "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -38,6 +39,9 @@ const (
 	ListDaemonAction   = "list-daemons"
 	CreateDaemonAction = "create-daemon"
 )
+
+// Ensure statically that FakeDaemons implements DaemonInterface.
+var _ kClientLib.DaemonInterface = &FakeDaemons{}
 
 func (c *FakeDaemons) Get(name string) (*api.Daemon, error) {
 	obj, err := c.Fake.Invokes(NewGetAction("daemons", c.Namespace, name), &api.Daemon{})

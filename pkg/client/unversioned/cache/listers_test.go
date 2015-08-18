@@ -64,7 +64,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 			},
 			outRCNames: util.NewStringSet("basic"),
 		},
-		// No pod lables
+		// No pod labels
 		{
 			inRCs: []*api.ReplicationController{
 				{
@@ -186,7 +186,7 @@ func TestStoreToDaemonLister(t *testing.T) {
 			},
 			outDCNames: util.NewStringSet("basic", "complex", "complex2"),
 		},
-		// No pod lables
+		// No pod labels
 		{
 			inDCs: []*api.Daemon{
 				{
@@ -200,7 +200,7 @@ func TestStoreToDaemonLister(t *testing.T) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
-				return lister.GetPodDaemon(pod)
+				return lister.GetPodDaemons(pod)
 			},
 			outDCNames: util.NewStringSet(),
 			expectErr:  true,
@@ -220,7 +220,7 @@ func TestStoreToDaemonLister(t *testing.T) {
 						Labels:    map[string]string{"foo": "bar"},
 					},
 				}
-				return lister.GetPodDaemon(pod)
+				return lister.GetPodDaemons(pod)
 			},
 			outDCNames: util.NewStringSet(),
 			expectErr:  true,
@@ -249,7 +249,7 @@ func TestStoreToDaemonLister(t *testing.T) {
 						Namespace: "ns",
 					},
 				}
-				return lister.GetPodDaemon(pod)
+				return lister.GetPodDaemons(pod)
 			},
 			outDCNames: util.NewStringSet("bar"),
 		},

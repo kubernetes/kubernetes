@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
@@ -46,6 +46,9 @@ type daemons struct {
 func newDaemons(c *Client, namespace string) *daemons {
 	return &daemons{c, namespace}
 }
+
+// Ensure statically that daemons implements DaemonInterface.
+var _ DaemonInterface = &daemons{}
 
 func (c *daemons) List(selector labels.Selector) (result *api.DaemonList, err error) {
 	result = &api.DaemonList{}
