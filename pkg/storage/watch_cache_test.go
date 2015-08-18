@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package storage
 
 import (
 	"strconv"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -36,7 +38,7 @@ func makeTestPod(name string, resourceVersion uint64) *api.Pod {
 }
 
 func TestWatchCacheBasic(t *testing.T) {
-	store := NewWatchCache(2)
+	store := newWatchCache(2)
 
 	// Test Add/Update/Delete.
 	pod1 := makeTestPod("pod", 1)
@@ -106,7 +108,7 @@ func TestWatchCacheBasic(t *testing.T) {
 }
 
 func TestEvents(t *testing.T) {
-	store := NewWatchCache(5)
+	store := newWatchCache(5)
 
 	store.Add(makeTestPod("pod", 2))
 
@@ -218,6 +220,47 @@ func TestEvents(t *testing.T) {
 		prevPod := makeTestPod("pod", uint64(8))
 		if !api.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
+		}
+	}
+}
+
+type testLW struct {
+	ListFunc  func() (runtime.Object, error)
+	WatchFunc func(resourceVersion string) (watch.Interface, error)
+}
+
+func (t *testLW) List() (runtime.Object, error) { return t.ListFunc() }
+func (t *testLW) Watch(resourceVersion string) (watch.Interface, error) {
+	return t.WatchFunc(resourceVersion)
+}
+
+func TestReflectorForWatchCache(t *testing.T) {
+	store := newWatchCache(5)
+
+	{
+		_, version := store.ListWithVersion()
+		if version != 0 {
+			t.Errorf("unexpected resource version: %d", version)
+		}
+	}
+
+	lw := &testLW{
+		WatchFunc: func(rv string) (watch.Interface, error) {
+			fw := watch.NewFake()
+			go fw.Stop()
+			return fw, nil
+		},
+		ListFunc: func() (runtime.Object, error) {
+			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "10"}}, nil
+		},
+	}
+	r := cache.NewReflector(lw, &api.Pod{}, store, 0)
+	r.ListAndWatch(util.NeverStop)
+
+	{
+		_, version := store.ListWithVersion()
+		if version != 10 {
+			t.Errorf("unexpected resource version: %d", version)
 		}
 	}
 }
