@@ -140,7 +140,8 @@ func (c *Config) getValidLockOrDelete() (*api.Lock, error) {
 
 	//Read the renewal time.  We will delete the lock unless the renewal time
 	//is within our TTL.
-	rTime, _ := time.Parse("Mon Jan 2 15:04:05 -0700 MST 2006", acquiredLock.Spec.RenewTime)
+	glog.Errorf("%v acquiredLock.Spec.RenewTime", acquiredLock.Spec.RenewTime)
+	rTime, _ := time.Parse("2006-01-02 15:04:05 -0700 MST", acquiredLock.Spec.RenewTime)
 
 	//If the current time is larger than the last update time, the lock is old,
 	//regardless of the owner, we can safely delete it - because any lock owner
@@ -179,19 +180,18 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 			glog.Errorf("Lock was NOT created, ERROR = %v", err)
 			return false, err
 		} else {
-			glog.Errorf("Lock created successfully %v !", acquiredLock)
+			glog.Errorf("Lock created successfully %v !", acquiredLock.Spec.RenewTime)
 		}
 	}
 	// UPDATE will fail if another node has the lock.  In any case, if an UPDATE fails,
 	// we cannot take the lock, so the result is the same - return false and return error details.
 	glog.Errorf("Updating acquired lock %v", acquiredLock)
-	_, err = ilock.Update(acquiredLock)
+	acquiredLock, err = ilock.Update(acquiredLock)
 	if err != nil {
 		glog.Errorf("Acquire lock failed.  We don't have the lock, master is %v", acquiredLock)
 		return false, err
 	}
-	glog.Errorf("Acquired lock successfully.  We are the master, yipppeee!")
-
+	glog.Errorf("Acquired lock successfully.  We are the master, yipppeee! %v", acquiredLock.Spec.RenewTime)
 	//When we return true, this should result in a update to master status.
 	return true, nil
 }
