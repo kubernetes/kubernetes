@@ -155,7 +155,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
-		Validator: func() (validation.Schema, error) {
+		Validator: func(validate bool) (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
 		DefaultNamespace: func() (string, bool, error) {
@@ -210,7 +210,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
-		Validator: func() (validation.Schema, error) {
+		Validator: func(validate bool) (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
 		DefaultNamespace: func() (string, bool, error) {

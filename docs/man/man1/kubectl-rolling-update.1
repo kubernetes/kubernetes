@@ -84,6 +84,10 @@ existing replication controller and overwrite at least one (common) label in its
 \fB\-\-update\-period\fP=1m0s
     Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
+.PP
+\fB\-\-validate\fP=true
+    If true, use a schema to validate the input before sending it
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
@@ -173,10 +177,6 @@ existing replication controller and overwrite at least one (common) label in its
 .PP
 \fB\-\-v\fP=0
     log level for V logs
-
-.PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
 
 .PP
 \fB\-\-vmodule\fP=

@@ -57,7 +57,7 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to file to use to create the resource"
 	kubectl.AddJsonFilenameFlag(cmd, usage)
 	cmd.MarkFlagRequired("filename")
-
+	cmdutil.AddValidateFlag(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	return cmd
 }
@@ -70,8 +70,7 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 }
 
 func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
-
-	schema, err := f.Validator()
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
 		return err
 	}
