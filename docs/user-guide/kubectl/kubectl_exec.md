@@ -41,7 +41,7 @@ Execute a command in a container.
 Execute a command in a container.
 
 ```
-kubectl exec POD -c CONTAINER -- COMMAND [args...]
+kubectl exec POD [-c CONTAINER] -- COMMAND [args...]
 ```
 
 ### Examples
@@ -61,7 +61,7 @@ $ kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il
 ### Options
 
 ```
-  -c, --container="": Container name
+  -c, --container="": Container name. If omitted, the first container in the pod will be chosen
   -h, --help[=false]: help for exec
   -p, --pod="": Pod name
   -i, --stdin[=false]: Pass stdin to the container
