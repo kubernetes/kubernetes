@@ -359,34 +359,3 @@ func TestReflector_ListAndWatchWithErrors(t *testing.T) {
 		r.ListAndWatch(util.NeverStop)
 	}
 }
-
-func TestReflectorForWatchCache(t *testing.T) {
-	store := NewWatchCache(5)
-
-	{
-		_, version := store.ListWithVersion()
-		if version != 0 {
-			t.Errorf("unexpected resource version: %d", version)
-		}
-	}
-
-	lw := &testLW{
-		WatchFunc: func(rv string) (watch.Interface, error) {
-			fw := watch.NewFake()
-			go fw.Stop()
-			return fw, nil
-		},
-		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "10"}}, nil
-		},
-	}
-	r := NewReflector(lw, &api.Pod{}, store, 0)
-	r.ListAndWatch(util.NeverStop)
-
-	{
-		_, version := store.ListWithVersion()
-		if version != 10 {
-			t.Errorf("unexpected resource version: %d", version)
-		}
-	}
-}
