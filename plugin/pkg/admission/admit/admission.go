@@ -20,7 +20,7 @@ import (
 	"io"
 
 	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func init() {

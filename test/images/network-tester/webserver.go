@@ -44,7 +44,7 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 )
 

@@ -34,7 +34,7 @@ package e2e
 import (
 	"fmt"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"time"
 
 	. "github.com/onsi/ginkgo"

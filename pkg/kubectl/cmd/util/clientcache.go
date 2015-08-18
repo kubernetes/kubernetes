@@ -18,8 +18,8 @@ package util
 
 import (
 	"k8s.io/kubernetes/pkg/api/registered"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
 func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
