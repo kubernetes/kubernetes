@@ -443,7 +443,7 @@ All dates should be serialized as RFC3339 strings.
 
 ## Units
 
-Units must either be explicit in the field name (e.g., `timeoutSeconds`), or must be specified as part of the value (e.g., `resource.Quantity`). Which approach is preferred is TBD.
+Units must either be explicit in the field name (e.g., `timeoutSeconds`), or must be specified as part of the value (e.g., `resource.Quantity`). Which approach is preferred is TBD, though currently we use the `fooSeconds` convention for durations.
 
 
 ## Selecting Fields
@@ -681,6 +681,10 @@ Accumulate repeated events in the client, especially for frequent events, to red
 * `Minion` has been deprecated in favor of `Node`. Use `Node` where referring to the node resource in the context of the cluster. Use `Host` where referring to properties of the individual physical/virtual system, such as `hostname`, `hostPath`, `hostNetwork`, etc.
 * `FooController` is a deprecated kind naming convention. Name the kind after the thing being controlled instead (e.g., `Job` rather than `JobController`).
 * The name of a field that specifies the time at which `something` occurs should be called `somethingTime`. Do not use `stamp` (e.g., `creationTimestamp`).
+* We use the `fooSeconds` convention for durations, as discussed in the [units subsection](#units).
+  * `fooPeriodSeconds` is preferred for periodic intervals and other waiting periods (e.g., over `fooIntervalSeconds`).
+  * `fooTimeoutSeconds` is preferred for inactivity/unresponsiveness deadlines.
+  * `fooDeadlineSeconds` is preferred for activity completion deadlines.
 * Do not use abbreviations in the API, except where they are extremely commonly used, such as "id", "args", or "stdin".
 * Acronyms should similarly only be used when extremely commonly known. All letters in the acronym should have the same case, using the appropriate case for the situation. For example, at the beginning of a field name, the acronym should be all lowercase, such as "httpGet". Where used as a constant, all letters should be uppercase, such as "TCP" or "UDP".
 
