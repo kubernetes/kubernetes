@@ -47,11 +47,10 @@ type LeaseUser struct {
 
 // Configuration options needed for running the lease loop.
 type Config struct {
-	Key       string
-	whoami    string
-	ttl       uint64
-	sleep     time.Duration
-	lastLease time.Time
+	Key    string
+	whoami string
+	ttl    uint64
+	sleep  time.Duration
 	// These two functions return "err" or else nil.
 	// They should also update information in the LeaseUserInfo struct
 	// about the state of the lease owner.
@@ -104,24 +103,25 @@ var countsleeps = 0
 func (c *Config) leaseAndUpdateLoop() {
 	for {
 		glog.Errorf("zzzz")
-		master, err := c.acquireOrRenewLease()
-		glog.Errorf("zzzz acquired")
-		if err != nil {
-			glog.Errorf("Error in lock acquisition: %v, looping", err)
-		} else {
-			glog.Errorf("Checking ttl = %v , [[[ last %v ]]]  [[[ now %v ]]],  time difference = %v ", c.ttl, c.lastLease, time.Now(), time.Now().Sub(c.lastLease))
 
-			//We may need to "unset" the master status... if a leasettl expired!
-			//If Location is nil, then time is uninitialized.
-			if !c.lastLease.IsZero() && uint64(time.Now().Sub(c.lastLease).Seconds()) >= c.ttl {
-				glog.Errorf("Too much time has elapsed, giving up lease.")
-				master = false
-			}
-			if err := c.update(master); err != nil {
-				glog.Errorf("Error updating master status %v", err)
+		//Proactively give up the lease every 50 tries.
+		var master bool = false
+		var err error = nil
+
+		//Lets see if we are the master.
+		if countsleeps < 50 {
+			master, err = c.acquireOrRenewLease()
+			if err != nil {
+				glog.Errorf("Error in determining if master. %v, looping", err)
 			} else {
-				glog.Errorf("Done updating master status %v", c)
+				glog.Errorf("Master info acquired %v", master)
 			}
+		}
+
+		if err := c.update(master); err != nil {
+			glog.Errorf("Error updating master status %v", err)
+		} else {
+			glog.Errorf("Done updating master status %v", c)
 		}
 		countsleeps++
 		glog.Errorf("..sleep.. %v %v", c.sleep, countsleeps)
@@ -129,17 +129,40 @@ func (c *Config) leaseAndUpdateLoop() {
 	}
 }
 
+// A lock can be invalid if (1) it doesnt exist or (2) we decided to delete it.
+func (c *Config) getValidLockOrDelete() (*api.Lock, error) {
+	ilock := c.Cli.Locks(api.NamespaceDefault)
+	acquiredLock, err := ilock.Get(c.Key)
+	if err != nil {
+		glog.Errorf("Error could not get any lock : %v", err)
+		return nil, err
+	}
+
+	//Read the renewal time.  We will delete the lock unless the renewal time
+	//is within our TTL.
+	rTime, _ := time.Parse("Mon Jan 2 15:04:05 -0700 MST 2006", acquiredLock.Spec.RenewTime)
+
+	//If the current time is larger than the last update time, the lock is old,
+	//regardless of the owner, we can safely delete it - because any lock owner
+	//by now would have renewed it unless it has died off.
+	if uint64(time.Since(rTime)/time.Second) >= c.ttl {
+		ilock.Delete(c.Key)
+		glog.Errorf("Deleted a stale lock (last renewal was %v, current time is %v).  Time to make a new one !", rTime, time.Now())
+		return nil, nil
+	}
+
+	//Lock looks good.  Lets return it.
+	return acquiredLock, nil
+}
+
 // acquireOrRenewLease either races to acquire a new master lease, or update the existing master's lease
 // returns true if we have the lease, and an error if one occurs.
 // TODO: use the master election utility once it is merged in.
 func (c *Config) acquireOrRenewLease() (bool, error) {
-	//TODO It seems that for the type of leasing done by daemons for HA, we
-	//should put locks in the default NS.  Confirm this or create a new NS for HA locks.
+	acquiredLock, err := c.getValidLockOrDelete()
 	ilock := c.Cli.Locks(api.NamespaceDefault)
-	acquiredLock, err := ilock.Get(c.Key)
 	//No lock exists, lets create one if possible.
-	if err != nil {
-
+	if acquiredLock == nil {
 		acquiredLock, err = ilock.Create(
 			&api.Lock{
 				ObjectMeta: api.ObjectMeta{
@@ -157,23 +180,15 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 			return false, err
 		} else {
 			glog.Errorf("Lock created successfully %v !", acquiredLock)
-			//Set the time of the lock to "now".
-			c.lastLease = time.Now()
 		}
 	}
-
 	// UPDATE will fail if another node has the lock.  In any case, if an UPDATE fails,
 	// we cannot take the lock, so the result is the same - return false and return error details.
+	glog.Errorf("Updating acquired lock %v", acquiredLock)
 	_, err = ilock.Update(acquiredLock)
 	if err != nil {
 		glog.Errorf("Acquire lock failed.  We don't have the lock, master is %v", acquiredLock)
 		return false, err
-	}
-
-	//In the case where the daemon has restarted, and happens to find a lock from etcd - we need to set lease time to now.
-	//Also, in the case that a fresh lock is created, we need to set the lease time to now.
-	if c.lastLease.IsZero() {
-		c.lastLease = time.Now()
 	}
 	glog.Errorf("Acquired lock successfully.  We are the master, yipppeee!")
 
