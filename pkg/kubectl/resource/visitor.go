@@ -34,7 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const constSTDINstr string = "STDIN"
+const (
+	constSTDINstr       string = "STDIN"
+	stopValidateMessage        = "if you choose to ignore these errors, turn validation off with --validate=false"
+)
 
 // Visitor lets clients walk a list of resources.
 type Visitor interface {
@@ -205,7 +208,7 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 		return fmt.Errorf("error converting to YAML: %v", err)
 	}
 	if err := schema.ValidateBytes(data); err != nil {
-		return fmt.Errorf("error validating data: %v", err)
+		return fmt.Errorf("error validating data: %v; %s", err, stopValidateMessage)
 	}
 	return nil
 }

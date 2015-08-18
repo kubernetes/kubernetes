@@ -141,7 +141,6 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 		}
 		errs := s.validateField(value, apiVersion, fieldName+key, fieldType, &details)
 		if len(errs) > 0 {
-			glog.Errorf("Validation failed for: %s, %v", key, value)
 			allErrs = append(allErrs, errs...)
 		}
 	}
