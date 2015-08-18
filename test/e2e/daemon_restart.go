@@ -131,7 +131,7 @@ func replacePods(pods []*api.Pod, store cache.Store) {
 	for i := range pods {
 		found = append(found, pods[i])
 	}
-	expectNoError(store.Replace(found))
+	expectNoError(store.Replace(found, "0"))
 }
 
 // getContainerRestarts returns the count of container restarts across all pods matching the given labelSelector,

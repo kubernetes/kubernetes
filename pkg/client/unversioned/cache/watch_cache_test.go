@@ -90,7 +90,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	store.Replace([]interface{}{
 		makeTestPod("pod4", 7),
 		makeTestPod("pod5", 8),
-	})
+	}, "8")
 	{
 		podNames := util.StringSet{}
 		for _, item := range store.List() {

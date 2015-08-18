@@ -234,12 +234,7 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 	for _, item := range items {
 		found = append(found, item)
 	}
-
-	myStore, ok := r.store.(*WatchCache)
-	if ok {
-		return myStore.ReplaceWithVersion(found, resourceVersion)
-	}
-	return r.store.Replace(found)
+	return r.store.Replace(found, resourceVersion)
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
