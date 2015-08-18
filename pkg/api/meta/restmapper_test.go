@@ -155,7 +155,7 @@ func TestKindToResource(t *testing.T) {
 		{Kind: "lowercases", MixedCase: false, Plural: "lowercases", Singular: "lowercases"},
 	}
 	for i, testCase := range testCases {
-		plural, singular := kindToResource(testCase.Kind, testCase.MixedCase)
+		plural, singular := KindToResource(testCase.Kind, testCase.MixedCase)
 		if singular != testCase.Singular || plural != testCase.Plural {
 			t.Errorf("%d: unexpected plural and singular: %s %s", i, plural, singular)
 		}

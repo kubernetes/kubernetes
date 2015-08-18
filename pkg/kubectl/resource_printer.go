@@ -19,6 +19,7 @@ package kubectl
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,6 +33,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/labels"
@@ -53,6 +55,8 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		printer = &JSONPrinter{}
 	case "yaml":
 		printer = &YAMLPrinter{}
+	case "name":
+		printer = &NamePrinter{}
 	case "template":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("template format specified but no template given")
@@ -143,6 +147,56 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return p.printer.PrintObj(converted, w)
 	}
 	return fmt.Errorf("the object cannot be converted to any of the versions: %v", p.version)
+}
+
+// NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
+type NamePrinter struct {
+}
+
+// PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
+// and print "resource/name" pair. If the object is a List, print all items in it.
+func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	objvalue := reflect.ValueOf(obj).Elem()
+	kind := objvalue.FieldByName("Kind")
+	if !kind.IsValid() {
+		kind = reflect.ValueOf("<unknown>")
+	}
+	if kind.String() == "List" {
+		items := objvalue.FieldByName("Items")
+		if items.Type().String() == "[]runtime.RawExtension" {
+			for i := 0; i < items.Len(); i++ {
+				rawObj := items.Index(i).FieldByName("RawJSON").Interface().([]byte)
+				scheme := api.Scheme
+				version, kind, err := scheme.DataVersionAndKind(rawObj)
+				if err != nil {
+					return err
+				}
+				decodedObj, err := scheme.DecodeToVersion(rawObj, "")
+				if err != nil {
+					return err
+				}
+				tpmeta := api.TypeMeta{
+					APIVersion: version,
+					Kind:       kind,
+				}
+				s := reflect.ValueOf(decodedObj).Elem()
+				s.FieldByName("TypeMeta").Set(reflect.ValueOf(tpmeta))
+				p.PrintObj(decodedObj, w)
+			}
+		} else {
+			return errors.New("the list object contains unrecognized items.")
+		}
+	} else {
+		name := objvalue.FieldByName("Name")
+		if !name.IsValid() {
+			name = reflect.ValueOf("<unknown>")
+		}
+		_, resource := meta.KindToResource(kind.String(), false)
+
+		fmt.Fprintf(w, "%s/%s\n", resource, name)
+	}
+
+	return nil
 }
 
 // JSONPrinter is an implementation of ResourcePrinter which outputs an object as JSON.
