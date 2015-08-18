@@ -17,7 +17,7 @@ limitations under the License.
 /*
 Package client contains the implementation of the client side communication with the
 Kubernetes master. The Client class provides methods for reading, creating, updating,
-and deleting pods, replication controllers, services, and minions.
+and deleting pods, replication controllers, daemons, services, and minions.
 
 Most consumers should use the Config object to create a Client:
 
