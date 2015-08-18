@@ -39,7 +39,7 @@ var _ = Describe("Docker Containers", func() {
 	})
 
 	AfterEach(func() {
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})

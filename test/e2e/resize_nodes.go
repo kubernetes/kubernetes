@@ -413,7 +413,7 @@ var _ = Describe("Nodes", func() {
 			Failf("Not all nodes are ready: %v", err)
 		}
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
 		}
 	})

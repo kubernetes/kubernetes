@@ -234,7 +234,7 @@ var _ = Describe("Volumes", func() {
 
 	AfterEach(func() {
 		if clean {
-			if err := c.Namespaces().Delete(namespace.Name); err != nil {
+			if err := deleteNS(c, namespace.Name); err != nil {
 				Failf("Couldn't delete ns %s", err)
 			}
 		}
