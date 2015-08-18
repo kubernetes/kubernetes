@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -94,7 +93,7 @@ func TestNewStatus(t *testing.T) {
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 1)
 
-	status, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(testPod))
+	status, _ := syncer.GetPodStatus(testPod.UID)
 	if status.StartTime.IsZero() {
 		t.Errorf("SetPodStatus did not set a proper start time value")
 	}
@@ -115,7 +114,7 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	pod.Status.StartTime = &startTime
 	syncer.SetPodStatus(pod, getRandomPodStatus())
 
-	status, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(pod))
+	status, _ := syncer.GetPodStatus(pod.UID)
 	if !status.StartTime.Time.Equal(startTime.Time) {
 		t.Errorf("Unexpected start time, expected %v, actual %v", startTime, status.StartTime)
 	}
@@ -136,7 +135,7 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 	syncer.SetPodStatus(testPod, firstStatus)
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 2)
-	finalStatus, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(testPod))
+	finalStatus, _ := syncer.GetPodStatus(testPod.UID)
 	if finalStatus.StartTime.IsZero() {
 		t.Errorf("StartTime should not be zero")
 	}

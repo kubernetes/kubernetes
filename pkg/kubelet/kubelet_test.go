@@ -2047,13 +2047,13 @@ func TestHandlePortConflicts(t *testing.T) {
 	pods[1].CreationTimestamp = util.NewTime(time.Now())
 	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
-	conflictedPodName := kubecontainer.GetPodFullName(pods[0])
+	conflictedPod := pods[0]
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
-	status, found := kl.statusManager.GetPodStatus(conflictedPodName)
+	status, found := kl.statusManager.GetPodStatus(conflictedPod.UID)
 	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", conflictedPodName)
+		t.Fatalf("status of pod %q is not found in the status map", conflictedPod.UID)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2089,13 +2089,13 @@ func TestHandleNodeSelector(t *testing.T) {
 		},
 	}
 	// The first pod should be rejected.
-	notfittingPodName := kubecontainer.GetPodFullName(pods[0])
+	notfittingPod := pods[0]
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
-	status, found := kl.statusManager.GetPodStatus(notfittingPodName)
+	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
 	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", notfittingPodName)
+		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2137,13 +2137,13 @@ func TestHandleMemExceeded(t *testing.T) {
 	pods[1].CreationTimestamp = util.NewTime(time.Now())
 	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
-	notfittingPodName := kubecontainer.GetPodFullName(pods[0])
+	notfittingPod := pods[0]
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
-	status, found := kl.statusManager.GetPodStatus(notfittingPodName)
+	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
 	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", notfittingPodName)
+		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2159,17 +2159,18 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 
 	kl := testKubelet.kubelet
 	pods := []*api.Pod{
-		{ObjectMeta: api.ObjectMeta{Name: "pod1"}, Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-		{ObjectMeta: api.ObjectMeta{Name: "pod2"}, Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
+		{ObjectMeta: api.ObjectMeta{Name: "pod1", UID: "1234"}, Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
+		{ObjectMeta: api.ObjectMeta{Name: "pod2", UID: "4567"}, Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
 	}
+	podToTest := pods[1]
 	// Run once to populate the status map.
 	kl.handleNotFittingPods(pods)
-	if _, found := kl.statusManager.GetPodStatus(kubecontainer.BuildPodFullName("pod2", "")); !found {
+	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); !found {
 		t.Fatalf("expected to have status cached for pod2")
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.SyncPods([]*api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if _, found := kl.statusManager.GetPodStatus(kubecontainer.BuildPodFullName("pod2", "")); found {
+	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
 		t.Fatalf("expected to not have status cached for pod2")
 	}
 }
@@ -2816,10 +2817,9 @@ func TestDoNotCacheStatusForStaticPods(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	podFullName := kubecontainer.GetPodFullName(pods[0])
-	status, ok := kubelet.statusManager.GetPodStatus(podFullName)
+	status, ok := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	if ok {
-		t.Errorf("unexpected status %#v found for static pod %q", status, podFullName)
+		t.Errorf("unexpected status %#v found for static pod %q", status, pods[0].UID)
 	}
 }
 
@@ -3148,10 +3148,9 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	podFullName := kubecontainer.GetPodFullName(pods[0])
-	status, found := kubelet.statusManager.GetPodStatus(podFullName)
+	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	if !found {
-		t.Errorf("expected to found status for pod %q", podFullName)
+		t.Errorf("expected to found status for pod %q", pods[0].UID)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q, ot %q.", api.PodFailed, status.Phase)
@@ -3203,10 +3202,9 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	podFullName := kubecontainer.GetPodFullName(pods[0])
-	status, found := kubelet.statusManager.GetPodStatus(podFullName)
+	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	if !found {
-		t.Errorf("expected to found status for pod %q", podFullName)
+		t.Errorf("expected to found status for pod %q", pods[0].UID)
 	}
 	if status.Phase == api.PodFailed {
 		t.Fatalf("expected pod status to not be %q", status.Phase)
