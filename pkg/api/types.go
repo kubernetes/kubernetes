@@ -2111,6 +2111,7 @@ const (
 // Similarly to above, these are constants to support HTTP PATCH utilized by
 // both the client and server that didn't make sense for a whole package to be
 // dedicated to.
+// TODO: Clients refer to this, so it should be versioned.
 type PatchType string
 
 const (

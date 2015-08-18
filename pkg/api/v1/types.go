@@ -1644,6 +1644,24 @@ const (
 	// Status code 500.
 	StatusReasonUnknown StatusReason = ""
 
+	// StatusReasonUnauthorized means the server can be reached and understood the request, but requires
+	// the user to present appropriate authorization credentials (identified by the WWW-Authenticate header)
+	// in order for the action to be completed. If the user has specified credentials on the request, the
+	// server considers them insufficient.
+	// Status code 401
+	StatusReasonUnauthorized StatusReason = "Unauthorized"
+
+	// StatusReasonForbidden means the server can be reached and understood the request, but refuses
+	// to take any further action.  It is the result of the server being configured to deny access for some reason
+	// to the requested resource by the client.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the forbidden resource
+	//                   on some operations may differ from the requested
+	//                   resource.
+	//   "id"   string - the identifier of the forbidden resource
+	// Status code 403
+	StatusReasonForbidden StatusReason = "Forbidden"
+
 	// StatusReasonNotFound means one or more resources required for this operation
 	// could not be found.
 	// Details (optional):
