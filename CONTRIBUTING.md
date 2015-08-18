@@ -1,6 +1,12 @@
-# How to become a contributor and submit your own code
+# Contributing guidelines
 
-## Contributor License Agreements
+## Filing issues
+
+If you have a question about Kubernetes or have a problem using Kubernetes, before filing an issue, please read the [troubleshooting guide](docs/troubleshooting.md).
+
+## How to become a contributor and submit your own code
+
+### Contributor License Agreements
 
 We'd love to accept your patches! Before we can take them, we have to jump a couple of legal hurdles.
 
@@ -11,9 +17,9 @@ Please fill out either the individual or corporate Contributor License Agreement
 
 Follow either of the two links above to access the appropriate CLA and instructions for how to sign and return it. Once we receive it, we'll be able to accept your pull requests.
 
-***NOTE***: Only original source code from you and other people that have signed the CLA can be accepted into the main repository. This policy does not apply to [third_party](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/third_party).
+***NOTE***: Only original source code from you and other people that have signed the CLA can be accepted into the main repository. This policy does not apply to [third_party](https://github.com/kubernetes/kubernetes/tree/master/third_party).
 
-## Contributing A Patch
+### Contributing A Patch
 
 1. Submit an issue describing your proposed change to the repo in question.
 1. The repo owner will respond to your issue promptly.
@@ -21,12 +27,12 @@ Follow either of the two links above to access the appropriate CLA and instructi
 1. Fork the desired repo, develop and test your code changes.
 1. Submit a pull request.
 
-## Protocols for Collaborative Development
+### Protocols for Collaborative Development
 
 Please read [this doc](docs/devel/collab.md) for information on how we're running development for the project.
 Also take a look at the [development guide](docs/devel/development.md) for information on how to set up your environment, run tests, manage dependencies, etc.
 
-## Adding dependencies
+### Adding dependencies
 
 If your patch depends on new packages, add that package with [`godep`](https://github.com/tools/godep).  Follow the [instructions to add a dependency](docs/devel/development.md#godep-and-dependency-management).
 
