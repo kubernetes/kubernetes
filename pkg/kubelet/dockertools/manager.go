@@ -317,20 +317,6 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string,
 		result.status.State.Running = &api.ContainerStateRunning{
 			StartedAt: util.NewTime(inspectResult.State.StartedAt),
 		}
-		if containerName == PodInfraContainerName {
-			if inspectResult.NetworkSettings != nil {
-				result.ip = inspectResult.NetworkSettings.IPAddress
-			}
-			// override the above if a network plugin exists
-			if dm.networkPlugin.Name() != network.DefaultPluginName {
-				netStatus, err := dm.networkPlugin.Status(pod.Namespace, pod.Name, kubeletTypes.DockerID(dockerID))
-				if err != nil {
-					glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), pod.Name, err)
-				} else if netStatus != nil {
-					result.ip = netStatus.IP.String()
-				}
-			}
-		}
 	} else if !inspectResult.State.FinishedAt.IsZero() {
 		reason := ""
 		// Note: An application might handle OOMKilled gracefully.
@@ -386,6 +372,9 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	}
 
 	var podStatus api.PodStatus
+	// Fill in the old PodIP (this is set at pod creation)
+	podStatus.PodIP = pod.Status.PodIP
+
 	statuses := make(map[string]*api.ContainerStatus, len(pod.Spec.Containers))
 
 	expectedContainers := make(map[string]api.Container)
@@ -459,12 +448,7 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 			continue
 		}
 
-		if dockerContainerName == PodInfraContainerName {
-			// Found network container
-			if result.status.State.Running != nil {
-				podStatus.PodIP = result.ip
-			}
-		} else {
+		if dockerContainerName != PodInfraContainerName {
 			// Add user container information.
 			if oldStatus, found := oldStatuses[dockerContainerName]; found {
 				// Use the last observed restart count if it's available.
@@ -1734,7 +1718,9 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 			glog.Errorf("Error adding network: %v", err)
 			return err
 		}
-		glog.V(2).Infof("Got result: %v", res)
+
+		ip := res.IP4.IP.String()
+		pod.Status.PodIP = ip
 	}
 
 	// Start everything

@@ -1259,6 +1259,9 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
+	// SyncPod will have set the PodIP; sync that change to the APIServer.
+	kl.statusManager.SetPodStatus(pod, pod.Status)
+
 	if isStaticPod(pod) {
 		if mirrorPod != nil && !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
 			// The mirror pod is semantically different from the static pod. Remove
