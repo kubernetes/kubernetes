@@ -159,7 +159,8 @@ func (s *ProxyServer) Run(_ []string) error {
 	if !s.ForceUserspaceProxy && shouldUseIptables {
 		glog.V(2).Info("Using iptables Proxier.")
 
-		proxierIptables, err := iptables.NewProxier(utiliptables.New(exec.New(), protocol), s.SyncPeriod)
+		execer := exec.New()
+		proxierIptables, err := iptables.NewProxier(utiliptables.New(execer, protocol), execer, s.SyncPeriod)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
