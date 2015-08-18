@@ -189,7 +189,7 @@ func TestResourceQuotaWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   "/api/" + testapi.Version() + "/watch/" + getResourceQuotasResoureName(),
+			Path:   testapi.ResourcePathWithPrefix("watch", getResourceQuotasResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}

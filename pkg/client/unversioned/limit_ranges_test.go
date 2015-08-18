@@ -203,7 +203,7 @@ func TestLimitRangeWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   "/api/" + testapi.Version() + "/watch/" + getLimitRangesResourceName(),
+			Path:   testapi.ResourcePathWithPrefix("watch", getLimitRangesResourceName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}

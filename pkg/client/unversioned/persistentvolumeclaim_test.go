@@ -193,7 +193,7 @@ func TestPersistentVolumeClaimWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   "/api/" + testapi.Version() + "/watch/" + getPersistentVolumeClaimsResoureName(),
+			Path:   testapi.ResourcePathWithPrefix("watch", getPersistentVolumeClaimsResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
