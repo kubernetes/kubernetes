@@ -104,6 +104,9 @@ func deepCopy_expapi_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *Ho
 	if err := deepCopy_expapi_HorizontalPodAutoscalerSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
+	if err := deepCopy_expapi_HorizontalPodAutoscalerStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -138,14 +141,39 @@ func deepCopy_expapi_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec,
 	}
 	out.MinCount = in.MinCount
 	out.MaxCount = in.MaxCount
-	if err := deepCopy_expapi_TargetConsumption(in.Target, &out.Target, c); err != nil {
+	if err := deepCopy_expapi_ResourceConsumption(in.Target, &out.Target, c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func deepCopy_expapi_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, c *conversion.Cloner) error {
+	out.CurrentReplicas = in.CurrentReplicas
+	out.DesiredReplicas = in.DesiredReplicas
+	if err := deepCopy_expapi_ResourceConsumption(in.CurrentConsumption, &out.CurrentConsumption, c); err != nil {
+		return err
+	}
+	if in.LastScaleTimestamp != nil {
+		out.LastScaleTimestamp = new(util.Time)
+		if err := deepCopy_util_Time(*in.LastScaleTimestamp, out.LastScaleTimestamp, c); err != nil {
+			return err
+		}
+	} else {
+		out.LastScaleTimestamp = nil
 	}
 	return nil
 }
 
 func deepCopy_expapi_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_expapi_ResourceConsumption(in ResourceConsumption, out *ResourceConsumption, c *conversion.Cloner) error {
+	out.Resource = in.Resource
+	if err := deepCopy_resource_Quantity(in.Quantity, &out.Quantity, c); err != nil {
 		return err
 	}
 	return nil
@@ -194,14 +222,6 @@ func deepCopy_expapi_SubresourceReference(in SubresourceReference, out *Subresou
 	return nil
 }
 
-func deepCopy_expapi_TargetConsumption(in TargetConsumption, out *TargetConsumption, c *conversion.Cloner) error {
-	out.Resource = in.Resource
-	if err := deepCopy_resource_Quantity(in.Quantity, &out.Quantity, c); err != nil {
-		return err
-	}
-	return nil
-}
-
 func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) error {
 	if newVal, err := c.DeepCopy(in.Time); err != nil {
 		return err
@@ -220,12 +240,13 @@ func init() {
 		deepCopy_expapi_HorizontalPodAutoscaler,
 		deepCopy_expapi_HorizontalPodAutoscalerList,
 		deepCopy_expapi_HorizontalPodAutoscalerSpec,
+		deepCopy_expapi_HorizontalPodAutoscalerStatus,
 		deepCopy_expapi_ReplicationControllerDummy,
+		deepCopy_expapi_ResourceConsumption,
 		deepCopy_expapi_Scale,
 		deepCopy_expapi_ScaleSpec,
 		deepCopy_expapi_ScaleStatus,
 		deepCopy_expapi_SubresourceReference,
-		deepCopy_expapi_TargetConsumption,
 		deepCopy_util_Time,
 	)
 	if err != nil {
