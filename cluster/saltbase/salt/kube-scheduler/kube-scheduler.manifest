@@ -12,10 +12,7 @@
 {
 "apiVersion": "v1",
 "kind": "Pod",
-"metadata": {
-  "name":"kube-scheduler",
-  "namespace": "kube-system"
-},
+"metadata": {"name":"kube-scheduler"},
 "spec":{
 "hostNetwork": true,
 "containers":[
@@ -34,9 +31,8 @@
                ],
     "livenessProbe": {
       "httpGet": {
-        "host": "127.0.0.1",
-        "port": 10251,
-        "path": "/healthz"
+        "path": "/healthz",
+        "port": 10251
       },
       "initialDelaySeconds": 15,
       "timeoutSeconds": 15
