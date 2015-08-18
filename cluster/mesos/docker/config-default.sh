@@ -65,3 +65,5 @@ MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR:-${HOME}/tmp/kubernetes}"
 # Must not be either an AUFS mount or an SMB/CIFS mount.
 # If using docker-machine or boot2docker, should NOT be under /Users (which is mounted from the host into the docker vm).
 MESOS_DOCKER_IMAGE_DIR="${MESOS_DOCKER_IMAGE_DIR:-/var/tmp/kubernetes}"
+
+DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:---log-level=error}"
