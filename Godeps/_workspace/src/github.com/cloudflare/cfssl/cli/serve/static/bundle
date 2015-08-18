@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+
+  <title>CFSSL - Bundle</title>
+  <link href='//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.4/css/bootstrap.min.css' rel='stylesheet prefetch'>
+  <style>
+    body {
+      padding-top: 30px;
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="/">CFSSL</a>
+      </div>
+
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li>
+            <a href="/bundle">Bundle</a>
+          </li>
+          <li>
+            <a href="/scan">Scan</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1 class="page-header">Bundle</h1>
+
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        <form class="
+        " id="cfssl-bundle" name="cfssl-bundle" method="post">
+          <label for="domain">Domain</label>
+          <input class="form-control" id="domain" name="domain" placeholder="cfssl.org" type="text">
+          <label for="flavor">Flavor</label>
+          <select id="flavor" name="flavor">
+            <option selected value="ubiquitous">Ubiquitous</option>
+            <option value="optimal">Optimal</option>
+            <option value="force">Force</option>
+          </select>
+
+          <button class="btn btn-primary" style="float: right;" type="submit">Bundle</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="row">
+      <div id="response" class="col-md-8 col-md-offset-2" style="display: none;">
+        <h3>Certificate Bundle</h2>
+        <table id="messages" class="table table-bordered table-striped" style="display: none;"></table>
+        <table id="errors" class="table table-bordered table-striped" style="display: none;"></table>
+        <pre id="result" style="display: none;"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <script>
+    var messagesHTML = '<tr><th>Messages</th></tr>';
+    var errorsHTML = '<tr><th>Errors</th></tr>';
+    $('#cfssl-bundle').submit(function(event) {
+      $('#result').hide();
+      $('#messages').hide();
+      $('#errors').hide();
+      $('#response').show();
+
+      $.post(
+        '/api/v1/cfssl/bundle',
+        JSON.stringify({
+          domain: $('#domain').val(),
+          flavor: $('#flavor').val()
+        }),
+        null,
+        "json").always(function(data) {
+
+        if (data['result']) {
+          var result = data['result']
+          if (result['bundle']) {
+            $('#result').show().text(result['bundle']);
+          }
+
+          if (result['status'] && result['status']['messages'] && result['status']['messages'].length != 0) {
+            $('#messages').html(messagesHTML).show();
+            $.each(result['status']['messages'], function() {
+              $('#messages').append($('<tr/>').append($('<td/>').html($('<code/>').text(this))));
+            });
+          }
+        } else {
+          data = data['responseJSON'];
+        }
+
+        if (data['errors'] && data['errors'].length != 0) {
+          console.log(data['errors'])
+          console.log([])
+          console.log(typeof data['errors'])
+          $('#errors').html(errorsHTML).show();
+          $.each(data['errors'], function() {
+            $('#errors').append($('<tr/>').append($('<td/>').html($('<code/>').text(this['message']))));
+          });
+        }
+      });
+      event.preventDefault();
+    });
+  </script>
+</body>
+</html>

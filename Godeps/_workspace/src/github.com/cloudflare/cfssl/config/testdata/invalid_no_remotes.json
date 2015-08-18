@@ -1,0 +1,24 @@
+{
+	"signing": {
+		"profiles": {
+			"CA": {
+				"auth_key": "garbage",
+				"remote": "localhoster"
+			},
+			"email": {
+				"usages": ["s/mime"],
+				"expiry": "720h"
+			}
+		},
+		"default": {
+			"usages": ["digital signature", "email protection"],
+			"expiry": "8000h"
+		}
+	},
+	"auth_keys": {
+		"garbage": {
+			"type":"standard",
+			"key":"0123456789ABCDEF0123456789ABCDEF"
+		}
+	}
+}

@@ -1,0 +1,18 @@
+{
+	"signing": {
+		"profiles": {
+			"CA": {
+				"usages": ["cert sign"],
+				"expiry": "720h"
+			},
+			"email": {
+				"usages": ["BAD_USAGE"],
+				"expiry": "720h"
+			}
+		},
+		"default": {
+			"usages": ["digital signature", "email protection"],
+			"expiry": "8000h"
+		}
+	}
+}
