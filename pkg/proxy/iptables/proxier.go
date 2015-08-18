@@ -652,7 +652,7 @@ func (proxier *Proxier) syncProxyRules() error {
 				args = append(args,
 					"-m", "statistic",
 					"--mode", "random",
-					"--probability", fmt.Sprintf("%f", 1.0/float64(n-i)))
+					"--probability", fmt.Sprintf("%0.5f", 1.0/float64(n-i)))
 			}
 			// The final (or only if n == 1) rule is a guaranteed match.
 			args = append(args, "-j", string(endpointChain))
