@@ -42,14 +42,13 @@ mesosslave1:
   - MESOS_CONTAINERIZERS=docker,mesos
   - MESOS_WORK_DIR=/var/tmp/mesos
   - DOCKER_NETWORK_OFFSET=0.0.1.0
-  - DOCKER_DAEMON_ARGS=--log-level=error
+  - DOCKER_DAEMON_ARGS
   links:
   - etcd
   - mesosmaster1
   - "ambassador:apiserver"
   volumes:
   - ${MESOS_DOCKER_WORK_DIR}/mesosslave1/mesos:/var/tmp/mesos
-  - ${MESOS_DOCKER_IMAGE_DIR}/mesosslave1/docker:/var/lib/docker
 mesosslave2:
   hostname: mesosslave2
   privileged: true
@@ -66,14 +65,13 @@ mesosslave2:
   - MESOS_CONTAINERIZERS=docker,mesos
   - MESOS_WORK_DIR=/var/tmp/mesos
   - DOCKER_NETWORK_OFFSET=0.0.2.0
-  - DOCKER_DAEMON_ARGS=--log-level=error
+  - DOCKER_DAEMON_ARGS
   links:
   - etcd
   - mesosmaster1
   - "ambassador:apiserver"
   volumes:
   - ${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos:/var/tmp/mesos
-  - ${MESOS_DOCKER_IMAGE_DIR}/mesosslave2/docker:/var/lib/docker
 apiserver:
   hostname: apiserver
   image: mesosphere/kubernetes-mesos
