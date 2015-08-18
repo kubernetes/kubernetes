@@ -37,6 +37,7 @@ var testTTL uint64 = 60
 
 func NewTestEventStorage(t *testing.T) (*tools.FakeEtcdClient, *REST) {
 	f := tools.NewFakeEtcdClient(t)
+	f.HideExpires = true
 	f.TestIndex = true
 
 	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())

@@ -132,11 +132,13 @@ func PriorityTwo(pod *api.Pod, podLister algorithm.PodLister, minionLister algor
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
+	grace := int64(30)
 	testPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
 		},
 	}
 	handler := util.FakeHandler{

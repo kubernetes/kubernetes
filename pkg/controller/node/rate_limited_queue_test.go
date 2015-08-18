@@ -17,14 +17,16 @@ limitations under the License.
 package nodecontroller
 
 import (
+	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func CheckQueueEq(lhs, rhs []string) bool {
+func CheckQueueEq(lhs []string, rhs TimedQueue) bool {
 	for i := 0; i < len(lhs); i++ {
-		if rhs[i] != lhs[i] {
+		if rhs[i].Value != lhs[i] {
 			return false
 		}
 	}
@@ -36,10 +38,10 @@ func CheckSetEq(lhs, rhs util.StringSet) bool {
 }
 
 func TestAddNode(t *testing.T) {
-	evictor := NewPodEvictor(util.NewFakeRateLimiter())
-	evictor.AddNodeToEvict("first")
-	evictor.AddNodeToEvict("second")
-	evictor.AddNodeToEvict("third")
+	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter(), true)
+	evictor.Add("first")
+	evictor.Add("second")
+	evictor.Add("third")
 
 	queuePattern := []string{"first", "second", "third"}
 	if len(evictor.queue.queue) != len(queuePattern) {
@@ -59,11 +61,11 @@ func TestAddNode(t *testing.T) {
 }
 
 func TestDelNode(t *testing.T) {
-	evictor := NewPodEvictor(util.NewFakeRateLimiter())
-	evictor.AddNodeToEvict("first")
-	evictor.AddNodeToEvict("second")
-	evictor.AddNodeToEvict("third")
-	evictor.RemoveNodeToEvict("first")
+	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter(), true)
+	evictor.Add("first")
+	evictor.Add("second")
+	evictor.Add("third")
+	evictor.Remove("first")
 
 	queuePattern := []string{"second", "third"}
 	if len(evictor.queue.queue) != len(queuePattern) {
@@ -81,11 +83,11 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid map. Got %v, expected %v", evictor.queue.set, setPattern)
 	}
 
-	evictor = NewPodEvictor(util.NewFakeRateLimiter())
-	evictor.AddNodeToEvict("first")
-	evictor.AddNodeToEvict("second")
-	evictor.AddNodeToEvict("third")
-	evictor.RemoveNodeToEvict("second")
+	evictor = NewRateLimitedTimedQueue(util.NewFakeRateLimiter(), true)
+	evictor.Add("first")
+	evictor.Add("second")
+	evictor.Add("third")
+	evictor.Remove("second")
 
 	queuePattern = []string{"first", "third"}
 	if len(evictor.queue.queue) != len(queuePattern) {
@@ -103,11 +105,11 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid map. Got %v, expected %v", evictor.queue.set, setPattern)
 	}
 
-	evictor = NewPodEvictor(util.NewFakeRateLimiter())
-	evictor.AddNodeToEvict("first")
-	evictor.AddNodeToEvict("second")
-	evictor.AddNodeToEvict("third")
-	evictor.RemoveNodeToEvict("third")
+	evictor = NewRateLimitedTimedQueue(util.NewFakeRateLimiter(), true)
+	evictor.Add("first")
+	evictor.Add("second")
+	evictor.Add("third")
+	evictor.Remove("third")
 
 	queuePattern = []string{"first", "second"}
 	if len(evictor.queue.queue) != len(queuePattern) {
@@ -126,15 +128,18 @@ func TestDelNode(t *testing.T) {
 	}
 }
 
-func TestEvictNode(t *testing.T) {
-	evictor := NewPodEvictor(util.NewFakeRateLimiter())
-	evictor.AddNodeToEvict("first")
-	evictor.AddNodeToEvict("second")
-	evictor.AddNodeToEvict("third")
-	evictor.RemoveNodeToEvict("second")
+func TestTry(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter(), true)
+	evictor.Add("first")
+	evictor.Add("second")
+	evictor.Add("third")
+	evictor.Remove("second")
 
 	deletedMap := util.NewStringSet()
-	evictor.TryEvict(func(nodeName string) { deletedMap.Insert(nodeName) })
+	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+		deletedMap.Insert(value.Value)
+		return true, 0
+	})
 
 	setPattern := util.NewStringSet("first", "third")
 	if len(deletedMap) != len(setPattern) {
@@ -142,5 +147,37 @@ func TestEvictNode(t *testing.T) {
 	}
 	if !CheckSetEq(setPattern, deletedMap) {
 		t.Errorf("Invalid map. Got %v, expected %v", deletedMap, setPattern)
+	}
+}
+
+func TestTryOrdering(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter(), false)
+	evictor.Add("first")
+	evictor.Add("second")
+	evictor.Add("third")
+
+	order := []string{}
+	count := 0
+	queued := false
+	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+		count++
+		if value.Added.IsZero() {
+			t.Fatalf("added should not be zero")
+		}
+		if value.Next.IsZero() {
+			t.Fatalf("next should not be zero")
+		}
+		if !queued && value.Value == "second" {
+			queued = true
+			return false, time.Millisecond
+		}
+		order = append(order, value.Value)
+		return true, 0
+	})
+	if reflect.DeepEqual(order, []string{"first", "third", "second"}) {
+		t.Fatalf("order was wrong: %v", order)
+	}
+	if count != 4 {
+		t.Fatalf("unexpected iterations: %d", count)
 	}
 }
