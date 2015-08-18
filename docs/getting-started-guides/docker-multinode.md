@@ -48,6 +48,7 @@ Please install Docker 1.6.2 or Docker 1.7.1.
   - [Bootstrap Docker](#bootstrap-docker)
 - [Master Node](#master-node)
 - [Adding a worker node](#adding-a-worker-node)
+- [Deploy a DNS](#deploy-a-dns)
 - [Testing your cluster](#testing-your-cluster)
 
 ## Prerequisites
@@ -105,6 +106,10 @@ cd kubernetes/docs/getting-started-guides/docker-multinode/
 `Worker done!`
 
 See [here](docker-multinode/worker.md) for detailed instructions explanation.
+
+## Deploy a DNS
+
+See [here](docker-multinode/deployDNS.md) for instructions.
 
 ## Testing your cluster
 
