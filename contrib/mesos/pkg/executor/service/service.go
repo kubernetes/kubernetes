@@ -99,6 +99,12 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 	k.Address = net.ParseIP(defaultBindingAddress())
 	k.ShutdownFD = -1 // indicates unspecified FD
 
+	// empty string for all containers (= cgroup paths) which stop the kubelet
+	// from taking any control over the cgroups of itself and other system processes.
+	k.SystemContainer = ""
+	k.ResourceContainer = ""
+	k.DockerDaemonContainer = ""
+
 	return k
 }
 
@@ -134,8 +140,6 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	// derive the executor cgroup and use it as docker cgroup root
 	mesosCgroup := findMesosCgroup(s.cgroupPrefix)
 	s.cgroupRoot = mesosCgroup
-	s.SystemContainer = mesosCgroup
-	s.ResourceContainer = mesosCgroup
 	log.V(2).Infof("passing cgroup %q to the kubelet as cgroup root", s.CgroupRoot)
 
 	// create apiserver client
