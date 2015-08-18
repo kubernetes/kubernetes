@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/expapi"
-	_ "k8s.io/kubernetes/pkg/expapi/v1"
+	_ "k8s.io/kubernetes/pkg/expapi/v1alpha1"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -63,13 +63,16 @@ func main() {
 
 	data := new(bytes.Buffer)
 
-	group, version := path.Split(*groupVersion)
-	group = strings.TrimRight(group, "/")
+	group := util.GetGroup(*groupVersion)
+	version := util.GetVersion(*groupVersion)
 	registerTo := "api.Scheme"
 	if *groupVersion == "api/" {
 		registerTo = "Scheme"
 	}
 	pkgname := group
+	if group == "experimental" {
+		pkgname = "expapi"
+	}
 	if len(version) != 0 {
 		pkgname = version
 	}
@@ -79,7 +82,11 @@ func main() {
 		glog.Fatalf("error writing package line: %v", err)
 	}
 
-	versionPath := path.Join(pkgBase, group, version)
+	versionPath := path.Join(pkgBase, *groupVersion)
+	if group == "experimental" {
+		//TODO: we should rename the direcotry /expapi to /experimental, so directory path match groupVerson
+		versionPath = path.Join(pkgBase, "expapi", version)
+	}
 	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, util.NewStringSet("k8s.io/kubernetes"))
 	generator.AddImport(path.Join(pkgBase, "api"))
 
@@ -92,7 +99,14 @@ func main() {
 			generator.OverwritePackage(vals[0], vals[1])
 		}
 	}
-	for _, knownType := range api.Scheme.KnownTypes(version) {
+	//handle the special cases of groupVersion = "api/" and "experimental/"
+	if version == "" {
+		*groupVersion = ""
+	}
+	if *groupVersion == "api/v1" {
+		*groupVersion = "v1"
+	}
+	for _, knownType := range api.Scheme.KnownTypes(*groupVersion) {
 		if !strings.HasPrefix(knownType.PkgPath(), versionPath) {
 			continue
 		}

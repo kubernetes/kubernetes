@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
 
@@ -16,24 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package v1alpha1
 
-import (
-	"net/http"
-	"testing"
-
-	"k8s.io/kubernetes/test/integration/framework"
-)
-
-func TestExperimentalPrefix(t *testing.T) {
-	_, s := framework.RunAMaster(t)
-	defer s.Close()
-
-	resp, err := http.Get(s.URL + "/kube-api/experimental/")
-	if err != nil {
-		t.Fatalf("unexpected error getting experimental prefix: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
-	}
+func addDefaultingFuncs() {
 }

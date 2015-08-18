@@ -22,9 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/v1"
+	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/expapi/v1alpha1"
+
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -40,15 +41,25 @@ var scheme *runtime.Scheme
 var codec runtime.Codec
 
 func init() {
-	// Ensure that expapi/v1 packege is used, so that it will get initialized and register HorizontalPodAutoscaler object.
-	dummy := v1.HorizontalPodAutoscaler{}
-	dummy.Spec = v1.HorizontalPodAutoscalerSpec{}
+	// Ensure that expapi/v1alpha1 packege is used, so that it will get initialized and register HorizontalPodAutoscaler object.
+	dummy := v1alpha1.HorizontalPodAutoscaler{}
+	dummy.Spec = v1alpha1.HorizontalPodAutoscalerSpec{}
+}
+
+//TODO: Use testapi.Codec(group) once testapi supports multiple groups.
+func expCodec(t *testing.T) runtime.Codec {
+	expInterface, err := explatest.InterfacesFor("v1alpha1")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	return expInterface.Codec
 }
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
+
+	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, expCodec(t), etcdtest.PathPrefix())
 	storage := NewREST(etcdStorage)
 	return storage, fakeEtcdClient, etcdStorage
 }
@@ -120,7 +131,7 @@ func TestDelete(t *testing.T) {
 		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(testapi.Codec(), autoscaler),
+					Value:         runtime.EncodeOrDie(expCodec(t), autoscaler),
 					ModifiedIndex: 1,
 				},
 			},
@@ -176,12 +187,12 @@ func TestList(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.HorizontalPodAutoscaler{
+						Value: runtime.EncodeOrDie(expCodec(t), &expapi.HorizontalPodAutoscaler{
 							ObjectMeta: api.ObjectMeta{Name: "foo"},
 						}),
 					},
 					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.HorizontalPodAutoscaler{
+						Value: runtime.EncodeOrDie(expCodec(t), &expapi.HorizontalPodAutoscaler{
 							ObjectMeta: api.ObjectMeta{Name: "bar"},
 						}),
 					},

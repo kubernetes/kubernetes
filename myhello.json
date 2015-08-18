@@ -1,0 +1,19 @@
+{
+	"apiVersion": "experimental/v1alpha1",
+	"kind": "Hello",
+	"metadata": {
+		"name": "myhello"
+	},
+	"text": "this is a smart hello.",
+	"test": "This is another text.",
+	"template": {
+		"metadata": {
+			"name": "myhellospec"
+		},
+		"spec": {
+			"volumes": [{
+				"name": "vol1"
+			}]
+		}
+	}
+}

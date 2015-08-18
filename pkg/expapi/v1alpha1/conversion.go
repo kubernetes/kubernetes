@@ -14,7 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
-func addDefaultingFuncs() {
+import (
+	"k8s.io/kubernetes/pkg/api"
+)
+
+func addConversionFuncs() {
+	err := api.Scheme.AddConversionFuncs()
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 }

@@ -94,6 +94,38 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 	return nil
 }
 
+func deepCopy_expapi_Hello(in Hello, out *Hello, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.Text = in.Text
+	out.Text2 = in.Text2
+	return nil
+}
+
+func deepCopy_expapi_HelloList(in HelloList, out *HelloList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Hello, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_expapi_Hello(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_expapi_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -217,6 +249,8 @@ func init() {
 		deepCopy_api_ObjectMeta,
 		deepCopy_api_TypeMeta,
 		deepCopy_resource_Quantity,
+		deepCopy_expapi_Hello,
+		deepCopy_expapi_HelloList,
 		deepCopy_expapi_HorizontalPodAutoscaler,
 		deepCopy_expapi_HorizontalPodAutoscalerList,
 		deepCopy_expapi_HorizontalPodAutoscalerSpec,

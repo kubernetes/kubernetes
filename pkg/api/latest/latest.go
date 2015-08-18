@@ -28,17 +28,25 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-// Version is the string that represents the current external default version.
+// GroupVersion is the string that represents the current external default groupVersion.
+var GroupVersion string
+
+//
+var Group string
+
+//Version is the string that represents the current external default Version.
 var Version string
 
 // OldestVersion is the string that represents the oldest server version supported,
 // for client code that wants to hardcode the lowest common denominator.
 var OldestVersion string
 
-// Versions is the list of versions that are recognized in code. The order provided
-// may be assumed to be least feature rich to most feature rich, and clients may
-// choose to prefer the latter items in the list over the former items when presented
-// with a set of versions to choose.
+// GroupVersions is the list of groupVersions that are recognized in code. The
+// order provided may be assumed to be least feature rich to most feature rich,
+// and clients may choose to prefer the latter items in the list over the former
+// items when presented with a set of versions to choose.
+var GroupVersions []string
+
 var Versions []string
 
 // Codec is the default codec for serializing output that should use
@@ -66,15 +74,19 @@ var userResources = []string{"rc", "svc", "pods", "pvc"}
 const importPrefix = "k8s.io/kubernetes/pkg/api"
 
 func init() {
+	// Native v1 object has an empty group name.
+	apiGroupVersions := registered.GroupVersionsForGroup("")
 	// Use the first API version in the list of registered versions as the latest.
-	Version = registered.RegisteredVersions[0]
-	OldestVersion = registered.RegisteredVersions[len(registered.RegisteredVersions)-1]
-	Codec = runtime.CodecFor(api.Scheme, Version)
-	// Put the registered versions in Versions in reverse order.
-	versions := registered.RegisteredVersions
-	Versions = []string{}
-	for i := len(versions) - 1; i >= 0; i-- {
-		Versions = append(Versions, versions[i])
+	GroupVersion = apiGroupVersions[0]
+	Group = util.GetGroup(GroupVersion)
+	Version = util.GetVersion(GroupVersion)
+	OldestVersion = apiGroupVersions[len(apiGroupVersions)-1]
+	Codec = runtime.CodecFor(api.Scheme, GroupVersion)
+	// Put the registered groupVersions in GroupVersions in reverse order.
+	GroupVersions = []string{}
+	for i := len(apiGroupVersions) - 1; i >= 0; i-- {
+		GroupVersions = append(GroupVersions, apiGroupVersions[i])
+		Versions = append(Versions, util.GetVersion(apiGroupVersions[i]))
 	}
 
 	// the list of kinds that are scoped at the root of the api hierarchy
@@ -100,7 +112,7 @@ func init() {
 		"ThirdPartyResourceData",
 		"ThirdPartyResourceList")
 
-	mapper := api.NewDefaultRESTMapper("api", versions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
+	mapper := api.NewDefaultRESTMapper(Group, apiGroupVersions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
 	// setup aliases for groups of resources
 	mapper.AddResourceAlias("all", userResources...)
 	RESTMapper = mapper
@@ -118,6 +130,6 @@ func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(GroupVersions, ", "))
 	}
 }

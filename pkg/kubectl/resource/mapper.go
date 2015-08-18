@@ -49,7 +49,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
 	}
 	if ok := registered.IsRegisteredAPIVersion(version); !ok {
-		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", version, source, registered.RegisteredVersions)
+		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", version, source, registered.RegisteredGroupVersions)
 	}
 	if kind == "" {
 		return nil, fmt.Errorf("kind not set in %q", source)

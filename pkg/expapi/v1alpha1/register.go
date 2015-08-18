@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-var Codec = runtime.CodecFor(api.Scheme, "v1")
+var Codec = runtime.CodecFor(api.Scheme, "experimental/v1alpha1")
 
 func init() {
 	addKnownTypes()
@@ -31,11 +31,13 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("v1",
+	api.Scheme.AddKnownTypes("experimental/v1alpha1",
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
 		&ReplicationControllerDummy{},
 		&Scale{},
+		&Hello{},
+		&HelloList{},
 	)
 }
 
@@ -43,3 +45,5 @@ func (*HorizontalPodAutoscaler) IsAnAPIObject()     {}
 func (*HorizontalPodAutoscalerList) IsAnAPIObject() {}
 func (*ReplicationControllerDummy) IsAnAPIObject()  {}
 func (*Scale) IsAnAPIObject()                       {}
+func (*Hello) IsAnAPIObject()                       {}
+func (*HelloList) IsAnAPIObject()                   {}

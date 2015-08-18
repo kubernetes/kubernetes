@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -97,4 +97,19 @@ type HorizontalPodAutoscalerList struct {
 	v1.ListMeta `json:"metadata,omitempty"`
 
 	Items []HorizontalPodAutoscaler `json:"items" description:"list of horizontal pod autoscalers"`
+}
+
+type Hello struct {
+	v1.TypeMeta   `json:",inline"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
+
+	Text  string `json:"text,omitempty"`
+	Text2 string `json:"test,omitempty"`
+}
+
+type HelloList struct {
+	v1.TypeMeta `json:",inline"`
+	v1.ListMeta `json:"metadata,omitempty"`
+
+	Items []Hello `json:"items,omitempty"`
 }

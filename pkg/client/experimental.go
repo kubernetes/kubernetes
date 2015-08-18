@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -100,18 +101,18 @@ func NewExperimentalOrDie(c *Config) *ExperimentalClient {
 
 func setExperimentalDefaults(config *Config) error {
 	if config.Prefix == "" {
-		config.Prefix = "/experimental"
+		config.Prefix = "kube-api"
 	}
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
 	if config.Version == "" {
-		config.Version = explatest.Version
+		config.Version = explatest.GroupVersion
 	}
-	versionInterfaces, err := explatest.InterfacesFor(config.Version)
+	versionInterfaces, err := explatest.InterfacesFor(util.GetVersion(config.Version))
 	if err != nil {
 		return fmt.Errorf("Experimental API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join(explatest.Versions, ", "))
+			config.Version, strings.Join(explatest.GroupVersions, ", "))
 	}
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec
