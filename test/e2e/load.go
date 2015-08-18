@@ -81,7 +81,7 @@ var _ = Describe("Load capacity", func() {
 		deleteAllRC(configs)
 
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 
