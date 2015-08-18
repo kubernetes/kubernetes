@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -130,90 +131,26 @@ func TestDelete(t *testing.T) {
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
-func TestEtcdListNodes(t *testing.T) {
-	ctx := api.NewContext()
-	storage, fakeClient := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Node{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Node{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
-		},
-		E: nil,
-	}
-	nodesObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	nodes := nodesObj.(*api.NodeList)
-	if len(nodes.Items) != 2 || nodes.Items[0].Name != "foo" || nodes.Items[1].Name != "bar" {
-		t.Errorf("Unexpected nodes list: %#v", nodes)
-	}
-}
-
-func TestEtcdListNodesMatch(t *testing.T) {
-	ctx := api.NewContext()
-	storage, fakeClient := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Node{
-							ObjectMeta: api.ObjectMeta{Name: "foo",
-								Labels: map[string]string{
-									"name": "foo",
-								},
-							},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Node{
-							ObjectMeta: api.ObjectMeta{Name: "bar",
-								Labels: map[string]string{
-									"name": "bar",
-								},
-							},
-						}),
-					},
-				},
-			},
-		},
-		E: nil,
-	}
-	label := labels.SelectorFromSet(labels.Set{"name": "bar"})
-	nodesObj, err := storage.List(ctx, label, fields.Everything())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	nodes := nodesObj.(*api.NodeList)
-	if len(nodes.Items) != 1 || nodes.Items[0].Name != "bar" {
-		t.Errorf("Unexpected nodes list: %#v", nodes)
-	}
-}
-
 func TestEtcdGetNode(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	node := validNewNode()
 	test.TestGet(node)
+}
+
+func TestEtcdListNodes(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	node := validNewNode()
+	test.TestList(
+		node,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeClient, key, objects)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		})
 }
 
 func TestEtcdUpdateEndpoints(t *testing.T) {

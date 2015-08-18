@@ -25,8 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/expapi/v1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -143,68 +142,17 @@ func TestGet(t *testing.T) {
 	test.TestGet(autoscaler)
 }
 
-func TestEmptyList(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := registry.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-	}
-	autoscalerList, err := registry.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(autoscalerList.(*expapi.HorizontalPodAutoscalerList).Items) != 0 {
-		t.Errorf("Unexpected non-zero autoscaler list: %#v", autoscalerList)
-	}
-	if autoscalerList.(*expapi.HorizontalPodAutoscalerList).ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", autoscalerList)
-	}
-}
-
 func TestList(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := registry.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.HorizontalPodAutoscaler{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.HorizontalPodAutoscaler{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
+	storage, fakeEtcdClient, _ := newStorage(t)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	autoscaler := validNewHorizontalPodAutoscaler("foo")
+	test.TestList(
+		autoscaler,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeEtcdClient, key, objects)
 		},
-	}
-	obj, err := registry.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	autoscalerList := obj.(*expapi.HorizontalPodAutoscalerList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(autoscalerList.Items) != 2 {
-		t.Errorf("Unexpected HorizontalPodAutoscaler list: %#v", autoscalerList)
-	}
-	if autoscalerList.Items[0].Name != "foo" {
-		t.Errorf("Unexpected HorizontalPodAutoscaler: %#v", autoscalerList.Items[0])
-	}
-	if autoscalerList.Items[1].Name != "bar" {
-		t.Errorf("Unexpected HorizontalPodAutoscaler: %#v", autoscalerList.Items[1])
-	}
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeEtcdClient, resourceVersion)
+		})
 }

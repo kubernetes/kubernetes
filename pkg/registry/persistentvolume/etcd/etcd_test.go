@@ -23,8 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -116,38 +115,6 @@ func TestDelete(t *testing.T) {
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
-func TestEtcdListPersistentVolumes(t *testing.T) {
-	ctx := api.NewContext()
-	storage, _, fakeClient, _ := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, validNewPersistentVolume("foo")),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, validNewPersistentVolume("bar")),
-					},
-				},
-			},
-		},
-		E: nil,
-	}
-
-	pvObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	pvs := pvObj.(*api.PersistentVolumeList)
-
-	if len(pvs.Items) != 2 || pvs.Items[0].Name != "foo" || pvs.Items[1].Name != "bar" {
-		t.Errorf("Unexpected persistentVolume list: %#v", pvs)
-	}
-}
-
 func TestEtcdGetPersistentVolumes(t *testing.T) {
 	storage, _, fakeClient, _ := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
@@ -155,70 +122,19 @@ func TestEtcdGetPersistentVolumes(t *testing.T) {
 	test.TestGet(persistentVolume)
 }
 
-func TestListEmptyPersistentVolumesList(t *testing.T) {
-	ctx := api.NewContext()
+func TestEtcdListPersistentVolumes(t *testing.T) {
 	storage, _, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-	}
-
-	persistentVolume, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(persistentVolume.(*api.PersistentVolumeList).Items) != 0 {
-		t.Errorf("Unexpected non-zero pod list: %#v", persistentVolume)
-	}
-	if persistentVolume.(*api.PersistentVolumeList).ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", persistentVolume)
-	}
-}
-
-func TestListPersistentVolumesList(t *testing.T) {
-	ctx := api.NewContext()
-	storage, _, fakeClient, _ := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.PersistentVolume{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.PersistentVolume{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	persistentVolume := validNewPersistentVolume("foo")
+	test.TestList(
+		persistentVolume,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeClient, key, objects)
 		},
-	}
-
-	persistentVolumeObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	persistentVolumeList := persistentVolumeObj.(*api.PersistentVolumeList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(persistentVolumeList.Items) != 2 {
-		t.Errorf("Unexpected persistentVolume list: %#v", persistentVolumeList)
-	}
-	if persistentVolumeList.Items[0].Name != "foo" {
-		t.Errorf("Unexpected persistentVolume: %#v", persistentVolumeList.Items[0])
-	}
-	if persistentVolumeList.Items[1].Name != "bar" {
-		t.Errorf("Unexpected persistentVolume: %#v", persistentVolumeList.Items[1])
-	}
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		})
 }
 
 func TestPersistentVolumesDecode(t *testing.T) {
