@@ -215,11 +215,7 @@ func (w *WatchCache) GetByKey(key string) (interface{}, bool, error) {
 	return w.store.GetByKey(key)
 }
 
-func (w *WatchCache) Replace(objs []interface{}) error {
-	return w.ReplaceWithVersion(objs, "0")
-}
-
-func (w *WatchCache) ReplaceWithVersion(objs []interface{}, resourceVersion string) error {
+func (w *WatchCache) Replace(objs []interface{}, resourceVersion string) error {
 	version, err := parseResourceVersion(resourceVersion)
 	if err != nil {
 		return err
@@ -230,7 +226,7 @@ func (w *WatchCache) ReplaceWithVersion(objs []interface{}, resourceVersion stri
 
 	w.startIndex = 0
 	w.endIndex = 0
-	if err := w.store.Replace(objs); err != nil {
+	if err := w.store.Replace(objs, resourceVersion); err != nil {
 		return err
 	}
 	w.resourceVersion = version

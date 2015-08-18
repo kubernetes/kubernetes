@@ -188,7 +188,7 @@ func (f *FIFO) Pop() interface{} {
 // 'f' takes ownership of the map, you should not reference the map again
 // after calling this function. f's queue is reset, too; upon return, it
 // will contain the items in the map, in no particular order.
-func (f *FIFO) Replace(list []interface{}) error {
+func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	items := map[string]interface{}{}
 	for _, item := range list {
 		key, err := f.keyFunc(item)
