@@ -432,7 +432,7 @@ func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Wri
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, mapping, false)
+	printer, err := f.PrinterForMapping(cmd, mapping, false, false)
 	if err != nil {
 		return err
 	}
@@ -441,7 +441,7 @@ func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Wri
 
 // PrinterForMapping returns a printer suitable for displaying the provided resource type.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
-func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool, withHeader bool) (kubectl.ResourcePrinter, error) {
 	printer, ok, err := PrinterForCommand(cmd)
 	if err != nil {
 		return nil, err
@@ -460,7 +460,8 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if len(version) == 0 {
 			return nil, fmt.Errorf("you must specify an output-version when using this output format")
 		}
-		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.APIVersion)
+		preprocessor := kubectl.NewVersionConverter(mapping.ObjectConvertor, version, mapping.APIVersion)
+		printer.AddObjectPreprocessor(preprocessor)
 	} else {
 		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
 		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
@@ -471,7 +472,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			return nil, err
 		}
-		printer = maybeWrapSortingPrinter(cmd, printer)
+		printer = maybeAddSortingPreprocessor(cmd, printer)
 	}
 	return printer, nil
 }

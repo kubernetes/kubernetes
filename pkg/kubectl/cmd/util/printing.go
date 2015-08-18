@@ -92,16 +92,16 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 		return nil, generic, err
 	}
 
-	return maybeWrapSortingPrinter(cmd, printer), generic, nil
+	return maybeAddSortingPreprocessor(cmd, printer), generic, nil
 }
 
-func maybeWrapSortingPrinter(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {
+func maybeAddSortingPreprocessor(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {
 	sorting := GetFlagString(cmd, "sort-by")
 	if len(sorting) != 0 {
-		return &kubectl.SortingPrinter{
+		printer.AddObjectPreprocessor(kubectl.SortingPreprocessor{
 			Delegate:  printer,
 			SortField: fmt.Sprintf("{%s}", sorting),
-		}
+		})
 	}
 	return printer
 }
