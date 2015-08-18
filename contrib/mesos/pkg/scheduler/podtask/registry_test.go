@@ -297,6 +297,7 @@ func TestInMemoryRegistry_TaskLifeCycle(t *testing.T) {
 func TestInMemoryRegistry_NotFinished(t *testing.T) {
 	// all these behave the same
 	notFinishedStates := []mesos.TaskState{
+		mesos.TaskState_TASK_ERROR,
 		mesos.TaskState_TASK_FAILED,
 		mesos.TaskState_TASK_KILLED,
 		mesos.TaskState_TASK_LOST,

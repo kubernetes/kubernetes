@@ -429,7 +429,7 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 			log.Errorf("Ignore status %+v because the slave does not exist", taskStatus)
 			return
 		}
-	case mesos.TaskState_TASK_FAILED:
+	case mesos.TaskState_TASK_FAILED, mesos.TaskState_TASK_ERROR:
 		if task, _ := k.taskRegistry.UpdateStatus(taskStatus); task != nil {
 			if task.Has(podtask.Launched) && !task.Has(podtask.Bound) {
 				go k.plugin.reconcileTask(task)
@@ -449,7 +449,7 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 func (k *KubernetesScheduler) reconcileTerminalTask(driver bindings.SchedulerDriver, taskStatus *mesos.TaskStatus) {
 	task, state := k.taskRegistry.UpdateStatus(taskStatus)
 
-	if (state == podtask.StateRunning || state == podtask.StatePending) && taskStatus.SlaveId != nil &&
+	if (state == podtask.StateRunning || state == podtask.StatePending) &&
 		((taskStatus.GetSource() == mesos.TaskStatus_SOURCE_MASTER && taskStatus.GetReason() == mesos.TaskStatus_REASON_RECONCILIATION) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_TERMINATED) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_SLAVE && taskStatus.GetReason() == mesos.TaskStatus_REASON_EXECUTOR_UNREGISTERED)) {
