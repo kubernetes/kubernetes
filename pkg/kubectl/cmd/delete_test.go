@@ -335,6 +335,41 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	}
 }
 
+func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
+	_, svc, rc := testData()
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/baz" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			case p == "/namespaces/test/replicationcontrollers/foo" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			case p == "/namespaces/test/services/baz" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+			case p == "/namespaces/test/services/foo" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+			default:
+				// Ensures no GET is performed when deleting by name
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDelete(f, buf)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"replicationcontrollers,services", "baz", "foo"})
+	if buf.String() != "replicationcontroller/baz\nreplicationcontroller/foo\nservice/baz\nservice/foo\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
 func TestDeleteDirectory(t *testing.T) {
 	_, svc, rc := testData()
 

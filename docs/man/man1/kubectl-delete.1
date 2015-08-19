@@ -174,6 +174,9 @@ $ kubectl delete \-f ./pod.json
 # Delete a pod based on the type and name in the JSON passed into stdin.
 $ cat pod.json | kubectl delete \-f \-
 
+# Delete pods and services with same names "baz" and "foo"
+$ kubectl delete pod,service baz foo
+
 # Delete pods and services with label name=myLabel.
 $ kubectl delete pods,services \-l name=myLabel
 
