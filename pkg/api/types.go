@@ -883,10 +883,13 @@ const (
 	PodReady PodConditionType = "Ready"
 )
 
-// TODO: add LastTransitionTime, Reason, Message to match NodeCondition api.
 type PodCondition struct {
-	Type   PodConditionType `json:"type"`
-	Status ConditionStatus  `json:"status"`
+	Type               PodConditionType `json:"type"`
+	Status             ConditionStatus  `json:"status"`
+	LastProbeTime      unversioned.Time `json:"lastProbeTime,omitempty"`
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	Reason             string           `json:"reason,omitempty"`
+	Message            string           `json:"message,omitempty"`
 }
 
 // RestartPolicy describes how the container should be restarted.
