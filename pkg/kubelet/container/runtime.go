@@ -62,6 +62,11 @@ type Runtime interface {
 	GetPodStatus(*api.Pod) (*api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
+
+	// The kubelet needs a container-runtime-agnostic way to inspect an image and determine
+	// what the effective UID/GID it will run as is
+	InspectImage(image ImageSpec) (ImageSpec, error)
+
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error
 	// IsImagePresent checks whether the container image is already in the local storage.
 	IsImagePresent(image ImageSpec) (bool, error)

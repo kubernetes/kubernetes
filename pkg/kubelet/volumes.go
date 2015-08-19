@@ -96,6 +96,34 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, 
 	return builder, nil
 }
 
+func (kl *Kubelet) setVolumeOwnership(volume api.Volume, podRef *api.Pod) error {
+	// Determine volume usage
+	containers := []api.Container{}
+
+	for _, container := range pod.Spec.Containers {
+		for _, volumeMount := range container.VolumeMounts {
+			if volumeMount.Name == volume.Name {
+				containers = append(containers, container)
+				break
+			}
+		}
+	}
+
+	if len(containers) == 0 {
+		return nil
+	}
+
+	// Do images need to be pulled here?
+
+	usage := map[string]string{}
+
+	for _, container := range containers {
+
+	}
+
+	return nil
+}
+
 func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, error) {
 	podVolumes := make(kubecontainer.VolumeMap)
 	for i := range pod.Spec.Volumes {
@@ -120,6 +148,12 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if err != nil {
 			return nil, err
 		}
+
+		err = kl.setVolumeOwnership(volSpec, pod)
+		if err != nil {
+			return nil, err
+		}
+
 		podVolumes[volSpec.Name] = builder
 	}
 	return podVolumes, nil

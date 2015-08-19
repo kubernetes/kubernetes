@@ -39,6 +39,13 @@ import (
 type VolumeOptions struct {
 	// The rootcontext to use when performing mounts for a volume.
 	RootContext string
+
+	// Usage is contains usage information about how the volume is used
+	// by containers in the pod.
+	Usage VolumeUsage
+}
+
+type VolumeUsage struct {
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a

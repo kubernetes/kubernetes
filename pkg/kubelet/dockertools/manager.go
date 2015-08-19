@@ -233,6 +233,10 @@ func (sc *stringCache) Get(uid types.UID, name string) (string, bool) {
 	}
 }
 
+func (dm *DockerManager) InspectImage(imageSpec container.ImageSpec) (container.Image, error) {
+	return container.Image{}, nil
+}
+
 // GetContainerLogs returns logs of a specific container. By
 // default, it returns a snapshot of the container log. Set 'follow' to true to
 // stream the log. Set 'follow' to false and specify the number of lines (e.g.
