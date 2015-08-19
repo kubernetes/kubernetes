@@ -18,11 +18,8 @@ package unversioned
 
 import (
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
-	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/probe"
@@ -43,65 +40,14 @@ func TestHTTPKubeletClient(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	hostURL, err := url.Parse(testServer.URL)
+	_, err = url.Parse(testServer.URL)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
-	}
-
-	parts := strings.Split(hostURL.Host, ":")
-
-	port, err := strconv.Atoi(parts[1])
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	c := &HTTPKubeletClient{
-		Client: http.DefaultClient,
-		Config: &KubeletConfig{Port: uint(port)},
-	}
-	gotObj, _, err := c.HealthCheck(parts[0])
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if gotObj != expectObj {
-		t.Errorf("expected: %#v, got %#v", expectObj, gotObj)
-	}
-}
-
-func TestHTTPKubeletClientError(t *testing.T) {
-	expectObj := probe.Failure
-	fakeHandler := util.FakeHandler{
-		StatusCode:   500,
-		ResponseBody: "Internal server error",
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-
-	hostURL, err := url.Parse(testServer.URL)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	parts := strings.Split(hostURL.Host, ":")
-
-	port, err := strconv.Atoi(parts[1])
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	c := &HTTPKubeletClient{
-		Client: http.DefaultClient,
-		Config: &KubeletConfig{Port: uint(port)},
-	}
-	gotObj, _, err := c.HealthCheck(parts[0])
-	if gotObj != expectObj {
-		t.Errorf("expected: %#v, got %#v", expectObj, gotObj)
 	}
 }
 
 func TestNewKubeletClient(t *testing.T) {
 	config := &KubeletConfig{
-		Port:        9000,
 		EnableHttps: false,
 	}
 
@@ -112,20 +58,10 @@ func TestNewKubeletClient(t *testing.T) {
 	if client == nil {
 		t.Error("client is nil.")
 	}
-
-	host := "127.0.0.1"
-	healthStatus, _, err := client.HealthCheck(host)
-	if healthStatus != probe.Failure {
-		t.Errorf("Expected %v and got %v.", probe.Failure, healthStatus)
-	}
-	if err != nil {
-		t.Error("Expected a nil error")
-	}
 }
 
 func TestNewKubeletClientTLSInvalid(t *testing.T) {
 	config := &KubeletConfig{
-		Port:        9000,
 		EnableHttps: true,
 		//Invalid certificate and key path
 		TLSClientConfig: TLSClientConfig{
@@ -146,7 +82,6 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 
 func TestNewKubeletClientTLSValid(t *testing.T) {
 	config := &KubeletConfig{
-		Port:        9000,
 		EnableHttps: true,
 		TLSClientConfig: TLSClientConfig{
 			CertFile: "../testdata/mycertvalid.cer",
