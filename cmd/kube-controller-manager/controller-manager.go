@@ -51,7 +51,7 @@ func main() {
 	defer util.FlushLogs()
 
 	//Functions to start and stop this daemon.
-	startRC := func(leaseUserInfo *ha.LeaseUser) bool {
+	startCM := func(leaseUserInfo *ha.LeaseUser) bool {
 		leaseUserInfo.Running = true
 		if err := s.Run(pflag.CommandLine.Args()); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -61,7 +61,7 @@ func main() {
 		return true
 	}
 
-	endRC := func(leaseUserInfo *ha.LeaseUser) bool {
+	endCM := func(leaseUserInfo *ha.LeaseUser) bool {
 		glog.Infof("Hard-exiting the replication controller process now !")
 
 		//Even though we're exiting, we should set this flag before dying just for completeness.
@@ -76,7 +76,7 @@ func main() {
 		haconfig.Key = "ha.controllermanager.lock"
 	}
 	//This starts a thread that continues running.
-	ha.RunHA(s.Kubeconfig, s.Master, startRC, endRC, &haconfig)
+	ha.RunHA(s.Kubeconfig, s.Master, startCM, endCM, &haconfig)
 
 	for true {
 		glog.Infof("CM lease loop is running...")
