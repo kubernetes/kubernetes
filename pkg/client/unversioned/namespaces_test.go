@@ -170,7 +170,7 @@ func TestNamespaceWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   "/api/" + testapi.Version() + "/watch/namespaces",
+			Path:   testapi.ResourcePathWithPrefix("watch", "namespaces", "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}

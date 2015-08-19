@@ -133,7 +133,7 @@ func TestPodTemplateWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   "/api/" + testapi.Version() + "/watch/" + getPodTemplatesResoureName(),
+			Path:   testapi.ResourcePathWithPrefix("watch", getPodTemplatesResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
