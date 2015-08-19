@@ -45,22 +45,22 @@ If your problem isn't answered by any of the guides above, there are variety of 
 
 ## Questions
 
-We have a number of FAQ pages
-   * [User FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
-   * [Debugging FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Debugging-FAQ)
-   * [Services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ)
+If you aren't familiar with it, many of your questions may be answered by the [user guide](user-guide/README.md).
 
-You may also find the StackOverflow topics relevant
+We also have a number of FAQ pages:
+   * [User FAQ](https://github.com/kubernetes/kubernetes/wiki/User-FAQ)
+   * [Debugging FAQ](https://github.com/kubernetes/kubernetes/wiki/Debugging-FAQ)
+   * [Services FAQ](https://github.com/kubernetes/kubernetes/wiki/Services-FAQ)
+
+You may also find the StackOverflow topics relevant:
    * [Kubernetes](http://stackoverflow.com/questions/tagged/kubernetes)
    * [Google Container Engine - GKE](http://stackoverflow.com/questions/tagged/google-container-engine)
 
-## Bugs and Feature requests
-
-If you have what looks like a bug, or you would like to make a feature request, please use the [Github issue tracking system](https://github.com/GoogleCloudPlatform/kubernetes/issues).
-
-Before you file an issue, please search existing issues to see if your issue is already covered.
-
 # Help! My question isn't covered!  I need help now!
+
+## Stackoverflow
+
+Someone else from the community may have already asked a similar question or may be able to help with your problem. The Kubernetes team will also monitor posts tagged kubernetes.
 
 ## IRC
 
@@ -68,8 +68,15 @@ The Kubernetes team hangs out on IRC at [`#google-containers`](https://botbot.me
 
 ## Mailing List
 
-The Kubernetes mailing list is [google-containers@googlegroups.com](https://groups.google.com/forum/#!forum/google-containers)
+The Google Container Engine mailing list is [google-containers@googlegroups.com](https://groups.google.com/forum/#!forum/google-containers)
 
+## Bugs and Feature requests
+
+If you have what looks like a bug, or you would like to make a feature request, please use the [Github issue tracking system](https://github.com/kubernetes/kubernetes/issues).
+
+Before you file an issue, please search existing issues to see if your issue is already covered.
+
+If filing a bug, please include detailed information about how to reproduce the problem.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/troubleshooting.md?pixel)]()
