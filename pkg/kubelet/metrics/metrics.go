@@ -163,7 +163,7 @@ func (pc *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
 func (pc *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
 	runningPods, err := pc.containerCache.GetPods()
 	if err != nil {
-		glog.Warning("Failed to get running container information while collecting metrics: %v", err)
+		glog.Warningf("Failed to get running container information while collecting metrics: %v", err)
 		return
 	}
 
