@@ -1,0 +1,13 @@
+binaries
+
+master/bin/etcd
+master/bin/etcdctl
+master/bin/kube*
+
+minion/bin/brctl
+minion/bin/docker
+minion/bin/etcd
+minion/bin/etcdctl
+minion/bin/flanneld
+minion/bin/kube*
+test.sh
