@@ -89,3 +89,28 @@ func (c *ClientCache) ClientForVersion(version string) (*client.Client, error) {
 	c.clients[config.Version] = client
 	return client, nil
 }
+
+type ExperimentalClientCache struct {
+	loader clientcmd.ClientConfig
+	client *client.ExperimentalClient
+	err    error
+	init   bool
+}
+
+func NewExperimentalClientCache(loader clientcmd.ClientConfig) *ExperimentalClientCache {
+	return &ExperimentalClientCache{loader: loader}
+}
+
+func (cc *ExperimentalClientCache) Client() (*client.ExperimentalClient, error) {
+	if cc.init {
+		return cc.client, cc.err
+	}
+	cfg, err := cc.loader.ClientConfig()
+	if err != nil {
+		cc.err = err
+	} else {
+		cc.client, cc.err = client.NewExperimental(cfg)
+	}
+	cc.init = true
+	return cc.client, cc.err
+}
