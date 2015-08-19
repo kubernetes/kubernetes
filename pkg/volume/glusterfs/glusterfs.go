@@ -140,12 +140,12 @@ func (b *glusterfsBuilder) SetUp() error {
 }
 
 func (b *glusterfsBuilder) SetUpAt(dir string) error {
-	mountpoint, err := b.mounter.IsMountPoint(dir)
-	glog.V(4).Infof("Glusterfs: mount set up: %s %v %v", dir, mountpoint, err)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
+	glog.V(4).Infof("Glusterfs: mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if mountpoint {
+	if !notMnt {
 		return nil
 	}
 
@@ -185,12 +185,12 @@ func (c *glusterfsCleaner) TearDownAt(dir string) error {
 }
 
 func (c *glusterfsCleaner) cleanup(dir string) error {
-	mountpoint, err := c.mounter.IsMountPoint(dir)
+	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.Errorf("Glusterfs: Error checking IsMountPoint: %v", err)
+		glog.Errorf("Glusterfs: Error checking IsLikelyNotMountPoint: %v", err)
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		return os.RemoveAll(dir)
 	}
 
@@ -198,12 +198,12 @@ func (c *glusterfsCleaner) cleanup(dir string) error {
 		glog.Errorf("Glusterfs: Unmounting failed: %v", err)
 		return err
 	}
-	mountpoint, mntErr := c.mounter.IsMountPoint(dir)
+	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
-		glog.Errorf("Glusterfs: IsMountpoint check failed: %v", mntErr)
+		glog.Errorf("Glusterfs: IsLikelyNotMountPoint check failed: %v", mntErr)
 		return mntErr
 	}
-	if !mountpoint {
+	if notMnt {
 		if err := os.RemoveAll(dir); err != nil {
 			return err
 		}

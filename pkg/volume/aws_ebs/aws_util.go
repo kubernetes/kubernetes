@@ -61,13 +61,13 @@ func (util *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, glob
 	}
 
 	// Only mount the PD globally once.
-	mountpoint, err := b.mounter.IsMountPoint(globalPDPath)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
 				return err
 			}
-			mountpoint = false
+			notMnt = true
 		} else {
 			return err
 		}
@@ -76,7 +76,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, glob
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	if !mountpoint {
+	if notMnt {
 		err = b.diskMounter.Mount(devicePath, globalPDPath, b.fsType, options)
 		if err != nil {
 			os.Remove(globalPDPath)

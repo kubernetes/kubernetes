@@ -111,7 +111,7 @@ func (b *secretVolumeBuilder) getMetaDir() string {
 }
 
 func (b *secretVolumeBuilder) SetUpAt(dir string) error {
-	isMnt, err := b.mounter.IsMountPoint(dir)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
 	if err != nil && !os.IsNotExist(err) {
@@ -120,7 +120,7 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 
 	// If the plugin readiness file is present for this volume and
 	// the setup dir is a mountpoint, this volume is already ready.
-	if volumeutil.IsReady(b.getMetaDir()) && isMnt {
+	if volumeutil.IsReady(b.getMetaDir()) && !notMnt {
 		return nil
 	}
 
