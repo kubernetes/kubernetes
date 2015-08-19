@@ -211,6 +211,9 @@ func (nc *NodeController) getCondition(status *api.NodeStatus, conditionType api
 // not reachable for a long period of time.
 func (nc *NodeController) monitorNodeStatus() error {
 	nodes, err := nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return err
+	}
 	for _, node := range nodes.Items {
 		if !nc.knownNodeSet.Has(node.Name) {
 			glog.V(1).Infof("NodeController observed a new Node: %#v", node)
