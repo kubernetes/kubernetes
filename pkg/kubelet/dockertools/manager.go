@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"github.com/appc/cni"
+	cniTypes "github.com/appc/cni/pkg/types"
 )
 
 const (
@@ -1154,7 +1155,7 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) err
 	}
 	wg.Wait()
 	if networkContainer != nil {
-		if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubeletTypes.DockerID(networkContainer.ID)); err != nil {
+		if err := tearDownPod(runningPod.Name, runningPod.Namespace, string(networkContainer.ID), dm.networkPlugin, dm.client); err != nil {
 			glog.Errorf("Failed tearing down the infra container: %v", err)
 			errs <- err
 		}
@@ -1170,6 +1171,24 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) err
 			errList = append(errList, err)
 		}
 		return fmt.Errorf("failed to delete containers (%v)", errList)
+	}
+	return nil
+}
+
+// TODO-PAT: refactor this into the plugin.
+func tearDownPod(podName string, podNamespace string, podInfraContainerID string, networkPlugin network.NetworkPlugin, client DockerInterface) error {
+	netconf, cninet, err := loadPlugin(networkPlugin)
+	rt, err := buildRtConfig(podName, podNamespace, podInfraContainerID, client)
+	if err != nil {
+		glog.Errorf("Error deleting network: %v", err)
+		return err
+	}
+
+	glog.V(2).Infof("About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)
+	err = cninet.DelNetwork(netconf, rt)
+	if err != nil {
+		glog.Errorf("Error deleting network: %v", err)
+		return err
 	}
 	return nil
 }
@@ -1668,58 +1687,24 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
 		podInfraContainerID, err = dm.createPodInfraContainer(pod)
-
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
 			return err
 		}
 
-		// Expect "kubernetes.io/no-op" if no plugin was specified on kubelet start.
-		pluginName := dm.networkPlugin.Name()
-		// TODO-PAT: fix log levels
-		glog.V(2).Infof("Calling CNI network plugin '%v'", pluginName)
-
-		netconf, err := cni.LoadConf(DefaultNetDir, pluginName)
+		res, err := setUpPod(pod.Name, pod.Namespace, string(podInfraContainerID), dm.networkPlugin, dm.client)
 		if err != nil {
-			glog.Errorf("Error loading network config: '%v'", err)
-			return err
-		}
-		glog.V(2).Infof("Got network config %v", netconf)
-
-		cninet := &cni.CNIConfig{
-			// TODO-PAT: this should be a constant path, e.g. /opt/cni or RKT_NETPLUGIN_PATH=/usr/lib/rkt/plugins/net
-			Path: strings.Split(os.Getenv(EnvCNIPath), ":"),
-		}
-
-		inspectResult, err := dm.client.InspectContainer(string(podInfraContainerID))
-		if err != nil {
-			glog.Errorf("Error inspecting container: '%v'", err)
+			glog.Errorf("Failed setting up pod infra container: %v", err)
 			return err
 		}
 
-		pid := inspectResult.State.Pid
-		netns := fmt.Sprintf(DockerNetnsFmt, pid)
-		glog.V(2).Infof("Got netns path %v", netns)
-
-		rt := &cni.RuntimeConf{
-			ContainerID: "cni",
-			NetNS:       netns,
-			IfName:      "eth0",
-			Args:        [][2]string{
-				{"POD_NAMESPACE", pod.Namespace},
-				{"POD_NAME", pod.Name},
-				{"POD_INFRA_CONTAINER_ID", string(podInfraContainerID)},
-			},
+		var ip string
+		if res.IP4 != nil {
+			ip = res.IP4.IP.String()
+		} else {
+			ip = res.IP6.IP.String()
 		}
-
-		glog.V(2).Infof("About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)
-		res, err := cninet.AddNetwork(netconf, rt)
-		if err != nil {
-			glog.Errorf("Error adding network: %v", err)
-			return err
-		}
-
-		ip := res.IP4.IP.String()
+		// TODO-PAT: check that PodIP can be an IPv6.
 		pod.Status.PodIP = ip
 	}
 
@@ -1758,6 +1743,73 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	}
 
 	return nil
+}
+
+// TODO-PAT: refactor this into the plugin.
+func setUpPod(podName string, podNamespace string, podInfraContainerID string, networkPlugin network.NetworkPlugin, client DockerInterface) (*cniTypes.Result, error) {
+	netconf, cninet, err := loadPlugin(networkPlugin)
+	rt, err := buildRtConfig(podName, podNamespace, podInfraContainerID, client)
+	if err != nil {
+		glog.Errorf("Error adding network: %v", err)
+		return nil, err
+	}
+
+	glog.V(2).Infof("About to run with conf.Type=%v, c.Path=%v", netconf.Type, cninet.Path)
+	res, err := cninet.AddNetwork(netconf, rt)
+	if err != nil {
+		glog.Errorf("Error adding network: %v", err)
+		return nil, err
+	}
+
+	return res, nil
+}
+
+// TODO-PAT: This should be refactored to be run when the network plugin is loaded.
+func loadPlugin(networkPlugin network.NetworkPlugin) (*cni.NetworkConfig, *cni.CNIConfig, error) {
+	// Expect "kubernetes.io/no-op" if no plugin was specified on kubelet start.
+	pluginName := networkPlugin.Name()
+
+	// TODO-PAT: fix log levels
+	glog.V(2).Infof("Calling CNI network plugin '%v'", pluginName)
+
+	netconf, err := cni.LoadConf(DefaultNetDir, pluginName)
+	if err != nil {
+		glog.Errorf("Error loading network config: '%v'", err)
+		return nil, nil, err
+	}
+	glog.V(2).Infof("Got network config %v", netconf)
+
+	cninet := &cni.CNIConfig{
+		// TODO-PAT: this should be a constant path, e.g. /opt/cni or RKT_NETPLUGIN_PATH=/usr/lib/rkt/plugins/net
+		Path: strings.Split(os.Getenv(EnvCNIPath), ":"),
+	}
+
+	return netconf, cninet, nil
+}
+
+func buildRtConfig(podName string, podNs string, podInfraContainerID string, client DockerInterface) (*cni.RuntimeConf, error){
+	inspectResult, err := client.InspectContainer(podInfraContainerID)
+	if err != nil {
+		glog.Errorf("Error inspecting container: '%v'", err)
+		return nil, err
+	}
+
+	pid := inspectResult.State.Pid
+	netns := fmt.Sprintf(DockerNetnsFmt, pid)
+	glog.V(2).Infof("Got netns path %v", netns)
+
+	rt := &cni.RuntimeConf{
+		ContainerID: "cni",
+		NetNS:       netns,
+		IfName:      "eth0",
+		Args:        [][2]string{
+			{"POD_NAMESPACE", podNs},
+			{"POD_NAME", podName},
+			{"POD_INFRA_CONTAINER_ID", podInfraContainerID},
+		},
+	}
+
+	return rt, nil
 }
 
 // verifyNonRoot returns an error if the container or image will run as the root user.
