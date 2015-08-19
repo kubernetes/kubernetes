@@ -204,8 +204,12 @@ runTests() {
 }
 
 reportCoverageToCoveralls() {
-  if [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
-    ${KUBE_GOVERALLS_BIN} -coverprofile="${COMBINED_COVER_PROFILE}" || true
+  if [[ ${KUBE_COVER} =~ ^[yY]$ ]] && [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
+    kube::log::status "Reporting coverage results to Coveralls for service ${CI_NAME:-}"
+    ${KUBE_GOVERALLS_BIN} -coverprofile="${COMBINED_COVER_PROFILE}" \
+    ${CI_NAME:+"-service=${CI_NAME}"} \
+    ${COVERALLS_REPO_TOKEN:+"-repotoken=${COVERALLS_REPO_TOKEN}"} \
+      || true
   fi
 }
 
