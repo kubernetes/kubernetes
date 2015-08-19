@@ -22,6 +22,7 @@ script:
   - ./hack/verify-swagger-spec.sh
   - ./hack/verify-linkcheck.sh
   - ./hack/verify-flags-underscore.py
+  - ./hack/verify-godeps.sh $TRAVIS_BRANCH
 
 notifications:
   irc: "chat.freenode.net#kubernetes-dev"
