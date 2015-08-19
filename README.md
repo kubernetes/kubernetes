@@ -1,6 +1,6 @@
 # Kubernetes
 
-[![GoDoc](https://godoc.org/k8s.io/kubernetes?status.png)](https://godoc.org/k8s.io/kubernetes) [![Travis](https://travis-ci.org/GoogleCloudPlatform/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes) [![Coverage Status](https://coveralls.io/repos/GoogleCloudPlatform/kubernetes/badge.svg)](https://coveralls.io/r/GoogleCloudPlatform/kubernetes)
+[![GoDoc](https://godoc.org/k8s.io/kubernetes?status.png)](https://godoc.org/k8s.io/kubernetes) [![Travis](https://travis-ci.org/kubernetes/kubernetes.svg?branch=master)](https://travis-ci.org/kubernetes/kubernetes) [![Coverage Status](https://coveralls.io/repos/kubernetes/kubernetes/badge.svg)](https://coveralls.io/r/kubernetes/kubernetes)
 
 ### Are you ...
   * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io)

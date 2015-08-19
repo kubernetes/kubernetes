@@ -1,4 +1,0 @@
----
-- name: Fedora | Remove docker window manager on F20
-  yum: pkg=docker state=absent
-  when: ansible_distribution_major_version == "20"

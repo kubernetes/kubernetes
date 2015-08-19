@@ -43,29 +43,30 @@ func calculateScore(requested int64, capacity int64, node string) int {
 
 // For each of these resources, a pod that doesn't request the resource explicitly
 // will be treated as having requested the amount indicated below, for the purpose
-// of computing priority only. This ensures that when scheduling zero-limit pods, such
-// pods will not all be scheduled to the machine with the smallest in-use limit,
-// and that when scheduling regular pods, such pods will not see zero-limit pods as
+// of computing priority only. This ensures that when scheduling zero-request pods, such
+// pods will not all be scheduled to the machine with the smallest in-use request,
+// and that when scheduling regular pods, such pods will not see zero-request pods as
 // consuming no resources whatsoever. We chose these values to be similar to the
 // resources that we give to cluster addon pods (#10653). But they are pretty arbitrary.
-const defaultMilliCpuLimit int64 = 100             // 0.1 core
-const defaultMemoryLimit int64 = 200 * 1024 * 1024 // 200 MB
+// As described in #11713, we use request instead of limit to deal with resource requirements.
+const defaultMilliCpuRequest int64 = 100             // 0.1 core
+const defaultMemoryRequest int64 = 200 * 1024 * 1024 // 200 MB
 
 // TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
 // as an additional argument here) rather than using constants
-func getNonzeroLimits(limits *api.ResourceList) (int64, int64) {
+func getNonzeroRequests(requests *api.ResourceList) (int64, int64) {
 	var out_millicpu, out_memory int64
 	// Override if un-set, but not if explicitly set to zero
-	if (*limits.Cpu() == resource.Quantity{}) {
-		out_millicpu = defaultMilliCpuLimit
+	if (*requests.Cpu() == resource.Quantity{}) {
+		out_millicpu = defaultMilliCpuRequest
 	} else {
-		out_millicpu = limits.Cpu().MilliValue()
+		out_millicpu = requests.Cpu().MilliValue()
 	}
 	// Override if un-set, but not if explicitly set to zero
-	if (*limits.Memory() == resource.Quantity{}) {
-		out_memory = defaultMemoryLimit
+	if (*requests.Memory() == resource.Quantity{}) {
+		out_memory = defaultMemoryRequest
 	} else {
-		out_memory = limits.Memory().Value()
+		out_memory = requests.Memory().Value()
 	}
 	return out_millicpu, out_memory
 }
@@ -80,7 +81,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := getNonzeroLimits(&container.Resources.Limits)
+			cpu, memory := getNonzeroRequests(&container.Resources.Requests)
 			totalMilliCPU += cpu
 			totalMemory += memory
 		}
@@ -88,7 +89,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
 	for _, container := range pod.Spec.Containers {
-		cpu, memory := getNonzeroLimits(&container.Resources.Limits)
+		cpu, memory := getNonzeroRequests(&container.Resources.Requests)
 		totalMilliCPU += cpu
 		totalMemory += memory
 	}
@@ -196,7 +197,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	score := int(0)
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := getNonzeroLimits(&container.Resources.Limits)
+			cpu, memory := getNonzeroRequests(&container.Resources.Requests)
 			totalMilliCPU += cpu
 			totalMemory += memory
 		}
@@ -204,7 +205,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
 	for _, container := range pod.Spec.Containers {
-		cpu, memory := getNonzeroLimits(&container.Resources.Limits)
+		cpu, memory := getNonzeroRequests(&container.Resources.Requests)
 		totalMilliCPU += cpu
 		totalMemory += memory
 	}

@@ -38,7 +38,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				MinCount: 1,
 				MaxCount: 5,
-				Target:   expapi.TargetConsumption{api.ResourceCPU, resource.MustParse("0.8")},
+				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 	}
@@ -60,7 +60,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				MinCount: -1,
 				MaxCount: 5,
-				Target:   expapi.TargetConsumption{api.ResourceCPU, resource.MustParse("0.8")},
+				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"must be bigger or equal to minCount": {
@@ -74,7 +74,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				MinCount: 7,
 				MaxCount: 5,
-				Target:   expapi.TargetConsumption{api.ResourceCPU, resource.MustParse("0.8")},
+				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"invalid value": {
@@ -88,7 +88,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				MinCount: 1,
 				MaxCount: 5,
-				Target:   expapi.TargetConsumption{api.ResourceCPU, resource.MustParse("-0.8")},
+				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("-0.8")},
 			},
 		},
 		"resource not supported": {
@@ -102,7 +102,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 				MinCount: 1,
 				MaxCount: 5,
-				Target:   expapi.TargetConsumption{api.ResourceName("NotSupportedResource"), resource.MustParse("0.8")},
+				Target:   expapi.ResourceConsumption{Resource: api.ResourceName("NotSupportedResource"), Quantity: resource.MustParse("0.8")},
 			},
 		},
 		"required value": {
@@ -113,7 +113,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			Spec: expapi.HorizontalPodAutoscalerSpec{
 				MinCount: 1,
 				MaxCount: 5,
-				Target:   expapi.TargetConsumption{api.ResourceCPU, resource.MustParse("0.8")},
+				Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 			},
 		},
 	}

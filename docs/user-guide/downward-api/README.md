@@ -61,8 +61,9 @@ through the pod logs to see that the pod was injected with the correct values:
 
 ```console
 $ kubectl logs dapi-test-pod | grep POD_
-2015-04-30T20:22:18.568024817Z POD_NAME=dapi-test-pod
-2015-04-30T20:22:18.568087688Z POD_NAMESPACE=default
+2015-04-30T20:22:18.568024817Z MY_POD_NAME=dapi-test-pod
+2015-04-30T20:22:18.568087688Z MY_POD_NAMESPACE=default
+2015-04-30T20:22:18.568092435Z MY_POD_IP=10.0.1.6
 ```
 
 

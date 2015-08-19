@@ -27,8 +27,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/remotecommand"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -53,7 +53,7 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 		Executor: &DefaultRemoteExecutor{},
 	}
 	cmd := &cobra.Command{
-		Use:     "exec POD -c CONTAINER -- COMMAND [args...]",
+		Use:     "exec POD [-c CONTAINER] -- COMMAND [args...]",
 		Short:   "Execute a command in a container.",
 		Long:    "Execute a command in a container.",
 		Example: exec_example,
@@ -65,7 +65,7 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 	}
 	cmd.Flags().StringVarP(&options.PodName, "pod", "p", "", "Pod name")
 	// TODO support UID
-	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name")
+	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
 	return cmd

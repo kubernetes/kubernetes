@@ -96,12 +96,15 @@ GCE_DEFAULT_SKIP_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
+    "Autoscaling"
+    "DaemonRestart"
     "ResourceUsage"
     )
 
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
     ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}}
+    "Autoscaling"
     "Etcd"
     "NetworkingNew"
     "Nodes\sNetwork"
@@ -115,6 +118,7 @@ GCE_PARALLEL_SKIP_TESTS=(
 
 # Tests which are known to be flaky when run in parallel.
 GCE_PARALLEL_FLAKY_TESTS=(
+    "DaemonRestart"
     "Elasticsearch"
     "PD"
     "ServiceAccounts"
@@ -127,10 +131,11 @@ GCE_PARALLEL_FLAKY_TESTS=(
 
 # Tests that should not run on soak cluster.
 GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
+    "Autoscaling"
     "Density.*30\spods"
     "Elasticsearch"
     "Etcd.*SIGKILL"
-    "external\sload\sbalancer"    
+    "external\sload\sbalancer"
     "identically\snamed\sservices"
     "network\spartition"
     "Reboot"
@@ -139,6 +144,10 @@ GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
     "Services.*Type\sgoes\sfrom"
     "Services.*nodeport\ssettings"
     "Skipped"
+    )
+
+GCE_RELEASE_SKIP_TESTS=(
+    "Autoscaling"
     )
 
 # Define environment variables based on the Jenkins project name.
@@ -180,6 +189,8 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
+    # Override GCE default for cluster size autoscaling purposes.
+    ENABLE_CLUSTER_MONITORING="googleinfluxdb"
     ;;
 
   # Runs all non-flaky tests on GCE in parallel.
@@ -283,6 +294,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gce-release"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_RELEASE_SKIP_TESTS[@]:+${GCE_RELEASE_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-gce"}

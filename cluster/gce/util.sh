@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
-if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
+if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "${OS_DISTRIBUTION}" == "trusty" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
 else
   echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
@@ -1196,7 +1196,11 @@ function ssh-to-node {
 
 # Restart the kube-proxy on a node ($1)
 function restart-kube-proxy {
-  ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+  if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
+    ssh-to-node "$1" "sudo initctl restart kube-proxy"
+  else
+    ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+  fi
 }
 
 # Restart the kube-apiserver on a node ($1)

@@ -39,9 +39,9 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
@@ -1051,7 +1051,10 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod
 	if err != nil {
 		return "", err
 	}
-
+	switch internalFieldPath {
+	case "status.podIP":
+		return pod.Status.PodIP, nil
+	}
 	return fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
 }
 
@@ -1279,7 +1282,6 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 }
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull secrets
-// TODO transitively search through the referenced service account to find the required secrets
 // TODO duplicate secrets are being retrieved multiple times and there is no cache.  Creating and using a secret manager interface will make this easier to address.
 func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	pullSecrets := []api.Secret{}
@@ -1287,7 +1289,8 @@ func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
 		secret, err := kl.kubeClient.Secrets(pod.Namespace).Get(secretRef.Name)
 		if err != nil {
-			return nil, err
+			glog.Warningf("Unable to retrieve pull secret %s/%s for %s/%s due to %v.  The image pull may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
+			continue
 		}
 
 		pullSecrets = append(pullSecrets, *secret)

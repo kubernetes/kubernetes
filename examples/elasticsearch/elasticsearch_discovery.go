@@ -19,20 +19,17 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
 var (
-	token     = flag.String("token", "", "Bearer token for authentication to the API server.")
-	server    = flag.String("server", "", "The address and port of the Kubernetes API server")
 	namespace = flag.String("namespace", api.NamespaceDefault, "The namespace containing Elasticsearch pods")
 	selector  = flag.String("selector", "", "Selector (label query) for selecting Elasticsearch pods")
 )
@@ -40,26 +37,11 @@ var (
 func main() {
 	flag.Parse()
 	glog.Info("Elasticsearch discovery")
-	apiServer := *server
-	if apiServer == "" {
-		kubernetesService := os.Getenv("KUBERNETES_SERVICE_HOST")
-		if kubernetesService == "" {
-			glog.Fatalf("Please specify the Kubernetes server with --server")
-		}
-		apiServer = fmt.Sprintf("https://%s:%s", kubernetesService, os.Getenv("KUBERNETES_SERVICE_PORT"))
-	}
 
-	glog.Infof("Server: %s", apiServer)
 	glog.Infof("Namespace: %q", *namespace)
 	glog.Infof("selector: %q", *selector)
 
-	config := client.Config{
-		Host:        apiServer,
-		BearerToken: *token,
-		Insecure:    true,
-	}
-
-	c, err := client.New(&config)
+	c, err := client.NewInCluster()
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}

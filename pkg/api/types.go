@@ -2208,3 +2208,35 @@ type RangeAllocation struct {
 	// a single allocated address (the fifth bit on CIDR 10.0.0.0/8 is 10.0.0.4).
 	Data []byte `json:"data"`
 }
+
+// A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
+// types to the API.  It consists of one or more Versions of the api.
+type ThirdPartyResource struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+
+	Description string `json:"description,omitempty" description:"The description of this object"`
+
+	Versions []APIVersion `json:"versions,omitempty" description:"The versions for this third party object"`
+}
+
+type ThirdPartyResourceList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+
+	Items []ThirdPartyResource `json:"items" description:"items is a list of schema objects"`
+}
+
+// An APIVersion represents a single concrete version of an object model.
+type APIVersion struct {
+	Name     string `json:"name,omitempty" description:"name of this version (e.g. 'v1')"`
+	APIGroup string `json:"apiGroup,omitempty" description:"The API group to add this object into, default 'experimental'"`
+}
+
+// An internal object, used for versioned storage in etcd.  Not exposed to the end user.
+type ThirdPartyResourceData struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+
+	Data []byte `json:"name,omitempty" description:"the raw JSON data for this data"`
+}

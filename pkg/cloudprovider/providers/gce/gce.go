@@ -19,7 +19,6 @@ package gce_cloud
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"path"
@@ -28,7 +27,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -44,9 +42,7 @@ import (
 )
 
 const (
-	ProviderName             = "gce"
-	EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
-	INTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
+	ProviderName = "gce"
 )
 
 const k8sNodeRouteTag = "k8s-node-route"
@@ -60,9 +56,6 @@ type GCECloud struct {
 	instanceID       string
 	externalID       string
 	networkURL       string
-
-	// Used for accessing the metadata server
-	metadataAccess func(string) (string, error)
 }
 
 type Config struct {
@@ -75,25 +68,6 @@ type Config struct {
 
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
-}
-
-func getMetadata(url string) (string, error) {
-	client := http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Add("X-Google-Metadata-Request", "True")
-	res, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
 }
 
 func getProjectAndZone() (string, string, error) {
@@ -205,7 +179,6 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		instanceID:       instanceID,
 		externalID:       externalID,
 		networkURL:       networkURL,
-		metadataAccess:   getMetadata,
 	}, nil
 }
 
@@ -640,11 +613,11 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
-	internalIP, err := gce.metadataAccess(INTERNAL_IP_METADATA_URL)
+	internalIP, err := metadata.Get("instance/network-interfaces/0/ip")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get internal IP: %v", err)
 	}
-	externalIP, err := gce.metadataAccess(EXTERNAL_IP_METADATA_URL)
+	externalIP, err := metadata.Get("instance/network-interfaces/0/access-configs/0/external-ip")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get external IP: %v", err)
 	}
@@ -691,50 +664,6 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 		instances = append(instances, instance.Name)
 	}
 	return instances, nil
-}
-
-// cpu is in cores, memory is in GiB
-func makeResources(cpu float64, memory float64) *api.NodeResources {
-	return &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(int64(cpu*1000), resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(int64(memory*1024*1024*1024), resource.BinarySI),
-		},
-	}
-}
-
-func canonicalizeMachineType(machineType string) string {
-	ix := strings.LastIndex(machineType, "/")
-	return machineType[ix+1:]
-}
-
-func (gce *GCECloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	instance := canonicalizeInstanceName(name)
-	instanceCall := gce.service.Instances.Get(gce.projectID, gce.zone, instance)
-	res, err := instanceCall.Do()
-	if err != nil {
-		return nil, err
-	}
-	// TODO: actually read machine size instead of this awful hack.
-	switch canonicalizeMachineType(res.MachineType) {
-	case "f1-micro":
-		return makeResources(1, 0.6), nil
-	case "g1-small":
-		return makeResources(1, 1.70), nil
-	case "n1-standard-1":
-		return makeResources(1, 3.75), nil
-	case "n1-standard-2":
-		return makeResources(2, 7.5), nil
-	case "n1-standard-4":
-		return makeResources(4, 15), nil
-	case "n1-standard-8":
-		return makeResources(8, 30), nil
-	case "n1-standard-16":
-		return makeResources(16, 30), nil
-	default:
-		glog.Errorf("unknown machine: %s", res.MachineType)
-		return nil, nil
-	}
 }
 
 func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {

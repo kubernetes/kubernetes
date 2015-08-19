@@ -386,32 +386,6 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	return "/" + srv.ID, nil
 }
 
-func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
-	glog.V(4).Infof("GetNodeResources(%v) called", name)
-
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return nil, err
-	}
-
-	s, ok := srv.Flavor["id"]
-	if !ok {
-		return nil, ErrAttrNotFound
-	}
-	flavId, ok := s.(string)
-	if !ok {
-		return nil, ErrAttrNotFound
-	}
-	rsrc, ok := i.flavor_to_resource[flavId]
-	if !ok {
-		return nil, ErrNotFound
-	}
-
-	glog.V(4).Infof("GetNodeResources(%v) => %v", name, rsrc)
-
-	return rsrc, nil
-}
-
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
@@ -586,7 +560,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 
 		_, err = members.Create(lb.network, members.CreateOpts{
 			PoolID:       pool.ID,
-			ProtocolPort: ports[0].Port, //TODO: need to handle multi-port
+			ProtocolPort: ports[0].NodePort, //TODO: need to handle multi-port
 			Address:      addr,
 		}).Extract()
 		if err != nil {

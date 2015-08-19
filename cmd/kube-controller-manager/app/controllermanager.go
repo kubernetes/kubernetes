@@ -31,9 +31,9 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"

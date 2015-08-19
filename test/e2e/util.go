@@ -35,10 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -178,7 +178,9 @@ type RCConfig struct {
 	Timeout       time.Duration
 	PodStatusFile *os.File
 	Replicas      int
+	CpuRequest    int64 // millicores
 	CpuLimit      int64 // millicores
+	MemRequest    int64 // bytes
 	MemLimit      int64 // bytes
 
 	// Env vars, set the same for every pod.
@@ -1201,6 +1203,15 @@ func RunRC(config RCConfig) error {
 	if config.MemLimit > 0 {
 		rc.Spec.Template.Spec.Containers[0].Resources.Limits[api.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
 	}
+	if config.CpuRequest > 0 || config.MemRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{}
+	}
+	if config.CpuRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests[api.ResourceCPU] = *resource.NewMilliQuantity(config.CpuRequest, resource.DecimalSI)
+	}
+	if config.MemRequest > 0 {
+		rc.Spec.Template.Spec.Containers[0].Resources.Requests[api.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
+	}
 
 	_, err := config.Client.ReplicationControllers(config.Namespace).Create(rc)
 	if err != nil {
@@ -1365,7 +1376,7 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 	return events.Items
 }
 
-func ScaleRC(c *client.Client, ns, name string, size uint) error {
+func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("%v Scaling replication controller %s in namespace %s to %d", time.Now(), name, ns, size))
 	scaler, err := kubectl.ScalerFor("ReplicationController", kubectl.NewScalerClient(c))
 	if err != nil {
@@ -1375,6 +1386,9 @@ func ScaleRC(c *client.Client, ns, name string, size uint) error {
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
 	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
 		return err
+	}
+	if !wait {
+		return nil
 	}
 	return waitForRCPodsRunning(c, ns, name)
 }

@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
-	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
@@ -81,7 +81,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.IPVar(&s.HealthzBindAddress, "healthz-bind-address", s.HealthzBindAddress, "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
-	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
@@ -159,7 +159,8 @@ func (s *ProxyServer) Run(_ []string) error {
 	if !s.ForceUserspaceProxy && shouldUseIptables {
 		glog.V(2).Info("Using iptables Proxier.")
 
-		proxierIptables, err := iptables.NewProxier(utiliptables.New(exec.New(), protocol), s.SyncPeriod)
+		execer := exec.New()
+		proxierIptables, err := iptables.NewProxier(utiliptables.New(execer, protocol), execer, s.SyncPeriod)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}

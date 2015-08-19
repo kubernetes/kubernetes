@@ -31,7 +31,7 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util"
 )

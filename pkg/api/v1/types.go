@@ -1178,7 +1178,7 @@ type ServicePort struct {
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
-	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed when type=NodePort or LoadBalancer; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#type--nodeport"`
+	NodePort int `json:"nodePort,omitempty" description:"the port on each node on which this service is exposed when type=NodePort or LoadBalancer; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; see http://releases.k8s.io/HEAD/docs/user-guide/services.md#type--nodeport"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -2011,17 +2011,12 @@ type ComponentStatusList struct {
 	Items []ComponentStatus `json:"items" description:"list of component status objects"`
 }
 
-// SecurityContext holds security configuration that will be applied to a container.  SecurityContext
-// contains duplication of some existing fields from the Container resource.  These duplicate fields
-// will be populated based on the Container configuration if they are not set.  Defining them on
-// both the Container AND the SecurityContext will result in an error.
+// SecurityContext holds security configuration that will be applied to a container.
 type SecurityContext struct {
 	// Capabilities are the capabilities to add/drop when running the container
-	// Must match Container.Capabilities or be unset.  Will be defaulted to Container.Capabilities if left unset
-	Capabilities *Capabilities `json:"capabilities,omitempty" description:"the linux capabilites that should be added or removed; see http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"`
+	Capabilities *Capabilities `json:"capabilities,omitempty" description:"the linux kernel capabilites that should be added or removed; see http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"`
 
 	// Run the container in privileged mode
-	// Must match Container.Privileged or be unset.  Will be defaulted to Container.Privileged if left unset
 	Privileged *bool `json:"privileged,omitempty" description:"run the container in privileged mode; see http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"`
 
 	// SELinuxOptions are the labels to be applied to the container
@@ -2059,4 +2054,36 @@ type RangeAllocation struct {
 
 	Range string `json:"range" description:"a range string that identifies the range represented by 'data'; required"`
 	Data  []byte `json:"data" description:"a bit array containing all allocated addresses in the previous segment"`
+}
+
+// A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
+// types to the API.  It consists of one or more Versions of the api.
+type ThirdPartyResource struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+
+	Description string `json:"description,omitempty" description:"The description of this object"`
+
+	Versions []APIVersion `json:"versions,omitempty" description:"The versions for this third party object"`
+}
+
+type ThirdPartyResourceList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+
+	Items []ThirdPartyResource `json:"items" description:"items is a list of schema objects"`
+}
+
+// An APIVersion represents a single concrete version of an object model.
+type APIVersion struct {
+	Name     string `json:"name,omitempty" description:"name of this version (e.g. 'v1')"`
+	APIGroup string `json:"apiGroup,omitempty" description:"The API group to add this object into, default 'experimental'"`
+}
+
+// An internal object, used for versioned storage in etcd.  Not exposed to the end user.
+type ThirdPartyResourceData struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+
+	Data []byte `json:"name,omitempty" description:"the raw JSON data for this data"`
 }

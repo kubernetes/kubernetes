@@ -31,8 +31,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
+	"k8s.io/kubernetes/pkg/api/errors"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -47,12 +48,13 @@ var (
 )
 
 const (
-	deleteTimeout        = 2 * time.Minute
-	endpointTimeout      = 5 * time.Minute
-	nodeListTimeout      = 2 * time.Minute
-	podCreateTimeout     = 2 * time.Minute
-	podStartTimeout      = 30 * time.Minute
-	serviceCreateTimeout = 2 * time.Minute
+	deleteTimeout          = 2 * time.Minute
+	endpointTimeout        = 5 * time.Minute
+	nodeListTimeout        = 2 * time.Minute
+	podCreateTimeout       = 2 * time.Minute
+	podStartTimeout        = 30 * time.Minute
+	serviceCreateTimeout   = 2 * time.Minute
+	namespaceDeleteTimeout = 5 * time.Minute
 )
 
 func main() {
@@ -116,6 +118,16 @@ func main() {
 	defer func(ns string) {
 		if err := c.Namespaces().Delete(ns); err != nil {
 			glog.Warningf("Failed to delete namespace ns: %e", ns, err)
+		} else {
+			// wait until the namespace disappears
+			for i := 0; i < int(namespaceDeleteTimeout/time.Second); i++ {
+				if _, err := c.Namespaces().Get(ns); err != nil {
+					if errors.IsNotFound(err) {
+						return
+					}
+				}
+				time.Sleep(time.Second)
+			}
 		}
 	}(ns)
 	glog.Infof("Created namespace %s", ns)

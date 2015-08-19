@@ -217,29 +217,6 @@ func (c *MesosCloud) List(filter string) ([]string, error) {
 	return addr, err
 }
 
-// GetNodeResources gets the resources for a particular node
-func (c *MesosCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	//TODO(jdef) use a timeout here? 15s?
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
-
-	nodes, err := c.client.listSlaves(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if len(nodes) == 0 {
-		log.V(2).Info("no slaves found, are any running?")
-	} else {
-		for _, node := range nodes {
-			if name == node.hostname {
-				return node.resources, nil
-			}
-		}
-	}
-	log.Warningf("failed to locate node spec for %q", name)
-	return nil, nil
-}
-
 // NodeAddresses returns the addresses of the specified instance.
 func (c *MesosCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	ip, err := ipAddress(name)

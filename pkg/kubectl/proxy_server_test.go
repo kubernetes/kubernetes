@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func TestAccept(t *testing.T) {

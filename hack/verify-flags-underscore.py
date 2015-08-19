@@ -28,9 +28,6 @@ parser.add_argument("filenames", help="list of files to check, all files if unsp
 parser.add_argument("-e", "--skip-exceptions", help="ignore hack/verify-flags/exceptions.txt and print all output", action="store_true")
 args = parser.parse_args()
 
-
-dashRE = re.compile('[-_]')
-
 # Cargo culted from http://stackoverflow.com/questions/898669/how-can-i-detect-if-a-file-is-binary-non-text-in-python
 def is_binary(pathname):
     """Return true if the given filename is binary.
@@ -96,11 +93,10 @@ def normalize_files(rootdir, files):
     return newfiles
 
 def line_has_bad_flag(line, flagre):
-    m  = flagre.search(line)
-    if not m:
-        return False
-    if "_" in m.group(0):
-        return True
+    results  = flagre.findall(line)
+    for result in results:
+        if "_" in result:
+            return True
     return False
 
 # The list of files might not be the whole repo. If someone only changed a
@@ -109,14 +105,16 @@ def line_has_bad_flag(line, flagre):
 # If running the golang files finds a new flag not in that file, return an
 # error and tell the user to add the flag to the flag list.
 def get_flags(rootdir, files):
-    # use a set for uniqueness
-    flags = set()
-
     # preload the 'known' flags
     pathname = os.path.join(rootdir, "hack/verify-flags/known-flags.txt")
     f = open(pathname, 'r')
-    for line in f.read().splitlines():
-        flags.add(line)
+    flags = set(f.read().splitlines())
+    f.close()
+
+    # preload the 'known' flags which don't follow the - standard
+    pathname = os.path.join(rootdir, "hack/verify-flags/excluded-flags.txt")
+    f = open(pathname, 'r')
+    excluded_flags = set(f.read().splitlines())
     f.close()
 
     regexs = [ re.compile('Var[P]?\([^,]*, "([^"]*)"'),
@@ -127,6 +125,7 @@ def get_flags(rootdir, files):
                re.compile('.StringSlice[P]?\("([^"]*)",[^,]+,[^)]+\)') ]
 
     new_flags = set()
+    new_excluded_flags = set()
     # walk all the files looking for any flags being declared
     for pathname in files:
         if not pathname.endswith(".go"):
@@ -138,11 +137,19 @@ def get_flags(rootdir, files):
         for regex in regexs:
             matches = matches + regex.findall(data)
         for flag in matches:
-            # if the flag doesn't have a - or _ it is not interesting
-            if not dashRE.search(flag):
+            if any(x in flag for x in excluded_flags):
+                continue
+            if "_" in flag:
+                new_excluded_flags.add(flag)
+            if not "-" in flag:
                 continue
             if flag not in flags:
                 new_flags.add(flag)
+    if len(new_excluded_flags) != 0:
+        print("Found a flag declared with an _ but which is not explicitly listed as a valid flag name in hack/verify-flags/excluded-flags.txt")
+        print("Are you certain this flag should not have been declared with an - instead?")
+        print("%s" % "\n".join(new_excluded_flags))
+        sys.exit(1)
     if len(new_flags) != 0:
         print("Found flags in golang files not in the list of known flags. Please add these to hack/verify-flags/known-flags.txt")
         print("%s" % "\n".join(new_flags))
@@ -150,12 +157,14 @@ def get_flags(rootdir, files):
     return list(flags)
 
 def flags_to_re(flags):
-    """turn the list of all flags we found into a regex find both - and _ version"""
+    """turn the list of all flags we found into a regex find both - and _ versions"""
+    dashRE = re.compile('[-_]')
     flagREs = []
     for flag in flags:
         # turn all flag names into regexs which will find both types
         newre = dashRE.sub('[-_]', flag)
-        flagREs.append(newre)
+        # only match if there is not a leading or trailing alphanumeric character
+        flagREs.append("[^\w]" + newre + "[^\w]")
     # turn that list of regex strings into a single large RE
     flagRE = "|".join(flagREs)
     flagRE = re.compile(flagRE)

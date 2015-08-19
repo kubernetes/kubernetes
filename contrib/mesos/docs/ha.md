@@ -5,7 +5,7 @@
 The implementation of the scheduler HA feature includes:
 
 - Checkpointing by default (`--checkpoint`)
-- Large failover-timeout by default (`--failover_timeout`)
+- Large failover-timeout by default (`--failover-timeout`)
 - Hot-failover w/ multiple scheduler instances (`--ha`)
 - Best effort task reconciliation on failover
 

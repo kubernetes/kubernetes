@@ -1,7 +1,0 @@
-{
-    "name": "haproxy",
-    "reloadCmd": "./haproxy_reload",
-    "config": "/etc/haproxy/haproxy.cfg",
-    "template": "template.cfg",
-    "algorithm": "roundrobin"
-}

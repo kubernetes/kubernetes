@@ -32,6 +32,20 @@ func init() {
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
 	factory.RegisterPriorityFunction("EqualPriority", scheduler.EqualPriority, 1)
+
+	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
+	// the number of pods (belonging to the same service) on the same node.
+	// Register the factory so that it's available, but do not include it as part of the default priorities
+	// Largely replaced by "SelectorSpreadPriority", but registered for backward compatibility with 1.0
+	factory.RegisterPriorityConfigFactory(
+		"ServiceSpreadingPriority",
+		factory.PriorityConfigFactory{
+			Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{})
+			},
+			Weight: 1,
+		},
+	)
 }
 
 func defaultPredicates() util.StringSet {
@@ -65,7 +79,7 @@ func defaultPriorities() util.StringSet {
 		factory.RegisterPriorityFunction("LeastRequestedPriority", priorities.LeastRequestedPriority, 1),
 		// Prioritizes nodes to help achieve balanced resource usage
 		factory.RegisterPriorityFunction("BalancedResourceAllocation", priorities.BalancedResourceAllocation, 1),
-		// spreads pods by minimizing the number of pods (belonging to the same service) on the same minion.
+		// spreads pods by minimizing the number of pods (belonging to the same service or replication controller) on the same node.
 		factory.RegisterPriorityConfigFactory(
 			"SelectorSpreadPriority",
 			factory.PriorityConfigFactory{

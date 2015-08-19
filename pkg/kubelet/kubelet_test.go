@@ -38,8 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/testclient"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1187,6 +1187,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 							},
 						},
 					},
+					{
+						Name: "POD_IP",
+						ValueFrom: &api.EnvVarSource{
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: testapi.Version(),
+								FieldPath:  "status.podIP",
+							},
+						},
+					},
 				},
 			},
 			masterServiceNs: "nothing",
@@ -1194,6 +1203,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "POD_NAME", Value: "dapi-test-pod-name"},
 				{Name: "POD_NAMESPACE", Value: "downward-api"},
+				{Name: "POD_IP", Value: "1.2.3.4"},
 			},
 		},
 		{
@@ -1345,6 +1355,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				Name:      "dapi-test-pod-name",
 			},
 		}
+		testPod.Status.PodIP = "1.2.3.4"
 
 		result, err := kl.makeEnvironmentVariables(testPod, tc.container)
 		if err != nil {

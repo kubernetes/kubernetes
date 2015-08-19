@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

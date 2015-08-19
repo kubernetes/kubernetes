@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/master"
@@ -152,10 +152,12 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"the cluster and that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup.")
 	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead")
+	fs.MarkDeprecated("port", "see --insecure-port instead")
 	fs.IPVar(&s.InsecureBindAddress, "insecure-bind-address", s.InsecureBindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
 		"Defaults to localhost.")
 	fs.IPVar(&s.InsecureBindAddress, "address", s.InsecureBindAddress, "DEPRECATED: see --insecure-bind-address instead")
+	fs.MarkDeprecated("address", "see --insecure-bind-address instread")
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --read-only-port and --secure-port ports. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
@@ -166,6 +168,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
 	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress, "DEPRECATED: see --bind-address instead")
+	fs.MarkDeprecated("public-address-override", "see --bind-address instead")
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
 		"don't serve HTTPS at all.")
@@ -223,6 +226,10 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 func (s *APIServer) verifyClusterIPFlags() {
 	if s.ServiceClusterIPRange.IP == nil {
 		glog.Fatal("No --service-cluster-ip-range specified")
+	}
+	var ones, bits = s.ServiceClusterIPRange.Mask.Size()
+	if bits-ones > 20 {
+		glog.Fatal("Specified --service-cluster-ip-range is too large")
 	}
 }
 

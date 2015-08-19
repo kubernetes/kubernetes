@@ -39,11 +39,18 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for files that need boilerplate... "
-out=($(hack/verify-boilerplate.sh))
-if [[ $? -ne 0 ]]; then
+files=($(git diff --cached --name-only --diff-filter ACM))
+# We always make sure there is one file in the files list. Some tools check
+# the whole repo if they get no files, so in fact, this is much faster on
+# git commit --amend
+if [[ ${#files[@]} -eq 0 ]]; then
+  files+=("README.md")
+fi
+out=($(hack/boilerplate/boilerplate.py "${files[@]}"))
+if [[ "${#out}" -ne 0 ]]; then
   echo "${red}ERROR!"
   echo "Some files are missing the required boilerplate header"
-  echo "from hooks/boilerplate.txt:"
+  echo "from hack/boilerplate/boilerplate.*.txt:"
   for f in "${out[@]}"; do
     echo "  ${f}"
   done
@@ -53,10 +60,8 @@ else
 fi
 echo "${reset}"
 
-allfiles=($(git diff --cached --name-only --diff-filter ACM | grep -v -e "third_party" -e "Godeps"))
-
 echo -ne "Checking for problems with flag names... "
-invalid_flag_lines=$(hack/verify-flags-underscore.py "${allfiles[@]}")
+invalid_flag_lines=$(hack/verify-flags-underscore.py "${files[@]}")
 if [[ "${invalid_flag_lines:-}" != "" ]]; then
   echo "${red}ERROR!"
   echo "There appear to be problems with the following"

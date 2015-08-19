@@ -249,7 +249,7 @@ KUBE_COVER=y hack/test-go.sh pkg/kubectl
 
 Multiple arguments can be passed, in which case the coverage results will be combined for all tests run.
 
-Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/GoogleCloudPlatform/kubernetes), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls.
+Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/kubernetes/kubernetes), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls. Coverage reports from before the Kubernetes Github organization was created can be found [here](https://coveralls.io/r/GoogleCloudPlatform/kubernetes).
 
 ## Integration tests
 

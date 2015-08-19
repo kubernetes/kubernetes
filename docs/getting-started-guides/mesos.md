@@ -99,6 +99,8 @@ export KUBERNETES_MASTER_IP=$(hostname -i)
 export KUBERNETES_MASTER=http://${KUBERNETES_MASTER_IP}:8888
 ```
 
+Note that KUBERNETES_MASTER is used as the api endpoint. If you have existing `~/.kube/config` and point to another endpoint, you need to add option `--server=${KUBERNETES_MASTER}` to kubectl in later steps.
+
 ### Deploy etcd
 
 Start etcd and verify that it is running:

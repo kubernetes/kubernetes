@@ -12777,7 +12777,7 @@
     "properties": {
      "capabilities": {
       "$ref": "v1.Capabilities",
-      "description": "the linux capabilites that should be added or removed; see http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"
+      "description": "the linux kernel capabilites that should be added or removed; see http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context"
      },
      "privileged": {
       "type": "boolean",
@@ -13446,8 +13446,7 @@
    "v1.ServicePort": {
     "id": "v1.ServicePort",
     "required": [
-     "port",
-     "nodePort"
+     "port"
     ],
     "properties": {
      "name": {

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: es
-        image: kubernetes/elasticsearch:1.0
+        image: kubernetes/elasticsearch:1.1
         env:
           - name: "CLUSTER_NAME"
             value: "mytunes-db"
@@ -29,11 +29,4 @@ spec:
           containerPort: 9200
         - name: es-transport
           containerPort: 9300
-        volumeMounts:
-        - name: apiserver-secret
-          mountPath: /etc/apiserver-secret
-          readOnly: true
-      volumes:
-      - name: apiserver-secret
-        secret:
-          secretName: apiserver-secret
+

@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -141,7 +141,7 @@ var _ = Describe("Density", func() {
 		}
 
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 

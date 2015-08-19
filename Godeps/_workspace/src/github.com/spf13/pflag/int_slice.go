@@ -7,11 +7,16 @@ import (
 )
 
 // -- intSlice Value
-type intSliceValue []int
+type intSliceValue struct {
+	value   *[]int
+	changed bool
+}
 
 func newIntSliceValue(val []int, p *[]int) *intSliceValue {
-	*p = val
-	return (*intSliceValue)(p)
+	isv := new(intSliceValue)
+	isv.value = p
+	*isv.value = val
+	return isv
 }
 
 func (s *intSliceValue) Set(val string) error {
@@ -25,7 +30,12 @@ func (s *intSliceValue) Set(val string) error {
 		}
 
 	}
-	*s = append(*s, out...)
+	if !s.changed {
+		*s.value = out
+	} else {
+		*s.value = append(*s.value, out...)
+	}
+	s.changed = true
 	return nil
 }
 
@@ -34,8 +44,8 @@ func (s *intSliceValue) Type() string {
 }
 
 func (s *intSliceValue) String() string {
-	out := make([]string, len(*s))
-	for i, d := range *s {
+	out := make([]string, len(*s.value))
+	for i, d := range *s.value {
 		out[i] = fmt.Sprintf("%d", d)
 	}
 	return "[" + strings.Join(out, ",") + "]"

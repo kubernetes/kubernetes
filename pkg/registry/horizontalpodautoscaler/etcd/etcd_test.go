@@ -65,7 +65,7 @@ func validNewHorizontalPodAutoscaler(name string) *expapi.HorizontalPodAutoscale
 			},
 			MinCount: 1,
 			MaxCount: 5,
-			Target:   expapi.TargetConsumption{api.ResourceCPU, resource.MustParse("0.8")},
+			Target:   expapi.ResourceConsumption{Resource: api.ResourceCPU, Quantity: resource.MustParse("0.8")},
 		},
 	}
 }
@@ -133,7 +133,7 @@ func TestDelete(t *testing.T) {
 		}
 		return fakeEtcdClient.Data[key].R.Node.TTL == 30
 	}
-	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
+	test.TestDelete(createFn, gracefulSetFn)
 }
 
 func TestGet(t *testing.T) {

@@ -169,10 +169,37 @@ If a pod or pods are pending with this message, then there are several things to
 - Check that the pod is not larger than all the nodes.  For example, if all the nodes
 have a capacity of `cpu: 1`, then a pod with a limit of `cpu: 1.1` will never be scheduled.
 
-You can check node capacities with the `kubectl get nodes -o <format>` command.
-Here are some example command lines that extract just the necessary information:
-- `kubectl get nodes -o yaml | grep '\sname\|cpu\|memory'`
-- `kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, cap: .status.capacity}'`
+You can check node capacities and amounts allocated with the `kubectl describe nodes` command.
+For example:
+
+```console
+$ kubectl describe nodes gke-cluster-4-386701dd-node-ww4p
+Name:			gke-cluster-4-386701dd-node-ww4p
+[ ... lines removed for clarity ...]
+Capacity:
+ cpu:		1
+ memory:	464Mi
+ pods:		40
+Allocated resources (total requests):
+ cpu:		910m
+ memory:	2370Mi
+ pods:		4
+[ ... lines removed for clarity ...]
+Pods:				(4 in total)
+  Namespace			Name								CPU(milliCPU)			Memory(bytes)
+  frontend 			webserver-ffj8j							500 (50% of total)		2097152000 (50% of total)
+  kube-system			fluentd-cloud-logging-gke-cluster-4-386701dd-node-ww4p		100 (10% of total)		209715200 (5% of total)
+  kube-system			kube-dns-v8-qopgw						310 (31% of total)		178257920 (4% of total)
+TotalResourceLimits:
+  CPU(milliCPU):		910 (91% of total)
+  Memory(bytes):		2485125120 (59% of total)
+[ ... lines removed for clarity ...]
+```
+
+Here you can see from the `Allocated resorces` section that that a pod which ask for more than
+90 millicpus or more than 1341MiB of memory will not be able to fit on this node.
+
+Looking at the `Pods` section, you can see which pods are taking up space on the node.
 
 The [resource quota](../admin/resource-quota.md) feature can be configured
 to limit the total amount of resources that can be consumed.  If used in conjunction

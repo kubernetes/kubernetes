@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"os"
 	"path"
@@ -52,7 +52,7 @@ var _ = Describe("hostPath", func() {
 
 	AfterEach(func() {
 		By(fmt.Sprintf("Destroying namespace for this suite %v", namespace.Name))
-		if err := c.Namespaces().Delete(namespace.Name); err != nil {
+		if err := deleteNS(c, namespace.Name); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})

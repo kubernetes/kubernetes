@@ -98,14 +98,14 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
       --minimum-container-ttl-duration=0: Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'
       --network-plugin="": <Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle
       --node-status-update-frequency=0: Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s
-      --oom-score-adj=0: The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]
+      --oom-score-adj=0: The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]
       --pod-cidr="": The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.
       --pod-infra-container-image="": The image whose network/ipc namespaces containers in each pod will use.
       --port=0: The port for the Kubelet to serve on. Note that "kubectl logs" will not work if you set this flag.
       --read-only-port=0: The read-only port for the Kubelet to serve on (set to 0 to disable)
       --really-crash-for-testing=false: If true, when panics occur crash. Intended for testing.
       --register-node=false: Register the node with the apiserver (defaults to true if --api-server is set)
-      --registry-burst=0: Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry-qps > 0
+      --registry-burst=0: Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0
       --registry-qps=0: If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]
       --resource-container="": Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).
       --root-dir="": Directory path for managing kubelet files (volume mounts,etc).

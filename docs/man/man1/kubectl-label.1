@@ -27,6 +27,10 @@ If \-\-resource\-version is specified, then updates will use this resource versi
     select all resources in the namespace of the specified resource types
 
 .PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to update the labels
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for label
 
@@ -175,6 +179,9 @@ $ kubectl label \-\-overwrite pods foo status=unhealthy
 
 # Update all pods in the namespace
 $ kubectl label pods \-\-all status=unhealthy
+
+# Update a pod identified by the type and name in "pod.json"
+$ kubectl label \-f pod.json status=unhealthy
 
 # Update pod 'foo' only if the resource is unchanged from version 1.
 $ kubectl label pods foo status=unhealthy \-\-resource\-version=1

@@ -48,6 +48,7 @@ Please install Docker 1.6.2 or Docker 1.7.1.
   - [Bootstrap Docker](#bootstrap-docker)
 - [Master Node](#master-node)
 - [Adding a worker node](#adding-a-worker-node)
+- [Deploy a DNS](#deploy-a-dns)
 - [Testing your cluster](#testing-your-cluster)
 
 ## Prerequisites
@@ -81,7 +82,7 @@ Clone the Kubernetes repo, and run [master.sh](docker-multinode/master.sh) on th
 
 ```sh
 export K8S_VERSION=<your_k8s_version (e.g. 1.0.1)>
-cd kubernetes/cluster/docker-multinode
+cd kubernetes/docs/getting-started-guides/docker-multinode/
 ./master.sh
 ```
 
@@ -98,13 +99,17 @@ Clone the Kubernetes repo, and run [worker.sh](docker-multinode/worker.sh) on th
 ```sh
 export K8S_VERSION=<your_k8s_version (e.g. 1.0.1)>
 export MASTER_IP=<your_master_ip (e.g. 1.2.3.4)>
-cd kubernetes/cluster/docker-multinode
+cd kubernetes/docs/getting-started-guides/docker-multinode/
 ./worker.sh
 ```
 
 `Worker done!`
 
 See [here](docker-multinode/worker.md) for detailed instructions explanation.
+
+## Deploy a DNS
+
+See [here](docker-multinode/deployDNS.md) for instructions.
 
 ## Testing your cluster
 

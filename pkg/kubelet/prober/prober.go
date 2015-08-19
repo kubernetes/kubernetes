@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
@@ -255,7 +255,7 @@ func extractPort(param util.IntOrString, container api.Container) (int, error) {
 func findPortByName(container api.Container, portName string) (int, error) {
 	for _, port := range container.Ports {
 		if port.Name == portName {
-			return port.HostPort, nil
+			return port.ContainerPort, nil
 		}
 	}
 	return 0, fmt.Errorf("port %s not found", portName)

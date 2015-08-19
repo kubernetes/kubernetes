@@ -1,27 +1,41 @@
 package pflag
 
 import (
+	"fmt"
 	"strings"
 )
 
+var _ = fmt.Fprint
+
 // -- stringSlice Value
-type stringSliceValue []string
+type stringSliceValue struct {
+	value   *[]string
+	changed bool
+}
 
 func newStringSliceValue(val []string, p *[]string) *stringSliceValue {
-	*p = val
-	return (*stringSliceValue)(p)
+	ssv := new(stringSliceValue)
+	ssv.value = p
+	*ssv.value = val
+	return ssv
 }
 
 func (s *stringSliceValue) Set(val string) error {
 	v := strings.Split(val, ",")
-	*s = append(*s, v...)
+	if !s.changed {
+		*s.value = v
+	} else {
+		*s.value = append(*s.value, v...)
+	}
+	s.changed = true
 	return nil
 }
+
 func (s *stringSliceValue) Type() string {
 	return "stringSlice"
 }
 
-func (s *stringSliceValue) String() string { return "[" + strings.Join(*s, ",") + "]" }
+func (s *stringSliceValue) String() string { return "[" + strings.Join(*s.value, ",") + "]" }
 
 func stringSliceConv(sval string) (interface{}, error) {
 	sval = strings.Trim(sval, "[]")

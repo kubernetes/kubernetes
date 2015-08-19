@@ -42,9 +42,7 @@ image detects other Elasticsearch [pods](../../docs/user-guide/pods.md) running 
 label selector. The detected instances are used to form a list of peer hosts which
 are used as part of the unicast discovery mechanism for Elasticsearch. The detection
 of the peer nodes is done by a program which communicates with the Kubernetes API
-server to get a list of matching Elasticsearch pods. To enable authenticated
-communication this image needs a [secret](../../docs/user-guide/secrets.md) to be mounted at `/etc/apiserver-secret`
-with the basic authentication username and password.
+server to get a list of matching Elasticsearch pods.
 
 Here is an example replication controller specification that creates 4 instances of Elasticsearch.
 
@@ -69,7 +67,7 @@ spec:
     spec:
       containers:
       - name: es
-        image: kubernetes/elasticsearch:1.0
+        image: kubernetes/elasticsearch:1.1
         env:
           - name: "CLUSTER_NAME"
             value: "mytunes-db"
@@ -82,14 +80,6 @@ spec:
           containerPort: 9200
         - name: es-transport
           containerPort: 9300
-        volumeMounts:
-        - name: apiserver-secret
-          mountPath: /etc/apiserver-secret
-          readOnly: true
-      volumes:
-      - name: apiserver-secret
-        secret:
-          secretName: apiserver-secret
 ```
 
 [Download example](music-rc.yaml)
@@ -104,55 +94,24 @@ The `NAMESPACE` variable identifies the namespace
 to be used to search for Elasticsearch pods and this should be the same as the namespace specified
 for the replication controller (in this case `mytunes`).
 
-Before creating pods with the replication controller a secret containing the bearer authentication token
-should be set up.
 
-<!-- BEGIN MUNGE: EXAMPLE apiserver-secret.yaml -->
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: apiserver-secret
-  namespace: NAMESPACE
-data:
-  token: "TOKEN"
-```
-
-[Download example](apiserver-secret.yaml)
-<!-- END MUNGE: EXAMPLE apiserver-secret.yaml -->
-
-Replace `NAMESPACE` with the actual namespace to be used and `TOKEN` with the basic64 encoded
-versions of the bearer token reported by `kubectl config view` e.g.
-
-```console
-$ kubectl config view
-...
-- name: kubernetes-logging_kubernetes-basic-auth
-...
-  token: yGlDcMvSZPX4PyP0Q5bHgAYgi1iyEHv2
- ...   
-$ echo yGlDcMvSZPX4PyP0Q5bHgAYgi1iyEHv2 | base64
-eUdsRGNNdlNaUFg0UHlQMFE1YkhnQVlnaTFpeUVIdjIK=
-```
-
-resulting in the file:
+Replace `NAMESPACE` with the actual namespace to be used. In this example we shall use
+the namespace `mytunes`.
 
 ```yaml
+kind: Namespace
 apiVersion: v1
-kind: Secret
 metadata:
-  name: apiserver-secret
-  namespace: mytunes
-data:
-  token: "eUdsRGNNdlNaUFg0UHlQMFE1YkhnQVlnaTFpeUVIdjIK="
+  name: mytunes
+  labels:
+    name: mytunes
 ```
 
-which can be used to create the secret in your namespace:
+First, let's create the namespace:
 
 ```console
-kubectl create -f examples/elasticsearch/apiserver-secret.yaml --namespace=mytunes
-secrets/apiserver-secret
+$ kubectl create -f examples/elasticsearch/mytunes-namespace.yaml 
+namespaces/mytunes
 ```
 
 Now you are ready to create the replication controller which will then create the pods:
@@ -160,6 +119,19 @@ Now you are ready to create the replication controller which will then create th
 ```console
 $ kubectl create -f examples/elasticsearch/music-rc.yaml --namespace=mytunes
 replicationcontrollers/music-db
+```
+
+Let's check to see if the replication controller and pods are running:
+
+```console
+$ kubectl get rc,pods --namespace=mytunes
+CONTROLLER   CONTAINER(S)   IMAGE(S)                       SELECTOR        REPLICAS
+music-db     es             kubernetes/elasticsearch:1.1   name=music-db   4
+NAME             READY     STATUS    RESTARTS   AGE
+music-db-5p46b   1/1       Running   0          34s
+music-db-8re0f   1/1       Running   0          34s
+music-db-eq8j0   1/1       Running   0          34s
+music-db-uq5px   1/1       Running   0          34s
 ```
 
 It's also useful to have a [service](../../docs/user-guide/services.md) with an load balancer for accessing the Elasticsearch
@@ -195,29 +167,50 @@ $ kubectl create -f examples/elasticsearch/music-service.yaml --namespace=mytune
 services/music-server
 ```
 
+Let's check the status of the service:
+
+```console
+$ kubectl get service --namespace=mytunes
+NAME           LABELS          SELECTOR        IP(S)          PORT(S)
+music-server   name=music-db   name=music-db   10.0.185.179   9200/TCP
+
+```
+
+Although this service has an IP address `10.0.185.179` internal to the cluster we don't yet have
+an external IP address provisioned. Let's wait a bit and try again...
+
+```console
+$ kubectl get service --namespace=mytunes
+NAME           LABELS          SELECTOR        IP(S)             PORT(S)
+music-server   name=music-db   name=music-db   10.0.185.179      9200/TCP
+                                               104.197.114.130 
+```
+
+Now we have an external IP address `104.197.114.130` available for accessing the service
+from outside the cluster.
+
 Let's see what we've got:
 
 ```console
-$ kubectl get pods,rc,services,secrets --namespace=mytunes
-
+$ kubectl get pods,rc,services --namespace=mytunes
 NAME             READY     STATUS    RESTARTS   AGE
-music-db-cl4hw   1/1       Running   0          27m
-music-db-x8dbq   1/1       Running   0          27m
-music-db-xkebl   1/1       Running   0          27m
-music-db-ycjim   1/1       Running   0          27m
+music-db-5p46b   1/1       Running   0          7m
+music-db-8re0f   1/1       Running   0          7m
+music-db-eq8j0   1/1       Running   0          7m
+music-db-uq5px   1/1       Running   0          7m
 CONTROLLER   CONTAINER(S)   IMAGE(S)                       SELECTOR        REPLICAS
-music-db     es             kubernetes/elasticsearch:1.0   name=music-db   4
-NAME           LABELS          SELECTOR        IP(S)            PORT(S)
-music-server   name=music-db   name=music-db   10.0.45.177      9200/TCP
-                                               104.197.12.157
-NAME                  TYPE                                      DATA
-apiserver-secret      Opaque                                    1
+music-db     es             kubernetes/elasticsearch:1.1   name=music-db   4
+NAME           LABELS          SELECTOR        IP(S)             PORT(S)
+music-server   name=music-db   name=music-db   10.0.185.179      9200/TCP
+                                               104.197.114.130   
+NAME                  TYPE                                  DATA
+default-token-gcilu   kubernetes.io/service-account-token   2
 ```
 
 This shows 4 instances of Elasticsearch running. After making sure that port 9200 is accessible for this cluster (e.g. using a firewall rule for Google Compute Engine) we can make queries via the service which will be fielded by the matching Elasticsearch pods.
 
 ```console
-$ curl 104.197.12.157:9200
+$ curl 104.197.114.130:9200
 {
   "status" : 200,
   "name" : "Warpath",
@@ -231,7 +224,7 @@ $ curl 104.197.12.157:9200
   },
   "tagline" : "You Know, for Search"
 }
-$ curl 104.197.12.157:9200
+$ curl 104.197.114.130:9200
 {
   "status" : 200,
   "name" : "Callisto",
@@ -250,7 +243,7 @@ $ curl 104.197.12.157:9200
 We can query the nodes to confirm that an Elasticsearch cluster has been formed.
 
 ```console
-$ curl 104.197.12.157:9200/_nodes?pretty=true
+$ curl 104.197.114.130:9200/_nodes?pretty=true
 {
   "cluster_name" : "mytunes-db",
   "nodes" : {
@@ -299,22 +292,22 @@ $ kubectl scale --replicas=10 replicationcontrollers music-db --namespace=mytune
 scaled
 $ kubectl get pods --namespace=mytunes
 NAME             READY     STATUS    RESTARTS   AGE
-music-db-063vy   1/1       Running   0          38s
-music-db-5ej4e   1/1       Running   0          38s
-music-db-dl43y   1/1       Running   0          38s
-music-db-lw1lo   1/1       Running   0          1m
-music-db-s8hq2   1/1       Running   0          38s
-music-db-t98iw   1/1       Running   0          38s
-music-db-u1ru3   1/1       Running   0          38s
-music-db-wnss2   1/1       Running   0          1m
-music-db-x7j2w   1/1       Running   0          1m
-music-db-zjqyv   1/1       Running   0          1m
+music-db-0n8rm   0/1       Running   0          9s
+music-db-4izba   1/1       Running   0          9s
+music-db-5dqes   0/1       Running   0          9s
+music-db-5p46b   1/1       Running   0          10m
+music-db-8re0f   1/1       Running   0          10m
+music-db-eq8j0   1/1       Running   0          10m
+music-db-p9ajw   0/1       Running   0          9s
+music-db-p9u1k   1/1       Running   0          9s
+music-db-rav1q   0/1       Running   0          9s
+music-db-uq5px   1/1       Running   0          10m
 ```
 
 Let's check to make sure that these 10 nodes are part of the same Elasticsearch cluster:
 
 ```console
-$ curl 104.197.12.157:9200/_nodes?pretty=true | grep name
+$ curl 104.197.114.130:9200/_nodes?pretty=true | grep name
 "cluster_name" : "mytunes-db",
       "name" : "Killraven",
         "name" : "Killraven",

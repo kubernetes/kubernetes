@@ -19,6 +19,7 @@ package v1
 import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // ScaleSpec describes the attributes a Scale subresource
@@ -62,8 +63,8 @@ type SubresourceReference struct {
 	Subresource string `json:"subresource,omitempty" decription:"subresource name of the referent"`
 }
 
-// TargetConsumption is an object for specifying target average resource consumption of a particular resource.
-type TargetConsumption struct {
+// ResourceConsumption is an object for specifying average resource consumption of a particular resource.
+type ResourceConsumption struct {
 	Resource v1.ResourceName   `json:"resource,omitempty"`
 	Quantity resource.Quantity `json:"quantity,omitempty"`
 }
@@ -79,7 +80,25 @@ type HorizontalPodAutoscalerSpec struct {
 	MaxCount int `json:"maxCount" description:"upper limit for the number of pods"`
 	// Target is the target average consumption of the given resource that the autoscaler will try to maintain by adjusting the desired number of pods.
 	// Currently two types of resources are supported: "cpu" and "memory".
-	Target TargetConsumption `json:"target"	description:"target average consumption of resource that the autoscaler will try to maintain by adjusting the desired number of pods"`
+	Target ResourceConsumption `json:"target" description:"target average consumption of resource that the autoscaler will try to maintain by adjusting the desired number of pods"`
+}
+
+// HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler
+type HorizontalPodAutoscalerStatus struct {
+	// CurrentReplicas is the number of replicas of pods managed by this autoscaler.
+	CurrentReplicas int `json:"replicas" description:"number of replicas observed by the autoscaler"`
+
+	// DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.
+	DesiredReplicas int `json:"replicas" description:"number of desired replicas"`
+
+	// CurrentConsumption is the current average consumption of the given resource that the autoscaler will
+	// try to maintain by adjusting the desired number of pods.
+	// Two types of resources are supported: "cpu" and "memory".
+	CurrentConsumption ResourceConsumption `json:"currentConsumption" description:"current resource consumption"`
+
+	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
+	// This is used by the autoscaler to controll how often the number of pods is changed.
+	LastScaleTimestamp *util.Time `json:"lastScaleTimestamp,omitempty" description:"last time the autoscaler made decision about changing the number of pods"`
 }
 
 // HorizontalPodAutoscaler represents the configuration of a horizontal pod autoscaler.
@@ -89,6 +108,9 @@ type HorizontalPodAutoscaler struct {
 
 	// Spec defines the behaviour of autoscaler.
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" description:"specification of the desired behavior of the autoscaler; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+
+	// Status represents the current information about the autoscaler.
+	Status HorizontalPodAutoscalerStatus `json:"status,omitempty"`
 }
 
 // HorizontalPodAutoscaler is a collection of pod autoscalers.

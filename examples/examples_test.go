@@ -237,9 +237,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"dapi-pod": &api.Pod{},
 		},
 		"../examples/elasticsearch": {
-			"apiserver-secret": nil,
-			"music-rc":         &api.ReplicationController{},
-			"music-service":    &api.Service{},
+			"mytunes-namespace": &api.Namespace{},
+			"music-rc":          &api.ReplicationController{},
+			"music-service":     &api.Service{},
 		},
 		"../examples/explorer": {
 			"pod": &api.Pod{},
