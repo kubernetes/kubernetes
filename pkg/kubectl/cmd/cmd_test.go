@@ -112,6 +112,10 @@ func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	return t.Err
 }
 
+func (t *testPrinter) AddObjectPreprocessor(preprocessor kubectl.ObjectPreprocessor) {
+	// do nothing
+}
+
 type testDescriber struct {
 	Name, Namespace string
 	Output          string

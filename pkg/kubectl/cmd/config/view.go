@@ -66,7 +66,8 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 				glog.FatalDepth(1, err)
 			}
 			version := cmdutil.OutputVersion(cmd, latest.Version)
-			printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
+			preprocessor := kubectl.NewVersionConverter(clientcmdapi.Scheme, version)
+			printer.AddObjectPreprocessor(preprocessor)
 
 			if err := options.Run(out, printer); err != nil {
 				glog.FatalDepth(1, err)

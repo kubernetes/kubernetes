@@ -18,7 +18,6 @@ package kubectl
 
 import (
 	"fmt"
-	"io"
 	"reflect"
 	"sort"
 
@@ -27,26 +26,25 @@ import (
 	"k8s.io/kubernetes/pkg/util/jsonpath"
 )
 
-// Sorting printer sorts list types before delegating to another printer.
-// Non-list types are simply passed through
-type SortingPrinter struct {
+// Sorting preprocessor sorts list types. Non-list types are simply passed through
+// WARNING: it modifies the object.
+// TODO: do not modify the object.
+type SortingPreprocessor struct {
 	SortField string
 	Delegate  ResourcePrinter
 }
 
-func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
+func (s SortingPreprocessor) Process(obj runtime.Object) (runtime.Object, error) {
 	if !runtime.IsListType(obj) {
-		fmt.Fprintf(out, "Not a list, skipping: %#v\n", obj)
-		return s.Delegate.PrintObj(obj, out)
+		return obj, nil
 	}
-
 	if err := s.sortObj(obj); err != nil {
-		return err
+		return nil, err
 	}
-	return s.Delegate.PrintObj(obj, out)
+	return obj, nil
 }
 
-func (s *SortingPrinter) sortObj(obj runtime.Object) error {
+func (s *SortingPreprocessor) sortObj(obj runtime.Object) error {
 	objs, err := runtime.ExtractList(obj)
 	if err != nil {
 		return err

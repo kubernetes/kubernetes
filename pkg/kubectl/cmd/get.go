@@ -134,7 +134,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
-		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
+		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces, true)
 		if err != nil {
 			return err
 		}
@@ -150,7 +150,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 		// print the current object
 		if !isWatchOnly {
-			if err := printer.PrintObj(obj, out); err != nil {
+			if hrp, ok := printer.(*kubectl.HumanReadablePrinter); ok {
+				err = kubectl.NewPrinterWithEvent(hrp, nil).PrintObj(obj, out)
+			} else {
+				err = printer.PrintObj(obj, out)
+			}
+			if err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
 		}
@@ -162,7 +167,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		}
 
 		kubectl.WatchLoop(w, func(e watch.Event) error {
-			return printer.PrintObj(e.Object, out)
+			if hrp, ok := printer.(*kubectl.HumanReadablePrinter); ok {
+				return kubectl.NewPrinterWithEvent(hrp, &e.Type).PrintObj(e.Object, out)
+			} else {
+				return printer.PrintObj(e.Object, out)
+			}
 		})
 		return nil
 	}
@@ -206,7 +215,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	// use the default printer for each object
 	return b.Do().Visit(func(r *resource.Info) error {
-		printer, err := f.PrinterForMapping(cmd, r.Mapping, allNamespaces)
+		printer, err := f.PrinterForMapping(cmd, r.Mapping, allNamespaces, false)
 		if err != nil {
 			return err
 		}

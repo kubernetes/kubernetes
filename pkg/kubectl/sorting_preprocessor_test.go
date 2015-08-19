@@ -159,8 +159,10 @@ func TestSortingPrinter(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		sort := &SortingPrinter{SortField: test.field}
-		if err := sort.sortObj(test.obj); err != nil {
+		sort := &SortingPreprocessor{SortField: test.field}
+		// TODO: preprocessor has side effects.
+		_, err := sort.Process(test.obj)
+		if err != nil {
 			t.Errorf("unexpected error: %v (%s)", err, test.name)
 			continue
 		}

@@ -20,8 +20,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -57,23 +57,21 @@ var testData = testStruct{
 	IntList:    []int{1, 2, 3},
 }
 
-func TestVersionedPrinter(t *testing.T) {
+func TestVersionConverter(t *testing.T) {
 	original := &testStruct{Key: "value"}
-	p := NewVersionedPrinter(
-		ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
-			if obj == original {
-				t.Fatalf("object should not be identical: %#v", obj)
-			}
-			if obj.(*testStruct).Key != "value" {
-				t.Fatalf("object was not converted: %#v", obj)
-			}
-			return nil
-		}),
+	p := NewVersionConverter(
 		api.Scheme,
 		testapi.Version(),
 	)
-	if err := p.PrintObj(original, nil); err != nil {
+	obj, err := p.Process(original)
+	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if obj == original {
+		t.Fatalf("object should not be identical: %#v", obj)
+	}
+	if obj.(*testStruct).Key != "value" {
+		t.Fatalf("object was not converted: %#v", obj)
 	}
 }
 
@@ -100,7 +98,6 @@ type internalType struct {
 }
 
 func (*internalType) IsAnAPIObject() {
-
 }
 
 func TestPrintJSONForObject(t *testing.T) {
@@ -236,44 +233,6 @@ func (*TestPrintType) IsAnAPIObject() {}
 type TestUnknownType struct{}
 
 func (*TestUnknownType) IsAnAPIObject() {}
-
-func PrintCustomType(obj *TestPrintType, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
-	_, err := fmt.Fprintf(w, "%s", obj.Data)
-	return err
-}
-
-func ErrorPrintHandler(obj *TestPrintType, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
-	return fmt.Errorf("ErrorPrintHandler error")
-}
-
-func TestCustomTypePrinting(t *testing.T) {
-	columns := []string{"Data"}
-	printer := NewHumanReadablePrinter(false, false, false, []string{})
-	printer.Handler(columns, PrintCustomType)
-
-	obj := TestPrintType{"test object"}
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&obj, buffer)
-	if err != nil {
-		t.Fatalf("An error occurred printing the custom type: %#v", err)
-	}
-	expectedOutput := "Data\ntest object"
-	if buffer.String() != expectedOutput {
-		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
-	}
-}
-
-func TestPrintHandlerError(t *testing.T) {
-	columns := []string{"Data"}
-	printer := NewHumanReadablePrinter(false, false, false, []string{})
-	printer.Handler(columns, ErrorPrintHandler)
-	obj := TestPrintType{"test object"}
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&obj, buffer)
-	if err == nil || err.Error() != "ErrorPrintHandler error" {
-		t.Errorf("Did not get the expected error: %#v", err)
-	}
-}
 
 func TestUnknownTypePrinting(t *testing.T) {
 	printer := NewHumanReadablePrinter(false, false, false, []string{})
@@ -421,11 +380,12 @@ func TestTemplateStrings(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := NewVersionedPrinter(p, api.Scheme, testapi.Version())
+	preprocessor := NewVersionConverter(api.Scheme, testapi.Version())
+	p.AddObjectPreprocessor(preprocessor)
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
-		err = printer.PrintObj(&item.pod, buffer)
+		err = p.PrintObj(&item.pod, buffer)
 		if err != nil {
 			t.Errorf("%v: unexpected err: %v", name, err)
 			continue
@@ -740,9 +700,15 @@ func TestPrintHumanReadableService(t *testing.T) {
 	}
 
 	for _, svc := range tests {
-		buff := bytes.Buffer{}
-		printService(&svc, &buff, false, false, []string{})
-		output := string(buff.Bytes())
+
+		printer := NewHumanReadablePrinter(true /* noHeaders */, false, false, []string{})
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&svc, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing the Service: %#v", err)
+		}
+		output := buffer.String()
+
 		ip := svc.Spec.ClusterIP
 		if !strings.Contains(output, ip) {
 			t.Errorf("expected to contain ClusterIP %s, but doesn't: %s", ip, output)
@@ -1027,15 +993,22 @@ func TestPrintPod(t *testing.T) {
 		},
 	}
 
-	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printPod(&test.pod, buf, false, false, []string{})
-		// We ignore time
-		if !strings.HasPrefix(buf.String(), test.expect) {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		printer := NewHumanReadablePrinter(true /* noHeaders */, false, false, []string{})
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.pod, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing the Pod: %#v", err)
 		}
-		buf.Reset()
+		output := replaceSpacesWithTabs(buffer.String())
+		if !strings.HasPrefix(output, test.expect) {
+			t.Fatalf("Expected: %s, got: %s", test.expect, output)
+		}
 	}
+}
+
+func replaceSpacesWithTabs(s string) string {
+	return regexp.MustCompile(" [ ]*").ReplaceAllString(s, "\t")
 }
 
 func TestPrintPodWithLabels(t *testing.T) {
@@ -1087,13 +1060,17 @@ func TestPrintPodWithLabels(t *testing.T) {
 		},
 	}
 
-	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printPod(&test.pod, buf, false, false, test.labelColumns)
-		// We ignore time
-		if !strings.HasPrefix(buf.String(), test.startsWith) || !strings.HasSuffix(buf.String(), test.endsWith) {
-			t.Fatalf("Expected to start with: %s and end with: %s, but got: %s", test.startsWith, test.endsWith, buf.String())
+		printer := NewHumanReadablePrinter(true /* noHeaders */, false, false, test.labelColumns)
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.pod, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing the Pod: %#v", err)
 		}
-		buf.Reset()
+		output := replaceSpacesWithTabs(buffer.String())
+		// We ignore time
+		if !strings.HasPrefix(output, test.startsWith) || !strings.HasSuffix(output, test.endsWith) {
+			t.Fatalf("Expected to start with: %s and end with: %s, but got: %s", test.startsWith, test.endsWith, output)
+		}
 	}
 }
