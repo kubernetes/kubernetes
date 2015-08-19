@@ -33,7 +33,7 @@ fi
 address=${1:-}
 [ -z "${address}" ] && echo "No address supplied" && exit 1
 
-bin=$(cd $(dirname $0) && pwd -P)
+bin=$(cd "$(dirname ${BASH_SOURCE})" && pwd -P)
 
 echo "Waiting (up to ${duration}s) for ${address} to be healthy"
 if ! timeout "${duration}" bash -c "while ! ${bin}/health-check ${address}; do sleep 0.5; done"; then
