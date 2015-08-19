@@ -56,7 +56,6 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *tools.FakeEtcd
 }
 
 func validNewPod() *api.Pod {
-	grace := int64(30)
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
@@ -65,8 +64,6 @@ func validNewPod() *api.Pod {
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
-
-			TerminationGracePeriodSeconds: &grace,
 			Containers: []api.Container{
 				{
 					Name:            "foo",
@@ -121,10 +118,8 @@ func TestDelete(t *testing.T) {
 	key = etcdtest.AddPrefix(key)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 
-	expectedNode := "some-node"
 	createFn := func() runtime.Object {
 		pod := validChangedPod()
-		pod.Spec.NodeName = expectedNode
 		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
@@ -139,17 +134,8 @@ func TestDelete(t *testing.T) {
 		if fakeEtcdClient.Data[key].R.Node == nil {
 			return false
 		}
-		obj, err := latest.Codec.Decode([]byte(fakeEtcdClient.Data[key].R.Node.Value))
-		if err != nil {
-			return false
-		}
-		pod := obj.(*api.Pod)
-		t.Logf("found object %#v", pod.ObjectMeta)
-		return pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds != 0
+		return fakeEtcdClient.Data[key].R.Node.TTL == 30
 	}
-	test.TestDeleteGraceful(createFn, 30, gracefulSetFn)
-
-	expectedNode = ""
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
@@ -1041,7 +1027,6 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 		},
 	}), 1)
 
-	grace := int64(30)
 	podIn := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
@@ -1063,8 +1048,6 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
-
-			TerminationGracePeriodSeconds: &grace,
 		},
 	}
 	_, _, err := registry.Update(ctx, &podIn)
@@ -1105,7 +1088,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 			},
 		},
 	}
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &podStart), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &podStart), 1)
 
 	podIn := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -1134,8 +1117,6 @@ func TestEtcdUpdateStatus(t *testing.T) {
 
 	expected := podStart
 	expected.ResourceVersion = "2"
-	grace := int64(30)
-	expected.Spec.TerminationGracePeriodSeconds = &grace
 	expected.Spec.RestartPolicy = api.RestartPolicyAlways
 	expected.Spec.DNSPolicy = api.DNSClusterFirst
 	expected.Spec.Containers[0].ImagePullPolicy = api.PullIfNotPresent

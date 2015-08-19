@@ -324,8 +324,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
+		podEvictor := NewPodEvictor(util.NewFakeRateLimiter())
 		nodeController := NewNodeController(nil, item.fakeNodeHandler,
-			evictionTimeout, util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
+			evictionTimeout, podEvictor, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -339,17 +340,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 
-		nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-			remaining, _ := nodeController.deletePods(value.Value)
-			if remaining {
-				nodeController.terminationEvictor.Add(value.Value)
-			}
-			return true, 0
-		})
-		nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-			nodeController.terminatePods(value.Value, value.Added)
-			return true, 0
-		})
+		podEvictor.TryEvict(func(nodeName string) { nodeController.deletePods(nodeName) })
 		podEvicted := false
 		for _, action := range item.fakeNodeHandler.Actions() {
 			if action.GetVerb() == "delete" && action.GetResource() == "pods" {
@@ -540,7 +531,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, NewPodEvictor(util.NewFakeRateLimiter()),
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -619,7 +610,7 @@ func TestNodeDeletion(t *testing.T) {
 		Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}}),
 	}
 
-	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, util.NewFakeRateLimiter(),
+	nodeController := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, NewPodEvictor(util.NewFakeRateLimiter()),
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 	nodeController.now = func() util.Time { return fakeNow }
 	if err := nodeController.monitorNodeStatus(); err != nil {
@@ -629,10 +620,6 @@ func TestNodeDeletion(t *testing.T) {
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-		nodeController.deletePods(value.Value)
-		return true, 0
-	})
 	podEvicted := false
 	for _, action := range fakeNodeHandler.Actions() {
 		if action.GetVerb() == "delete" && action.GetResource() == "pods" {

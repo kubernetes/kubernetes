@@ -54,13 +54,11 @@ func newTestCacher(client tools.EtcdClient) *storage.Cacher {
 }
 
 func makeTestPod(name string) *api.Pod {
-	gracePeriod := int64(30)
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{Namespace: "ns", Name: name},
 		Spec: api.PodSpec{
-			TerminationGracePeriodSeconds: &gracePeriod,
-			DNSPolicy:                     api.DNSClusterFirst,
-			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			RestartPolicy: api.RestartPolicyAlways,
 		},
 	}
 }

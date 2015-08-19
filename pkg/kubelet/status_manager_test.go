@@ -153,21 +153,8 @@ func TestUnchangedStatus(t *testing.T) {
 	verifyUpdates(t, syncer, 1)
 }
 
-func TestSyncBatchIgnoresNotFound(t *testing.T) {
-	syncer := newTestStatusManager()
-	syncer.SetPodStatus(testPod, getRandomPodStatus())
-	err := syncer.syncBatch()
-	if err != nil {
-		t.Errorf("unexpected syncing error: %v", err)
-	}
-	verifyActions(t, syncer.kubeClient, []testclient.Action{
-		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
-	})
-}
-
 func TestSyncBatch(t *testing.T) {
 	syncer := newTestStatusManager()
-	syncer.kubeClient = testclient.NewSimpleFake(testPod)
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	err := syncer.syncBatch()
 	if err != nil {
@@ -178,22 +165,6 @@ func TestSyncBatch(t *testing.T) {
 		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
 	},
 	)
-}
-
-func TestSyncBatchChecksMismatchedUID(t *testing.T) {
-	syncer := newTestStatusManager()
-	testPod.UID = "first"
-	differentPod := *testPod
-	differentPod.UID = "second"
-	syncer.kubeClient = testclient.NewSimpleFake(testPod)
-	syncer.SetPodStatus(&differentPod, getRandomPodStatus())
-	err := syncer.syncBatch()
-	if err != nil {
-		t.Errorf("unexpected syncing error: %v", err)
-	}
-	verifyActions(t, syncer.kubeClient, []testclient.Action{
-		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
-	})
 }
 
 // shuffle returns a new shuffled list of container statuses.

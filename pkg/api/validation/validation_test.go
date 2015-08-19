@@ -1317,9 +1317,6 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
-	now := util.Now()
-	grace := int64(30)
-	grace2 := int64(31)
 	tests := []struct {
 		a       api.Pod
 		b       api.Pod
@@ -1405,30 +1402,6 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			false,
 			"more containers",
-		},
-		{
-			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
-				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
-			},
-			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
-			},
-			true,
-			"deletion timestamp filled out",
-		},
-		{
-			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace},
-				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
-			},
-			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2},
-				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
-			},
-			false,
-			"deletion grace period seconds cleared",
 		},
 		{
 			api.Pod{

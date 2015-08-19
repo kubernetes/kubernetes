@@ -81,48 +81,14 @@ func (podStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fiel
 	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
 }
 
-// AllowUnconditionalUpdate allows pods to be overwritten
 func (podStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// CheckGracefulDelete allows a pod to be gracefully deleted. It updates the DeleteOptions to
-// reflect the desired grace value.
+// CheckGracefulDelete allows a pod to be gracefully deleted.
 func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
-	if options == nil {
-		return false
-	}
-	pod := obj.(*api.Pod)
-	period := int64(0)
-	// user has specified a value
-	if options.GracePeriodSeconds != nil {
-		period = *options.GracePeriodSeconds
-	} else {
-		// use the default value if set, or deletes the pod immediately (0)
-		if pod.Spec.TerminationGracePeriodSeconds != nil {
-			period = *pod.Spec.TerminationGracePeriodSeconds
-		}
-	}
-	// if the pod is not scheduled, delete immediately
-	if len(pod.Spec.NodeName) == 0 {
-		period = 0
-	}
-	// ensure the options and the pod are in sync
-	options.GracePeriodSeconds = &period
-	return true
-}
-
-type podStrategyWithoutGraceful struct {
-	podStrategy
-}
-
-// CheckGracefulDelete prohibits graceful deletion.
-func (podStrategyWithoutGraceful) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
 	return false
 }
-
-// StrategyWithoutGraceful implements the legacy instant delele behavior.
-var StrategyWithoutGraceful = podStrategyWithoutGraceful{Strategy}
 
 type podStatusStrategy struct {
 	podStrategy
@@ -134,7 +100,6 @@ func (podStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Spec = oldPod.Spec
-	newPod.DeletionTimestamp = nil
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
