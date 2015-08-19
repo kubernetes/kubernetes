@@ -43,12 +43,12 @@ as recommended by the Kubernetes project.  Your cluster administrator may have
 customized the behavior in your cluster, in which case this documentation may
 not apply.*
 
-When you (a human) access the cluster (e.g. using kubectl), you are
+When you (a human) access the cluster (e.g. using `kubectl`), you are
 authenticated by the apiserver as a particular User Account (currently this is
-usually "admin", unless your cluster administrator has customized your
+usually `admin`, unless your cluster administrator has customized your
 cluster).  Processes in containers inside pods can also contact the apiserver.
 When they do, they are authenticated as a particular Service Account (e.g.
-"default").
+`default`).
 
 ## Using the Default Service Account to access the API server.
 
@@ -63,7 +63,7 @@ You can access the API using a proxy or with a client library, as described in
 
 ## Using Multiple Service Accounts.
 
-Every namespace has a default service account resource called "default".
+Every namespace has a default service account resource called `default`.
 You can list this and any other serviceAccount resources in the namespace with this command:
 
 ```console

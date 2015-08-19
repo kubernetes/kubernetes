@@ -91,9 +91,9 @@ medium that backs it, and the contents of it are determined by the particular
 volume type used.
 
 To use a volume, a pod specifies what volumes to provide for the pod (the
-[spec.volumes](http://kubernetes.io/third_party/swagger-ui/#!/v1/createPod)
+[`spec.volumes`](http://kubernetes.io/third_party/swagger-ui/#!/v1/createPod)
 field) and where to mount those into containers(the
-[spec.containers.volumeMounts](http://kubernetes.io/third_party/swagger-ui/#!/v1/createPod)
+[`spec.containers.volumeMounts`](http://kubernetes.io/third_party/swagger-ui/#!/v1/createPod)
 field).
 
 A process in a container sees a filesystem view composed from their Docker
@@ -107,17 +107,17 @@ mount each volume.
 ## Types of Volumes
 
 Kubernetes supports several types of Volumes:
-   * emptyDir
-   * hostPath
-   * gcePersistentDisk
-   * awsElasticBlockStore
-   * nfs
-   * iscsi
-   * glusterfs
-   * rbd
-   * gitRepo
-   * secret
-   * persistentVolumeClaim
+   * `emptyDir`
+   * `hostPath`
+   * `gcePersistentDisk`
+   * `awsElasticBlockStore`
+   * `nfs`
+   * `iscsi`
+   * `glusterfs`
+   * `rbd`
+   * `gitRepo`
+   * `secret`
+   * `persistentVolumeClaim`
 
 We welcome additional contributions.
 
@@ -291,8 +291,8 @@ See the [NFS example](../../examples/nfs/) for more details.
 For example, [this file](../../examples/nfs/nfs-web-pod.yaml) demonstrates how to
 specify the usage of an NFS volume within a pod.
 
-In this example one can see that a `volumeMount` called "nfs" is being mounted
-onto `/var/www/html` in the container "web".  The volume "nfs" is defined as
+In this example one can see that a `volumeMount` called `nfs` is being mounted
+onto `/var/www/html` in the container `web`.  The volume "nfs" is defined as
 type `nfs`, with the NFS server serving from `nfs-server.default.kube.local`
 and exporting directory `/` as the share.  The mount being created in this
 example is writeable.

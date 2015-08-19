@@ -96,7 +96,7 @@ which redirects to the backend `Pods`.
 A `Service` in Kubernetes is a REST object, similar to a `Pod`.  Like all of the
 REST objects, a `Service` definition can be POSTed to the apiserver to create a
 new instance.  For example, suppose you have a set of `Pods` that each expose
-port 9376 and carry a label "app=MyApp".
+port 9376 and carry a label `"app=MyApp"`.
 
 ```json
 {
@@ -121,7 +121,7 @@ port 9376 and carry a label "app=MyApp".
 ```
 
 This specification will create a new `Service` object named "my-service" which
-targets TCP port 9376 on any `Pod` with the "app=MyApp" label.  This `Service`
+targets TCP port 9376 on any `Pod` with the `"app=MyApp"` label.  This `Service`
 will also be assigned an IP address (sometimes called the "cluster IP"), which
 is used by the service proxies (see below).  The `Service`'s selector will be
 evaluated continuously and the results will be POSTed to an `Endpoints` object
@@ -266,7 +266,7 @@ request.  To do this, set the `spec.clusterIP` field. For example, if you
 already have an existing DNS entry that you wish to replace, or legacy systems
 that are configured for a specific IP address and difficult to re-configure.
 The IP address that a user chooses must be a valid IP address and within the
-service-cluster-ip-range CIDR range that is specified by flag to the API
+`service-cluster-ip-range` CIDR range that is specified by flag to the API
 server.  If the IP address value is invalid, the apiserver returns a 422 HTTP
 status code to indicate that the value is invalid.
 
@@ -299,7 +299,7 @@ compatible](https://docs.docker.com/userguide/dockerlinks/) variables (see
 and simpler `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` variables,
 where the Service name is upper-cased and dashes are converted to underscores.
 
-For example, the Service "redis-master" which exposes TCP port 6379 and has been
+For example, the Service `"redis-master"` which exposes TCP port 6379 and has been
 allocated cluster IP address 10.0.0.11 produces the following environment
 variables:
 
@@ -325,17 +325,17 @@ DNS server watches the Kubernetes API for new `Services` and creates a set of
 DNS records for each.  If DNS has been enabled throughout the cluster then all
 `Pods` should be able to do name resolution of `Services` automatically.
 
-For example, if you have a `Service` called "my-service" in Kubernetes
-`Namespace` "my-ns" a DNS record for "my-service.my-ns" is created.  `Pods`
-which exist in the "my-ns" `Namespace` should be able to find it by simply doing
-a name lookup for "my-service".  `Pods` which exist in other `Namespaces` must
-qualify the name as "my-service.my-ns".  The result of these name lookups is the
+For example, if you have a `Service` called `"my-service"` in Kubernetes
+`Namespace` `"my-ns"` a DNS record for `"my-service.my-ns"` is created.  `Pods`
+which exist in the `"my-ns"` `Namespace` should be able to find it by simply doing
+a name lookup for `"my-service"`.  `Pods` which exist in other `Namespaces` must
+qualify the name as `"my-service.my-ns"`.  The result of these name lookups is the
 cluster IP.
 
 Kubernetes also supports DNS SRV (service) records for named ports.  If the
-"my-service.my-ns" `Service` has a port named "http" with protocol `TCP`, you
-can do a DNS SRV query for "_http._tcp.my-service.my-ns" to discover the port
-number for "http".
+`"my-service.my-ns"` `Service` has a port named `"http"` with protocol `TCP`, you
+can do a DNS SRV query for `"_http._tcp.my-service.my-ns"` to discover the port
+number for `"http"`.
 
 ## Headless services
 
