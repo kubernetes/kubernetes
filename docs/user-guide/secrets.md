@@ -105,7 +105,7 @@ data:
 ```
 
 The data field is a map.  Its keys must match
-[DNS_SUBDOMAIN](../design/identifiers.md), except that leading dots are also
+[`DNS_SUBDOMAIN`](../design/identifiers.md), except that leading dots are also
 allowed.  The values are arbitrary data, encoded using base64. The values of
 username and password in the example above, before base64 encoding,
 are `value-1` and `value-2`, respectively, with carriage return and newline characters at the end.
@@ -167,8 +167,8 @@ Use of imagePullSecrets is described in the [images documentation](images.md#spe
 *This feature is planned but not implemented.  See [issue
 9902](http://issue.k8s.io/9902).*
 
-You can reference manually created secrets from a [service account](service-accounts.md).
-Then, pods which use that service account will have
+You can reference manually created secrets from a [Service Account](service-accounts.md).
+Then, pods which use that Service Account will have
 `volumeMounts` and/or `imagePullSecrets` added to them.
 The secrets will be mounted at **TBD**.
 
@@ -441,7 +441,7 @@ Both containers will have the following files present on their filesystems:
 Note how the specs for the two pods differ only in one field;  this facilitates
 creating pods with different capabilities from a common pod config template.
 
-You could further simplify the base pod specification by using two service accounts:
+You could further simplify the base pod specification by using two Service Accounts:
 one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
 `test-user` with the `test-db-secret`.  Then, the pod spec can be shortened to, for example:
 

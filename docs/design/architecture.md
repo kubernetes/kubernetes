@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 
 # Kubernetes architecture
 
-A running Kubernetes cluster contains node agents (kubelet) and master components (APIs, scheduler, etc), on top of a distributed storage solution. This diagram shows our desired eventual state, though we're still working on a few things, like making kubelet itself (all our components, really) run within containers, and making the scheduler 100% pluggable.
+A running Kubernetes cluster contains node agents (`kubelet`) and master components (APIs, scheduler, etc), on top of a distributed storage solution. This diagram shows our desired eventual state, though we're still working on a few things, like making `kubelet` itself (all our components, really) run within containers, and making the scheduler 100% pluggable.
 
 ![Architecture Diagram](architecture.png?raw=true "Architecture overview")
 
@@ -45,21 +45,21 @@ The Kubernetes node has the services necessary to run application containers and
 
 Each node runs Docker, of course.  Docker takes care of the details of downloading images and running containers.
 
-### Kubelet
+### `kubelet`
 
-The **Kubelet** manages [pods](../user-guide/pods.md) and their containers, their images, their volumes, etc.
+The `kubelet` manages [pods](../user-guide/pods.md) and their containers, their images, their volumes, etc.
 
-### Kube-Proxy
+### `kube-proxy`
 
 Each node also runs a simple network proxy and load balancer (see the [services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ) for more details).  This reflects `services` (see [the services doc](../user-guide/services.md) for more details) as defined in the Kubernetes API on each node and can do simple TCP and UDP stream forwarding (round robin) across a set of backends.
 
-Service endpoints are currently found via [DNS](../admin/dns.md) or through environment variables (both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) and Kubernetes {FOO}_SERVICE_HOST and {FOO}_SERVICE_PORT variables are supported).  These variables resolve to ports managed by the service proxy.
+Service endpoints are currently found via [DNS](../admin/dns.md) or through environment variables (both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) and Kubernetes `{FOO}_SERVICE_HOST` and `{FOO}_SERVICE_PORT` variables are supported).  These variables resolve to ports managed by the service proxy.
 
 ## The Kubernetes Control Plane
 
 The Kubernetes control plane is split into a set of components. Currently they all run on a single _master_ node, but that is expected to change soon in order to support high-availability clusters.  These components work together to provide a unified view of the cluster.
 
-### etcd
+### `etcd`
 
 All persistent master state is stored in an instance of `etcd`.  This provides a great way to store configuration data reliably.  With `watch` support, coordinating components can be notified very quickly of changes.
 

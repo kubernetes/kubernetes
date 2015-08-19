@@ -80,8 +80,8 @@ uses host-private networking.  It creates a virtual bridge, called `docker0` by
 default, and allocates a subnet from one of the private address blocks defined
 in [RFC1918](https://tools.ietf.org/html/rfc1918) for that bridge.  For each
 container that Docker creates, it allocates a virtual ethernet device (called
-`veth`) which is attached to the bridge. The veth is mapped to appear as eth0
-in the container, using Linux namespaces.  The in-container eth0 interface is
+`veth`) which is attached to the bridge. The veth is mapped to appear as `eth0`
+in the container, using Linux namespaces.  The in-container `eth0` interface is
 given an IP address from the bridge's address range.
 
 The result is that Docker containers can talk to other containers only if they
@@ -147,7 +147,7 @@ here.
 
 For the Google Compute Engine cluster configuration scripts, we use [advanced
 routing](https://developers.google.com/compute/docs/networking#routing) to
-assign each VM a subnet (default is /24 - 254 IPs).  Any traffic bound for that
+assign each VM a subnet (default is `/24` - 254 IPs).  Any traffic bound for that
 subnet will be routed directly to the VM by the GCE network fabric.  This is in
 addition to the "main" IP address assigned to the VM, which is NAT'ed for
 outbound internet access.  A linux bridge (called `cbr0`) is configured to exist
