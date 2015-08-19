@@ -47,17 +47,23 @@ This proposal supersedes [autoscaling.md](http://releases.k8s.io/release-1.0/doc
 
 The usage of a serving application usually vary over time: sometimes the demand for the application rises,
 and sometimes it drops.
-In the version 1.0, a user can only manually set the number of serving pods.
-Our aim is to provide a mechanism for the automatic adjustment of the number of pods basing on usage statistics.
+In Kubernetes version 1.0, a user can only manually set the number of serving pods.
+Our aim is to provide a mechanism for the automatic adjustment of the number of pods based on usage statistics.
 
 ## Scale Subresource
 
-We are going to introduce Scale subresource and implement horizontal autoscaling of pods on a base of it.
+We are going to introduce Scale subresource and implement horizontal autoscaling of pods based on it.
 Scale subresource will be supported for replication controllers and deployments.
+Scale subresource will be a Virtual Resource (will not be stored in etcd as a separate object).
+It will be only present in API as an interface to accessing replication controller or deployment,
+and the values of Scale fields will be inferred from the corresponing replication controller/deployment object.
 HorizontalPodAutoscaler object will be bound with exactly one Scale subresource and will be
 autoscaling associated replication controller/deployment through it.
+The main advantage of such approach is that whenever we introduce another type we want to auto-scale,
+we just need to implement Scale subresource for it (w/o modifying autoscaler code or API).
+The wider discussion regarding Scale took place in [#1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629).
 
-Scale subresource will be present for replication controller or deployment under the following paths:
+Scale subresource will be present in API for replication controller or deployment under the following paths:
 
 ```api/vX/replicationcontrollers/myrc/scale```
 
@@ -95,10 +101,10 @@ type ScaleStatus struct {
 
 ```
 
-Writing ```ScaleSpec.Count``` will resize the replication controller/deployment associated with
+Writing ```ScaleSpec.Replicas``` will resize the replication controller/deployment associated with
 the given Scale subresource.
-```ScaleStatus.Count``` will report how many pods are currently running in the replication controller/deployment,
-and ```ScaleStatus.PodSelector``` will return selector for the pods.
+```ScaleStatus.Replicas``` will report how many pods are currently running in the replication controller/deployment,
+and ```ScaleStatus.Selector``` will return selector for the pods.
 
 ## HorizontalPodAutoscaler Object
 
@@ -135,7 +141,7 @@ type HorizontalPodAutoscalerSpec struct {
 	MaxCount int
 	// Target is the target average consumption of the given resource that the autoscaler will try
 	// to maintain by adjusting the desired number of pods.
-	// Currently two types of resources are supported: "cpu" and "memory".
+	// Currently this can be either "cpu" or "memory".
 	Target ResourceConsumption
 }
 
@@ -202,7 +208,7 @@ the current number, while scale-down will happen only when the ceiling of ```Tar
 the current number.
 
 The decision to scale-up will be executed instantly.
-However, we will execute scale-down only if the sufficient time has past from the last scale-up (e.g.: 10 minutes).
+However, we will execute scale-down only if the sufficient time has passed from the last scale-up (e.g.: 10 minutes).
 Such approach has two benefits:
 
 * Autoscaler works in a conservative way.
@@ -229,35 +235,38 @@ Therefore, we decided to give absolute values for the target metrics in the init
 Please note that when custom metrics are supported, it will be possible to create additional metrics
 in heapster that will divide CPU/memory consumption by resource request/limit.
 From autoscaler point of view the metrics will be absolute,
-althoug such metrics will be bring the benefits of relative metrics to the user.
+although such metrics will be bring the benefits of relative metrics to the user.
 
 
 ## Support in kubectl
 
-To make manipulation on HorizontalPodAutoscaler object simpler, we will add support for creating/updating/deletion/listing of HorizontalPodAutoscaler to kubectl.
+To make manipulation on HorizontalPodAutoscaler object simpler, we will add support for
+creating/updating/deletion/listing of HorizontalPodAutoscaler to kubectl.
 In addition, we will add kubectl support for the following use-cases:
 * When running an image with ```kubectl run```, there should be an additional option to create
   an autoscaler for it.
 * When creating a replication controller or deployment with ```kubectl create [-f]```, there should be
   a possibility to specify an additional autoscaler object.
+  (This should work out-of-the-box when creation of autoscaler is supported by kubectl as we may include
+  multiple objects in the same config file).
 * We will and a new command ```kubectl autoscale``` that will allow for easy creation of an autoscaler object
   for already existing replication controller/deployment.
 
-## Future Features
+## Next steps
 
 We list here some features that will not be supported in the initial version of autoscaler.
 However, we want to keep them in mind, as they will most probably be needed in future.
 Our design is in general compatible with them.
-* Autoscale pods on a base of metrics different than CPU & memory (e.g.: network traffic, qps).
+* Autoscale pods based on metrics different than CPU & memory (e.g.: network traffic, qps).
   This includes scaling based on a custom metric.
-* Autoscale pods on a base of multiple metrics.
+* Autoscale pods based on multiple metrics.
   If the target numbers of pods for different metrics are different, choose the largest target number of pods.
 * Scale the number of pods starting from 0: all pods can be turned-off,
   and then turned-on when there is a demand for them.
   When a request to service with no pods arrives, kube-proxy will generate an event for autoscaler
   to create a new pod.
   Discussed in [#3247](https://github.com/GoogleCloudPlatform/kubernetes/issues/3247).
-* When scaling down, make more educated decision which pods to kill (e.g.: kill pods that doubled-up first).
+* When scaling down, make more educated decision which pods to kill (e.g.: if two or more pods are on the same node, kill one of them).
   Discussed in [#4301](https://github.com/GoogleCloudPlatform/kubernetes/issues/4301).
 * Allow rule based autoscaling: instead of specifying the target value for metric,
   specify a rule, e.g.: “if average CPU consumption of pod is higher than 80% add two more replicas”.
