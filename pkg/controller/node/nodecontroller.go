@@ -309,15 +309,21 @@ func (nc *NodeController) monitorNodeStatus() error {
 				if _, err := instances.ExternalID(node.Name); err != nil && err == cloudprovider.InstanceNotFound {
 					glog.Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
 					nc.recordNodeEvent(node.Name, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
-					if _, err := nc.deletePods(node.Name); err != nil {
+					remaining, err := nc.deletePods(node.Name)
+					if err != nil {
 						glog.Errorf("Unable to delete pods from node %s: %v", node.Name, err)
+						continue
+					}
+					if remaining {
+						glog.Infof("Terminating pods on node (no longer present in cloud provider): %s", node.Name)
+						nc.terminationEvictor.Add(node.Name)
 						continue
 					}
 					if err := nc.kubeClient.Nodes().Delete(node.Name); err != nil {
 						glog.Errorf("Unable to delete node %s: %v", node.Name, err)
 						continue
 					}
-					nc.podEvictor.Add(node.Name)
+
 				}
 			}
 		}
@@ -535,6 +541,9 @@ func (nc *NodeController) deletePods(nodeID string) (bool, error) {
 		if pod.Spec.NodeName != nodeID {
 			continue
 		}
+		// as long as there is one pod scheduled on a node, we must continue to follow up
+		remaining = true
+
 		// if the pod has already been deleted, ignore it
 		if pod.DeletionGracePeriodSeconds != nil {
 			continue
@@ -545,7 +554,6 @@ func (nc *NodeController) deletePods(nodeID string) (bool, error) {
 		if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
 		}
-		remaining = true
 	}
 	return remaining, nil
 }
