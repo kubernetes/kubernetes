@@ -248,6 +248,8 @@ case ${JOB_NAME} in
     MINION_SIZE="n1-standard-2"
     MINION_DISK_SIZE="50GB"
     NUM_MINIONS="100"
+    # Reduce logs verbosity
+    TEST_CLUSTER_LOG_LEVEL="--v=1"
     ;;
 
   # Runs tests on GCE soak cluster.
