@@ -628,6 +628,14 @@ __EOF__
   # Post-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
 
+  ### Scale replication controller from JSON with replicas only
+  # Pre-condition: 3 replicas
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+  # Command
+  kubectl scale  --replicas=2 -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  # Post-condition: 2 replicas
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+
   ### Scale multiple replication controllers
   kubectl create -f examples/guestbook/redis-master-controller.yaml "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
@@ -640,8 +648,8 @@ __EOF__
   kubectl delete rc redis-{master,slave} "${kube_flags[@]}"
 
   ### Expose replication controller as service
-  # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+  # Pre-condition: 2 replicas
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Command
   kubectl expose rc frontend --port=80 "${kube_flags[@]}"
   # Post-condition: service exists and the port is unnamed
