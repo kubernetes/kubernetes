@@ -249,7 +249,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	case kubelet.SET:
-		glog.V(4).Infof("Setting pods for source %s : %v", source, update)
+		glog.V(4).Infof("Setting pods for source %s", source)
 		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
