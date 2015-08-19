@@ -1309,7 +1309,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	// This resolv.conf file is shared by all containers of the same pod, and needs to be modified only once per pod.
 	// we modify it when the pause container is created since it is the first container created in the pod since it holds
 	// the networking namespace.
-	if container.Name == PodInfraContainerName {
+	if container.Name == PodInfraContainerName && utsMode != "host" {
 		err = addNDotsOption(containerInfo.ResolvConfPath)
 	}
 
