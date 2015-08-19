@@ -1453,16 +1453,32 @@ func waitForPodsWithLabel(c *client.Client, ns string, label labels.Selector) (p
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
 	By(fmt.Sprintf("%v Deleting replication controller %s in namespace %s", time.Now(), name, ns))
+	rc, err := c.ReplicationControllers(ns).Get(name)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Logf("RC %s was already deleted: %v", name, err)
+			return nil
+		}
+		return err
+	}
 	reaper, err := kubectl.ReaperForReplicationController(c, 10*time.Minute)
 	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Logf("RC %s was already deleted: %v", name, err)
+			return nil
+		}
 		return err
 	}
 	startTime := time.Now()
 	_, err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
+	if apierrs.IsNotFound(err) {
+		Logf("RC %s was already deleted: %v", name, err)
+		return nil
+	}
 	deleteRCTime := time.Now().Sub(startTime)
 	Logf("Deleting RC took: %v", deleteRCTime)
 	if err == nil {
-		err = waitForRCPodsGone(c, ns, name)
+		err = waitForRCPodsGone(c, rc)
 	}
 	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
 	Logf("Terminating RC pods took: %v", terminatePodTime)
@@ -1471,13 +1487,9 @@ func DeleteRC(c *client.Client, ns, name string) error {
 
 // waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
 // have completed termination).
-func waitForRCPodsGone(c *client.Client, ns, name string) error {
-	rc, err := c.ReplicationControllers(ns).Get(name)
-	if err != nil {
-		return err
-	}
+func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
 	return wait.Poll(poll, singleCallTimeout, func() (bool, error) {
-		if pods, err := c.Pods(ns).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything()); err == nil && len(pods.Items) == 0 {
+		if pods, err := c.Pods(rc.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything()); err == nil && len(pods.Items) == 0 {
 			return true, nil
 		}
 		return false, nil
