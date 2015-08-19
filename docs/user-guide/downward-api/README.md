@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 
 # Downward API example
 
-Following this example, you will create a pod with a containers that consumes the pod's name and
+Following this example, you will create a pod with a container that consumes the pod's name and
 namespace using the [downward API](../downward-api.md).
 
 ## Step Zero: Prerequisites
