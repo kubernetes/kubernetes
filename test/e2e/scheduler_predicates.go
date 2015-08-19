@@ -124,6 +124,16 @@ func verifyResult(c *client.Client, podName string, ns string, oldNotRunning int
 	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Pods found in the cluster: %#v", allPods)))
 }
 
+func cleanupPods(c *client.Client, ns string) {
+	By("Removing all pods in namespace " + ns)
+	pods, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
+	expectNoError(err)
+	opt := api.NewDeleteOptions(0)
+	for _, p := range pods.Items {
+		expectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
+	}
+}
+
 var _ = Describe("SchedulerPredicates", func() {
 	var c *client.Client
 	var nodeList *api.NodeList
@@ -228,6 +238,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns, currentlyDeadPods)
+		cleanupPods(c, ns)
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacit.
@@ -316,6 +327,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns, currentlyDeadPods)
+		cleanupPods(c, ns)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -355,5 +367,6 @@ var _ = Describe("SchedulerPredicates", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, ns, currentlyDeadPods)
+		cleanupPods(c, ns)
 	})
 })
