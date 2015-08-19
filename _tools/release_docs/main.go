@@ -77,7 +77,6 @@ func fixURL(filename string, u *url.URL) bool {
 
 		hasReadme := false
 		for _, f := range files {
-			fmt.Println("KRIS:", f)
 			if strings.ToLower(filepath.Base(f)) == "readme.md" {
 				hasReadme = true
 			}
