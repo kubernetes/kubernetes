@@ -401,10 +401,10 @@ func TestServeRunInContainer(t *testing.T) {
 		return []byte(output), nil
 	}
 
-	resp, err := http.Get(fw.testHTTPServer.URL + "/run/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?cmd=ls%20-a")
+	resp, err := http.Post(fw.testHTTPServer.URL+"/run/"+podNamespace+"/"+podName+"/"+expectedContainerName+"?cmd=ls%20-a", "", nil)
 
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error POSTing: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -445,10 +445,10 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 		return []byte(output), nil
 	}
 
-	resp, err := http.Get(fw.testHTTPServer.URL + "/run/" + podNamespace + "/" + podName + "/" + expectedUID + "/" + expectedContainerName + "?cmd=ls%20-a")
+	resp, err := http.Post(fw.testHTTPServer.URL+"/run/"+podNamespace+"/"+podName+"/"+expectedUID+"/"+expectedContainerName+"?cmd=ls%20-a", "", nil)
 
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error POSTing: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -681,9 +681,9 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
-	resp, err := c.Get(url)
+	resp, err := c.Post(url, "", nil)
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error POSTing: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -839,9 +839,9 @@ func TestServeExecInContainer(t *testing.T) {
 			c = &http.Client{Transport: upgradeRoundTripper}
 		}
 
-		resp, err = c.Get(url)
+		resp, err = c.Post(url, "", nil)
 		if err != nil {
-			t.Fatalf("%d: Got error GETing: %v", i, err)
+			t.Fatalf("%d: Got error POSTing: %v", i, err)
 		}
 		defer resp.Body.Close()
 
@@ -1070,9 +1070,9 @@ func TestServeAttachContainer(t *testing.T) {
 			c = &http.Client{Transport: upgradeRoundTripper}
 		}
 
-		resp, err = c.Get(url)
+		resp, err = c.Post(url, "", nil)
 		if err != nil {
-			t.Fatalf("%d: Got error GETing: %v", i, err)
+			t.Fatalf("%d: Got error POSTing: %v", i, err)
 		}
 		defer resp.Body.Close()
 
@@ -1182,9 +1182,9 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 	upgradeRoundTripper := spdy.NewRoundTripper(nil)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
-	resp, err := c.Get(url)
+	resp, err := c.Post(url, "", nil)
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error POSTing: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -1284,9 +1284,9 @@ func TestServePortForward(t *testing.T) {
 		upgradeRoundTripper := spdy.NewRoundTripper(nil)
 		c := &http.Client{Transport: upgradeRoundTripper}
 
-		resp, err := c.Get(url)
+		resp, err := c.Post(url, "", nil)
 		if err != nil {
-			t.Fatalf("%d: Got error GETing: %v", i, err)
+			t.Fatalf("%d: Got error POSTing: %v", i, err)
 		}
 		defer resp.Body.Close()
 
