@@ -39,6 +39,9 @@ func main() {
 	s := app.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 
+	haconfig := ha.Config{}
+	haconfig.AddFlags(pflag.CommandLine)
+
 	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -61,8 +64,10 @@ func main() {
 		return true
 	}
 
-	ha.RunHA(s.Kubeconfig, s.Master, startSched, endSched, "ha.scheduler.lock")
-
+	if haconfig.Key == "" {
+		haconfig.Key = "ha.scheduler.lock"
+	}
+	ha.RunHA(s.Kubeconfig, s.Master, startSched, endSched, &haconfig)
 	for true {
 		glog.Infof("Scheduler lease loop is running...")
 		time.Sleep(5 * time.Second)

@@ -43,6 +43,9 @@ func main() {
 	s := app.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 
+	haconfig := ha.Config{}
+	haconfig.AddFlags(pflag.CommandLine)
+
 	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -69,8 +72,11 @@ func main() {
 		return true
 	}
 
+	if haconfig.Key == "" {
+		haconfig.Key = "ha.controllermanager.lock"
+	}
 	//This starts a thread that continues running.
-	ha.RunHA(s.Kubeconfig, s.Master, startRC, endRC, "ha.cm.lock")
+	ha.RunHA(s.Kubeconfig, s.Master, startRC, endRC, &haconfig)
 
 	for true {
 		glog.Infof("CM lease loop is running...")

@@ -24,6 +24,7 @@ package ha
 import (
 	"fmt"
 	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/client/clientcmd"
@@ -60,8 +61,16 @@ type Config struct {
 	LeaseUserInfo *LeaseUser
 }
 
+func (c *Config) AddFlags(fs *pflag.FlagSet) {
+	//If key or whoami aren't provided, they should be set by default by the calling program.
+	pflag.StringVar(&c.Key, "key", "", "The key to use for the lock")
+	pflag.StringVar(&c.whoami, "whoami", "", "The name to use for the reservation.  If empty os.Hostname is the default.")
+	pflag.Uint64Var(&c.ttl, "ttl", 30, "The time to live for the lock.")
+	pflag.DurationVar(&c.sleep, "sleep", 5*time.Second, "The length of time to sleep between checking the lock.")
+}
+
 // RunHA runs a process in a highly available fashion.
-func RunHA(kubecfg string, master string, start func(l *LeaseUser) bool, stop func(l *LeaseUser) bool, lockName string) {
+func RunHA(kubecfg string, master string, start func(l *LeaseUser) bool, stop func(l *LeaseUser) bool, mcfg *Config) {
 
 	//We need a kubeconfig in order to use the locking API, so we create it here.
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -81,18 +90,13 @@ func RunHA(kubecfg string, master string, start func(l *LeaseUser) bool, stop fu
 		LeasesLost:   0,
 	}
 
-	//Acquire a lock before starting.
-	//TODO some of these will change now that implementing robs lock.
-	//we can delete some params...
-	mcfg := Config{
-		Key:           lockName,
-		LeaseUserInfo: &leaseUserInfo,
-		LeaseGained:   start,
-		LeaseLost:     stop,
-		Cli:           kubeClient}
+	mcfg.LeaseUserInfo = &leaseUserInfo
+	mcfg.LeaseGained = start
+	mcfg.LeaseLost = stop
+	mcfg.Cli = kubeClient
 
-	RunLease(&mcfg)
-	glog.Infof("zz Done with starting the lease loop for %v.", lockName)
+	RunLease(mcfg)
+	glog.Infof("zz Done with starting the lease loop for %v.", mcfg)
 }
 
 var countsleeps = 0
@@ -102,8 +106,6 @@ var countsleeps = 0
 // Likewise, it can give up the lease, in which case the LeaseLost() callbacks will be triggered.
 func (c *Config) leaseAndUpdateLoop() {
 	for {
-		glog.Errorf("zzzz")
-
 		//Proactively give up the lease every 50 tries.
 		var master bool = false
 		var err error = nil
@@ -186,6 +188,10 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 	// UPDATE will fail if another node has the lock.  In any case, if an UPDATE fails,
 	// we cannot take the lock, so the result is the same - return false and return error details.
 	glog.Errorf("Updating acquired lock %v", acquiredLock)
+
+	//IMPORTANT! Before updating, make sure to mutate the whoami
+	//Otherwise, you can steal someone else's lock.
+	acquiredLock.Spec.HeldBy = c.whoami
 	acquiredLock, err = ilock.Update(acquiredLock)
 	if err != nil {
 		glog.Errorf("Acquire lock failed.  We don't have the lock, master is %v", acquiredLock)
