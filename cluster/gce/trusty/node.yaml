@@ -38,10 +38,16 @@ script
 	# Fetch kube-env from GCE metadata server.
 	curl --fail --silent --show-error \
 		-H "X-Google-Metadata-Request: True" \
-		-o /etc/kube-env \
+		-o /tmp/kube-env-yaml \
 		http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+	# Convert the yaml format file into a shell-style file.
+	eval $(python -c '''
+import pipes,sys,yaml
+for k,v in yaml.load(sys.stdin).iteritems():
+  print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
+''' < /tmp/kube-env-yaml > /etc/kube-env)
 
-	# Create the kubelet kubeconfig file.
+	 #Create the kubelet kubeconfig file.
 	. /etc/kube-env
 	if [ -z "${KUBELET_CA_CERT}" ]; then
 		KUBELET_CA_CERT="${CA_CERT}"
