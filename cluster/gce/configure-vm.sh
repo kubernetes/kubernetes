@@ -307,10 +307,9 @@ EOF
     # TODO: Replace this  with a persistent volume (and create it).
     if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-cluster_registry_disk:
-  gcePersistentDisk:
-    pdName: ${CLUSTER_REGISTRY_DISK}
-    fsType: ext4
+cluster_registry_disk_type: gce
+cluster_registry_disk_size: ${CLUSTER_REGISTRY_DISK_SIZE//GB/Gi}
+cluster_registry_disk_name: ${CLUSTER_REGISTRY_DISK}
 EOF
     fi
 }

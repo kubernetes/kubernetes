@@ -92,7 +92,24 @@ addon-dir-create:
 
 /etc/kubernetes/addons/registry/registry-rc.yaml:
   file.managed:
-    - source: salt://kube-addons/registry/registry-rc.yaml.in
+    - source: salt://kube-addons/registry/registry-rc.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+
+/etc/kubernetes/addons/registry/registry-pv.yaml:
+  file.managed:
+    - source: salt://kube-addons/registry/registry-pv.yaml.in
+    - template: jinja
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+
+/etc/kubernetes/addons/registry/registry-pvc.yaml:
+  file.managed:
+    - source: salt://kube-addons/registry/registry-pvc.yaml.in
     - template: jinja
     - user: root
     - group: root

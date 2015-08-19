@@ -41,13 +41,5 @@ spec:
       # TODO: use a persistent volume claim
       volumes:
       - name: image-store
-      {%- if pillar.get('cluster_registry_disk', '') != '' -%}
-      {%- for disk in pillar['cluster_registry_disk'].keys() %}
-        {{ disk }}:
-        {%- for k, v in pillar['cluster_registry_disk'][disk].items() %}
-          {{k}}: {{v}}
-        {%- endfor -%}
-      {%- endfor -%}
-      {%- else %}
-        emptyDir: {}
-      {%- endif -%}
+        persistentVolumeClaim:
+          claimName: kube-registry-pvc

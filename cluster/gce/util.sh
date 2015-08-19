@@ -648,7 +648,7 @@ function kube-up {
     gcloud compute disks create "${CLUSTER_REGISTRY_DISK}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
-      --type "${CLUSTER_REGISTRY_DISK_TYPE}" \
+      --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
       --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
   fi
 
