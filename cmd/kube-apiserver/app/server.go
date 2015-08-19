@@ -83,6 +83,10 @@ type APIServer struct {
 	BasicAuthFile              string
 	ClientCAFile               string
 	TokenAuthFile              string
+	OIDCIssuerURL              string
+	OIDCClientID               string
+	OIDCCAFile                 string
+	OIDCUsernameClaim          string
 	ServiceAccountKeyFile      string
 	ServiceAccountLookup       bool
 	KeystoneURL                string
@@ -190,6 +194,12 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
 	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, "If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file is authenticated with an identity corresponding to the CommonName of the client certificate.")
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
+	fs.StringVar(&s.OIDCIssuerURL, "oidc-issuer-url", s.OIDCIssuerURL, "The URL of the OpenID issuer. If set, it will be used to verify the OIDC JSON Web Token (JWT)")
+	fs.StringVar(&s.OIDCClientID, "oidc-client-id", s.OIDCClientID, "The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set")
+	fs.StringVar(&s.OIDCCAFile, "oidc-ca-file", s.OIDCCAFile, "If set, the OpenID server's certificate will be verified by one of the authorities in the oidc-ca-file, otherwise the host's root CA set will be used")
+	fs.StringVar(&s.OIDCUsernameClaim, "oidc-username-claim", "sub", ""+
+		"The OpenID claim to use as the user name. Note that claims other than the default ('sub') is not "+
+		"guaranteed to be unique and immutable. This flag is experimental, please see the authentication documentation for further details.")
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-key-file", s.ServiceAccountKeyFile, "File containing PEM-encoded x509 RSA private or public key, used to verify ServiceAccount tokens. If unspecified, --tls-private-key-file is used.")
 	fs.BoolVar(&s.ServiceAccountLookup, "service-account-lookup", s.ServiceAccountLookup, "If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
@@ -350,7 +360,20 @@ func (s *APIServer) Run(_ []string) error {
 			glog.Warning("no RSA key provided, service account token authentication disabled")
 		}
 	}
-	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile, s.ServiceAccountKeyFile, s.ServiceAccountLookup, etcdStorage, s.KeystoneURL)
+	authenticator, err := apiserver.NewAuthenticator(apiserver.AuthenticatorConfig{
+		BasicAuthFile:         s.BasicAuthFile,
+		ClientCAFile:          s.ClientCAFile,
+		TokenAuthFile:         s.TokenAuthFile,
+		OIDCIssuerURL:         s.OIDCIssuerURL,
+		OIDCClientID:          s.OIDCClientID,
+		OIDCCAFile:            s.OIDCCAFile,
+		OIDCUsernameClaim:     s.OIDCUsernameClaim,
+		ServiceAccountKeyFile: s.ServiceAccountKeyFile,
+		ServiceAccountLookup:  s.ServiceAccountLookup,
+		Storage:               etcdStorage,
+		KeystoneURL:           s.KeystoneURL,
+	})
+
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
