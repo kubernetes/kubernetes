@@ -247,8 +247,8 @@ function upload-server-tars() {
 #   MINION_NAMES
 function detect-minion-names {
   detect-project
-  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" instances --group "${NODE_INSTANCE_PREFIX}-group" list \
+  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+    "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
     | cut -d'/' -f11))
   echo "MINION_NAMES=${MINION_NAMES[*]}" >&2
 }
@@ -764,7 +764,7 @@ function kube-down {
 
   # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
-  if gcloud compute instance-groups managed describe --project "${PROJECT}" --zone "${ZONE}" "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
+  if gcloud compute instance-groups managed describe "${NODE_INSTANCE_PREFIX}-group" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
     deleteCmdOutput=$(gcloud compute instance-groups managed delete --zone "${ZONE}" \
       --project "${PROJECT}" \
       --quiet \
