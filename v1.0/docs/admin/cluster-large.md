@@ -40,7 +40,7 @@ To avoid running into cloud provider quota issues, when creating a cluster with 
 
 ### Addon Resources
 
-To prevent memory leaks or other resource issues in [cluster addons](../../cluster/addons/) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](https://github.com/GoogleCloudPlatform/kubernetes/pull/10653/files) and [#10778](https://github.com/GoogleCloudPlatform/kubernetes/pull/10778/files)).
+To prevent memory leaks or other resource issues in [cluster addons](https://releases.k8s.io/v1.0.1/cluster/addons) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](https://github.com/GoogleCloudPlatform/kubernetes/pull/10653/files) and [#10778](https://github.com/GoogleCloudPlatform/kubernetes/pull/10778/files)).
 
 For example:
 

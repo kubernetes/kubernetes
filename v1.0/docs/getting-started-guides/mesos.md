@@ -385,16 +385,16 @@ Future work will add instructions to this guide to enable support for Kubernetes
 [1]: http://mesosphere.com/docs/tutorials/run-hadoop-on-mesos-using-installer
 [2]: http://mesosphere.com/docs/tutorials/run-spark-on-mesos
 [3]: http://mesosphere.com/docs/tutorials/run-chronos-on-mesos
-[4]: ../../cluster/addons/dns/README.md
+[4]: https://releases.k8s.io/v1.0.1/cluster/addons/dns/README.md
 [5]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/
 [6]: http://mesos.apache.org/
 [7]: https://github.com/mesosphere/kubernetes-mesos/blob/master/docs/issues.md
 [8]: https://github.com/mesosphere/kubernetes-mesos/issues
 [9]: ../../examples/
 [10]: http://open.mesosphere.com/getting-started/cloud/google/mesosphere/#vpn-setup
-[11]: ../../cluster/addons/dns/skydns-rc.yaml.in
-[12]: ../../cluster/addons/dns/skydns-svc.yaml.in
-[13]: ../../contrib/mesos/README.md
+[11]: https://releases.k8s.io/v1.0.1/cluster/addons/dns/skydns-rc.yaml.in
+[12]: https://releases.k8s.io/v1.0.1/cluster/addons/dns/skydns-svc.yaml.in
+[13]: https://releases.k8s.io/v1.0.1/contrib/mesos/README.md
 
 
 <!-- BEGIN MUNGE: IS_VERSIONED -->

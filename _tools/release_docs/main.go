@@ -42,8 +42,56 @@ var (
 	subdirs = []string{"docs", "examples"}
 )
 
-func fixURL(u *url.URL) bool {
-	if u.Host == "" && strings.HasSuffix(u.Path, ".md") {
+func fileExistsInBranch(path string) bool {
+	out, err := exec.Command("git", "ls-tree", fmt.Sprintf("%s/%s", *remote, *branch), path).Output()
+	return err == nil && len(out) != 0
+}
+
+func fixURL(filename string, u *url.URL) bool {
+	if u.Host != "" || u.Path == "" {
+		return false
+	}
+
+	target := filepath.Join(filepath.Dir(filename), u.Path)
+	if fi, err := os.Stat(target); os.IsNotExist(err) {
+		// We're linking to something we didn't copy over. Send
+		// it through the redirector.
+		rel, err := filepath.Rel(*outputDir, target)
+		if err != nil {
+			return false
+		}
+
+		if fileExistsInBranch(rel) {
+			u.Path = filepath.Join("HEAD", rel)
+			u.Host = "releases.k8s.io"
+			u.Scheme = "https"
+			return true
+		}
+	} else if fi.IsDir() {
+		// If there's no README.md in the directory, redirect to github
+		// for the directory view.
+		files, err := filepath.Glob(target + "/*")
+		if err != nil {
+			return false
+		}
+
+		hasReadme := false
+		for _, f := range files {
+			if strings.ToLower(filepath.Base(f)) == "readme.md" {
+				hasReadme = true
+			}
+		}
+		if !hasReadme {
+			rel, err := filepath.Rel(*outputDir, target)
+			if err != nil {
+				return false
+			}
+			u.Path = filepath.Join("HEAD", rel)
+			u.Host = "releases.k8s.io"
+			u.Scheme = "https"
+			return true
+		}
+	} else if strings.HasSuffix(u.Path, ".md") {
 		u.Path = u.Path[:len(u.Path)-3] + ".html"
 		return true
 	}
@@ -62,7 +110,7 @@ func processFile(prefix, filename string) error {
 		title = filename[len(prefix)+1 : len(filename)-len(".md")]
 	}
 
-	output := rewriteLinks(fileBytes)
+	output := rewriteLinks(filename, fileBytes)
 	output = rewriteCodeBlocks(output)
 
 	f, err := os.Create(filename)
@@ -82,33 +130,50 @@ func processFile(prefix, filename string) error {
 var (
 	// Finds markdown links of the form [foo](bar "alt-text").
 	linkRE = regexp.MustCompile(`\[([^]]*)\]\(([^)]*)\)`)
+	// Finds markdown refence style link definitions
+	refRE = regexp.MustCompile(`(?m)^\[([^]]*)\]:\s+(.*)$`)
 	// Splits the link target into link target and alt-text.
 	altTextRE = regexp.MustCompile(`(.*)( ".*")`)
 )
 
-func rewriteLinks(fileBytes []byte) []byte {
-	return linkRE.ReplaceAllFunc(fileBytes, func(in []byte) (out []byte) {
-		match := linkRE.FindSubmatch(in)
+func rewriteLinks(filename string, fileBytes []byte) []byte {
+	getParts := func(re *regexp.Regexp, in []byte) (text, link, caption string, changed bool) {
+		match := re.FindSubmatch(in)
+		text = string(match[1])
+		link = strings.TrimSpace(string(match[2]))
 
-		visibleText := string(match[1])
-		linkText := string(match[2])
-		altText := ""
-
-		if parts := altTextRE.FindStringSubmatch(linkText); parts != nil {
-			linkText = parts[1]
-			altText = parts[2]
+		if parts := altTextRE.FindStringSubmatch(link); parts != nil {
+			link = parts[1]
+			caption = parts[2]
 		}
 
-		u, err := url.Parse(linkText)
-		if err != nil {
-			return in
+		u, err := url.Parse(link)
+		if err != nil || !fixURL(filename, u) {
+			return "", "", "", false
 		}
 
-		if !fixURL(u) {
-			return in
-		}
-		return []byte(fmt.Sprintf("[%s](%s)", visibleText, u.String()+altText))
-	})
+		return text, u.String(), caption, true
+	}
+
+	for _, conversion := range []struct {
+		re     *regexp.Regexp
+		format string
+	}{
+		{linkRE, "[%s](%s)"},
+		{refRE, "[%s]: %s"},
+	} {
+
+		fileBytes = conversion.re.ReplaceAllFunc(fileBytes, func(in []byte) (out []byte) {
+			text, link, caption, changed := getParts(conversion.re, in)
+			if !changed {
+				return in
+			}
+
+			return []byte(fmt.Sprintf(conversion.format, text, link+caption))
+		})
+
+	}
+	return fileBytes
 }
 
 var (
