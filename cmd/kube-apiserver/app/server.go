@@ -270,8 +270,9 @@ func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
 
 	// If advertise-address is not specified, use bind-address. If bind-address
-	// is also unset (or 0.0.0.0), setDefaults() in pkg/master/master.go will
-	// do the right thing and use the host's default interface.
+	// is not usable (unset, 0.0.0.0, or loopback), setDefaults() in
+	// pkg/master/master.go will do the right thing and use the host's default
+	// interface.
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
 		s.AdvertiseAddress = s.BindAddress
 	}

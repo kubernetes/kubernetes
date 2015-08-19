@@ -1,7 +1,7 @@
 {
   "swaggerVersion": "1.2",
   "apiVersion": "v1",
-  "basePath": "https://127.0.0.1:6443",
+  "basePath": "https://10.10.10.10:6443",
   "resourcePath": "/api/v1",
   "apis": [
    {
@@ -11230,7 +11230,7 @@
     "properties": {
      "ip": {
       "type": "string",
-      "description": "IP address of the endpoint"
+      "description": "IP address of the endpoint; may not be loopback (127.0.0.0/8), link-local (169.254.0.0/16), or link-local multicast ((224.0.0.0/24)"
      },
      "targetRef": {
       "$ref": "v1.ObjectReference",
