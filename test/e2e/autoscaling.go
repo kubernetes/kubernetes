@@ -167,7 +167,7 @@ func ConsumeMemory(f *Framework, id string, chunks int) {
 		Namespace: f.Namespace.Name,
 		Timeout:   10 * time.Minute,
 		Image:     "jess/stress",
-		Command:   []string{"stress", "-m", "1"},
+		Command:   []string{"stress", "-m", "1", "--vm-hang", "0"},
 		Replicas:  chunks,
 	}
 	expectNoError(RunRC(*config))
