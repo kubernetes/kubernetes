@@ -11017,11 +11017,6 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
-     "deletionGracePeriodSeconds": {
-      "type": "integer",
-      "format": "int64",
-      "description": "number of seconds allowed for this object to gracefully terminate before it will be removed from the system; only set when deletionTimestamp is also set, read-only; may only be shortened"
-     },
      "labels": {
       "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services; see http://releases.k8s.io/HEAD/docs/user-guide/labels.md"
@@ -12332,7 +12327,7 @@
      "terminationGracePeriodSeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process; defaults to 30 seconds"
+      "description": "optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process"
      },
      "activeDeadlineSeconds": {
       "type": "integer",

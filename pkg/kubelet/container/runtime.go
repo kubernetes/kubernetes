@@ -54,8 +54,8 @@ type Runtime interface {
 	GetPods(all bool) ([]*Pod, error)
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error
-	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
-	KillPod(pod *api.Pod, runningPod Pod) error
+	// KillPod kills all the containers of a pod.
+	KillPod(pod Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
 	// all containers in the pod. Clients of this interface assume the containers
 	// statuses in a pod always have a deterministic ordering (eg: sorted by name).

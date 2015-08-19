@@ -70,12 +70,6 @@ func deepCopy_v1_ObjectMeta(in v1.ObjectMeta, out *v1.ObjectMeta, c *conversion.
 	} else {
 		out.DeletionTimestamp = nil
 	}
-	if in.DeletionGracePeriodSeconds != nil {
-		out.DeletionGracePeriodSeconds = new(int64)
-		*out.DeletionGracePeriodSeconds = *in.DeletionGracePeriodSeconds
-	} else {
-		out.DeletionGracePeriodSeconds = nil
-	}
 	if in.Labels != nil {
 		out.Labels = make(map[string]string)
 		for key, val := range in.Labels {

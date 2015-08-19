@@ -51,7 +51,6 @@ current-release-pr
 current-replicas
 default-container-cpu-limit
 default-container-mem-limit
-delay-shutdown
 deleting-pods-burst
 deleting-pods-qps
 deployment-label-key

@@ -123,7 +123,6 @@ func TestExtractInvalidPods(t *testing.T) {
 func TestExtractPodsFromHTTP(t *testing.T) {
 	hostname := "different-value"
 
-	grace := int64(30)
 	var testCases = []struct {
 		desc     string
 		pods     runtime.Object
@@ -157,11 +156,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, "mynamespace"),
 					},
 					Spec: api.PodSpec{
-						NodeName:                      hostname,
-						RestartPolicy:                 api.RestartPolicyAlways,
-						DNSPolicy:                     api.DNSClusterFirst,
-						TerminationGracePeriodSeconds: &grace,
-
+						NodeName:      hostname,
+						RestartPolicy: api.RestartPolicyAlways,
+						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "1",
 							Image: "foo",
@@ -212,11 +209,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						NodeName:                      hostname,
-						RestartPolicy:                 api.RestartPolicyAlways,
-						DNSPolicy:                     api.DNSClusterFirst,
-						TerminationGracePeriodSeconds: &grace,
-
+						NodeName:      hostname,
+						RestartPolicy: api.RestartPolicyAlways,
+						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "1",
 							Image: "foo",
@@ -234,11 +229,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("bar-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						NodeName:                      hostname,
-						RestartPolicy:                 api.RestartPolicyAlways,
-						DNSPolicy:                     api.DNSClusterFirst,
-						TerminationGracePeriodSeconds: &grace,
-
+						NodeName:      hostname,
+						RestartPolicy: api.RestartPolicyAlways,
+						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "2",
 							Image: "bar",
