@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -80,10 +79,6 @@ type fakeKubeletClient struct{}
 
 func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
-}
-
-func (fakeKubeletClient) HealthCheck(host string) (probe.Result, string, error) {
-	return probe.Success, "", nil
 }
 
 type delegateHandler struct {

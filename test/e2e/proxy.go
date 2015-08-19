@@ -52,6 +52,7 @@ func proxyContext(version string) {
 	f := NewFramework("proxy")
 	prefix := "/api/" + version
 
+	// Port here has to be kept in sync with default kubelet port.
 	It("should proxy logs on node with explicit kubelet port", func() { nodeProxyTest(f, version, ":10250/logs/") })
 
 	It("should proxy logs on node", func() { nodeProxyTest(f, version, "/logs/") })
