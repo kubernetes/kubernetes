@@ -504,8 +504,6 @@ func (kl *kubeletExecutor) Run(updates <-chan kubelet.PodUpdate) {
 	util.Until(func() { kl.Kubelet.Run(pipe) }, 0, kl.executorDone)
 
 	//TODO(jdef) revisit this if/when executor failover lands
-	err := kl.SyncPods([]*api.Pod{}, nil, nil, time.Now())
-	if err != nil {
-		log.Errorf("failed to cleanly remove all pods and associated state: %v", err)
-	}
+	// Force kubelet to delete all pods.
+	kl.HandlePodDeletions(kl.GetPods())
 }
