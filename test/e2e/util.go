@@ -526,7 +526,7 @@ func deleteNS(c *client.Client, namespace string) error {
 		return err
 	}
 
-	err := wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
+	err := wait.Poll(5*time.Second, 5*time.Minute, func() (bool, error) {
 		if _, err := c.Namespaces().Get(namespace); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
