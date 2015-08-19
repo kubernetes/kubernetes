@@ -247,8 +247,8 @@ function upload-server-tars() {
 #   MINION_NAMES
 function detect-minion-names {
   detect-project
-  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" instances --group "${NODE_INSTANCE_PREFIX}-group" list \
+  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+    "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
     | cut -d'/' -f11))
   echo "MINION_NAMES=${MINION_NAMES[*]}" >&2
 }
@@ -709,7 +709,7 @@ function kube-up {
     METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
     METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
     echo "Creating node autoscaler."
-    gcloud preview autoscaler --zone "${ZONE}" create "${NODE_INSTANCE_PREFIX}-autoscaler" --target "${NODE_INSTANCE_PREFIX}-group" \
+    gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project $"{PROJECT}" \
         --min-num-replicas "${AUTOSCALER_MIN_NODES}" --max-num-replicas "${AUTOSCALER_MAX_NODES}" ${METRICS} || true
   fi
 
@@ -776,11 +776,11 @@ function kube-down {
 
   # Delete autoscaler for nodes if present.
   local autoscaler
-  autoscaler=( $(gcloud preview autoscaler --zone "${ZONE}" list \
-                 | awk 'NR >= 2 { print $1 }' \
-                 | grep "${NODE_INSTANCE_PREFIX}-autoscaler") )
-  if [[ "${autoscaler:-}" != "" ]]; then
-    gcloud preview autoscaler --zone "${ZONE}" delete "${NODE_INSTANCE_PREFIX}-autoscaler"
+  autoscaler=( $(gcloud compute instance-groups managed list --zone "${ZONE}" --project "${PROJECT}" \
+                 | grep "${NODE_INSTANCE_PREFIX}-group" \
+                 | awk '{print $7}') )
+  if [[ "${autoscaler:-}" == "yes" ]]; then
+    gcloud compute instance-groups managed stop-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}"
   fi
 
   # Get the name of the managed instance group template before we delete the
@@ -790,7 +790,7 @@ function kube-down {
 
   # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
-  if gcloud compute instance-groups managed describe --project "${PROJECT}" --zone "${ZONE}" "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
+  if gcloud compute instance-groups managed describe "${NODE_INSTANCE_PREFIX}-group" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
     deleteCmdOutput=$(gcloud compute instance-groups managed delete --zone "${ZONE}" \
       --project "${PROJECT}" \
       --quiet \

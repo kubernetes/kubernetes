@@ -241,8 +241,8 @@ function detect-minion-names {
   echo "... in gke:detect-minion-names()" >&2
   detect-project
   detect-node-instance-group
-  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" instances --group "${NODE_INSTANCE_GROUP}" list --quiet \
+  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+    "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
     | cut -d'/' -f11))
   echo "MINION_NAMES=${MINION_NAMES[*]}"
 }
