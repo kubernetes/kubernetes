@@ -212,6 +212,7 @@ service-node-port-range
 service-node-ports
 service-sync-period
 session-affinity
+show-all
 shutdown-fd
 shutdown-fifo
 skip-munges

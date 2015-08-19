@@ -328,6 +328,33 @@ func TestGetListObjects(t *testing.T) {
 	}
 }
 
+func TestGetAllListObjects(t *testing.T) {
+	pods, _, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("show-all", "true")
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := []runtime.Object{pods}
+	actual := tf.Printer.(*testPrinter).Objects
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("unexpected object: %#v %#v", expected, actual)
+	}
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
+	}
+}
+
 func TestGetListComponentStatus(t *testing.T) {
 	statuses := testComponentStatusData()
 

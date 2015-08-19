@@ -91,6 +91,10 @@ re\-use the labels from the resource it exposes.
     If non\-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'
 
 .PP
+\fB\-a\fP, \fB\-\-show\-all\fP=false
+    When printing, show all resources (default hide terminated pods.)
+
+.PP
 \fB\-\-sort\-by\fP=""
     If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
 
