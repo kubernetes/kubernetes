@@ -129,9 +129,6 @@ var _ = Describe("Kubectl client", func() {
 
 		BeforeEach(func() {
 			guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
-
-			// requires ExternalLoadBalancer support
-			SkipUnlessProviderIs("gce", "gke", "aws")
 		})
 
 		It("should create and stop a working application", func() {
