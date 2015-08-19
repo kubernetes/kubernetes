@@ -1235,6 +1235,8 @@ func RunRC(config RCConfig) error {
 	for oldRunning != config.Replicas {
 		time.Sleep(interval)
 
+		terminating := 0
+
 		running := 0
 		waiting := 0
 		pending := 0
@@ -1244,10 +1246,13 @@ func RunRC(config RCConfig) error {
 		containerRestartNodes := util.NewStringSet()
 
 		pods := podStore.List()
-		if config.CreatedPods != nil {
-			*config.CreatedPods = pods
-		}
+		created := []*api.Pod{}
 		for _, p := range pods {
+			if p.DeletionTimestamp != nil {
+				terminating++
+				continue
+			}
+			created = append(created, p)
 			if p.Status.Phase == api.PodRunning {
 				running++
 				for _, v := range FailedContainers(p) {
@@ -1266,9 +1271,13 @@ func RunRC(config RCConfig) error {
 				unknown++
 			}
 		}
+		pods = created
+		if config.CreatedPods != nil {
+			*config.CreatedPods = pods
+		}
 
-		Logf("%v %v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d unknown ",
-			time.Now(), rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, unknown)
+		Logf("%v %v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown ",
+			time.Now(), rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, terminating, unknown)
 
 		promPushRunningPending(running, pending)
 
@@ -1330,6 +1339,16 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 		}
 	}
 	dumpNodeDebugInfo(c, badNodes.List())
+}
+
+func dumpAllPodInfo(c *client.Client) {
+	pods, err := c.Pods("").List(labels.Everything(), fields.Everything())
+	if err != nil {
+		Logf("unable to fetch pod debug info: %v", err)
+	}
+	for _, pod := range pods.Items {
+		Logf("Pod %s %s node=%s, deletionTimestamp=%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+	}
 }
 
 func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
@@ -1442,7 +1461,27 @@ func DeleteRC(c *client.Client, ns, name string) error {
 	_, err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
 	deleteRCTime := time.Now().Sub(startTime)
 	Logf("Deleting RC took: %v", deleteRCTime)
+	if err == nil {
+		err = waitForRCPodsGone(c, ns, name)
+	}
+	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
+	Logf("Terminating RC pods took: %v", terminatePodTime)
 	return err
+}
+
+// waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
+// have completed termination).
+func waitForRCPodsGone(c *client.Client, ns, name string) error {
+	rc, err := c.ReplicationControllers(ns).Get(name)
+	if err != nil {
+		return err
+	}
+	return wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		if pods, err := c.Pods(ns).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything()); err == nil && len(pods.Items) == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 // Convenient wrapper around listing nodes supporting retries.
@@ -1606,7 +1645,6 @@ func getSigner(provider string) (ssh.Signer, error) {
 		return nil, fmt.Errorf("getSigner(...) not implemented for %s", provider)
 	}
 	key := filepath.Join(keydir, keyfile)
-	Logf("Using SSH key: %s", key)
 
 	return util.MakePrivateKeySignerFromFile(key)
 }

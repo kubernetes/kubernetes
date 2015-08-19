@@ -190,7 +190,7 @@ var _ = Describe("Pod Disks", func() {
 			By("cleaning up PD-RW test environment")
 			// Teardown pods, PD. Ignore errors.
 			// Teardown should do nothing unless test failed.
-			podClient.Delete(host0Pod.Name, nil)
+			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, diskName)
 			deletePD(diskName)
 		}()
@@ -221,7 +221,7 @@ var _ = Describe("Pod Disks", func() {
 			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			By("deleting host0Pod")
-			expectNoError(podClient.Delete(host0Pod.Name, nil), "Failed to delete host0Pod")
+			expectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 		}
 
 		By(fmt.Sprintf("deleting PD %q", diskName))

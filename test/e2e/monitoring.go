@@ -92,6 +92,9 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 				return nil, err
 			}
 			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
 				expectedPods = append(expectedPods, string(pod.UID))
 			}
 		}
