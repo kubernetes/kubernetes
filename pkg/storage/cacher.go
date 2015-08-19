@@ -322,11 +322,11 @@ func (c *cacheWatcher) sendWatchCacheEvent(event cache.WatchCacheEvent) {
 	}
 	switch {
 	case curObjPasses && !oldObjPasses:
-		c.result <- watch.Event{watch.Added, event.Object}
+		c.result <- watch.Event{Type: watch.Added, Object: event.Object}
 	case curObjPasses && oldObjPasses:
-		c.result <- watch.Event{watch.Modified, event.Object}
+		c.result <- watch.Event{Type: watch.Modified, Object: event.Object}
 	case !curObjPasses && oldObjPasses:
-		c.result <- watch.Event{watch.Deleted, event.Object}
+		c.result <- watch.Event{Type: watch.Deleted, Object: event.Object}
 	}
 }
 
