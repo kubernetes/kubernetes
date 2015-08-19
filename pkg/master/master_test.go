@@ -17,15 +17,21 @@ limitations under the License.
 package master
 
 import (
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/expapi"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	
+	"github.com/emicklei/go-restful"
 )
 
 func TestGetServersToValidate(t *testing.T) {
@@ -71,5 +77,46 @@ func TestFindExternalAddress(t *testing.T) {
 	_, err := findExternalAddress(new(api.Node))
 	if err == nil {
 		t.Errorf("expected findExternalAddress to fail on a node with missing ip information")
+	}
+}
+
+func TestInstallThirdPartyAPI(t *testing.T) {
+	master := &Master{}
+	api := &expapi.ThirdPartyResource{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
+		Versions: []expapi.APIVersion{
+			expapi.APIVersion{
+				APIGroup: "group",
+				Name: "v1",
+			},
+		},
+	}
+	master.handlerContainer = restful.NewContainer()
+	if err := master.InstallThirdPartyAPI(api); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	
+	server := httptest.NewServer(master.handlerContainer.ServeMux)
+	defer server.Close()
+	
+	resp, err := http.Get(server.URL + "/thirdparty/foo/v1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("unexpected status: %v", resp)
+	}
+	
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	
+	if string(data) != "foo" {
+		t.Errorf("unexpected response: %s", string(data))
 	}
 }

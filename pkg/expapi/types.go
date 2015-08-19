@@ -167,6 +167,7 @@ type ThirdPartyResourceData struct {
 	Data []byte `json:"name,omitempty" description:"the raw JSON data for this data"`
 }
 
+<<<<<<< HEAD
 type Deployment struct {
 	api.TypeMeta   `json:",inline"`
 	api.ObjectMeta `json:"metadata,omitempty"`
@@ -271,6 +272,7 @@ type DeploymentList struct {
 	Items []Deployment `json:"items"`
 }
 
+<<<<<<< HEAD
 // DaemonSpec is the specification of a daemon.
 type DaemonSpec struct {
 	// Selector is a label query over pods that are managed by the daemon.
@@ -317,4 +319,11 @@ type DaemonList struct {
 	api.ListMeta `json:"metadata,omitempty"`
 
 	Items []Daemon `json:"items"`
+}
+
+type ThirdPartyResourceDataList struct {
+	api.TypeMeta `json:",inline"`
+	api.ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+
+	Items []ThirdPartyResourceData `json:"items" description:"items is a list of third party objects"`
 }
