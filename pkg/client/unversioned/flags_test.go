@@ -77,12 +77,3 @@ func (f *fakeFlagSet) IntVar(p *int, name string, value int, usage string) {
 	}
 	f.set.Insert(name)
 }
-
-func TestBindKubeletClientConfigFlags(t *testing.T) {
-	flags := &fakeFlagSet{t, util.StringSet{}}
-	config := &KubeletConfig{}
-	BindKubeletClientConfigFlags(flags, config)
-	if len(flags.set) != 6 {
-		t.Errorf("unexpected flag set: %#v", flags)
-	}
-}
