@@ -1102,7 +1102,6 @@ const (
 )
 
 // PodCondition contains details for the current condition of this pod.
-// TODO: add LastTransitionTime, Reason, Message to match NodeCondition api.
 type PodCondition struct {
 	// Type is the type of the condition.
 	// Currently only Ready.
@@ -1112,6 +1111,14 @@ type PodCondition struct {
 	// Can be True, False, Unknown.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
 	Status ConditionStatus `json:"status"`
+	// Last time we probed the condition.
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition.
+	Message string `json:"message,omitempty"`
 }
 
 // RestartPolicy describes how the container should be restarted.

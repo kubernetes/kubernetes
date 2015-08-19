@@ -13137,6 +13137,18 @@
      "status": {
       "type": "string",
       "description": "Status is the status of the condition. Can be True, False, Unknown. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions"
+     },
+     "lastProbeTime": {
+      "type": "string"
+     },
+     "lastTransitionTime": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
      }
     }
    },

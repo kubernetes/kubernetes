@@ -1344,6 +1344,14 @@ func deepCopy_api_PodAttachOptions(in PodAttachOptions, out *PodAttachOptions, c
 func deepCopy_api_PodCondition(in PodCondition, out *PodCondition, c *conversion.Cloner) error {
 	out.Type = in.Type
 	out.Status = in.Status
+	if err := deepCopy_unversioned_Time(in.LastProbeTime, &out.LastProbeTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_Time(in.LastTransitionTime, &out.LastTransitionTime, c); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
 	return nil
 }
 
