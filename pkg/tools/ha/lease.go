@@ -110,22 +110,31 @@ func (c *Config) leaseAndUpdateLoop() {
 		var master bool = false
 		var err error = nil
 
-		//Lets see if we are the master.
-		if countsleeps < 50 {
+		//TODO Delete this condition, its only to cause quick failover.
+		if countsleeps < 10 {
 			master, err = c.acquireOrRenewLease()
 			if err != nil {
 				glog.Errorf("Error in determining if master. %v, looping", err)
 			} else {
 				glog.Errorf("Master info acquired %v", master)
 			}
+		} else {
+			glog.Errorf("WARNING: GIVING UP THE LEASE PROACTIVELY!!!")
 		}
-
 		if err := c.update(master); err != nil {
 			glog.Errorf("Error updating master status %v", err)
 		} else {
 			glog.Errorf("Done updating master status %v", c)
 		}
-		countsleeps++
+
+		//countsleeps is just for hacktesting of failover, we can delete it.
+		//If not master, we make sure countdown is at 0, so
+		//that when we become the master, we have 10 rounds.
+		if master {
+			countsleeps++
+		} else {
+			countsleeps = 0
+		}
 		glog.Errorf("..sleep.. %v %v", c.sleep, countsleeps)
 		time.Sleep(c.sleep)
 	}

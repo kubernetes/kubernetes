@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -89,10 +90,13 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	}
 
 	editLock := oldObj.(*api.Lock)
+	glog.Errorf("LOCK1 TRYING update %v %v", editLock.Spec.HeldBy, lock.Spec.HeldBy)
 	if editLock.Spec.HeldBy != lock.Spec.HeldBy {
+		glog.Errorf("LOCK1 FAILED UPDATE !!!!!!!!!!!!!")
 		return nil, false, fmt.Errorf("Lock %s is held by %s but attempted to be updated by %s", lock.Name, editLock.Spec.HeldBy, lock.Spec.HeldBy)
+	} else {
+		glog.Errorf("LOCK1 SUCCESFULL UPDATE !!!!!!!!!!!!!!!")
 	}
-
 	// Preserve the time the lock was first acquired
 	atime := editLock.Spec.AcquiredTime
 
@@ -151,11 +155,11 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fi
 		l = labels.Set{}
 	}
 	return l, fields.Set{
-		"metadata.name":  lock.Name,
-		"spec.heldby":    lock.Spec.HeldBy,
-		"spec.duration":  string(lock.Spec.LeaseTime),
-		"spec.atime":     lock.Spec.AcquiredTime,
-		"spec.rtime":     lock.Spec.RenewTime,
+		"metadata.name": lock.Name,
+		"spec.heldby":   lock.Spec.HeldBy,
+		"spec.duration": string(lock.Spec.LeaseTime),
+		"spec.atime":    lock.Spec.AcquiredTime,
+		"spec.rtime":    lock.Spec.RenewTime,
 	}, nil
 }
 

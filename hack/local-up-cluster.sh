@@ -230,13 +230,23 @@ function start_apiserver {
 }
 
 function start_controller_manager {
-    CTLRMGR_LOG=/tmp/kube-controller-manager.log
+    CTLRMGR_LOG=/tmp/kube-controller-manager-1.log
     sudo -E "${GO_OUT}/kube-controller-manager" \
       --v=${LOG_LEVEL} \
+      --whoami="kcm1.lock" \
       --service_account_private_key_file="${SERVICE_ACCOUNT_KEY}" \
       --root_ca_file="${ROOT_CA_FILE}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
+
+    CTLRMGR_LOG=/tmp/kube-controller-manager-2.log
+    sudo -E "${GO_OUT}/kube-controller-manager" \
+      --v=${LOG_LEVEL} \
+      --service_account_private_key_file="${SERVICE_ACCOUNT_KEY}" \
+      --whoami="kcm2.lock" \
+      --root_ca_file="${ROOT_CA_FILE}" \
+      --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
+    #CTLRMGR_PID=$!
 }
 
 function start_kubelet {
