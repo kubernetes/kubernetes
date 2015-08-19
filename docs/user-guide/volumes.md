@@ -318,7 +318,7 @@ See the [iSCSI example](../../examples/iscsi/) for more details.
 
 ### glusterfs
 
-A `glusterfs` volume allows an [Glusterfs](http://www.gluster.org) (an open
+A `glusterfs` volume allows a [Glusterfs](http://www.gluster.org) (an open
 source networked filesystem) volume to be mounted into your pod.  Unlike
 `emptyDir`, which is erased when a Pod is removed, the contents of a
 `glusterfs` volume are preserved and the volume is merely unmounted.  This
@@ -336,7 +336,7 @@ See the [GlusterFS example](../../examples/glusterfs/) for more details.
 An `rbd` volume allows a [Rados Block
 Device](http://ceph.com/docs/master/rbd/rbd/) volume to be mounted into your
 pod.  Unlike `emptyDir`, which is erased when a Pod is removed, the contents of
-an `rbd` volume are preserved and the volume is merely unmounted.  This
+a `rbd` volume are preserved and the volume is merely unmounted.  This
 means that a RBD volume can be pre-populated with data, and that data can
 be "handed off" between pods.
 
