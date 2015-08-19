@@ -410,6 +410,9 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool, wide bool, columnLa
 			readyContainers++
 		}
 	}
+	if pod.DeletionTimestamp != nil {
+		reason = "Terminating"
+	}
 
 	if withNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {

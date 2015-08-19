@@ -80,6 +80,59 @@ func TestGet(t *testing.T) {
 	})
 }
 
+func TestWriteTTL(t *testing.T) {
+	client := framework.NewEtcdClient()
+	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), "")
+	framework.WithEtcdKey(func(key string) {
+		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		if err := etcdStorage.Set(key, &testObject, nil, 0); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		result := &api.ServiceAccount{}
+		err := etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "foo" {
+				t.Fatalf("unexpected existing object: %v", obj)
+			}
+			if res.TTL != 0 {
+				t.Fatalf("unexpected TTL: %#v", res)
+			}
+			ttl := uint64(10)
+			out := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "out"}}
+			return out, &ttl, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.Name != "out" {
+			t.Errorf("unexpected response: %#v", result)
+		}
+		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL != 10 {
+			t.Fatalf("unexpected get: %v %#v", err, res)
+		}
+
+		result = &api.ServiceAccount{}
+		err = etcdStorage.GuaranteedUpdate(key, result, false, func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			if in, ok := obj.(*api.ServiceAccount); !ok || in.Name != "out" {
+				t.Fatalf("unexpected existing object: %v", obj)
+			}
+			if res.TTL <= 1 {
+				t.Fatalf("unexpected TTL: %#v", res)
+			}
+			out := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "out2"}}
+			return out, nil, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.Name != "out2" {
+			t.Errorf("unexpected response: %#v", result)
+		}
+		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL <= 1 {
+			t.Fatalf("unexpected get: %v %#v", err, res)
+		}
+	})
+}
+
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
 	etcdStorage := etcd.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix())
