@@ -45,6 +45,7 @@ type serviceInfo struct {
 	proxyPort           int
 	socket              proxySocket
 	timeout             time.Duration
+	activeClients       *clientCache
 	nodePort            int
 	loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
@@ -257,6 +258,7 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 		protocol:            protocol,
 		socket:              sock,
 		timeout:             timeout,
+		activeClients:       newClientCache(),
 		sessionAffinityType: api.ServiceAffinityNone, // default
 		stickyMaxAgeMinutes: 180,                     // TODO: parameterize this in the API.
 	}

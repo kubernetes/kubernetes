@@ -210,6 +210,22 @@ func waitForNumProxyLoops(t *testing.T, p *Proxier, want int32) {
 	t.Errorf("expected %d ProxyLoops running, got %d", want, got)
 }
 
+func waitForNumProxyClients(t *testing.T, s *serviceInfo, want int, timeout time.Duration) {
+	var got int
+	now := time.Now()
+	deadline := now.Add(timeout)
+	for time.Now().Before(deadline) {
+		s.activeClients.mu.Lock()
+		got = len(s.activeClients.clients)
+		s.activeClients.mu.Unlock()
+		if got == want {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	t.Errorf("expected %d ProxyClients live, got %d", want, got)
+}
+
 func TestTCPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
@@ -262,6 +278,37 @@ func TestUDPProxy(t *testing.T) {
 	}
 	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
+}
+
+func TestUDPProxyTimeout(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "p"}
+	lb.OnEndpointsUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+				Ports:     []api.EndpointPort{{Name: "p", Port: udpServerPort}},
+			}},
+		},
+	})
+
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"), nil, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitForNumProxyLoops(t, p, 0)
+
+	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	waitForNumProxyLoops(t, p, 1)
+	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
+	// When connecting to a UDP service endpoint, there shoule be a Conn for proxy.
+	waitForNumProxyClients(t, svcInfo, 1, time.Second)
+	// If conn has no activity for serviceInfo.timeout since last Read/Write, it shoule be closed because of timeout.
+	waitForNumProxyClients(t, svcInfo, 0, 2*time.Second)
 }
 
 func TestMultiPortProxy(t *testing.T) {
@@ -825,7 +872,5 @@ func TestProxyUpdatePortal(t *testing.T) {
 	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 }
-
-// TODO: Test UDP timeouts.
 
 // TODO(justinsb): Add test for nodePort conflict detection, once we have nodePort wired in
