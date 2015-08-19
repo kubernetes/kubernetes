@@ -137,8 +137,6 @@ func newContainerManager(cadvisorInterface cadvisor.Interface, dockerDaemonConta
 		systemContainers = append(systemContainers, newSystemContainer(kubeletContainerName))
 	}
 
-	// TODO(vmarmol): Add Kube-proxy container.
-
 	return &containerManagerImpl{
 		systemContainers: systemContainers,
 	}, nil
@@ -250,8 +248,16 @@ func getContainer(pid int) (string, error) {
 	return cgroups.ParseCgroupFile("cpu", f)
 }
 
-// Ensures the system container is created and all non-kernel processes without
-// a container are moved to it.
+// Ensures the system container is created and all non-kernel threads and process 1
+// without a container are moved to it.
+//
+// The reason of leaving kernel threads at root cgroup is that we don't want to tie the
+// execution of these threads with to-be defined /system quota and create priority inversions.
+//
+// The reason of leaving process 1 at root cgroup is that libcontainer hardcoded on
+// the base cgroup path based on process 1. Please see:
+// https://github.com/kubernetes/kubernetes/issues/12789#issuecomment-132384126
+// for detail explanation.
 func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
@@ -267,13 +273,18 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 			continue
 		}
 
-		// Remove kernel pids
+		// Remove kernel pids and process 1
 		pids := make([]int, 0, len(allPids))
 		for _, pid := range allPids {
 			if isKernelPid(pid) {
 				continue
 			}
 
+			// TODO(dawnchen): Remove this once the hard dependency on process 1 is removed
+			// on systemd node.
+			if pid == 1 {
+				continue
+			}
 			pids = append(pids, pid)
 		}
 		glog.Infof("Found %d PIDs in root, %d of them are kernel related", len(allPids), len(allPids)-len(pids))
