@@ -152,3 +152,101 @@ type ThirdPartyResourceData struct {
 
 	Data []byte `json:"name,omitempty" description:"the raw JSON data for this data"`
 }
+
+type Deployment struct {
+	v1.TypeMeta   `json:",inline"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Specification of the desired behavior of the Deployment.
+	Spec DeploymentSpec `json:"spec,omitempty" description: "specification of the desired behavior of deployment"`
+
+	// Most recently observed status of the Deployment.
+	Status DeploymentStatus `json:"status,omitempty" description: "most recently observed status of deployment"`
+}
+
+type DeploymentSpec struct {
+	// Number of desired pods. This is a pointer to distinguish between explicit
+	// zero and not specified. Defaults to 1.
+	Replicas *int `json:"replicas,omitempty" description:"number of desired pods; Defaults to 1"`
+
+	// Label selector for pods. Existing ReplicationControllers whose pods are
+	// selected by this will be scaled down.
+	Selector map[string]string `json:"selector,omitempty" description:"label selector for pods; existing replication controllers whose pods are selected by this will be scaled down`
+
+	// Describes the pods that will be created.
+	Template *v1.PodTemplateSpec `json:"template,omitempty" description:"template to describe the pods that will be created"`
+
+	// The deployment strategy to use to replace existing pods with new ones.
+	Strategy DeploymentStrategy `json:"strategy,omitempty" description:"deployment strategy to use to replace existing pods with new ones"`
+
+	// Key of the selector that is added to existing RCs (and label key that is
+	// added to its pods) to prevent the existing RCs to select new pods (and old
+	// pods being selected by new RC).
+	// Users can set this to an empty string to indicate that the system should
+	// not add any selector and label. If unspecified, system uses
+	// "deployment.kubernetes.io/podTemplateHash".
+	// Value of this key is hash of DeploymentSpec.PodTemplateSpec.
+	UniqueLabelKey *string `json:"uniqueLabel,omitempty" description:"key of the label that is added to existing pods to distinguish them from new ones; deployment.kubernetes.io/podTemplateHash is used by default; value of this label is hash of pod template spec; no label is added if this is set to empty string"`
+}
+
+type DeploymentStrategy struct {
+	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	Type DeploymentType `json:"type,omitempty" description:"type of deployment; can be Recreate or RollingUpdate; defaults to RollingUpdate"`
+
+	// TODO: Update this to follow our convention for oneOf, whatever we decide it
+	// to be.
+	// Rolling update config params. Present only if DeploymentType =
+	// RollingUpdate.
+	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty" description:"rolling update config params; present only if deploymentType=RollingUpdate"`
+}
+
+type DeploymentType string
+
+const (
+	// Kill all existing pods before creating new ones.
+	DeploymentRecreate DeploymentType = "Recreate"
+
+	// Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
+	DeploymentRollingUpdate DeploymentType = "RollingUpdate"
+)
+
+// Spec to control the desired behavior of rolling update.
+type RollingUpdateDeployment struct {
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	// This can not be 0 if MaxSurge is 0.
+	// By default, a fixed value of 1 is used.
+	// Example: when this is set to 30%, the old RC can be scaled down by 30%
+	// immediately when the rolling update starts. Once new pods are ready, old RC
+	// can be scaled down further, followed by scaling up the new RC, ensuring
+	// that at least 70% of original number of pods are available at all times
+	// during the update.
+	MaxUnavailable util.IntOrString `json:"maxUnavailable,omitempty" description:"max number of pods that can be unavailable during the update; value can be an absolute number or a percentage of total pods at start of update"`
+
+	// The maximum number of pods that can be scheduled above the original number of
+	// pods.
+	// Value can be an absolute number (ex: 5) or a percentage of total pods at
+	// the start of the update (ex: 10%). This can not be 0 if MaxUnavailable is 0.
+	// Absolute number is calculated from percentage by rounding up.
+	// By default, a value of 1 is used.
+	// Example: when this is set to 30%, the new RC can be scaled up by 30%
+	// immediately when the rolling update starts. Once old pods have been killed,
+	// new RC can be scaled up further, ensuring that total number of pods running
+	// at any time during the update is atmost 130% of original pods.
+	MaxSurge util.IntOrString `json:"maxSurge,omitempty" description:"max number of pods that can be scheduled above the original number of pods; value can be an absolute number or a percentage of total pods at start of update"`
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	MinReadySeconds int `json:"minReadySeconds,omitempty" description:"min seconds for which a newly created pod should be ready for it to be considered available"`
+}
+
+type DeploymentStatus struct {
+	// Total number of ready pods targeted by this deployment (this
+	// includes both the old and new pods).
+	Replicas int `json:"replicas,omitempty" description:"total number of ready pods targeted by this deployment (includes both old and new pods"`
+
+	// Total number of new ready pods with the desired template spec.
+	UpdatedReplicas int `json:"updatedReplicas,omitempty" description:"total number of new ready pods with the desired template spec"`
+}
