@@ -330,12 +330,15 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 		return false, fmt.Errorf("error checking rule: %v", err)
 	}
 
-	// Sadly, iptables has inconsistent quoting rules for comments.
-	// Just unquote any arg that is wrapped in quotes.
-	argsCopy := make([]string, len(args))
-	copy(argsCopy, args)
-	for i := range argsCopy {
-		unquote(&argsCopy[i])
+	// Sadly, iptables has inconsistent quoting rules for comments. Just remove all quotes.
+	// Also, quoted multi-word comments (which are counted as a single arg)
+	// will be unpacked into multiple args,
+	// in order to compare against iptables-save output (which will be split at whitespace boundary)
+	// e.g. a single arg('"this must be before the NodePort rules"') will be unquoted and unpacked into 7 args.
+	var argsCopy []string
+	for i := range args {
+		tmpField := strings.Trim(args[i], "\"")
+		argsCopy = append(argsCopy, strings.Fields(tmpField)...)
 	}
 	argset := util.NewStringSet(argsCopy...)
 
@@ -344,14 +347,14 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 
 		// Check that this is a rule for the correct chain, and that it has
 		// the correct number of argument (+2 for "-A <chain name>")
-		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(args)+2 {
+		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(argsCopy)+2 {
 			continue
 		}
 
 		// Sadly, iptables has inconsistent quoting rules for comments.
-		// Just unquote any arg that is wrapped in quotes.
+		// Just remove all quotes.
 		for i := range fields {
-			unquote(&fields[i])
+			fields[i] = strings.Trim(fields[i], "\"")
 		}
 
 		// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
@@ -362,12 +365,6 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 	}
 
 	return false, nil
-}
-
-func unquote(strp *string) {
-	if len(*strp) >= 2 && (*strp)[0] == '"' && (*strp)[len(*strp)-1] == '"' {
-		*strp = strings.TrimPrefix(strings.TrimSuffix(*strp, `"`), `"`)
-	}
 }
 
 // Executes the rule check using the "-C" flag
