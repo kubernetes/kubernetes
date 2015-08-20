@@ -21,18 +21,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage), fakeClient
 }
 
 func validNewSecret(name string) *api.Secret {
@@ -48,9 +44,8 @@ func validNewSecret(name string) *api.Secret {
 }
 
 func TestCreate(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage := NewStorage(etcdStorage)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	secret := validNewSecret("foo")
 	secret.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
@@ -70,17 +65,16 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage := NewStorage(etcdStorage)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	key, err := storage.KeyFunc(test.TestContext(), "foo")
 	if err != nil {
 		t.Fatal(err)
 	}
 	key = etcdtest.AddPrefix(key)
 
-	fakeEtcdClient.ExpectNotFoundGet(key)
-	fakeEtcdClient.ChangeIndex = 2
+	fakeClient.ExpectNotFoundGet(key)
+	fakeClient.ChangeIndex = 2
 	secret := validNewSecret("foo")
 	existing := validNewSecret("exists")
 	existing.Namespace = test.TestNamespace()

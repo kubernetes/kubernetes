@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -36,7 +36,7 @@ import (
 func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
+	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
 	return fakeEtcdClient, etcdStorage
 }
 
@@ -98,7 +98,7 @@ func TestGet(t *testing.T) {
 	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(latest.Codec, &validController),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), &validController),
 				ModifiedIndex: 1,
 			},
 		},
@@ -123,7 +123,7 @@ func TestUpdate(t *testing.T) {
 	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(latest.Codec, &validController),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), &validController),
 				ModifiedIndex: 1,
 			},
 		},
@@ -146,7 +146,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	var controller api.ReplicationController
-	latest.Codec.DecodeInto([]byte(response.Node.Value), &controller)
+	testapi.Codec().DecodeInto([]byte(response.Node.Value), &controller)
 	if controller.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, controller.Spec.Replicas)
 	}

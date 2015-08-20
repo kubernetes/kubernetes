@@ -27,13 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for persistentvolumeclaims against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewREST returns a RESTStorage object that will work against PersistentVolumeClaim objects.
-func NewStorage(s storage.Interface) (*REST, *StatusREST) {
+// NewREST returns a RESTStorage object that will work against persistent volume claims.
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
 	prefix := "/persistentvolumeclaims"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
@@ -52,12 +51,12 @@ func NewStorage(s storage.Interface) (*REST, *StatusREST) {
 		},
 		EndpointName: "persistentvolumeclaims",
 
+		CreateStrategy:      persistentvolumeclaim.Strategy,
+		UpdateStrategy:      persistentvolumeclaim.Strategy,
+		ReturnDeletedObject: true,
+
 		Storage: s,
 	}
-
-	store.CreateStrategy = persistentvolumeclaim.Strategy
-	store.UpdateStrategy = persistentvolumeclaim.Strategy
-	store.ReturnDeletedObject = true
 
 	statusStore := *store
 	statusStore.UpdateStrategy = persistentvolumeclaim.StatusStrategy

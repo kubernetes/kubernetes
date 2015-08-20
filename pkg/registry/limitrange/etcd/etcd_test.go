@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
@@ -34,11 +34,9 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func NewTestLimitRangeStorage(t *testing.T) (*tools.FakeEtcdClient, *REST) {
-	f := tools.NewFakeEtcdClient(t)
-	f.TestIndex = true
-	s := etcdstorage.NewEtcdStorage(f, testapi.Codec(), etcdtest.PathPrefix())
-	return f, NewStorage(s)
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage), fakeClient
 }
 
 func TestLimitRangeCreate(t *testing.T) {
@@ -110,7 +108,7 @@ func TestLimitRangeCreate(t *testing.T) {
 	}
 
 	for name, item := range table {
-		fakeClient, storage := NewTestLimitRangeStorage(t)
+		storage, fakeClient := newStorage(t)
 		fakeClient.Data[path] = item.existing
 		_, err := storage.Create(ctx, item.toCreate)
 		if !item.errOK(err) {

@@ -20,12 +20,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
@@ -33,17 +31,9 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
-}
-
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	fakeEtcdClient, s := newEtcdStorage(t)
-	storage := NewStorage(s)
-	return storage, fakeEtcdClient
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage), fakeClient
 }
 
 func validNewEndpoints() *api.Endpoints {
@@ -70,8 +60,8 @@ func validChangedEndpoints() *api.Endpoints {
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	endpoints := validNewEndpoints()
 	endpoints.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -86,17 +76,17 @@ func TestCreate(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 
 	endpoints := validChangedEndpoints()
 	key, _ := storage.KeyFunc(ctx, endpoints.Name)
 	key = etcdtest.AddPrefix(key)
 	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(latest.Codec, endpoints),
+					Value:         runtime.EncodeOrDie(testapi.Codec(), endpoints),
 					ModifiedIndex: 1,
 				},
 			},
@@ -104,10 +94,10 @@ func TestDelete(t *testing.T) {
 		return endpoints
 	}
 	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
+		if fakeClient.Data[key].R.Node == nil {
 			return false
 		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
+		return fakeClient.Data[key].R.Node.TTL == 30
 	}
 	test.TestDelete(createFn, gracefulSetFn)
 }
@@ -137,13 +127,13 @@ func TestEtcdListEndpoints(t *testing.T) {
 func TestEndpointsDecode(t *testing.T) {
 	storage, _ := newStorage(t)
 	expected := validNewEndpoints()
-	body, err := latest.Codec.Encode(expected)
+	body, err := testapi.Codec().Encode(expected)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	actual := storage.New()
-	if err := latest.Codec.DecodeInto(body, actual); err != nil {
+	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -159,7 +149,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, validNewEndpoints()), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewEndpoints()), 0)
 
 	_, _, err := storage.Update(ctx, endpoints)
 	if err != nil {
@@ -171,7 +161,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var endpointsOut api.Endpoints
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &endpointsOut)
+	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &endpointsOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -193,7 +183,7 @@ func TestDeleteEndpoints(t *testing.T) {
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(latest.Codec, endpoints),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), endpoints),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},

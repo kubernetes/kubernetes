@@ -17,12 +17,24 @@ limitations under the License.
 package registrytest
 
 import (
+	"testing"
+
 	"github.com/coreos/go-etcd/etcd"
 
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
 )
+
+func NewEtcdStorage(t *testing.T) (storage.Interface, *tools.FakeEtcdClient) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+	etcdStorage := etcdstorage.NewEtcdStorage(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	return etcdStorage, fakeClient
+}
 
 func SetResourceVersion(fakeClient *tools.FakeEtcdClient, resourceVersion uint64) {
 	fakeClient.ChangeIndex = resourceVersion
@@ -33,8 +45,8 @@ func SetObjectsForKey(fakeClient *tools.FakeEtcdClient, key string, objects []ru
 	if len(objects) > 0 {
 		nodes := make([]*etcd.Node, len(objects))
 		for i, obj := range objects {
-			encoded := runtime.EncodeOrDie(latest.Codec, obj)
-			decoded, _ := latest.Codec.Decode([]byte(encoded))
+			encoded := runtime.EncodeOrDie(testapi.Codec(), obj)
+			decoded, _ := testapi.Codec().Decode([]byte(encoded))
 			nodes[i] = &etcd.Node{Value: encoded}
 			result[i] = decoded
 		}
