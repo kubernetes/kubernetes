@@ -18,23 +18,37 @@ package autoscalercontroller
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
+const (
+	heapsterNamespace = "kube-system"
+	heapsterService   = "monitoring-heapster"
+)
+
+var resourceToMetric = map[api.ResourceName]string{
+	api.ResourceCPU: "cpu-usage",
+}
+var heapsterQueryStart, _ = time.ParseDuration("-20m")
+
 type HorizontalPodAutoscalerController struct {
-	kubeClient unversioned.ExperimentalInterface
+	client    *client.Client
+	expClient client.ExperimentalInterface
 }
 
-func New(kubeClient unversioned.ExperimentalInterface) *HorizontalPodAutoscalerController {
+func New(client *client.Client, expClient client.ExperimentalInterface) *HorizontalPodAutoscalerController {
+	//TODO: switch to client.Interface
 	return &HorizontalPodAutoscalerController{
-		kubeClient: kubeClient,
+		client:    client,
+		expClient: expClient,
 	}
 }
 
@@ -48,11 +62,58 @@ func (a *HorizontalPodAutoscalerController) Run(syncPeriod time.Duration) {
 
 func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
 	ns := api.NamespaceAll
-	list, err := a.kubeClient.HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
+	list, err := a.expClient.HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
-	// TODO: implement!
-	glog.Info("autoscalers: %v", list)
+	for _, hpa := range list.Items {
+		reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Namespace, hpa.Spec.ScaleRef.Name)
+
+		scale, err := a.expClient.Scales(hpa.Spec.ScaleRef.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
+		if err != nil {
+			glog.Warningf("Failed to query scale subresource for %s: %v", reference, err)
+			continue
+		}
+		podList, err := a.client.Pods(hpa.Spec.ScaleRef.Namespace).
+			List(labels.SelectorFromSet(labels.Set(scale.Status.Selector)), fields.Everything())
+
+		if err != nil {
+			glog.Warningf("Failed to get pod list for %s: %v", reference, err)
+			continue
+		}
+		podNames := []string{}
+		for _, pod := range podList.Items {
+			podNames = append(podNames, pod.Name)
+		}
+
+		metric, metricDefined := resourceToMetric[hpa.Spec.Target.Resource]
+		if !metricDefined {
+			glog.Warningf("Heapster metric not defined for %s %v", reference, hpa.Spec.Target.Resource)
+			continue
+		}
+		startTime := time.Now().Add(heapsterQueryStart)
+		metricPath := fmt.Sprintf("/api/v1/model/namespaces/%s/pod-list/%s/metrics/%s",
+			hpa.Spec.ScaleRef.Namespace,
+			strings.Join(podNames, ","),
+			metric)
+
+		resultRaw, err := a.client.
+			Get().
+			Prefix("proxy").
+			Resource("services").
+			Namespace(heapsterNamespace).
+			Name(heapsterService).
+			Suffix(metricPath).
+			Param("start", startTime.Format(time.RFC3339)).
+			Do().
+			Raw()
+
+		if err != nil {
+			glog.Warningf("Failed to get pods metrics for %s: %v", reference, err)
+			continue
+		}
+
+		glog.Infof("Metrics available for %s: %s", reference, string(resultRaw))
+	}
 	return nil
 }
