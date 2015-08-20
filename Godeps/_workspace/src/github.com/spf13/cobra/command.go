@@ -158,7 +158,6 @@ func (c *Command) SetHelpTemplate(s string) {
 func (c *Command) SetGlobalNormalizationFunc(n func(f *flag.FlagSet, name string) flag.NormalizedName) {
 	c.Flags().SetNormalizeFunc(n)
 	c.PersistentFlags().SetNormalizeFunc(n)
-	c.LocalFlags().SetNormalizeFunc(n)
 	c.globNormFunc = n
 
 	for _, command := range c.commands {
@@ -873,6 +872,13 @@ func (c *Command) LocalFlags() *flag.FlagSet {
 	c.lflags.VisitAll(func(f *flag.Flag) {
 		local.AddFlag(f)
 	})
+	if !c.HasParent() {
+		flag.CommandLine.VisitAll(func(f *flag.Flag) {
+			if local.Lookup(f.Name) == nil {
+				local.AddFlag(f)
+			}
+		})
+	}
 	return local
 }
 

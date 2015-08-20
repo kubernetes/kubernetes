@@ -62,7 +62,7 @@ func (f *FlagSet) StringSliceVar(p *[]string, name string, value []string, usage
 	f.VarP(newStringSliceValue(value, p), name, "", usage)
 }
 
-// Like StringSliceVar, but accepts a shorthand letter that can be used after a single dash.
+// StringSliceVarP is like StringSliceVar, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) StringSliceVarP(p *[]string, name, shorthand string, value []string, usage string) {
 	f.VarP(newStringSliceValue(value, p), name, shorthand, usage)
 }
@@ -73,7 +73,7 @@ func StringSliceVar(p *[]string, name string, value []string, usage string) {
 	CommandLine.VarP(newStringSliceValue(value, p), name, "", usage)
 }
 
-// Like StringSliceVar, but accepts a shorthand letter that can be used after a single dash.
+// StringSliceVarP is like StringSliceVar, but accepts a shorthand letter that can be used after a single dash.
 func StringSliceVarP(p *[]string, name, shorthand string, value []string, usage string) {
 	CommandLine.VarP(newStringSliceValue(value, p), name, shorthand, usage)
 }
@@ -81,14 +81,14 @@ func StringSliceVarP(p *[]string, name, shorthand string, value []string, usage 
 // StringSlice defines a string flag with specified name, default value, and usage string.
 // The return value is the address of a []string variable that stores the value of the flag.
 func (f *FlagSet) StringSlice(name string, value []string, usage string) *[]string {
-	p := make([]string, 0)
+	p := []string{}
 	f.StringSliceVarP(&p, name, "", value, usage)
 	return &p
 }
 
-// Like StringSlice, but accepts a shorthand letter that can be used after a single dash.
+// StringSliceP is like StringSlice, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) StringSliceP(name, shorthand string, value []string, usage string) *[]string {
-	p := make([]string, 0)
+	p := []string{}
 	f.StringSliceVarP(&p, name, shorthand, value, usage)
 	return &p
 }
@@ -99,7 +99,7 @@ func StringSlice(name string, value []string, usage string) *[]string {
 	return CommandLine.StringSliceP(name, "", value, usage)
 }
 
-// Like StringSlice, but accepts a shorthand letter that can be used after a single dash.
+// StringSliceP is like StringSlice, but accepts a shorthand letter that can be used after a single dash.
 func StringSliceP(name, shorthand string, value []string, usage string) *[]string {
 	return CommandLine.StringSliceP(name, shorthand, value, usage)
 }

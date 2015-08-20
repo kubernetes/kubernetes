@@ -44,7 +44,7 @@ func (f *FlagSet) Float64Var(p *float64, name string, value float64, usage strin
 	f.VarP(newFloat64Value(value, p), name, "", usage)
 }
 
-// Like Float64Var, but accepts a shorthand letter that can be used after a single dash.
+// Float64VarP is like Float64Var, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) Float64VarP(p *float64, name, shorthand string, value float64, usage string) {
 	f.VarP(newFloat64Value(value, p), name, shorthand, usage)
 }
@@ -55,7 +55,7 @@ func Float64Var(p *float64, name string, value float64, usage string) {
 	CommandLine.VarP(newFloat64Value(value, p), name, "", usage)
 }
 
-// Like Float64Var, but accepts a shorthand letter that can be used after a single dash.
+// Float64VarP is like Float64Var, but accepts a shorthand letter that can be used after a single dash.
 func Float64VarP(p *float64, name, shorthand string, value float64, usage string) {
 	CommandLine.VarP(newFloat64Value(value, p), name, shorthand, usage)
 }
@@ -68,7 +68,7 @@ func (f *FlagSet) Float64(name string, value float64, usage string) *float64 {
 	return p
 }
 
-// Like Float64, but accepts a shorthand letter that can be used after a single dash.
+// Float64P is like Float64, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) Float64P(name, shorthand string, value float64, usage string) *float64 {
 	p := new(float64)
 	f.Float64VarP(p, name, shorthand, value, usage)
@@ -81,7 +81,7 @@ func Float64(name string, value float64, usage string) *float64 {
 	return CommandLine.Float64P(name, "", value, usage)
 }
 
-// Like Float64, but accepts a shorthand letter that can be used after a single dash.
+// Float64P is like Float64, but accepts a shorthand letter that can be used after a single dash.
 func Float64P(name, shorthand string, value float64, usage string) *float64 {
 	return CommandLine.Float64P(name, shorthand, value, usage)
 }

@@ -19,15 +19,15 @@ import (
 )
 
 var (
-	test_bool                    = Bool("test_bool", false, "bool value")
-	test_int                     = Int("test_int", 0, "int value")
-	test_int64                   = Int64("test_int64", 0, "int64 value")
-	test_uint                    = Uint("test_uint", 0, "uint value")
-	test_uint64                  = Uint64("test_uint64", 0, "uint64 value")
-	test_string                  = String("test_string", "0", "string value")
-	test_float64                 = Float64("test_float64", 0, "float64 value")
-	test_duration                = Duration("test_duration", 0, "time.Duration value")
-	test_optional_int            = Int("test_optional_int", 0, "optional int value")
+	testBool                     = Bool("test_bool", false, "bool value")
+	testInt                      = Int("test_int", 0, "int value")
+	testInt64                    = Int64("test_int64", 0, "int64 value")
+	testUint                     = Uint("test_uint", 0, "uint value")
+	testUint64                   = Uint64("test_uint64", 0, "uint64 value")
+	testString                   = String("test_string", "0", "string value")
+	testFloat                    = Float64("test_float64", 0, "float64 value")
+	testDuration                 = Duration("test_duration", 0, "time.Duration value")
+	testOptionalInt              = Int("test_optional_int", 0, "optional int value")
 	normalizeFlagNameInvocations = 0
 )
 
@@ -107,6 +107,23 @@ func TestUsage(t *testing.T) {
 	}
 	if !called {
 		t.Error("did not call Usage for unknown flag")
+	}
+}
+
+func TestAddFlagSet(t *testing.T) {
+	oldSet := NewFlagSet("old", ContinueOnError)
+	newSet := NewFlagSet("new", ContinueOnError)
+
+	oldSet.String("flag1", "flag1", "flag1")
+	oldSet.String("flag2", "flag2", "flag2")
+
+	newSet.String("flag2", "flag2", "flag2")
+	newSet.String("flag3", "flag3", "flag3")
+
+	oldSet.AddFlagSet(newSet)
+
+	if len(oldSet.formal) != 3 {
+		t.Errorf("Unexpected result adding a FlagSet to a FlagSet %v", oldSet)
 	}
 }
 
@@ -291,7 +308,7 @@ func testParse(f *FlagSet, t *testing.T) {
 		t.Error("mask flag should be 255.255.255.0, is ", (*maskFlag).String())
 	}
 	if v, err := f.GetIPv4Mask("mask"); err != nil || v.String() != (*maskFlag).String() {
-		t.Errorf("GetIP returned %v but maskFlag was %v", v, *maskFlag, err)
+		t.Errorf("GetIP returned %v maskFlag was %v error was %v", v, *maskFlag, err)
 	}
 	if *durationFlag != 2*time.Minute {
 		t.Error("duration flag should be 2m, is ", *durationFlag)

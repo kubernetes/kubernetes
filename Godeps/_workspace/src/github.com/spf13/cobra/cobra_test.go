@@ -963,3 +963,11 @@ func TestGlobalNormFuncPropagation(t *testing.T) {
 		t.Error("cmdPrint and cmdEchoSub should had the normalization function of rootCmd")
 	}
 }
+
+func TestFlagOnPflagCommandLine(t *testing.T) {
+	flagName := "flagOnCommandLine"
+	pflag.CommandLine.String(flagName, "", "about my flag")
+	r := fullSetupTest("--help")
+
+	checkResultContains(t, r, flagName)
+}

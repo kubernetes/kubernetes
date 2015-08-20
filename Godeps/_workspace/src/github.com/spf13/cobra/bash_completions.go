@@ -13,6 +13,7 @@ import (
 const (
 	BashCompFilenameExt     = "cobra_annotation_bash_completion_filename_extentions"
 	BashCompOneRequiredFlag = "cobra_annotation_bash_completion_one_required_flag"
+	BashCompSubdirsInDir    = "cobra_annotation_bash_completion_subdirs_in_dir"
 )
 
 func preamble(out *bytes.Buffer) {
@@ -98,6 +99,12 @@ __handle_filename_extension_flag()
 {
     local ext="$1"
     _filedir "@(${ext})"
+}
+
+__handle_subdirs_in_dir_flag()
+{
+    local dir="$1"
+    pushd "${dir}" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1
 }
 
 __handle_flag()
@@ -224,6 +231,16 @@ func writeFlagHandler(name string, annotations map[string][]string, out *bytes.B
 				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
 			} else {
 				ext := "_filedir"
+				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			}
+		case BashCompSubdirsInDir:
+			fmt.Fprintf(out, "    flags_with_completion+=(%q)\n", name)
+
+			if len(value) == 1 {
+				ext := "__handle_subdirs_in_dir_flag " + value[0]
+				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
+			} else {
+				ext := "_filedir -d"
 				fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
 			}
 		}

@@ -46,7 +46,7 @@ func (f *FlagSet) Uint16Var(p *uint16, name string, value uint16, usage string) 
 	f.VarP(newUint16Value(value, p), name, "", usage)
 }
 
-// Like Uint16Var, but accepts a shorthand letter that can be used after a single dash.
+// Uint16VarP is like Uint16Var, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) Uint16VarP(p *uint16, name, shorthand string, value uint16, usage string) {
 	f.VarP(newUint16Value(value, p), name, shorthand, usage)
 }
@@ -57,7 +57,7 @@ func Uint16Var(p *uint16, name string, value uint16, usage string) {
 	CommandLine.VarP(newUint16Value(value, p), name, "", usage)
 }
 
-// Like Uint16Var, but accepts a shorthand letter that can be used after a single dash.
+// Uint16VarP is like Uint16Var, but accepts a shorthand letter that can be used after a single dash.
 func Uint16VarP(p *uint16, name, shorthand string, value uint16, usage string) {
 	CommandLine.VarP(newUint16Value(value, p), name, shorthand, usage)
 }
@@ -70,7 +70,7 @@ func (f *FlagSet) Uint16(name string, value uint16, usage string) *uint16 {
 	return p
 }
 
-// Like Uint16, but accepts a shorthand letter that can be used after a single dash.
+// Uint16P is like Uint16, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) Uint16P(name, shorthand string, value uint16, usage string) *uint16 {
 	p := new(uint16)
 	f.Uint16VarP(p, name, shorthand, value, usage)
@@ -83,7 +83,7 @@ func Uint16(name string, value uint16, usage string) *uint16 {
 	return CommandLine.Uint16P(name, "", value, usage)
 }
 
-// Like Uint16, but accepts a shorthand letter that can be used after a single dash.
+// Uint16P is like Uint16, but accepts a shorthand letter that can be used after a single dash.
 func Uint16P(name, shorthand string, value uint16, usage string) *uint16 {
 	return CommandLine.Uint16P(name, shorthand, value, usage)
 }
