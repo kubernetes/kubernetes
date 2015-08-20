@@ -42,6 +42,7 @@ import (
 	replicationControllerPkg "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/controller/route"
+	"k8s.io/kubernetes/pkg/controller/secret"
 	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/healthz"
@@ -76,6 +77,7 @@ type CMServer struct {
 	DeletingPodsBurst       int
 	ServiceAccountKeyFile   string
 	RootCAFile              string
+	SecretSyncPeriod        time.Duration
 
 	ClusterName       string
 	ClusterCIDR       net.IPNet
@@ -142,6 +144,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
+	fs.DurationVar(&s.SecretSyncPeriod, "secret-sync-period", s.SecretSyncPeriod, "The period for syncing secrets with their generated values")
 }
 
 // Run runs the CMServer.  This should never exit.
@@ -262,6 +265,13 @@ func (s *CMServer) Run(_ []string) error {
 	serviceaccount.NewServiceAccountsController(
 		kubeClient,
 		serviceaccount.DefaultServiceAccountsControllerOptions(),
+	).Run()
+
+	opts := secret.DefaultSecretsControllerOptions()
+	opts.SecretResync = s.SecretSyncPeriod
+	secret.NewSecretsController(
+		kubeClient,
+		opts,
 	).Run()
 
 	select {}

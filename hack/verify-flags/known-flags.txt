@@ -204,6 +204,7 @@ run-proxy
 runtime-config
 scheduler-config
 secure-port
+secret-sync-period
 service-account-key-file
 service-account-lookup
 service-account-private-key-file

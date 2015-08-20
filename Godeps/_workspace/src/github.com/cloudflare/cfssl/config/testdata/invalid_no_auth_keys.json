@@ -1,0 +1,23 @@
+{
+	"signing": {
+		"profiles": {
+			"CA": {
+				"remote": "localhost",
+				"auth_key": "garbage"
+			},
+			"email": {
+				"usages": ["s/mime"],
+				"expiry": "720h"
+			}
+		},
+		"default": {
+			"usages": ["digital signature", "email protection"],
+			"expiry": "8000h"
+		}
+	},
+	"auth_keys": {
+	},
+	"remotes": {
+		"localhost": "127.0.0.1:8888"
+	}
+}
