@@ -114,17 +114,20 @@ func (t *Tester) TestUpdate(valid runtime.Object, existing, older runtime.Object
 
 // Test deleting an object.
 func (t *Tester) TestDelete(createFn func() runtime.Object, wasGracefulFn func() bool, invalid ...runtime.Object) {
-	t.testDeleteNonExist(createFn)
-	t.testDeleteNoGraceful(createFn, wasGracefulFn)
-	t.testDeleteInvokesValidation(invalid...)
+	t.TestDeleteNonExist(createFn)
+	t.TestDeleteNoGraceful(createFn, wasGracefulFn)
+	t.TestDeleteInvokesValidation(invalid...)
 	// TODO: Test delete namespace mismatch rejection
 	// once #5684 is fixed.
 }
 
 // Test graceful deletion.
 func (t *Tester) TestDeleteGraceful(createFn func() runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
-	t.testDeleteGracefulHasDefault(createFn(), expectedGrace, wasGracefulFn)
-	t.testDeleteGracefulUsesZeroOnNil(createFn(), 0)
+	t.TestDeleteGracefulHasDefault(createFn(), expectedGrace, wasGracefulFn)
+	t.TestDeleteGracefulWithValue(createFn(), expectedGrace, wasGracefulFn)
+	t.TestDeleteGracefulUsesZeroOnNil(createFn(), 0)
+	t.TestDeleteGracefulExtend(createFn(), expectedGrace, wasGracefulFn)
+	t.TestDeleteGracefulImmediate(createFn(), expectedGrace, wasGracefulFn)
 }
 
 // Test getting object.
@@ -298,7 +301,7 @@ func (t *Tester) testUpdateFailsOnVersion(older runtime.Object) {
 // =============================================================================
 // Deletion tests.
 
-func (t *Tester) testDeleteInvokesValidation(invalid ...runtime.Object) {
+func (t *Tester) TestDeleteInvokesValidation(invalid ...runtime.Object) {
 	for i, obj := range invalid {
 		objectMeta := t.getObjectMetaOrFail(obj)
 		ctx := t.TestContext()
@@ -309,7 +312,7 @@ func (t *Tester) testDeleteInvokesValidation(invalid ...runtime.Object) {
 	}
 }
 
-func (t *Tester) testDeleteNonExist(createFn func() runtime.Object) {
+func (t *Tester) TestDeleteNonExist(createFn func() runtime.Object) {
 	existing := createFn()
 	objectMeta := t.getObjectMetaOrFail(existing)
 	context := t.TestContext()
@@ -322,7 +325,10 @@ func (t *Tester) testDeleteNonExist(createFn func() runtime.Object) {
 	})
 }
 
-func (t *Tester) testDeleteNoGraceful(createFn func() runtime.Object, wasGracefulFn func() bool) {
+// =============================================================================
+// Graceful Deletion tests.
+
+func (t *Tester) TestDeleteNoGraceful(createFn func() runtime.Object, wasGracefulFn func() bool) {
 	existing := createFn()
 	objectMeta := t.getObjectMetaOrFail(existing)
 	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
@@ -338,25 +344,142 @@ func (t *Tester) testDeleteNoGraceful(createFn func() runtime.Object, wasGracefu
 	}
 }
 
-// =============================================================================
-// Graceful Deletion tests.
-
-func (t *Tester) testDeleteGracefulHasDefault(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
+func (t *Tester) TestDeleteGracefulHasDefault(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
 	objectMeta := t.getObjectMetaOrFail(existing)
 	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
 	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, &api.DeleteOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name); err != nil {
+	if !wasGracefulFn() {
+		t.Errorf("did not gracefully delete resource")
+		return
+	}
+	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	if err != nil {
 		t.Errorf("unexpected error, object should exist: %v", err)
+		return
+	}
+	objectMeta, err = api.ObjectMetaFor(object)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, object)
+	}
+	if objectMeta.DeletionTimestamp == nil {
+		t.Errorf("did not set deletion timestamp")
+	}
+	if objectMeta.DeletionGracePeriodSeconds == nil {
+		t.Fatalf("did not set deletion grace period seconds")
+	}
+	if *objectMeta.DeletionGracePeriodSeconds != expectedGrace {
+		t.Errorf("actual grace period does not match expected: %d", *objectMeta.DeletionGracePeriodSeconds)
+	}
+}
+
+func (t *Tester) TestDeleteGracefulWithValue(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
+	objectMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
+	}
+
+	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace+2))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 	if !wasGracefulFn() {
 		t.Errorf("did not gracefully delete resource")
 	}
+	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	if err != nil {
+		t.Errorf("unexpected error, object should exist: %v", err)
+	}
+	objectMeta, err = api.ObjectMetaFor(object)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, object)
+	}
+	if objectMeta.DeletionTimestamp == nil {
+		t.Errorf("did not set deletion timestamp")
+	}
+	if objectMeta.DeletionGracePeriodSeconds == nil {
+		t.Fatalf("did not set deletion grace period seconds")
+	}
+	if *objectMeta.DeletionGracePeriodSeconds != expectedGrace+2 {
+		t.Errorf("actual grace period does not match expected: %d", *objectMeta.DeletionGracePeriodSeconds)
+	}
 }
 
-func (t *Tester) testDeleteGracefulUsesZeroOnNil(existing runtime.Object, expectedGrace int64) {
+func (t *Tester) TestDeleteGracefulExtend(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
+	objectMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
+	}
+
+	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !wasGracefulFn() {
+		t.Errorf("did not gracefully delete resource")
+	}
+	// second delete duration is ignored
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace+2))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	if err != nil {
+		t.Errorf("unexpected error, object should exist: %v", err)
+	}
+	objectMeta, err = api.ObjectMetaFor(object)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, object)
+	}
+	if objectMeta.DeletionTimestamp == nil {
+		t.Errorf("did not set deletion timestamp")
+	}
+	if objectMeta.DeletionGracePeriodSeconds == nil {
+		t.Fatalf("did not set deletion grace period seconds")
+	}
+	if *objectMeta.DeletionGracePeriodSeconds != expectedGrace {
+		t.Errorf("actual grace period does not match expected: %d", *objectMeta.DeletionGracePeriodSeconds)
+	}
+}
+
+func (t *Tester) TestDeleteGracefulImmediate(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
+	objectMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
+	}
+
+	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !wasGracefulFn() {
+		t.Errorf("did not gracefully delete resource")
+	}
+	// second delete is immediate, resource is deleted
+	out, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(0))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	_, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	if !errors.IsNotFound(err) {
+		t.Errorf("unexpected error, object should be deleted immediately: %v", err)
+	}
+	objectMeta, err = api.ObjectMetaFor(out)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	if objectMeta.DeletionTimestamp == nil || objectMeta.DeletionGracePeriodSeconds == nil || *objectMeta.DeletionGracePeriodSeconds != 0 {
+		t.Errorf("unexpected deleted meta: %#v", objectMeta)
+	}
+}
+
+func (t *Tester) TestDeleteGracefulUsesZeroOnNil(existing runtime.Object, expectedGrace int64) {
 	objectMeta := t.getObjectMetaOrFail(existing)
 	ctx := api.WithNamespace(t.TestContext(), objectMeta.Namespace)
 	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, nil)
@@ -364,7 +487,7 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(existing runtime.Object, expect
 		t.Errorf("unexpected error: %v", err)
 	}
 	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name); !errors.IsNotFound(err) {
-		t.Errorf("unexpected error, object should exist: %v", err)
+		t.Errorf("unexpected error, object should not exist: %v", err)
 	}
 }
 

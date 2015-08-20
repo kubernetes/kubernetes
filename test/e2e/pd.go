@@ -78,8 +78,8 @@ var _ = Describe("Pod Disks", func() {
 			By("cleaning up PD-RW test environment")
 			// Teardown pods, PD. Ignore errors.
 			// Teardown should do nothing unless test failed.
-			podClient.Delete(host0Pod.Name, nil)
-			podClient.Delete(host1Pod.Name, nil)
+			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
+			podClient.Delete(host1Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, diskName)
 			detachPD(host1Name, diskName)
 			deletePD(diskName)
@@ -98,7 +98,7 @@ var _ = Describe("Pod Disks", func() {
 		Logf("Wrote value: %v", testFileContents)
 
 		By("deleting host0Pod")
-		expectNoError(podClient.Delete(host0Pod.Name, nil), "Failed to delete host0Pod")
+		expectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 
 		By("submitting host1Pod to kubernetes")
 		_, err = podClient.Create(host1Pod)
@@ -113,7 +113,7 @@ var _ = Describe("Pod Disks", func() {
 		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(testFileContents)))
 
 		By("deleting host1Pod")
-		expectNoError(podClient.Delete(host1Pod.Name, nil), "Failed to delete host1Pod")
+		expectNoError(podClient.Delete(host1Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host1Pod")
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
 		deletePDWithRetry(diskName)
@@ -136,9 +136,9 @@ var _ = Describe("Pod Disks", func() {
 			By("cleaning up PD-RO test environment")
 			// Teardown pods, PD. Ignore errors.
 			// Teardown should do nothing unless test failed.
-			podClient.Delete(rwPod.Name, nil)
-			podClient.Delete(host0ROPod.Name, nil)
-			podClient.Delete(host1ROPod.Name, nil)
+			podClient.Delete(rwPod.Name, api.NewDeleteOptions(0))
+			podClient.Delete(host0ROPod.Name, api.NewDeleteOptions(0))
+			podClient.Delete(host1ROPod.Name, api.NewDeleteOptions(0))
 
 			detachPD(host0Name, diskName)
 			detachPD(host1Name, diskName)
@@ -149,7 +149,7 @@ var _ = Describe("Pod Disks", func() {
 		_, err = podClient.Create(rwPod)
 		expectNoError(err, "Failed to create rwPod")
 		expectNoError(framework.WaitForPodRunning(rwPod.Name))
-		expectNoError(podClient.Delete(rwPod.Name, nil), "Failed to delete host0Pod")
+		expectNoError(podClient.Delete(rwPod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 		expectNoError(waitForPDDetach(diskName, host0Name))
 
 		By("submitting host0ROPod to kubernetes")
@@ -165,10 +165,10 @@ var _ = Describe("Pod Disks", func() {
 		expectNoError(framework.WaitForPodRunning(host1ROPod.Name))
 
 		By("deleting host0ROPod")
-		expectNoError(podClient.Delete(host0ROPod.Name, nil), "Failed to delete host0ROPod")
+		expectNoError(podClient.Delete(host0ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host0ROPod")
 
 		By("deleting host1ROPod")
-		expectNoError(podClient.Delete(host1ROPod.Name, nil), "Failed to delete host1ROPod")
+		expectNoError(podClient.Delete(host1ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host1ROPod")
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
 		deletePDWithRetry(diskName)
@@ -190,7 +190,7 @@ var _ = Describe("Pod Disks", func() {
 			By("cleaning up PD-RW test environment")
 			// Teardown pods, PD. Ignore errors.
 			// Teardown should do nothing unless test failed.
-			podClient.Delete(host0Pod.Name, nil)
+			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			detachPD(host0Name, diskName)
 			deletePD(diskName)
 		}()
@@ -221,7 +221,7 @@ var _ = Describe("Pod Disks", func() {
 			verifyPDContentsViaContainer(framework, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			By("deleting host0Pod")
-			expectNoError(podClient.Delete(host0Pod.Name, nil), "Failed to delete host0Pod")
+			expectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
 		}
 
 		By(fmt.Sprintf("deleting PD %q", diskName))

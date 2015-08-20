@@ -21,8 +21,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -88,41 +86,24 @@ func ServeImageOrFail(f *Framework, test string, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		By("Cleaning up the replication controller")
-		rcReaper, err := kubectl.ReaperFor("ReplicationController", f.Client, nil)
-		if err != nil {
+		if err := DeleteRC(f.Client, f.Namespace.Name, controller.Name); err != nil {
 			Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
-		}
-		if _, err = rcReaper.Stop(f.Namespace.Name, controller.Name, 0, nil); err != nil {
-			Logf("Failed to stop replication controller %v: %v.", controller.Name, err)
 		}
 	}()
 
 	// List the pods, making sure we observe all the replicas.
-	listTimeout := time.Minute
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := f.Client.Pods(f.Namespace.Name).List(label, fields.Everything())
-	Expect(err).NotTo(HaveOccurred())
-	t := time.Now()
-	for {
-		Logf("Controller %s: Found %d pods out of %d", name, len(pods.Items), replicas)
-		if len(pods.Items) == replicas {
-			break
-		}
-		if time.Since(t) > listTimeout {
-			Failf("Controller %s: Gave up waiting for %d pods to come up after seeing only %d pods after %v seconds",
-				name, replicas, len(pods.Items), time.Since(t).Seconds())
-		}
-		time.Sleep(5 * time.Second)
-		pods, err = f.Client.Pods(f.Namespace.Name).List(label, fields.Everything())
-		Expect(err).NotTo(HaveOccurred())
-	}
+
+	pods, err := podsCreated(f.Client, f.Namespace.Name, name, replicas)
 
 	By("Ensuring each pod is running")
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		err = f.WaitForPodRunning(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}

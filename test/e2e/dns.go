@@ -158,7 +158,7 @@ func validateDNSResults(f *Framework, pod *api.Pod, fileNames []string) {
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
-		podClient.Delete(pod.Name, nil)
+		podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(pod); err != nil {
 		Failf("Failed to create %s pod: %v", pod.Name, err)

@@ -23,7 +23,7 @@ readonly   red=$(tput setaf 1)
 readonly green=$(tput setaf 2)
 
 kube::test::clear_all() {
-  kubectl delete "${kube_flags[@]}" rc,pods --all
+  kubectl delete "${kube_flags[@]}" rc,pods --all --grace-period=0
 }
 
 kube::test::get_object_assert() {

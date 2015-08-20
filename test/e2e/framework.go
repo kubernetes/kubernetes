@@ -86,6 +86,8 @@ func (f *Framework) afterEach() {
 		// Note that we don't wait for any cleanup to propagate, which means
 		// that if you delete a bunch of pods right before ending your test,
 		// you may or may not see the killing/deletion/cleanup events.
+
+		dumpAllPodInfo(f.Client)
 	}
 
 	// Check whether all nodes are ready after the test.

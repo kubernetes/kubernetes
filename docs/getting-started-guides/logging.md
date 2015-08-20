@@ -182,6 +182,7 @@ spec:
       mountPath: /varlog
     - name: containers
       mountPath: /var/lib/docker/containers
+  terminationGracePeriodSeconds: 30
   volumes:
   - name: varlog
     hostPath:

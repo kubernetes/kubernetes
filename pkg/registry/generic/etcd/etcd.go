@@ -341,6 +341,11 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 	return obj, nil
 }
 
+var (
+	errAlreadyDeleting = fmt.Errorf("abort delete")
+	errDeleteNow       = fmt.Errorf("delete now")
+)
+
 // Delete removes the item from etcd.
 func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
 	key, err := e.KeyFunc(ctx, name)
@@ -367,13 +372,41 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	if pendingGraceful {
 		return e.finalizeDelete(obj, false)
 	}
-	if graceful && *options.GracePeriodSeconds != 0 {
+	if graceful {
 		trace.Step("Graceful deletion")
 		out := e.NewFunc()
-		if err := e.Storage.Set(key, obj, out, uint64(*options.GracePeriodSeconds)); err != nil {
+		lastGraceful := int64(0)
+		err := e.Storage.GuaranteedUpdate(
+			key, out, false,
+			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+				graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
+				if err != nil {
+					return nil, err
+				}
+				if pendingGraceful {
+					return nil, errAlreadyDeleting
+				}
+				if !graceful {
+					return nil, errDeleteNow
+				}
+				lastGraceful = *options.GracePeriodSeconds
+				return existing, nil
+			}),
+		)
+		switch err {
+		case nil:
+			if lastGraceful > 0 {
+				return out, nil
+			}
+			// fall through and delete immediately
+		case errDeleteNow:
+			// we've updated the object to have a zero grace period, or it's already at 0, so
+			// we should fall through and truly delete the object.
+		case errAlreadyDeleting:
+			return e.finalizeDelete(obj, true)
+		default:
 			return nil, etcderr.InterpretUpdateError(err, e.EndpointName, name)
 		}
-		return e.finalizeDelete(out, true)
 	}
 
 	// delete immediately, or no graceful deletion supported

@@ -232,7 +232,7 @@ var deleteNow string = `
 {
   "kind": "DeleteOptions",
   "apiVersion": "` + testapi.Version() + `",
-  "gracePeriodSeconds": null%s
+  "gracePeriodSeconds": 0%s
 }
 `
 

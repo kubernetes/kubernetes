@@ -329,7 +329,8 @@ var _ = Describe("Services", func() {
 		ns := namespaces[0]
 		numPods, servicePort := 3, 80
 
-		defer func() { expectNoError(stopServeHostnameService(c, ns, "service1")) }()
+		By("Creating a service and verifying it serves the right pods")
+		//defer func() { expectNoError(stopServeHostnameService(c, ns, "service1")) }()
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
 
 		hosts, err := NodeSSHHosts(c)
@@ -342,22 +343,27 @@ var _ = Describe("Services", func() {
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
 
 		// Restart apiserver
+		dumpAllPodInfo(c)
+		By("Restarting the apiserver and checking that the service has the right pods")
 		if err := restartApiserver(); err != nil {
 			Failf("error restarting apiserver: %v", err)
 		}
 		if err := waitForApiserverUp(c); err != nil {
 			Failf("error while waiting for apiserver up: %v", err)
 		}
+		dumpAllPodInfo(c)
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
 
+		By("Creating a new service and check it's not reusing an IP")
 		// Create a new service and check if it's not reusing IP.
-		defer func() { expectNoError(stopServeHostnameService(c, ns, "service2")) }()
+		//defer func() { expectNoError(stopServeHostnameService(c, ns, "service2")) }()
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
 
 		if svc1IP == svc2IP {
 			Failf("VIPs conflict: %v", svc1IP)
 		}
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
+		By("Verifying the second service pods are available")
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
 	})
 
@@ -1319,10 +1325,10 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	}
 
 	for i := range createdPods {
+		Logf("Service pod created %s %s: %v", name, createdPods[i].Name, createdPods[i].DeletionTimestamp)
 		podNames[i] = createdPods[i].ObjectMeta.Name
 	}
 	sort.StringSlice(podNames).Sort()
-
 	service, err := c.Services(ns).Get(name)
 	if err != nil {
 		return podNames, "", err
@@ -1331,6 +1337,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		return podNames, "", fmt.Errorf("Service IP is blank for %v", name)
 	}
 	serviceIP := service.Spec.ClusterIP
+	Logf("Service %s (%s) found names: %v", name, serviceIP, podNames)
 	return podNames, serviceIP, nil
 }
 
@@ -1341,6 +1348,7 @@ func stopServeHostnameService(c *client.Client, ns, name string) error {
 	if err := c.Services(ns).Delete(name); err != nil {
 		return err
 	}
+	Logf("Stopped service %s", name)
 	return nil
 }
 
@@ -1372,7 +1380,7 @@ func verifyServeHostnameServiceUp(c *client.Client, host string, expectedPods []
 				passed = true
 				break
 			}
-			Logf("Expected pods: %v, got: %v", expectedPods, pods)
+			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, pods)
 		}
 		if !passed {
 			return fmt.Errorf("service verification failed for:\n %s", cmd)
