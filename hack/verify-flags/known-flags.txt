@@ -31,6 +31,7 @@ certificate-authority
 cgroup-prefix
 cgroup-root
 chaos-chance
+cleanup-iptables
 client-ca-file
 client-certificate
 client-key
