@@ -211,6 +211,10 @@
 			"Rev": "588cb435e59ee8b6c2795482887755841ad67207"
 		},
 		{
+			"ImportPath": "github.com/go-ldap/ldap",
+			"Rev": "12f28659a82ac70ca6f3fafd977c0e2fdc144f53"
+		},
+		{
 			"ImportPath": "github.com/godbus/dbus",
 			"Comment": "0-7-g939230d",
 			"Rev": "939230d2086a4f1870e04c52e0a376c25bae0ec4"
@@ -320,14 +324,6 @@
 			"ImportPath": "github.com/google/cadvisor/version",
 			"Comment": "0.16.0-51-g78419de",
 			"Rev": "78419de3ea9c2d23cb04ec9d63f8899de34ebd43"
-		},
-		{
-			"ImportPath": "github.com/google/go-github/github",
-			"Rev": "800345634beceb9b499012319eb8bf97fd97a298"
-		},
-		{
-			"ImportPath": "github.com/google/go-querystring/query",
-			"Rev": "547ef5ac979778feb2f760cdb5f4eae1a2207b86"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
@@ -578,6 +574,10 @@
 		{
 			"ImportPath": "google.golang.org/cloud/internal",
 			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
+		},
+		{
+			"ImportPath": "gopkg.in/asn1-ber.v1",
+			"Rev": "9eae18c3681ae3d3c677ac2b80a8fe57de45fc09"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",

@@ -27,13 +27,14 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/keystone"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/ldap"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 )
 
 // NewAuthenticator returns an authenticator.Request or an error
-func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyFile string, serviceAccountLookup bool, storage storage.Interface, keystoneURL string) (authenticator.Request, error) {
+func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyFile string, serviceAccountLookup bool, storage storage.Interface, keystoneURL string, ldapConfigFile string) (authenticator.Request, error) {
 	var authenticators []authenticator.Request
 
 	if len(basicAuthFile) > 0 {
@@ -74,6 +75,13 @@ func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyF
 			return nil, err
 		}
 		authenticators = append(authenticators, keystoneAuth)
+	}
+	if len(ldapConfigFile) > 0 {
+		ldapAuth, err := newLdapAuthenticator(ldapConfigFile)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, ldapAuth)
 	}
 
 	switch len(authenticators) {
@@ -151,4 +159,14 @@ func newAuthenticatorFromKeystoneURL(keystoneConfigFile string) (authenticator.R
 	}
 
 	return basicauth.New(keystoneAuthenticator), nil
+}
+
+// newAuthenticatorFromTokenFile returns an authenticator.Request or an error
+func newLdapAuthenticator(ldapConfigFile string) (authenticator.Request, error) {
+	LDAPAuthenticator, err := ldap.New(ldapConfigFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return basicauth.New(LDAPAuthenticator), nil
 }

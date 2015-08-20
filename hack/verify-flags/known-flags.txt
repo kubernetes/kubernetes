@@ -76,6 +76,7 @@ executor-path
 executor-suicide-timeout
 experimental-keystone-url
 experimental-prefix
+experimental-ldap-config
 external-hostname
 failover-timeout
 file-check-frequency
