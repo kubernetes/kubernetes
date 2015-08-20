@@ -61,6 +61,7 @@ type ProxyServer struct {
 	ForceUserspaceProxy bool
 	SyncPeriod          time.Duration
 	nodeRef             *api.ObjectReference // Reference to this node.
+	MasqueradeAll       bool
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -88,6 +89,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.BoolVar(&s.ForceUserspaceProxy, "legacy-userspace-proxy", true, "Use the legacy userspace proxy (instead of the pure iptables proxy).")
 	fs.DurationVar(&s.SyncPeriod, "iptables-sync-period", 5*time.Second, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
@@ -160,7 +162,7 @@ func (s *ProxyServer) Run(_ []string) error {
 		glog.V(2).Info("Using iptables Proxier.")
 
 		execer := exec.New()
-		proxierIptables, err := iptables.NewProxier(utiliptables.New(execer, protocol), execer, s.SyncPeriod)
+		proxierIptables, err := iptables.NewProxier(utiliptables.New(execer, protocol), execer, s.SyncPeriod, s.MasqueradeAll)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
