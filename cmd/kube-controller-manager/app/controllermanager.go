@@ -272,7 +272,7 @@ func (s *CMServer) Run(_ []string) error {
 	// if err != nil {
 	// 	glog.Fatalf("Invalid API configuration: %v", err)
 	// }
-	// horizontalPodAutoscalerController := autoscalercontroller.New(expClient)
+	// horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, expClient)
 	// horizontalPodAutoscalerController.Run(s.NodeSyncPeriod)
 
 	select {}
