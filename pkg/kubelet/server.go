@@ -36,6 +36,7 @@ import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
@@ -151,7 +152,8 @@ func (s *Server) InstallDefaultHandlers() {
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
 		To(s.getNodeStats).
-		Operation("getNodeStats"))
+		Operation("getNodeStats").
+		Writes(v1.NodeStats{}))
 	s.restfulCont.Add(ws)
 
 	ws = new(restful.WebService)
