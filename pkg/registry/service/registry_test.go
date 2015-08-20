@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
@@ -37,8 +37,8 @@ import (
 )
 
 func NewTestEtcdRegistry(client tools.EtcdClient) (Registry, *etcdservice.REST) {
-	storage := etcdstorage.NewEtcdStorage(client, latest.Codec, etcdtest.PathPrefix())
-	rest := etcdservice.NewStorage(storage)
+	storage := etcdstorage.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix())
+	rest := etcdservice.NewREST(storage)
 	registry := NewRegistry(rest)
 	return registry, rest
 }
@@ -87,10 +87,10 @@ func TestEtcdListServices(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, makeTestService("foo")),
+						Value: runtime.EncodeOrDie(testapi.Codec(), makeTestService("foo")),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, makeTestService("bar")),
+						Value: runtime.EncodeOrDie(testapi.Codec(), makeTestService("bar")),
 					},
 				},
 			},
@@ -124,7 +124,7 @@ func TestEtcdCreateService(t *testing.T) {
 	}
 
 	var service api.Service
-	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &service)
+	err = testapi.Codec().DecodeInto([]byte(resp.Node.Value), &service)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
 	registry, rest := NewTestEtcdRegistry(fakeClient)
 	key, _ := rest.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, makeTestService("foo")), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), makeTestService("foo")), 0)
 	_, err := registry.CreateService(ctx, makeTestService("foo"))
 	if !errors.IsAlreadyExists(err) {
 		t.Errorf("expected already exists err, got %#v", err)
@@ -161,8 +161,8 @@ func TestEtcdGetServiceDifferentNamespace(t *testing.T) {
 	key1 = etcdtest.AddPrefix(key1)
 	key2 = etcdtest.AddPrefix(key2)
 
-	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Namespace: "default", Name: "foo"}}), 0)
-	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Namespace: "other", Name: "foo"}}), 0)
+	fakeClient.Set(key1, runtime.EncodeOrDie(testapi.Codec(), &api.Service{ObjectMeta: api.ObjectMeta{Namespace: "default", Name: "foo"}}), 0)
+	fakeClient.Set(key2, runtime.EncodeOrDie(testapi.Codec(), &api.Service{ObjectMeta: api.ObjectMeta{Namespace: "other", Name: "foo"}}), 0)
 
 	service1, err := registry.GetService(ctx1, "foo")
 	if err != nil {
@@ -194,7 +194,7 @@ func TestEtcdGetService(t *testing.T) {
 	registry, rest := NewTestEtcdRegistry(fakeClient)
 	key, _ := rest.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, makeTestService("foo")), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), makeTestService("foo")), 0)
 	service, err := registry.GetService(ctx, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -229,10 +229,10 @@ func TestEtcdDeleteService(t *testing.T) {
 	registry, _ := NewTestEtcdRegistry(fakeClient)
 	key, _ := etcdgeneric.NamespaceKeyFunc(ctx, "/services/specs", "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, makeTestService("foo")), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), makeTestService("foo")), 0)
 	path, _ := etcdgeneric.NamespaceKeyFunc(ctx, "/services/endpoints", "foo")
 	endpointsKey := etcdtest.AddPrefix(path)
-	fakeClient.Set(endpointsKey, runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
+	fakeClient.Set(endpointsKey, runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 
 	err := registry.DeleteService(ctx, "foo")
 	if err != nil {
@@ -254,7 +254,7 @@ func TestEtcdUpdateService(t *testing.T) {
 	registry, rest := NewTestEtcdRegistry(fakeClient)
 	key, _ := rest.KeyFunc(ctx, "uniquefoo")
 	key = etcdtest.AddPrefix(key)
-	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, makeTestService("uniquefoo")), 0)
+	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), makeTestService("uniquefoo")), 0)
 	testService := api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "uniquefoo",

@@ -27,13 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for resourcequotas against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewStorage returns a RESTStorage object that will work against ResourceQuota objects.
-func NewStorage(s storage.Interface) (*REST, *StatusREST) {
+// NewREST returns a RESTStorage object that will work against resource quotas.
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
 	prefix := "/resourcequotas"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
@@ -52,12 +51,12 @@ func NewStorage(s storage.Interface) (*REST, *StatusREST) {
 		},
 		EndpointName: "resourcequotas",
 
+		CreateStrategy:      resourcequota.Strategy,
+		UpdateStrategy:      resourcequota.Strategy,
+		ReturnDeletedObject: true,
+
 		Storage: s,
 	}
-
-	store.CreateStrategy = resourcequota.Strategy
-	store.UpdateStrategy = resourcequota.Strategy
-	store.ReturnDeletedObject = true
 
 	statusStore := *store
 	statusStore.UpdateStrategy = resourcequota.StatusStrategy

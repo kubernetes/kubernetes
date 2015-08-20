@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for pod templates against etcd
 type REST struct {
 	etcdgeneric.Etcd
 }
@@ -58,6 +57,5 @@ func NewREST(s storage.Interface) *REST {
 
 		Storage: s,
 	}
-
 	return &REST{store}
 }

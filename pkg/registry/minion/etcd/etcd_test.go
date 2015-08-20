@@ -22,24 +22,17 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 
 	"github.com/coreos/go-etcd/etcd"
-)
-
-const (
-	PASS = iota
-	FAIL
 )
 
 type fakeConnectionInfoGetter struct {
@@ -49,17 +42,10 @@ func (fakeConnectionInfoGetter) GetConnectionInfo(host string) (string, uint, ht
 	return "http", 12345, nil, nil
 }
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
-}
-
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	fakeEtcdClient, s := newEtcdStorage(t)
-	storage, _ := NewStorage(s, fakeConnectionInfoGetter{})
-	return storage, fakeEtcdClient
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	storage, _ := NewREST(etcdStorage, fakeConnectionInfoGetter{})
+	return storage, fakeClient
 }
 
 func validNewNode() *api.Node {
@@ -89,8 +75,8 @@ func validChangedNode() *api.Node {
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	node := validNewNode()
 	node.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
@@ -105,17 +91,17 @@ func TestCreate(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	ctx := api.NewContext()
-	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 
 	node := validChangedNode()
 	key, _ := storage.KeyFunc(ctx, node.Name)
 	key = etcdtest.AddPrefix(key)
 	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(latest.Codec, node),
+					Value:         runtime.EncodeOrDie(testapi.Codec(), node),
 					ModifiedIndex: 1,
 				},
 			},
@@ -123,10 +109,10 @@ func TestDelete(t *testing.T) {
 		return node
 	}
 	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
+		if fakeClient.Data[key].R.Node == nil {
 			return false
 		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
+		return fakeClient.Data[key].R.Node.TTL == 30
 	}
 	test.TestDelete(createFn, gracefulSetFn)
 }
@@ -160,7 +146,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, node.Name)
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, validNewNode()), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewNode()), 0)
 
 	_, _, err := storage.Update(ctx, node)
 	if err != nil {
@@ -172,7 +158,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var nodeOut api.Node
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &nodeOut)
+	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &nodeOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -189,7 +175,7 @@ func TestEtcdDeleteNode(t *testing.T) {
 	node := validNewNode()
 	key, _ := storage.KeyFunc(ctx, node.Name)
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, node), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), node), 0)
 	_, err := storage.Delete(ctx, node.Name, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -245,7 +231,7 @@ func TestEtcdWatchNodesMatch(t *testing.T) {
 	}
 	fakeClient.WaitForWatchCompletion()
 
-	nodeBytes, _ := latest.Codec.Encode(node)
+	nodeBytes, _ := testapi.Codec().Encode(node)
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "create",
 		Node: &etcd.Node{
@@ -278,7 +264,7 @@ func TestEtcdWatchNodesNotMatch(t *testing.T) {
 	}
 	fakeClient.WaitForWatchCompletion()
 
-	nodeBytes, _ := latest.Codec.Encode(node)
+	nodeBytes, _ := testapi.Codec().Encode(node)
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "create",
 		Node: &etcd.Node{

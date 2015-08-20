@@ -20,13 +20,11 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
@@ -34,17 +32,10 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
-}
-
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient, s := newEtcdStorage(t)
-	storage, _, _ := NewStorage(s)
-	return storage, fakeEtcdClient, s
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	storage, _, _ := NewREST(etcdStorage)
+	return storage, fakeClient
 }
 
 func validNewNamespace() *api.Namespace {
@@ -65,14 +56,13 @@ func validChangedNamespace() *api.Namespace {
 }
 
 func TestStorage(t *testing.T) {
-	storage, _, _ := newStorage(t)
+	storage, _ := newStorage(t)
 	namespace.NewRegistry(storage)
 }
 
 func TestCreate(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage, _, _ := NewStorage(etcdStorage)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	namespace := validNewNamespace()
 	namespace.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
@@ -95,23 +85,19 @@ func expectNamespace(t *testing.T, out runtime.Object) (*api.Namespace, bool) {
 }
 
 func TestCreateSetsFields(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage, _, _ := NewStorage(etcdStorage)
+	storage, fakeClient := newStorage(t)
 	namespace := validNewNamespace()
-	_, err := storage.Create(api.NewContext(), namespace)
-	if err != fakeEtcdClient.Err {
+	ctx := api.NewContext()
+	_, err := storage.Create(ctx, namespace)
+	if err != fakeClient.Err {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	actual := &api.Namespace{}
-	ctx := api.NewContext()
-	key, err := storage.Etcd.KeyFunc(ctx, "foo")
+	object, err := storage.Get(ctx, "foo")
 	if err != nil {
-		t.Fatalf("unexpected key error: %v", err)
+		t.Errorf("unexpected error: %v", err)
 	}
-	if err := etcdStorage.Get(key, actual, false); err != nil {
-		t.Fatalf("unexpected extraction error: %v", err)
-	}
+	actual := object.(*api.Namespace)
 	if actual.Name != namespace.Name {
 		t.Errorf("unexpected namespace: %#v", actual)
 	}
@@ -124,18 +110,17 @@ func TestCreateSetsFields(t *testing.T) {
 }
 
 func TestNamespaceDecode(t *testing.T) {
-	_, etcdStorage := newEtcdStorage(t)
-	storage, _, _ := NewStorage(etcdStorage)
+	storage, _ := newStorage(t)
 	expected := validNewNamespace()
 	expected.Status.Phase = api.NamespaceActive
 	expected.Spec.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
-	body, err := latest.Codec.Encode(expected)
+	body, err := testapi.Codec().Encode(expected)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	actual := storage.New()
-	if err := latest.Codec.DecodeInto(body, actual); err != nil {
+	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -145,38 +130,37 @@ func TestNamespaceDecode(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	namespace := validNewNamespace()
 	test.TestGet(namespace)
 }
 
 func TestList(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
 	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
 	namespace := validNewNamespace()
 	test.TestList(
 		namespace,
 		func(objects []runtime.Object) []runtime.Object {
-			return registrytest.SetObjectsForKey(fakeEtcdClient, key, objects)
+			return registrytest.SetObjectsForKey(fakeClient, key, objects)
 		},
 		func(resourceVersion uint64) {
-			registrytest.SetResourceVersion(fakeEtcdClient, resourceVersion)
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
 		})
 }
 
 func TestDeleteNamespace(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	fakeEtcdClient.ChangeIndex = 1
-	storage, _, _ := NewStorage(etcdStorage)
+	storage, fakeClient := newStorage(t)
+	fakeClient.ChangeIndex = 1
 	ctx := api.NewContext()
 	key, err := storage.Etcd.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
+				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Namespace{
 					ObjectMeta: api.ObjectMeta{
 						Name: "foo",
 					},
@@ -195,14 +179,14 @@ func TestDeleteNamespace(t *testing.T) {
 }
 
 func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
-	now := util.Now()
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	fakeEtcdClient.ChangeIndex = 1
+	storage, fakeClient := newStorage(t)
+	fakeClient.ChangeIndex = 1
 	key := etcdtest.AddPrefix("/namespaces/foo")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+	now := util.Now()
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
+				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Namespace{
 					ObjectMeta: api.ObjectMeta{
 						Name:              "foo",
 						DeletionTimestamp: &now,
@@ -217,7 +201,6 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewStorage(etcdStorage)
 	_, err := storage.Delete(api.NewContext(), "foo", nil)
 	if err == nil {
 		t.Fatalf("expected error: %v", err)
@@ -225,14 +208,14 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 }
 
 func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
-	now := util.Now()
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	fakeEtcdClient.ChangeIndex = 1
+	storage, fakeClient := newStorage(t)
+	fakeClient.ChangeIndex = 1
 	key := etcdtest.AddPrefix("/namespaces/foo")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+	now := util.Now()
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
+				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Namespace{
 					ObjectMeta: api.ObjectMeta{
 						Name:              "foo",
 						DeletionTimestamp: &now,
@@ -247,7 +230,6 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewStorage(etcdStorage)
 	_, err := storage.Delete(api.NewContext(), "foo", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -28,14 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for horizontal pod autoscalers against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
 func NewREST(s storage.Interface) *REST {
-	var prefix = "/horizontalpodautoscalers"
+	prefix := "/horizontalpodautoscalers"
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &expapi.HorizontalPodAutoscaler{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
@@ -68,6 +67,5 @@ func NewREST(s storage.Interface) *REST {
 
 		Storage: s,
 	}
-
 	return &REST{store}
 }

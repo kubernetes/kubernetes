@@ -20,13 +20,11 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
@@ -34,12 +32,10 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	storage, statusStorage := NewStorage(etcdStorage)
-	return storage, statusStorage, fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	storage, statusStorage := NewREST(etcdStorage)
+	return storage, statusStorage, fakeClient
 }
 
 func validNewPersistentVolumeClaim(name, ns string) *api.PersistentVolumeClaim {
@@ -70,9 +66,8 @@ func validChangedPersistentVolumeClaim() *api.PersistentVolumeClaim {
 }
 
 func TestCreate(t *testing.T) {
-
-	registry, _, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, registry, fakeEtcdClient.SetError)
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	pv := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	pv.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -87,17 +82,17 @@ func TestCreate(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, _, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, _, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 
 	pv := validChangedPersistentVolumeClaim()
 	key, _ := storage.KeyFunc(ctx, pv.Name)
 	key = etcdtest.AddPrefix(key)
 	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(latest.Codec, pv),
+					Value:         runtime.EncodeOrDie(testapi.Codec(), pv),
 					ModifiedIndex: 1,
 				},
 			},
@@ -105,23 +100,23 @@ func TestDelete(t *testing.T) {
 		return pv
 	}
 	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
+		if fakeClient.Data[key].R.Node == nil {
 			return false
 		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
+		return fakeClient.Data[key].R.Node.TTL == 30
 	}
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
 func TestEtcdGetPersistentVolumeClaims(t *testing.T) {
-	storage, _, fakeClient, _ := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
 	claim := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	test.TestGet(claim)
 }
 
 func TestEtcdListPersistentVolumeClaims(t *testing.T) {
-	storage, _, fakeClient, _ := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
 	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
 	claim := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
@@ -136,15 +131,15 @@ func TestEtcdListPersistentVolumeClaims(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimsDecode(t *testing.T) {
-	registry, _, _, _ := newStorage(t)
+	storage, _, _ := newStorage(t)
 	expected := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
-	body, err := latest.Codec.Encode(expected)
+	body, err := testapi.Codec().Encode(expected)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	actual := registry.New()
-	if err := latest.Codec.DecodeInto(body, actual); err != nil {
+	actual := storage.New()
+	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -155,14 +150,14 @@ func TestPersistentVolumeClaimsDecode(t *testing.T) {
 
 func TestEtcdUpdatePersistentVolumeClaims(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, _, fakeClient, _ := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	persistentVolume := validChangedPersistentVolumeClaim()
 
-	key, _ := registry.KeyFunc(ctx, "foo")
+	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, validNewPersistentVolumeClaim("foo", api.NamespaceDefault)), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), validNewPersistentVolumeClaim("foo", api.NamespaceDefault)), 0)
 
-	_, _, err := registry.Update(ctx, persistentVolume)
+	_, _, err := storage.Update(ctx, persistentVolume)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -172,7 +167,7 @@ func TestEtcdUpdatePersistentVolumeClaims(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var persistentVolumeOut api.PersistentVolumeClaim
-	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &persistentVolumeOut)
+	err = testapi.Codec().DecodeInto([]byte(response.Node.Value), &persistentVolumeOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -185,36 +180,36 @@ func TestEtcdUpdatePersistentVolumeClaims(t *testing.T) {
 
 func TestDeletePersistentVolumeClaims(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, _, fakeClient, _ := newStorage(t)
+	storage, _, fakeClient := newStorage(t)
 	pvClaim := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	name := pvClaim.Name
-	key, _ := registry.KeyFunc(ctx, name)
+	key, _ := storage.KeyFunc(ctx, name)
 	key = etcdtest.AddPrefix(key)
 	fakeClient.ChangeIndex = 1
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(latest.Codec, pvClaim),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), pvClaim),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
 		},
 	}
-	_, err := registry.Delete(ctx, name, nil)
+	_, err := storage.Delete(ctx, name, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestEtcdUpdateStatus(t *testing.T) {
-	storage, statusStorage, fakeClient, etcdStorage := newStorage(t)
+	storage, statusStorage, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	pvcStart := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, pvcStart), 1)
+	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), pvcStart), 1)
 
 	pvc := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
@@ -244,12 +239,11 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	var pvcOut api.PersistentVolumeClaim
-	key, _ = storage.KeyFunc(ctx, "foo")
-	if err := etcdStorage.Get(key, &pvcOut, false); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	pvcOut, err := storage.Get(ctx, "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepEqual(expected, pvcOut) {
-		t.Errorf("unexpected object: %s", util.ObjectDiff(expected, pvcOut))
+	if !api.Semantic.DeepEqual(&expected, pvcOut) {
+		t.Errorf("unexpected object: %s", util.ObjectDiff(&expected, pvcOut))
 	}
 }

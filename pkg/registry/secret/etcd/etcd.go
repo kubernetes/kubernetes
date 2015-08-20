@@ -27,13 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// REST implements a RESTStorage for secrets against etcd
 type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewStorage returns a registry which will store Secret in the given etcdStorage
-func NewStorage(s storage.Interface) *REST {
+// NewREST returns a RESTStorage object that will work against secrets.
+func NewREST(s storage.Interface) *REST {
 	prefix := "/secrets"
 
 	store := &etcdgeneric.Etcd{
@@ -53,11 +52,10 @@ func NewStorage(s storage.Interface) *REST {
 		},
 		EndpointName: "secrets",
 
+		CreateStrategy: secret.Strategy,
+		UpdateStrategy: secret.Strategy,
+
 		Storage: s,
 	}
-
-	store.CreateStrategy = secret.Strategy
-	store.UpdateStrategy = secret.Strategy
-
 	return &REST{store}
 }
