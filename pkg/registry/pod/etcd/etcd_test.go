@@ -143,8 +143,10 @@ func TestDelete(t *testing.T) {
 	key = etcdtest.AddPrefix(key)
 	test := resttest.New(t, storage, fakeClient.SetError)
 
+	expectedNode := "some-node"
 	createFn := func() runtime.Object {
 		pod := validChangedPod()
+		pod.Spec.NodeName = expectedNode
 		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
@@ -159,8 +161,17 @@ func TestDelete(t *testing.T) {
 		if fakeClient.Data[key].R.Node == nil {
 			return false
 		}
-		return fakeClient.Data[key].R.Node.TTL == 30
+		obj, err := testapi.Codec().Decode([]byte(fakeClient.Data[key].R.Node.Value))
+		if err != nil {
+			return false
+		}
+		pod := obj.(*api.Pod)
+		t.Logf("found object %#v", pod.ObjectMeta)
+		return pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds != 0
 	}
+	test.TestDeleteGraceful(createFn, 30, gracefulSetFn)
+
+	expectedNode = ""
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
