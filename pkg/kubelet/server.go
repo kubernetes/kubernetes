@@ -393,8 +393,16 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		return
 	}
 
-	follow, _ := strconv.ParseBool(request.QueryParameter("follow"))
-	previous, _ := strconv.ParseBool(request.QueryParameter("previous"))
+	follow, err := boolQueryParameter(request, "follow", false)
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	previous, err := boolQueryParameter(request, "previous", false)
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
 	tail := request.QueryParameter("tail")
 
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
@@ -421,7 +429,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	fw := flushwriter.Wrap(response)
 	response.Header().Set("Transfer-Encoding", "chunked")
 	response.WriteHeader(http.StatusOK)
-	err := s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, tail, follow, previous, fw, fw)
+	err = s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, tail, follow, previous, fw, fw)
 	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
