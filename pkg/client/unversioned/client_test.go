@@ -54,6 +54,7 @@ type Response struct {
 
 type testClient struct {
 	*Client
+	*ExperimentalClient
 	Request  testRequest
 	Response Response
 	Error    bool
@@ -82,6 +83,16 @@ func (c *testClient) Setup() *testClient {
 			version = testapi.Version()
 		}
 		c.Client = NewOrDie(&Config{
+			Host:    c.server.URL,
+			Version: version,
+		})
+	}
+	if c.ExperimentalClient == nil {
+		version := c.Version
+		if len(version) == 0 {
+			version = testapi.Version()
+		}
+		c.ExperimentalClient = NewExperimentalOrDie(&Config{
 			Host:    c.server.URL,
 			Version: version,
 		})
