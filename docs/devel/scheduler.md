@@ -42,13 +42,13 @@ indicating where the Pod should be scheduled.
 
 The scheduler tries to find a node for each Pod, one at a time, as it notices
 these Pods via watch. There are three steps. First it applies a set of "predicates" that filter out
-inappropriate nodes. For example, if the PodSpec specifies resource limits, then the scheduler
+inappropriate nodes. For example, if the PodSpec specifies resource requests, then the scheduler
 will filter out nodes that don't have at least that much resources available (computed
-as the capacity of the node minus the sum of the resource limits of the containers that
+as the capacity of the node minus the sum of the resource requests of the containers that
 are already running on the node). Second, it applies a set of "priority functions"
 that rank the nodes that weren't filtered out by the predicate check. For example,
 it tries to spread Pods across nodes while at the same time favoring the least-loaded
-nodes (where "load" here is sum of the resource limits of the containers running on the node,
+nodes (where "load" here is sum of the resource requests of the containers running on the node,
 divided by the node's capacity).
 Finally, the node with the highest priority is chosen
 (or, if there are multiple such nodes, then one of them is chosen at random). The code
