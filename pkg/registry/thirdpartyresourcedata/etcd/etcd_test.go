@@ -40,41 +40,37 @@ var codec runtime.Codec
 
 func init() {
 	// Ensure that expapi/v1 packege is used, so that it will get initialized and register HorizontalPodAutoscaler object.
-	_ = v1.ThirdPartyResource{}
+	_ = v1.ThirdPartyResourceData{}
 }
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, storage.Interface) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
 	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	storage := NewREST(etcdStorage)
+	storage := NewREST(etcdStorage, "foo", "bar")
 	return storage, fakeEtcdClient, etcdStorage
 }
 
-func validNewThirdPartyResource(name string) *expapi.ThirdPartyResource {
-	return &expapi.ThirdPartyResource{
+func validNewThirdPartyResourceData(name string) *expapi.ThirdPartyResourceData {
+	return &expapi.ThirdPartyResourceData{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Versions: []expapi.APIVersion{
-			{
-				Name: "stable/v1",
-			},
-		},
+		Data: []byte("foobarbaz"),
 	}
 }
 
 func TestCreate(t *testing.T) {
 	storage, fakeEtcdClient, _ := newStorage(t)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	rsrc := validNewThirdPartyResource("foo")
+	rsrc := validNewThirdPartyResourceData("foo")
 	rsrc.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		rsrc,
 		// invalid
-		&expapi.ThirdPartyResource{},
+		&expapi.ThirdPartyResourceData{},
 	)
 }
 
@@ -88,14 +84,14 @@ func TestUpdate(t *testing.T) {
 	key = etcdtest.AddPrefix(key)
 	fakeEtcdClient.ExpectNotFoundGet(key)
 	fakeEtcdClient.ChangeIndex = 2
-	rsrc := validNewThirdPartyResource("foo")
-	existing := validNewThirdPartyResource("exists")
+	rsrc := validNewThirdPartyResourceData("foo")
+	existing := validNewThirdPartyResourceData("exists")
 	existing.Namespace = test.TestNamespace()
 	obj, err := storage.Create(test.TestContext(), existing)
 	if err != nil {
 		t.Fatalf("unable to create object: %v", err)
 	}
-	older := obj.(*expapi.ThirdPartyResource)
+	older := obj.(*expapi.ThirdPartyResourceData)
 	older.ResourceVersion = "1"
 	test.TestUpdate(
 		rsrc,
@@ -104,37 +100,10 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
-func TestDelete(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	rsrc := validNewThirdPartyResource("foo2")
-	key, _ := storage.KeyFunc(ctx, "foo2")
-	key = etcdtest.AddPrefix(key)
-	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(testapi.Codec(), rsrc),
-					ModifiedIndex: 1,
-				},
-			},
-		}
-		return rsrc
-	}
-	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
-			return false
-		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
-	}
-	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
-}
-
 func TestGet(t *testing.T) {
 	storage, fakeEtcdClient, _ := newStorage(t)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	rsrc := validNewThirdPartyResource("foo")
+	rsrc := validNewThirdPartyResourceData("foo")
 	test.TestGet(rsrc)
 }
 
@@ -152,10 +121,10 @@ func TestEmptyList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(rsrcList.(*expapi.ThirdPartyResourceList).Items) != 0 {
+	if len(rsrcList.(*expapi.ThirdPartyResourceDataList).Items) != 0 {
 		t.Errorf("Unexpected non-zero autoscaler list: %#v", rsrcList)
 	}
-	if rsrcList.(*expapi.ThirdPartyResourceList).ResourceVersion != "1" {
+	if rsrcList.(*expapi.ThirdPartyResourceDataList).ResourceVersion != "1" {
 		t.Errorf("Unexpected resource version: %#v", rsrcList)
 	}
 }
@@ -171,12 +140,12 @@ func TestList(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.ThirdPartyResource{
+						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.ThirdPartyResourceData{
 							ObjectMeta: api.ObjectMeta{Name: "foo"},
 						}),
 					},
 					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.ThirdPartyResource{
+						Value: runtime.EncodeOrDie(testapi.Codec(), &expapi.ThirdPartyResourceData{
 							ObjectMeta: api.ObjectMeta{Name: "bar"},
 						}),
 					},
@@ -188,18 +157,18 @@ func TestList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	rsrcList := obj.(*expapi.ThirdPartyResourceList)
+	rsrcList := obj.(*expapi.ThirdPartyResourceDataList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(rsrcList.Items) != 2 {
-		t.Errorf("Unexpected ThirdPartyResource list: %#v", rsrcList)
+		t.Errorf("Unexpected ThirdPartyResourceData list: %#v", rsrcList)
 	}
 	if rsrcList.Items[0].Name != "foo" {
-		t.Errorf("Unexpected ThirdPartyResource: %#v", rsrcList.Items[0])
+		t.Errorf("Unexpected ThirdPartyResourceData: %#v", rsrcList.Items[0])
 	}
 	if rsrcList.Items[1].Name != "bar" {
-		t.Errorf("Unexpected ThirdPartyResource: %#v", rsrcList.Items[1])
+		t.Errorf("Unexpected ThirdPartyResourceData: %#v", rsrcList.Items[1])
 	}
 }

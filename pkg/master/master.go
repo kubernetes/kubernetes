@@ -72,6 +72,7 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
+	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -771,26 +772,28 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 }
 
 func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
-	thirdparty := m.thirdpartyapi(rsrc)
+	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	if err != nil {
+		return err
+	}
+	thirdparty := m.thirdpartyapi(group, strings.ToLower(kind)+"s", rsrc.Versions[0].Name)
 	if err := thirdparty.InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
-	thirdPartyPrefix := "/thirdparty/" + rsrc.Name + "/"
-	apiRoot := rsrc.Name
+	thirdPartyPrefix := "/thirdparty/" + group + "/"
 	apiserver.AddApiWebService(m.handlerContainer, thirdPartyPrefix, []string{rsrc.Versions[0].Name})
-	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(apiRoot, "/")), RestMapper: thirdparty.Mapper}
+	thirdPartyRequestInfoResolver := &apiserver.APIRequestInfoResolver{APIPrefixes: util.NewStringSet(strings.TrimPrefix(group, "/")), RestMapper: thirdparty.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, thirdPartyRequestInfoResolver, []string{thirdparty.Version})
 	return nil
 }
 
-func (m *Master) thirdpartyapi(rsrc *expapi.ThirdPartyResource) *apiserver.APIGroupVersion {
-	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage)
+func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
+	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, group, kind)
 
-	apiGroup := rsrc.Name
-	apiRoot := "/thirdparty/" + rsrc.Name + "/" + rsrc.Versions[0].Name
+	apiRoot := "/thirdparty/" + group + "/"
 
 	storage := map[string]rest.Storage{
-		apiGroup: resourceStorage,
+		kind: resourceStorage,
 	}
 
 	return &apiserver.APIGroupVersion{
@@ -800,11 +803,11 @@ func (m *Master) thirdpartyapi(rsrc *expapi.ThirdPartyResource) *apiserver.APIGr
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:  explatest.RESTMapper,
+		Mapper:  thirdpartyresourcedata.NewMapper(explatest.RESTMapper, kind),
 		Codec:   explatest.Codec,
 		Linker:  explatest.SelfLinker,
 		Storage: storage,
-		Version: rsrc.Versions[0].Name,
+		Version: version,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

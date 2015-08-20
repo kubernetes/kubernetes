@@ -52,7 +52,7 @@ func (strategy) PrepareForCreate(obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateThirdPartyResource(obj.(*expapi.ThirdPartyResource))
+	return validation.ValidateThirdPartyResourceData(obj.(*expapi.ThirdPartyResourceData))
 }
 
 func (strategy) AllowCreateOnUpdate() bool {
@@ -63,7 +63,7 @@ func (strategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateThirdPartyResourceUpdate(old.(*expapi.ThirdPartyResource), obj.(*expapi.ThirdPartyResource))
+	return validation.ValidateThirdPartyResourceDataUpdate(old.(*expapi.ThirdPartyResourceData), obj.(*expapi.ThirdPartyResourceData))
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {
@@ -73,9 +73,9 @@ func (strategy) AllowUnconditionalUpdate() bool {
 // Matcher returns a generic matcher for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		sa, ok := obj.(*expapi.ThirdPartyResource)
+		sa, ok := obj.(*expapi.ThirdPartyResourceData)
 		if !ok {
-			return false, fmt.Errorf("not a ThirdPartyResource")
+			return false, fmt.Errorf("not a ThirdPartyResourceData")
 		}
 		fields := SelectableFields(sa)
 		return label.Matches(labels.Set(sa.Labels)) && field.Matches(fields), nil
@@ -83,6 +83,6 @@ func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 }
 
 // SelectableFields returns a label set that can be used for filter selection
-func SelectableFields(obj *expapi.ThirdPartyResource) labels.Set {
+func SelectableFields(obj *expapi.ThirdPartyResourceData) labels.Set {
 	return labels.Set{}
 }

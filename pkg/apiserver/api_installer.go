@@ -248,6 +248,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var ctxFn ContextFunc
 	ctxFn = func(req *restful.Request) api.Context {
+		if context == nil {
+			return api.NewContext()
+		}
 		if ctx, ok := context.Get(req.Request); ok {
 			return ctx
 		}
