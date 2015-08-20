@@ -271,11 +271,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 // BindFlags adds any flags that are common to all kubectl sub commands.
 func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
-	util.AddFlagSetToPFlagSet(flag.CommandLine, flags)
-
-	// This is necessary as github.com/spf13/cobra doesn't support "global"
-	// pflags currently.  See https://github.com/spf13/cobra/issues/44.
-	util.AddPFlagSetToPFlagSet(pflag.CommandLine, flags)
+	flags.AddGoFlagSet(flag.CommandLine)
 
 	// Hack for global access to validation flag.
 	// TODO: Refactor out after configuration flag overhaul.
@@ -284,7 +280,7 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	}
 
 	// Merge factory's flags
-	util.AddPFlagSetToPFlagSet(f.flags, flags)
+	flags.AddFlagSet(f.flags)
 
 	// Globally persistent flags across all subcommands.
 	// TODO Change flag names to consts to allow safer lookup from subcommands.

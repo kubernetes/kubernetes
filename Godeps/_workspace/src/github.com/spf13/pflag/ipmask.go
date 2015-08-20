@@ -28,7 +28,7 @@ func (i *ipMaskValue) Type() string {
 	return "ipMask"
 }
 
-// Parse IPv4 netmask written in IP form (e.g. 255.255.255.0).
+// ParseIPv4Mask written in IP form (e.g. 255.255.255.0).
 // This function should really belong to the net package.
 func ParseIPv4Mask(s string) net.IPMask {
 	mask := net.ParseIP(s)
@@ -79,7 +79,7 @@ func (f *FlagSet) IPMaskVar(p *net.IPMask, name string, value net.IPMask, usage 
 	f.VarP(newIPMaskValue(value, p), name, "", usage)
 }
 
-// Like IPMaskVar, but accepts a shorthand letter that can be used after a single dash.
+// IPMaskVarP is like IPMaskVar, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) IPMaskVarP(p *net.IPMask, name, shorthand string, value net.IPMask, usage string) {
 	f.VarP(newIPMaskValue(value, p), name, shorthand, usage)
 }
@@ -90,7 +90,7 @@ func IPMaskVar(p *net.IPMask, name string, value net.IPMask, usage string) {
 	CommandLine.VarP(newIPMaskValue(value, p), name, "", usage)
 }
 
-// Like IPMaskVar, but accepts a shorthand letter that can be used after a single dash.
+// IPMaskVarP is like IPMaskVar, but accepts a shorthand letter that can be used after a single dash.
 func IPMaskVarP(p *net.IPMask, name, shorthand string, value net.IPMask, usage string) {
 	CommandLine.VarP(newIPMaskValue(value, p), name, shorthand, usage)
 }
@@ -103,7 +103,7 @@ func (f *FlagSet) IPMask(name string, value net.IPMask, usage string) *net.IPMas
 	return p
 }
 
-// Like IPMask, but accepts a shorthand letter that can be used after a single dash.
+// IPMaskP is like IPMask, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) IPMaskP(name, shorthand string, value net.IPMask, usage string) *net.IPMask {
 	p := new(net.IPMask)
 	f.IPMaskVarP(p, name, shorthand, value, usage)
@@ -116,7 +116,7 @@ func IPMask(name string, value net.IPMask, usage string) *net.IPMask {
 	return CommandLine.IPMaskP(name, "", value, usage)
 }
 
-// Like IP, but accepts a shorthand letter that can be used after a single dash.
+// IPMaskP is like IP, but accepts a shorthand letter that can be used after a single dash.
 func IPMaskP(name, shorthand string, value net.IPMask, usage string) *net.IPMask {
 	return CommandLine.IPMaskP(name, shorthand, value, usage)
 }

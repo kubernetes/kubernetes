@@ -476,12 +476,11 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
-			"Rev": "385fc87e4343efec233811d3d933509e8975d11a"
+			"Rev": "db0518444643a7b170abb78164bbeaf5a2bb816f"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Comment": "v0.0.1-81-g4869ec2",
-			"Rev": "4869ec2ae0628354eaac5bf88fccf9a7265ae475"
+			"Rev": "112aaa578dfdd0e913663b05153be974bd72497a"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",

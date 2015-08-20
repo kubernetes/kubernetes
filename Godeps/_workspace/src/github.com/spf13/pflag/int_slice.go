@@ -85,7 +85,7 @@ func (f *FlagSet) IntSliceVar(p *[]int, name string, value []int, usage string) 
 	f.VarP(newIntSliceValue(value, p), name, "", usage)
 }
 
-// Like IntSliceVar, but accepts a shorthand letter that can be used after a single dash.
+// IntSliceVarP is like IntSliceVar, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) IntSliceVarP(p *[]int, name, shorthand string, value []int, usage string) {
 	f.VarP(newIntSliceValue(value, p), name, shorthand, usage)
 }
@@ -96,7 +96,7 @@ func IntSliceVar(p *[]int, name string, value []int, usage string) {
 	CommandLine.VarP(newIntSliceValue(value, p), name, "", usage)
 }
 
-// Like IntSliceVar, but accepts a shorthand letter that can be used after a single dash.
+// IntSliceVarP is like IntSliceVar, but accepts a shorthand letter that can be used after a single dash.
 func IntSliceVarP(p *[]int, name, shorthand string, value []int, usage string) {
 	CommandLine.VarP(newIntSliceValue(value, p), name, shorthand, usage)
 }
@@ -104,14 +104,14 @@ func IntSliceVarP(p *[]int, name, shorthand string, value []int, usage string) {
 // IntSlice defines a []int flag with specified name, default value, and usage string.
 // The return value is the address of a []int variable that stores the value of the flag.
 func (f *FlagSet) IntSlice(name string, value []int, usage string) *[]int {
-	p := make([]int, 0)
+	p := []int{}
 	f.IntSliceVarP(&p, name, "", value, usage)
 	return &p
 }
 
-// Like IntSlice, but accepts a shorthand letter that can be used after a single dash.
+// IntSliceP is like IntSlice, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) IntSliceP(name, shorthand string, value []int, usage string) *[]int {
-	p := make([]int, 0)
+	p := []int{}
 	f.IntSliceVarP(&p, name, shorthand, value, usage)
 	return &p
 }
@@ -122,7 +122,7 @@ func IntSlice(name string, value []int, usage string) *[]int {
 	return CommandLine.IntSliceP(name, "", value, usage)
 }
 
-// Like IntSlice, but accepts a shorthand letter that can be used after a single dash.
+// IntSliceP is like IntSlice, but accepts a shorthand letter that can be used after a single dash.
 func IntSliceP(name, shorthand string, value []int, usage string) *[]int {
 	return CommandLine.IntSliceP(name, shorthand, value, usage)
 }

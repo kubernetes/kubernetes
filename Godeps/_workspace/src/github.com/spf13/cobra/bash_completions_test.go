@@ -56,6 +56,11 @@ func TestBashCompletions(t *testing.T) {
 	c.Flags().StringVar(&flagvalExt, "filename-ext", "", "Enter a filename (extension limited)")
 	c.MarkFlagFilename("filename-ext")
 
+	// subdirectories in a given directory
+	var flagvalTheme string
+	c.Flags().StringVar(&flagvalTheme, "theme", "", "theme to use (located in /themes/THEMENAME/)")
+	c.Flags().SetAnnotation("theme", BashCompSubdirsInDir, []string{"themes"})
+
 	out := new(bytes.Buffer)
 	c.GenBashCompletion(out)
 	str := out.String()
@@ -75,6 +80,8 @@ func TestBashCompletions(t *testing.T) {
 	check(t, str, `flags_completion+=("_filedir")`)
 	// check for filename extension flags
 	check(t, str, `flags_completion+=("__handle_filename_extension_flag json|yaml|yml")`)
+	// check for subdirs_in_dir flags
+	check(t, str, `flags_completion+=("__handle_subdirs_in_dir_flag themes")`)
 
 	checkOmit(t, str, cmdDeprecated.Name())
 }

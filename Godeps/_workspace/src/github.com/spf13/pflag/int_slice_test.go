@@ -13,13 +13,13 @@ import (
 
 func setUpISFlagSet(isp *[]int) *FlagSet {
 	f := NewFlagSet("test", ContinueOnError)
-	f.IntSliceVar(isp, "is", []int{}, "Command seperated list!")
+	f.IntSliceVar(isp, "is", []int{}, "Command separated list!")
 	return f
 }
 
 func setUpISFlagSetWithDefault(isp *[]int) *FlagSet {
 	f := NewFlagSet("test", ContinueOnError)
-	f.IntSliceVar(isp, "is", []int{0, 1}, "Command seperated list!")
+	f.IntSliceVar(isp, "is", []int{0, 1}, "Command separated list!")
 	return f
 }
 
@@ -87,7 +87,7 @@ func TestISDefault(t *testing.T) {
 			t.Fatalf("got error: %v", err)
 		}
 		if d != v {
-			t.Fatalf("expected is[%d] to be %s but got: %s", i, d, v)
+			t.Fatalf("expected is[%d] to be %d but got: %d", i, d, v)
 		}
 	}
 
@@ -101,7 +101,7 @@ func TestISDefault(t *testing.T) {
 			t.Fatal("got an error from GetIntSlice():", err)
 		}
 		if d != v {
-			t.Fatalf("expected is[%d] to be %s from GetIntSlice but got: %s", i, d, v)
+			t.Fatalf("expected is[%d] to be %d from GetIntSlice but got: %d", i, d, v)
 		}
 	}
 }
@@ -122,7 +122,7 @@ func TestISWithDefault(t *testing.T) {
 			t.Fatalf("got error: %v", err)
 		}
 		if d != v {
-			t.Fatalf("expected is[%d] to be %s but got: %s", i, d, v)
+			t.Fatalf("expected is[%d] to be %d but got: %d", i, d, v)
 		}
 	}
 
@@ -136,7 +136,7 @@ func TestISWithDefault(t *testing.T) {
 			t.Fatalf("got error: %v", err)
 		}
 		if d != v {
-			t.Fatalf("expected is[%d] to be %s from GetIntSlice but got: %s", i, d, v)
+			t.Fatalf("expected is[%d] to be %d from GetIntSlice but got: %d", i, d, v)
 		}
 	}
 }
@@ -156,7 +156,7 @@ func TestISCalledTwice(t *testing.T) {
 	}
 	for i, v := range is {
 		if expected[i] != v {
-			t.Fatalf("expected is[%d] to be %s but got: %s", i, expected[i], v)
+			t.Fatalf("expected is[%d] to be %d but got: %d", i, expected[i], v)
 		}
 	}
 }

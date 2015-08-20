@@ -48,7 +48,7 @@ func (f *FlagSet) Uint8Var(p *uint8, name string, value uint8, usage string) {
 	f.VarP(newUint8Value(value, p), name, "", usage)
 }
 
-// Like Uint8Var, but accepts a shorthand letter that can be used after a single dash.
+// Uint8VarP is like Uint8Var, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) Uint8VarP(p *uint8, name, shorthand string, value uint8, usage string) {
 	f.VarP(newUint8Value(value, p), name, shorthand, usage)
 }
@@ -59,7 +59,7 @@ func Uint8Var(p *uint8, name string, value uint8, usage string) {
 	CommandLine.VarP(newUint8Value(value, p), name, "", usage)
 }
 
-// Like Uint8Var, but accepts a shorthand letter that can be used after a single dash.
+// Uint8VarP is like Uint8Var, but accepts a shorthand letter that can be used after a single dash.
 func Uint8VarP(p *uint8, name, shorthand string, value uint8, usage string) {
 	CommandLine.VarP(newUint8Value(value, p), name, shorthand, usage)
 }
@@ -72,7 +72,7 @@ func (f *FlagSet) Uint8(name string, value uint8, usage string) *uint8 {
 	return p
 }
 
-// Like Uint8, but accepts a shorthand letter that can be used after a single dash.
+// Uint8P is like Uint8, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) Uint8P(name, shorthand string, value uint8, usage string) *uint8 {
 	p := new(uint8)
 	f.Uint8VarP(p, name, shorthand, value, usage)
@@ -85,7 +85,7 @@ func Uint8(name string, value uint8, usage string) *uint8 {
 	return CommandLine.Uint8P(name, "", value, usage)
 }
 
-// Like Uint8, but accepts a shorthand letter that can be used after a single dash.
+// Uint8P is like Uint8, but accepts a shorthand letter that can be used after a single dash.
 func Uint8P(name, shorthand string, value uint8, usage string) *uint8 {
 	return CommandLine.Uint8P(name, shorthand, value, usage)
 }

@@ -126,7 +126,7 @@ func TestServerHelp(t *testing.T) {
 	x := runFull(t, "hyperkube test1 --help")
 	assert.NoError(t, x.err)
 	assert.Contains(t, x.output, "A simple server named test1")
-	assert.Contains(t, x.output, "--help=false: help for hyperkube")
+	assert.Contains(t, x.output, "--help[=false]: help for hyperkube")
 	assert.NotContains(t, x.output, "test1 Run")
 }
 
@@ -134,7 +134,7 @@ func TestServerFlagsBad(t *testing.T) {
 	x := runFull(t, "hyperkube test1 --bad-flag")
 	assert.EqualError(t, x.err, "unknown flag: --bad-flag")
 	assert.Contains(t, x.output, "A simple server named test1")
-	assert.Contains(t, x.output, "--help=false: help for hyperkube")
+	assert.Contains(t, x.output, "--help[=false]: help for hyperkube")
 	assert.NotContains(t, x.output, "test1 Run")
 }
 
