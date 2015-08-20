@@ -30,10 +30,10 @@ type NodeStats struct {
 
 type ContainerStats struct {
 	Name  string                 `json:"name"`
-	Stats []*ContainerStatsPoint `json:"stats"`
+	Stats []*StatsPoint `json:"stats"`
 }
 
-type ContainerStatsPoint struct {
+type StatsPoint struct {
 	Time time.Time `json:"time"`
 
 	Cpu    CpuStats    `json:"cpu"`

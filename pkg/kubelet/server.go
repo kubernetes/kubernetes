@@ -867,6 +867,13 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	w.Write(data)
 }
 
+func convertContainerStats(stats *cadvisorApi.ContainerStats) *v1.StatsPoint {
+	point := &v1.StatsPoint{
+		Time: stats.Timestamp,
+	}
+	return point
+}
+
 func (s *Server) getNodeStats(request *restful.Request, response *restful.Response) {
 	numstats, err := intQueryParameter(request, "numstats", 60)
 	if err != nil {
@@ -893,20 +900,27 @@ func (s *Server) getNodeStats(request *restful.Request, response *restful.Respon
 		Start:    start,
 		End:      end,
 	}
-	// var statsMap map[string]*cadvisorApi.ContainerInfo
 	statsMap, err := s.host.GetRawContainerInfo("/", cadvisorRequest, subcontainers)
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
 
-	stats := []v1.ContainerStats{}
+	contStats := []v1.ContainerStats{}
 
-	rootStats := statsMap["/"]
-	_ = rootStats
-	stats = append(stats, v1.ContainerStats{
-		Name:  "/",
-		Stats: nil,
-	})
+	for name, info := range statsMap {
+		points := []*v1.StatsPoint{}
+		for _, sp := range info.Stats {
+			points = append(points, convertContainerStats(sp))
+		}
+		contStats = append(contStats, v1.ContainerStats{
+			Name:  name,
+			Stats: points,
+		})
+	}
 
 	nodeStats := v1.NodeStats{
-		Containers: stats,
+		Containers: contStats,
 	}
 	response.WriteEntity(&nodeStats)
 	return
