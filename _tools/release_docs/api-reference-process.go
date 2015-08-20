@@ -22,6 +22,8 @@ import (
 	"flag"
 	"io/ioutil"
 	"os"
+	"path"
+	"regexp"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -62,6 +64,23 @@ func stripHTML(filename string) error {
 	return nil
 }
 
+// replace http://releases.k8s.io/HEAD/docs/xxx.md with
+// http://kubernetes.io/v1.0/docs/xxx.html
+func fixLinks(fileName, outputDir string) error {
+	mdRE := regexp.MustCompile(`http://releases.k8s.io/HEAD/docs(.*?\.)md`)
+	repl := []byte("http://kubernetes.io/" + path.Base(outputDir) + "/docs" + "${1}" + "html")
+	file, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+	file = mdRE.ReplaceAll(file, repl)
+
+	if err = ioutil.WriteFile(fileName, file, 0666); err != nil {
+		return err
+	}
+	return nil
+}
+
 func nitFix(filename string) error {
 	file, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -88,6 +107,9 @@ func processHTML(filePath string, fileName string, outputDir string) error {
 		return err
 	}
 	if err := nitFix(filePath); err != nil {
+		return err
+	}
+	if err := fixLinks(filePath, outputDir); err != nil {
 		return err
 	}
 	if err := moveHTML(filePath, fileName, outputDir); err != nil {
