@@ -77,14 +77,6 @@ func TestVersionedPrinter(t *testing.T) {
 	}
 }
 
-func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, &YAMLPrinter{}, yaml.Unmarshal)
-}
-
-func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, &JSONPrinter{}, json.Unmarshal)
-}
-
 func TestPrintDefault(t *testing.T) {
 	printer, found, err := GetPrinter("", "")
 	if err != nil {
@@ -95,90 +87,72 @@ func TestPrintDefault(t *testing.T) {
 	}
 }
 
-type internalType struct {
-	Name string
+type TestPrintType struct {
+	Data string
 }
 
-func (*internalType) IsAnAPIObject() {
+func (*TestPrintType) IsAnAPIObject() {}
 
-}
+type TestUnknownType struct{}
 
-func TestPrintJSONForObject(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	printer, found, err := GetPrinter("json", "")
-	if err != nil || !found {
-		t.Fatalf("unexpected error: %#v", err)
-	}
-	if err := printer.PrintObj(&internalType{Name: "foo"}, buf); err != nil {
-		t.Fatalf("unexpected error: %#v", err)
-	}
-	obj := map[string]interface{}{}
-	if err := json.Unmarshal(buf.Bytes(), &obj); err != nil {
-		t.Fatalf("unexpected error: %#v\n%s", err, buf.String())
-	}
-	if obj["Name"] != "foo" {
-		t.Errorf("unexpected field: %#v", obj)
-	}
-}
+func (*TestUnknownType) IsAnAPIObject() {}
 
-func TestPrintJSON(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	printer, found, err := GetPrinter("json", "")
-	if err != nil || !found {
-		t.Fatalf("unexpected error: %#v", err)
-	}
-	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
-	obj := map[string]interface{}{}
-	if err := json.Unmarshal(buf.Bytes(), &obj); err != nil {
-		t.Errorf("unexpected error: %#v\n%s", err, buf.String())
-	}
-}
-
-func TestPrintYAML(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	printer, found, err := GetPrinter("yaml", "")
-	if err != nil || !found {
-		t.Fatalf("unexpected error: %#v", err)
-	}
-	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
-	obj := map[string]interface{}{}
-	if err := yaml.Unmarshal(buf.Bytes(), &obj); err != nil {
-		t.Errorf("unexpected error: %#v\n%s", err, buf.String())
-	}
-}
-
-func TestPrintTemplate(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	printer, found, err := GetPrinter("template", "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}")
-	if err != nil || !found {
-		t.Fatalf("unexpected error: %#v", err)
-	}
-	unversionedPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	obj, err := api.Scheme.ConvertToVersion(unversionedPod, testapi.Version())
-	err = printer.PrintObj(obj, buf)
+func TestPrinter(t *testing.T) {
+	//test inputs
+	simpleTest := &TestPrintType{"foo"}
+	podTest := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	testapi, err := api.Scheme.ConvertToVersion(podTest, testapi.Version())
 	if err != nil {
-		t.Fatalf("unexpected error: %#v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if buf.String() != "foo" {
-		t.Errorf("unexpected output: %s", buf.String())
+
+	printerTests := []struct {
+		Name           string
+		Format         string
+		FormatArgument string
+		Input          runtime.Object
+		Expect         string
+	}{
+		{"test json", "json", "", simpleTest, "{\n    \"Data\": \"foo\"\n}\n"},
+		{"test yaml", "yaml", "", simpleTest, "Data: foo\n"},
+		{"test template", "template", "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}",
+			podTest, "foo"},
+		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "foo"},
+		{"emits versioned objects", "template", "{{.kind}}", testapi, "Pod"},
 	}
+	for _, test := range printerTests {
+		buf := bytes.NewBuffer([]byte{})
+		printer, found, err := GetPrinter(test.Format, test.FormatArgument)
+		if err != nil || !found {
+			t.Errorf("unexpected error: %#v", err)
+		}
+		if err := printer.PrintObj(test.Input, buf); err != nil {
+			t.Errorf("unexpected error: %#v", err)
+		}
+		if buf.String() != test.Expect {
+			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String(), buf.String())
+		}
+	}
+
 }
 
-func TestPrintEmptyTemplate(t *testing.T) {
-	if _, _, err := GetPrinter("template", ""); err == nil {
-		t.Errorf("unexpected non-error")
+func TestBadPrinter(t *testing.T) {
+	badPrinterTests := []struct {
+		Name           string
+		Format         string
+		FormatArgument string
+		Error          error
+	}{
+		{"empty template", "template", "", fmt.Errorf("template format specified but no template given")},
+		{"bad template", "template", "{{ .Name", fmt.Errorf("error parsing template {{ .Name, template: output:1: unclosed action\n")},
+		{"bad templatefile", "templatefile", "", fmt.Errorf("templatefile format specified but no template file given")},
+		{"bad jsonpath", "jsonpath", "{.Name", fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
 	}
-}
-
-func TestPrintBadTemplate(t *testing.T) {
-	if _, _, err := GetPrinter("template", "{{ .Name"); err == nil {
-		t.Errorf("unexpected non-error")
-	}
-}
-
-func TestPrintBadTemplateFile(t *testing.T) {
-	if _, _, err := GetPrinter("templatefile", ""); err == nil {
-		t.Errorf("unexpected non-error")
+	for _, test := range badPrinterTests {
+		_, _, err := GetPrinter(test.Format, test.FormatArgument)
+		if err == nil || err.Error() != test.Error.Error() {
+			t.Errorf("in %s, expect %s, got %s", test.Name, test.Error, err)
+		}
 	}
 }
 
@@ -227,15 +201,13 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 }
 
-type TestPrintType struct {
-	Data string
+func TestYAMLPrinter(t *testing.T) {
+	testPrinter(t, &YAMLPrinter{}, yaml.Unmarshal)
 }
 
-func (*TestPrintType) IsAnAPIObject() {}
-
-type TestUnknownType struct{}
-
-func (*TestUnknownType) IsAnAPIObject() {}
+func TestJSONPrinter(t *testing.T) {
+	testPrinter(t, &JSONPrinter{}, json.Unmarshal)
+}
 
 func PrintCustomType(obj *TestPrintType, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	_, err := fmt.Fprintf(w, "%s", obj.Data)
@@ -281,27 +253,6 @@ func TestUnknownTypePrinting(t *testing.T) {
 	err := printer.PrintObj(&TestUnknownType{}, buffer)
 	if err == nil {
 		t.Errorf("An error was expected from printing unknown type")
-	}
-}
-
-func TestTemplateEmitsVersionedObjects(t *testing.T) {
-	// kind is always blank in memory and set on the wire
-	printer, err := NewTemplatePrinter([]byte(`{{.kind}}`))
-	if err != nil {
-		t.Fatalf("tmpl fail: %v", err)
-	}
-	obj, err := api.Scheme.ConvertToVersion(&api.Pod{}, testapi.Version())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	buffer := &bytes.Buffer{}
-	err = printer.PrintObj(obj, buffer)
-	if err != nil {
-		t.Fatalf("print fail: %v", err)
-	}
-	if e, a := "Pod", string(buffer.Bytes()); e != a {
-		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
 
@@ -450,6 +401,10 @@ func TestPrinters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	jsonpathPrinter, err := NewJSONPathPrinter("{.metadata.name}")
+	if err != nil {
+		t.Fatal(err)
+	}
 	printers := map[string]ResourcePrinter{
 		"humanReadable":        NewHumanReadablePrinter(true, false, false, false, []string{}),
 		"humanReadableHeaders": NewHumanReadablePrinter(false, false, false, false, []string{}),
@@ -457,6 +412,7 @@ func TestPrinters(t *testing.T) {
 		"yaml":                 &YAMLPrinter{},
 		"template":             templatePrinter,
 		"template2":            templatePrinter2,
+		"jsonpath":             jsonpathPrinter,
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
@@ -471,6 +427,7 @@ func TestPrinters(t *testing.T) {
 	// map of printer name to set of objects it should fail on.
 	expectedErrors := map[string]util.StringSet{
 		"template2": util.NewStringSet("pod", "emptyPodList", "endpoints"),
+		"jsonpath":  util.NewStringSet("emptyPodList", "nonEmptyPodList", "endpoints"),
 	}
 
 	for pName, p := range printers {

@@ -49,7 +49,7 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|template|templatefile|wide.
+    Output format. One of: json|yaml|template|templatefile|wide|jsonpath.
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -69,8 +69,9 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 
 .PP
 \fB\-t\fP, \fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+    Template string or path to template file to use when \-o=template, \-o=templatefile or \-o=jsonpath.  The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]. The jsonpath template is composed of jsonpath expressions enclosed by {} [
+\[la]http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md\[ra]]
 
 .PP
 \fB\-w\fP, \fB\-\-watch\fP=false

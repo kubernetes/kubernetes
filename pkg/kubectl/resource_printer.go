@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/jsonpath"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -70,6 +71,15 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		printer, err = NewTemplatePrinter(data)
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
+		}
+	case "jsonpath":
+		if len(formatArgument) == 0 {
+			return nil, false, fmt.Errorf("jsonpath format specified but no jsonpath template given")
+		}
+		var err error
+		printer, err = NewJSONPathPrinter(formatArgument)
+		if err != nil {
+			return nil, false, fmt.Errorf("error parsing jsonpath %s, %v\n", formatArgument, err)
 		}
 	case "wide":
 		fallthrough
@@ -1213,4 +1223,38 @@ func indirect(v reflect.Value) (rv reflect.Value, isNil bool) {
 		}
 	}
 	return v, false
+}
+
+// JSONPathPrinter is an implementation of ResourcePrinter which formats data with jsonpath expression.
+type JSONPathPrinter struct {
+	rawTemplate string
+	*jsonpath.JSONPath
+}
+
+func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
+	j := jsonpath.New("out")
+	if err := j.Parse(tmpl); err != nil {
+		return nil, err
+	}
+	return &JSONPathPrinter{tmpl, j}, nil
+}
+
+// PrintObj formats the obj with the JSONPath Template.
+func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	out := map[string]interface{}{}
+	if err := json.Unmarshal(data, &out); err != nil {
+		return err
+	}
+	if err = j.JSONPath.Execute(w, out); err != nil {
+		fmt.Fprintf(w, "Error executing template: %v\n", err)
+		fmt.Fprintf(w, "template was:\n\t%v\n", j.rawTemplate)
+		fmt.Fprintf(w, "raw data was:\n\t%v\n", string(data))
+		fmt.Fprintf(w, "object given to template engine was:\n\t%+v\n", out)
+		return fmt.Errorf("error executing jsonpath '%v': '%v'\n----data----\n%+v\n", j.rawTemplate, err, out)
+	}
+	return nil
 }

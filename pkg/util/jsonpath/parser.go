@@ -151,7 +151,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		return fmt.Errorf("unclosed action")
 	case r == ' ':
 		p.consumeText()
-	case r == '@': //the current object, just pass it
+	case r == '@' || r == '$': //the current object, just pass it
 		p.consumeText()
 	case r == '[':
 		return p.parseArray(cur)
