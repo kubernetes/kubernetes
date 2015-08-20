@@ -32,6 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
+	_ "k8s.io/kubernetes/pkg/expapi"
+	_ "k8s.io/kubernetes/pkg/expapi/v1"
+
 	flag "github.com/spf13/pflag"
 )
 
