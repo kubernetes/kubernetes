@@ -22,8 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -113,46 +112,6 @@ func TestDelete(t *testing.T) {
 	test.TestDelete(createFn, gracefulSetFn)
 }
 
-func TestEtcdListEndpoints(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-							Subsets: []api.EndpointSubset{{
-								Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-								Ports:     []api.EndpointPort{{Port: 8345, Protocol: "TCP"}},
-							}},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
-		},
-		E: nil,
-	}
-
-	endpointsObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	endpoints := endpointsObj.(*api.EndpointsList)
-
-	if len(endpoints.Items) != 2 || endpoints.Items[0].Name != "foo" || endpoints.Items[1].Name != "bar" {
-		t.Errorf("Unexpected endpoints list: %#v", endpoints)
-	}
-}
-
 func TestEtcdGetEndpoints(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	test := resttest.New(t, storage, fakeClient.SetError)
@@ -160,70 +119,19 @@ func TestEtcdGetEndpoints(t *testing.T) {
 	test.TestGet(endpoints)
 }
 
-func TestListEmptyEndpointsList(t *testing.T) {
-	ctx := api.NewDefaultContext()
+func TestEtcdListEndpoints(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
-	}
-
-	endpoints, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(endpoints.(*api.EndpointsList).Items) != 0 {
-		t.Errorf("Unexpected non-zero pod list: %#v", endpoints)
-	}
-	if endpoints.(*api.EndpointsList).ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", endpoints)
-	}
-}
-
-func TestListEndpointsList(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
+	test := resttest.New(t, storage, fakeClient.SetError)
+	endpoints := validNewEndpoints()
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	test.TestList(
+		endpoints,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeClient, key, objects)
 		},
-	}
-
-	endpointsObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
-	endpoints := endpointsObj.(*api.EndpointsList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(endpoints.Items) != 2 {
-		t.Errorf("Unexpected endpoints list: %#v", endpoints)
-	}
-	if endpoints.Items[0].Name != "foo" {
-		t.Errorf("Unexpected endpoints: %#v", endpoints.Items[0])
-	}
-	if endpoints.Items[1].Name != "bar" {
-		t.Errorf("Unexpected endpoints: %#v", endpoints.Items[1])
-	}
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		})
 }
 
 func TestEndpointsDecode(t *testing.T) {

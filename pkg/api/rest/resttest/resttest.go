@@ -17,6 +17,8 @@ limitations under the License.
 package resttest
 
 import (
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -24,6 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
@@ -91,6 +96,9 @@ func copyOrDie(obj runtime.Object) runtime.Object {
 	return out
 }
 
+type AssignFunc func(objs []runtime.Object) []runtime.Object
+type SetRVFunc func(resourceVersion uint64)
+
 // Test creating an object.
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.testCreateHasMetadata(copyOrDie(valid))
@@ -113,6 +121,7 @@ func (t *Tester) TestUpdate(valid runtime.Object, existing, older runtime.Object
 }
 
 // Test deleting an object.
+// TODO(wojtek-t): Change it to use AssignFunc instead.
 func (t *Tester) TestDelete(createFn func() runtime.Object, wasGracefulFn func() bool, invalid ...runtime.Object) {
 	t.testDeleteNonExist(createFn)
 	t.testDeleteNoGraceful(createFn, wasGracefulFn)
@@ -122,6 +131,7 @@ func (t *Tester) TestDelete(createFn func() runtime.Object, wasGracefulFn func()
 }
 
 // Test graceful deletion.
+// TODO(wojtek-t): Change it to use AssignFunc instead.
 func (t *Tester) TestDeleteGraceful(createFn func() runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
 	t.testDeleteGracefulHasDefault(createFn(), expectedGrace, wasGracefulFn)
 	t.testDeleteGracefulUsesZeroOnNil(createFn(), 0)
@@ -135,6 +145,14 @@ func (t *Tester) TestGet(obj runtime.Object) {
 	if !t.clusterScope {
 		t.testGetDifferentNamespace(obj)
 	}
+}
+
+// Test listing object.
+func (t *Tester) TestList(obj runtime.Object, assignFn AssignFunc, setRVFn SetRVFunc) {
+	t.testListError()
+	t.testListFound(obj, assignFn)
+	t.testListNotFound(assignFn, setRVFn)
+	t.testListMatchLabels(obj, assignFn)
 }
 
 // =============================================================================
@@ -476,5 +494,130 @@ func (t *Tester) testGetNotFound(obj runtime.Object) {
 	_, err = t.storage.(rest.Getter).Get(ctx, "foo3")
 	if !errors.IsNotFound(err) {
 		t.Errorf("unexpected error returned: %#v", err)
+	}
+}
+
+// =============================================================================
+// List tests.
+
+func listToItems(listObj runtime.Object) ([]runtime.Object, error) {
+	v, err := conversion.EnforcePtr(listObj)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error: %v", err)
+	}
+	items := v.FieldByName("Items")
+	if !items.IsValid() {
+		return nil, fmt.Errorf("unexpected Items field in %v", listObj)
+	}
+	if items.Type().Kind() != reflect.Slice {
+		return nil, fmt.Errorf("unexpected Items field type: %v", items.Type().Kind())
+	}
+	result := make([]runtime.Object, items.Len())
+	for i := 0; i < items.Len(); i++ {
+		result[i] = items.Index(i).Addr().Interface().(runtime.Object)
+	}
+	return result, nil
+}
+
+func (t *Tester) testListError() {
+	ctx := t.TestContext()
+
+	storageError := fmt.Errorf("test error")
+	t.withStorageError(storageError, func() {
+		_, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything())
+		if err != storageError {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}
+
+func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
+	ctx := t.TestContext()
+
+	foo1 := copyOrDie(obj)
+	foo1Meta := t.getObjectMetaOrFail(foo1)
+	foo1Meta.Name = "foo1"
+	foo1Meta.Namespace = api.NamespaceValue(ctx)
+	foo2 := copyOrDie(obj)
+	foo2Meta := t.getObjectMetaOrFail(foo2)
+	foo2Meta.Name = "foo2"
+	foo2Meta.Namespace = api.NamespaceValue(ctx)
+
+	existing := assignFn([]runtime.Object{foo1, foo2})
+
+	listObj, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	items, err := listToItems(listObj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(items) != len(existing) {
+		t.Errorf("unexpected number of items: %v", len(items))
+	}
+	if !api.Semantic.DeepEqual(existing, items) {
+		t.Errorf("expected: %#v, got: %#v", existing, items)
+	}
+}
+
+func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
+	ctx := t.TestContext()
+	testLabels := map[string]string{"key": "value"}
+
+	foo1 := copyOrDie(obj)
+	foo1Meta := t.getObjectMetaOrFail(foo1)
+	foo1Meta.Name = "foo1"
+	foo1Meta.Namespace = api.NamespaceValue(ctx)
+	foo2 := copyOrDie(obj)
+	foo2Meta := t.getObjectMetaOrFail(foo2)
+	foo2Meta.Name = "foo2"
+	foo2Meta.Namespace = api.NamespaceValue(ctx)
+	foo2Meta.Labels = testLabels
+
+	existing := assignFn([]runtime.Object{foo1, foo2})
+	filtered := []runtime.Object{existing[1]}
+
+	selector := labels.SelectorFromSet(labels.Set(testLabels))
+	listObj, err := t.storage.(rest.Lister).List(ctx, selector, fields.Everything())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	items, err := listToItems(listObj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(items) != len(filtered) {
+		t.Errorf("unexpected number of items: %v", len(items))
+	}
+	if !api.Semantic.DeepEqual(filtered, items) {
+		t.Errorf("expected: %#v, got: %#v", filtered, items)
+	}
+}
+
+func (t *Tester) testListNotFound(assignFn AssignFunc, setRVFn SetRVFunc) {
+	ctx := t.TestContext()
+
+	setRVFn(uint64(123))
+	_ = assignFn([]runtime.Object{})
+
+	listObj, err := t.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	items, err := listToItems(listObj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(items) != 0 {
+		t.Errorf("unexpected items: %v", items)
+	}
+
+	meta, err := api.ListMetaFor(listObj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if meta.ResourceVersion != "123" {
+		t.Errorf("unexpected resource version: %d", meta.ResourceVersion)
 	}
 }

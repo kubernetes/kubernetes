@@ -142,7 +142,7 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	}
 	f.t.Logf("returning %v: %#v %#v", key, result.R, result.E)
 
-	// Sort response, note this will alter resutl.R.
+	// Sort response, note this will alter result.R.
 	if result.R.Node != nil && result.R.Node.Nodes != nil && sort {
 		f.sortResponse(result.R.Node.Nodes)
 	}

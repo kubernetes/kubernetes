@@ -22,9 +22,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/namespace"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -124,144 +123,6 @@ func TestCreateSetsFields(t *testing.T) {
 	}
 }
 
-func TestListEmptyNamespaceList(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	fakeEtcdClient.ChangeIndex = 1
-	key := etcdtest.AddPrefix("/namespaces")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: fakeEtcdClient.NewError(tools.EtcdErrorCodeNotFound),
-	}
-
-	storage, _, _ := NewStorage(etcdStorage)
-	namespaces, err := storage.List(api.NewContext(), labels.Everything(), fields.Everything())
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if len(namespaces.(*api.NamespaceList).Items) != 0 {
-		t.Errorf("Unexpected non-zero namespace list: %#v", namespaces)
-	}
-	if namespaces.(*api.NamespaceList).ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", namespaces)
-	}
-}
-
-func TestListNamespaceList(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	key := etcdtest.AddPrefix("/namespaces")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-						}),
-					},
-					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
-							ObjectMeta: api.ObjectMeta{Name: "bar"},
-						}),
-					},
-				},
-			},
-		},
-	}
-	storage, _, _ := NewStorage(etcdStorage)
-	namespacesObj, err := storage.List(api.NewContext(), labels.Everything(), fields.Everything())
-	namespaces := namespacesObj.(*api.NamespaceList)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(namespaces.Items) != 2 {
-		t.Errorf("Unexpected namespaces list: %#v", namespaces)
-	}
-	if namespaces.Items[0].Name != "foo" || namespaces.Items[0].Status.Phase != api.NamespaceActive {
-		t.Errorf("Unexpected namespace: %#v", namespaces.Items[0])
-	}
-	if namespaces.Items[1].Name != "bar" {
-		t.Errorf("Unexpected namespace: %#v", namespaces.Items[1])
-	}
-}
-
-func TestListNamespaceListSelection(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	key := etcdtest.AddPrefix("/namespaces")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
-						ObjectMeta: api.ObjectMeta{Name: "foo"},
-					})},
-					{Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
-						ObjectMeta: api.ObjectMeta{Name: "bar"},
-					})},
-					{Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
-						ObjectMeta: api.ObjectMeta{Name: "baz"},
-						Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
-					})},
-					{Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
-						ObjectMeta: api.ObjectMeta{
-							Name:   "qux",
-							Labels: map[string]string{"label": "qux"},
-						},
-					})},
-					{Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
-						ObjectMeta: api.ObjectMeta{Name: "zot"},
-					})},
-				},
-			},
-		},
-	}
-	storage, _, _ := NewStorage(etcdStorage)
-	ctx := api.NewContext()
-	table := []struct {
-		label, field string
-		expectedIDs  util.StringSet
-	}{
-		{
-			expectedIDs: util.NewStringSet("foo", "bar", "baz", "qux", "zot"),
-		}, {
-			field:       "name=zot",
-			expectedIDs: util.NewStringSet("zot"),
-		}, {
-			label:       "label=qux",
-			expectedIDs: util.NewStringSet("qux"),
-		}, {
-			field:       "status.phase=Terminating",
-			expectedIDs: util.NewStringSet("baz"),
-		},
-	}
-
-	for index, item := range table {
-		label, err := labels.Parse(item.label)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			continue
-		}
-		field, err := fields.ParseSelector(item.field)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			continue
-		}
-		namespacesObj, err := storage.List(ctx, label, field)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		namespaces := namespacesObj.(*api.NamespaceList)
-
-		set := util.NewStringSet()
-		for i := range namespaces.Items {
-			set.Insert(namespaces.Items[i].Name)
-		}
-		if e, a := len(item.expectedIDs), len(set); e != a {
-			t.Errorf("%v: Expected %v, got %v", index, item.expectedIDs, set)
-		}
-	}
-}
-
 func TestNamespaceDecode(t *testing.T) {
 	_, etcdStorage := newEtcdStorage(t)
 	storage, _, _ := NewStorage(etcdStorage)
@@ -288,6 +149,21 @@ func TestGet(t *testing.T) {
 	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
 	namespace := validNewNamespace()
 	test.TestGet(namespace)
+}
+
+func TestList(t *testing.T) {
+	storage, fakeEtcdClient, _ := newStorage(t)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	namespace := validNewNamespace()
+	test.TestList(
+		namespace,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeEtcdClient, key, objects)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeEtcdClient, resourceVersion)
+		})
 }
 
 func TestDeleteNamespace(t *testing.T) {
