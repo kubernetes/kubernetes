@@ -9,7 +9,6 @@ gke_context
 host_port_endpoints
 kubecfg_file
 kube_master_url
-log_flush_frequency
 max_in_flight
 max_par
 new_file_0644

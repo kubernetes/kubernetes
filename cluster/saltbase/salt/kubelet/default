@@ -30,7 +30,7 @@
     # Unless given a specific directive, disable registration for the kubelet
     # running on the master.
     {% if grains.kubelet_api_servers is defined -%}
-      {% set api_servers_with_port = "--api_servers=https://" + grains.kubelet_api_servers -%}
+      {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
     {% endif -%}

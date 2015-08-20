@@ -95,8 +95,23 @@ def normalize_files(rootdir, files):
 def line_has_bad_flag(line, flagre):
     results  = flagre.findall(line)
     for result in results:
-        if "_" in result:
-            return True
+        if not "_" in result:
+            return False
+        # this should exclude many cases where jinja2 templates use kube flags
+        # as variables, except it uses _ for the variable name
+        if "{% set" + result + "= \"" in line:
+            return False
+        if "pillar[" + result + "]" in line:
+            return False
+        if "grains" + result in line:
+            return False
+        # These are usually yaml definitions
+        if result.endswith(":"):
+            return False
+         # something common in juju variables...
+        if "template_data[" + result + "]" in line:
+            return False
+        return True
     return False
 
 # The list of files might not be the whole repo. If someone only changed a
@@ -148,10 +163,12 @@ def get_flags(rootdir, files):
     if len(new_excluded_flags) != 0:
         print("Found a flag declared with an _ but which is not explicitly listed as a valid flag name in hack/verify-flags/excluded-flags.txt")
         print("Are you certain this flag should not have been declared with an - instead?")
+        new_excluded_flags.sort()
         print("%s" % "\n".join(new_excluded_flags))
         sys.exit(1)
     if len(new_flags) != 0:
         print("Found flags in golang files not in the list of known flags. Please add these to hack/verify-flags/known-flags.txt")
+        new_flags.sort()
         print("%s" % "\n".join(new_flags))
         sys.exit(1)
     return list(flags)
@@ -164,7 +181,7 @@ def flags_to_re(flags):
         # turn all flag names into regexs which will find both types
         newre = dashRE.sub('[-_]', flag)
         # only match if there is not a leading or trailing alphanumeric character
-        flagREs.append("[^\w]" + newre + "[^\w]")
+        flagREs.append("[^\w${]" + newre + "[^\w]")
     # turn that list of regex strings into a single large RE
     flagRE = "|".join(flagREs)
     flagRE = re.compile(flagRE)
@@ -214,7 +231,8 @@ def main():
 
     if len(bad_lines) != 0:
         if not args.skip_exceptions:
-            print("Found illegal 'flag' usage. If this is a false positive add the following line(s) to hack/verify-flags/exceptions.txt:")
+            print("Found illegal 'flag' usage. If these are false positives you should running `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
+        bad_lines.sort()
         for (relname, line) in bad_lines:
             print("%s:%s" % (relname, line))
 
