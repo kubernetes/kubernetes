@@ -906,10 +906,10 @@ func (s *Server) getNodeStats(request *restful.Request, response *restful.Respon
 		return
 	}
 
-	contStats := []v1.ContainerStats{}
+	contStats := make([]v1.ContainerStats, len(statsMap))
 
 	for name, info := range statsMap {
-		points := []*v1.StatsPoint{}
+		points := make([]*v1.StatsPoint, 0, len(info.Stats))
 		for _, sp := range info.Stats {
 			points = append(points, convertContainerStats(sp))
 		}
