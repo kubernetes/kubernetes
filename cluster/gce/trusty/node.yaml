@@ -15,11 +15,16 @@ description "Prepare kube node environment"
 start on cloud-config
 
 script
+	set -o errexit
+	set -o nounset
+
 	# Set the hostname to the short version.
 	short_hostname=$(hostname -s)
 	hostname $short_hostname
 
-	# We have seen that GCE image may have strict host firewall rules which drop most inbound/forwarded packets. In such a case, add rules to accept all TCP/UDP packets.
+	# We have seen that GCE image may have strict host firewall rules which drop
+	# most inbound/forwarded packets. In such a case, add rules to accept all
+	# TCP/UDP packets.
 	if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
 		echo "Add rules to accpet all inbound TCP/UDP packets"
 		iptables -A INPUT -w -p TCP -j ACCEPT
@@ -49,7 +54,7 @@ for k,v in yaml.load(sys.stdin).iteritems():
 
 	 #Create the kubelet kubeconfig file.
 	. /etc/kube-env
-	if [ -z "${KUBELET_CA_CERT}" ]; then
+	if [ -z "${KUBELET_CA_CERT:-}" ]; then
 		KUBELET_CA_CERT="${CA_CERT}"
 	fi
 	cat > /var/lib/kubelet/kubeconfig << EOF
@@ -106,8 +111,11 @@ description "Install packages needed to run kubernetes"
 start on cloud-config
 
 script
+	set -o errexit
+	set -o nounset
+
 	apt-get update
-	# Install docker, brctl, and socat if they are not in the image.
+	# Install docker and brctl if they are not in the image.
 	if ! which docker > /dev/null; then
   	echo "Do not find docker. Install it."
 		# We should install the docker that passes qualification. At present, it is version 1.7.1.
@@ -116,10 +124,6 @@ script
 	if ! which brctl > /dev/null; then
 		echo "Do not find brctl. Install it."
 		apt-get install --yes bridge-utils
-	fi
-	if ! which socat > /dev/null; then
-		echo "Do not find socat. Install it."
-		apt-get install --yes socat
 	fi
 end script
 
@@ -133,12 +137,18 @@ Content-Disposition: attachment; filename="kube-install-additional-packages.conf
 
 description "Install additional packages used by kubernetes"
 
-start on started docker
+start on stopped kube-install-packages
 
 script
-	# Installation of nsenter through a docker container may be slow. We move it
-	# here to be in parallel with instllation of other packages, so as to reduce
-	# the cluster creation time.
+	set -o errexit
+	set -o nounset
+
+	# Socat and nsenter are not required for spinning up a cluster. We move the
+	# installation here to be in parallel with the cluster creation.
+	if ! which socat > /dev/null; then
+		echo "Do not find socat. Install it."
+		apt-get install --yes socat
+	fi
 	if ! which nsenter > /dev/null; then
 		echo "Do not find nsenter. Install it."
 		# Note: this is an easy way to install nsenter, but may not be the fastest way.
@@ -161,9 +171,18 @@ description "Download and install k8s binaries and configurations"
 start on stopped kube-env
 
 script
+	set -o errexit
+	set -o nounset
+
 	. /etc/kube-env
-	# If kubelet or kube-proxy is not installed in the image, pull release binaries and put them in /usr/bin.
-	if ! which kubelet > /dev/null || ! which kube-proxy > /dev/null; then
+	# For a testing cluster, we pull kubelet and kube-proxy binaries, and place them
+	# in /usr/local/bin. For a non-test cluster, we use the binaries pre-installed
+	# in the image, or pull and place them in /usr/bin if they are not pre-installed.
+	BINARY_PATH="/usr/bin/"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		BINARY_PATH="/usr/local/bin/"
+	fi
+	if ! which kubelet > /dev/null || ! which kube-proxy > /dev/null || [ "${TEST_CLUSTER:-}" = "true" ]; then
 		cd /tmp
 		k8s_sha1="${SERVER_BINARY_TAR_URL##*/}.sha1"
 		echo "Downloading k8s tar sha1 file ${k8s_sha1}"
@@ -179,8 +198,8 @@ script
 			echo "Validated ${SERVER_BINARY_TAR_URL} SHA1 = ${SERVER_BINARY_TAR_HASH}"
 		fi
 		tar xzf "/tmp/${k8s_tar}" -C /tmp/ --overwrite
-		cp /tmp/kubernetes/server/bin/kubelet /usr/bin/
-		cp /tmp/kubernetes/server/bin/kube-proxy /usr/bin/
+		cp /tmp/kubernetes/server/bin/kubelet ${BINARY_PATH}
+		cp /tmp/kubernetes/server/bin/kube-proxy ${BINARY_PATH}
 		rm -rf "/tmp/kubernetes"
 		rm "/tmp/${k8s_tar}"
 		rm "/tmp/${k8s_sha1}"
@@ -222,20 +241,31 @@ start on stopped kube-install-minion and stopped kube-install-packages
 respawn
 
 script
+	set -o errexit
+	set -o nounset
+
 	# TODO(andyzheng0831): Add health check functionality.
 	. /etc/kube-env
-	/usr/bin/kubelet \
+	ARGS="--v=2"
+	if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+		ARGS="${KUBELET_TEST_ARGS}"
+	fi
+	BINARY_PATH="/usr/bin/kubelet"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		BINARY_PATH="/usr/local/bin/kubelet"
+	fi
+	${BINARY_PATH} \
 		--api-servers=https://${KUBERNETES_MASTER_NAME} \
 		--enable-debugging-handlers=true \
 		--cloud-provider=gce \
 		--config=/etc/kubernetes/manifests \
 		--allow-privileged=false \
-		--v=2 \
 		--cluster-dns=${DNS_SERVER_IP} \
 		--cluster-domain=${DNS_DOMAIN} \
 		--configure-cbr0=true \
 		--cgroup-root=/ \
-		--system-container=/system
+		--system-container=/system \
+		${ARGS}
 end script
 
 # Wait for 10s to start kubelet again.
@@ -256,11 +286,22 @@ start on stopped kube-install-minion and stopped kube-install-packages
 respawn
 
 script
+	set -o errexit
+	set -o nounset
+
 	. /etc/kube-env
-	/usr/bin/kube-proxy \
+	ARGS="--v=2"
+	if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
+		ARGS="${KUBEPROXY_TEST_ARGS}"
+	fi
+	BINARY_PATH="/usr/bin/kube-proxy"
+	if [ "${TEST_CLUSTER:-}" = "true" ]; then
+		BINARY_PATH="/usr/local/bin/kube-proxy"
+	fi
+	${BINARY_PATH} \
 		--master=https://${KUBERNETES_MASTER_NAME} \
 		--kubeconfig=/var/lib/kube-proxy/kubeconfig \
-		--v=2
+		${ARGS}
 end script
 
 # Wait for 10s to start kube-proxy again.
@@ -282,6 +323,9 @@ description "Restart docker daemon"
 start on started kubelet and stopped kube-install-additional-packages
 
 script
+	set -o errexit
+	set -o nounset
+
 	. /etc/kube-env
 	# Assemble docker deamon options
 	echo "DOCKER_OPTS=\"-p /var/run/docker.pid ${EXTRA_DOCKER_OPTS} --log-level=\"debug\" --bridge cbr0 --iptables=false --ip-masq=false\"" > /etc/default/docker
@@ -309,6 +353,9 @@ description "Install kubelet add-on manifest files"
 start on stopped kube-docker
 
 script
+	set -o errexit
+	set -o nounset
+
 	# Configuration files are located at /etc/saltbase.
 	. /etc/kube-env
 	if [ "${ENABLE_NODE_LOGGING}" = "true" ]; then
