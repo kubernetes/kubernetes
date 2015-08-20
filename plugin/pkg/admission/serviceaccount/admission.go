@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"strconv"
 	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
@@ -39,12 +40,19 @@ import (
 // DefaultServiceAccountName is the name of the default service account to set on pods which do not specify a service account
 const DefaultServiceAccountName = "default"
 
+// EnforceMountableSecretsAnnotation is a default annotation that indicates that a service account should enforce mountable secrets.
+// The value must be true to have this annotation take effect
+const EnforceMountableSecretsAnnotation = "kubernetes.io/enforce-mountable-secrets"
+
 // DefaultAPITokenMountPath is the path that ServiceAccountToken secrets are automounted to.
 // The token file would then be accessible at /var/run/secrets/kubernetes.io/serviceaccount
 const DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 
+// PluginName is the name of this admission plugin
+const PluginName = "ServiceAccount"
+
 func init() {
-	admission.RegisterPlugin("ServiceAccount", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin(PluginName, func(client client.Interface, config io.Reader) (admission.Interface, error) {
 		serviceAccountAdmission := NewServiceAccount(client)
 		serviceAccountAdmission.Run()
 		return serviceAccountAdmission, nil
@@ -183,7 +191,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, fmt.Errorf("service account %s/%s was not found, retry after the service account is created", a.GetNamespace(), pod.Spec.ServiceAccountName))
 	}
 
-	if s.LimitSecretReferences {
+	if s.enforceMountableSecrets(serviceAccount) {
 		if err := s.limitSecretReferences(serviceAccount, pod); err != nil {
 			return admission.NewForbidden(a, err)
 		}
@@ -201,6 +209,21 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 
 	return nil
+}
+
+// enforceMountableSecrets indicates whether mountable secrets should be enforced for a particular service account
+// A global setting of true will override any flag set on the individual service account
+func (s *serviceAccount) enforceMountableSecrets(serviceAccount *api.ServiceAccount) bool {
+	if s.LimitSecretReferences {
+		return true
+	}
+
+	if value, ok := serviceAccount.Annotations[EnforceMountableSecretsAnnotation]; ok {
+		enforceMountableSecretCheck, _ := strconv.ParseBool(value)
+		return enforceMountableSecretCheck
+	}
+
+	return false
 }
 
 // getServiceAccount returns the ServiceAccount for the given namespace and name if it exists
