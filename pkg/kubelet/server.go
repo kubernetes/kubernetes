@@ -873,8 +873,41 @@ func (s *Server) getNodeStats(request *restful.Request, response *restful.Respon
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}
-	start := request.QueryParameter("start")
-	end := request.QueryParameter("end")
-	_, _, _ = numstats, start, end
+	start, err := timeQueryParameter(request, "start", time.Time{})
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	end, err := timeQueryParameter(request, "end", time.Now())
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	subcontainers, err := boolQueryParameter(request, "subcontainers", false)
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	cadvisorRequest := &cadvisorApi.ContainerInfoRequest{
+		NumStats: numstats,
+		Start:    start,
+		End:      end,
+	}
+	// var statsMap map[string]*cadvisorApi.ContainerInfo
+	statsMap, err := s.host.GetRawContainerInfo("/", cadvisorRequest, subcontainers)
+
+	stats := []v1.ContainerStats{}
+
+	rootStats := statsMap["/"]
+	_ = rootStats
+	stats = append(stats, v1.ContainerStats{
+		Name:  "/",
+		Stats: nil,
+	})
+
+	nodeStats := v1.NodeStats{
+		Containers: stats,
+	}
+	response.WriteEntity(&nodeStats)
 	return
 }
