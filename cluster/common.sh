@@ -171,6 +171,32 @@ function get-kubeconfig-bearertoken() {
   fi
 }
 
+# Get the master IP for the current-context in kubeconfig if one exists.
+#
+# Assumed vars:
+#   KUBECONFIG  # if unset, defaults to global
+#
+# Vars set:
+#   KUBE_MASTER_URL
+#
+# KUBE_MASTER_URL will be empty if no current-context is set, or the
+# current-context user does not exist or contain a server entry.
+function detect-master-from-kubeconfig() {
+  export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+  # Template to safely extract the server for the current-context cluster.
+  # The long chain of 'with' commands avoids indexing nil if any of the
+  # entries ("current-context", "contexts"."current-context", "users", etc)
+  # is missing.
+  # Note: we save dot ('.') to $root because the 'with' action overrides it.
+  # See http://golang.org/pkg/text/template/.
+  local server_tpl='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $cluster := .context.cluster }}{{range $element := (index $dot "clusters")}}{{ if eq .name $cluster }}{{ index . "cluster" "server" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
+  KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${server_tpl}")
+  # Handle empty/missing server
+  if [[ "${KUBE_MASTER_URL}" == '<no value>' ]]; then
+    KUBE_MASTER_URL=''
+  fi
+}
+
 # Sets KUBE_VERSION variable to the version passed in as an argument, or if argument is
 # latest_stable, latest_release, or latest_ci fetches and sets the corresponding version number
 #

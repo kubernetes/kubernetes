@@ -45,6 +45,9 @@ source "${KUBE_ROOT}/cluster/kube-env.sh"
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     echo "Conformance test: not doing test setup."
     KUBERNETES_PROVIDER=""
+
+    detect-master-from-kubeconfig
+
     auth_config=(
       "--kubeconfig=${KUBECONFIG}"
     )
@@ -56,6 +59,7 @@ else
     prepare-e2e
 
     detect-master >/dev/null
+    KUBE_MASTER_URL="${KUBE_MASTER_URL:-https://${KUBE_MASTER_IP:-}}"
 
     auth_config=(
       "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
@@ -89,7 +93,7 @@ fi
 export PATH=$(dirname "${e2e_test}"):"${PATH}"
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
-  --host="https://${KUBE_MASTER_IP:-}" \
+  --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
   --gce-zone="${ZONE:-}" \
