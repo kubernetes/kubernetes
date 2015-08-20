@@ -32,6 +32,7 @@ Documentation for other releases can be found at
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 Kubernetes Deployment On Bare-metal Ubuntu Nodes with Calico Networking
 ------------------------------------------------
+
 ## Introduction
 
 This document describes how to deploy Kubernetes on ubuntu bare metal nodes with Calico Networking plugin. See [projectcalico.org](http://projectcalico.org) for more information on what Calico is, and [the calicoctl github](https://github.com/projectcalico/calico-docker) for more information on the command-line tool, `calicoctl`.
