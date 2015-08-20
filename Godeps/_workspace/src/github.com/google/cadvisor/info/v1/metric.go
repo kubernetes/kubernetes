@@ -56,7 +56,20 @@ type MetricSpec struct {
 }
 
 // An exported metric.
+type MetricValBasic struct {
+	// Time at which the metric was queried
+	Timestamp time.Time `json:"timestamp"`
+
+	// The value of the metric at this point.
+	IntValue   int64   `json:"int_value,omitempty"`
+	FloatValue float64 `json:"float_value,omitempty"`
+}
+
+// An exported metric.
 type MetricVal struct {
+	// Label associated with a metric
+	Label string `json:"label,omitempty"`
+
 	// Time at which the metric was queried
 	Timestamp time.Time `json:"timestamp"`
 

@@ -42,7 +42,7 @@ import (
 // Housekeeping interval.
 var HousekeepingInterval = flag.Duration("housekeeping_interval", 1*time.Second, "Interval between container housekeepings")
 
-var cgroupPathRegExp = regexp.MustCompile(".*:devices:(.*?),.*")
+var cgroupPathRegExp = regexp.MustCompile(".*devices:(.*?)[,;$].*")
 
 // Decay value used for load average smoothing. Interval length of 10 seconds is used.
 var loadDecay = math.Exp(float64(-1 * (*HousekeepingInterval).Seconds() / 10))
@@ -416,6 +416,8 @@ func (c *containerData) housekeeping() {
 		// Schedule the next housekeeping. Sleep until that time.
 		if time.Now().Before(next) {
 			time.Sleep(next.Sub(time.Now()))
+		} else {
+			next = time.Now()
 		}
 		lastHousekeeping = next
 	}
@@ -529,7 +531,7 @@ func (c *containerData) updateStats() error {
 	return customStatsErr
 }
 
-func (c *containerData) updateCustomStats() (map[string]info.MetricVal, error) {
+func (c *containerData) updateCustomStats() (map[string][]info.MetricVal, error) {
 	_, customStats, customStatsErr := c.collectorManager.Collect()
 	if customStatsErr != nil {
 		if !c.handler.Exists() {

@@ -221,7 +221,7 @@ func (self *manager) Start() error {
 		} else {
 			err = cpuLoadReader.Start()
 			if err != nil {
-				glog.Warning("Could not start cpu load stat collector: %s", err)
+				glog.Warningf("Could not start cpu load stat collector: %s", err)
 			} else {
 				self.loadReader = cpuLoadReader
 			}
@@ -705,15 +705,28 @@ func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *c
 		}
 		glog.V(3).Infof("Got config from %q: %q", v, configFile)
 
-		newCollector, err := collector.NewCollector(k, configFile)
-		if err != nil {
-			glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
-			return err
-		}
-		err = cont.collectorManager.RegisterCollector(newCollector)
-		if err != nil {
-			glog.Infof("failed to register collector for container %q, config %q: %v", cont.info.Name, k, err)
-			return err
+		if strings.HasPrefix(k, "prometheus") || strings.HasPrefix(k, "Prometheus") {
+			newCollector, err := collector.NewPrometheusCollector(k, configFile)
+			if err != nil {
+				glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
+				return err
+			}
+			err = cont.collectorManager.RegisterCollector(newCollector)
+			if err != nil {
+				glog.Infof("failed to register collector for container %q, config %q: %v", cont.info.Name, k, err)
+				return err
+			}
+		} else {
+			newCollector, err := collector.NewCollector(k, configFile)
+			if err != nil {
+				glog.Infof("failed to create collector for container %q, config %q: %v", cont.info.Name, k, err)
+				return err
+			}
+			err = cont.collectorManager.RegisterCollector(newCollector)
+			if err != nil {
+				glog.Infof("failed to register collector for container %q, config %q: %v", cont.info.Name, k, err)
+				return err
+			}
 		}
 	}
 	return nil
