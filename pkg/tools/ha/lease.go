@@ -141,40 +141,27 @@ func (c *Config) leaseAndUpdateLoop() {
 }
 
 // A lock can be invalid if (1) it doesnt exist or (2) we decided to delete it.
-func (c *Config) getValidLockOrDelete() (*api.Lock, error) {
-	ilock := c.Cli.Locks(api.NamespaceDefault)
+// This function will return nil if a lock cannot be acquired.
+func (c *Config) getValidLockOrDelete(ilock client.LockInterface) (*api.Lock, error) {
 	acquiredLock, err := ilock.Get(c.Key)
+	glog.Errorf("LOCK GET :::::::::::::::::: %v %v", acquiredLock, err)
 	if err != nil {
 		glog.Errorf("Error could not get any lock : %v", err)
-		return nil, err
+	} else {
+		//Read the renewal time.  We will delete the lock unless the renewal time
+		//is within our TTL.
+		glog.Errorf("%v acquiredLock.Spec.RenewTime", acquiredLock.Spec.RenewTime)
+		rTime, _ := time.Parse("2006-01-02 15:04:05 -0700 MST", acquiredLock.Spec.RenewTime)
+		//If the current time is larger than the last update time, the lock is old,
+		//regardless of the owner, we can safely delete it - because any lock owner
+		//by now would have renewed it unless it has died off.
+		if uint64(time.Since(rTime)/time.Second) >= c.ttl {
+			ilock.Delete(c.Key)
+			glog.Errorf("Deleted a stale lock (last renewal was %v, current time is %v).  Time to make a new one !", rTime, time.Now())
+		}
 	}
-
-	//Read the renewal time.  We will delete the lock unless the renewal time
-	//is within our TTL.
-	glog.Errorf("%v acquiredLock.Spec.RenewTime", acquiredLock.Spec.RenewTime)
-	rTime, _ := time.Parse("2006-01-02 15:04:05 -0700 MST", acquiredLock.Spec.RenewTime)
-
-	//If the current time is larger than the last update time, the lock is old,
-	//regardless of the owner, we can safely delete it - because any lock owner
-	//by now would have renewed it unless it has died off.
-	if uint64(time.Since(rTime)/time.Second) >= c.ttl {
-		ilock.Delete(c.Key)
-		glog.Errorf("Deleted a stale lock (last renewal was %v, current time is %v).  Time to make a new one !", rTime, time.Now())
-		return nil, nil
-	}
-
-	//Lock looks good.  Lets return it.
-	return acquiredLock, nil
-}
-
-// acquireOrRenewLease either races to acquire a new master lease, or update the existing master's lease
-// returns true if we have the lease, and an error if one occurs.
-// TODO: use the master election utility once it is merged in.
-func (c *Config) acquireOrRenewLease() (bool, error) {
-	acquiredLock, err := c.getValidLockOrDelete()
-	ilock := c.Cli.Locks(api.NamespaceDefault)
 	//No lock exists, lets create one if possible.
-	if acquiredLock == nil {
+	if acquiredLock == nil || err != nil {
 		acquiredLock, err = ilock.Create(
 			&api.Lock{
 				ObjectMeta: api.ObjectMeta{
@@ -189,11 +176,23 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 
 		if err != nil {
 			glog.Errorf("Lock was NOT created, ERROR = %v", err)
-			return false, err
+			return nil, err
 		} else {
 			glog.Errorf("Lock created successfully %v !", acquiredLock.Spec.RenewTime)
 		}
 	}
+	return acquiredLock, nil
+}
+
+// acquireOrRenewLease either races to acquire a new master lease, or update the existing master's lease
+// returns true if we have the lease, and an error if one occurs.
+// TODO: use the master election utility once it is merged in.
+func (c *Config) acquireOrRenewLease() (bool, error) {
+
+	ilock := c.Cli.Locks(api.NamespaceDefault)
+
+	acquiredLock, err := c.getValidLockOrDelete(ilock)
+
 	// UPDATE will fail if another node has the lock.  In any case, if an UPDATE fails,
 	// we cannot take the lock, so the result is the same - return false and return error details.
 	glog.Errorf("Updating acquired lock %v", acquiredLock)
@@ -203,7 +202,7 @@ func (c *Config) acquireOrRenewLease() (bool, error) {
 	acquiredLock.Spec.HeldBy = c.whoami
 	acquiredLock, err = ilock.Update(acquiredLock)
 	if err != nil {
-		glog.Errorf("Acquire lock failed.  We don't have the lock, master is %v", acquiredLock)
+		glog.Errorf("Acquire lock failed.  We don't have the lock, master is %v , %v", acquiredLock.Spec.HeldBy, acquiredLock.Spec)
 		return false, err
 	}
 	glog.Errorf("Acquired lock successfully.  We are the master, yipppeee! %v", acquiredLock.Spec.RenewTime)
