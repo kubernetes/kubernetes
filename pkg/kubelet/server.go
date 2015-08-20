@@ -153,6 +153,9 @@ func (s *Server) InstallDefaultHandlers() {
 	ws.Route(ws.GET("").
 		To(s.getNodeStats).
 		Operation("getNodeStats").
+		Param(ws.QueryParameter("numstats", "max number of stats to return").DataType("int")).
+		Param(ws.QueryParameter("start", "start time of the query").DataType("time.Time")).
+		Param(ws.QueryParameter("end", "end time of the query").DataType("time.Time")).
 		Writes(v1.NodeStats{}))
 	s.restfulCont.Add(ws)
 
@@ -265,6 +268,43 @@ func (s *Server) InstallDebuggingHandlers() {
 		To(s.getRunningPods).
 		Operation("getRunningPods"))
 	s.restfulCont.Add(ws)
+}
+
+func boolQueryParameter(req *restful.Request, param string, defValue bool) (bool, error) {
+	s := req.QueryParameter(param)
+	if s == "" {
+		return defValue, nil
+	}
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		return false, fmt.Errorf("invalid bool query parameter: %s", s)
+	}
+	return b, nil
+}
+
+func intQueryParameter(req *restful.Request, param string, defValue int) (int, error) {
+	s := req.QueryParameter(param)
+	if s == "" {
+		return defValue, nil
+	}
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid int query parameter: %s", s)
+	}
+	return i, nil
+}
+
+func timeQueryParameter(req *restful.Request, param string, defValue time.Time) (time.Time, error) {
+	s := req.QueryParameter(param)
+	if s == "" {
+		return defValue, nil
+	}
+	// RFC3339 since it's simple and doesn't contain any spaces
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid time query parameter: %s", s)
+	}
+	return t, nil
 }
 
 type httpHandler struct {
@@ -820,5 +860,13 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) getNodeStats(request *restful.Request, response *restful.Response) {
+	numstats, err := intQueryParameter(request, "numstats", 60)
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	start := request.QueryParameter("start")
+	end := request.QueryParameter("end")
+	_, _, _ = numstats, start, end
 	return
 }
