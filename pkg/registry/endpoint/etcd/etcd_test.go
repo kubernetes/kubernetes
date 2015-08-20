@@ -67,6 +67,12 @@ func TestCreate(t *testing.T) {
 	test.TestCreate(
 		// valid
 		endpoints,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&api.Endpoints{
 			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},

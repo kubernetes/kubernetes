@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -32,6 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util"
 )
+
+// TODO(wojtek-t): Cleanup this file.
+// It is now testing mostly the same things as other resources but
+// in a completely different way. We should unify it.
 
 func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry) {
 	registry := registrytest.NewServiceRegistry()
@@ -741,25 +744,6 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	}
 }
 
-// TODO: remove, covered by TestCreate
-func TestCreateServiceWithConflictingNamespace(t *testing.T) {
-	storage := REST{}
-	service := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
-	}
-
-	ctx := api.NewDefaultContext()
-	obj, err := storage.Create(ctx, service)
-	if obj != nil {
-		t.Error("Expected a nil object, but we got a value")
-	}
-	if err == nil {
-		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Contains(err.Error(), "Service.Namespace does not match the provided context") {
-		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
-	}
-}
-
 func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	service := &api.Service{
@@ -776,44 +760,4 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
 		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
 	}
-}
-
-func TestCreate(t *testing.T) {
-	rest, registry := NewTestREST(t, nil)
-
-	test := resttest.New(t, rest, registry.SetError)
-	test.TestCreate(
-		// valid
-		&api.Service{
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				ClusterIP:       "None",
-				SessionAffinity: "None",
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:       6502,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: util.NewIntOrStringFromInt(6502),
-				}},
-			},
-		},
-		// invalid
-		&api.Service{
-			Spec: api.ServiceSpec{},
-		},
-		// invalid
-		&api.Service{
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				ClusterIP:       "invalid",
-				SessionAffinity: "None",
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:       6502,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: util.NewIntOrStringFromInt(6502),
-				}},
-			},
-		},
-	)
 }

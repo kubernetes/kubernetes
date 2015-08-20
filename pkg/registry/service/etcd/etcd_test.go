@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
@@ -32,38 +32,34 @@ func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	return NewREST(etcdStorage), fakeClient
 }
 
-func validNewLimitRange() *api.LimitRange {
-	return &api.LimitRange{
+func validService() *api.Service {
+	return &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: api.LimitRangeSpec{
-			Limits: []api.LimitRangeItem{
-				{
-					Type: api.LimitTypePod,
-					Max: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100"),
-						api.ResourceMemory: resource.MustParse("10000"),
-					},
-					Min: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("0"),
-						api.ResourceMemory: resource.MustParse("100"),
-					},
-				},
-			},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			ClusterIP:       "None",
+			SessionAffinity: "None",
+			Type:            api.ServiceTypeClusterIP,
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
+			}},
 		},
 	}
 }
 
 func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError).GeneratesName()
-	validLimitRange := validNewLimitRange()
-	validLimitRange.ObjectMeta = api.ObjectMeta{}
+	test := resttest.New(t, storage, fakeClient.SetError)
+	validService := validService()
+	validService.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
-		validLimitRange,
+		validService,
 		func(ctx api.Context, obj runtime.Object) error {
 			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
 		},
@@ -71,8 +67,22 @@ func TestCreate(t *testing.T) {
 			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
 		},
 		// invalid
-		&api.LimitRange{
-			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
+		&api.Service{
+			Spec: api.ServiceSpec{},
+		},
+		// invalid
+		&api.Service{
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				ClusterIP:       "invalid",
+				SessionAffinity: "None",
+				Type:            api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(6502),
+				}},
+			},
 		},
 	)
 }

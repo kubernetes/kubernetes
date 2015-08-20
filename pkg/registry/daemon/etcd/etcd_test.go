@@ -17,7 +17,6 @@ limitations under the License.
 package etcd
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -29,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
@@ -41,18 +40,9 @@ const (
 	FAIL
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	helper := etcdstorage.NewEtcdStorage(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
-	return fakeEtcdClient, helper
-}
-
-// newStorage creates a REST storage backed by etcd helpers
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	fakeEtcdClient, h := newEtcdStorage(t)
-	storage := NewREST(h)
-	return storage, fakeEtcdClient
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage), fakeClient
 }
 
 // createController is a helper function that returns a controller with the updated resource version.
@@ -95,6 +85,33 @@ var validController = api.Daemon{
 	Spec:       validControllerSpec,
 }
 
+func TestCreate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
+	test.TestCreate(
+		// valid
+		&api.Daemon{
+			Spec: api.DaemonSpec{
+				Selector: map[string]string{"a": "b"},
+				Template: &validPodTemplate.Template,
+			},
+		},
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// invalid
+		&api.Daemon{
+			Spec: api.DaemonSpec{
+				Selector: map[string]string{},
+				Template: &validPodTemplate.Template,
+			},
+		},
+	)
+}
+
 // makeControllerKey constructs etcd paths to controller items enforcing namespace rules.
 func makeControllerKey(ctx api.Context, id string) (string, error) {
 	return etcdgeneric.NamespaceKeyFunc(ctx, daemonPrefix, id)
@@ -104,103 +121,6 @@ func makeControllerKey(ctx api.Context, id string) (string, error) {
 // not a specific controller resource
 func makeControllerListKey(ctx api.Context) string {
 	return etcdgeneric.NamespaceKeyRootFunc(ctx, daemonPrefix)
-}
-
-func TestEtcdCreateController(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	_, err := storage.Create(ctx, &validController)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	key, _ := makeControllerKey(ctx, validController.Name)
-	key = etcdtest.AddPrefix(key)
-	resp, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var ctrl api.Daemon
-	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &ctrl)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if ctrl.Name != "foo" {
-		t.Errorf("Unexpected controller: %#v %s", ctrl, resp.Node.Value)
-	}
-}
-
-func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	key, _ := makeControllerKey(ctx, validController.Name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &validController), 0)
-
-	_, err := storage.Create(ctx, &validController)
-	if !errors.IsAlreadyExists(err) {
-		t.Errorf("expected already exists err, got %#v", err)
-	}
-}
-
-func TestEtcdCreateControllerValidates(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, _ := newStorage(t)
-	emptyName := validController
-	emptyName.Name = ""
-	failureCases := []api.Daemon{emptyName}
-	for _, failureCase := range failureCases {
-		c, err := storage.Create(ctx, &failureCase)
-		if c != nil {
-			t.Errorf("Expected nil channel")
-		}
-		if !errors.IsInvalid(err) {
-			t.Errorf("Expected to get an invalid resource error, got %v", err)
-		}
-	}
-}
-
-func TestCreateControllerWithGeneratedName(t *testing.T) {
-	storage, _ := newStorage(t)
-	controller := &api.Daemon{
-		ObjectMeta: api.ObjectMeta{
-			Namespace:    api.NamespaceDefault,
-			GenerateName: "daemon-",
-		},
-		Spec: api.DaemonSpec{
-			Selector: map[string]string{"a": "b"},
-			Template: &validPodTemplate.Template,
-		},
-	}
-
-	ctx := api.NewDefaultContext()
-	_, err := storage.Create(ctx, controller)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if controller.Name == "daemon-" || !strings.HasPrefix(controller.Name, "daemon-") {
-		t.Errorf("unexpected name: %#v", controller)
-	}
-}
-
-func TestCreateControllerWithConflictingNamespace(t *testing.T) {
-	storage, _ := newStorage(t)
-	controller := &api.Daemon{
-		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
-	}
-
-	ctx := api.NewDefaultContext()
-	channel, err := storage.Create(ctx, controller)
-	if channel != nil {
-		t.Error("Expected a nil channel, but we got a value")
-	}
-	errSubString := "namespace"
-	if err == nil {
-		t.Errorf("Expected an error, but we didn't get one")
-	} else if !errors.IsBadRequest(err) ||
-		strings.Index(err.Error(), errSubString) == -1 {
-		t.Errorf("Expected a Bad Request error with the sub string '%s', got %v", errSubString, err)
-	}
 }
 
 func TestEtcdGetController(t *testing.T) {
@@ -651,27 +571,6 @@ func TestEtcdWatchControllersNotMatch(t *testing.T) {
 	case <-time.After(time.Millisecond * 100):
 		// expected case
 	}
-}
-
-func TestCreate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	test.TestCreate(
-		// valid
-		&api.Daemon{
-			Spec: api.DaemonSpec{
-				Selector: map[string]string{"a": "b"},
-				Template: &validPodTemplate.Template,
-			},
-		},
-		// invalid
-		&api.Daemon{
-			Spec: api.DaemonSpec{
-				Selector: map[string]string{},
-				Template: &validPodTemplate.Template,
-			},
-		},
-	)
 }
 
 func TestDelete(t *testing.T) {
