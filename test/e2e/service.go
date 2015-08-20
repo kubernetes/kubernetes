@@ -1372,7 +1372,7 @@ func verifyServeHostnameServiceUp(c *client.Client, host string, expectedPods []
 				passed = true
 				break
 			}
-			Logf("Expected pods: %v, got: %v", expectedPods, pods)
+			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, pods)
 		}
 		if !passed {
 			return fmt.Errorf("service verification failed for:\n %s", cmd)

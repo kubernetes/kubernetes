@@ -255,8 +255,17 @@ func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList,
 			return nil, err
 		}
 
-		Logf("Pod name %s: Found %d pods out of %d", name, len(pods.Items), replicas)
-		if len(pods.Items) == replicas {
+		created := []api.Pod{}
+		for _, pod := range pods.Items {
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
+			created = append(created, pod)
+		}
+		Logf("Pod name %s: Found %d pods out of %d", name, len(created), replicas)
+
+		if len(created) == replicas {
+			pods.Items = created
 			return pods, nil
 		}
 	}
@@ -415,6 +424,9 @@ var _ = Describe("Nodes", func() {
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
 		if err := deleteNS(c, ns); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
+		}
+		if err := deleteTestingNS(c); err != nil {
+			Failf("Couldn't delete testing namespaces '%s', %v", ns, err)
 		}
 	})
 

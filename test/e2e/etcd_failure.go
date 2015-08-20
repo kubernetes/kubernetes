@@ -138,7 +138,7 @@ func checkExistingRCRecovers(f Framework) {
 		pods, err := podClient.List(rcSelector, fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range pods.Items {
-			if api.IsPodReady(&pod) {
+			if pod.DeletionTimestamp == nil && api.IsPodReady(&pod) {
 				return true, nil
 			}
 		}
