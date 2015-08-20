@@ -99,15 +99,23 @@ func TestCreate(t *testing.T) {
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 	pod := validNewPod()
 	pod.ObjectMeta = api.ObjectMeta{}
+	// Make an invalid pod with an an incorrect label.
+	invalidPod := validNewPod()
+	invalidPod.Namespace = test.TestNamespace()
+	invalidPod.Labels = map[string]string{
+		"invalid/label/to/cause/validation/failure": "bar",
+	}
 	test.TestCreate(
 		// valid
 		pod,
-		// invalid
+		// invalid (empty contains list)
 		&api.Pod{
 			Spec: api.PodSpec{
 				Containers: []api.Container{},
 			},
 		},
+		// invalid (invalid labels)
+		invalidPod,
 	)
 }
 
@@ -199,68 +207,6 @@ func TestPodDecode(t *testing.T) {
 
 	if !api.Semantic.DeepEqual(expected, actual) {
 		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
-	}
-}
-
-// TODO: remove, this is covered by RESTTest.TestCreate
-func TestPodStorageValidatesCreate(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage := NewStorage(etcdStorage, nil).Pod
-
-	pod := validNewPod()
-	pod.Labels = map[string]string{
-		"invalid/label/to/cause/validation/failure": "bar",
-	}
-	c, err := storage.Create(api.NewDefaultContext(), pod)
-	if c != nil {
-		t.Errorf("Expected nil object")
-	}
-	if !errors.IsInvalid(err) {
-		t.Errorf("Expected to get an invalid resource error, got %v", err)
-	}
-}
-
-// TODO: remove, this is covered by RESTTest.TestCreate
-func TestCreatePod(t *testing.T) {
-	_, etcdStorage := newEtcdStorage(t)
-	storage := NewStorage(etcdStorage, nil).Pod
-	ctx := api.NewDefaultContext()
-	key, _ := storage.Etcd.KeyFunc(ctx, "foo")
-
-	pod := validNewPod()
-	obj, err := storage.Create(api.NewDefaultContext(), pod)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if obj == nil {
-		t.Fatalf("unexpected object: %#v", obj)
-	}
-	actual := &api.Pod{}
-	if err := etcdStorage.Get(key, actual, false); err != nil {
-		t.Fatalf("unexpected extraction error: %v", err)
-	}
-	if !api.HasObjectMetaSystemFieldValues(&actual.ObjectMeta) {
-		t.Errorf("Expected ObjectMeta field values were populated: %#v", actual)
-	}
-}
-
-// TODO: remove, this is covered by RESTTest.TestCreate
-func TestCreateWithConflictingNamespace(t *testing.T) {
-	_, etcdStorage := newEtcdStorage(t)
-	storage := NewStorage(etcdStorage, nil).Pod
-
-	pod := validNewPod()
-	pod.Namespace = "not-default"
-
-	obj, err := storage.Create(api.NewDefaultContext(), pod)
-	if obj != nil {
-		t.Error("Expected a nil obj, but we got a value")
-	}
-	if err == nil {
-		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
-		t.Errorf("Expected 'Pod.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
 }
 
