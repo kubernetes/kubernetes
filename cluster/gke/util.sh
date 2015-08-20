@@ -113,6 +113,7 @@ function verify-prereqs() {
 #   CLUSTER_API_VERSION (optional)
 #   NUM_MINIONS
 #   MINION_SCOPES
+#   MACHINE_TYPE
 function kube-up() {
   echo "... in gke:kube-up()" >&2
   detect-project >&2
@@ -145,6 +146,7 @@ function kube-up() {
     "--network=${NETWORK}"
     "--scopes=${MINION_SCOPES}"
     "--cluster-version=${CLUSTER_API_VERSION}"
+    "--machine-type=${MACHINE_TYPE}"
   )
 
   # Bring up the cluster.
