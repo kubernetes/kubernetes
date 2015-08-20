@@ -198,6 +198,7 @@ required-contexts
 resource-container
 resource-quota-sync-period
 resource-version
+rkt-path
 root-ca-file
 root-dir
 run-proxy

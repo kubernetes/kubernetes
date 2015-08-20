@@ -131,11 +131,14 @@ func New(config *Config,
 		return nil, fmt.Errorf("cannot connect to dbus: %v", err)
 	}
 
-	// Test if rkt binary is in $PATH.
-	// TODO(yifan): Use a kubelet flag to read the path.
-	rktBinAbsPath, err := exec.LookPath("rkt")
-	if err != nil {
-		return nil, fmt.Errorf("cannot find rkt binary: %v", err)
+	rktBinAbsPath := config.Path
+	if rktBinAbsPath == "" {
+		// No default rkt path was set, so try to find one in $PATH.
+		var err error
+		rktBinAbsPath, err = exec.LookPath("rkt")
+		if err != nil {
+			return nil, fmt.Errorf("cannot find rkt binary: %v", err)
+		}
 	}
 
 	rkt := &runtime{
