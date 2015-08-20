@@ -521,8 +521,8 @@ func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (*api.LoadBalanc
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(4).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, ports, hosts, affinity)
+func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, ports, hosts, affinity)
 
 	if len(ports) > 1 {
 		return nil, fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
@@ -536,6 +536,21 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		persistence = &vips.SessionPersistence{Type: "SOURCE_IP"}
 	default:
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
+	}
+
+	glog.V(2).Info("Checking if openstack load balancer already exists: %s", name)
+	_, exists, err := lb.GetTCPLoadBalancer(name, region)
+	if err != nil {
+		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
+	}
+
+	// TODO: Implement a more efficient update strategy for common changes than delete & create
+	// In particular, if we implement hosts update, we can get rid of UpdateHosts
+	if exists {
+		err := lb.EnsureTCPLoadBalancerDeleted(name, region)
+		if err != nil {
+			return nil, fmt.Errorf("error deleting existing openstack load balancer: %v", err)
+		}
 	}
 
 	lbmethod := lb.opts.LBMethod

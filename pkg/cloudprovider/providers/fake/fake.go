@@ -56,7 +56,7 @@ type FakeCloud struct {
 	ClusterList   []string
 	MasterName    string
 	ExternalIP    net.IP
-	Balancers     []FakeBalancer
+	Balancers     map[string]FakeBalancer
 	UpdateCalls   []FakeUpdateBalancerCall
 	RouteMap      map[string]*FakeRoute
 	Lock          sync.Mutex
@@ -123,11 +123,14 @@ func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerSt
 	return status, f.Exists, f.Err
 }
 
-// CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
+// EnsureTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.EnsureTCPLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+func (f *FakeCloud) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	f.addCall("create")
-	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, ports, hosts})
+	if f.Balancers == nil {
+		f.Balancers = make(map[string]FakeBalancer)
+	}
+	f.Balancers[name] = FakeBalancer{name, region, externalIP, ports, hosts}
 
 	status := &api.LoadBalancerStatus{}
 	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}

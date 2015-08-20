@@ -348,11 +348,26 @@ func makeFirewallName(name string) string {
 	return fmt.Sprintf("k8s-fw-%s", name)
 }
 
-// CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
+// EnsureTCPLoadBalancer is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancer.
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
+func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	glog.V(2).Info("Checking if load balancer already exists: %s", name)
+	_, exists, err := gce.GetTCPLoadBalancer(name, region)
+	if err != nil {
+		return nil, fmt.Errorf("error checking if GCE load balancer already exists: %v", err)
+	}
+
+	// TODO: Implement a more efficient update strategy for common changes than delete & create
+	// In particular, if we implement hosts update, we can get rid of UpdateHosts
+	if exists {
+		err := gce.EnsureTCPLoadBalancerDeleted(name, region)
+		if err != nil {
+			return nil, fmt.Errorf("error deleting existing GCE load balancer: %v", err)
+		}
+	}
+
+	err = gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
 			return nil, err
