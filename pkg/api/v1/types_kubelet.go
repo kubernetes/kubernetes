@@ -25,13 +25,15 @@ import (
 type NodeStats struct {
 	TypeMeta
 	ObjectMeta // should have node name
-	Containers []struct {
-		Name  string            `json:"name"`
-		Stats []*ContainerStats `json:"stats"`
-	}
+	Containers []ContainerStats
 }
 
 type ContainerStats struct {
+	Name  string                 `json:"name"`
+	Stats []*ContainerStatsPoint `json:"stats"`
+}
+
+type ContainerStatsPoint struct {
 	Time time.Time `json:"time"`
 
 	Cpu    CpuStats    `json:"cpu"`
