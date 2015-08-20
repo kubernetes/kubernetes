@@ -584,7 +584,17 @@ func (dm *DockerManager) runContainer(
 	// TODO(vmarmol): Handle better.
 	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
 	const hostnameMaxLen = 63
-	containerHostname := pod.Name
+	var containerHostname string
+	if pod.Spec.HostNetwork {
+		hostname, err := os.Hostname()
+		if err != nil {
+			glog.Errorf("Failed to get node hostname: %v", err)
+		} else {
+			containerHostname = hostname
+		}
+	} else {
+		containerHostname = pod.Name
+	}
 	if len(containerHostname) > hostnameMaxLen {
 		containerHostname = containerHostname[:hostnameMaxLen]
 	}
