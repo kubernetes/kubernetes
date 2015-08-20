@@ -363,7 +363,13 @@ func podHostString(host, ip string) string {
 }
 
 func shortHumanDuration(d time.Duration) string {
-	if seconds := int(d.Seconds()); seconds < 60 {
+	// Allow deviation no more than 2 seconds(excluded) to tolerate machine time
+	// inconsistence, it can be considered as almost now.
+	if seconds := int(d.Seconds()); seconds < -1 {
+		return fmt.Sprintf("<invalid>")
+	} else if seconds < 0 {
+		return fmt.Sprintf("0s")
+	} else if seconds < 60 {
 		return fmt.Sprintf("%ds", seconds)
 	} else if minutes := int(d.Minutes()); minutes < 60 {
 		return fmt.Sprintf("%dm", minutes)
@@ -378,6 +384,9 @@ func shortHumanDuration(d time.Duration) string {
 // translateTimestamp returns the elapsed time since timestamp in
 // human-readable approximation.
 func translateTimestamp(timestamp util.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
 	return shortHumanDuration(time.Now().Sub(timestamp.Time))
 }
 
