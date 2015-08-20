@@ -27,24 +27,46 @@ set -o errtrace
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 provider_root="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}"
-compose_file="${provider_root}/docker-compose.yml"
 
 source "${provider_root}/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${provider_root}/common/bin/util-ssl.sh"
 
+# Execute a docker-compose command with the default environment and compose file.
+function cluster::mesos::docker::docker_compose {
+  local params="$@"
+
+  # All vars required to be set
+  declare -a env_vars=(
+    "KUBE_KEYGEN_TIMEOUT"
+    "MESOS_DOCKER_ETCD_TIMEOUT"
+    "MESOS_DOCKER_MESOS_TIMEOUT"
+    "MESOS_DOCKER_API_TIMEOUT"
+    "MESOS_DOCKER_ADDON_TIMEOUT"
+    "MESOS_DOCKER_WORK_DIR"
+    "DOCKER_DAEMON_ARGS"
+  )
+
+  (
+    for var_name in "${env_vars[@]}"; do
+      export ${var_name}="${!var_name}"
+    done
+
+    docker-compose -f "${provider_root}/docker-compose.yml" ${params}
+  )
+}
 
 # Run kubernetes scripts inside docker.
 # This bypasses the need to set up network routing when running docker in a VM (e.g. boot2docker).
 # Trap signals and kills the docker container for better signal handing
 function cluster::mesos::docker::run_in_docker_test {
-  entrypoint="$1"
+  local entrypoint="$1"
   if [[ "${entrypoint}" = "./"* ]]; then
     # relative to project root
     entrypoint="/go/src/github.com/GoogleCloudPlatform/kubernetes/${entrypoint}"
   fi
   shift
-  args="$@"
+  local args="$@"
 
   # only mount KUBECONFIG if it exists, otherwise the directory will be created/owned by root
   kube_config_mount=""
@@ -87,7 +109,7 @@ function cluster::mesos::docker::run_in_docker_test {
 # Run kube-cagen.sh inside docker.
 # Creating and signing in the same environment avoids a subject comparison string_mask issue.
 function cluster::mesos::docker::run_in_docker_cagen {
-  out_dir="$1"
+  local out_dir="$1"
 
   container_id=$(
     docker run \
@@ -153,7 +175,7 @@ function test-build-release {
 function detect-master {
   #  echo "KUBE_MASTER: $KUBE_MASTER" 1>&2
 
-  docker_id=$(docker ps --filter="name=docker_apiserver" --quiet)
+  local docker_id=$(docker ps --filter="name=docker_apiserver" --quiet)
   if [[ "${docker_id}" == *'\n'* ]]; then
     echo "ERROR: Multiple API Servers running" 1>&2
     return 1
@@ -172,13 +194,13 @@ function detect-master {
 # These Mesos slaves MAY host Kublets,
 # but might not have a Kublet running unless a kubernetes task has been scheduled on them.
 function detect-minions {
-  docker_ids=$(docker ps --filter="name=docker_mesosslave" --quiet)
+  local docker_ids=$(docker ps --filter="name=docker_mesosslave" --quiet)
   if [ -z "${docker_ids}" ]; then
     echo "ERROR: Mesos slave(s) not running" 1>&2
     return 1
   fi
   while read -r docker_id; do
-    minion_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
+    local minion_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
     KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
   done <<< "$docker_ids"
   echo "KUBE_MINION_IP_ADDRESSES: [${KUBE_MINION_IP_ADDRESSES[*]}]" 1>&2
@@ -186,10 +208,9 @@ function detect-minions {
 
 # Verify prereqs on host machine
 function verify-prereqs {
-  echo "TODO: verify-prereqs" 1>&2
-  # Verify that docker, docker-compose, and jq exist
-  # Verify that all the right docker images exist:
-  # mesosphere/kubernetes-mesos-test, etc.
+  echo "Verifying required commands" 1>&2
+  hash docker 2>/dev/null || { echo "Missing required command: docker" 1>&2; exit 1; }
+  hash docker 2>/dev/null || { echo "Missing required command: docker-compose" 1>&2; exit 1; }
 }
 
 # Initialize
@@ -202,17 +223,17 @@ function cluster::mesos::docker::init_auth {
   mkdir -p "${auth_dir}"
   rm -rf "${auth_dir}"/*
 
-  echo "Creating root certificate authority" 1>&2
+  echo "Creating Certificate Authority" 1>&2
   cluster::mesos::docker::run_in_docker_cagen "${auth_dir}"
 
-  echo "Creating service-account rsa key" 1>&2
+  echo "Creating Service-Account RSA Key" 1>&2
   cluster::mesos::docker::create_rsa_key "${auth_dir}/service-accounts.key"
 
-  echo "Creating cluster-admin token user" 1>&2
+  echo "Creating User Accounts" 1>&2
   cluster::mesos::docker::create_token_user "cluster-admin" > "${auth_dir}/token-users"
-
-  echo "Creating admin basic auth user" 1>&2
+  echo "Token Users: ${auth_dir}/token-users" 1>&2
   cluster::mesos::docker::create_basic_user "admin" "admin" > "${auth_dir}/basic-users"
+  echo "Basic-Auth Users: ${auth_dir}/basic-users" 1>&2
 }
 
 # Instantiate a kubernetes cluster.
@@ -235,7 +256,7 @@ function kube-up {
     # Pull before `docker-compose up` to avoid timeouts between container runs.
     # Pull before building images (but only if built) to avoid overwriting locally built images.
     echo "Pulling docker images" 1>&2
-    docker-compose -f "${compose_file}" pull
+    cluster::mesos::docker::docker_compose pull
 
     echo "Building Docker images" 1>&2
     # TODO: version images (k8s version, git sha, and dirty state) to avoid re-building them every time.
@@ -251,14 +272,7 @@ function kube-up {
   trap "cluster::mesos::docker::dump_logs '${log_dir}'" EXIT
 
   echo "Starting ${KUBERNETES_PROVIDER} cluster" 1>&2
-  export MESOS_DOCKER_ETCD_TIMEOUT="${MESOS_DOCKER_ETCD_TIMEOUT}"
-  export MESOS_DOCKER_MESOS_TIMEOUT="${MESOS_DOCKER_MESOS_TIMEOUT}"
-  export MESOS_DOCKER_API_TIMEOUT="${MESOS_DOCKER_API_TIMEOUT}"
-  export KUBE_KEYGEN_TIMEOUT="${KUBE_KEYGEN_TIMEOUT}"
-  export MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR}"
-  export MESOS_DOCKER_IMAGE_DIR="${MESOS_DOCKER_IMAGE_DIR}"
-  export DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS}"
-  docker-compose -f "${compose_file}" up -d
+  cluster::mesos::docker::docker_compose up -d
 
   # await-health-check requires GNU timeout
   # apiserver hostname resolved by docker
@@ -293,8 +307,8 @@ function validate-cluster {
 function kube-down {
   echo "Stopping ${KUBERNETES_PROVIDER} cluster" 1>&2
   # Since restoring a stopped cluster is not yet supported, use the nuclear option
-  docker-compose -f "${compose_file}" kill
-  docker-compose -f "${compose_file}" rm -f
+  cluster::mesos::docker::docker_compose kill
+  cluster::mesos::docker::docker_compose rm -f
 }
 
 function test-setup {
@@ -359,5 +373,5 @@ function cluster::mesos::docker::dump_logs {
   mkdir -p "${out_dir}"
   while read name; do
     docker logs "${name}" &> "${out_dir}/${name}.log"
-  done < <(docker-compose -f "${compose_file}" ps -q | xargs docker inspect --format '{{.Name}}')
+  done < <(cluster::mesos::docker::docker_compose ps -q | xargs docker inspect --format '{{.Name}}')
 }
