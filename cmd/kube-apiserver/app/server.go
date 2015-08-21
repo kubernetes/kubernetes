@@ -21,11 +21,13 @@ package app
 
 import (
 	"crypto/tls"
+	goflag "flag"
 	"net"
 	"net/http"
 	"os"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -45,10 +47,12 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 	forked "k8s.io/kubernetes/third_party/forked/coreos/go-etcd/etcd"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -146,6 +150,31 @@ func NewAPIServer() *APIServer {
 	return &s
 }
 
+func NewAPIServerCmd() *cobra.Command {
+	s := NewAPIServer()
+	cmd := &cobra.Command{
+		Use:   "kube-apiserver",
+		Short: "kube-apiserver is the API server for a kubernetes cluster",
+		Long: `The Kubernetes API server validates and configures data
+for the api objects which include pods, services, replicationcontrollers, and
+others. The API Server services REST operations and provides the frontend to the
+cluster's shared state through which all other components interact.
+
+Find more information at https://github.com/kubernetes/kubernetes.`,
+		Run: func(_ *cobra.Command, args []string) {
+			if err := s.Run(args); err != nil {
+				glog.Fatalf("%v", err)
+			}
+		},
+	}
+
+	s.AddFlags(cmd.Flags())
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	cmd.SetGlobalNormalizationFunc(util.WordSepNormalizeFunc)
+
+	return cmd
+}
+
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
@@ -205,7 +234,9 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL, "If passed, activates the keystone authentication plugin")
 	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	fs.StringVar(&s.AuthorizationPolicyFile, "authorization-policy-file", s.AuthorizationPolicyFile, "File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
-	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
+	plugins := admission.GetPlugins()
+	sort.Strings(plugins)
+	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(plugins, ", "))
 	fs.StringVar(&s.AdmissionControlConfigFile, "admission-control-config-file", s.AdmissionControlConfigFile, "File with admission control configuration.")
 	fs.StringSliceVar(&s.EtcdServerList, "etcd-servers", s.EtcdServerList, "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd-config")
 	fs.StringVar(&s.EtcdConfigFile, "etcd-config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with -etcd-servers.")
@@ -277,6 +308,8 @@ func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta
 
 // Run runs the specified APIServer.  This should never exit.
 func (s *APIServer) Run(_ []string) error {
+	verflag.PrintAndExitIfRequested()
+
 	s.verifyClusterIPFlags()
 
 	// If advertise-address is not specified, use bind-address. If bind-address
