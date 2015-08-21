@@ -150,6 +150,7 @@ type Proxier struct {
 	iptables                    utiliptables.Interface
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
+	MasqueradeAll               bool
 }
 
 // Proxier implements ProxyProvider
@@ -160,7 +161,7 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, MasqueradeAll bool) (*Proxier, error) {
 
 	// Set the route_localnet sysctl we need for
 	if err := setSysctl(sysctlRouteLocalnet, 1); err != nil {
@@ -180,9 +181,10 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 	tearDownUserspaceIptables(ipt)
 
 	return &Proxier{
-		serviceMap: make(map[proxy.ServicePortName]*serviceInfo),
-		syncPeriod: syncPeriod,
-		iptables:   ipt,
+		serviceMap:    make(map[proxy.ServicePortName]*serviceInfo),
+		syncPeriod:    syncPeriod,
+		iptables:      ipt,
+		MasqueradeAll: MasqueradeAll,
 	}, nil
 }
 
@@ -547,13 +549,19 @@ func (proxier *Proxier) syncProxyRules() error {
 		activeChains[svcChain] = true
 
 		// Capture the clusterIP.
-		writeLine(rulesLines,
+		args := []string{
 			"-A", string(iptablesServicesChain),
 			"-m", "comment", "--comment", fmt.Sprintf("\"%s cluster IP\"", name.String()),
 			"-m", protocol, "-p", protocol,
 			"-d", fmt.Sprintf("%s/32", info.clusterIP.String()),
 			"--dport", fmt.Sprintf("%d", info.port),
-			"-j", string(svcChain))
+		}
+		if proxier.MasqueradeAll {
+			writeLine(rulesLines, append(args,
+				"-j", "MARK", "--set-xmark", fmt.Sprintf("%s/0xffffffff", iptablesMasqueradeMark))...)
+		}
+		writeLine(rulesLines, append(args,
+			"-j", string(svcChain))...)
 
 		// Capture externalIPs.
 		for _, externalIP := range info.externalIPs {

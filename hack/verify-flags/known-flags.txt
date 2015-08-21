@@ -132,6 +132,7 @@ long-running-request-regexp
 low-diskspace-threshold-mb
 manifest-url
 manifest-url-header
+masquerade-all
 master-service-namespace
 max-concurrency
 max-connection-bytes-per-sec
