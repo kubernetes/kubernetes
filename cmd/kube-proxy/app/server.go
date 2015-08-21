@@ -20,6 +20,7 @@ package app
 
 import (
 	"errors"
+	goflag "flag"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -42,8 +43,10 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -68,7 +71,7 @@ type ProxyServer struct {
 
 // NewProxyServer creates a new ProxyServer object with default parameters
 func NewProxyServer() *ProxyServer {
-	return &ProxyServer{
+	s := ProxyServer{
 		BindAddress:        net.ParseIP("0.0.0.0"),
 		HealthzPort:        10249,
 		HealthzBindAddress: net.ParseIP("127.0.0.1"),
@@ -76,6 +79,37 @@ func NewProxyServer() *ProxyServer {
 		ResourceContainer:  "/kube-proxy",
 		SyncPeriod:         5 * time.Second,
 	}
+
+	return &s
+}
+
+// NewProxyServerCommand creates a new ProxyServer object with default parameters
+func NewProxyServerCommand() *cobra.Command {
+	s := NewProxyServer()
+
+	cmd := &cobra.Command{
+		Use:   "kube-proxy",
+		Short: "The kube-proxy implements the code needed to support kubernetes services",
+		Long: `The Kubernetes network proxy runs on each node. This
+reflects services as defined in the Kubernetes API on each node and can do simple
+TCP,UDP stream forwarding or round robin TCP,UDP forwarding across a set of backends.
+Service cluster ips and ports are currently found through Docker-links-compatible
+environment variables specifying ports opened by the service proxy. There is an optional
+addon that provides cluster DNS for these cluster IPs. The user must create a service
+with the apiserver API to configure the proxy.`,
+		Run: func(_ *cobra.Command, args []string) {
+			if err := s.Run(args); err != nil {
+				glog.Fatalf("%v", err)
+			}
+		},
+	}
+
+	s.AddFlags(cmd.Flags())
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	cmd.SetGlobalNormalizationFunc(util.WordSepNormalizeFunc)
+
+	return cmd
+
 }
 
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
@@ -97,6 +131,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 func (s *ProxyServer) Run(_ []string) error {
+	verflag.PrintAndExitIfRequested()
 	protocol := utiliptables.ProtocolIpv4
 	if s.BindAddress.To4() == nil {
 		protocol = utiliptables.ProtocolIpv6
