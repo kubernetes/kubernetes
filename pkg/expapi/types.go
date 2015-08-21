@@ -264,3 +264,10 @@ type DeploymentStatus struct {
 	// Total number of new ready pods with the desired template spec.
 	UpdatedReplicas int `json:"updatedReplicas,omitempty"`
 }
+
+type DeploymentList struct {
+	api.TypeMeta `json:",inline"`
+	api.ListMeta `json:"metadata,omitempty"`
+
+	Items []Deployment `json:"items"`
+}

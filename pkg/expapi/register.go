@@ -28,6 +28,8 @@ func init() {
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
 	api.Scheme.AddKnownTypes("",
+		&Deployment{},
+		&DeploymentList{},
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
 		&ReplicationControllerDummy{},
@@ -37,6 +39,8 @@ func addKnownTypes() {
 	)
 }
 
+func (*Deployment) IsAnAPIObject()                  {}
+func (*DeploymentList) IsAnAPIObject()              {}
 func (*HorizontalPodAutoscaler) IsAnAPIObject()     {}
 func (*HorizontalPodAutoscalerList) IsAnAPIObject() {}
 func (*ReplicationControllerDummy) IsAnAPIObject()  {}
