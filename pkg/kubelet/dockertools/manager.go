@@ -1294,6 +1294,7 @@ func (dm *DockerManager) killContainer(containerID types.UID, container *api.Con
 	} else {
 		// TODO: pass reason down here, and state, or move this call up the stack.
 		dm.recorder.Eventf(ref, "Killing", "Killing with docker id %v", util.ShortenString(ID, 12))
+		dm.containerRefManager.ClearRef(ID)
 	}
 	return err
 }
