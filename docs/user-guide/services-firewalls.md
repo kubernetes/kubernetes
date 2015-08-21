@@ -56,7 +56,7 @@ $ gcloud compute firewall-rules create my-rule --allow=tcp:<port>
 **Note**
 There is one important security note when using firewalls on Google Compute Engine:
 
-as of kubernmetes v1.0.0, GCE firewalls are defined per-vm, rather than per-ip
+as of Kubernetes v1.0.0, GCE firewalls are defined per-vm, rather than per-ip
 address.  This means that when you open a firewall for a service's ports,
 anything that serves on that port on that VM's host IP address may potentially
 serve traffic.  Note that this is not a problem for other Kubernetes services,
