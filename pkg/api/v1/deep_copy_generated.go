@@ -736,6 +736,47 @@ func deepCopy_v1_LocalObjectReference(in LocalObjectReference, out *LocalObjectR
 	return nil
 }
 
+func deepCopy_v1_Lock(in Lock, out *Lock, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_LockSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_LockList(in LockList, out *LockList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Lock, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_Lock(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_LockSpec(in LockSpec, out *LockSpec, c *conversion.Cloner) error {
+	out.HeldBy = in.HeldBy
+	out.LeaseTime = in.LeaseTime
+	out.AcquiredTime = in.AcquiredTime
+	out.RenewTime = in.RenewTime
+	return nil
+}
+
 func deepCopy_v1_NFSVolumeSource(in NFSVolumeSource, out *NFSVolumeSource, c *conversion.Cloner) error {
 	out.Server = in.Server
 	out.Path = in.Path
@@ -2140,6 +2181,9 @@ func init() {
 		deepCopy_v1_LoadBalancerIngress,
 		deepCopy_v1_LoadBalancerStatus,
 		deepCopy_v1_LocalObjectReference,
+		deepCopy_v1_Lock,
+		deepCopy_v1_LockList,
+		deepCopy_v1_LockSpec,
 		deepCopy_v1_NFSVolumeSource,
 		deepCopy_v1_Namespace,
 		deepCopy_v1_NamespaceList,

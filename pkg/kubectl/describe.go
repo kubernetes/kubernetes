@@ -77,6 +77,7 @@ func describerMap(c *client.Client) map[string]Describer {
 		"PersistentVolume":      &PersistentVolumeDescriber{c},
 		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
 		"Namespace":             &NamespaceDescriber{c},
+		"Lock":                  &LockDescriber{c},
 	}
 	return m
 }
@@ -1098,4 +1099,31 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 		err = out[1].Interface().(error)
 	}
 	return s, err
+}
+
+// LockDescriber generates information about a lock
+type LockDescriber struct {
+	client.Interface
+}
+
+func (d *LockDescriber) Describe(namespace, name string) (string, error) {
+
+	lock, err := d.Locks(namespace).Get(name)
+
+	if err != nil {
+		return "", err
+	}
+	return describeLock(lock)
+}
+
+func describeLock(lock *api.Lock) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", lock.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", lock.Namespace)
+		fmt.Fprintf(out, "HeldBy:\t%s\n", lock.Spec.HeldBy)
+		fmt.Fprintf(out, "LeaseTime:\t%d\n", lock.Spec.LeaseTime)
+		fmt.Fprintf(out, "AcquiredTime:\t%s\n", lock.Spec.AcquiredTime)
+		fmt.Fprintf(out, "RenewTime:\t%s\n", lock.Spec.RenewTime)
+		return nil
+	})
 }

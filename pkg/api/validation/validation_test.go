@@ -3560,6 +3560,75 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 }
 
+func TestValidateLock(t *testing.T) {
+	successCases := []api.Lock{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name: "test-lock",
+				Namespace: "default",
+			},
+			Spec: api.LockSpec{
+				HeldBy:    "test-app",
+				LeaseTime: 5,
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateLock(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]api.Lock{
+		"missing Name": {
+			ObjectMeta: api.ObjectMeta{
+				Name: "",
+				Namespace: "default",
+			},
+			Spec: api.LockSpec{
+				HeldBy:    "test-app",
+				LeaseTime: 5,
+			},
+		},
+		"missing Namespace": {
+			ObjectMeta: api.ObjectMeta{
+				Name: "test-lock",
+				Namespace: "",
+			},
+			Spec: api.LockSpec{
+				HeldBy:    "test-app",
+				LeaseTime: 5,
+			},
+		},
+		"missing HeldBy": {
+			ObjectMeta: api.ObjectMeta{
+				Name: "test-lock",
+				Namespace: "default",
+			},
+			Spec: api.LockSpec{
+				HeldBy:    "",
+				LeaseTime: 5,
+			},
+		},
+		"missing LeaseTime": {
+			ObjectMeta: api.ObjectMeta{
+				Name: "test-lock",
+				Namespace: "default",
+			},
+			Spec: api.LockSpec{
+				HeldBy:    "test-app",
+				LeaseTime: 0,
+			},
+		},
+	}
+	for k, v := range errorCases {
+		errs := ValidateLock(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
 func fakeValidSecurityContext(priv bool) *api.SecurityContext {
 	return &api.SecurityContext{
 		Privileged: &priv,
