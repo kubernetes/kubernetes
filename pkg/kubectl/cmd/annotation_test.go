@@ -463,6 +463,55 @@ func TestAnnotateObject(t *testing.T) {
 	}
 }
 
+func TestAnnotateObjectFromFile(t *testing.T) {
+	pods, _, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch req.Method {
+			case "GET":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/cassandra":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			case "PUT":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/cassandra":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			default:
+				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &client.Config{Version: testapi.Version()}
+	buf := bytes.NewBuffer([]byte{})
+
+	options := &AnnotateOptions{}
+	options.filenames = []string{"../../../examples/cassandra/cassandra.yaml"}
+	args := []string{"a=b", "c-"}
+	if err := options.Complete(f, args, buf); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.Validate(args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.RunAnnotate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 
