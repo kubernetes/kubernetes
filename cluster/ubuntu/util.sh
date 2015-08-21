@@ -179,6 +179,7 @@ function verify-minion(){
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
+      echo $daemon
       ssh $SSH_OPTS "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
         printf "."
         validated="1"
@@ -365,6 +366,21 @@ function kube-up() {
   create-kubeconfig
 }
 
+function create-systemd-service() {
+for f in `sudo ls /lib/systemd/system/kubernetes.d`; 
+do 
+sudo ln -sf /lib/systemd/system/kubernetes.d/$f /etc/systemd/system/$f; 
+done;
+}
+
+function delete-systemd-service() {
+for f in `sudo ls /lib/systemd/system/kubernetes.d`;
+do
+sudo service $f stop;
+sudo rm /etc/systemd/system/$f;
+done;
+}
+
 function provision-master() {
   # copy the binaries and scripts to the ~/kube directory on the master
   echo "Deploying master on machine ${MASTER_IP}"
@@ -380,11 +396,16 @@ function provision-master() {
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-flanneld-opts; \
-                            sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ;\
+                            sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ && sudo cp -r ~/kube/init_systemd/* /lib/systemd/system/; \
+                            create-systemd-service; \
                             sudo groupadd -f -r kube-cert; \
                             sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
-                            sudo service etcd start;"
+                            sudo systemctl daemon-reload; \
+                            sudo service etcd start; \
+                            sudo service kube-apiserver start; \
+                            sudo service kube-controller-manager start; \
+                            sudo service kube-scheduler start; "
 }
 
 function provision-minion() {
@@ -401,10 +422,16 @@ function provision-minion() {
                          create-kubelet-opts "${1#*@}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
                          create-kube-proxy-opts "${MASTER_IP}"; \
                          create-flanneld-opts; \
-                         sudo -p '[sudo] password to copy files and start minion: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
+                         sudo -p '[sudo] password to copy files and start minion: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ && sudo cp -r ~/kube/init_systemd/* /lib/systemd/system/ \
                          && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin; \
+                         create-systemd-service; \
+                         sudo systemctl daemon-reload; \
                          sudo service etcd start; \
-                         sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh"
+                         sudo service flanneld start; \
+                         sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh; \
+                         sudo service kube-proxy start; \
+                         sudo service kubelet start; \
+                         sudo service docker start;"
 }
 
 function provision-masterandminion() {
@@ -424,13 +451,23 @@ function provision-masterandminion() {
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
                             create-kube-proxy-opts "${MASTER_IP}";\
                             create-flanneld-opts; \
-                            sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
+                            sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ && sudo cp -r ~/kube/init_systemd/* /lib/systemd/system/; \
+                            create-systemd-service; \
                             sudo groupadd -f -r kube-cert; \
                             sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
+                            sudo systemctl daemon-reload; \
                             sudo service etcd start; \
-                            sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh"
+                            sudo service flanneld start; \
+                            sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh; \
+                            sudo service kube-apiserver start; \
+                            sudo service kube-controller-manager start; \
+                            sudo service kube-scheduler start; \
+                            sudo service kube-proxy start; \
+                            sudo service kubelet start; \
+                            sudo service docker start; "
 }
+
 
 # Delete a kubernetes cluster
 function kube-down {
@@ -442,7 +479,8 @@ function kube-down {
       echo "Cleaning on node ${i#*@}"
       ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop && sudo rm -rf /infra*'
       # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
-      ssh -t $i 'rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; rm -rf ~/kube /var/lib/kubelet'
+      delete-systemd-service
+      ssh -t $i 'sudo rm -f /opt/bin/kube* /etc/init/kube* /etc/init.d/kube* /etc/default/kube*; sudo rm -rf ~/kube /lib/systemd/system/kubernetes.d /var/lib/kubelet'
     }
   done
   wait

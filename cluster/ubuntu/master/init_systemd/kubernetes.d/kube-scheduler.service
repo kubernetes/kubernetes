@@ -1,0 +1,11 @@
+[Unit]
+Description=Kubernetes Scheduler
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Requires=etcd.service
+After=etcd.service
+
+[Service]
+EnvironmentFile=/etc/default/kube-scheduler
+ExecStart=/opt/bin/kube-scheduler $KUBE_SCHEDULER_OPTS
+Restart=always
+RestartSec=10

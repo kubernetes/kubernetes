@@ -1,0 +1,10 @@
+[Unit]
+Description=etcd
+After=network-online.service
+
+[Service]
+EnvironmentFile=/etc/default/etcd
+PermissionsStartOnly=true
+ExecStart=/opt/bin/etcd  $ETCD_OPTS
+Restart=always
+RestartSec=10s
