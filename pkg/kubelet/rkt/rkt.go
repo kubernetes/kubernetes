@@ -980,12 +980,16 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 // By default, it returns a snapshot of the container log. Set |follow| to true to
 // stream the log. Set |follow| to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
-// TODO(yifan): Currently, it fetches all the containers' log within a pod. We will
-// be able to fetch individual container's log once https://github.com/coreos/rkt/pull/841
-// landed.
+//
+// In rkt runtime's implementation, per container log is get via 'journalctl -M [rkt-$UUID] -u [APP_NAME]'.
+// See https://github.com/coreos/rkt/blob/master/Documentation/commands.md#logging for more details.
 func (r *runtime) GetContainerLogs(pod *api.Pod, containerID string, tail string, follow bool, stdout, stderr io.Writer) error {
-	unitName := makePodServiceFileName(pod.UID)
-	cmd := exec.Command("journalctl", "-u", unitName)
+	id, err := parseContainerID(containerID)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("journalctl", "-M", fmt.Sprintf("rkt-%s", id.uuid), "-u", id.appName)
 	if follow {
 		cmd.Args = append(cmd.Args, "-f")
 	}
@@ -998,7 +1002,7 @@ func (r *runtime) GetContainerLogs(pod *api.Pod, containerID string, tail string
 		}
 	}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	return cmd.Start()
+	return cmd.Run()
 }
 
 // GarbageCollect collects the pods/containers. TODO(yifan): Enforce the gc policy.
