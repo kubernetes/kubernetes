@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,95 +17,62 @@ limitations under the License.
 package persistentvolumeclaim
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// persistentvolumeclaimStrategy implements behavior for PersistentVolumeClaim objects
-type persistentvolumeclaimStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	*etcdgeneric.Etcd
 }
 
-// Strategy is the default logic that applies when creating and updating PersistentVolumeClaim
-// objects via the REST API.
-var Strategy = persistentvolumeclaimStrategy{api.Scheme, api.SimpleNameGenerator}
+// NewREST returns a RESTStorage object that will work against persistent volume claims.
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
+	prefix := "/persistentvolumeclaims"
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
+		NewListFunc: func() runtime.Object { return &api.PersistentVolumeClaimList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.PersistentVolumeClaim).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchPersistentVolumeClaim(label, field)
+		},
+		EndpointName: "persistentvolumeclaims",
 
-func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
-	return true
-}
+		CreateStrategy:      Strategy,
+		UpdateStrategy:      Strategy,
+		ReturnDeletedObject: true,
 
-// PrepareForCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeclaimStrategy) PrepareForCreate(obj runtime.Object) {
-	pv := obj.(*api.PersistentVolumeClaim)
-	pv.Status = api.PersistentVolumeClaimStatus{}
-}
-
-func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	pvc := obj.(*api.PersistentVolumeClaim)
-	return validation.ValidatePersistentVolumeClaim(pvc)
-}
-
-func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
-	return false
-}
-
-// PrepareForUpdate sets the Status field which is not allowed to be set by end users on update
-func (persistentvolumeclaimStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newPvc := obj.(*api.PersistentVolumeClaim)
-	oldPvc := obj.(*api.PersistentVolumeClaim)
-	newPvc.Status = oldPvc.Status
-}
-
-func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
-	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
-}
-
-func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-type persistentvolumeclaimStatusStrategy struct {
-	persistentvolumeclaimStrategy
-}
-
-var StatusStrategy = persistentvolumeclaimStatusStrategy{Strategy}
-
-// PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
-func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newPv := obj.(*api.PersistentVolumeClaim)
-	oldPv := obj.(*api.PersistentVolumeClaim)
-	newPv.Spec = oldPv.Spec
-}
-
-func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
-}
-
-// MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
-		if !ok {
-			return false, fmt.Errorf("not a persistentvolumeclaim")
-		}
-		fields := PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj)
-		return label.Matches(labels.Set(persistentvolumeclaimObj.Labels)) && field.Matches(fields), nil
-	})
-}
-
-// PersistentVolumeClaimToSelectableFields returns a label set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
-func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) labels.Set {
-	return labels.Set{
-		"name": persistentvolumeclaim.Name,
+		Storage: s,
 	}
+
+	statusStore := *store
+	statusStore.UpdateStrategy = StatusStrategy
+
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// StatusREST implements the REST endpoint for changing the status of a persistentvolumeclaim.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.PersistentVolumeClaim{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }

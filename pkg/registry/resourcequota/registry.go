@@ -40,18 +40,18 @@ type Registry interface {
 	DeleteResourceQuota(ctx api.Context, resourceQuotaID string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListResourceQuotas(ctx api.Context, label labels.Selector) (*api.ResourceQuotaList, error) {
+func (s *registry) ListResourceQuotas(ctx api.Context, label labels.Selector) (*api.ResourceQuotaList, error) {
 	obj, err := s.List(ctx, label, fields.Everything())
 	if err != nil {
 		return nil, err
@@ -59,11 +59,11 @@ func (s *storage) ListResourceQuotas(ctx api.Context, label labels.Selector) (*a
 	return obj.(*api.ResourceQuotaList), nil
 }
 
-func (s *storage) WatchResourceQuotas(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchResourceQuotas(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetResourceQuota(ctx api.Context, resourceQuotaID string) (*api.ResourceQuota, error) {
+func (s *registry) GetResourceQuota(ctx api.Context, resourceQuotaID string) (*api.ResourceQuota, error) {
 	obj, err := s.Get(ctx, resourceQuotaID)
 	if err != nil {
 		return nil, err
@@ -71,17 +71,17 @@ func (s *storage) GetResourceQuota(ctx api.Context, resourceQuotaID string) (*ap
 	return obj.(*api.ResourceQuota), nil
 }
 
-func (s *storage) CreateResourceQuota(ctx api.Context, resourceQuota *api.ResourceQuota) error {
+func (s *registry) CreateResourceQuota(ctx api.Context, resourceQuota *api.ResourceQuota) error {
 	_, err := s.Create(ctx, resourceQuota)
 	return err
 }
 
-func (s *storage) UpdateResourceQuota(ctx api.Context, resourceQuota *api.ResourceQuota) error {
+func (s *registry) UpdateResourceQuota(ctx api.Context, resourceQuota *api.ResourceQuota) error {
 	_, _, err := s.Update(ctx, resourceQuota)
 	return err
 }
 
-func (s *storage) DeleteResourceQuota(ctx api.Context, resourceQuotaID string) error {
+func (s *registry) DeleteResourceQuota(ctx api.Context, resourceQuotaID string) error {
 	_, err := s.Delete(ctx, resourceQuotaID, nil)
 	return err
 }

@@ -36,19 +36,19 @@ type Registry interface {
 	DeleteController(ctx api.Context, controllerID string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
 // List obtains a list of ReplicationControllers that match selector.
-func (s *storage) ListControllers(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error) {
+func (s *registry) ListControllers(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -59,11 +59,11 @@ func (s *storage) ListControllers(ctx api.Context, label labels.Selector, field 
 	return obj.(*api.ReplicationControllerList), err
 }
 
-func (s *storage) WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
+func (s *registry) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
 	obj, err := s.Get(ctx, controllerID)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (s *storage) GetController(ctx api.Context, controllerID string) (*api.Repl
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
+func (s *registry) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	obj, err := s.Create(ctx, controller)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (s *storage) CreateController(ctx api.Context, controller *api.ReplicationC
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
+func (s *registry) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	obj, _, err := s.Update(ctx, controller)
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (s *storage) UpdateController(ctx api.Context, controller *api.ReplicationC
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) DeleteController(ctx api.Context, controllerID string) error {
+func (s *registry) DeleteController(ctx api.Context, controllerID string) error {
 	_, err := s.Delete(ctx, controllerID, nil)
 	return err
 }

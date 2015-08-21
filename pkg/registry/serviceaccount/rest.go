@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourcequota
+package serviceaccount
 
 import (
 	"k8s.io/kubernetes/pkg/api"
@@ -30,12 +30,12 @@ type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewREST returns a RESTStorage object that will work against resource quotas.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
-	prefix := "/resourcequotas"
+// NewREST returns a RESTStorage object that will work against service accounts.
+func NewREST(s storage.Interface) *REST {
+	prefix := "/serviceaccounts"
 	store := &etcdgeneric.Etcd{
-		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
-		NewListFunc: func() runtime.Object { return &api.ResourceQuotaList{} },
+		NewFunc:     func() runtime.Object { return &api.ServiceAccount{} },
+		NewListFunc: func() runtime.Object { return &api.ServiceAccountList{} },
 		KeyRootFunc: func(ctx api.Context) string {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
@@ -43,12 +43,12 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.ResourceQuota).Name, nil
+			return obj.(*api.ServiceAccount).Name, nil
 		},
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return MatchResourceQuota(label, field)
+			return Matcher(label, field)
 		},
-		EndpointName: "resourcequotas",
+		EndpointName: "serviceaccounts",
 
 		CreateStrategy:      Strategy,
 		UpdateStrategy:      Strategy,
@@ -56,23 +56,5 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 
 		Storage: s,
 	}
-
-	statusStore := *store
-	statusStore.UpdateStrategy = StatusStrategy
-
-	return &REST{store}, &StatusREST{store: &statusStore}
-}
-
-// StatusREST implements the REST endpoint for changing the status of a resourcequota.
-type StatusREST struct {
-	store *etcdgeneric.Etcd
-}
-
-func (r *StatusREST) New() runtime.Object {
-	return &api.ResourceQuota{}
-}
-
-// Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, obj)
+	return &REST{store}
 }

@@ -40,18 +40,18 @@ type Registry interface {
 	DeletePersistentVolume(ctx api.Context, persistentVolumeID string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListPersistentVolumes(ctx api.Context, label labels.Selector) (*api.PersistentVolumeList, error) {
+func (s *registry) ListPersistentVolumes(ctx api.Context, label labels.Selector) (*api.PersistentVolumeList, error) {
 	obj, err := s.List(ctx, label, fields.Everything())
 	if err != nil {
 		return nil, err
@@ -59,11 +59,11 @@ func (s *storage) ListPersistentVolumes(ctx api.Context, label labels.Selector) 
 	return obj.(*api.PersistentVolumeList), nil
 }
 
-func (s *storage) WatchPersistentVolumes(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchPersistentVolumes(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetPersistentVolume(ctx api.Context, persistentVolumeID string) (*api.PersistentVolume, error) {
+func (s *registry) GetPersistentVolume(ctx api.Context, persistentVolumeID string) (*api.PersistentVolume, error) {
 	obj, err := s.Get(ctx, persistentVolumeID)
 	if err != nil {
 		return nil, err
@@ -71,17 +71,17 @@ func (s *storage) GetPersistentVolume(ctx api.Context, persistentVolumeID string
 	return obj.(*api.PersistentVolume), nil
 }
 
-func (s *storage) CreatePersistentVolume(ctx api.Context, persistentVolume *api.PersistentVolume) error {
+func (s *registry) CreatePersistentVolume(ctx api.Context, persistentVolume *api.PersistentVolume) error {
 	_, err := s.Create(ctx, persistentVolume)
 	return err
 }
 
-func (s *storage) UpdatePersistentVolume(ctx api.Context, persistentVolume *api.PersistentVolume) error {
+func (s *registry) UpdatePersistentVolume(ctx api.Context, persistentVolume *api.PersistentVolume) error {
 	_, _, err := s.Update(ctx, persistentVolume)
 	return err
 }
 
-func (s *storage) DeletePersistentVolume(ctx api.Context, persistentVolumeID string) error {
+func (s *registry) DeletePersistentVolume(ctx api.Context, persistentVolumeID string) error {
 	_, err := s.Delete(ctx, persistentVolumeID, nil)
 	return err
 }

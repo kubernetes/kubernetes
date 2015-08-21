@@ -17,105 +17,51 @@ limitations under the License.
 package daemon
 
 import (
-	"fmt"
-	"reflect"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// daemonStrategy implements verification logic for daemons.
-type daemonStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	*etcdgeneric.Etcd
 }
 
-// Strategy is the default logic that applies when creating and updating Daemon objects.
-var Strategy = daemonStrategy{api.Scheme, api.SimpleNameGenerator}
+// NewREST returns a RESTStorage object that will work against daemons.
+func NewREST(s storage.Interface) *REST {
+	prefix := "/daemons"
+	store := &etcdgeneric.Etcd{
+		NewFunc: func() runtime.Object { return &api.Daemon{} },
 
-// NamespaceScoped returns true because all Daemons need to be within a namespace.
-func (daemonStrategy) NamespaceScoped() bool {
-	return true
-}
-
-// PrepareForCreate clears the status of a daemon before creation.
-func (daemonStrategy) PrepareForCreate(obj runtime.Object) {
-	daemon := obj.(*api.Daemon)
-	daemon.Status = api.DaemonStatus{}
-
-	daemon.Generation = 1
-}
-
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (daemonStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newDaemon := obj.(*api.Daemon)
-	oldDaemon := old.(*api.Daemon)
-
-	// Any changes to the spec increment the generation number, any changes to the
-	// status should reflect the generation number of the corresponding object. We push
-	// the burden of managing the status onto the clients because we can't (in general)
-	// know here what version of spec the writer of the status has seen. It may seem like
-	// we can at first -- since obj contains spec -- but in the future we will probably make
-	// status its own object, and even if we don't, writes may be the result of a
-	// read-update-write loop, so the contents of spec may not actually be the spec that
-	// the controller has *seen*.
-	//
-	// TODO: Any changes to a part of the object that represents desired state (labels,
-	// annotations etc) should also increment the generation.
-	if !reflect.DeepEqual(oldDaemon.Spec, newDaemon.Spec) {
-		newDaemon.Generation = oldDaemon.Generation + 1
-	}
-}
-
-// Validate validates a new daemon.
-func (daemonStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	daemon := obj.(*api.Daemon)
-	return validation.ValidateDaemon(daemon)
-}
-
-// AllowCreateOnUpdate is false for daemon; this means a POST is
-// needed to create one
-func (daemonStrategy) AllowCreateOnUpdate() bool {
-	return false
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (daemonStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	validationErrorList := validation.ValidateDaemon(obj.(*api.Daemon))
-	updateErrorList := validation.ValidateDaemonUpdate(old.(*api.Daemon), obj.(*api.Daemon))
-	return append(validationErrorList, updateErrorList...)
-}
-
-// AllowUnconditionalUpdate is the default update policy for daemon objects.
-func (daemonStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-// DaemonToSelectableFields returns a field set that represents the object.
-func DaemonToSelectableFields(daemon *api.Daemon) fields.Set {
-	return fields.Set{
-		"metadata.name": daemon.Name,
-	}
-}
-
-// MatchDaemon is the filter used by the generic etcd backend to route
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchDaemon(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			daemon, ok := obj.(*api.Daemon)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not a daemon.")
-			}
-			return labels.Set(daemon.ObjectMeta.Labels), DaemonToSelectableFields(daemon), nil
+		// NewListFunc returns an object capable of storing results of an etcd list.
+		NewListFunc: func() runtime.Object { return &api.DaemonList{} },
+		// Produces a path that etcd understands, to the root of the resource
+		// by combining the namespace in the context with the given prefix
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
+		// Produces a path that etcd understands, to the resource by combining
+		// the namespace in the context with the given prefix
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		// Retrieve the name field of a daemon
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.Daemon).Name, nil
+		},
+		// Used to match objects based on labels/fields for list and watch
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchDaemon(label, field)
+		},
+		EndpointName: "daemons",
+
+		CreateStrategy: Strategy,
+		UpdateStrategy: Strategy,
+
+		Storage: s,
 	}
+	return &REST{store}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,113 +20,212 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest/resttest"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/pkg/util"
+
+	"github.com/coreos/go-etcd/etcd"
 )
 
-func TestNamespaceStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	if Strategy.NamespaceScoped() {
-		t.Errorf("Namespaces should not be namespace scoped")
-	}
-	if Strategy.AllowCreateOnUpdate() {
-		t.Errorf("Namespaces should not allow create on update")
-	}
-	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
-		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
-	}
-	Strategy.PrepareForCreate(namespace)
-	if namespace.Status.Phase != api.NamespaceActive {
-		t.Errorf("Namespaces do not allow setting phase on create")
-	}
-	if len(namespace.Spec.Finalizers) != 1 || namespace.Spec.Finalizers[0] != api.FinalizerKubernetes {
-		t.Errorf("Prepare For Create should have added kubernetes finalizer")
-	}
-	errs := Strategy.Validate(ctx, namespace)
-	if len(errs) != 0 {
-		t.Errorf("Unexpected error validating %v", errs)
-	}
-	invalidNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
-	}
-	// ensure we copy spec.finalizers from old to new
-	Strategy.PrepareForUpdate(invalidNamespace, namespace)
-	if len(invalidNamespace.Spec.Finalizers) != 1 || invalidNamespace.Spec.Finalizers[0] != api.FinalizerKubernetes {
-		t.Errorf("PrepareForUpdate should have preserved old.spec.finalizers")
-	}
-	errs = Strategy.ValidateUpdate(ctx, invalidNamespace, namespace)
-	if len(errs) == 0 {
-		t.Errorf("Expected a validation error")
-	}
-	if invalidNamespace.ResourceVersion != "4" {
-		t.Errorf("Incoming resource version on update should not be mutated")
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	storage, _, _ := NewREST(etcdStorage)
+	return storage, fakeClient
+}
+
+func validNewNamespace() *api.Namespace {
+	return &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
 	}
 }
 
-func TestNamespaceStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	if StatusStrategy.NamespaceScoped() {
-		t.Errorf("Namespaces should not be namespace scoped")
+func validChangedNamespace() *api.Namespace {
+	namespace := validNewNamespace()
+	namespace.ResourceVersion = "1"
+	namespace.Labels = map[string]string{
+		"foo": "bar",
 	}
-	if StatusStrategy.AllowCreateOnUpdate() {
-		t.Errorf("Namespaces should not allow create on update")
+	return namespace
+}
+
+func TestCreate(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	namespace := validNewNamespace()
+	namespace.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
+	test.TestCreate(
+		// valid
+		namespace,
+		// invalid
+		&api.Namespace{
+			ObjectMeta: api.ObjectMeta{Name: "bad value"},
+		},
+	)
+}
+
+func expectNamespace(t *testing.T, out runtime.Object) (*api.Namespace, bool) {
+	namespace, ok := out.(*api.Namespace)
+	if !ok || namespace == nil {
+		t.Errorf("Expected an api.Namespace object, was %#v", out)
+		return nil, false
 	}
+	return namespace, true
+}
+
+func TestCreateSetsFields(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	namespace := validNewNamespace()
+	ctx := api.NewContext()
+	_, err := storage.Create(ctx, namespace)
+	if err != fakeClient.Err {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	object, err := storage.Get(ctx, "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	actual := object.(*api.Namespace)
+	if actual.Name != namespace.Name {
+		t.Errorf("unexpected namespace: %#v", actual)
+	}
+	if len(actual.UID) == 0 {
+		t.Errorf("expected namespace UID to be set: %#v", actual)
+	}
+	if actual.Status.Phase != api.NamespaceActive {
+		t.Errorf("expected namespace phase to be set to active, but %v", actual.Status.Phase)
+	}
+}
+
+func TestNamespaceDecode(t *testing.T) {
+	storage, _ := newStorage(t)
+	expected := validNewNamespace()
+	expected.Status.Phase = api.NamespaceActive
+	expected.Spec.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
+	body, err := testapi.Codec().Encode(expected)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	actual := storage.New()
+	if err := testapi.Codec().DecodeInto(body, actual); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !api.Semantic.DeepEqual(expected, actual) {
+		t.Errorf("mismatch: %s", util.ObjectDiff(expected, actual))
+	}
+}
+
+func TestGet(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	namespace := validNewNamespace()
+	test.TestGet(namespace)
+}
+
+func TestList(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError).ClusterScope()
+	key := etcdtest.AddPrefix(storage.KeyRootFunc(test.TestContext()))
+	namespace := validNewNamespace()
+	test.TestList(
+		namespace,
+		func(objects []runtime.Object) []runtime.Object {
+			return registrytest.SetObjectsForKey(fakeClient, key, objects)
+		},
+		func(resourceVersion uint64) {
+			registrytest.SetResourceVersion(fakeClient, resourceVersion)
+		})
+}
+
+func TestDeleteNamespace(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	fakeClient.ChangeIndex = 1
+	ctx := api.NewContext()
+	key, err := storage.Etcd.KeyFunc(ctx, "foo")
+	key = etcdtest.AddPrefix(key)
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Namespace{
+					ObjectMeta: api.ObjectMeta{
+						Name: "foo",
+					},
+					Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+				}),
+				ModifiedIndex: 1,
+				CreatedIndex:  1,
+			},
+		},
+	}
+	_, err = storage.Delete(api.NewContext(), "foo", nil)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	fakeClient.ChangeIndex = 1
+	key := etcdtest.AddPrefix("/namespaces/foo")
 	now := util.Now()
-	oldNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
-		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes"}},
-		Status:     api.NamespaceStatus{Phase: api.NamespaceActive},
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Namespace{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "foo",
+						DeletionTimestamp: &now,
+					},
+					Spec: api.NamespaceSpec{
+						Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+					},
+					Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+				}),
+				ModifiedIndex: 1,
+				CreatedIndex:  1,
+			},
+		},
 	}
-	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9", DeletionTimestamp: &now},
-		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
-	}
-	StatusStrategy.PrepareForUpdate(namespace, oldNamespace)
-	if namespace.Status.Phase != api.NamespaceTerminating {
-		t.Errorf("Namespace status updates should allow change of phase: %v", namespace.Status.Phase)
-	}
-	if len(namespace.Spec.Finalizers) != 1 || namespace.Spec.Finalizers[0] != api.FinalizerKubernetes {
-		t.Errorf("PrepareForUpdate should have preserved old finalizers")
-	}
-	errs := StatusStrategy.ValidateUpdate(ctx, namespace, oldNamespace)
-	if len(errs) != 0 {
-		t.Errorf("Unexpected error %v", errs)
-	}
-	if namespace.ResourceVersion != "9" {
-		t.Errorf("Incoming resource version on update should not be mutated")
+	_, err := storage.Delete(api.NewContext(), "foo", nil)
+	if err == nil {
+		t.Fatalf("expected error: %v", err)
 	}
 }
 
-func TestNamespaceFinalizeStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	if FinalizeStrategy.NamespaceScoped() {
-		t.Errorf("Namespaces should not be namespace scoped")
+func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
+	storage, fakeClient := newStorage(t)
+	fakeClient.ChangeIndex = 1
+	key := etcdtest.AddPrefix("/namespaces/foo")
+	now := util.Now()
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Namespace{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "foo",
+						DeletionTimestamp: &now,
+					},
+					Spec: api.NamespaceSpec{
+						Finalizers: []api.FinalizerName{},
+					},
+					Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+				}),
+				ModifiedIndex: 1,
+				CreatedIndex:  1,
+			},
+		},
 	}
-	if FinalizeStrategy.AllowCreateOnUpdate() {
-		t.Errorf("Namespaces should not allow create on update")
-	}
-	oldNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
-		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes", "example.com/org"}},
-		Status:     api.NamespaceStatus{Phase: api.NamespaceActive},
-	}
-	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9"},
-		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"example.com/foo"}},
-		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
-	}
-	FinalizeStrategy.PrepareForUpdate(namespace, oldNamespace)
-	if namespace.Status.Phase != api.NamespaceActive {
-		t.Errorf("finalize updates should not allow change of phase: %v", namespace.Status.Phase)
-	}
-	if len(namespace.Spec.Finalizers) != 1 || string(namespace.Spec.Finalizers[0]) != "example.com/foo" {
-		t.Errorf("PrepareForUpdate should have modified finalizers")
-	}
-	errs := StatusStrategy.ValidateUpdate(ctx, namespace, oldNamespace)
-	if len(errs) != 0 {
-		t.Errorf("Unexpected error %v", errs)
-	}
-	if namespace.ResourceVersion != "9" {
-		t.Errorf("Incoming resource version on update should not be mutated")
+	_, err := storage.Delete(api.NewContext(), "foo", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,156 +17,86 @@ limitations under the License.
 package minion
 
 import (
-	"fmt"
-	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/rest"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// nodeStrategy implements behavior for nodes
-type nodeStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	*etcdgeneric.Etcd
+	connection client.ConnectionInfoGetter
 }
 
-// Nodes is the default logic that applies when creating and updating Node
-// objects.
-var Strategy = nodeStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// NamespaceScoped is false for nodes.
-func (nodeStrategy) NamespaceScoped() bool {
-	return false
+// StatusREST implements the REST endpoint for changing the status of a pod.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
 }
 
-// AllowCreateOnUpdate is false for nodes.
-func (nodeStrategy) AllowCreateOnUpdate() bool {
-	return false
+func (r *StatusREST) New() runtime.Object {
+	return &api.Node{}
 }
 
-// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (nodeStrategy) PrepareForCreate(obj runtime.Object) {
-	_ = obj.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set on create.
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }
 
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (nodeStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newNode := obj.(*api.Node)
-	oldNode := old.(*api.Node)
-	newNode.Status = oldNode.Status
-}
+// NewStorage returns a RESTStorage object that will work against nodes.
+func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
+	prefix := "/minions"
 
-// Validate validates a new node.
-func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	node := obj.(*api.Node)
-	return validation.ValidateNode(node)
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	errorList := validation.ValidateNode(obj.(*api.Node))
-	return append(errorList, validation.ValidateNodeUpdate(old.(*api.Node), obj.(*api.Node))...)
-}
-
-func (nodeStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-type nodeStatusStrategy struct {
-	nodeStrategy
-}
-
-var StatusStrategy = nodeStatusStrategy{Strategy}
-
-func (nodeStatusStrategy) PrepareForCreate(obj runtime.Object) {
-	_ = obj.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set on create.
-}
-
-func (nodeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newNode := obj.(*api.Node)
-	oldNode := old.(*api.Node)
-	newNode.Spec = oldNode.Spec
-}
-
-func (nodeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateNodeUpdate(old.(*api.Node), obj.(*api.Node))
-}
-
-// ResourceGetter is an interface for retrieving resources by ResourceLocation.
-type ResourceGetter interface {
-	Get(api.Context, string) (runtime.Object, error)
-}
-
-// NodeToSelectableFields returns a label set that represents the object.
-func NodeToSelectableFields(node *api.Node) fields.Set {
-	return fields.Set{
-		"metadata.name":      node.Name,
-		"spec.unschedulable": fmt.Sprint(node.Spec.Unschedulable),
-	}
-}
-
-// MatchNode returns a generic matcher for a given label and field selector.
-func MatchNode(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			nodeObj, ok := obj.(*api.Node)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a node")
-			}
-			return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
-		},
-	}
-}
-
-// ResourceLocation returns an URL and transport which one can use to send traffic for the specified node.
-func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	name, portReq, valid := util.SplitPort(id)
-	if !valid {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
-	}
-
-	nodeObj, err := getter.Get(ctx, name)
-	if err != nil {
-		return nil, nil, err
-	}
-	node := nodeObj.(*api.Node)
-	hostIP, err := nodeutil.GetNodeHostIP(node)
-	if err != nil {
-		return nil, nil, err
-	}
-	host := hostIP.String()
-
-	if portReq == "" || strconv.Itoa(ports.KubeletPort) == portReq {
-		scheme, port, transport, err := connection.GetConnectionInfo(host)
-		if err != nil {
-			return nil, nil, err
-		}
-		return &url.URL{
-				Scheme: scheme,
-				Host: net.JoinHostPort(
-					host,
-					strconv.FormatUint(uint64(port), 10),
-				),
+	storageInterface := s
+	if useCacher {
+		config := storage.CacherConfig{
+			CacheCapacity:  1000,
+			Storage:        s,
+			Type:           &api.Node{},
+			ResourcePrefix: prefix,
+			KeyFunc: func(obj runtime.Object) (string, error) {
+				return storage.NoNamespaceKeyFunc(prefix, obj)
 			},
-			transport,
-			nil
+			NewListFunc: func() runtime.Object { return &api.NodeList{} },
+		}
+		storageInterface = storage.NewCacher(config)
 	}
-	return &url.URL{Host: net.JoinHostPort(host, portReq)}, nil, nil
+
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.Node{} },
+		NewListFunc: func() runtime.Object { return &api.NodeList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return prefix
+		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return prefix + "/" + name, nil
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.Node).Name, nil
+		},
+		PredicateFunc: MatchNode,
+		EndpointName:  "node",
+
+		CreateStrategy: Strategy,
+		UpdateStrategy: Strategy,
+
+		Storage: storageInterface,
+	}
+
+	statusStore := *store
+	statusStore.UpdateStrategy = StatusStrategy
+
+	return &REST{store, connection}, &StatusREST{store: &statusStore}
+}
+
+// Implement Redirector.
+var _ = rest.Redirector(&REST{})
+
+// ResourceLocation returns a URL to which one can send traffic for the specified minion.
+func (r *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
+	return ResourceLocation(r, r.connection, ctx, id)
 }

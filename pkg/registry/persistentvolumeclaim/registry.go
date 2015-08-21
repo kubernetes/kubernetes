@@ -40,18 +40,18 @@ type Registry interface {
 	DeletePersistentVolumeClaim(ctx api.Context, pvcID string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListPersistentVolumeClaims(ctx api.Context, label labels.Selector) (*api.PersistentVolumeClaimList, error) {
+func (s *registry) ListPersistentVolumeClaims(ctx api.Context, label labels.Selector) (*api.PersistentVolumeClaimList, error) {
 	obj, err := s.List(ctx, label, fields.Everything())
 	if err != nil {
 		return nil, err
@@ -59,11 +59,11 @@ func (s *storage) ListPersistentVolumeClaims(ctx api.Context, label labels.Selec
 	return obj.(*api.PersistentVolumeClaimList), nil
 }
 
-func (s *storage) WatchPersistentVolumeClaims(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchPersistentVolumeClaims(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetPersistentVolumeClaim(ctx api.Context, podID string) (*api.PersistentVolumeClaim, error) {
+func (s *registry) GetPersistentVolumeClaim(ctx api.Context, podID string) (*api.PersistentVolumeClaim, error) {
 	obj, err := s.Get(ctx, podID)
 	if err != nil {
 		return nil, err
@@ -71,17 +71,17 @@ func (s *storage) GetPersistentVolumeClaim(ctx api.Context, podID string) (*api.
 	return obj.(*api.PersistentVolumeClaim), nil
 }
 
-func (s *storage) CreatePersistentVolumeClaim(ctx api.Context, pod *api.PersistentVolumeClaim) error {
+func (s *registry) CreatePersistentVolumeClaim(ctx api.Context, pod *api.PersistentVolumeClaim) error {
 	_, err := s.Create(ctx, pod)
 	return err
 }
 
-func (s *storage) UpdatePersistentVolumeClaim(ctx api.Context, pod *api.PersistentVolumeClaim) error {
+func (s *registry) UpdatePersistentVolumeClaim(ctx api.Context, pod *api.PersistentVolumeClaim) error {
 	_, _, err := s.Update(ctx, pod)
 	return err
 }
 
-func (s *storage) DeletePersistentVolumeClaim(ctx api.Context, podID string) error {
+func (s *registry) DeletePersistentVolumeClaim(ctx api.Context, podID string) error {
 	_, err := s.Delete(ctx, podID, nil)
 	return err
 }

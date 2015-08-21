@@ -40,18 +40,18 @@ type Registry interface {
 	DeleteServiceAccount(ctx api.Context, name string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListServiceAccounts(ctx api.Context, label labels.Selector) (*api.ServiceAccountList, error) {
+func (s *registry) ListServiceAccounts(ctx api.Context, label labels.Selector) (*api.ServiceAccountList, error) {
 	obj, err := s.List(ctx, label, fields.Everything())
 	if err != nil {
 		return nil, err
@@ -59,11 +59,11 @@ func (s *storage) ListServiceAccounts(ctx api.Context, label labels.Selector) (*
 	return obj.(*api.ServiceAccountList), nil
 }
 
-func (s *storage) WatchServiceAccounts(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchServiceAccounts(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetServiceAccount(ctx api.Context, name string) (*api.ServiceAccount, error) {
+func (s *registry) GetServiceAccount(ctx api.Context, name string) (*api.ServiceAccount, error) {
 	obj, err := s.Get(ctx, name)
 	if err != nil {
 		return nil, err
@@ -71,17 +71,17 @@ func (s *storage) GetServiceAccount(ctx api.Context, name string) (*api.ServiceA
 	return obj.(*api.ServiceAccount), nil
 }
 
-func (s *storage) CreateServiceAccount(ctx api.Context, serviceAccount *api.ServiceAccount) error {
+func (s *registry) CreateServiceAccount(ctx api.Context, serviceAccount *api.ServiceAccount) error {
 	_, err := s.Create(ctx, serviceAccount)
 	return err
 }
 
-func (s *storage) UpdateServiceAccount(ctx api.Context, serviceAccount *api.ServiceAccount) error {
+func (s *registry) UpdateServiceAccount(ctx api.Context, serviceAccount *api.ServiceAccount) error {
 	_, _, err := s.Update(ctx, serviceAccount)
 	return err
 }
 
-func (s *storage) DeleteServiceAccount(ctx api.Context, name string) error {
+func (s *registry) DeleteServiceAccount(ctx api.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }

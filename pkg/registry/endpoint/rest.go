@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,79 +17,59 @@ limitations under the License.
 package endpoint
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	endptspkg "k8s.io/kubernetes/pkg/api/endpoints"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// endpointsStrategy implements behavior for Endpoints
-type endpointsStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	*etcdgeneric.Etcd
 }
 
-// Strategy is the default logic that applies when creating and updating Endpoint
-// objects via the REST API.
-var Strategy = endpointsStrategy{api.Scheme, api.SimpleNameGenerator}
+// NewREST returns a RESTStorage object that will work against endpoints.
+func NewREST(s storage.Interface, useCacher bool) *REST {
+	prefix := "/services/endpoints"
 
-// NamespaceScoped is true for endpoints.
-func (endpointsStrategy) NamespaceScoped() bool {
-	return true
-}
-
-// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (endpointsStrategy) PrepareForCreate(obj runtime.Object) {
-	endpoints := obj.(*api.Endpoints)
-	endpoints.Subsets = endptspkg.RepackSubsets(endpoints.Subsets)
-}
-
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (endpointsStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newEndpoints := obj.(*api.Endpoints)
-	_ = old.(*api.Endpoints)
-	newEndpoints.Subsets = endptspkg.RepackSubsets(newEndpoints.Subsets)
-}
-
-// Validate validates a new endpoints.
-func (endpointsStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateEndpoints(obj.(*api.Endpoints))
-}
-
-// AllowCreateOnUpdate is true for endpoints.
-func (endpointsStrategy) AllowCreateOnUpdate() bool {
-	return true
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (endpointsStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	errorList := validation.ValidateEndpoints(obj.(*api.Endpoints))
-	return append(errorList, validation.ValidateEndpointsUpdate(old.(*api.Endpoints), obj.(*api.Endpoints))...)
-}
-
-func (endpointsStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-// MatchEndpoints returns a generic matcher for a given label and field selector.
-func MatchEndpoints(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: EndpointsAttributes}
-}
-
-// EndpointsAttributes returns the attributes of an endpoint such that a
-// generic.SelectionPredicate can match appropriately.
-func EndpointsAttributes(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	endpoints, ok := obj.(*api.Endpoints)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid object type %#v", obj)
+	storageInterface := s
+	if useCacher {
+		config := storage.CacherConfig{
+			CacheCapacity:  1000,
+			Storage:        s,
+			Type:           &api.Endpoints{},
+			ResourcePrefix: prefix,
+			KeyFunc: func(obj runtime.Object) (string, error) {
+				return storage.NamespaceKeyFunc(prefix, obj)
+			},
+			NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
+		}
+		storageInterface = storage.NewCacher(config)
 	}
-	return endpoints.Labels, fields.Set{
-		"metadata.name": endpoints.Name,
-	}, nil
+
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.Endpoints{} },
+		NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.Endpoints).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchEndpoints(label, field)
+		},
+		EndpointName: "endpoints",
+
+		CreateStrategy: Strategy,
+		UpdateStrategy: Strategy,
+
+		Storage: storageInterface,
+	}
+	return &REST{store}
 }

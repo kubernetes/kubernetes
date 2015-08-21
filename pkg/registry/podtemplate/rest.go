@@ -17,69 +17,44 @@ limitations under the License.
 package podtemplate
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	errs "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// podTemplateStrategy implements behavior for PodTemplates
-type podTemplateStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	etcdgeneric.Etcd
 }
 
-// Strategy is the default logic that applies when creating and updating PodTemplate
-// objects via the REST API.
-var Strategy = podTemplateStrategy{api.Scheme, api.SimpleNameGenerator}
+// NewREST returns a RESTStorage object that will work against pod templates.
+func NewREST(s storage.Interface) *REST {
+	prefix := "/podtemplates"
+	store := etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.PodTemplate{} },
+		NewListFunc: func() runtime.Object { return &api.PodTemplateList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.PodTemplate).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchPodTemplate(label, field)
+		},
+		EndpointName: "podtemplates",
 
-// NamespaceScoped is true for pod templates.
-func (podTemplateStrategy) NamespaceScoped() bool {
-	return true
-}
+		CreateStrategy:      Strategy,
+		UpdateStrategy:      Strategy,
+		ReturnDeletedObject: true,
 
-// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podTemplateStrategy) PrepareForCreate(obj runtime.Object) {
-	_ = obj.(*api.PodTemplate)
-}
-
-// Validate validates a new pod template.
-func (podTemplateStrategy) Validate(ctx api.Context, obj runtime.Object) errs.ValidationErrorList {
-	pod := obj.(*api.PodTemplate)
-	return validation.ValidatePodTemplate(pod)
-}
-
-// AllowCreateOnUpdate is false for pod templates.
-func (podTemplateStrategy) AllowCreateOnUpdate() bool {
-	return false
-}
-
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podTemplateStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	_ = obj.(*api.PodTemplate)
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (podTemplateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) errs.ValidationErrorList {
-	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))
-}
-
-func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-// MatchPodTemplate returns a generic matcher for a given label and field selector.
-func MatchPodTemplate(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		podObj, ok := obj.(*api.PodTemplate)
-		if !ok {
-			return false, fmt.Errorf("not a pod template")
-		}
-		return label.Matches(labels.Set(podObj.Labels)), nil
-	})
+		Storage: s,
+	}
+	return &REST{store}
 }
