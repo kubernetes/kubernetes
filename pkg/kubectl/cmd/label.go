@@ -199,7 +199,10 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	// TODO: support bulk generic output a la Get
-	return r.Visit(func(info *resource.Info) error {
+	return r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		obj, err := cmdutil.UpdateObject(info, func(obj runtime.Object) error {
 			err := labelFunc(obj, overwrite, resourceVersion, labels, remove)
 			if err != nil {

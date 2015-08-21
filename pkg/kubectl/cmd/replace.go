@@ -115,7 +115,10 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		return err
 	}
 
-	return r.Visit(func(info *resource.Info) error {
+	return r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
@@ -196,7 +199,10 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	}
 
 	count := 0
-	err = r.Visit(func(info *resource.Info) error {
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
 			return err

@@ -133,7 +133,7 @@ func (b *Builder) URL(urls ...*url.URL) *Builder {
 // will be ignored (but logged at V(2)).
 func (b *Builder) Stdin() *Builder {
 	b.stream = true
-	b.paths = append(b.paths, FileVisitorForSTDIN(b.mapper, b.continueOnError, b.schema))
+	b.paths = append(b.paths, FileVisitorForSTDIN(b.mapper, b.schema))
 	return b
 }
 
@@ -143,7 +143,7 @@ func (b *Builder) Stdin() *Builder {
 // will be ignored (but logged at V(2)).
 func (b *Builder) Stream(r io.Reader, name string) *Builder {
 	b.stream = true
-	b.paths = append(b.paths, NewStreamVisitor(r, b.mapper, name, b.continueOnError, b.schema))
+	b.paths = append(b.paths, NewStreamVisitor(r, b.mapper, name, b.schema))
 	return b
 }
 
@@ -164,7 +164,7 @@ func (b *Builder) Path(paths ...string) *Builder {
 			continue
 		}
 
-		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, []string{".json", ".stdin", ".yaml", ".yml"}, b.continueOnError, b.schema)
+		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, []string{".json", ".stdin", ".yaml", ".yml"}, b.schema)
 		if err != nil {
 			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
 		}

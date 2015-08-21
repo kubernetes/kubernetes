@@ -66,7 +66,7 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		Object:          list,
 		ResourceVersion: resourceVersion,
 	}
-	return fn(info)
+	return fn(info, nil)
 }
 
 func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
