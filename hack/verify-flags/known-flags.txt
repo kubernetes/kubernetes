@@ -246,3 +246,5 @@ user-whitelist
 watch-only
 whitelist-override-label
 www-prefix
+retry_time
+file_content_in_loop

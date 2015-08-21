@@ -1,6 +1,6 @@
 all: push
 
-TAG = 0.3
+TAG = 0.4
 
 mt: mt.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./mt.go

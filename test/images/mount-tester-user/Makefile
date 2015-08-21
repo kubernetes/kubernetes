@@ -1,6 +1,6 @@
 all: push
 
-TAG = 0.1
+TAG = 0.2
 
 image:
 	sudo docker build -t gcr.io/google_containers/mounttest-user:$(TAG) .
