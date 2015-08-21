@@ -261,3 +261,7 @@ func (c *FakeExperimental) Deployments(namespace string) client.DeploymentInterf
 func (c *FakeExperimental) Scales(namespace string) client.ScaleInterface {
 	return &FakeScales{Fake: c, Namespace: namespace}
 }
+
+func (c *FakeExperimental) Locks(namespace string) client.LockInterface {
+	return &FakeLocks{Fake: c, Namespace: namespace}
+}

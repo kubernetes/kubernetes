@@ -986,6 +986,58 @@ func deepCopy_expapi_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerSta
 	return nil
 }
 
+func deepCopy_expapi_Lock(in Lock, out *Lock, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_expapi_LockSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_expapi_LockStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_expapi_LockList(in LockList, out *LockList, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Lock, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_expapi_Lock(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_expapi_LockSpec(in LockSpec, out *LockSpec, c *conversion.Cloner) error {
+	out.HeldBy = in.HeldBy
+	out.LeaseSeconds = in.LeaseSeconds
+	return nil
+}
+
+func deepCopy_expapi_LockStatus(in LockStatus, out *LockStatus, c *conversion.Cloner) error {
+	if err := deepCopy_util_Time(in.AcquiredTime, &out.AcquiredTime, c); err != nil {
+		return err
+	}
+	if err := deepCopy_util_Time(in.LastRenewalTime, &out.LastRenewalTime, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_expapi_ReplicationControllerDummy(in ReplicationControllerDummy, out *ReplicationControllerDummy, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1206,6 +1258,10 @@ func init() {
 		deepCopy_expapi_HorizontalPodAutoscalerList,
 		deepCopy_expapi_HorizontalPodAutoscalerSpec,
 		deepCopy_expapi_HorizontalPodAutoscalerStatus,
+		deepCopy_expapi_Lock,
+		deepCopy_expapi_LockList,
+		deepCopy_expapi_LockSpec,
+		deepCopy_expapi_LockStatus,
 		deepCopy_expapi_ReplicationControllerDummy,
 		deepCopy_expapi_ResourceConsumption,
 		deepCopy_expapi_RollingUpdateDeployment,

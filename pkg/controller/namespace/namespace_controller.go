@@ -204,6 +204,10 @@ func deleteAllContent(kubeClient client.Interface, experimentalMode bool, namesp
 		if err != nil {
 			return estimate, err
 		}
+		err = deleteLocks(kubeClient.Experimental(), namespace)
+		if err != nil {
+			return estimate, err
+		}
 	}
 	return estimate, nil
 }
@@ -412,6 +416,20 @@ func deleteHorizontalPodAutoscalers(expClient client.ExperimentalInterface, ns s
 	}
 	for i := range items.Items {
 		err := expClient.HorizontalPodAutoscalers(ns).Delete(items.Items[i].Name, nil)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteLocks(expClient client.ExperimentalInterface, ns string) error {
+	items, err := expClient.Locks(ns).List(labels.Everything())
+	if err != nil {
+		return err
+	}
+	for i := range items.Items {
+		err := expClient.Locks(ns).Delete(items.Items[i].Name)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}

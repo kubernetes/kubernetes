@@ -55,6 +55,7 @@ import (
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
+	locketcd "k8s.io/kubernetes/pkg/registry/experimental/lock/etcd"
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
@@ -827,6 +828,7 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)
 	daemonSetStorage := daemonetcd.NewREST(c.ExpDatabaseStorage)
 	deploymentStorage := deploymentetcd.NewREST(c.ExpDatabaseStorage)
+	lockStorage := locketcd.NewStorage(c.DatabaseStorage)
 
 	storage := map[string]rest.Storage{
 		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
@@ -835,6 +837,7 @@ func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
 		strings.ToLower("thirdpartyresources"):          thirdPartyResourceStorage,
 		strings.ToLower("daemonsets"):                   daemonSetStorage,
 		strings.ToLower("deployments"):                  deploymentStorage,
+		strings.ToLower("locks"):                        lockStorage,
 	}
 
 	return &apiserver.APIGroupVersion{
