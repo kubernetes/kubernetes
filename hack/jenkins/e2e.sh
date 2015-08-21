@@ -96,6 +96,7 @@ GCE_DEFAULT_SKIP_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
+    "Autoscaling"
     "DaemonRestart"
     "ResourceUsage"
     )
@@ -188,6 +189,8 @@ case ${JOB_NAME} in
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
+    # Override GCE default for cluster size autoscaling purposes.
+    ENABLE_CLUSTER_MONITORING="googleinfluxdb"
     ;;
 
   # Runs all non-flaky tests on GCE in parallel.
