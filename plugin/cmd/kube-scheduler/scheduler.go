@@ -17,14 +17,17 @@ limitations under the License.
 package main
 
 import (
-	"runtime"
-
+	"fmt"
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/tools/ha"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
-
-	"github.com/spf13/pflag"
+	"os"
+	"runtime"
+	"time"
 )
 
 func init() {
@@ -36,11 +39,42 @@ func main() {
 	s := app.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 
+	haconfig := ha.Config{}
+	haconfig.AddFlags(pflag.CommandLine)
+
 	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 
-	s.Run(pflag.CommandLine.Args())
+	startSched := func(leaseUserInfo *ha.LeaseUser) bool {
+		leaseUserInfo.Running = true
+		glog.Infof("Starting kube scheduler. %v", leaseUserInfo)
+		if err := s.Run(pflag.CommandLine.Args()); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			glog.Infof("EXITING NOW ! Killed")
+			os.Exit(1)
+		}
+		return true
+	}
+
+	endSched := func(leaseUserInfo *ha.LeaseUser) bool {
+		glog.Infof("Hard-exiting the scheduler process now!")
+		leaseUserInfo.Running = true
+		os.Exit(0)
+		return true
+	}
+
+	if haconfig.Key == "" {
+		haconfig.Key = "ha.scheduler.lock"
+	}
+
+	ha.RunHA(s.Kubeconfig, s.Master, startSched, endSched, &haconfig)
+
+	for true {
+		glog.Infof("Scheduler lease loop is running...")
+		time.Sleep(5 * time.Second)
+	}
+
 }
