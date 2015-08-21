@@ -63,18 +63,14 @@ func TestExecutorRegister(t *testing.T) {
 	executor.Registered(mockDriver, nil, nil, nil)
 
 	initialPodUpdate := kubetypes.PodUpdate{
-		Pods:   []*api.Pod{},
-		Op:     kubetypes.SET,
-		Source: executor.sourcename,
+		Pods: []*api.Pod{},
+		Op:   kubetypes.SET,
 	}
 	receivedInitialPodUpdate := false
 	select {
-	case m := <-updates:
-		update, ok := m.(kubetypes.PodUpdate)
-		if ok {
-			if reflect.DeepEqual(initialPodUpdate, update) {
-				receivedInitialPodUpdate = true
-			}
+	case update := <-updates:
+		if reflect.DeepEqual(initialPodUpdate, update) {
+			receivedInitialPodUpdate = true
 		}
 	case <-time.After(time.Second):
 	}
@@ -136,7 +132,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	defer testApiServer.server.Close()
 
 	mockDriver := &MockExecutorDriver{}
-	updates := make(chan interface{}, 1024)
+	updates := make(chan kubetypes.PodUpdate, 1024)
 	config := Config{
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
 		Updates: updates,
@@ -154,7 +150,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 						},
 					},
 				},
-				Phase: api.PodRunning,
+				Phase:  api.PodRunning,
 				HostIP: "127.0.0.1",
 			}, nil
 		},
@@ -205,9 +201,8 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	gotPodUpdate := false
 	select {
-	case m := <-updates:
-		update, ok := m.(kubetypes.PodUpdate)
-		if ok && len(update.Pods) == 1 {
+	case update := <-updates:
+		if len(update.Pods) == 1 {
 			gotPodUpdate = true
 		}
 	case <-time.After(time.Second):
@@ -302,7 +297,7 @@ func TestExecutorStaticPods(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	config := Config{
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan interface{}, 1), // allow kube-executor source to proceed past init
+		Updates: make(chan kubetypes.PodUpdate, 1), // allow kube-executor source to proceed past init
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
 			Version: testapi.Default.Version(),
@@ -384,7 +379,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	kubeletFinished := make(chan struct{})
 	config := Config{
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan interface{}, 1024),
+		Updates: make(chan kubetypes.PodUpdate, 1024),
 		APIClient: client.NewOrDie(&client.Config{
 			Host:    testApiServer.server.URL,
 			Version: testapi.Default.Version(),
@@ -399,7 +394,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 						},
 					},
 				},
-				Phase: api.PodRunning,
+				Phase:  api.PodRunning,
 				HostIP: "127.0.0.1",
 			}, nil
 		},
@@ -560,9 +555,10 @@ func TestExecutorShutdown(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	kubeletFinished := make(chan struct{})
 	var exitCalled int32 = 0
+	updates := make(chan kubetypes.PodUpdate, 1024)
 	config := Config{
 		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: make(chan interface{}, 1024),
+		Updates: updates,
 		ShutdownAlert: func() {
 			close(kubeletFinished)
 		},
@@ -586,11 +582,21 @@ func TestExecutorShutdown(t *testing.T) {
 	assert.Equal(t, true, executor.isDone(),
 		"executor should be in Done state after Shutdown")
 
-	select {
-	case <-executor.Done():
-	default:
-		t.Fatal("done channel should be closed after shutdown")
+	// channel should be closed now, only a constant number of updates left
+	num := len(updates)
+drainLoop:
+	for {
+		select {
+		case _, ok := <-updates:
+			if !ok {
+				break drainLoop
+			}
+			num -= 1
+		default:
+			t.Fatal("Updates chan should be closed after Shutdown")
+		}
 	}
+	assert.Equal(t, num, 0, "Updates chan should get no new updates after Shutdown")
 
 	assert.Equal(t, true, atomic.LoadInt32(&exitCalled) > 0,
 		"the executor should call its ExitFunc when it is ready to close down")
