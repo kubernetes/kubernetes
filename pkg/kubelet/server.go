@@ -37,6 +37,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
@@ -867,9 +868,21 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	w.Write(data)
 }
 
+func binaryQuantityFromUint(u uint64) *resource.Quantity {
+	return resource.NewQuantity(int64(u), resource.BinarySI)
+}
+
 func convertContainerStats(stats *cadvisorApi.ContainerStats) *v1.StatsPoint {
 	point := &v1.StatsPoint{
 		Time: stats.Timestamp,
+		Cpu: v1.CpuStats{
+			// TODO: CpuInst https://github.com/google/cadvisor/pull/861
+			Usage: *binaryQuantityFromUint(stats.Cpu.Usage.Total),
+		},
+		Memory: v1.MemoryStats{
+			Usage:      *binaryQuantityFromUint(stats.Memory.Usage),
+			WorkingSet: *binaryQuantityFromUint(stats.Memory.WorkingSet),
+		},
 	}
 	return point
 }
