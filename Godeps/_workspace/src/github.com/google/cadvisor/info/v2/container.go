@@ -104,8 +104,8 @@ type ContainerStats struct {
 	HasLoad bool         `json:"has_load"`
 	Load    v1.LoadStats `json:"load_stats,omitempty"`
 	// Custom Metrics
-	HasCustomMetrics bool                    `json:"has_custom_metrics"`
-	CustomMetrics    map[string]v1.MetricVal `json:"custom_metrics,omitempty"`
+	HasCustomMetrics bool                      `json:"has_custom_metrics"`
+	CustomMetrics    map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
 }
 
 type Percentiles struct {

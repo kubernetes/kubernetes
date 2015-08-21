@@ -392,7 +392,7 @@ func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
 	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
 		c.errors.Set(1)
-		glog.Warning("Couldn't get containers: %s", err)
+		glog.Warningf("Couldn't get containers: %s", err)
 		return
 	}
 	for _, container := range containers {
