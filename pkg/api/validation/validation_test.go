@@ -1317,6 +1317,9 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
+	activeDeadlineSecondsZero := int64(0)
+	activeDeadlineSecondsNegative := int64(-30)
+	activeDeadlineSecondsPositive := int64(30)
 	tests := []struct {
 		a       api.Pod
 		b       api.Pod
@@ -1426,6 +1429,46 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			true,
 			"image change",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
+				},
+			},
+			api.Pod{},
+			false,
+			"activedeadlineseconds change to 0",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			api.Pod{},
+			true,
+			"activedeadlineseconds change to positive",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
+				},
+			},
+			api.Pod{},
+			false,
+			"activedeadlineseconds change to negative",
+		},
+		{
+			api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
+				},
+			},
+			api.Pod{},
+			true,
+			"activedeadlineseconds change back to nil",
 		},
 		{
 			api.Pod{
