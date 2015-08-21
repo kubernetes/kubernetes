@@ -35,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectRestart bool) {
+func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectNumRestarts int) {
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
 	_, err := c.Pods(ns).Create(podDescr)
 	expectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
@@ -60,24 +60,36 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectResta
 	initialRestartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
 	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
 
-	// Wait for at most 48 * 5 = 240s = 4 minutes until restartCount is incremented
-	restarts := false
-	for i := 0; i < 48; i++ {
-		// Wait until restartCount is incremented.
-		time.Sleep(5 * time.Second)
+	// Wait for the restart state to be as desired.
+	deadline := time.Now().Add(2 * time.Minute)
+	lastRestartCount := initialRestartCount
+	observedRestarts := 0
+	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = c.Pods(ns).Get(podDescr.Name)
 		expectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
 		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
-		By(fmt.Sprintf("Restart count of pod %s in namespace %s is now %d", podDescr.Name, ns, restartCount))
-		if restartCount > initialRestartCount {
-			By(fmt.Sprintf("Restart count of pod %s in namespace %s increased from %d to %d during the test", podDescr.Name, ns, initialRestartCount, restartCount))
-			restarts = true
+		if restartCount != lastRestartCount {
+			By(fmt.Sprintf("Restart count of pod %s/%s is now %d (%v elapsed)",
+				ns, podDescr.Name, restartCount, time.Since(start)))
+			if restartCount < lastRestartCount {
+				Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
+					ns, podDescr.Name, lastRestartCount, restartCount)
+			}
+		}
+		observedRestarts = restartCount - initialRestartCount
+		if expectNumRestarts > 0 && observedRestarts >= expectNumRestarts {
+			// Stop if we have observed more than expectNumRestarts restarts.
 			break
 		}
+		lastRestartCount = restartCount
 	}
 
-	if restarts != expectRestart {
-		Fail(fmt.Sprintf("pod %s in namespace %s - expected restarts: %v, found restarts: %v", podDescr.Name, ns, expectRestart, restarts))
+	// If we expected 0 restarts, fail if observed any restart.
+	// If we expected n restarts (n > 0), fail if we observed < n restarts.
+	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
+		observedRestarts < expectNumRestarts) {
+		Failf("pod %s/%s - expected number of restarts: %t, found restarts: %t",
+			ns, podDescr.Name, expectNumRestarts, observedRestarts)
 	}
 }
 
@@ -463,7 +475,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, true)
+		}, 1)
 	})
 
 	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {
@@ -489,7 +501,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, false)
+		}, 0)
 	})
 
 	It("should be restarted with a /healthz http liveness probe", func() {
@@ -516,7 +528,34 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		}, true)
+		}, 1)
+	})
+
+	It("should have monotonically increasing restart count", func() {
+		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-http",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/liveness",
+						Command: []string{"/server"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Path: "/healthz",
+									Port: util.NewIntOrStringFromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 5,
+						},
+					},
+				},
+			},
+		}, 8)
 	})
 
 	// The following tests for remote command execution and port forwarding are
