@@ -86,10 +86,10 @@ type HorizontalPodAutoscalerSpec struct {
 // HorizontalPodAutoscalerStatus contains the current status of a horizontal pod autoscaler
 type HorizontalPodAutoscalerStatus struct {
 	// CurrentReplicas is the number of replicas of pods managed by this autoscaler.
-	CurrentReplicas int `json:"replicas" description:"number of replicas observed by the autoscaler"`
+	CurrentReplicas int `json:"currentReplicas" description:"number of replicas observed by the autoscaler"`
 
 	// DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.
-	DesiredReplicas int `json:"replicas" description:"number of desired replicas"`
+	DesiredReplicas int `json:"desiredReplicas" description:"number of desired replicas"`
 
 	// CurrentConsumption is the current average consumption of the given resource that the autoscaler will
 	// try to maintain by adjusting the desired number of pods.
