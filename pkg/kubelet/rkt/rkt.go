@@ -301,13 +301,26 @@ func setIsolators(app *appctypes.App, c *api.Container) error {
 	return nil
 }
 
+// findEnvInList returns the index of environment variable in the environment whose Name equals env.Name.
+func findEnvInList(envs appctypes.Environment, env kubecontainer.EnvVar) int {
+	for i, e := range envs {
+		if e.Name == env.Name {
+			return i
+		}
+	}
+	return -1
+}
+
 // setApp overrides the app's fields if any of them are specified in the
 // container's spec.
 func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContainerOptions) error {
 	// Override the exec.
-	// TOOD(yifan): Revisit this for the overriding rule.
-	if len(c.Command) > 0 || len(c.Args) > 0 {
-		app.Exec = append(c.Command, c.Args...)
+
+	if len(c.Command) > 0 {
+		app.Exec = c.Command
+	}
+	if len(c.Args) > 0 {
+		app.Exec = append(app.Exec, c.Args...)
 	}
 
 	// TODO(yifan): Use non-root user in the future, see:
@@ -319,11 +332,12 @@ func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContain
 		app.WorkingDirectory = c.WorkingDir
 	}
 
-	// Override the environment.
-	if len(opts.Envs) > 0 {
-		app.Environment = []appctypes.EnvironmentVariable{}
-	}
-	for _, env := range c.Env {
+	// Merge the environment. Override the image with the ones defined in the spec if necessary.
+	for _, env := range opts.Envs {
+		if ix := findEnvInList(app.Environment, env); ix >= 0 {
+			app.Environment[ix].Value = env.Value
+			continue
+		}
 		app.Environment = append(app.Environment, appctypes.EnvironmentVariable{
 			Name:  env.Name,
 			Value: env.Value,
@@ -413,7 +427,7 @@ func (r *runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 		}
 
 		if imgManifest.App == nil {
-			return nil, fmt.Errorf("no app section in image manifest for image: %q", c.Image)
+			imgManifest.App = new(appctypes.App)
 		}
 
 		img, err := r.getImageByName(c.Image)
