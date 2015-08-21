@@ -1,5 +1,19 @@
 ./.generated_docs
+./contrib/completions/bash/kube-apiserver
+./contrib/completions/bash/kube-controller-manager
+./contrib/completions/bash/kube-proxy
+./contrib/completions/bash/kube-scheduler
 ./contrib/completions/bash/kubectl
+./contrib/completions/bash/kubelet
+./docs/admin/kube-apiserver.md
+./docs/admin/kube-controller-manager.md
+./docs/admin/kube-proxy.md
+./docs/admin/kube-scheduler.md
+./docs/admin/kubelet.md
+./docs/man/man1/kube-apiserver.1
+./docs/man/man1/kube-controller-manager.1
+./docs/man/man1/kube-proxy.1
+./docs/man/man1/kube-scheduler.1
 ./docs/man/man1/kubectl-annotate.1
 ./docs/man/man1/kubectl-api-versions.1
 ./docs/man/man1/kubectl-attach.1
@@ -31,6 +45,7 @@
 ./docs/man/man1/kubectl-stop.1
 ./docs/man/man1/kubectl-version.1
 ./docs/man/man1/kubectl.1
+./docs/man/man1/kubelet.1
 ./docs/user-guide/kubectl/kubectl.md
 ./docs/user-guide/kubectl/kubectl_annotate.md
 ./docs/user-guide/kubectl/kubectl_api-versions.md

@@ -1,0 +1,284 @@
+#!/bin/bash
+
+
+__debug()
+{
+    if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
+        echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
+    fi
+}
+
+__index_of_word()
+{
+    local w word=$1
+    shift
+    index=0
+    for w in "$@"; do
+        [[ $w = "$word" ]] && return
+        index=$((index+1))
+    done
+    index=-1
+}
+
+__contains_word()
+{
+    local w word=$1; shift
+    for w in "$@"; do
+        [[ $w = "$word" ]] && return
+    done
+    return 1
+}
+
+__handle_reply()
+{
+    __debug "${FUNCNAME}"
+    case $cur in
+        -*)
+            compopt -o nospace
+            local allflags
+            if [ ${#must_have_one_flag[@]} -ne 0 ]; then
+                allflags=("${must_have_one_flag[@]}")
+            else
+                allflags=("${flags[*]} ${two_word_flags[*]}")
+            fi
+            COMPREPLY=( $(compgen -W "${allflags[*]}" -- "$cur") )
+            [[ $COMPREPLY == *= ]] || compopt +o nospace
+            return 0;
+            ;;
+    esac
+
+    # check if we are handling a flag with special work handling
+    local index
+    __index_of_word "${prev}" "${flags_with_completion[@]}"
+    if [[ ${index} -ge 0 ]]; then
+        ${flags_completion[${index}]}
+        return
+    fi
+
+    # we are parsing a flag and don't have a special handler, no completion
+    if [[ ${cur} != "${words[cword]}" ]]; then
+        return
+    fi
+
+    local completions
+    if [[ ${#must_have_one_flag[@]} -ne 0 ]]; then
+        completions=("${must_have_one_flag[@]}")
+    elif [[ ${#must_have_one_noun[@]} -ne 0 ]]; then
+        completions=("${must_have_one_noun[@]}")
+    else
+        completions=("${commands[@]}")
+    fi
+    COMPREPLY=( $(compgen -W "${completions[*]}" -- "$cur") )
+
+    if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
+        declare -F __custom_func >/dev/null && __custom_func
+    fi
+}
+
+# The arguments should be in the form "ext1|ext2|extn"
+__handle_filename_extension_flag()
+{
+    local ext="$1"
+    _filedir "@(${ext})"
+}
+
+__handle_subdirs_in_dir_flag()
+{
+    local dir="$1"
+    pushd "${dir}" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1
+}
+
+__handle_flag()
+{
+    __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
+
+    # if a command required a flag, and we found it, unset must_have_one_flag()
+    local flagname=${words[c]}
+    # if the word contained an =
+    if [[ ${words[c]} == *"="* ]]; then
+        flagname=${flagname%=*} # strip everything after the =
+        flagname="${flagname}=" # but put the = back
+    fi
+    __debug "${FUNCNAME}: looking for ${flagname}"
+    if __contains_word "${flagname}" "${must_have_one_flag[@]}"; then
+        must_have_one_flag=()
+    fi
+
+    # skip the argument to a two word flag
+    if __contains_word "${words[c]}" "${two_word_flags[@]}"; then
+        c=$((c+1))
+        # if we are looking for a flags value, don't show commands
+        if [[ $c -eq $cword ]]; then
+            commands=()
+        fi
+    fi
+
+    # skip the flag itself
+    c=$((c+1))
+
+}
+
+__handle_noun()
+{
+    __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
+
+    if __contains_word "${words[c]}" "${must_have_one_noun[@]}"; then
+        must_have_one_noun=()
+    fi
+
+    nouns+=("${words[c]}")
+    c=$((c+1))
+}
+
+__handle_command()
+{
+    __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
+
+    local next_command
+    if [[ -n ${last_command} ]]; then
+        next_command="_${last_command}_${words[c]}"
+    else
+        next_command="_${words[c]}"
+    fi
+    c=$((c+1))
+    __debug "${FUNCNAME}: looking for ${next_command}"
+    declare -F $next_command >/dev/null && $next_command
+}
+
+__handle_word()
+{
+    if [[ $c -ge $cword ]]; then
+        __handle_reply
+	return
+    fi
+    __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
+    if [[ "${words[c]}" == -* ]]; then
+	__handle_flag
+    elif __contains_word "${words[c]}" "${commands[@]}"; then
+        __handle_command
+    else
+        __handle_noun
+    fi
+    __handle_word
+}
+
+_kubelet()
+{
+    last_command="kubelet"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--address=")
+    flags+=("--allow-privileged")
+    flags+=("--alsologtostderr")
+    flags+=("--api-servers=")
+    flags+=("--auth-path=")
+    flags+=("--boot-id-file=")
+    flags+=("--cadvisor-port=")
+    flags+=("--cert-dir=")
+    flags+=("--cgroup-root=")
+    flags+=("--chaos-chance=")
+    flags+=("--cloud-config=")
+    flags+=("--cloud-provider=")
+    flags+=("--cluster-dns=")
+    flags+=("--cluster-domain=")
+    flags+=("--config=")
+    flags+=("--configure-cbr0")
+    flags+=("--container-hints=")
+    flags+=("--container-runtime=")
+    flags+=("--containerized")
+    flags+=("--docker=")
+    flags+=("--docker-endpoint=")
+    flags+=("--docker-exec-handler=")
+    flags+=("--docker-only")
+    flags+=("--docker-root=")
+    flags+=("--docker-run=")
+    flags+=("--enable-debugging-handlers")
+    flags+=("--enable-load-reader")
+    flags+=("--enable-server")
+    flags+=("--event-storage-age-limit=")
+    flags+=("--event-storage-event-limit=")
+    flags+=("--file-check-frequency=")
+    flags+=("--global-housekeeping-interval=")
+    flags+=("--google-json-key=")
+    flags+=("--healthz-bind-address=")
+    flags+=("--healthz-port=")
+    flags+=("--help")
+    flags+=("-h")
+    flags+=("--host-network-sources=")
+    flags+=("--hostname-override=")
+    flags+=("--housekeeping-interval=")
+    flags+=("--http-check-frequency=")
+    flags+=("--httptest.serve=")
+    flags+=("--image-gc-high-threshold=")
+    flags+=("--image-gc-low-threshold=")
+    flags+=("--kubeconfig=")
+    flags+=("--log-backtrace-at=")
+    flags+=("--log-cadvisor-usage")
+    flags+=("--log-dir=")
+    flags+=("--log-flush-frequency=")
+    flags+=("--logtostderr")
+    flags+=("--low-diskspace-threshold-mb=")
+    flags+=("--machine-id-file=")
+    flags+=("--manifest-url=")
+    flags+=("--manifest-url-header=")
+    flags+=("--master-service-namespace=")
+    flags+=("--max-pods=")
+    flags+=("--maximum-dead-containers=")
+    flags+=("--maximum-dead-containers-per-container=")
+    flags+=("--minimum-container-ttl-duration=")
+    flags+=("--network-plugin=")
+    flags+=("--network-plugin-dir=")
+    flags+=("--node-status-update-frequency=")
+    flags+=("--oom-score-adj=")
+    flags+=("--pod-cidr=")
+    flags+=("--pod-infra-container-image=")
+    flags+=("--port=")
+    flags+=("--read-only-port=")
+    flags+=("--really-crash-for-testing")
+    flags+=("--register-node")
+    flags+=("--registry-burst=")
+    flags+=("--registry-qps=")
+    flags+=("--resource-container=")
+    flags+=("--rkt-path=")
+    flags+=("--root-dir=")
+    flags+=("--runonce")
+    flags+=("--stderrthreshold=")
+    flags+=("--streaming-connection-idle-timeout=")
+    flags+=("--sync-frequency=")
+    flags+=("--system-container=")
+    flags+=("--tls-cert-file=")
+    flags+=("--tls-private-key-file=")
+    flags+=("--v=")
+    flags+=("--version=")
+    flags+=("--vmodule=")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+}
+
+__start_kubelet()
+{
+    local cur prev words cword
+    _init_completion -s || return
+
+    local c=0
+    local flags=()
+    local two_word_flags=()
+    local flags_with_completion=()
+    local flags_completion=()
+    local commands=("kubelet")
+    local must_have_one_flag=()
+    local must_have_one_noun=()
+    local last_command
+    local nouns=()
+
+    __handle_word
+}
+
+complete -F __start_kubelet kubelet
+# ex: ts=4 sw=4 et filetype=sh

@@ -1,0 +1,371 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubelet \- The kubelet actualy launches containers on a node
+
+
+.SH SYNOPSIS
+.PP
+\fBkubelet\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+The kubelet is the primary "node agent" that runs on each
+node. The kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
+that describes a pod. The kubelet takes a set of PodSpecs that are provided through
+various mechanisms (primarily through the apiserver) and ensures that the containers
+described in those PodSpecs are running and healthy.
+
+.PP
+Other than from an PodSpec from the apiserver, there are three ways that a container
+manifest can be provided to the Kubelet.
+
+.PP
+File: Path passed as a flag on the command line. This file is rechecked every 20
+seconds (configurable with a flag).
+
+.PP
+HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint
+is checked every 20 seconds (also configurable with a flag).
+
+.PP
+HTTP server: The kubelet can also listen for HTTP and respond to a simple API
+(underspec'd currently) to submit a new manifest.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-address\fP=0.0.0.0
+    The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)
+
+.PP
+\fB\-\-allow\-privileged\fP[=false]
+    If true, allow containers to request privileged mode. [default=false]
+
+.PP
+\fB\-\-alsologtostderr\fP[=false]
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-servers\fP=[]
+    List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.
+
+.PP
+\fB\-\-boot\-id\-file\fP="/proc/sys/kernel/random/boot\_id"
+    Comma\-separated list of files to check for boot\-id. Use the first one that exists.
+
+.PP
+\fB\-\-cadvisor\-port\fP=4194
+    The port of the localhost cAdvisor endpoint
+
+.PP
+\fB\-\-cert\-dir\fP="/var/run/kubernetes"
+    The directory where the TLS certs are located (by default /var/run/kubernetes). If \-\-tls\-cert\-file and \-\-tls\-private\-key\-file are provided, this flag will be ignored.
+
+.PP
+\fB\-\-cgroup\-root\fP=""
+    Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.
+
+.PP
+\fB\-\-chaos\-chance\fP=0
+    If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]
+
+.PP
+\fB\-\-cloud\-config\fP=""
+    The path to the cloud provider configuration file.  Empty string for no configuration file.
+
+.PP
+\fB\-\-cloud\-provider\fP=""
+    The provider for cloud services.  Empty string for no provider.
+
+.PP
+\fB\-\-cluster\-dns\fP=<nil>
+    IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers
+
+.PP
+\fB\-\-cluster\-domain\fP=""
+    Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains
+
+.PP
+\fB\-\-config\fP=""
+    Path to the config file or directory of files
+
+.PP
+\fB\-\-configure\-cbr0\fP[=false]
+    If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.
+
+.PP
+\fB\-\-container\-hints\fP="/etc/cadvisor/container\_hints.json"
+    location of the container hints file
+
+.PP
+\fB\-\-container\-runtime\fP="docker"
+    The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.
+
+.PP
+\fB\-\-containerized\fP[=false]
+    Experimental support for running kubelet in a container.  Intended for testing. [default=false]
+
+.PP
+\fB\-\-docker\fP="unix:///var/run/docker.sock"
+    docker endpoint
+
+.PP
+\fB\-\-docker\-endpoint\fP=""
+    If non\-empty, use this for the docker endpoint to communicate with
+
+.PP
+\fB\-\-docker\-exec\-handler\fP="native"
+    Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.
+
+.PP
+\fB\-\-docker\-only\fP[=false]
+    Only report docker containers in addition to root stats
+
+.PP
+\fB\-\-docker\-root\fP="/var/lib/docker"
+    Absolute path to the Docker state root directory (default: /var/lib/docker)
+
+.PP
+\fB\-\-docker\-run\fP="/var/run/docker"
+    Absolute path to the Docker run directory (default: /var/run/docker)
+
+.PP
+\fB\-\-enable\-debugging\-handlers\fP[=true]
+    Enables server endpoints for log collection and local running of containers and commands
+
+.PP
+\fB\-\-enable\-load\-reader\fP[=false]
+    Whether to enable cpu load reader
+
+.PP
+\fB\-\-enable\-server\fP[=true]
+    Enable the Kubelet's server
+
+.PP
+\fB\-\-event\-storage\-age\-limit\fP="default=24h"
+    Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or "default" and the value is a duration. Default is applied to all non\-specified event types
+
+.PP
+\fB\-\-event\-storage\-event\-limit\fP="default=100000"
+    Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or "default" and the value is an integer. Default is applied to all non\-specified event types
+
+.PP
+\fB\-\-file\-check\-frequency\fP=20s
+    Duration between checking config files for new data
+
+.PP
+\fB\-\-global\-housekeeping\-interval\fP=1m0s
+    Interval between global housekeepings
+
+.PP
+\fB\-\-google\-json\-key\fP=""
+    The Google Cloud Platform Service Account JSON Key to use for authentication.
+
+.PP
+\fB\-\-healthz\-bind\-address\fP=127.0.0.1
+    The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
+
+.PP
+\fB\-\-healthz\-port\fP=10248
+    The port of the localhost healthz endpoint
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP[=false]
+    help for kubelet
+
+.PP
+\fB\-\-host\-network\-sources\fP="file"
+    Comma\-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use "*" [default="file"]
+
+.PP
+\fB\-\-hostname\-override\fP=""
+    If non\-empty, will use this string as identification instead of the actual hostname.
+
+.PP
+\fB\-\-housekeeping\-interval\fP=1s
+    Interval between container housekeepings
+
+.PP
+\fB\-\-http\-check\-frequency\fP=20s
+    Duration between checking http for new data
+
+.PP
+\fB\-\-httptest.serve\fP=""
+    if non\-empty, httptest.NewServer serves on this address and blocks
+
+.PP
+\fB\-\-image\-gc\-high\-threshold\fP=90
+    The percent of disk usage after which image garbage collection is always run. Default: 90%%
+
+.PP
+\fB\-\-image\-gc\-low\-threshold\fP=80
+    The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%%
+
+.PP
+\fB\-\-kubeconfig\fP="/var/lib/kubelet/kubeconfig"
+    Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api\-servers flag).
+
+.PP
+\fB\-\-log\-backtrace\-at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\-cadvisor\-usage\fP[=false]
+    Whether to log the usage of the cAdvisor container
+
+.PP
+\fB\-\-log\-dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\-flush\-frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP[=true]
+    log to standard error instead of files
+
+.PP
+\fB\-\-low\-diskspace\-threshold\-mb\fP=256
+    The absolute free disk space, in MB, to maintain. When disk space falls below this threshold, new pods would be rejected. Default: 256
+
+.PP
+\fB\-\-machine\-id\-file\fP="/etc/machine\-id,/var/lib/dbus/machine\-id"
+    Comma\-separated list of files to check for machine\-id. Use the first one that exists.
+
+.PP
+\fB\-\-manifest\-url\fP=""
+    URL for accessing the container manifest
+
+.PP
+\fB\-\-manifest\-url\-header\fP=""
+    HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'
+
+.PP
+\fB\-\-master\-service\-namespace\fP="default"
+    The namespace from which the kubernetes master services should be injected into pods
+
+.PP
+\fB\-\-max\-pods\fP=40
+    Number of Pods that can run on this Kubelet.
+
+.PP
+\fB\-\-maximum\-dead\-containers\fP=100
+    Maximum number of old instances of a containers to retain globally.  Each container takes up some disk space.  Default: 100.
+
+.PP
+\fB\-\-maximum\-dead\-containers\-per\-container\fP=2
+    Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 2.
+
+.PP
+\fB\-\-minimum\-container\-ttl\-duration\fP=1m0s
+    Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'
+
+.PP
+\fB\-\-network\-plugin\fP=""
+    <Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle
+
+.PP
+\fB\-\-network\-plugin\-dir\fP="/usr/libexec/kubernetes/kubelet\-plugins/net/exec/"
+    <Warning: Alpha feature> The full path of the directory in which to search for network plugins
+
+.PP
+\fB\-\-node\-status\-update\-frequency\fP=10s
+    Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s
+
+.PP
+\fB\-\-oom\-score\-adj\fP=\-999
+    The oom\-score\-adj value for kubelet process. Values must be within the range [\-1000, 1000]
+
+.PP
+\fB\-\-pod\-cidr\fP=""
+    The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.
+
+.PP
+\fB\-\-pod\-infra\-container\-image\fP="gcr.io/google\_containers/pause:0.8.0"
+    The image whose network/ipc namespaces containers in each pod will use.
+
+.PP
+\fB\-\-port\fP=10250
+    The port for the Kubelet to serve on. Note that "kubectl logs" will not work if you set this flag.
+
+.PP
+\fB\-\-read\-only\-port\fP=10255
+    The read\-only port for the Kubelet to serve on (set to 0 to disable)
+
+.PP
+\fB\-\-really\-crash\-for\-testing\fP[=false]
+    If true, when panics occur crash. Intended for testing.
+
+.PP
+\fB\-\-register\-node\fP[=true]
+    Register the node with the apiserver (defaults to true if \-\-api\-server is set)
+
+.PP
+\fB\-\-registry\-burst\fP=10
+    Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry\-qps.  Only used if \-\-registry\-qps > 0
+
+.PP
+\fB\-\-registry\-qps\fP=0
+    If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]
+
+.PP
+\fB\-\-resource\-container\fP="/kubelet"
+    Absolute name of the resource\-only container to create and run the Kubelet in (Default: /kubelet).
+
+.PP
+\fB\-\-rkt\-path\fP=""
+    Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if \-\-container\-runtime='rkt'
+
+.PP
+\fB\-\-root\-dir\fP="/var/lib/kubelet"
+    Directory path for managing kubelet files (volume mounts,etc).
+
+.PP
+\fB\-\-runonce\fP[=false]
+    If true, exit after spawning pods from local manifests or remote urls. Exclusive with \-\-api\-servers, and \-\-enable\-server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-streaming\-connection\-idle\-timeout\fP=0
+    Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'
+
+.PP
+\fB\-\-sync\-frequency\fP=10s
+    Max period between synchronizing running containers and config
+
+.PP
+\fB\-\-system\-container\fP=""
+    Optional resource\-only container in which to place all non\-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: "").
+
+.PP
+\fB\-\-tls\-cert\-file\fP=""
+    File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). If \-\-tls\-cert\-file and \-\-tls\-private\-key\-file are not provided, a self\-signed certificate and key are generated for the public address and saved to the directory passed to \-\-cert\-dir.
+
+.PP
+\fB\-\-tls\-private\-key\-file\fP=""
+    File containing x509 private key matching \-\-tls\-cert\-file.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-version\fP=false
+    Print version information and quit
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH HISTORY
+.PP
+2015\-08\-21 07:23:00.763380889 +0000 UTC Auto generated by spf13/cobra
