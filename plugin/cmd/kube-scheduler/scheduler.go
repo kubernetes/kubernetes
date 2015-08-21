@@ -17,17 +17,14 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
-	"github.com/golang/glog"
-	"github.com/spf13/pflag"
+	"runtime"
+
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/tools/ha"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
-	"os"
-	"runtime"
-	"time"
+
+	"github.com/spf13/pflag"
 )
 
 func init() {
