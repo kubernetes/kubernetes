@@ -572,7 +572,8 @@ func (dm *DockerManager) runContainer(
 	opts *kubecontainer.RunContainerOptions,
 	ref *api.ObjectReference,
 	netMode string,
-	ipcMode string) (string, error) {
+	ipcMode string,
+	utsMode string) (string, error) {
 
 	dockerName := KubeletContainerName{
 		PodFullName:   kubecontainer.GetPodFullName(pod),
@@ -679,6 +680,7 @@ func (dm *DockerManager) runContainer(
 		Binds:        binds,
 		NetworkMode:  netMode,
 		IpcMode:      ipcMode,
+		UTSMode:      utsMode,
 		// Memory and CPU are set here for newer versions of Docker (1.6+).
 		Memory:     memoryLimit,
 		MemorySwap: -1,
@@ -1240,7 +1242,11 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		return "", err
 	}
 
-	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode)
+	utsMode := ""
+	if pod.Spec.HostNetwork {
+		utsMode = "host"
+	}
+	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode)
 	if err != nil {
 		return "", err
 	}
@@ -1303,7 +1309,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	// This resolv.conf file is shared by all containers of the same pod, and needs to be modified only once per pod.
 	// we modify it when the pause container is created since it is the first container created in the pod since it holds
 	// the networking namespace.
-	if container.Name == PodInfraContainerName {
+	if container.Name == PodInfraContainerName && utsMode != "host" {
 		err = addNDotsOption(containerInfo.ResolvConfPath)
 	}
 

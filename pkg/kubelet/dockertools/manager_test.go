@@ -1991,6 +1991,46 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 	}
 }
 
+func TestSyncPodWithHostNetwork(t *testing.T) {
+	dm, fakeDocker := newTestDockerManager()
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar"},
+			},
+			HostNetwork: true,
+		},
+	}
+
+	runSyncPod(t, dm, fakeDocker, pod)
+
+	verifyCalls(t, fakeDocker, []string{
+		// Create pod infra container.
+		"create", "start", "inspect_container",
+		// Create container.
+		"create", "start", "inspect_container",
+	})
+
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+
+	utsMode := fakeDocker.Container.HostConfig.UTSMode
+	if utsMode != "host" {
+		t.Errorf("Pod with host network must have \"host\" utsMode, actual: \"%v\"", utsMode)
+	}
+
+	fakeDocker.Unlock()
+}
+
 func TestGetPodStatusSortedContainers(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
 	dockerInspect := map[string]*docker.Container{}
