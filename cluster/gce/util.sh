@@ -643,6 +643,15 @@ function kube-up {
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
 
+  # Create disk for cluster registry if enabled
+  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
+    gcloud compute disks create "${CLUSTER_REGISTRY_DISK}" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
+      --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
+  fi
+
   # Generate a bearer token for this cluster. We push this separately
   # from the other cluster variables so that the client (this
   # computer) can forget it later. This should disappear with
@@ -837,6 +846,17 @@ function kube-down {
       "${MASTER_NAME}"-pd
   fi
 
+  # Delete disk for cluster registry if enabled
+  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
+    if gcloud compute disks describe "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+      gcloud compute disks delete \
+        --project "${PROJECT}" \
+        --quiet \
+        --zone "${ZONE}" \
+        "${CLUSTER_REGISTRY_DISK}"
+    fi
+  fi
+
   # Find out what minions are running.
   local -a minions
   minions=( $(gcloud compute instances list \
@@ -952,6 +972,11 @@ function check-resources {
 
   if gcloud compute disks describe --project "${PROJECT}" "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Persistent disk ${MASTER_NAME}-pd"
+    return 1
+  fi
+
+  if gcloud compute disks describe --project "${PROJECT}" "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Persistent disk ${CLUSTER_REGISTRY_DISK}"
     return 1
   fi
 

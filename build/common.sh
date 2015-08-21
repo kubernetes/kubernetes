@@ -100,6 +100,12 @@ readonly KUBE_DOCKER_WRAPPED_BINARIES=(
   kube-scheduler
 )
 
+# The set of addons images that should be prepopulated
+readonly KUBE_ADDON_PATHS=(
+  gcr.io/google_containers/pause:0.8.0
+  gcr.io/google_containers/kube-registry-proxy:0.3
+)
+
 # ---------------------------------------------------------------------------
 # Basic setup functions
 
@@ -602,6 +608,7 @@ function kube::release::package_server_tarballs() {
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
     rm -rf "${release_stage}"
     mkdir -p "${release_stage}/server/bin"
+    mkdir -p "${release_stage}/addons"
 
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
@@ -610,6 +617,7 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
     
     kube::release::create_docker_images_for_server "${release_stage}/server/bin";
+    kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
@@ -678,6 +686,27 @@ function kube::release::create_docker_images_for_server() {
 
     kube::util::wait-for-jobs || { kube::log::error "previous Docker build failed"; return 1; }
     kube::log::status "Docker builds done"
+  )
+}
+
+# This will pull and save docker images for addons which need to placed
+# on the nodes directly.
+function kube::release::write_addon_docker_images_for_server() {
+  # Create a sub-shell so that we don't pollute the outer environment
+  (
+    local addon_path
+    for addon_path in "${KUBE_ADDON_PATHS[@]}"; do
+      (
+        kube::log::status "Pulling and writing Docker image for addon: ${addon_path}"
+
+        local dest_name="${addon_path//\//\~}"
+        docker pull "${addon_path}"
+        docker save "${addon_path}" > "${1}/${dest_name}.tar"
+      ) &
+    done
+
+    kube::util::wait-for-jobs || { kube::log::error "unable to pull or write addon image"; return 1; }
+    kube::log::status "Addon images done"
   )
 }
 

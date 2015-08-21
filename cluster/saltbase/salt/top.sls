@@ -25,6 +25,9 @@ base:
     - fluentd-gcp
   {% endif %}
 {% endif %}
+{% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}
+    - kube-registry-proxy
+{% endif %}
     - logrotate
 {% if grains['cloud'] is defined and grains.cloud == 'gce' %}
     - supervisor
