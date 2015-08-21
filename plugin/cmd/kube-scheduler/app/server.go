@@ -18,6 +18,7 @@ limitations under the License.
 package app
 
 import (
+	goflag "flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -42,6 +44,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -65,7 +68,34 @@ func NewSchedulerServer() *SchedulerServer {
 		Address:           net.ParseIP("127.0.0.1"),
 		AlgorithmProvider: factory.DefaultProvider,
 	}
+
 	return &s
+}
+
+func NewSchedulerServerCommand() *cobra.Command {
+	s := NewSchedulerServer()
+	cmd := &cobra.Command{
+		Use:   "kube-scheduler",
+		Short: "kube-scheduler schedules pods onto nodes",
+		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,
+workload-specific function that significantly impacts availability, performance,
+and capacity. The scheduler needs to take into account individual and collective
+resource requirements, quality of service requirements, hardware/software/policy
+constraints, affinity and anti-affinity specifications, data locality, inter-workload
+interference, deadlines, and so on. Workload-specific requirements will be exposed
+through the API as necessary.`,
+		Run: func(_ *cobra.Command, args []string) {
+			if err := s.Run(args); err != nil {
+				glog.Fatalf("%v", err)
+			}
+		},
+	}
+
+	s.AddFlags(cmd.Flags())
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	cmd.SetGlobalNormalizationFunc(util.WordSepNormalizeFunc)
+
+	return cmd
 }
 
 // AddFlags adds flags for a specific SchedulerServer to the specified FlagSet
@@ -83,6 +113,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 
 // Run runs the specified SchedulerServer.  This should never exit.
 func (s *SchedulerServer) Run(_ []string) error {
+	verflag.PrintAndExitIfRequested()
 	if s.Kubeconfig == "" && s.Master == "" {
 		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
 	}
