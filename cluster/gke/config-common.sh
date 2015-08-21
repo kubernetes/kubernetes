@@ -28,6 +28,7 @@ GCLOUD="${GCLOUD:-gcloud}"
 CMD_GROUP="${CMD_GROUP:-beta}"
 GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
 MINION_SCOPES="${MINION_SCOPES:-"compute-rw,storage-ro"}"
+MACHINE_TYPE="${MACHINE_TYPE:-n1-standard-1}"
 
 # WARNING: any new vars added here must correspond to options that can be
 # passed to `gcloud {CMD_GROUP} container clusters create`, or they will
