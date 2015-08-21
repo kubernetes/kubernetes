@@ -23,6 +23,7 @@ limitations under the License.
 package app
 
 import (
+	goflag "flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -53,9 +54,11 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -129,6 +132,7 @@ func NewCMServer() *CMServer {
 			PersistentVolumeRecyclerIncrementTimeoutHostPath: 30,
 		},
 	}
+
 	return &s
 }
 
@@ -143,6 +147,31 @@ type VolumeConfigFlags struct {
 	PersistentVolumeRecyclerPodTemplateFilePathHostPath string
 	PersistentVolumeRecyclerMinimumTimeoutHostPath      int
 	PersistentVolumeRecyclerIncrementTimeoutHostPath    int
+}
+
+func NewCMServerCommand() *cobra.Command {
+	s := NewCMServer()
+	cmd := &cobra.Command{
+		Use:   "kube-controller-manager",
+		Short: "kube-controller-manager is the daemon running most of the systems control loops",
+		Long: `The Kubernetes controller manager is a daemon that embeds
+the core control loops shipped with Kubernetes. In applications of robotics and
+automation, a control loop is a non-terminating loop that regulates the state of
+the system. In Kubernetes, a controller is a control loop that watches the shared
+state of the cluster through the apiserver and makes changes attempting to move the
+current state towards the desired state. Examples of controllers that ship with
+Kubernetes today are the replication controller, endpoints controller, namespace
+controller, and serviceaccounts controller.`,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return s.Run(args)
+		},
+	}
+
+	s.AddFlags(cmd.Flags())
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	cmd.SetGlobalNormalizationFunc(util.WordSepNormalizeFunc)
+
+	return cmd
 }
 
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
@@ -197,6 +226,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 
 // Run runs the CMServer.  This should never exit.
 func (s *CMServer) Run(_ []string) error {
+	verflag.PrintAndExitIfRequested()
 	if s.Kubeconfig == "" && s.Master == "" {
 		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
 	}
