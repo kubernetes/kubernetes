@@ -19,7 +19,6 @@ package executor
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -93,15 +92,9 @@ type kuberTask struct {
 
 type podStatusFunc func() (*api.PodStatus, error)
 
-// KubeletInterface consists of the kubelet.Kubelet API's that we actually use
-type KubeletInterface interface {
-	GetHostIP() (net.IP, error)
-}
-
 // KubernetesExecutor is an mesos executor that runs pods
 // in a minion machine.
 type KubernetesExecutor struct {
-	kl                   KubeletInterface   // the kubelet instance.
 	updateChan           chan<- interface{} // to send pod config updates to the kubelet
 	state                stateType
 	tasks                map[string]*kuberTask
@@ -118,15 +111,13 @@ type KubernetesExecutor struct {
 	kubeletFinished      <-chan struct{} // signals that kubelet Run() died
 	initialRegistration  sync.Once
 	exitFunc             func(int)
-	podStatusFunc        func(KubeletInterface, *api.Pod) (*api.PodStatus, error)
-	staticPodsConfig     []byte
+	podStatusFunc        func(*api.Pod) (*api.PodStatus, error)
 	staticPodsConfigPath string
 	initialRegComplete   chan struct{}
 	podController        *framework.Controller
 }
 
 type Config struct {
-	Kubelet              KubeletInterface
 	Updates              chan<- interface{} // to send pod config updates to the kubelet
 	SourceName           string
 	APIClient            *client.Client
@@ -135,7 +126,7 @@ type Config struct {
 	SuicideTimeout       time.Duration
 	KubeletFinished      <-chan struct{} // signals that kubelet Run() died
 	ExitFunc             func(int)
-	PodStatusFunc        func(KubeletInterface, *api.Pod) (*api.PodStatus, error)
+	PodStatusFunc        func(*api.Pod) (*api.PodStatus, error)
 	StaticPodsConfigPath string
 	PodLW                cache.ListerWatcher
 }
@@ -147,7 +138,6 @@ func (k *KubernetesExecutor) isConnected() bool {
 // New creates a new kubernetes executor.
 func New(config Config) *KubernetesExecutor {
 	k := &KubernetesExecutor{
-		kl:                   config.Kubelet,
 		updateChan:           config.Updates,
 		state:                disconnectedState,
 		tasks:                make(map[string]*kuberTask),
@@ -191,6 +181,10 @@ func New(config Config) *KubernetesExecutor {
 	return k
 }
 
+func (k *KubernetesExecutor) InitialRegComplete() <-chan struct{} {
+	return k.initialRegComplete
+}
+
 func (k *KubernetesExecutor) Init(driver bindings.ExecutorDriver) {
 	k.killKubeletContainers()
 	k.resetSuicideWatch(driver)
@@ -226,7 +220,7 @@ func (k *KubernetesExecutor) Registered(driver bindings.ExecutorDriver,
 	}
 
 	if executorInfo != nil && executorInfo.Data != nil {
-		k.staticPodsConfig = executorInfo.Data
+		k.initializeStaticPodsSource(executorInfo.Data)
 	}
 
 	if slaveInfo != nil {
@@ -276,24 +270,14 @@ func (k *KubernetesExecutor) onInitialRegistration() {
 	}
 }
 
-// InitializeStaticPodsSource blocks until initial regstration is complete and
-// then creates a static pod source using the given factory func.
-func (k *KubernetesExecutor) InitializeStaticPodsSource(sourceFactory func()) {
-	<-k.initialRegComplete
-
-	if k.staticPodsConfig == nil {
-		return
-	}
-
+// initializeStaticPodsSource unzips the data slice into the static-pods directory
+func (k *KubernetesExecutor) initializeStaticPodsSource(data []byte) {
 	log.V(2).Infof("extracting static pods config to %s", k.staticPodsConfigPath)
-	err := archive.UnzipDir(k.staticPodsConfig, k.staticPodsConfigPath)
+	err := archive.UnzipDir(data, k.staticPodsConfigPath)
 	if err != nil {
 		log.Errorf("Failed to extract static pod config: %v", err)
 		return
 	}
-
-	log.V(2).Infof("initializing static pods source factory, configured at path %q", k.staticPodsConfigPath)
-	sourceFactory()
 }
 
 // Disconnected is called when the executor is disconnected from the slave.
@@ -588,18 +572,7 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 
 	// Delay reporting 'task running' until container is up.
 	psf := podStatusFunc(func() (*api.PodStatus, error) {
-		status, err := k.podStatusFunc(k.kl, pod)
-		if err != nil {
-			return nil, err
-		}
-		status.Phase = kubelet.GetPhase(&pod.Spec, status.ContainerStatuses)
-		hostIP, err := k.kl.GetHostIP()
-		if err != nil {
-			log.Errorf("Cannot get host IP: %v", err)
-		} else {
-			status.HostIP = hostIP.String()
-		}
-		return status, nil
+		return k.podStatusFunc(pod)
 	})
 
 	go k._launchTask(driver, taskId, podFullName, psf)

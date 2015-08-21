@@ -143,10 +143,6 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 			Host:    testApiServer.server.URL,
 			Version: testapi.Default.Version(),
 		}),
-		Kubelet: &fakeKubelet{
-			Kubelet: &kubelet.Kubelet{},
-			hostIP:  net.IPv4(127, 0, 0, 1),
-		},
 		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
 				ContainerStatuses: []api.ContainerStatus{
@@ -158,6 +154,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 					},
 				},
 				Phase: api.PodRunning,
+				HostIP: "127.0.0.1",
 			}, nil
 		},
 		PodLW: &NewMockPodsListWatch(api.PodList{}).ListWatch,
@@ -310,7 +307,6 @@ func TestExecutorStaticPods(t *testing.T) {
 			Host:    testApiServer.server.URL,
 			Version: testapi.Default.Version(),
 		}),
-		Kubelet: &kubelet.Kubelet{},
 		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
 				ContainerStatuses: []api.ContainerStatus{
@@ -392,10 +388,6 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 			Host:    testApiServer.server.URL,
 			Version: testapi.Default.Version(),
 		}),
-		Kubelet: &fakeKubelet{
-			Kubelet: &kubelet.Kubelet{},
-			hostIP:  net.IPv4(127, 0, 0, 1),
-		},
 		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
 				ContainerStatuses: []api.ContainerStatus{
@@ -407,6 +399,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 					},
 				},
 				Phase: api.PodRunning,
+				HostIP: "127.0.0.1",
 			}, nil
 		},
 		ShutdownAlert: func() {
