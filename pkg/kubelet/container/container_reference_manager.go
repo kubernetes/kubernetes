@@ -46,8 +46,6 @@ func (c *RefManager) SetRef(id string, ref *api.ObjectReference) {
 }
 
 // ClearRef forgets the given container id and its associated container reference.
-// TODO(yifan): This is currently never called. Consider to remove this function,
-// or figure out when to clear the references.
 func (c *RefManager) ClearRef(id string) {
 	c.Lock()
 	defer c.Unlock()

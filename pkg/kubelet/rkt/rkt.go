@@ -726,6 +726,7 @@ func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 }
 
 // KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
+// TODO(yifan): Handle network plugin.
 func (r *runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	glog.V(4).Infof("Rkt is killing pod: name %q.", runningPod.Name)
 	serviceName := makePodServiceFileName(runningPod.ID)
@@ -948,7 +949,6 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 	}
 
 	if restartPod {
-		// TODO(yifan): Handle network plugin.
 		if err := r.KillPod(pod, runningPod); err != nil {
 			return err
 		}
