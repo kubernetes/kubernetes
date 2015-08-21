@@ -236,6 +236,7 @@ def main():
         bad_lines.sort()
         for (relname, line) in bad_lines:
             print("%s:%s" % (relname, line))
+        return 1
 
 if __name__ == "__main__":
   sys.exit(main())
