@@ -167,7 +167,6 @@ type ThirdPartyResourceData struct {
 	Data []byte `json:"name,omitempty" description:"the raw JSON data for this data"`
 }
 
-<<<<<<< HEAD
 type Deployment struct {
 	api.TypeMeta   `json:",inline"`
 	api.ObjectMeta `json:"metadata,omitempty"`

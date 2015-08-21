@@ -198,7 +198,7 @@ func TestInstallThirdPartyAPIGet(t *testing.T) {
 			Name: "test",
 		},
 		TypeMeta: api.TypeMeta{
-			Kind: "foo",
+			Kind: "Foo",
 		},
 		SomeField:  "test field",
 		OtherField: 10,
@@ -237,12 +237,12 @@ func TestInstallThirdPartyAPIPost(t *testing.T) {
 			Name: "test",
 		},
 		TypeMeta: api.TypeMeta{
-			Kind: "foo",
+			Kind: "Foo",
 		},
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	data, err := encodeToThirdParty("test", inputObj)
+	data, err := json.Marshal(inputObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v")
 		return
@@ -298,7 +298,7 @@ func TestInstallThirdPartyAPIDelete(t *testing.T) {
 			Name: "test",
 		},
 		TypeMeta: api.TypeMeta{
-			Kind: "foo",
+			Kind: "Foo",
 		},
 		SomeField:  "test field",
 		OtherField: 10,

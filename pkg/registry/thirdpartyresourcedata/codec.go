@@ -85,9 +85,6 @@ func (t *thirdPartyResourceDataCodec) populate(objIn *expapi.ThirdPartyResourceD
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
 	}
-	if kind == "ThirdPartyResourceData" {
-		return t.delegate.DecodeInto(data, objIn)
-	}
 	if kind != t.kind {
 		return fmt.Errorf("unexpected kind: %s, expected: %s", kind, t.kind)
 	}

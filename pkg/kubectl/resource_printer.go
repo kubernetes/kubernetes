@@ -1088,7 +1088,7 @@ func printThirdPartyResource(rsrc *expapi.ThirdPartyResource, w io.Writer, withN
 
 func printThirdPartyResourceList(list *expapi.ThirdPartyResourceList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
-		if err := printThirdPartyResource(&item, w, withNamespace, wide, columnLabels); err != nil {
+		if err := printThirdPartyResource(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}

@@ -101,7 +101,6 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
-<<<<<<< HEAD
 func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
