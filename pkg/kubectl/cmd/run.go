@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -111,11 +112,6 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		return err
 	}
 
-	client, err := f.Client()
-	if err != nil {
-		return err
-	}
-
 	restartPolicy, err := getRestartPolicy(cmd, interactive)
 	if err != nil {
 		return err
@@ -151,27 +147,36 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		return err
 	}
 
+	mapper, typer := f.Object()
+	version, kind, err := typer.ObjectVersionAndKind(obj)
+	if err != nil {
+		return err
+	}
+
 	inline := cmdutil.GetFlagString(cmd, "overrides")
 	if len(inline) > 0 {
-		var objType string
-		if restartPolicy == api.RestartPolicyAlways {
-			objType = "ReplicationController"
-		} else {
-			objType = "Pod"
-		}
-		obj, err = cmdutil.Merge(obj, inline, objType)
+		obj, err = cmdutil.Merge(obj, inline, kind)
 		if err != nil {
 			return err
 		}
 	}
 
+	mapping, err := mapper.RESTMapping(kind, version)
+	if err != nil {
+		return err
+	}
+	client, err := f.RESTClient(mapping)
+	if err != nil {
+		return err
+	}
+
 	// TODO: extract this flag to a central location, when such a location exists.
 	if !cmdutil.GetFlagBool(cmd, "dry-run") {
-		if restartPolicy == api.RestartPolicyAlways {
-			obj, err = client.ReplicationControllers(namespace).Create(obj.(*api.ReplicationController))
-		} else {
-			obj, err = client.Pods(namespace).Create(obj.(*api.Pod))
+		data, err := mapping.Codec.Encode(obj)
+		if err != nil {
+			return err
 		}
+		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, data)
 		if err != nil {
 			return err
 		}
@@ -205,10 +210,14 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			return err
 		}
 		opts.Client = client
-		if restartPolicy == api.RestartPolicyAlways {
-			return handleAttachReplicationController(client, obj.(*api.ReplicationController), opts)
-		} else {
-			return handleAttachPod(client, obj.(*api.Pod), opts)
+		// TODO: this should be abstracted into Factory to support other types
+		switch t := obj.(type) {
+		case *api.ReplicationController:
+			return handleAttachReplicationController(client, t, opts)
+		case *api.Pod:
+			return handleAttachPod(client, t, opts)
+		default:
+			return fmt.Errorf("cannot attach to %s: not implemented", kind)
 		}
 	}
 	return f.PrintObject(cmd, obj, cmdOut)
