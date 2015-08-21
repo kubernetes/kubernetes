@@ -56,6 +56,22 @@ function cluster::mesos::docker::docker_compose {
   )
 }
 
+# Pull the images from a docker compose file, if they're not already cached.
+# This avoid slow remote calls from `docker-compose pull` which delegates
+# to `docker pull` which always hits the remote docker repo, even if the image
+# is already cached.
+function cluster::mesos::docker::docker_compose_lazy_pull {
+  for img in $(grep '^\s*image:\s' "${provider_root}/docker-compose.yml" | sed 's/[ \t]*image:[ \t]*//'); do
+    read repo tag <<<$(echo "${img} "| sed 's/:/ /')
+    if [ -z "${tag}" ]; then
+      tag="latest"
+    fi
+    if ! docker images "${repo}" | awk '{print $2;}' | grep -q "${tag}"; then
+      docker pull "${img}"
+    fi
+  done
+}
+
 # Run kubernetes scripts inside docker.
 # This bypasses the need to set up network routing when running docker in a VM (e.g. boot2docker).
 # Trap signals and kills the docker container for better signal handing
@@ -252,12 +268,11 @@ function kube-up {
   mkdir -p "${log_dir}"
   rm -rf "${log_dir}"/*
 
-  if [ "${MESOS_DOCKER_SKIP_BUILD:-false}" != "true" ]; then
-    # Pull before `docker-compose up` to avoid timeouts between container runs.
-    # Pull before building images (but only if built) to avoid overwriting locally built images.
-    echo "Pulling docker images" 1>&2
-    cluster::mesos::docker::docker_compose pull
+  # Pull before `docker-compose up` to avoid timeouts caused by slow pulls during deployment.
+  echo "Pulling Docker images" 1>&2
+  cluster::mesos::docker::docker_compose_lazy_pull
 
+  if [ "${MESOS_DOCKER_SKIP_BUILD:-false}" != "true" ]; then
     echo "Building Docker images" 1>&2
     # TODO: version images (k8s version, git sha, and dirty state) to avoid re-building them every time.
     "${provider_root}/km/build.sh"
