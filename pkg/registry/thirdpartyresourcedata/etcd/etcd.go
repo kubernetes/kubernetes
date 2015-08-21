@@ -17,6 +17,8 @@ limitations under the License.
 package etcd
 
 import (
+	"strings"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/expapi"
 	"k8s.io/kubernetes/pkg/fields"
@@ -35,7 +37,7 @@ type REST struct {
 
 // NewREST returns a registry which will store ThirdPartyResourceData in the given helper
 func NewREST(s storage.Interface, group, kind string) *REST {
-	prefix := "/ThirdPartyResourceData/" + group + "/" + kind
+	prefix := "/ThirdPartyResourceData/" + group + "/" + strings.ToLower(kind) + "s"
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &expapi.ThirdPartyResourceData{} },

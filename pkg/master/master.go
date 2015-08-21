@@ -776,7 +776,7 @@ func (m *Master) InstallThirdPartyAPI(rsrc *expapi.ThirdPartyResource) error {
 	if err != nil {
 		return err
 	}
-	thirdparty := m.thirdpartyapi(group, strings.ToLower(kind)+"s", rsrc.Versions[0].Name)
+	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name)
 	if err := thirdparty.InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup thirdparty api: %v", err)
 	}
@@ -793,7 +793,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	apiRoot := "/thirdparty/" + group + "/"
 
 	storage := map[string]rest.Storage{
-		kind: resourceStorage,
+		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
 	return &apiserver.APIGroupVersion{
