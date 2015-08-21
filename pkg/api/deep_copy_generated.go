@@ -117,7 +117,22 @@ func deepCopy_api_ComponentList(in ComponentList, out *ComponentList, c *convers
 
 func deepCopy_api_ComponentSpec(in ComponentSpec, out *ComponentSpec, c *conversion.Cloner) error {
 	out.Type = in.Type
-	out.Address = in.Address
+	if in.LivenessProbe != nil {
+		out.LivenessProbe = new(Probe)
+		if err := deepCopy_api_Probe(*in.LivenessProbe, out.LivenessProbe, c); err != nil {
+			return err
+		}
+	} else {
+		out.LivenessProbe = nil
+	}
+	if in.ReadinessProbe != nil {
+		out.ReadinessProbe = new(Probe)
+		if err := deepCopy_api_Probe(*in.ReadinessProbe, out.ReadinessProbe, c); err != nil {
+			return err
+		}
+	} else {
+		out.ReadinessProbe = nil
+	}
 	return nil
 }
 
@@ -2086,6 +2101,7 @@ func deepCopy_api_StatusDetails(in StatusDetails, out *StatusDetails, c *convers
 }
 
 func deepCopy_api_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *conversion.Cloner) error {
+	out.Host = in.Host
 	if err := deepCopy_util_IntOrString(in.Port, &out.Port, c); err != nil {
 		return err
 	}

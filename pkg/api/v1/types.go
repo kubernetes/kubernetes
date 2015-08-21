@@ -784,6 +784,8 @@ const (
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
+	// Host name to connect to, defaults to the pod IP.
+	Host string `json:"host,omitempty"`
 	// Number or name of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
@@ -2501,8 +2503,9 @@ const (
 )
 
 type ComponentSpec struct {
-	Type    ComponentType `json:"type" description:"type of the component"`
-	Address string        `json:"address,omitempty" description:"address to reach the component (scheme, host, port, path); address paths determined by component type"`
+	Type           ComponentType `json:"type" description:"type of the component"`
+	LivenessProbe  *Probe        `json:"livenessProbe,omitempty" description:"periodic probe of component liveness"`
+	ReadinessProbe *Probe        `json:"readinessProbe,omitempty" description:"periodic probe of component readiness"`
 }
 
 type ComponentPhase string

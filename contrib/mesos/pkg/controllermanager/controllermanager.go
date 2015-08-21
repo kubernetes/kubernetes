@@ -22,7 +22,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"time"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,7 +30,7 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
-	"k8s.io/kubernetes/pkg/component"
+	"k8s.io/kubernetes/pkg/controller/component"
 	kendpoint "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
@@ -96,14 +95,44 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	heartbeat, err := component.Start(
-		kubeClient.ComponentsClient(),
-		5*time.Second,
-		api.ComponentControllerManager,
-		s.URI(),
-	)
+	host := s.Address.String()
+	// TODO: what if port is zero?
+	port := util.NewIntOrStringFromInt(s.Port)
+
+	// Register component
+	_, err = kubeClient.ComponentsClient().Create(&api.Component{
+		Spec: api.ComponentSpec{
+			Type: "k8sm-controller-manager",
+			LivenessProbe: &api.Probe{
+				InitialDelaySeconds: int64(30),
+				TimeoutSeconds:      int64(5),
+				Handler: api.Handler{
+					TCPSocket: &api.TCPSocketAction{
+						Host: host,
+						Port: port,
+					},
+				},
+			},
+			ReadinessProbe: &api.Probe{
+				InitialDelaySeconds: int64(30),
+				TimeoutSeconds:      int64(5),
+				Handler: api.Handler{
+					HTTPGet: &api.HTTPGetAction{
+						Scheme: api.URISchemeHTTP,
+						Host:   host,
+						Port:   port,
+						Path:   "/healthz",
+					},
+				},
+			},
+		},
+		Status: api.ComponentStatus{
+			Phase:      api.ComponentPending,
+			Conditions: []api.ComponentCondition{},
+		},
+	})
 	if err != nil {
-		glog.Fatalf("Failed to start heartbeat: %v", err)
+		return fmt.Errorf("Failed to register component: %v", err)
 	}
 
 	go func() {
@@ -120,8 +149,8 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	endpoints := s.createEndpointController(kubeClient)
-	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
+	components := componentcontroller.NewComponentController(kubeClient)
+	go components.Run(s.ConcurrentComponentProbes, util.NeverStop)
 
 	controllerManager := replicationcontroller.NewReplicationManager(kubeClient, replicationcontroller.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
@@ -202,24 +231,7 @@ func (s *CMServer) Run(_ []string) error {
 		serviceaccount.DefaultServiceAccountsControllerOptions(),
 	).Run()
 
-	// Assume that if we made it this far the controller-manager is healthy.
-	// TODO(karlkfi): Handle phase/condition transitions based on an aggregate controller state.
-	// TODO(karlkfi): Extract each controller to its own component, so they can each manage their own heatbeat and state transitions.
-	err = heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
-		Type:   api.ComponentRunningHealthy,
-		Status: api.ConditionTrue,
-	})
-	if err != nil {
-		glog.Errorf("Transition to running failed: %v", err)
-		heartbeat.Kill(err)
-	}
-
-	// block until heartbeat is stopped
-	for err = range heartbeat.Watch() {
-		glog.Errorf("Heartbeat Error: %s", err)
-	}
-
-	return nil
+	select {}
 }
 
 func (s *CMServer) createEndpointController(client *client.Client) kmendpoint.EndpointController {
@@ -230,8 +242,4 @@ func (s *CMServer) createEndpointController(client *client.Client) kmendpoint.En
 	glog.V(2).Infof("Creating podIP:containerPort endpoint controller")
 	stockEndpointController := kendpoint.NewEndpointController(client)
 	return stockEndpointController
-}
-
-func (s *CMServer) URI() string {
-	return fmt.Sprintf("http://%s:%d", s.Address, s.Port)
 }

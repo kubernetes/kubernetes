@@ -84,7 +84,7 @@ func (c *componentClient) Delete(name string) error {
 func (c *componentClient) Update(component *api.Component) (*api.Component, error) {
 	result := &api.Component{}
 	if len(component.ResourceVersion) == 0 {
-		err := fmt.Errorf("invalid update object, missing resource version: %v", component)
+		err := fmt.Errorf("invalid update object, missing resource version: %+v", component)
 		return nil, err
 	}
 	err := c.r.Put().Resource(c.resourceName()).Name(component.Name).Body(component).Do().Into(result)
@@ -95,7 +95,7 @@ func (c *componentClient) Update(component *api.Component) (*api.Component, erro
 func (c *componentClient) UpdateStatus(component *api.Component) (*api.Component, error) {
 	result := &api.Component{}
 	if len(component.ResourceVersion) == 0 {
-		err := fmt.Errorf("invalid update object, missing resource version: %v", component)
+		err := fmt.Errorf("invalid update object, missing resource version: %+v", component)
 		return nil, err
 	}
 	err := c.r.Put().Resource(c.resourceName()).Name(component.Name).SubResource("status").Body(component).Do().Into(result)

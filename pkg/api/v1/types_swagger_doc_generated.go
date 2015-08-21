@@ -1320,6 +1320,7 @@ func (StatusDetails) SwaggerDoc() map[string]string {
 
 var map_TCPSocketAction = map[string]string{
 	"":     "TCPSocketAction describes an action based on opening a socket",
+	"host": "Host name to connect to, defaults to the pod IP.",
 	"port": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
 }
 

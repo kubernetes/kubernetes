@@ -641,6 +641,8 @@ const (
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
+	// Optional: Host name to connect to, defaults to the pod IP.
+	Host string `json:"host,omitempty"`
 	// Required: Port to connect to.
 	Port util.IntOrString `json:"port,omitempty"`
 }
@@ -2138,8 +2140,10 @@ const (
 type ComponentSpec struct {
 	// Type of the component
 	Type ComponentType `json:"type"`
-	// Address to reach the component (scheme, host, port, path). Address paths determined by component type.
-	Address string `json:"address,omitempty"`
+	// LivenessProbe describes how to determine whether a component instance is alive
+	LivenessProbe *Probe `json:"livenessProbe,omitempty"`
+	// LivenessProbe describes how to determine whether a component instance is ready to receive requests
+	ReadinessProbe *Probe `json:"readinessProbe,omitempty"`
 }
 
 type ComponentPhase string

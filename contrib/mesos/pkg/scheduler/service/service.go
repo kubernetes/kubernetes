@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
@@ -63,10 +64,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
-	"k8s.io/kubernetes/pkg/component"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -141,7 +143,6 @@ type SchedulerServer struct {
 
 	executable  string // path to the binary running this service
 	client      client.Interface
-	heartbeat   component.HeartBeat
 	driver      bindings.SchedulerDriver
 	driverMutex sync.RWMutex
 	mux         *http.ServeMux
@@ -536,14 +537,16 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 // watch the scheduler process for failover signals and properly handle such. may never return.
 func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterface, handler func() error) error {
 
+	// we only want to return the first error (if any), everyone else can block forever
+	errCh := make(chan error, 1)
 	doFailover := func() error {
 		// we really don't expect handler to return, if it does something went seriously wrong
 		err := handler()
 		if err != nil {
 			defer schedulerProcess.End()
-			return fmt.Errorf("failover failed, scheduler will terminate: %v", err)
+			err = fmt.Errorf("failover failed, scheduler will terminate: %v", err)
 		}
-		return nil
+		return err
 	}
 
 	// guard for failover signal processing, first signal processor wins
@@ -554,13 +557,7 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 			select {}
 		}
 		var err error
-		defer func() {
-			if err != nil {
-				s.heartbeat.Kill(err)
-			} else {
-				s.heartbeat.Stop()
-			}
-		}()
+		defer func() { errCh <- err }()
 		select {
 		case <-schedulerProcess.Failover():
 			err = doFailover()
@@ -577,31 +574,9 @@ func (s *SchedulerServer) awaitFailover(schedulerProcess schedulerProcessInterfa
 			log.V(1).Infof("scheduler process signalled, already failing over")
 			select {}
 		}
-		err := doFailover()
-		if err != nil {
-			s.heartbeat.Kill(err)
-		} else {
-			s.heartbeat.Stop()
-		}
+		errCh <- doFailover()
 	})
-
-	// Assume that if we made it this far the controller-manager is healthy.
-	// TODO(karlkfi): Handle phase/condition transitions for errors or dependency state changes.
-	err := s.heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
-		Type:   api.ComponentRunningHealthy,
-		Status: api.ConditionTrue,
-	})
-	if err != nil {
-		log.Errorf("Transition to running failed: %v", err)
-		s.heartbeat.Kill(err)
-	}
-
-	// block until heartbeat is stopped
-	for err = range s.heartbeat.Watch() {
-		log.Errorf("Heartbeat Error: %s", err)
-	}
-
-	return nil
+	return <-errCh
 }
 
 func validateLeadershipTransition(desired, current string) {
@@ -635,6 +610,8 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 	s.FrameworkWebURI = strings.TrimSpace(s.FrameworkWebURI)
 
+	healthz.InstallHandler(s.mux)
+
 	metrics.Register()
 	runtime.Register()
 	s.mux.Handle("/metrics", prometheus.Handler())
@@ -653,16 +630,70 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 	s.client = client
 
-	heartbeat, err := component.Start(
-		s.client.ComponentsClient(),
-		5*time.Second,
-		api.ComponentScheduler,
-		s.URI(""),
-	)
+	// extract scheme/host/port from URL (which is compiled from multiple flags)
+	urlStr := s.URI("")
+	urlObj, err := url.Parse(urlStr)
 	if err != nil {
-		log.Fatalf("Failed to start heartbeat: %v", err)
+		log.Fatalf("Unable to parse component url %q: %v", urlStr, err)
 	}
-	s.heartbeat = heartbeat
+	host := urlObj.Host
+	port := util.IntOrString{}
+	if strings.Contains(host, ":") {
+		var portStr string
+		host, portStr, err = net.SplitHostPort(host)
+		if err != nil {
+			log.Fatalf("Unable to parse component host port %q: %v", host, err)
+		}
+		portInt, err := strconv.Atoi(portStr)
+		if err != nil {
+			log.Fatalf("Unable to parse component host port %q: %v", portStr, err)
+		}
+		port = util.NewIntOrStringFromInt(portInt)
+	}
+
+	var scheme api.URIScheme
+	switch urlObj.Scheme {
+	case "https":
+		scheme = api.URISchemeHTTPS
+	default:
+		scheme = api.URISchemeHTTP
+	}
+
+	// Register component
+	_, err = client.ComponentsClient().Create(&api.Component{
+		Spec: api.ComponentSpec{
+			Type: "k8sm-scheduler",
+			LivenessProbe: &api.Probe{
+				InitialDelaySeconds: int64(30),
+				TimeoutSeconds:      int64(5),
+				Handler: api.Handler{
+					TCPSocket: &api.TCPSocketAction{
+						Host: host,
+						Port: port,
+					},
+				},
+			},
+			ReadinessProbe: &api.Probe{
+				InitialDelaySeconds: int64(30),
+				TimeoutSeconds:      int64(5),
+				Handler: api.Handler{
+					HTTPGet: &api.HTTPGetAction{
+						Scheme: scheme,
+						Host:   host,
+						Port:   port,
+						Path:   "/healthz",
+					},
+				},
+			},
+		},
+		Status: api.ComponentStatus{
+			Phase:      api.ComponentPending,
+			Conditions: []api.ComponentCondition{},
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to register component: %v", err)
+	}
 
 	if s.ReconcileCooldown < defaultReconcileCooldown {
 		s.ReconcileCooldown = defaultReconcileCooldown

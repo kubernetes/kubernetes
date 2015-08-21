@@ -12012,9 +12012,96 @@
       "type": "string",
       "description": "type of the component"
      },
-     "address": {
+     "livenessProbe": {
+      "$ref": "v1.Probe",
+      "description": "periodic probe of component liveness"
+     },
+     "readinessProbe": {
+      "$ref": "v1.Probe",
+      "description": "periodic probe of component readiness"
+     }
+    }
+   },
+   "v1.Probe": {
+    "id": "v1.Probe",
+    "description": "Probe describes a liveness probe to be examined to the container.",
+    "properties": {
+     "exec": {
+      "$ref": "v1.ExecAction",
+      "description": "One and only one of the following should be specified. Exec specifies the action to take."
+     },
+     "httpGet": {
+      "$ref": "v1.HTTPGetAction",
+      "description": "HTTPGet specifies the http request to perform."
+     },
+     "tcpSocket": {
+      "$ref": "v1.TCPSocketAction",
+      "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
+     },
+     "initialDelaySeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+     },
+     "timeoutSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+     }
+    }
+   },
+   "v1.ExecAction": {
+    "id": "v1.ExecAction",
+    "description": "ExecAction describes a \"run in container\" action.",
+    "properties": {
+     "command": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy."
+     }
+    }
+   },
+   "v1.HTTPGetAction": {
+    "id": "v1.HTTPGetAction",
+    "description": "HTTPGetAction describes an action based on HTTP Get requests.",
+    "required": [
+     "port"
+    ],
+    "properties": {
+     "path": {
       "type": "string",
-      "description": "address to reach the component (scheme, host, port, path); address paths determined by component type"
+      "description": "Path to access on the HTTP server."
+     },
+     "port": {
+      "type": "string",
+      "description": "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
+     },
+     "host": {
+      "type": "string",
+      "description": "Host name to connect to, defaults to the pod IP."
+     },
+     "scheme": {
+      "type": "string",
+      "description": "Scheme to use for connecting to the host. Defaults to HTTP."
+     }
+    }
+   },
+   "v1.TCPSocketAction": {
+    "id": "v1.TCPSocketAction",
+    "description": "TCPSocketAction describes an action based on opening a socket",
+    "required": [
+     "port"
+    ],
+    "properties": {
+     "host": {
+      "type": "string",
+      "description": "Host name to connect to, defaults to the pod IP."
+     },
+     "port": {
+      "type": "string",
+      "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
      }
     }
    },
@@ -13721,85 +13808,6 @@
      "mountPath": {
       "type": "string",
       "description": "Path within the container at which the volume should be mounted."
-     }
-    }
-   },
-   "v1.Probe": {
-    "id": "v1.Probe",
-    "description": "Probe describes a liveness probe to be examined to the container.",
-    "properties": {
-     "exec": {
-      "$ref": "v1.ExecAction",
-      "description": "One and only one of the following should be specified. Exec specifies the action to take."
-     },
-     "httpGet": {
-      "$ref": "v1.HTTPGetAction",
-      "description": "HTTPGet specifies the http request to perform."
-     },
-     "tcpSocket": {
-      "$ref": "v1.TCPSocketAction",
-      "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
-     },
-     "initialDelaySeconds": {
-      "type": "integer",
-      "format": "int64",
-      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
-     },
-     "timeoutSeconds": {
-      "type": "integer",
-      "format": "int64",
-      "description": "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
-     }
-    }
-   },
-   "v1.ExecAction": {
-    "id": "v1.ExecAction",
-    "description": "ExecAction describes a \"run in container\" action.",
-    "properties": {
-     "command": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy."
-     }
-    }
-   },
-   "v1.HTTPGetAction": {
-    "id": "v1.HTTPGetAction",
-    "description": "HTTPGetAction describes an action based on HTTP Get requests.",
-    "required": [
-     "port"
-    ],
-    "properties": {
-     "path": {
-      "type": "string",
-      "description": "Path to access on the HTTP server."
-     },
-     "port": {
-      "type": "string",
-      "description": "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
-     },
-     "host": {
-      "type": "string",
-      "description": "Host name to connect to, defaults to the pod IP."
-     },
-     "scheme": {
-      "type": "string",
-      "description": "Scheme to use for connecting to the host. Defaults to HTTP."
-     }
-    }
-   },
-   "v1.TCPSocketAction": {
-    "id": "v1.TCPSocketAction",
-    "description": "TCPSocketAction describes an action based on opening a socket",
-    "required": [
-     "port"
-    ],
-    "properties": {
-     "port": {
-      "type": "string",
-      "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
      }
     }
    },

@@ -222,8 +222,12 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 		if err != nil {
 			return probe.Unknown, "", err
 		}
-		glog.V(4).Infof("TCP-Probe PodIP: %v, Port: %v, Timeout: %v", status.PodIP, port, timeout)
-		return pb.tcp.Probe(status.PodIP, port, timeout)
+		host := p.TCPSocket.Host
+		if host == "" {
+			host = status.PodIP
+		}
+		glog.V(4).Infof("TCP-Probe PodIP: tcp://%v, Port: %v, Timeout: %v", host, port, timeout)
+		return pb.tcp.Probe(host, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for container: %v", container)
 	return probe.Unknown, "", nil

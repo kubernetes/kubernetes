@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/component"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -358,15 +357,44 @@ func (s *APIServer) Run(_ []string) error {
 	componentStorage, componentStatusStorage := componentetcd.NewStorage(etcdStorage)
 	componentsClient := componentregistry.NewClient(componentStorage, componentStatusStorage)
 
-	//TODO(karlkfi): heartbeat secure location?
-	heartbeat, err := component.Start(
-		componentsClient,
-		5*time.Second,
-		api.ComponentAPIServer,
-		s.URI(),
-	)
+	host := s.InsecureBindAddress.String()
+	// TODO: what if port is zero?
+	port := util.NewIntOrStringFromInt(s.InsecurePort)
+
+	// Register component
+	_, err = componentsClient.Create(&api.Component{
+		Spec: api.ComponentSpec{
+			Type: "kube-apiserver",
+			LivenessProbe: &api.Probe{
+				InitialDelaySeconds: int64(30),
+				TimeoutSeconds:      int64(5),
+				Handler: api.Handler{
+					TCPSocket: &api.TCPSocketAction{
+						Host: host,
+						Port: port,
+					},
+				},
+			},
+			ReadinessProbe: &api.Probe{
+				InitialDelaySeconds: int64(30),
+				TimeoutSeconds:      int64(5),
+				Handler: api.Handler{
+					HTTPGet: &api.HTTPGetAction{
+						Scheme: api.URISchemeHTTP,
+						Host:   host,
+						Port:   port,
+						Path:   "/healthz",
+					},
+				},
+			},
+		},
+		Status: api.ComponentStatus{
+			Phase:      api.ComponentPending,
+			Conditions: []api.ComponentCondition{},
+		},
+	})
 	if err != nil {
-		glog.Fatalf("Failed to start heartbeat: %v", err)
+		return fmt.Errorf("Failed to register component: %v", err)
 	}
 
 	n := s.ServiceClusterIPRange
@@ -543,7 +571,6 @@ func (s *APIServer) Run(_ []string) error {
 				}
 				time.Sleep(15 * time.Second)
 			}
-			//TODO: heartbeat.Stop()/Kill + return to exit process
 		}()
 	}
 	handler := apiserver.TimeoutHandler(m.InsecureHandler, longRunningTimeout)
@@ -559,31 +586,7 @@ func (s *APIServer) Run(_ []string) error {
 		}
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)
-	go func() {
-		err := http.ListenAndServe()
-		if err != nil {
-			heartbeat.Kill(err)
-		} else {
-			heartbeat.Stop()
-		}
-	}()
-
-	// Assume that if we made it this far the apiserver is healthy.
-	// TODO(karlkfi): Handle phase/condition transitions for errors or dependency state changes.
-	err = heartbeat.Transition(api.ComponentRunning, api.ComponentCondition{
-		Type:   api.ComponentRunningHealthy,
-		Status: api.ConditionTrue,
-	})
-	if err != nil {
-		glog.Errorf("Transition to running failed: %v", err)
-		heartbeat.Kill(err)
-	}
-
-	// block until heartbeat is stopped
-	for err = range heartbeat.Watch() {
-		glog.Errorf("Heartbeat Error: %s", err)
-	}
-
+	glog.Fatal(http.ListenAndServe())
 	return nil
 }
 
@@ -600,8 +603,4 @@ func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool
 		return boolValue
 	}
 	return defaultValue
-}
-
-func (s *APIServer) URI() string {
-	return fmt.Sprintf("http://%s:%d", s.InsecureBindAddress, s.InsecurePort)
 }

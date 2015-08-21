@@ -134,7 +134,22 @@ func convert_api_ComponentSpec_To_v1_ComponentSpec(in *api.ComponentSpec, out *C
 		defaulting.(func(*api.ComponentSpec))(in)
 	}
 	out.Type = ComponentType(in.Type)
-	out.Address = in.Address
+	if in.LivenessProbe != nil {
+		out.LivenessProbe = new(Probe)
+		if err := convert_api_Probe_To_v1_Probe(in.LivenessProbe, out.LivenessProbe, s); err != nil {
+			return err
+		}
+	} else {
+		out.LivenessProbe = nil
+	}
+	if in.ReadinessProbe != nil {
+		out.ReadinessProbe = new(Probe)
+		if err := convert_api_Probe_To_v1_Probe(in.ReadinessProbe, out.ReadinessProbe, s); err != nil {
+			return err
+		}
+	} else {
+		out.ReadinessProbe = nil
+	}
 	return nil
 }
 
@@ -2330,6 +2345,7 @@ func convert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.TCPSocketAction))(in)
 	}
+	out.Host = in.Host
 	if err := s.Convert(&in.Port, &out.Port, 0); err != nil {
 		return err
 	}
@@ -2585,7 +2601,22 @@ func convert_v1_ComponentSpec_To_api_ComponentSpec(in *ComponentSpec, out *api.C
 		defaulting.(func(*ComponentSpec))(in)
 	}
 	out.Type = api.ComponentType(in.Type)
-	out.Address = in.Address
+	if in.LivenessProbe != nil {
+		out.LivenessProbe = new(api.Probe)
+		if err := convert_v1_Probe_To_api_Probe(in.LivenessProbe, out.LivenessProbe, s); err != nil {
+			return err
+		}
+	} else {
+		out.LivenessProbe = nil
+	}
+	if in.ReadinessProbe != nil {
+		out.ReadinessProbe = new(api.Probe)
+		if err := convert_v1_Probe_To_api_Probe(in.ReadinessProbe, out.ReadinessProbe, s); err != nil {
+			return err
+		}
+	} else {
+		out.ReadinessProbe = nil
+	}
 	return nil
 }
 
@@ -4781,6 +4812,7 @@ func convert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*TCPSocketAction))(in)
 	}
+	out.Host = in.Host
 	if err := s.Convert(&in.Port, &out.Port, 0); err != nil {
 		return err
 	}

@@ -284,7 +284,7 @@ var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
-var componentColumns = []string{"NAME", "TYPE", "URL", "STATUS", "CONDITION"}
+var componentColumns = []string{"NAME", "TYPE", "STATUS", "CONDITION"}
 var componentStatusesColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
@@ -1004,7 +1004,7 @@ func printComponent(item *api.Component, w io.Writer, withNamespace bool, wide b
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s", item.Name, item.Spec.Type, item.Spec.Address, item.Status.Phase, lastCondition); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", item.Name, item.Spec.Type, item.Status.Phase, lastCondition); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
