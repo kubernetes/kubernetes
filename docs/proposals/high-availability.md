@@ -66,6 +66,8 @@ Some command line options would be added to components that can do HA:
 
 ## Design Discussion Notes
 
+TODO: We should merge this doc into the main docs and outline what still needs to be done.
+
 Some components may run numerous threads in order to perform tasks in parallel.  Upon losing master status, such components should exit instantly instead of attempting to gracefully shut down such threads.  This is to ensure that, in the case there's some propagation delay in informing the threads they should stop, the lame-duck threads won't interfere with the new master.  The component should exit with an exit code indicating that the component is not the master.  Since all components will be run by systemd or some other monitoring system, this will just result in a restart.
 
 There is a short window after a new master acquires the lease, during which data from the old master might be committed.  This is because there is currently no way to condition a write on its source being the master.  Having the daemons exit shortens this window but does not eliminate it.  A proper solution for this problem will be addressed at a later date.  The proposed solution is:
