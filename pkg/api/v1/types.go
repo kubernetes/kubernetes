@@ -1509,6 +1509,13 @@ type ServiceSpec struct {
 	// Defaults to None.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
+
+	// Only applies to Service Type: LoadBalancer
+	// LoadBalancer will get created with the IP specified in this field.
+	// This feature depends on whether the underlying cloud-provider supports specifying
+	// the loadBalancerIP when a load balancer is created.
+	// This field will be ignored if the cloud-provider does not support the feature.
+	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 }
 
 // ServicePort conatins information on service's port.
