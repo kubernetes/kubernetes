@@ -40,18 +40,18 @@ type Registry interface {
 	DeleteNamespace(ctx api.Context, namespaceID string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListNamespaces(ctx api.Context, label labels.Selector) (*api.NamespaceList, error) {
+func (s *registry) ListNamespaces(ctx api.Context, label labels.Selector) (*api.NamespaceList, error) {
 	obj, err := s.List(ctx, label, fields.Everything())
 	if err != nil {
 		return nil, err
@@ -59,11 +59,11 @@ func (s *storage) ListNamespaces(ctx api.Context, label labels.Selector) (*api.N
 	return obj.(*api.NamespaceList), nil
 }
 
-func (s *storage) WatchNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetNamespace(ctx api.Context, namespaceName string) (*api.Namespace, error) {
+func (s *registry) GetNamespace(ctx api.Context, namespaceName string) (*api.Namespace, error) {
 	obj, err := s.Get(ctx, namespaceName)
 	if err != nil {
 		return nil, err
@@ -71,17 +71,17 @@ func (s *storage) GetNamespace(ctx api.Context, namespaceName string) (*api.Name
 	return obj.(*api.Namespace), nil
 }
 
-func (s *storage) CreateNamespace(ctx api.Context, namespace *api.Namespace) error {
+func (s *registry) CreateNamespace(ctx api.Context, namespace *api.Namespace) error {
 	_, err := s.Create(ctx, namespace)
 	return err
 }
 
-func (s *storage) UpdateNamespace(ctx api.Context, namespace *api.Namespace) error {
+func (s *registry) UpdateNamespace(ctx api.Context, namespace *api.Namespace) error {
 	_, _, err := s.Update(ctx, namespace)
 	return err
 }
 
-func (s *storage) DeleteNamespace(ctx api.Context, namespaceID string) error {
+func (s *registry) DeleteNamespace(ctx api.Context, namespaceID string) error {
 	_, err := s.Delete(ctx, namespaceID, nil)
 	return err
 }

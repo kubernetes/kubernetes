@@ -40,18 +40,18 @@ type Registry interface {
 	DeleteSecret(ctx api.Context, name string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListSecrets(ctx api.Context, label labels.Selector) (*api.SecretList, error) {
+func (s *registry) ListSecrets(ctx api.Context, label labels.Selector) (*api.SecretList, error) {
 	obj, err := s.List(ctx, label, fields.Everything())
 	if err != nil {
 		return nil, err
@@ -59,11 +59,11 @@ func (s *storage) ListSecrets(ctx api.Context, label labels.Selector) (*api.Secr
 	return obj.(*api.SecretList), nil
 }
 
-func (s *storage) WatchSecrets(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchSecrets(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetSecret(ctx api.Context, name string) (*api.Secret, error) {
+func (s *registry) GetSecret(ctx api.Context, name string) (*api.Secret, error) {
 	obj, err := s.Get(ctx, name)
 	if err != nil {
 		return nil, err
@@ -71,17 +71,17 @@ func (s *storage) GetSecret(ctx api.Context, name string) (*api.Secret, error) {
 	return obj.(*api.Secret), nil
 }
 
-func (s *storage) CreateSecret(ctx api.Context, secret *api.Secret) (*api.Secret, error) {
+func (s *registry) CreateSecret(ctx api.Context, secret *api.Secret) (*api.Secret, error) {
 	obj, err := s.Create(ctx, secret)
 	return obj.(*api.Secret), err
 }
 
-func (s *storage) UpdateSecret(ctx api.Context, secret *api.Secret) (*api.Secret, error) {
+func (s *registry) UpdateSecret(ctx api.Context, secret *api.Secret) (*api.Secret, error) {
 	obj, _, err := s.Update(ctx, secret)
 	return obj.(*api.Secret), err
 }
 
-func (s *storage) DeleteSecret(ctx api.Context, name string) error {
+func (s *registry) DeleteSecret(ctx api.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }

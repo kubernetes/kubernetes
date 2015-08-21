@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,78 +17,46 @@ limitations under the License.
 package event
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-type eventStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	*etcdgeneric.Etcd
 }
 
-// Strategy is the default logic that pplies when creating and updating
-// Event objects via the REST API.
-var Strategy = eventStrategy{api.Scheme, api.SimpleNameGenerator}
+// NewREST returns a RESTStorage object that will work against events.
+func NewREST(s storage.Interface, ttl uint64) *REST {
+	prefix := "/events"
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.Event{} },
+		NewListFunc: func() runtime.Object { return &api.EventList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		KeyFunc: func(ctx api.Context, id string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.Event).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchEvent(label, field)
+		},
+		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
+			return ttl, nil
+		},
+		EndpointName: "events",
 
-func (eventStrategy) NamespaceScoped() bool {
-	return true
-}
+		CreateStrategy: Strategy,
+		UpdateStrategy: Strategy,
 
-func (eventStrategy) PrepareForCreate(obj runtime.Object) {
-}
-
-func (eventStrategy) PrepareForUpdate(obj, old runtime.Object) {
-}
-
-func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
-}
-
-func (eventStrategy) AllowCreateOnUpdate() bool {
-	return true
-}
-
-func (eventStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
-}
-
-func (eventStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-func MatchEvent(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: getAttrs}
-}
-
-func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, nil, errors.NewInternalError(fmt.Errorf("object is not of type event: %#v", obj))
+		Storage: s,
 	}
-	l := event.Labels
-	if l == nil {
-		l = labels.Set{}
-	}
-	return l, fields.Set{
-		"metadata.name":                  event.Name,
-		"involvedObject.kind":            event.InvolvedObject.Kind,
-		"involvedObject.namespace":       event.InvolvedObject.Namespace,
-		"involvedObject.name":            event.InvolvedObject.Name,
-		"involvedObject.uid":             string(event.InvolvedObject.UID),
-		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
-		"involvedObject.resourceVersion": fmt.Sprintf("%s", event.InvolvedObject.ResourceVersion),
-		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
-		"reason":                         event.Reason,
-		"source":                         event.Source.Component,
-	}, nil
+	return &REST{store}
 }

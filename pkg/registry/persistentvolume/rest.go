@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,95 +17,64 @@ limitations under the License.
 package persistentvolume
 
 import (
-	"fmt"
+	"path"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// persistentvolumeStrategy implements behavior for PersistentVolume objects
-type persistentvolumeStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	*etcdgeneric.Etcd
 }
 
-// Strategy is the default logic that applies when creating and updating PersistentVolume
-// objects via the REST API.
-var Strategy = persistentvolumeStrategy{api.Scheme, api.SimpleNameGenerator}
+// NewREST returns a RESTStorage object that will work against persistent volumes.
+func NewREST(s storage.Interface) (*REST, *StatusREST) {
+	prefix := "/persistentvolumes"
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },
+		NewListFunc: func() runtime.Object { return &api.PersistentVolumeList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return prefix
+		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return path.Join(prefix, name), nil
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.PersistentVolume).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchPersistentVolumes(label, field)
+		},
+		EndpointName: "persistentvolume",
 
-func (persistentvolumeStrategy) NamespaceScoped() bool {
-	return false
-}
+		CreateStrategy:      Strategy,
+		UpdateStrategy:      Strategy,
+		ReturnDeletedObject: true,
 
-// ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeStrategy) PrepareForCreate(obj runtime.Object) {
-	pv := obj.(*api.PersistentVolume)
-	pv.Status = api.PersistentVolumeStatus{}
-}
-
-func (persistentvolumeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	persistentvolume := obj.(*api.PersistentVolume)
-	return validation.ValidatePersistentVolume(persistentvolume)
-}
-
-func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
-	return false
-}
-
-// PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
-func (persistentvolumeStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newPv := obj.(*api.PersistentVolume)
-	oldPv := obj.(*api.PersistentVolume)
-	newPv.Status = oldPv.Status
-}
-
-func (persistentvolumeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	errorList := validation.ValidatePersistentVolume(obj.(*api.PersistentVolume))
-	return append(errorList, validation.ValidatePersistentVolumeUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))...)
-}
-
-func (persistentvolumeStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-type persistentvolumeStatusStrategy struct {
-	persistentvolumeStrategy
-}
-
-var StatusStrategy = persistentvolumeStatusStrategy{Strategy}
-
-// PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
-func (persistentvolumeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newPv := obj.(*api.PersistentVolume)
-	oldPv := obj.(*api.PersistentVolume)
-	newPv.Spec = oldPv.Spec
-}
-
-func (persistentvolumeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidatePersistentVolumeStatusUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
-}
-
-// MatchPersistentVolume returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumes(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		persistentvolumeObj, ok := obj.(*api.PersistentVolume)
-		if !ok {
-			return false, fmt.Errorf("not a persistentvolume")
-		}
-		fields := PersistentVolumeToSelectableFields(persistentvolumeObj)
-		return label.Matches(labels.Set(persistentvolumeObj.Labels)) && field.Matches(fields), nil
-	})
-}
-
-// PersistentVolumeToSelectableFields returns a label set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
-func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) labels.Set {
-	return labels.Set{
-		"name": persistentvolume.Name,
+		Storage: s,
 	}
+
+	statusStore := *store
+	statusStore.UpdateStrategy = StatusStrategy
+
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// StatusREST implements the REST endpoint for changing the status of a persistentvolume.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.PersistentVolume{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }

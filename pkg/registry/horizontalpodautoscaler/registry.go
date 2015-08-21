@@ -38,17 +38,17 @@ type Registry interface {
 	DeleteHorizontalPodAutoscaler(ctx api.Context, autoscalerID string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewREST returns a new Registry interface for the given Storage. Any mismatched types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListHorizontalPodAutoscaler(ctx api.Context, label labels.Selector) (*expapi.HorizontalPodAutoscalerList, error) {
+func (s *registry) ListHorizontalPodAutoscaler(ctx api.Context, label labels.Selector) (*expapi.HorizontalPodAutoscalerList, error) {
 	obj, err := s.List(ctx, label, fields.Everything())
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (s *storage) ListHorizontalPodAutoscaler(ctx api.Context, label labels.Sele
 	return obj.(*expapi.HorizontalPodAutoscalerList), nil
 }
 
-func (s *storage) GetHorizontalPodAutoscaler(ctx api.Context, autoscalerID string) (*expapi.HorizontalPodAutoscaler, error) {
+func (s *registry) GetHorizontalPodAutoscaler(ctx api.Context, autoscalerID string) (*expapi.HorizontalPodAutoscaler, error) {
 	obj, err := s.Get(ctx, autoscalerID)
 	if err != nil {
 		return nil, err
@@ -64,17 +64,17 @@ func (s *storage) GetHorizontalPodAutoscaler(ctx api.Context, autoscalerID strin
 	return obj.(*expapi.HorizontalPodAutoscaler), nil
 }
 
-func (s *storage) CreateHorizontalPodAutoscaler(ctx api.Context, autoscaler *expapi.HorizontalPodAutoscaler) error {
+func (s *registry) CreateHorizontalPodAutoscaler(ctx api.Context, autoscaler *expapi.HorizontalPodAutoscaler) error {
 	_, err := s.Create(ctx, autoscaler)
 	return err
 }
 
-func (s *storage) UpdateHorizontalPodAutoscaler(ctx api.Context, autoscaler *expapi.HorizontalPodAutoscaler) error {
+func (s *registry) UpdateHorizontalPodAutoscaler(ctx api.Context, autoscaler *expapi.HorizontalPodAutoscaler) error {
 	_, _, err := s.Update(ctx, autoscaler)
 	return err
 }
 
-func (s *storage) DeleteHorizontalPodAutoscaler(ctx api.Context, autoscalerID string) error {
+func (s *registry) DeleteHorizontalPodAutoscaler(ctx api.Context, autoscalerID string) error {
 	_, err := s.Delete(ctx, autoscalerID, nil)
 	return err
 }

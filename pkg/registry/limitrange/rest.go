@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,60 +18,42 @@ package limitrange
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-type limitrangeStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	*etcdgeneric.Etcd
 }
 
-// Strategy is the default logic that applies when creating and updating
-// LimitRange objects via the REST API.
-var Strategy = limitrangeStrategy{api.Scheme, api.SimpleNameGenerator}
+// NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
+func NewREST(s storage.Interface) *REST {
+	prefix := "/limitranges"
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.LimitRange{} },
+		NewListFunc: func() runtime.Object { return &api.LimitRangeList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		KeyFunc: func(ctx api.Context, id string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.LimitRange).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchLimitRange(label, field)
+		},
+		EndpointName: "limitranges",
 
-func (limitrangeStrategy) NamespaceScoped() bool {
-	return true
-}
+		CreateStrategy: Strategy,
+		UpdateStrategy: Strategy,
 
-func (limitrangeStrategy) PrepareForCreate(obj runtime.Object) {
-	limitRange := obj.(*api.LimitRange)
-	if len(limitRange.Name) == 0 {
-		limitRange.Name = string(util.NewUUID())
+		Storage: s,
 	}
-}
-
-func (limitrangeStrategy) PrepareForUpdate(obj, old runtime.Object) {
-}
-
-func (limitrangeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	limitRange := obj.(*api.LimitRange)
-	return validation.ValidateLimitRange(limitRange)
-}
-
-func (limitrangeStrategy) AllowCreateOnUpdate() bool {
-	return true
-}
-
-func (limitrangeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	limitRange := obj.(*api.LimitRange)
-	return validation.ValidateLimitRange(limitRange)
-}
-
-func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-func MatchLimitRange(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: getAttrs}
-}
-
-func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	return labels.Set{}, fields.Set{}, nil
+	return &REST{store}
 }

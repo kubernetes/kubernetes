@@ -40,18 +40,18 @@ type Registry interface {
 	DeletePod(ctx api.Context, podID string) error
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListPods(ctx api.Context, label labels.Selector) (*api.PodList, error) {
+func (s *registry) ListPods(ctx api.Context, label labels.Selector) (*api.PodList, error) {
 	obj, err := s.List(ctx, label, fields.Everything())
 	if err != nil {
 		return nil, err
@@ -59,11 +59,11 @@ func (s *storage) ListPods(ctx api.Context, label labels.Selector) (*api.PodList
 	return obj.(*api.PodList), nil
 }
 
-func (s *storage) WatchPods(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchPods(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetPod(ctx api.Context, podID string) (*api.Pod, error) {
+func (s *registry) GetPod(ctx api.Context, podID string) (*api.Pod, error) {
 	obj, err := s.Get(ctx, podID)
 	if err != nil {
 		return nil, err
@@ -71,17 +71,17 @@ func (s *storage) GetPod(ctx api.Context, podID string) (*api.Pod, error) {
 	return obj.(*api.Pod), nil
 }
 
-func (s *storage) CreatePod(ctx api.Context, pod *api.Pod) error {
+func (s *registry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	_, err := s.Create(ctx, pod)
 	return err
 }
 
-func (s *storage) UpdatePod(ctx api.Context, pod *api.Pod) error {
+func (s *registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 	_, _, err := s.Update(ctx, pod)
 	return err
 }
 
-func (s *storage) DeletePod(ctx api.Context, podID string) error {
+func (s *registry) DeletePod(ctx api.Context, podID string) error {
 	_, err := s.Delete(ctx, podID, nil)
 	return err
 }

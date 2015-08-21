@@ -18,321 +18,385 @@ package pod
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
+	"path"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/validation"
+	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
-// podStrategy implements behavior for Pods
-type podStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+// PodStorage includes storage for pods and all sub resources
+type PodStorage struct {
+	Pod         *REST
+	Binding     *BindingREST
+	Status      *StatusREST
+	Log         *LogREST
+	Proxy       *ProxyREST
+	Exec        *ExecREST
+	Attach      *AttachREST
+	PortForward *PortForwardREST
 }
 
-// Strategy is the default logic that applies when creating and updating Pod
-// objects via the REST API.
-var Strategy = podStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// NamespaceScoped is true for pods.
-func (podStrategy) NamespaceScoped() bool {
-	return true
+// REST implements a RESTStorage for pods against etcd
+type REST struct {
+	etcdgeneric.Etcd
 }
 
-// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) PrepareForCreate(obj runtime.Object) {
-	pod := obj.(*api.Pod)
-	pod.Status = api.PodStatus{
-		Phase: api.PodPending,
+// NewStorage returns a RESTStorage object that will work against pods.
+func NewStorage(s storage.Interface, useCacher bool, k client.ConnectionInfoGetter) PodStorage {
+	prefix := "/pods"
+
+	storageInterface := s
+	if useCacher {
+		config := storage.CacherConfig{
+			CacheCapacity:  1000,
+			Storage:        s,
+			Type:           &api.Pod{},
+			ResourcePrefix: prefix,
+			KeyFunc: func(obj runtime.Object) (string, error) {
+				return storage.NamespaceKeyFunc(prefix, obj)
+			},
+			NewListFunc: func() runtime.Object { return &api.PodList{} },
+		}
+		storageInterface = storage.NewCacher(config)
 	}
-}
 
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newPod := obj.(*api.Pod)
-	oldPod := old.(*api.Pod)
-	newPod.Status = oldPod.Status
-}
-
-// Validate validates a new pod.
-func (podStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	pod := obj.(*api.Pod)
-	return validation.ValidatePod(pod)
-}
-
-// AllowCreateOnUpdate is false for pods.
-func (podStrategy) AllowCreateOnUpdate() bool {
-	return false
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (podStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	errorList := validation.ValidatePod(obj.(*api.Pod))
-	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
-}
-
-func (podStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-// CheckGracefulDelete allows a pod to be gracefully deleted.
-func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
-	return false
-}
-
-type podStatusStrategy struct {
-	podStrategy
-}
-
-var StatusStrategy = podStatusStrategy{Strategy}
-
-func (podStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newPod := obj.(*api.Pod)
-	oldPod := old.(*api.Pod)
-	newPod.Spec = oldPod.Spec
-	newPod.DeletionTimestamp = nil
-}
-
-func (podStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	// TODO: merge valid fields after update
-	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
-}
-
-// MatchPod returns a generic matcher for a given label and field selector.
-func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			pod, ok := obj.(*api.Pod)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a pod")
-			}
-			return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.Pod{} },
+		NewListFunc: func() runtime.Object { return &api.PodList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.Pod).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchPod(label, field)
+		},
+		EndpointName: "pods",
+
+		Storage: storageInterface,
+	}
+	statusStore := *store
+
+	store.CreateStrategy = Strategy
+	store.UpdateStrategy = Strategy
+	store.DeleteStrategy = Strategy
+	store.ReturnDeletedObject = true
+
+	statusStore.UpdateStrategy = StatusStrategy
+
+	return PodStorage{
+		Pod:         &REST{*store},
+		Binding:     &BindingREST{store: store},
+		Status:      &StatusREST{store: &statusStore},
+		Log:         &LogREST{store: store, kubeletConn: k},
+		Proxy:       &ProxyREST{store: store},
+		Exec:        &ExecREST{store: store, kubeletConn: k},
+		Attach:      &AttachREST{store: store, kubeletConn: k},
+		PortForward: &PortForwardREST{store: store, kubeletConn: k},
 	}
 }
 
-// PodToSelectableFields returns a label set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
-func PodToSelectableFields(pod *api.Pod) fields.Set {
-	return fields.Set{
-		"metadata.name": pod.Name,
-		"spec.nodeName": pod.Spec.NodeName,
-		"status.phase":  string(pod.Status.Phase),
+// Implement Redirector.
+var _ = rest.Redirector(&REST{})
+
+// ResourceLocation returns a pods location from its HostIP
+func (r *REST) ResourceLocation(ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
+	return ResourceLocation(r, ctx, name)
+}
+
+// BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
+type BindingREST struct {
+	store *etcdgeneric.Etcd
+}
+
+// New creates a new binding resource
+func (r *BindingREST) New() runtime.Object {
+	return &api.Binding{}
+}
+
+var _ = rest.Creater(&BindingREST{})
+
+// Create ensures a pod is bound to a specific host.
+func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.Object, err error) {
+	binding := obj.(*api.Binding)
+	// TODO: move me to a binding strategy
+	if len(binding.Target.Kind) != 0 && (binding.Target.Kind != "Node" && binding.Target.Kind != "Minion") {
+		return nil, errors.NewInvalid("binding", binding.Name, fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("to.kind", binding.Target.Kind, "must be empty, 'Node', or 'Minion'")})
 	}
+	if len(binding.Target.Name) == 0 {
+		return nil, errors.NewInvalid("binding", binding.Name, fielderrors.ValidationErrorList{fielderrors.NewFieldRequired("to.name")})
+	}
+	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
+	out = &api.Status{Status: api.StatusSuccess}
+	return
 }
 
-// ResourceGetter is an interface for retrieving resources by ResourceLocation.
-type ResourceGetter interface {
-	Get(api.Context, string) (runtime.Object, error)
-}
-
-func getPod(getter ResourceGetter, ctx api.Context, name string) (*api.Pod, error) {
-	obj, err := getter.Get(ctx, name)
+// setPodHostAndAnnotations sets the given pod's host to 'machine' iff it was previously 'oldMachine' and merges
+// the provided annotations with those of the pod.
+// Returns the current state of the pod, or an error.
+func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachine, machine string, annotations map[string]string) (finalPod *api.Pod, err error) {
+	podKey, err := r.store.KeyFunc(ctx, podID)
 	if err != nil {
 		return nil, err
 	}
-	pod := obj.(*api.Pod)
-	if pod == nil {
-		return nil, fmt.Errorf("Unexpected object type: %#v", pod)
-	}
-	return pod, nil
+	err = r.store.Storage.GuaranteedUpdate(podKey, &api.Pod{}, false, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+		pod, ok := obj.(*api.Pod)
+		if !ok {
+			return nil, fmt.Errorf("unexpected object: %#v", obj)
+		}
+		if pod.DeletionTimestamp != nil {
+			return nil, fmt.Errorf("pod %s is being deleted, cannot be assigned to a host", pod.Name)
+		}
+		if pod.Spec.NodeName != oldMachine {
+			return nil, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName)
+		}
+		pod.Spec.NodeName = machine
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
+		for k, v := range annotations {
+			pod.Annotations[k] = v
+		}
+		finalPod = pod
+		return pod, nil
+	}))
+	return finalPod, err
 }
 
-// ResourceLocation returns a URL to which one can send traffic for the specified pod.
-func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	// Allow ID as "podname" or "podname:port".  If port is not specified,
-	// try to use the first defined port on the pod.
-	name, port, valid := util.SplitPort(id)
-	if !valid {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
-	}
-	// TODO: if port is not a number but a "(container)/(portname)", do a name lookup.
-
-	pod, err := getPod(getter, ctx, name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Try to figure out a port.
-	if port == "" {
-		for i := range pod.Spec.Containers {
-			if len(pod.Spec.Containers[i].Ports) > 0 {
-				port = fmt.Sprintf("%d", pod.Spec.Containers[i].Ports[0].ContainerPort)
-				break
-			}
+// assignPod assigns the given pod to the given machine.
+func (r *BindingREST) assignPod(ctx api.Context, podID string, machine string, annotations map[string]string) (err error) {
+	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations); err != nil {
+		err = etcderr.InterpretGetError(err, "pod", podID)
+		err = etcderr.InterpretUpdateError(err, "pod", podID)
+		if _, ok := err.(*errors.StatusError); !ok {
+			err = errors.NewConflict("binding", podID, err)
 		}
 	}
-
-	// We leave off the scheme ('http://') because we have no idea what sort of server
-	// is listening at this endpoint.
-	loc := &url.URL{}
-	if port == "" {
-		loc.Host = pod.Status.PodIP
-	} else {
-		loc.Host = net.JoinHostPort(pod.Status.PodIP, port)
-	}
-	return loc, nil, nil
+	return
 }
 
-// LogLocation returns a the log URL for a pod container. If opts.Container is blank
-// and only one container is present in the pod, that container is used.
-func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodLogOptions) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Try to figure out a container
-	container := opts.Container
-	if container == "" {
-		if len(pod.Spec.Containers) == 1 {
-			container = pod.Spec.Containers[0].Name
-		} else {
-			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
-		}
-	}
-	nodeHost := pod.Spec.NodeName
-	if len(nodeHost) == 0 {
-		// If pod has not been assigned a host, return an empty location
-		return nil, nil, nil
-	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
-	if err != nil {
-		return nil, nil, err
-	}
-	params := url.Values{}
-	if opts.Follow {
-		params.Add("follow", "true")
-	}
-	if opts.Previous {
-		params.Add("previous", "true")
-	}
-	loc := &url.URL{
-		Scheme:   nodeScheme,
-		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
-		Path:     fmt.Sprintf("/containerLogs/%s/%s/%s", pod.Namespace, name, container),
-		RawQuery: params.Encode(),
-	}
-	return loc, nodeTransport, nil
+// StatusREST implements the REST endpoint for changing the status of a pod.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
 }
 
-func streamParams(params url.Values, opts runtime.Object) error {
-	switch opts := opts.(type) {
-	case *api.PodExecOptions:
-		if opts.Stdin {
-			params.Add(api.ExecStdinParam, "1")
-		}
-		if opts.Stdout {
-			params.Add(api.ExecStdoutParam, "1")
-		}
-		if opts.Stderr {
-			params.Add(api.ExecStderrParam, "1")
-		}
-		if opts.TTY {
-			params.Add(api.ExecTTYParam, "1")
-		}
-		for _, c := range opts.Command {
-			params.Add("command", c)
-		}
-	case *api.PodAttachOptions:
-		if opts.Stdin {
-			params.Add(api.ExecStdinParam, "1")
-		}
-		if opts.Stdout {
-			params.Add(api.ExecStdoutParam, "1")
-		}
-		if opts.Stderr {
-			params.Add(api.ExecStderrParam, "1")
-		}
-		if opts.TTY {
-			params.Add(api.ExecTTYParam, "1")
-		}
-	default:
-		return fmt.Errorf("Unknown object for streaming: %v", opts)
-	}
-	return nil
+// New creates a new pod resource
+func (r *StatusREST) New() runtime.Object {
+	return &api.Pod{}
 }
 
-// AttachLocation returns the attach URL for a pod container. If opts.Container is blank
-// and only one container is present in the pod, that container is used.
-func AttachLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodAttachOptions) (*url.URL, http.RoundTripper, error) {
-	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "attach")
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }
 
-// ExecLocation returns the exec URL for a pod container. If opts.Container is blank
-// and only one container is present in the pod, that container is used.
-func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodExecOptions) (*url.URL, http.RoundTripper, error) {
-	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
+// LogREST implements the log endpoint for a Pod
+type LogREST struct {
+	store       *etcdgeneric.Etcd
+	kubeletConn client.ConnectionInfoGetter
 }
 
-func streamLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts runtime.Object, container, path string) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
-	if err != nil {
-		return nil, nil, err
-	}
+// LogREST implements GetterWithOptions
+var _ = rest.GetterWithOptions(&LogREST{})
 
-	// Try to figure out a container
-	if container == "" {
-		if len(pod.Spec.Containers) == 1 {
-			container = pod.Spec.Containers[0].Name
-		} else {
-			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
-		}
-	}
-	nodeHost := pod.Spec.NodeName
-	if len(nodeHost) == 0 {
-		// If pod has not been assigned a host, return an empty location
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
-	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
-	if err != nil {
-		return nil, nil, err
-	}
-	params := url.Values{}
-	if err := streamParams(params, opts); err != nil {
-		return nil, nil, err
-	}
-	loc := &url.URL{
-		Scheme:   nodeScheme,
-		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
-		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, name, container),
-		RawQuery: params.Encode(),
-	}
-	return loc, nodeTransport, nil
+// New creates a new Pod log options object
+func (r *LogREST) New() runtime.Object {
+	// TODO - return a resource that represents a log
+	return &api.Pod{}
 }
 
-// PortForwardLocation returns a the port-forward URL for a pod.
-func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
-	if err != nil {
-		return nil, nil, err
+// Get retrieves a runtime.Object that will stream the contents of the pod log
+func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtime.Object, error) {
+	logOpts, ok := opts.(*api.PodLogOptions)
+	if !ok {
+		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
+	location, transport, err := LogLocation(r.store, r.kubeletConn, ctx, name, logOpts)
+	if err != nil {
+		return nil, err
+	}
+	return &genericrest.LocationStreamer{
+		Location:    location,
+		Transport:   transport,
+		ContentType: "text/plain",
+		Flush:       logOpts.Follow,
+	}, nil
+}
 
-	nodeHost := pod.Spec.NodeName
-	if len(nodeHost) == 0 {
-		// If pod has not been assigned a host, return an empty location
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+// NewGetOptions creates a new options object
+func (r *LogREST) NewGetOptions() (runtime.Object, bool, string) {
+	return &api.PodLogOptions{}, false, ""
+}
+
+// ProxyREST implements the proxy subresource for a Pod
+type ProxyREST struct {
+	store *etcdgeneric.Etcd
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&ProxyREST{})
+
+var proxyMethods = []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"}
+
+// New returns an empty pod resource
+func (r *ProxyREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// ConnectMethods returns the list of HTTP methods that can be proxied
+func (r *ProxyREST) ConnectMethods() []string {
+	return proxyMethods
+}
+
+// NewConnectOptions returns versioned resource that represents proxy parameters
+func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return &api.PodProxyOptions{}, true, "path"
+}
+
+// Connect returns a handler for the pod proxy
+func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object) (rest.ConnectHandler, error) {
+	proxyOpts, ok := opts.(*api.PodProxyOptions)
+	if !ok {
+		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	location, _, err := ResourceLocation(r.store, ctx, id)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	loc := &url.URL{
-		Scheme: nodeScheme,
-		Host:   fmt.Sprintf("%s:%d", nodeHost, nodePort),
-		Path:   fmt.Sprintf("/portForward/%s/%s", pod.Namespace, name),
+	location.Path = path.Join(location.Path, proxyOpts.Path)
+	return newUpgradeAwareProxyHandler(location, nil, false), nil
+}
+
+// Support both GET and POST methods. Over time, we want to move all clients to start using POST and then stop supporting GET.
+var upgradeableMethods = []string{"GET", "POST"}
+
+// AttachREST implements the attach subresource for a Pod
+type AttachREST struct {
+	store       *etcdgeneric.Etcd
+	kubeletConn client.ConnectionInfoGetter
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&AttachREST{})
+
+// New creates a new Pod object
+func (r *AttachREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// Connect returns a handler for the pod exec proxy
+func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object) (rest.ConnectHandler, error) {
+	attachOpts, ok := opts.(*api.PodAttachOptions)
+	if !ok {
+		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	return loc, nodeTransport, nil
+	location, transport, err := AttachLocation(r.store, r.kubeletConn, ctx, name, attachOpts)
+	if err != nil {
+		return nil, err
+	}
+	return genericrest.NewUpgradeAwareProxyHandler(location, transport, true), nil
+}
+
+// NewConnectOptions returns the versioned object that represents exec parameters
+func (r *AttachREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return &api.PodAttachOptions{}, false, ""
+}
+
+// ConnectMethods returns the methods supported by exec
+func (r *AttachREST) ConnectMethods() []string {
+	return upgradeableMethods
+}
+
+// ExecREST implements the exec subresource for a Pod
+type ExecREST struct {
+	store       *etcdgeneric.Etcd
+	kubeletConn client.ConnectionInfoGetter
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&ExecREST{})
+
+// New creates a new Pod object
+func (r *ExecREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// Connect returns a handler for the pod exec proxy
+func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object) (rest.ConnectHandler, error) {
+	execOpts, ok := opts.(*api.PodExecOptions)
+	if !ok {
+		return nil, fmt.Errorf("Invalid options object: %#v", opts)
+	}
+	location, transport, err := ExecLocation(r.store, r.kubeletConn, ctx, name, execOpts)
+	if err != nil {
+		return nil, err
+	}
+	return newUpgradeAwareProxyHandler(location, transport, true), nil
+}
+
+// NewConnectOptions returns the versioned object that represents exec parameters
+func (r *ExecREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return &api.PodExecOptions{}, false, ""
+}
+
+// ConnectMethods returns the methods supported by exec
+func (r *ExecREST) ConnectMethods() []string {
+	return upgradeableMethods
+}
+
+// PortForwardREST implements the portforward subresource for a Pod
+type PortForwardREST struct {
+	store       *etcdgeneric.Etcd
+	kubeletConn client.ConnectionInfoGetter
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&PortForwardREST{})
+
+// New returns an empty pod object
+func (r *PortForwardREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// NewConnectOptions returns nil since portforward doesn't take additional parameters
+func (r *PortForwardREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return nil, false, ""
+}
+
+// ConnectMethods returns the methods supported by portforward
+func (r *PortForwardREST) ConnectMethods() []string {
+	return upgradeableMethods
+}
+
+// Connect returns a handler for the pod portforward proxy
+func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Object) (rest.ConnectHandler, error) {
+	location, transport, err := PortForwardLocation(r.store, r.kubeletConn, ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return newUpgradeAwareProxyHandler(location, transport, true), nil
+}
+
+func newUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, upgradeRequired bool) *genericrest.UpgradeAwareProxyHandler {
+	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, upgradeRequired)
+	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
+	return handler
 }

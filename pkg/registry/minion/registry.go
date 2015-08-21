@@ -34,18 +34,18 @@ type Registry interface {
 	WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
-// storage puts strong typing around storage calls
-type storage struct {
+// registry puts strong typing around storage calls
+type registry struct {
 	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
 func NewRegistry(s rest.StandardStorage) Registry {
-	return &storage{s}
+	return &registry{s}
 }
 
-func (s *storage) ListMinions(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
+func (s *registry) ListMinions(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
 	obj, err := s.List(ctx, label, field)
 	if err != nil {
 		return nil, err
@@ -54,21 +54,21 @@ func (s *storage) ListMinions(ctx api.Context, label labels.Selector, field fiel
 	return obj.(*api.NodeList), nil
 }
 
-func (s *storage) CreateMinion(ctx api.Context, node *api.Node) error {
+func (s *registry) CreateMinion(ctx api.Context, node *api.Node) error {
 	_, err := s.Create(ctx, node)
 	return err
 }
 
-func (s *storage) UpdateMinion(ctx api.Context, node *api.Node) error {
+func (s *registry) UpdateMinion(ctx api.Context, node *api.Node) error {
 	_, _, err := s.Update(ctx, node)
 	return err
 }
 
-func (s *storage) WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *registry) WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.Watch(ctx, label, field, resourceVersion)
 }
 
-func (s *storage) GetMinion(ctx api.Context, name string) (*api.Node, error) {
+func (s *registry) GetMinion(ctx api.Context, name string) (*api.Node, error) {
 	obj, err := s.Get(ctx, name)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func (s *storage) GetMinion(ctx api.Context, name string) (*api.Node, error) {
 	return obj.(*api.Node), nil
 }
 
-func (s *storage) DeleteMinion(ctx api.Context, name string) error {
+func (s *registry) DeleteMinion(ctx api.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }

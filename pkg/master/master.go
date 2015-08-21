@@ -50,34 +50,30 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/componentstatus"
-	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
+	"k8s.io/kubernetes/pkg/registry/controller"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
-	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
-	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
-	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
-	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
+	"k8s.io/kubernetes/pkg/registry/event"
+	expcontroller "k8s.io/kubernetes/pkg/registry/experimental/controller"
+	"k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler"
+	"k8s.io/kubernetes/pkg/registry/limitrange"
 	"k8s.io/kubernetes/pkg/registry/minion"
-	nodeetcd "k8s.io/kubernetes/pkg/registry/minion/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
-	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
-	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
-	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
-	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
-	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
-	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
-	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
+	"k8s.io/kubernetes/pkg/registry/persistentvolume"
+	"k8s.io/kubernetes/pkg/registry/persistentvolumeclaim"
+	"k8s.io/kubernetes/pkg/registry/pod"
+	"k8s.io/kubernetes/pkg/registry/podtemplate"
+	"k8s.io/kubernetes/pkg/registry/resourcequota"
+	"k8s.io/kubernetes/pkg/registry/secret"
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
-	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
+	"k8s.io/kubernetes/pkg/registry/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
-
-	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
@@ -430,26 +426,26 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 func (m *Master) init(c *Config) {
 	healthzChecks := []healthz.HealthzChecker{}
 	m.clock = util.RealClock{}
-	podStorage := podetcd.NewStorage(c.DatabaseStorage, true, c.KubeletClient)
+	podStorage := pod.NewStorage(c.DatabaseStorage, true, c.KubeletClient)
 
-	podTemplateStorage := podtemplateetcd.NewREST(c.DatabaseStorage)
+	podTemplateStorage := podtemplate.NewREST(c.DatabaseStorage)
 
-	eventStorage := eventetcd.NewREST(c.DatabaseStorage, uint64(c.EventTTL.Seconds()))
-	limitRangeStorage := limitrangeetcd.NewREST(c.DatabaseStorage)
+	eventStorage := event.NewREST(c.DatabaseStorage, uint64(c.EventTTL.Seconds()))
+	limitRangeStorage := limitrange.NewREST(c.DatabaseStorage)
 
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(c.DatabaseStorage)
-	secretStorage := secretetcd.NewREST(c.DatabaseStorage)
-	serviceAccountStorage := serviceaccountetcd.NewREST(c.DatabaseStorage)
-	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(c.DatabaseStorage)
-	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(c.DatabaseStorage)
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequota.NewREST(c.DatabaseStorage)
+	secretStorage := secret.NewREST(c.DatabaseStorage)
+	serviceAccountStorage := serviceaccount.NewREST(c.DatabaseStorage)
+	persistentVolumeStorage, persistentVolumeStatusStorage := persistentvolume.NewREST(c.DatabaseStorage)
+	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := persistentvolumeclaim.NewREST(c.DatabaseStorage)
 
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(c.DatabaseStorage)
+	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespace.NewREST(c.DatabaseStorage)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
-	endpointsStorage := endpointsetcd.NewREST(c.DatabaseStorage, true)
+	endpointsStorage := endpoint.NewREST(c.DatabaseStorage, true)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(c.DatabaseStorage, true, c.KubeletClient)
+	nodeStorage, nodeStatusStorage := minion.NewREST(c.DatabaseStorage, true, c.KubeletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
 	serviceStorage := serviceetcd.NewREST(c.DatabaseStorage)
@@ -473,7 +469,7 @@ func (m *Master) init(c *Config) {
 	})
 	m.serviceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage := controlleretcd.NewREST(c.DatabaseStorage)
+	controllerStorage := controller.NewREST(c.DatabaseStorage)
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]rest.Storage{
@@ -779,8 +775,8 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 
 // expapi returns the resources and codec for the experimental api
 func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
-	controllerStorage := expcontrolleretcd.NewStorage(c.DatabaseStorage)
-	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.DatabaseStorage)
+	controllerStorage := expcontroller.NewStorage(c.DatabaseStorage)
+	autoscalerStorage := horizontalpodautoscaler.NewREST(c.DatabaseStorage)
 
 	storage := map[string]rest.Storage{
 		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,

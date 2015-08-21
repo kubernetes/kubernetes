@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,70 +17,51 @@ limitations under the License.
 package horizontalpodautoscaler
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	errs "k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// autoscalerStrategy implements behavior for HorizontalPodAutoscalers
-type autoscalerStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
+type REST struct {
+	*etcdgeneric.Etcd
 }
 
-// Strategy is the default logic that applies when creating and updating HorizontalPodAutoscaler
-// objects via the REST API.
-var Strategy = autoscalerStrategy{api.Scheme, api.SimpleNameGenerator}
+// NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
+func NewREST(s storage.Interface) *REST {
+	prefix := "/horizontalpodautoscalers"
+	store := &etcdgeneric.Etcd{
+		NewFunc: func() runtime.Object { return &expapi.HorizontalPodAutoscaler{} },
+		// NewListFunc returns an object capable of storing results of an etcd list.
+		NewListFunc: func() runtime.Object { return &expapi.HorizontalPodAutoscalerList{} },
+		// Produces a path that etcd understands, to the root of the resource
+		// by combining the namespace in the context with the given prefix
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		// Produces a path that etcd understands, to the resource by combining
+		// the namespace in the context with the given prefix
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		// Retrieve the name field of an autoscaler
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*expapi.HorizontalPodAutoscaler).Name, nil
+		},
+		// Used to match objects based on labels/fields for list
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return MatchAutoscaler(label, field)
+		},
+		EndpointName: "horizontalPodAutoscalers",
 
-// NamespaceScoped is true for autoscaler.
-func (autoscalerStrategy) NamespaceScoped() bool {
-	return true
-}
+		CreateStrategy: Strategy,
+		UpdateStrategy: Strategy,
 
-// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (autoscalerStrategy) PrepareForCreate(obj runtime.Object) {
-	_ = obj.(*expapi.HorizontalPodAutoscaler)
-}
-
-// Validate validates a new autoscaler.
-func (autoscalerStrategy) Validate(ctx api.Context, obj runtime.Object) errs.ValidationErrorList {
-	autoscaler := obj.(*expapi.HorizontalPodAutoscaler)
-	return validation.ValidateHorizontalPodAutoscaler(autoscaler)
-}
-
-// AllowCreateOnUpdate is false for autoscalers.
-func (autoscalerStrategy) AllowCreateOnUpdate() bool {
-	return false
-}
-
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (autoscalerStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	_ = obj.(*expapi.HorizontalPodAutoscaler)
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (autoscalerStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) errs.ValidationErrorList {
-	return validation.ValidateHorizontalPodAutoscalerUpdate(obj.(*expapi.HorizontalPodAutoscaler), old.(*expapi.HorizontalPodAutoscaler))
-}
-
-func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
-	return true
-}
-
-// MatchAutoscaler returns a generic matcher for a given label and field selector.
-func MatchAutoscaler(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		autoscaler, ok := obj.(*expapi.HorizontalPodAutoscaler)
-		if !ok {
-			return false, fmt.Errorf("not a horizontal pod autoscaler")
-		}
-		return label.Matches(labels.Set(autoscaler.Labels)), nil
-	})
+		Storage: s,
+	}
+	return &REST{store}
 }
