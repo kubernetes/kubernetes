@@ -42,18 +42,18 @@ type StatsPoint struct {
 
 type CpuStats struct {
 	// Current CPU usage
-	// Units: Cores
+	// Unit: Millicores per second
 	Usage resource.Quantity `json:"usage"`
 }
 
 type MemoryStats struct {
 	// Current memory usage, this includes all memory regardless of when it was
 	// accessed.
-	// Units: Bytes.
+	// Unit: Bytes
 	Usage resource.Quantity `json:"usage"`
 
 	// The amount of working set memory, this includes recently accessed memory,
 	// dirty memory, and kernel memory. Working set is <= "usage".
-	// Units: Bytes.
+	// Unit: Bytes
 	WorkingSet resource.Quantity `json:"working_set"`
 }
