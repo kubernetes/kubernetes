@@ -16,12 +16,17 @@ apt-get install -q -y \
 pip install path.py
 
 # Create the necessary kubernetes group.
-groupadd kubernetes
-useradd -d /var/lib/kubernetes \
-    -g kubernetes \
-    -s /sbin/nologin \
-    --system \
-    kubernetes
+groupadd --force kubernetes
+
+if ! grep "^kubernetes:" /etc/passwd > /dev/null 2>&1; then
+    useradd -d /var/lib/kubernetes \
+        -g kubernetes \
+        -s /sbin/nologin \
+        --system \
+        kubernetes
+else
+    echo "The kubernetes user already exists!"
+fi
 
 install -d -m 0744 -o kubernetes -g kubernetes /var/lib/kubernetes
 install -d -m 0744 -o kubernetes -g kubernetes /etc/kubernetes/manifests
