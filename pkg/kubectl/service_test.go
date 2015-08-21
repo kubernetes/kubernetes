@@ -128,7 +128,7 @@ func TestGenerateService(t *testing.T) {
 				"port":           "80",
 				"protocol":       "UDP",
 				"container-port": "foobar",
-				"public-ip":      "1.2.3.4",
+				"external-ip":    "1.2.3.4",
 			},
 			expected: api.Service{
 				ObjectMeta: api.ObjectMeta{
@@ -146,7 +146,7 @@ func TestGenerateService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					DeprecatedPublicIPs: []string{"1.2.3.4"},
+					ExternalIPs: []string{"1.2.3.4"},
 				},
 			},
 		},
@@ -158,7 +158,7 @@ func TestGenerateService(t *testing.T) {
 				"port":                          "80",
 				"protocol":                      "UDP",
 				"container-port":                "foobar",
-				"public-ip":                     "1.2.3.4",
+				"external-ip":                   "1.2.3.4",
 				"create-external-load-balancer": "true",
 			},
 			expected: api.Service{
@@ -177,8 +177,8 @@ func TestGenerateService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					Type:                api.ServiceTypeLoadBalancer,
-					DeprecatedPublicIPs: []string{"1.2.3.4"},
+					Type:        api.ServiceTypeLoadBalancer,
+					ExternalIPs: []string{"1.2.3.4"},
 				},
 			},
 		},

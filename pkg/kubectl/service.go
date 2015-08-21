@@ -18,11 +18,10 @@ package kubectl
 
 import (
 	"fmt"
-	"strconv"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"strconv"
 )
 
 // The only difference between ServiceGeneratorV1 and V2 is that the service port is named "default" in V1, while it is left unnamed in V2.
@@ -54,7 +53,7 @@ func paramNames() []GeneratorParam {
 		{"selector", true},
 		{"port", true},
 		{"labels", false},
-		{"public-ip", false},
+		{"external-ip", false},
 		{"create-external-load-balancer", false},
 		{"type", false},
 		{"protocol", false},
@@ -144,8 +143,8 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	if params["create-external-load-balancer"] == "true" {
 		service.Spec.Type = api.ServiceTypeLoadBalancer
 	}
-	if len(params["public-ip"]) != 0 {
-		service.Spec.DeprecatedPublicIPs = []string{params["public-ip"]}
+	if len(params["external-ip"]) > 0 {
+		service.Spec.ExternalIPs = []string{params["external-ip"]}
 	}
 	if len(params["type"]) != 0 {
 		service.Spec.Type = api.ServiceType(params["type"])

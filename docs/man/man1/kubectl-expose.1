@@ -35,6 +35,10 @@ re\-use the labels from the resource it exposes.
     If true, only print the object that would be sent, without creating it.
 
 .PP
+\fB\-\-external\-ip\fP=""
+    External IP address to set for the service. The service can be accessed by this IP in addition to its generated service IP.
+
+.PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
     Filename, directory, or URL to a file identifying the resource to expose a service
 
@@ -77,10 +81,6 @@ re\-use the labels from the resource it exposes.
 .PP
 \fB\-\-protocol\fP="TCP"
     The network protocol for the service to be created. Default is 'tcp'.
-
-.PP
-\fB\-\-public\-ip\fP=""
-    Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
 
 .PP
 \fB\-\-selector\fP=""

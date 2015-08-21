@@ -1721,23 +1721,23 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid publicIPs localhost",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.DeprecatedPublicIPs = []string{"127.0.0.1"}
+				s.Spec.ExternalIPs = []string{"127.0.0.1"}
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid publicIPs",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.DeprecatedPublicIPs = []string{"0.0.0.0"}
+				s.Spec.ExternalIPs = []string{"0.0.0.0"}
 			},
 			numErrs: 1,
 		},
 		{
-			name: "valid publicIPs host",
+			name: "invalid publicIPs host",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.DeprecatedPublicIPs = []string{"myhost.mydomain"}
+				s.Spec.ExternalIPs = []string{"myhost.mydomain"}
 			},
-			numErrs: 0,
+			numErrs: 1,
 		},
 		{
 			name: "dup port name",

@@ -77,6 +77,7 @@ executor-suicide-timeout
 experimental-keystone-url
 experimental-prefix
 external-hostname
+external-ip
 failover-timeout
 file-check-frequency
 file-suffix
@@ -180,7 +181,6 @@ proxy-bindall
 proxy-logv
 proxy-port-range
 public-address-override
-public-ip
 pvclaimbinder-sync-period
 read-only-port
 really-crash-for-testing

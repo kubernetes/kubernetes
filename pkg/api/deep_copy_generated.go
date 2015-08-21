@@ -1949,13 +1949,13 @@ func deepCopy_api_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cl
 	}
 	out.ClusterIP = in.ClusterIP
 	out.Type = in.Type
-	if in.DeprecatedPublicIPs != nil {
-		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))
-		for i := range in.DeprecatedPublicIPs {
-			out.DeprecatedPublicIPs[i] = in.DeprecatedPublicIPs[i]
+	if in.ExternalIPs != nil {
+		out.ExternalIPs = make([]string, len(in.ExternalIPs))
+		for i := range in.ExternalIPs {
+			out.ExternalIPs[i] = in.ExternalIPs[i]
 		}
 	} else {
-		out.DeprecatedPublicIPs = nil
+		out.ExternalIPs = nil
 	}
 	out.SessionAffinity = in.SessionAffinity
 	return nil
