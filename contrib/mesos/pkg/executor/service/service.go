@@ -363,10 +363,16 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		return nil, nil, err
 	}
 
+	// create static pods directory
+	staticPodsConfigPath := filepath.Join(kc.RootDirectory, "static-pods")
+	err = os.Mkdir(staticPodsConfigPath, 0755)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	//TODO(jdef) either configure Watch here with something useful, or else
 	// get rid of it from executor.Config
 	kubeletFinished := make(chan struct{})
-	staticPodsConfigPath := filepath.Join(kc.RootDirectory, "static-pods")
 	exec := executor.New(executor.Config{
 		Updates:         updates,
 		SourceName:      MESOS_CFG_SOURCE,
@@ -395,13 +401,6 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		PodLW:                cache.NewListWatchFromClient(kc.KubeClient, "pods", api.NamespaceAll, fields.OneTermEqualSelector(client.PodHost, kc.NodeName)),
 	})
 
-	go exec.InitializeStaticPodsSource(func() {
-		// Create file source only when we are called back. Otherwise, it is never marked unseen.
-		fileSourceUpdates := pc.Channel(kubetypes.FileSource)
-
-		kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates)
-	})
-
 	k := &kubeletExecutor{
 		Kubelet:         klet,
 		address:         ks.Address,
@@ -423,12 +422,20 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		k.driver = driver
 	}
 
-	log.V(2).Infof("Initialize executor driver...")
-
 	k.BirthCry()
+	k.StartGarbageCollection()
+
+	log.V(2).Infof("Initialize executor driver...")
 	exec.Init(k.driver)
 
-	k.StartGarbageCollection()
+	<- exec.InitialRegComplete()
+
+	// from here the executor is registered with the Mesos master
+
+	// create static-pods directory file source
+	log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
+	fileSourceUpdates := pc.Channel(kubetypes.FileSource)
+	kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates)
 
 	return k, pc, nil
 }
