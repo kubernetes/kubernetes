@@ -60,10 +60,5 @@ MESOS_DOCKER_ADDON_TIMEOUT="${MESOS_DOCKER_ADDON_TIMEOUT:-180}"
 # If running in a container, $HOME should be resolved outside of the container.
 MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR:-${HOME}/tmp/kubernetes}"
 
-# Path to directory to store mesos slave docker-in-docker images & volumes.
-# Usage: ${MESOS_DOCKER_IMAGE_DIR}/<component>/docker
-# Must not be either an AUFS mount or an SMB/CIFS mount.
-# If using docker-machine or boot2docker, should NOT be under /Users (which is mounted from the host into the docker vm).
-MESOS_DOCKER_IMAGE_DIR="${MESOS_DOCKER_IMAGE_DIR:-/var/tmp/kubernetes}"
-
+# Arguments to pass to docker-engine running on the mesos-slave-dind containers.
 DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:---log-level=error}"
