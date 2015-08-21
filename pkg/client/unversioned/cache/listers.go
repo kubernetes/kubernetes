@@ -225,6 +225,58 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	return
 }
 
+// StoreToDaemonLister gives a store List and Exists methods. The store must contain only Daemons.
+type StoreToDaemonLister struct {
+	Store
+}
+
+// Exists checks if the given dc exists in the store.
+func (s *StoreToDaemonLister) Exists(daemon *api.Daemon) (bool, error) {
+	_, exists, err := s.Store.Get(daemon)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToDaemonLister lists all daemons in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToDaemonLister) List() (daemons []api.Daemon, err error) {
+	for _, c := range s.Store.List() {
+		daemons = append(daemons, *(c.(*api.Daemon)))
+	}
+	return daemons, nil
+}
+
+// GetPodDaemons returns a list of daemons managing a pod. Returns an error iff no matching daemons are found.
+func (s *StoreToDaemonLister) GetPodDaemons(pod *api.Pod) (daemons []api.Daemon, err error) {
+	var selector labels.Selector
+	var daemonController api.Daemon
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("No daemons found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		daemonController = *m.(*api.Daemon)
+		if daemonController.Namespace != pod.Namespace {
+			continue
+		}
+		selector = labels.Set(daemonController.Spec.Selector).AsSelector()
+
+		// If a daemonController with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		daemons = append(daemons, daemonController)
+	}
+	if len(daemons) == 0 {
+		err = fmt.Errorf("Could not find daemons for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
 // StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
 // The Store must contain (only) Services.
 type StoreToServiceLister struct {
