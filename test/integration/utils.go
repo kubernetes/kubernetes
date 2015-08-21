@@ -78,6 +78,7 @@ func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		EnableLogsSupport:     false,
 		EnableProfiling:       true,
 		EnableUISupport:       false,
+		EnableCacher:          true,
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),

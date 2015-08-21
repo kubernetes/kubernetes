@@ -29,6 +29,7 @@ func TestMasterExportsSymbols(t *testing.T) {
 		EnableCoreControllers: false,
 		EnableUISupport:       false,
 		EnableSwaggerSupport:  false,
+		EnableCacher:          true,
 		RestfulContainer:      nil,
 	}
 	_ = (&master.Master{}).NewBootstrapController()
