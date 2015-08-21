@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
@@ -48,6 +49,8 @@ type MinionServer struct {
 	kmBinary       string
 	done           chan struct{} // closed when shutting down
 	exit           chan error    // to signal fatal errors
+
+	pathOverride string // the PATH environment for the sub-processes
 
 	logMaxSize      resource.Quantity
 	logMaxBackups   int
@@ -112,6 +115,9 @@ func (ms *MinionServer) launchProxyServer() {
 
 	if ms.clientConfig.Host != "" {
 		args = append(args, fmt.Sprintf("--master=%s", ms.clientConfig.Host))
+	}
+	if ms.KubeletExecutorServer.HostnameOverride != "" {
+		args = append(args, fmt.Sprintf("--hostname-override=%s", ms.KubeletExecutorServer.HostnameOverride))
 	}
 
 	ms.launchHyperkubeServer(hyperkube.CommandProxy, &args, "proxy.log")
@@ -204,6 +210,18 @@ func (ms *MinionServer) launchHyperkubeServer(server string, args *[]string, log
 		log.Infof("wrote %d bytes to %v", written, logFileName)
 	}()
 
+	// use given environment, but add /usr/sbin to the path for the iptables binary used in kube-proxy
+	if ms.pathOverride != "" {
+		env := os.Environ()
+		cmd.Env = make([]string, 0, len(env))
+		for _, e := range env {
+			if !strings.HasPrefix(e, "PATH=") {
+				cmd.Env = append(cmd.Env, e)
+			}
+		}
+		cmd.Env = append(cmd.Env, "PATH="+ms.pathOverride)
+	}
+
 	// if the server fails to start then we exit the executor, otherwise
 	// wait for the proxy process to end (and release resources after).
 	if err := cmd.Start(); err != nil {
@@ -258,6 +276,7 @@ func (ms *MinionServer) AddExecutorFlags(fs *pflag.FlagSet) {
 func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 	// general minion flags
 	fs.BoolVar(&ms.privateMountNS, "private-mountns", ms.privateMountNS, "Enter a private mount NS before spawning procs (linux only). Experimental, not yet compatible with k8s volumes.")
+	fs.StringVar(&ms.pathOverride, "path-override", ms.pathOverride, "Override the PATH in the environment of the sub-processes.")
 
 	// log file flags
 	fs.Var(resource.NewQuantityFlagValue(&ms.logMaxSize), "max-log-size", "Maximum log file size for the executor and proxy before rotation")

@@ -156,6 +156,7 @@ minimum-container-ttl-duration
 minion-max-log-age
 minion-max-log-backups
 minion-max-log-size
+minion-path-override
 min-pr-number
 min-request-timeout
 namespace-sync-period
@@ -176,6 +177,7 @@ oidc-username-claim
 oom-score-adj
 output-version
 out-version
+path-override
 pod-cidr
 pod-eviction-timeout
 pod-infra-container-image
