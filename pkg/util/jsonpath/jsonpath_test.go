@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -43,7 +46,12 @@ func testJSONPath(tests []jsonpathTest, t *testing.T) {
 			t.Errorf("in %s, execute error %v", test.name, err)
 		}
 		out := buf.String()
-		if out != test.expect {
+		//since map is itereated in random order, we need to sort the results.
+		sortedOut := strings.Fields(out)
+		sort.Strings(sortedOut)
+		sortedExpect := strings.Fields(test.expect)
+		sort.Strings(sortedExpect)
+		if !reflect.DeepEqual(sortedOut, sortedExpect) {
 			t.Errorf(`in %s, expect to get "%s", got "%s"`, test.name, test.expect, out)
 		}
 	}
