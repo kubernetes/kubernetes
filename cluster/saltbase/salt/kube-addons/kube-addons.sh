@@ -135,14 +135,14 @@ function load-docker-images() {
     for image in "$1/"*; do
       timeout 30 docker load -i "${image}" &>/dev/null
       rc=$?
-      if [[ $rc == 124 ]]; then
+      if [[ "$rc" == 124 ]]; then
         restart_docker=true
-      elif [[ $rc != 0 ]]; then
+      elif [[ "$rc" != 0 ]]; then
         success=false
       fi
     done
-    if [[ $success == true ]]; then break; fi
-    if [[ $restart_docker == true ]]; then service docker restart; fi
+    if [[ "$success" == "true" ]]; then break; fi
+    if [[ "$restart_docker" == "true" ]]; then service docker restart; fi
     sleep 15
   done
 }
@@ -200,13 +200,13 @@ while read line; do
     # do not have DNS available will have to override the server.
     create-kubeconfig-secret "${token}" "${username}" "https://kubernetes.default"
   fi
-done < ${token_dir}/known_tokens.csv
+done < "${token_dir}/known_tokens.csv"
 
 # Create admission_control objects if defined before any other addon services. If the limits
 # are defined in a namespace other than default, we should still create the limits for the
 # default namespace.
 for obj in $(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.json \)); do
-  start_addon ${obj} 100 10 default &
+  start_addon "${obj}" 100 10 default &
   echo "++ obj ${obj} is created ++"
 done
 
