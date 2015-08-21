@@ -36,6 +36,7 @@ type ExperimentalInterface interface {
 	ScaleNamespacer
 	DaemonSetsNamespacer
 	DeploymentsNamespacer
+	JobsNamespacer
 }
 
 // ExperimentalClient is used to interact with experimental Kubernetes features.
@@ -88,6 +89,10 @@ func (c *ExperimentalClient) DaemonSets(namespace string) DaemonSetInterface {
 
 func (c *ExperimentalClient) Deployments(namespace string) DeploymentInterface {
 	return newDeployments(c, namespace)
+}
+
+func (c *ExperimentalClient) Jobs(namespace string) JobInterface {
+	return newJobs(c, namespace)
 }
 
 // NewExperimental creates a new ExperimentalClient for the given config. This client
