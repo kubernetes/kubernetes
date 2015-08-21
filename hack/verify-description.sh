@@ -38,17 +38,23 @@ find_files() {
 }
 
 if [[ $# -eq 0 ]]; then
-  files=`find_files | egrep "pkg/api/v.[^/]*/types\.go"`
+  versioned_api_files=`find_files | egrep "pkg/api/v.[^/]*/types\.go"`
 else
-  files=("${@}")
+  versioned_api_files=("${@}")
 fi
 
-for file in $files; do
+for file in $versioned_api_files; do
   if grep json: "${file}" | grep -v // | grep -v ,inline | grep -v -q description: ; then
     echo "API file is missing the required field descriptions: ${file}"
     result=1
   fi
 done
+
+internal_types_file="${KUBE_ROOT}/pkg/api/types.go"
+if grep json: "${internal_types_file}" | grep -v // | grep description: ; then
+  echo "Internal API types should not contain descriptions"
+  result=1
+fi
 
 exit ${result}
 

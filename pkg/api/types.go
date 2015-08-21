@@ -728,8 +728,8 @@ type Container struct {
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
-	Stdin bool `json:"stdin,omitempty" description:"Whether this container should allocate a buffer for stdin in the container runtime; default is false"`
-	TTY   bool `json:"tty,omitempty" description:"Whether this container should allocate a TTY for itself, also requires 'stdin' to be true; default is false"`
+	Stdin bool `json:"stdin,omitempty"`
+	TTY   bool `json:"tty,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -2212,30 +2212,30 @@ type RangeAllocation struct {
 // types to the API.  It consists of one or more Versions of the api.
 type ThirdPartyResource struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+	ObjectMeta `json:"metadata,omitempty"`
 
-	Description string `json:"description,omitempty" description:"The description of this object"`
+	Description string `json:"description,omitempty"`
 
-	Versions []APIVersion `json:"versions,omitempty" description:"The versions for this third party object"`
+	Versions []APIVersion `json:"versions,omitempty"`
 }
 
 type ThirdPartyResourceList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty"`
 
-	Items []ThirdPartyResource `json:"items" description:"items is a list of schema objects"`
+	Items []ThirdPartyResource `json:"items"`
 }
 
 // An APIVersion represents a single concrete version of an object model.
 type APIVersion struct {
-	Name     string `json:"name,omitempty" description:"name of this version (e.g. 'v1')"`
-	APIGroup string `json:"apiGroup,omitempty" description:"The API group to add this object into, default 'experimental'"`
+	Name     string `json:"name,omitempty"`
+	APIGroup string `json:"apiGroup,omitempty"`
 }
 
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
 type ThirdPartyResourceData struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
+	ObjectMeta `json:"metadata,omitempty"`
 
-	Data []byte `json:"name,omitempty" description:"the raw JSON data for this data"`
+	Data []byte `json:"name,omitempty"`
 }
