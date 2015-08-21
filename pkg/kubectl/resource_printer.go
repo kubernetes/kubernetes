@@ -57,7 +57,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		printer = &YAMLPrinter{}
 	case "name":
 		printer = &NamePrinter{}
-	case "template":
+	case "template", "go-template":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("template format specified but no template given")
 		}
@@ -66,7 +66,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", formatArgument, err)
 		}
-	case "templatefile":
+	case "templatefile", "go-template-file":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("templatefile format specified but no template file given")
 		}
@@ -80,12 +80,24 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 		}
 	case "jsonpath":
 		if len(formatArgument) == 0 {
-			return nil, false, fmt.Errorf("jsonpath format specified but no jsonpath template given")
+			return nil, false, fmt.Errorf("jsonpath template format specified but no template given")
 		}
 		var err error
 		printer, err = NewJSONPathPrinter(formatArgument)
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing jsonpath %s, %v\n", formatArgument, err)
+		}
+	case "jsonpath-file":
+		if len(formatArgument) == 0 {
+			return nil, false, fmt.Errorf("jsonpath file format specified but no template file file given")
+		}
+		data, err := ioutil.ReadFile(formatArgument)
+		if err != nil {
+			return nil, false, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
+		}
+		printer, err = NewJSONPathPrinter(string(data))
+		if err != nil {
+			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
 		}
 	case "wide":
 		fallthrough

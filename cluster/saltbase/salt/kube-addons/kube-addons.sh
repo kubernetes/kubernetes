@@ -174,7 +174,7 @@ start_addon /etc/kubernetes/addons/namespace.yaml 100 10 "" &
 token_found=""
 while [ -z "${token_found}" ]; do
   sleep .5
-  token_found=$(${KUBECTL} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o template -t "{{with index .secrets 0}}{{.name}}{{end}}" || true)
+  token_found=$(${KUBECTL} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}" || true)
 done
 
 echo "== default service account in the ${SYSTEM_NAMESPACE} namespace has token ${token_found} =="
