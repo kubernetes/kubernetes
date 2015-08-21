@@ -378,28 +378,14 @@ func (s *ServiceController) createExternalLoadBalancer(service *api.Service) err
 		return err
 	}
 	name := s.loadBalancerName(service)
-	if len(service.Spec.ExternalIPs) > 0 {
-		for _, publicIP := range service.Spec.ExternalIPs {
-			// TODO: Make this actually work for multiple IPs by using different
-			// names for each. For now, we'll just create the first and break.
-			status, err := s.balancer.EnsureTCPLoadBalancer(name, s.zone.Region, net.ParseIP(publicIP),
-				ports, hostsFromNodeList(&nodes), service.Spec.SessionAffinity)
-			if err != nil {
-				return err
-			} else {
-				service.Status.LoadBalancer = *status
-			}
-			break
-		}
+	status, err := s.balancer.EnsureTCPLoadBalancer(name, s.zone.Region, net.ParseIP(service.Spec.LoadBalancerIP),
+		ports, hostsFromNodeList(&nodes), service.Spec.SessionAffinity)
+	if err != nil {
+		return err
 	} else {
-		status, err := s.balancer.EnsureTCPLoadBalancer(name, s.zone.Region, nil,
-			ports, hostsFromNodeList(&nodes), service.Spec.SessionAffinity)
-		if err != nil {
-			return err
-		} else {
-			service.Status.LoadBalancer = *status
-		}
+		service.Status.LoadBalancer = *status
 	}
+
 	return nil
 }
 
@@ -475,6 +461,9 @@ func needsUpdate(oldService *api.Service, newService *api.Service) bool {
 		return true
 	}
 	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
+		return true
+	}
+	if !loadBalancerIPsAreEqual(oldService, newService) {
 		return true
 	}
 	if len(oldService.Spec.ExternalIPs) != len(newService.Spec.ExternalIPs) {
@@ -688,4 +677,8 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 
 func wantsExternalLoadBalancer(service *api.Service) bool {
 	return service.Spec.Type == api.ServiceTypeLoadBalancer
+}
+
+func loadBalancerIPsAreEqual(oldService, newService *api.Service) bool {
+	return oldService.Spec.LoadBalancerIP == newService.Spec.LoadBalancerIP
 }

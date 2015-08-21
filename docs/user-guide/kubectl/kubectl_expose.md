@@ -73,6 +73,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
   -f, --filename=[]: Filename, directory, or URL to a file identifying the resource to expose a service
       --generator="service/v2": The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.
   -l, --labels="": Labels to apply to the service created by this call.
+      --load-balancer-ip="": IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used(cloud-provider specific).
       --name="": The name for the newly created object.
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].

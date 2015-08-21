@@ -1958,6 +1958,7 @@ func deepCopy_api_ServicePort(in ServicePort, out *ServicePort, c *conversion.Cl
 }
 
 func deepCopy_api_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cloner) error {
+	out.Type = in.Type
 	if in.Ports != nil {
 		out.Ports = make([]ServicePort, len(in.Ports))
 		for i := range in.Ports {
@@ -1977,7 +1978,6 @@ func deepCopy_api_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cl
 		out.Selector = nil
 	}
 	out.ClusterIP = in.ClusterIP
-	out.Type = in.Type
 	if in.ExternalIPs != nil {
 		out.ExternalIPs = make([]string, len(in.ExternalIPs))
 		for i := range in.ExternalIPs {
@@ -1986,6 +1986,7 @@ func deepCopy_api_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cl
 	} else {
 		out.ExternalIPs = nil
 	}
+	out.LoadBalancerIP = in.LoadBalancerIP
 	out.SessionAffinity = in.SessionAffinity
 	return nil
 }
