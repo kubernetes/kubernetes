@@ -1124,8 +1124,8 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 }
 
 // Kill all running containers in a pod (includes the pod infra container).
-func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
-	return kl.containerRuntime.KillPod(pod)
+func (kl *Kubelet) killPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
+	return kl.containerRuntime.KillPod(pod, runningPod)
 }
 
 type empty struct{}
@@ -1181,9 +1181,10 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}()
 
 	// Kill pods we can't run.
-	err := canRunPod(pod)
-	if err != nil {
-		kl.killPod(runningPod)
+	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {
+		if err := kl.killPod(pod, runningPod); err != nil {
+			util.HandleError(err)
+		}
 		return err
 	}
 
@@ -1370,6 +1371,32 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 	return nil
 }
 
+// Delete any pods that are no longer running and are marked for deletion.
+func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+	var terminating []*api.Pod
+	for _, pod := range pods {
+		if pod.DeletionTimestamp != nil {
+			found := false
+			for _, runningPod := range runningPods {
+				if runningPod.ID == pod.UID {
+					found = true
+					break
+				}
+			}
+			if found {
+				podFullName := kubecontainer.GetPodFullName(pod)
+				glog.V(5).Infof("Keeping terminated pod %q and uid %q, still running", podFullName, pod.UID)
+				continue
+			}
+			terminating = append(terminating, pod)
+		}
+	}
+	if !kl.statusManager.TerminatePods(terminating) {
+		return errors.New("not all pods were successfully terminated")
+	}
+	return nil
+}
+
 // pastActiveDeadline returns true if the pod has been active for more than
 // ActiveDeadlineSeconds.
 func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
@@ -1532,6 +1559,10 @@ func (kl *Kubelet) cleanupPods(allPods []*api.Pod, admittedPods []*api.Pod) erro
 	// Remove any orphaned mirror pods.
 	kl.podManager.DeleteOrphanedMirrorPods()
 
+	if err := kl.cleanupTerminatedPods(allPods, runningPods); err != nil {
+		glog.Errorf("Failed to cleanup terminated pods: %v", err)
+	}
+
 	return err
 }
 
@@ -1554,7 +1585,7 @@ func (kl *Kubelet) killUnwantedPods(desiredPods map[types.UID]empty,
 			}()
 			glog.V(1).Infof("Killing unwanted pod %q", pod.Name)
 			// Stop the containers.
-			err = kl.killPod(*pod)
+			err = kl.killPod(nil, *pod)
 			if err != nil {
 				glog.Errorf("Failed killing the pod %q: %v", pod.Name, err)
 				return
