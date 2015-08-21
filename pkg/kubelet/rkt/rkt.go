@@ -18,13 +18,13 @@ package rkt
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -624,18 +625,18 @@ func (r *runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 
 // makeRuntimePod constructs the container runtime pod. It will:
 // 1, Construct the pod by the information stored in the unit file.
-// 2, Construct the pod status from pod info.
-func (r *runtime) makeRuntimePod(unitName string, podInfos map[string]*podInfo) (*kubecontainer.Pod, error) {
+// 2, Return the rkt uuid.
+func (r *runtime) makeRuntimePod(unitName string) (*kubecontainer.Pod, string, error) {
 	f, err := os.Open(path.Join(systemdServiceDir, unitName))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer f.Close()
 
 	var pod kubecontainer.Pod
 	opts, err := unit.Deserialize(f)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var rktID string
@@ -647,24 +648,19 @@ func (r *runtime) makeRuntimePod(unitName string, podInfos map[string]*podInfo) 
 		case unitPodName:
 			err = json.Unmarshal([]byte(opt.Value), &pod)
 			if err != nil {
-				return nil, err
+				return nil, "", err
 			}
 		case unitRktID:
 			rktID = opt.Value
 		default:
-			return nil, fmt.Errorf("rkt: Unexpected key: %q", opt.Name)
+			return nil, "", fmt.Errorf("rkt: Unexpected key: %q", opt.Name)
 		}
 	}
 
 	if len(rktID) == 0 {
-		return nil, fmt.Errorf("rkt: cannot find rkt ID of pod %v, unit file is broken", pod)
+		return nil, "", fmt.Errorf("rkt: cannot find rkt ID of pod %v, unit file is broken", pod)
 	}
-	info, found := podInfos[rktID]
-	if !found {
-		return nil, fmt.Errorf("rkt: cannot find info for pod %q, rkt uuid: %q", pod.Name, rktID)
-	}
-	pod.Status = info.toPodStatus(&pod)
-	return &pod, nil
+	return &pod, "", nil
 }
 
 // GetPods runs 'systemctl list-unit' and 'rkt list' to get the list of rkt pods.
@@ -679,20 +675,13 @@ func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 		return nil, err
 	}
 
-	// TODO(yifan): Now we are getting the status of the pod as well.
-	// Probably we can leave much of the work to GetPodStatus().
-	podInfos, err := r.getPodInfos()
-	if err != nil {
-		return nil, err
-	}
-
 	var pods []*kubecontainer.Pod
 	for _, u := range units {
 		if strings.HasPrefix(u.Name, kubernetesUnitPrefix) {
 			if !all && u.SubState != "running" {
 				continue
 			}
-			pod, err := r.makeRuntimePod(u.Name, podInfos)
+			pod, _, err := r.makeRuntimePod(u.Name)
 			if err != nil {
 				glog.Warningf("rkt: Cannot construct pod from unit file: %v.", err)
 				continue
@@ -712,18 +701,81 @@ func (r *runtime) KillPod(pod kubecontainer.Pod) error {
 	return r.systemd.Reload()
 }
 
-// GetPodStatus currently invokes GetPods() to return the status.
-// TODO(yifan): Split the get status logic from GetPods().
-func (r *runtime) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
-	pods, err := r.GetPods(true)
+type byModTime []os.FileInfo
+
+func (b byModTime) Len() int           { return len(b) }
+func (b byModTime) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b byModTime) Less(i, j int) bool { return b[i].ModTime().After(b[j].ModTime()) }
+
+// listUnitFiles reads the systemd directory and returns a list of rkt
+// service file names, sorted by the modification date from newest to oldest.
+// TODO(yifan): Listing all units under the directory is inefficent, consider to
+// create the list during startup, and then record every unit creation to avoid
+// reading the whole directory.
+func listUnitFiles() ([]string, error) {
+	files, err := ioutil.ReadDir(systemdServiceDir)
 	if err != nil {
 		return nil, err
 	}
-	p := kubecontainer.Pods(pods).FindPodByID(pod.UID)
-	if len(p.Containers) == 0 {
-		return nil, fmt.Errorf("cannot find status for pod: %q", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
+
+	sort.Sort(byModTime(files))
+
+	var rktFiles []string
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), kubernetesUnitPrefix) {
+			rktFiles = append(rktFiles, f.Name())
+		}
 	}
-	return &p.Status, nil
+	return rktFiles, nil
+}
+
+// getPodStatus reads the service file and invokes 'rkt status $UUID' to get the
+// pod's status.
+func (r *runtime) getPodStatus(serviceName string) (*api.PodStatus, error) {
+	// TODO(yifan): Get rkt uuid from the service file name.
+	pod, uuid, err := r.makeRuntimePod(serviceName)
+	if err != nil {
+		return nil, err
+	}
+	podInfo, err := r.getPodInfo(uuid)
+	if err != nil {
+		return nil, err
+	}
+	status := podInfo.toPodStatus(pod)
+	return &status, nil
+}
+
+// GetPodStatus returns the status of the given pod.
+func (r *runtime) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
+	unitNames, err := listUnitFiles()
+	if err != nil {
+		glog.Errorf("rkt: Cannot list unit files: %v", err)
+		return nil, err
+	}
+
+	var status *api.PodStatus
+	var errlist []error
+	for _, name := range unitNames {
+		if !strings.Contains(name, string(pod.UID)) {
+			continue
+		}
+
+		if status != nil {
+			// This means the pod has been restarted.
+			for _, c := range status.ContainerStatuses {
+				c.RestartCount++
+			}
+			continue
+		}
+
+		status, err = r.getPodStatus(name)
+		if err != nil {
+			glog.Errorf("rkt: Cannot get pod status for pod %q, service file %q: %v", pod.Name, name, err)
+			errlist = append(errlist, err)
+			continue
+		}
+	}
+	return status, errors.NewAggregate(errlist)
 }
 
 // Version invokes 'rkt version' to get the version information of the rkt
@@ -978,7 +1030,7 @@ func (r *runtime) RunInContainer(containerID string, cmd []string) ([]byte, erro
 }
 
 func (r *runtime) AttachContainer(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	return errors.New("unimplemented")
+	return fmt.Errorf("unimplemented")
 }
 
 // Note: In rkt, the container ID is in the form of "UUID:appName", where UUID is
@@ -1124,6 +1176,20 @@ func isUUID(input string) bool {
 		return false
 	}
 	return true
+}
+
+// getPodInfo returns the pod info of a single pod according
+// to the uuid.
+func (r *runtime) getPodInfo(uuid string) (*podInfo, error) {
+	status, err := r.runCommand("status", uuid)
+	if err != nil {
+		return nil, err
+	}
+	info, err := parsePodInfo(status)
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
 }
 
 // getPodInfos returns a map of [pod-uuid]:*podInfo

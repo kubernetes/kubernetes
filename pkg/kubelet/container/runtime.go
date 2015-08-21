@@ -118,11 +118,6 @@ type Pod struct {
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
-	// The status of the pod.
-	// TODO(yifan): Inspect and get the statuses for all pods can be expensive,
-	// maybe we want to get one pod's status at a time (e.g. GetPodStatus()
-	// for the particular pod after we GetPods()).
-	Status api.PodStatus
 }
 
 // ContainerID is a type that identifies a container.
@@ -294,7 +289,6 @@ func (p *Pod) ToAPIPod() *api.Pod {
 	pod.UID = p.ID
 	pod.Name = p.Name
 	pod.Namespace = p.Namespace
-	pod.Status = p.Status
 
 	for _, c := range p.Containers {
 		var container api.Container
