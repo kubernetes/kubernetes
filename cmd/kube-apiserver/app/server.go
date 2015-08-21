@@ -33,6 +33,7 @@ import (
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
+	"k8s.io/kubernetes/cmd/genutils"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -167,6 +168,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 			}
 		},
 	}
+	genutils.AddGeneratedDocsCommands(cmd)
 
 	s.AddFlags(cmd.Flags())
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)

@@ -164,11 +164,29 @@ kube::util::gen-docs() {
   genman=$(kube::util::find-binary "genman")
   genbashcomp=$(kube::util::find-binary "genbashcomp")
 
-  mkdir -p "${dest}/docs/user-guide/kubectl/"
-  "${gendocs}" "${dest}/docs/user-guide/kubectl/"
+  local binaries=()
+  binaries+=($(kube::util::find-binary "kube-apiserver"))
+  binaries+=($(kube::util::find-binary "kube-controller-manager"))
+  binaries+=($(kube::util::find-binary "kube-scheduler"))
+  binaries+=($(kube::util::find-binary "kube-proxy"))
+  binaries+=($(kube::util::find-binary "kubelet"))
+
+  local commands=(genmd genman genbash)
+  local directories=("docs/admin" "docs/man/man1" "contrib/completions/bash")
+
+  mkdir -p "${dest}/docs/admin/"
   mkdir -p "${dest}/docs/man/man1/"
-  "${genman}" "${dest}/docs/man/man1/"
+  mkdir -p "${dest}/docs/user-guide/kubectl/"
   mkdir -p "${dest}/contrib/completions/bash/"
+
+  for bin in "${binaries[@]}"; do
+    for i in "${!commands[@]}"; do
+      "${bin}" "${commands[$i]}" "${dest}"/"${directories[$i]}" > /dev/null 2>&1
+    done
+  done
+
+  "${gendocs}" "${dest}/docs/user-guide/kubectl/"
+  "${genman}" "${dest}/docs/man/man1/"
   "${genbashcomp}" "${dest}/contrib/completions/bash/"
 
   # create the list of generated files

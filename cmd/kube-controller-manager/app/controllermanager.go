@@ -32,6 +32,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/cmd/genutils"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -131,6 +132,7 @@ controller, and serviceaccounts controller.`,
 			}
 		},
 	}
+	genutils.AddGeneratedDocsCommands(cmd)
 
 	s.AddFlags(cmd.Flags())
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)

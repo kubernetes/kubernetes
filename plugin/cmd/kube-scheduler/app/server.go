@@ -27,6 +27,7 @@ import (
 	"os"
 	"strconv"
 
+	"k8s.io/kubernetes/cmd/genutils"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -90,6 +91,7 @@ through the API as necessary.`,
 			}
 		},
 	}
+	genutils.AddGeneratedDocsCommands(cmd)
 
 	s.AddFlags(cmd.Flags())
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)

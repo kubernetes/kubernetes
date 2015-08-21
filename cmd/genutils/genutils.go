@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/cobra"
 )
 
 func OutDir(path string) (string, error) {
@@ -38,4 +40,66 @@ func OutDir(path string) (string, error) {
 	}
 	outDir = outDir + "/"
 	return outDir, nil
+}
+
+func getOutDir(path string, args []string) string {
+	if len(args) == 1 {
+		path = args[0]
+	} else if len(args) > 1 {
+		fmt.Fprintf(os.Stderr, "usage: COMMAND [output directory]\n")
+		os.Exit(1)
+	}
+
+	outDir, err := OutDir(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get output directory: %v\n", err)
+		os.Exit(1)
+	}
+	return outDir
+}
+
+func AddGeneratedDocsCommands(cmd *cobra.Command) {
+	genMD := &cobra.Command{
+		Use:        "genmd",
+		Short:      "genmd",
+		Run:        runGenMD,
+		Deprecated: "but really writing md docs",
+	}
+	cmd.AddCommand(genMD)
+
+	genMan := &cobra.Command{
+		Use:        "genman",
+		Short:      "genman",
+		Run:        runGenMan,
+		Deprecated: "but really writing man pages",
+	}
+	cmd.AddCommand(genMan)
+
+	genBash := &cobra.Command{
+		Use:        "genbash",
+		Short:      "genbash",
+		Run:        runGenBash,
+		Deprecated: "but really writing bash completions",
+	}
+	cmd.AddCommand(genBash)
+}
+
+func runGenMD(cmd *cobra.Command, args []string) {
+	parent := cmd.Parent()
+	outDir := getOutDir("docs/", args)
+	parent.GenMarkdownTree(outDir)
+}
+
+func runGenMan(cmd *cobra.Command, args []string) {
+	parent := cmd.Parent()
+	outDir := getOutDir("docs/man/man1", args)
+	parent.GenManTree("KUBERNETES", outDir)
+
+}
+
+func runGenBash(cmd *cobra.Command, args []string) {
+	parent := cmd.Parent()
+	outDir := getOutDir("contrib/completions/bash/", args)
+	outFile := filepath.Join(outDir, parent.Name())
+	parent.GenBashCompletionFile(outFile)
 }

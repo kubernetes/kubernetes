@@ -33,6 +33,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/cmd/genutils"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
@@ -224,6 +225,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			}
 		},
 	}
+	genutils.AddGeneratedDocsCommands(cmd)
 
 	s.AddFlags(cmd.Flags())
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
