@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -34,10 +35,8 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -59,6 +58,8 @@ const (
 type KubeletExecutorServer struct {
 	*app.KubeletServer
 	SuicideTimeout time.Duration
+	kletLock       sync.Mutex
+	klet           *kubelet.Kubelet
 }
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
@@ -94,6 +95,13 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	// stops the kubelet taking any control over other system processes.
 	s.SystemContainer = ""
 	s.DockerDaemonContainer = ""
+
+	// create static pods directory
+	staticPodsConfigPath := filepath.Join(s.RootDirectory, "static-pods")
+	err := os.Mkdir(staticPodsConfigPath, 0755)
+	if err != nil {
+		return err
+	}
 
 	// create apiserver client
 	var apiclient *client.Client
@@ -158,7 +166,68 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		log.Warningf("Unknown Docker exec handler %q; defaulting to native", s.DockerExecHandlerName)
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
+	dockerClient := dockertools.ConnectToDockerOrDie(s.DockerEndpoint)
 
+	//TODO(jdef) either configure Watch here with something useful, or else
+	// get rid of it from executor.Config
+	kubeletFinished := make(chan struct{})
+	execUpdates := make(chan kubelet.PodUpdate, 1)
+	exec := executor.New(executor.Config{
+		Updates:         execUpdates,
+		APIClient:       apiclient,
+		Docker:          dockerClient,
+		SuicideTimeout:  s.SuicideTimeout,
+		KubeletFinished: kubeletFinished,
+		ExitFunc:        os.Exit,
+		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
+			s.kletLock.Lock()
+			defer s.kletLock.Unlock()
+
+			if s.klet == nil {
+				return nil, fmt.Errorf("PodStatucFunc called before kubelet is initialized")
+			}
+
+			status, err := s.klet.GetRuntime().GetPodStatus(pod)
+			if err != nil {
+				return nil, err
+			}
+
+			status.Phase = kubelet.GetPhase(&pod.Spec, status.ContainerStatuses)
+			hostIP, err := s.klet.GetHostIP()
+			if err != nil {
+				log.Errorf("Cannot get host IP: %v", err)
+			} else {
+				status.HostIP = hostIP.String()
+			}
+			return status, nil
+		},
+		StaticPodsConfigPath: staticPodsConfigPath,
+	})
+
+	// initialize driver and initialize the executor with it
+	dconfig := bindings.DriverConfig{
+		Executor:         exec,
+		HostnameOverride: s.HostnameOverride,
+		BindingAddress:   s.Address,
+	}
+	driver, err := bindings.NewMesosExecutorDriver(dconfig)
+	if err != nil {
+		log.Fatalf("failed to create executor driver: %v", err)
+	}
+	log.V(2).Infof("Initialize executor driver...")
+	exec.Init(driver)
+
+	// start the driver
+	go func() {
+		if _, err := driver.Run(); err != nil {
+			log.Fatalf("executor driver failed: %v", err)
+		}
+		log.Info("executor Run completed")
+	}()
+
+	<-exec.InitiallyRegistered()
+
+	// prepare kubelet
 	kcfg := app.KubeletConfig{
 		Address:            s.Address,
 		AllowPrivileged:    s.AllowPrivileged,
@@ -186,7 +255,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		CAdvisorInterface:              cAdvisorInterface,
 		EnableServer:                   s.EnableServer,
 		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
-		DockerClient:                   dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		DockerClient:                   dockerClient,
 		KubeClient:                     apiclient,
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  app.ProbeVolumePlugins(),
@@ -216,9 +285,8 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 	kcfg.NodeName = kcfg.Hostname
 
 	kcfg.Builder = app.KubeletBuilder(func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
-		return s.createAndInitKubelet(kc, hks, clientConfig)
+		return s.createAndInitKubelet(kc, clientConfig, staticPodsConfigPath, execUpdates, kubeletFinished)
 	})
-
 	err = app.RunKubelet(&kcfg)
 	if err != nil {
 		return err
@@ -250,8 +318,10 @@ func defaultBindingAddress() string {
 
 func (ks *KubeletExecutorServer) createAndInitKubelet(
 	kc *app.KubeletConfig,
-	hks hyperkube.Interface,
 	clientConfig *client.Config,
+	staticPodsConfigPath string,
+	execUpdates <-chan kubelet.PodUpdate,
+	kubeletDone chan<- struct{},
 ) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
 
 	// TODO(k8s): block until all sources have delivered at least one update to the channel, or break the sync loop
@@ -272,8 +342,24 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		MaxContainers:      kc.MaxContainerCount,
 	}
 
+	// create main pod source
 	pc := kconfig.NewPodConfig(kconfig.PodConfigNotificationIncremental, kc.Recorder)
 	updates := pc.Channel(MESOS_CFG_SOURCE)
+	executorDone := make(chan struct{})
+	go func() {
+		// execUpdates will be closed by the executor on shutdown
+		defer close(executorDone)
+
+		for u := range execUpdates {
+			u.Source = MESOS_CFG_SOURCE
+			updates <- u
+		}
+	}()
+
+	// create static-pods directory file source
+	log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
+	fileSourceUpdates := pc.Channel(kubelet.FileSource)
+	kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates)
 
 	klet, err := kubelet.NewMainKubelet(
 		kc.Hostname,
@@ -328,83 +414,21 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		return nil, nil, err
 	}
 
-	// create static pods directory
-	staticPodsConfigPath := filepath.Join(kc.RootDirectory, "static-pods")
-	err = os.Mkdir(staticPodsConfigPath, 0755)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	//TODO(jdef) either configure Watch here with something useful, or else
-	// get rid of it from executor.Config
-	kubeletFinished := make(chan struct{})
-	exec := executor.New(executor.Config{
-		Updates:         updates,
-		SourceName:      MESOS_CFG_SOURCE,
-		APIClient:       kc.KubeClient,
-		Docker:          kc.DockerClient,
-		SuicideTimeout:  ks.SuicideTimeout,
-		KubeletFinished: kubeletFinished,
-		ExitFunc:      os.Exit,
-		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
-			status, err := klet.GetRuntime().GetPodStatus(pod)
-			if err != nil {
-				return nil, err
-			}
-
-			status.Phase = kubelet.GetPhase(&pod.Spec, status.ContainerStatuses)
-			hostIP, err := klet.GetHostIP()
-			if err != nil {
-				log.Errorf("Cannot get host IP: %v", err)
-			} else {
-				status.HostIP = hostIP.String()
-			}
-			return status, nil
-		},
-		StaticPodsConfigPath: staticPodsConfigPath,
-		PodLW:                cache.NewListWatchFromClient(kc.KubeClient, "pods", api.NamespaceAll, fields.OneTermEqualSelector(client.PodHost, kc.NodeName)),
-	})
-
-	// initialize driver and initialize the executor with it
-	dconfig := bindings.DriverConfig{
-		Executor:         exec,
-		HostnameOverride: ks.HostnameOverride,
-		BindingAddress:   ks.Address,
-	}
-	driver, err := bindings.NewMesosExecutorDriver(dconfig)
-	if err != nil {
-		log.Fatalf("failed to create executor driver: %v", err)
-	}
-	log.V(2).Infof("Initialize executor driver...")
-	exec.Init(driver)
-
-	// start the driver
-	go func() {
-		if _, err := driver.Run(); err != nil {
-			log.Fatalf("executor driver failed: %v", err)
-		}
-		log.Info("executor Run completed")
-	}()
-
-	<- exec.InitialRegComplete()
+	ks.kletLock.Lock()
+	ks.klet = klet
+	ks.kletLock.Unlock()
 
 	k := &kubeletExecutor{
-		Kubelet:         klet,
-		address:         ks.Address,
-		dockerClient:    kc.DockerClient,
-		hks:             hks,
-		kubeletFinished: kubeletFinished,
-		executorDone:    exec.Done(),
-		clientConfig:    clientConfig,
+		Kubelet:      ks.klet,
+		address:      ks.Address,
+		dockerClient: kc.DockerClient,
+		kubeletDone:  kubeletDone,
+		clientConfig: clientConfig,
+		executorDone: executorDone,
 	}
 
 	k.BirthCry()
 	k.StartGarbageCollection()
-
-	// create static-pods directory file source
-	log.V(2).Infof("initializing static pods source factory, configured at path %q", staticPodsConfigPath)
-	fileSourceUpdates := pc.Channel(kubelet.FileSource)
-	kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates)
 
 	return k, pc, nil
 }
@@ -412,12 +436,11 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 // kubelet decorator
 type kubeletExecutor struct {
 	*kubelet.Kubelet
-	address         net.IP
-	dockerClient    dockertools.DockerInterface
-	hks             hyperkube.Interface
-	kubeletFinished chan struct{}   // closed once kubelet.Run() returns
-	executorDone    <-chan struct{} // from KubeletExecutor.Done()
-	clientConfig    *client.Config
+	address      net.IP
+	dockerClient dockertools.DockerInterface
+	kubeletDone  chan<- struct{} // closed once kubelet.Run() returns
+	executorDone <-chan struct{} // closed when executor terminates
+	clientConfig *client.Config
 }
 
 func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions *kubelet.TLSOptions, enableDebuggingHandlers bool) {
@@ -427,21 +450,21 @@ func (kl *kubeletExecutor) ListenAndServe(address net.IP, port uint, tlsOptions 
 
 // runs the main kubelet loop, closing the kubeletFinished chan when the loop exits.
 // never returns.
-func (kl *kubeletExecutor) Run(updates <-chan kubelet.PodUpdate) {
+func (kl *kubeletExecutor) Run(mergedUpdates <-chan kubelet.PodUpdate) {
 	defer func() {
-		close(kl.kubeletFinished)
+		close(kl.kubeletDone)
 		util.HandleCrash()
 		log.Infoln("kubelet run terminated") //TODO(jdef) turn down verbosity
 		// important: never return! this is in our contract
 		select {}
 	}()
 
-	// push updates through a closable pipe. when the executor indicates shutdown
-	// via Done() we want to stop the Kubelet from processing updates.
-	pipe := make(chan kubelet.PodUpdate)
+	// push merged updates into another, closable update channel which is closed
+	// when the executor shuts down.
+	closableUpdates := make(chan kubelet.PodUpdate)
 	go func() {
-		// closing pipe will cause our patched kubelet's syncLoop() to exit
-		defer close(pipe)
+		// closing closableUpdates will cause our patched kubelet's syncLoop() to exit
+		defer close(closableUpdates)
 	pipeLoop:
 		for {
 			select {
@@ -449,9 +472,9 @@ func (kl *kubeletExecutor) Run(updates <-chan kubelet.PodUpdate) {
 				break pipeLoop
 			default:
 				select {
-				case u := <-updates:
+				case u := <-mergedUpdates:
 					select {
-					case pipe <- u: // noop
+					case closableUpdates <- u: // noop
 					case <-kl.executorDone:
 						break pipeLoop
 					}
@@ -462,12 +485,12 @@ func (kl *kubeletExecutor) Run(updates <-chan kubelet.PodUpdate) {
 		}
 	}()
 
-	// we expect that Run() will complete after the pipe is closed and the
+	// we expect that Run() will complete after closableUpdates is closed and the
 	// kubelet's syncLoop() has finished processing its backlog, which hopefully
 	// will not take very long. Peeking into the future (current k8s master) it
 	// seems that the backlog has grown from 1 to 50 -- this may negatively impact
 	// us going forward, time will tell.
-	util.Until(func() { kl.Kubelet.Run(pipe) }, 0, kl.executorDone)
+	util.Until(func() { kl.Kubelet.Run(closableUpdates) }, 0, kl.executorDone)
 
 	//TODO(jdef) revisit this if/when executor failover lands
 	// Force kubelet to delete all pods.
