@@ -32,6 +32,7 @@ import (
 type Interface interface {
 	PodsNamespacer
 	PodTemplatesNamespacer
+	JobsNamespacer
 	ReplicationControllersNamespacer
 	DaemonsNamespacer
 	ServicesNamespacer
@@ -47,6 +48,10 @@ type Interface interface {
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
+}
+
+func (c *Client) Jobs(namespace string) JobInterface {
+	return newJobs(c, namespace)
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
