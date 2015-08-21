@@ -243,9 +243,10 @@ function detect-minions() {
 function detect-minion-names {
   detect-project
   detect-node-instance-group
-  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" instances --group "${NODE_INSTANCE_GROUP}" list \
-    | cut -d'/' -f11))
+  MINION_NAMES=($(gcloud compute instance-groups managed list-instances \
+    "${NODE_INSTANCE_GROUP}" --zone "${ZONE}" --project "${PROJECT}" \
+    --format=yaml | grep instance: | cut -d ' ' -f 2))
+
   echo "MINION_NAMES=${MINION_NAMES[*]}"
 }
 
