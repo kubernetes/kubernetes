@@ -44,7 +44,7 @@ func (fakeConnectionInfoGetter) GetConnectionInfo(host string) (string, uint, ht
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
-	storage, _ := NewREST(etcdStorage, fakeConnectionInfoGetter{})
+	storage, _ := NewREST(etcdStorage, false, fakeConnectionInfoGetter{})
 	return storage, fakeClient
 }
 

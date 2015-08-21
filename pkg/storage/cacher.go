@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -62,8 +63,13 @@ type CacherConfig struct {
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
 // based on the underlying storage contents.
+// Cacher implements storage.Interface (although most of the calls are just
+// delegated to the underlying storage).
 type Cacher struct {
 	sync.RWMutex
+
+	// Underlying storage.Interface.
+	storage Interface
 
 	// Whether Cacher is initialized.
 	initialized sync.WaitGroup
@@ -93,6 +99,7 @@ func NewCacher(config CacherConfig) *Cacher {
 
 	cacher := &Cacher{
 		initialized: sync.WaitGroup{},
+		storage:     config.Storage,
 		watchCache:  watchCache,
 		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
 		watcherIdx:  0,
@@ -134,7 +141,32 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	}
 }
 
-// Implements Watch (signature from storage.Interface).
+// Implements storage.Interface.
+func (c *Cacher) Backends() []string {
+	return c.storage.Backends()
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Versioner() Versioner {
+	return c.storage.Versioner()
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Create(key string, obj, out runtime.Object, ttl uint64) error {
+	return c.storage.Create(key, obj, out, ttl)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Set(key string, obj, out runtime.Object, ttl uint64) error {
+	return c.storage.Set(key, obj, out, ttl)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Delete(key string, out runtime.Object) error {
+	return c.storage.Delete(key, out)
+}
+
+// Implements storage.Interface.
 func (c *Cacher) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -156,13 +188,34 @@ func (c *Cacher) Watch(key string, resourceVersion uint64, filter FilterFunc) (w
 	return watcher, nil
 }
 
-// Implements WatchList (signature from storage.Interface).
+// Implements storage.Interface.
 func (c *Cacher) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
 	return c.Watch(key, resourceVersion, filter)
 }
 
-// Implements List (signature from storage.Interface).
+// Implements storage.Interface.
+func (c *Cacher) Get(key string, objPtr runtime.Object, ignoreNotFound bool) error {
+	return c.storage.Get(key, objPtr, ignoreNotFound)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) GetToList(key string, listObj runtime.Object) error {
+	return c.storage.GetToList(key, listObj)
+}
+
+// Implements storage.Interface.
 func (c *Cacher) List(key string, listObj runtime.Object) error {
+	return c.storage.List(key, listObj)
+}
+
+// ListFromMemory implements list operation (the same signature as List method)
+// but it serves the contents from memory.
+// Current we cannot use ListFromMemory() instead of List(), because it only
+// guarantees eventual consistency (e.g. it's possible for Get called right after
+// Create to return not-exist, before the change is propagate).
+// TODO: We may consider changing to use ListFromMemory in the future, but this
+// requires wider discussion as an "api semantic change".
+func (c *Cacher) ListFromMemory(key string, listObj runtime.Object) error {
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -189,6 +242,16 @@ func (c *Cacher) List(key string, listObj runtime.Object) error {
 		}
 	}
 	return nil
+}
+
+// Implements storage.Interface.
+func (c *Cacher) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error {
+	return c.storage.GuaranteedUpdate(key, ptrToType, ignoreNotFound, tryUpdate)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Codec() runtime.Codec {
+	return c.storage.Codec()
 }
 
 func (c *Cacher) processEvent(event cache.WatchCacheEvent) {
@@ -327,13 +390,23 @@ func (c *cacheWatcher) sendWatchCacheEvent(event cache.WatchCacheEvent) {
 	if event.PrevObject != nil {
 		oldObjPasses = c.filter(event.PrevObject)
 	}
+	if !curObjPasses && !oldObjPasses {
+		// Watcher is not interested in that object.
+		return
+	}
+
+	object, err := api.Scheme.Copy(event.Object)
+	if err != nil {
+		glog.Errorf("unexpected copy error: %v", err)
+		return
+	}
 	switch {
 	case curObjPasses && !oldObjPasses:
-		c.result <- watch.Event{Type: watch.Added, Object: event.Object}
+		c.result <- watch.Event{Type: watch.Added, Object: object}
 	case curObjPasses && oldObjPasses:
-		c.result <- watch.Event{Type: watch.Modified, Object: event.Object}
+		c.result <- watch.Event{Type: watch.Modified, Object: object}
 	case !curObjPasses && oldObjPasses:
-		c.result <- watch.Event{Type: watch.Deleted, Object: event.Object}
+		c.result <- watch.Event{Type: watch.Deleted, Object: object}
 	}
 }
 

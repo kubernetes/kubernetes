@@ -43,7 +43,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *tools.FakeEtcdClient) {
 	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
-	storage := NewStorage(etcdStorage, nil)
+	storage := NewStorage(etcdStorage, false, nil)
 	return storage.Pod, storage.Binding, storage.Status, fakeClient
 }
 
@@ -989,7 +989,8 @@ func TestEtcdWatchPodsMatch(t *testing.T) {
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "foo",
+			Name:      "foo",
+			Namespace: "default",
 			Labels: map[string]string{
 				"name": "foo",
 			},
