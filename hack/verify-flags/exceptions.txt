@@ -63,10 +63,10 @@ docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var 
 docs/getting-started-guides/logging-elasticsearch.md:  "cluster_name" : "kubernetes-logging",
 docs/user-guide/accessing-the-cluster.md:	 "cluster_name" : "kubernetes_logging",
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
-examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
-examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
-examples/elasticsearch/README.md:  "cluster_name" : "mytunes-db",
-examples/elasticsearch/README.md:"cluster_name" : "mytunes-db",
+examples/elasticsearch/README.md:  "cluster_name" : "myesdb",
+examples/elasticsearch/README.md:  "cluster_name" : "myesdb",
+examples/elasticsearch/production_cluster/README.md:  "cluster_name" : "myesdb",
+examples/elasticsearch/production_cluster/README.md:  "cluster_name" : "myesdb",
 hack/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 hack/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=\"${RUNTIME_CONFIG}\""
