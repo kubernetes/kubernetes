@@ -176,10 +176,6 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}
 
-	// No turning back. Remove artifacts that might still exist from the userspace Proxier.
-	glog.V(2).Info("Tearing down userspace rules. Errors here are acceptable.")
-	tearDownUserspaceIptables(ipt)
-
 	return &Proxier{
 		serviceMap:    make(map[proxy.ServicePortName]*serviceInfo),
 		syncPeriod:    syncPeriod,
@@ -188,47 +184,20 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 	}, nil
 }
 
-// Chains from the userspace proxy
-// TODO: Remove these Chains and tearDownUserspaceIptables once the userspace Proxier has been removed.
-var iptablesContainerPortalChain utiliptables.Chain = "KUBE-PORTALS-CONTAINER"
-var iptablesHostPortalChain utiliptables.Chain = "KUBE-PORTALS-HOST"
-var iptablesContainerNodePortChain utiliptables.Chain = "KUBE-NODEPORT-CONTAINER"
-var iptablesHostNodePortChain utiliptables.Chain = "KUBE-NODEPORT-HOST"
-
-// tearDownUserspaceIptables removes all iptables rules and chains created by the userspace Proxier
-func tearDownUserspaceIptables(ipt utiliptables.Interface) {
-	// NOTE: Warning, this needs to be kept in sync with the userspace Proxier,
-	// we want to ensure we remove all of the iptables rules it creates.
-	// Currently they are all in iptablesInit()
-	// Delete Rules first, then Flush and Delete Chains
-	args := []string{"-m", "comment", "--comment", "handle ClusterIPs; NOTE: this must be before the NodePort rules"}
-	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainOutput, append(args, "-j", string(iptablesHostPortalChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
+// CleanupLeftovers removes all iptables rules and chains created by the Proxier
+// It returns true if an error was encountered. Errors are logged.
+func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
+	//TODO: actually tear down all rules and chains.
+	args := []string{"-j", "KUBE-SERVICES"}
+	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainOutput, args...); err != nil {
+		glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+		encounteredError = true
 	}
-	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPrerouting, append(args, "-j", string(iptablesContainerPortalChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
+	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPrerouting, args...); err != nil {
+		glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
+		encounteredError = true
 	}
-	args = []string{"-m", "addrtype", "--dst-type", "LOCAL"}
-	args = append(args, "-m", "comment", "--comment", "handle service NodePorts; NOTE: this must be the last rule in the chain")
-	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainOutput, append(args, "-j", string(iptablesHostNodePortChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
-	}
-	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPrerouting, append(args, "-j", string(iptablesContainerNodePortChain))...); err != nil {
-		glog.Errorf("Error removing userspace rule: %v", err)
-	}
-
-	// flush and delete chains.
-	chains := []utiliptables.Chain{iptablesContainerPortalChain, iptablesHostPortalChain, iptablesHostNodePortChain, iptablesContainerNodePortChain}
-	for _, c := range chains {
-		// flush chain, then if sucessful delete, delete will fail if flush fails.
-		if err := ipt.FlushChain(utiliptables.TableNAT, c); err != nil {
-			glog.Errorf("Error flushing userspace chain: %v", err)
-		} else {
-			if err = ipt.DeleteChain(utiliptables.TableNAT, c); err != nil {
-				glog.Errorf("Error flushing userspace chain: %v", err)
-			}
-		}
-	}
+	return encounteredError
 }
 
 func (proxier *Proxier) sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) bool {
