@@ -92,7 +92,7 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("consume secrets", f.Client, pod, 0, []string{
+		testContainerOutput("consume secrets", f.Client, pod, 0, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			"mode of file \"/etc/secret-volume/data-1\": -r--r--r--",
 		}, f.Namespace.Name)
