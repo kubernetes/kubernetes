@@ -25,14 +25,12 @@ kube::golang::setup_env
 
 binaries=(
   "cmd/mungedocs"
-  "cmd/gendocs"
-  "cmd/genman"
-  "cmd/genbashcomp"
   "cmd/kube-apiserver"
   "cmd/kube-controller-manager"
   "plugin/cmd/kube-scheduler"
   "cmd/kube-proxy"
   "cmd/kubelet"
+  "cmd/kubectl"
 )
 
 "${KUBE_ROOT}/hack/build-go.sh" "${binaries[@]}"

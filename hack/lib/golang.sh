@@ -62,10 +62,7 @@ readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 kube::golang::test_targets() {
   local targets=(
     cmd/integration
-    cmd/gendocs
-    cmd/genman
     cmd/mungedocs
-    cmd/genbashcomp
     cmd/genconversion
     cmd/gendeepcopy
     cmd/genswaggertypedocs

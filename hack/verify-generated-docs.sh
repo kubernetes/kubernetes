@@ -22,8 +22,17 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+binaries=(
+  "cmd/mungedocs"
+  "cmd/kube-apiserver"
+  "cmd/kube-controller-manager"
+  "plugin/cmd/kube-scheduler"
+  "cmd/kube-proxy"
+  "cmd/kubelet"
+  "cmd/kubectl"
+)
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman cmd/genbashcomp cmd/mungedocs
+"${KUBE_ROOT}/hack/build-go.sh" "${binaries[@]}"
 
 "${KUBE_ROOT}/hack/after-build/verify-generated-docs.sh" "$@"
 
