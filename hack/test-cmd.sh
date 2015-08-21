@@ -74,8 +74,7 @@ function check-curl-proxy-code()
   echo "For address ${full_address}, got ${status} but wanted ${desired}"
   return 1
 }
-
-trap cleanup EXIT SIGINT
+kube::util::trap_add cleanup EXIT SIGINT
 
 kube::util::ensure-temp-dir
 kube::etcd::start
