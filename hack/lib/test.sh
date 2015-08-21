@@ -31,7 +31,7 @@ kube::test::get_object_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" $object -o template -t \"$request\")
+  res=$(eval kubectl get "${kube_flags[@]}" $object -o go-template=\"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
@@ -56,7 +56,7 @@ kube::test::get_object_jsonpath_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath -t \"$request\")
+  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath=\"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
