@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/pkg/api"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
@@ -65,13 +66,12 @@ func (m *MockExecutorDriver) SendFrameworkMessage(msg string) (mesosproto.Status
 	return args.Get(0).(mesosproto.Status), args.Error(1)
 }
 
-func NewTestKubernetesExecutor() (*KubernetesExecutor, chan interface{}) {
-	updates := make(chan interface{}, 1024)
+func NewTestKubernetesExecutor() (*KubernetesExecutor, chan kubetypes.PodUpdate) {
+	updates := make(chan kubetypes.PodUpdate, 1024)
 	return New(Config{
 		Docker:     dockertools.ConnectToDockerOrDie("fake://"),
 		Updates:    updates,
 		PodLW:      &NewMockPodsListWatch(api.PodList{}).ListWatch,
-		SourceName: "executor_test",
 	}), updates
 }
 
