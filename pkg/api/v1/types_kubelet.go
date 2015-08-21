@@ -29,7 +29,7 @@ type NodeStats struct {
 }
 
 type ContainerStats struct {
-	Name  string                 `json:"name"`
+	Name  string        `json:"name"`
 	Stats []*StatsPoint `json:"stats"`
 }
 
