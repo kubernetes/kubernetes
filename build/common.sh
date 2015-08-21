@@ -103,7 +103,7 @@ readonly KUBE_DOCKER_WRAPPED_BINARIES=(
 # The set of addons images that should be prepopulated
 readonly KUBE_ADDON_PATHS=(
   gcr.io/google_containers/pause:0.8.0
-  uluyol/kube-registry-proxy:0.2.3
+  gcr.io/google_containers/kube-registry-proxy:0.3
 )
 
 # ---------------------------------------------------------------------------
