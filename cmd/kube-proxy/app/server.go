@@ -20,6 +20,7 @@ package app
 
 import (
 	"errors"
+	goflag "flag"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -43,8 +44,10 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -76,6 +79,36 @@ type ProxyServer struct {
 	Proxier          proxy.ProxyProvider
 	Recorder         record.EventRecorder
 	ServiceConfig    *proxyconfig.ServiceConfig
+}
+
+// NewProxyServerCommand creates a new ProxyServer object with default parameters
+func NewProxyServerCommand() *cobra.Command {
+	config := NewProxyConfig()
+	s, err := NewProxyServerDefault(config)
+	if err != nil {
+		glog.Fatalf("%v", err)
+	}
+
+	cmd := &cobra.Command{
+		Use:   "kube-proxy",
+		Short: "The kube-proxy implements the code needed to support kubernetes services",
+		Long: `The Kubernetes network proxy runs on each node. This
+reflects services as defined in the Kubernetes API on each node and can do simple
+TCP,UDP stream forwarding or round robin TCP,UDP forwarding across a set of backends.
+Service cluster ips and ports are currently found through Docker-links-compatible
+environment variables specifying ports opened by the service proxy. There is an optional
+addon that provides cluster DNS for these cluster IPs. The user must create a service
+with the apiserver API to configure the proxy.`,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return s.Run(args)
+		},
+	}
+
+	config.AddFlags(cmd.Flags())
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	cmd.SetGlobalNormalizationFunc(util.WordSepNormalizeFunc)
+
+	return cmd
 }
 
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
@@ -281,6 +314,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 func (s *ProxyServer) Run(_ []string) error {
+	verflag.PrintAndExitIfRequested()
 	// remove iptables rules and exit
 	if s.Config.CleanupAndExit {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
