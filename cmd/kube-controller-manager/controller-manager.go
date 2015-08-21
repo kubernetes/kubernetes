@@ -50,6 +50,8 @@ func main() {
 	util.InitLogs()
 	defer util.FlushLogs()
 
+	verflag.PrintAndExitIfRequested()
+
 	//Functions to start and stop this daemon.
 	startCM := func(leaseUserInfo *ha.LeaseUser) bool {
 		leaseUserInfo.Running = true
@@ -83,5 +85,4 @@ func main() {
 		time.Sleep(5 * time.Second)
 	}
 
-	verflag.PrintAndExitIfRequested()
 }

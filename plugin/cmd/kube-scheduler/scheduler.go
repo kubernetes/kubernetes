@@ -46,6 +46,8 @@ func main() {
 	util.InitLogs()
 	defer util.FlushLogs()
 
+	verflag.PrintAndExitIfRequested()
+
 	startSched := func(leaseUserInfo *ha.LeaseUser) bool {
 		leaseUserInfo.Running = true
 		glog.Infof("Starting kube scheduler. %v", leaseUserInfo)
@@ -67,11 +69,12 @@ func main() {
 	if haconfig.Key == "" {
 		haconfig.Key = "ha.scheduler.lock"
 	}
+
 	ha.RunHA(s.Kubeconfig, s.Master, startSched, endSched, &haconfig)
+
 	for true {
 		glog.Infof("Scheduler lease loop is running...")
 		time.Sleep(5 * time.Second)
 	}
 
-	verflag.PrintAndExitIfRequested()
 }
