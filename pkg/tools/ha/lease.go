@@ -50,27 +50,30 @@ type LeaseUser struct {
 type Config struct {
 	Key    string
 	whoami string
-	ttl    uint64
-	sleep  time.Duration
+	Ttl    uint64
+	Sleep  uint64
 	// These two functions return "err" or else nil.
 	// They should also update information in the LeaseUserInfo struct
 	// about the state of the lease owner.
 	LeaseGained   func(lu *LeaseUser) bool
 	LeaseLost     func(lu *LeaseUser) bool
-	Cli           *client.Client
+	Cli           client.Interface
 	LeaseUserInfo *LeaseUser
+	Timebomb      uint64
 }
 
 func (c *Config) AddFlags(fs *pflag.FlagSet) {
 	//If key or whoami aren't provided, they should be set by default by the calling program.
 	pflag.StringVar(&c.Key, "key", "", "The key to use for the lock")
+	pflag.Uint64Var(&c.Timebomb, "timebomb", 120, "Seconds until Lease is automatically relinquished. In production, of course, should be more than 5 minutes (300).")
 	pflag.StringVar(&c.whoami, "whoami", "", "The name to use for the reservation.  If empty os.Hostname is the default.")
-	pflag.Uint64Var(&c.ttl, "ttl", 30, "The time to live for the lock.")
-	pflag.DurationVar(&c.sleep, "sleep", 5*time.Second, "The length of time to sleep between checking the lock.")
+	pflag.Uint64Var(&c.Ttl, "ttl", 30, "The time to live for the lock.")
+	pflag.Uint64Var(&c.Sleep, "sleep", 5, "The length of time to sleep between checking the lock.")
 }
 
-// RunHA runs a process in a highly available fashion.
-func RunHA(kubeClient *client.Client, master string, start func(l *LeaseUser) bool, stop func(l *LeaseUser) bool, mcfg *Config) {
+// RunHA is a convenience wrapper which allows you to build a minimal HA process by simply defining
+// a few functions (start, stop, and so on).
+func RunLeasedProcess(kubeClient client.Interface, master string, start func(l *LeaseUser) bool, stop func(l *LeaseUser) bool, mcfg *Config) {
 
 	leaseUserInfo := LeaseUser{
 		Running:      false,
@@ -83,23 +86,35 @@ func RunHA(kubeClient *client.Client, master string, start func(l *LeaseUser) bo
 	mcfg.LeaseLost = stop
 	mcfg.Cli = kubeClient
 
-	RunLease(mcfg)
+	run(mcfg)
 	glog.Infof("zz Done with starting the lease loop for %v.", mcfg)
 }
 
-var countsleeps = 0
+var start = time.Now()
 
 // leaseAndUpdateLoop runs the loop to acquire a lease.  This will continue trying to get a lease
 // until it succeeds, and then callbacks sent in by the user will be triggered.
 // Likewise, it can give up the lease, in which case the LeaseLost() callbacks will be triggered.
 func (c *Config) leaseAndUpdateLoop() {
+
+	var timebombExpirationOccured = false
+	var timebombStarted = false
+
 	for {
 		//Proactively give up the lease every 50 tries.
 		var master bool = false
 		var err error = nil
 
-		//TODO Delete this condition, its only to cause quick failover.
-		if countsleeps < 10 {
+		//once the master is enabled, we enable a timebomb.
+		if !timebombStarted && c.LeaseUserInfo.Running {
+			glog.Errorf("WARNING: Master is enabled, turning timebomb on for %v seconds.", c.Timebomb)
+			timebombStarted = true
+			time.AfterFunc(time.Duration(c.Timebomb)*time.Second, func() {
+				timebombExpirationOccured = true
+			})
+		}
+
+		if !timebombExpirationOccured {
 			master, err = c.acquireOrRenewLease()
 			if err != nil {
 				glog.Errorf("Error in determining if master. %v, looping", err)
@@ -115,16 +130,8 @@ func (c *Config) leaseAndUpdateLoop() {
 			glog.Errorf("Done updating master status %v", c)
 		}
 
-		//countsleeps is just for hacktesting of failover, we can delete it.
-		//If not master, we make sure countdown is at 0, so
-		//that when we become the master, we have 10 rounds.
-		if master {
-			countsleeps++
-		} else {
-			countsleeps = 0
-		}
-		glog.Errorf("..sleep.. %v %v", c.sleep, countsleeps)
-		time.Sleep(c.sleep)
+		glog.Errorf("..sleep.. %v seconds", c.Sleep)
+		time.Sleep(time.Duration(c.Sleep) * time.Second)
 	}
 }
 
@@ -143,7 +150,7 @@ func (c *Config) getValidLockOrDelete(ilock client.LockInterface) (*api.Lock, er
 		//If the current time is larger than the last update time, the lock is old,
 		//regardless of the owner, we can safely delete it - because any lock owner
 		//by now would have renewed it unless it has died off.
-		if uint64(time.Since(rTime)/time.Second) >= c.ttl {
+		if uint64(time.Since(rTime)/time.Second) >= c.Ttl {
 			ilock.Delete(c.Key)
 			glog.Errorf("Deleted a stale lock (last renewal was %v, current time is %v).  Time to make a new one !", rTime, time.Now())
 		}
@@ -158,7 +165,7 @@ func (c *Config) getValidLockOrDelete(ilock client.LockInterface) (*api.Lock, er
 				},
 				Spec: api.LockSpec{
 					HeldBy:    c.whoami,
-					LeaseTime: c.ttl,
+					LeaseTime: c.Ttl,
 				},
 			})
 
@@ -229,7 +236,7 @@ func (c *Config) update(master bool) error {
 	return nil
 }
 
-func RunLease(c *Config) {
+func run(c *Config) {
 	//set some reasonable defaults.
 	if len(c.whoami) == 0 {
 		hostname, err := os.Hostname()
@@ -239,16 +246,16 @@ func RunLease(c *Config) {
 		c.whoami = hostname
 		glog.Infof("--whoami is empty, defaulting to %s", c.whoami)
 	}
-	if c.ttl < 1 {
-		c.ttl = 30
-		glog.Infof("Set default to %v seconds for lease", c.ttl)
+	if c.Ttl < 1 {
+		c.Ttl = 30
+		glog.Infof("Set default to %v seconds for lease", c.Ttl)
 	}
-	if c.sleep < 1 {
-		c.sleep = 5 * time.Second
-		glog.Infof("Set default to %v seconds for sleep", c.sleep)
+	if c.Sleep < 1 {
+		c.Sleep = 5
+		glog.Infof("Set default to %v seconds for sleep", c.Sleep)
 	}
 
-	glog.Infof("Config : %v, sleep %v", c, c.sleep)
+	glog.Infof("Config : %v, sleep %v", c, c.Sleep)
 
 	go c.leaseAndUpdateLoop()
 

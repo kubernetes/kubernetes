@@ -92,7 +92,7 @@ func main() {
 	kubeClient, err := client.New(kubeconfig)
 
 	//This starts a thread that continues running.
-	ha.RunHA(kubeClient, s.Master, startCM, endCM, &haconfig)
+	ha.RunLeasedProcess(kubeClient, s.Master, startCM, endCM, &haconfig)
 
 	for true {
 		glog.Infof("CM lease loop is running...")

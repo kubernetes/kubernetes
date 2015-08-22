@@ -84,7 +84,7 @@ func main() {
 
 	kubeClient, err := client.New(kubeconfig)
 
-	ha.RunHA(kubeClient, s.Master, startSched, endSched, &haconfig)
+	ha.RunLeasedProcess(kubeClient, s.Master, startSched, endSched, &haconfig)
 
 	for true {
 		glog.Infof("Scheduler lease loop is running...")
