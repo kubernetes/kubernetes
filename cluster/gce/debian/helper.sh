@@ -55,9 +55,14 @@ CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
 KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
 KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 EOF
-  if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
+  if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
     cat >>$file <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
+EOF
+  fi
+  if [ -n "${TEST_CLUSTER:-}" ]; then
+    cat >>$file <<EOF
+TEST_CLUSTER: $(yaml-quote ${TEST_CLUSTER})
 EOF
   fi
   if [[ "${master}" == "true" ]]; then

@@ -104,3 +104,9 @@ ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContext
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
+
+# Optional: setting it to true denotes this is a testing cluster,
+# so that we can use pulled kubernetes binaries, even if binaries
+# are pre-installed in the image. Note that currently this logic
+# is only supported in trusty nodes.
+TEST_CLUSTER="${TEST_CLUSTER:-true}"
