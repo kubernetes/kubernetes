@@ -59,19 +59,31 @@ Documentation for other releases can be found at
 
 ## Introduction
 
-This document describes how to build a high-availability (HA) Kubernetes cluster.  This is a fairly advanced topic.
-Users who merely want to experiment with Kubernetes are encouraged to use configurations that are simpler to set up such as
+This document describes how to build a high-availability (HA) Kubernetes cluster.
+Users who merely want to experiment with Kubernetes are encouraged to use configurations that are simpler to set up, such as
 the simple [Docker based single node cluster instructions](../../docs/getting-started-guides/docker.md),
 or try [Google Container Engine](https://cloud.google.com/container-engine/) for hosted Kubernetes.
 
 Also, at this time high availability support for Kubernetes is not continuously tested in our end-to-end (e2e) testing.  We will
 be working to add this continuous testing, but for now the single-node master installations are more heavily tested.
 
+## Terminology
+
+1. Hot Standby: In this scenario, data and state are shared between the two components such that an immediate failure in one component causes the standby daemon to take over exactly where the failed component had left off.  Kubernetes does not currently support this mode of operation.
+
+2. **Warm Standby**: In this scenario there is only one active component acting as the master and additional components running but not providing service or responding to requests.  Data and state are not shared between the active and standby components.  When a failure occurs, the standby component that becomes the master must determine the current state of the system before resuming functionality.  This is the approach taken for non-stateless components in kubernetes, including the controller manager and scheduler.
+
+3. Active-Active (Load Balanced): Clients can simply load-balance across any number of servers that are currently running.  Their general availability can be continuously updated, or published, such that load balancing only occurs across active participants.  This is the HA method for the api-server. 
+
+For complete reference see [this](https://www.ibm.com/developerworks/community/blogs/RohitShetty/entry/high_availability_cold_warm_hot?lang=en)
+
 ## Overview
 
 Setting up a truly reliable, highly available distributed system requires a number of steps, it is akin to
 wearing underwear, pants, a belt, suspenders, another pair of underwear, and another pair of pants.  We go into each
-of these steps in detail, but a summary is given here to help guide and orient the user.
+of these steps in detail, but a summary is given here to help guide and orient the user.  
+
+TODO: Figure out whether we should have a doc breakout POD-master and Other.
 
 The steps involved are as follows:
    * [Creating the reliable constituent nodes that collectively form our HA master implementation.](#reliable-nodes)

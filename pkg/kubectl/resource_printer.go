@@ -272,6 +272,7 @@ var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODE
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
+var lockColumns = []string{"NAME", "HELDBY", "RENEWED"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -305,6 +306,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
 	h.Handler(componentStatusColumns, printComponentStatus)
 	h.Handler(componentStatusColumns, printComponentStatusList)
+	h.Handler(lockColumns, printLock)
+	h.Handler(lockColumns, printLockList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -949,6 +952,35 @@ func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, withNa
 		}
 	}
 
+	return nil
+}
+
+func printLock(lock *api.Lock, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	namespace := lock.Namespace
+	if withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintf(
+		w, "%s\t%s\t%s\t",
+		lock.Name,
+		lock.Spec.HeldBy,
+		lock.Spec.RenewTime,
+	); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(lock.Labels, columnLabels))
+	return err
+}
+
+// Sorts and prints the EventList in a human-friendly format.
+func printLockList(list *api.LockList, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+	for i := range list.Items {
+		if err := printLock(&list.Items[i], w, withNamespace, wide, columnLabels); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

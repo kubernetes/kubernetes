@@ -19,20 +19,11 @@ package master
 import (
 	"bytes"
 	"fmt"
+	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/swagger"
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"io/ioutil"
-	"math/rand"
-	"net"
-	"net/http"
-	"net/http/pprof"
-	"net/url"
-	"os"
-	rt "runtime"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
-
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -56,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/etcd"
 	"k8s.io/kubernetes/pkg/registry/event"
 	"k8s.io/kubernetes/pkg/registry/limitrange"
+	"k8s.io/kubernetes/pkg/registry/lock"
 	"k8s.io/kubernetes/pkg/registry/minion"
 	nodeetcd "k8s.io/kubernetes/pkg/registry/minion/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
@@ -67,21 +59,28 @@ import (
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
+	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/emicklei/go-restful"
-	"github.com/emicklei/go-restful/swagger"
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/registry/service/allocator"
-	"k8s.io/kubernetes/pkg/registry/service/portallocator"
+	"math/rand"
+	"net"
+	"net/http"
+	"net/http/pprof"
+	"net/url"
+	"os"
+	rt "runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 const (
@@ -453,6 +452,8 @@ func (m *Master) init(c *Config) {
 	registry := etcd.NewRegistry(c.DatabaseStorage, m.endpointRegistry)
 	m.serviceRegistry = registry
 
+	lockRegistry := lock.NewEtcdRegistry(c.DatabaseStorage)
+
 	var serviceClusterIPRegistry service.RangeRegistry
 	serviceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(m.serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
@@ -495,6 +496,7 @@ func (m *Master) init(c *Config) {
 		"events":                 event.NewStorage(eventRegistry),
 
 		"limitRanges":                   limitrange.NewStorage(limitRangeRegistry),
+		"locks":                         lock.NewStorage(lockRegistry),
 		"resourceQuotas":                resourceQuotaStorage,
 		"resourceQuotas/status":         resourceQuotaStatusStorage,
 		"namespaces":                    namespaceStorage,
