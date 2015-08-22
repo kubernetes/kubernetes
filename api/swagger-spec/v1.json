@@ -5909,7 +5909,7 @@
         "allowMultiple": false
        },
        {
-        "type": "",
+        "type": "string",
         "paramType": "query",
         "name": "command",
         "description": "the command to execute; argv array; not executed within a shell",
@@ -5987,7 +5987,7 @@
         "allowMultiple": false
        },
        {
-        "type": "",
+        "type": "string",
         "paramType": "query",
         "name": "command",
         "description": "the command to execute; argv array; not executed within a shell",

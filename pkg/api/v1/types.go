@@ -1578,7 +1578,7 @@ type PodExecOptions struct {
 	Container string `json:"container,omitempty" description:"the container in which to execute the command. Defaults to only container if there is only one container in the pod."`
 
 	// Command is the remote command to execute; argv array; not executed within a shell.
-	Command []string `json:"command" description:"the command to execute; argv array; not executed within a shell"`
+	Command []string `json:"command,csv" description:"the command to execute; argv array; not executed within a shell"`
 }
 
 // PodProxyOptions is the query options to a Pod's proxy call

@@ -797,7 +797,7 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 					continue
 				}
 				desc := sf.Tag.Get("description")
-				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.Name())))
+				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
 			}
 		}
 	}
@@ -812,11 +812,13 @@ func typeToJSON(typeName string) string {
 		return "boolean"
 	case "uint8", "int", "int32", "int64", "uint32", "uint64":
 		return "integer"
-	case "byte":
-		return "string"
 	case "float64", "float32":
 		return "number"
+	case "byte":
+		return "string"
 	case "util.Time":
+		return "string"
+	case "[]string":
 		return "string"
 	default:
 		return typeName
