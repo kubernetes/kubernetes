@@ -169,6 +169,10 @@ node-status-update-frequency
 node-sync-period
 no-headers
 num-nodes
+oidc-ca-file
+oidc-client-id
+oidc-issuer-url
+oidc-username-claim
 oom-score-adj
 output-version
 out-version

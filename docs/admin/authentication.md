@@ -41,16 +41,34 @@ to use to validate client certificates presented to the apiserver. If a client c
 is presented and verified, the common name of the subject is used as the user name for the
 request.
 
-**Token authentication** is enabled by passing the `--token-auth-file=SOMEFILE` option
+**Token File** is enabled by passing the `--token-auth-file=SOMEFILE` option
 to apiserver.  Currently, tokens last indefinitely, and the token list cannot
-be changed without restarting apiserver.  We plan in the future for tokens to
-be short-lived, and to be generated as needed rather than stored in a file.
+be changed without restarting apiserver.
 
 The token file format is implemented in `plugin/pkg/auth/authenticator/token/tokenfile/...`
 and is a csv file with 3 columns: token, user name, user uid.
 
 When using token authentication from an http client the apiserver expects an `Authorization`
 header with a value of `Bearer SOMETOKEN`.
+
+**OpenID Connect ID Token** is enabled by passing the following options to the apiserver:
+- `--oidc-issuer-url` (required) tells the apiserver where to connect to the OpenID provider.
+- `--oidc-client-id` (required) is used by apiserver to verify the audience of the token.
+A valid [ID token](http://openid.net/specs/openid-connect-core-1_0.html#IDToken) MUST have this
+client-id in its `aud` claims.
+- `--oidc-ca-file` (optional) is used by apiserver to establish and verify the secure connection
+to the OpenID provider.
+- `--oidc-username-claim` (optional, experimental) specifies which OpenID claim to use as the user name. By default, `sub`
+will be used, which should be unique and immutable under the issuer's domain. Cluster administrator can
+choose other claims such as `email` to use as the user name, but the uniqueness and immutability is not guaranteed.
+
+Please note that this flag is still experimental until we settle more on how to handle the mapping of the OpenID user to the Kubernetes user. Thus futher changes are possible.
+
+Currently, the ID token will be obtained by some third-party app. This means the app and apiserver
+MUST share the `--oidc-client-id`.
+
+Like **Token File**, when using token authentication from an http client the apiserver expects
+an `Authorization` header with a value of `Bearer SOMETOKEN`.
 
 **Basic authentication** is enabled by passing the `--basic-auth-file=SOMEFILE`
 option to apiserver. Currently, the basic auth credentials last indefinitely,
