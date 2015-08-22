@@ -71,6 +71,7 @@ import (
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
+	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
@@ -779,13 +780,15 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 
 // expapi returns the resources and codec for the experimental api
 func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
-	controllerStorage := expcontrolleretcd.NewStorage(c.DatabaseStorage)
-	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.DatabaseStorage)
+	controllerStorage := expcontrolleretcd.NewStorage(c.ExpDatabaseStorage)
+	autoscalerStorage := horizontalpodautoscaleretcd.NewREST(c.ExpDatabaseStorage)
+	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(c.ExpDatabaseStorage)
 
 	storage := map[string]rest.Storage{
 		strings.ToLower("replicationControllers"):       controllerStorage.ReplicationController,
 		strings.ToLower("replicationControllers/scale"): controllerStorage.Scale,
 		strings.ToLower("horizontalpodautoscalers"):     autoscalerStorage,
+		"thirdpartyresources":                           thirdPartyResourceStorage,
 	}
 
 	return &apiserver.APIGroupVersion{

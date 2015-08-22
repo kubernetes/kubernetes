@@ -101,6 +101,12 @@ func deepCopy_v1_TypeMeta(in v1.TypeMeta, out *v1.TypeMeta, c *conversion.Cloner
 	return nil
 }
 
+func deepCopy_v1_APIVersion(in APIVersion, out *APIVersion, c *conversion.Cloner) error {
+	out.Name = in.Name
+	out.APIGroup = in.APIGroup
+	return nil
+}
+
 func deepCopy_v1_HorizontalPodAutoscaler(in HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -229,6 +235,47 @@ func deepCopy_v1_SubresourceReference(in SubresourceReference, out *SubresourceR
 	return nil
 }
 
+func deepCopy_v1_ThirdPartyResource(in ThirdPartyResource, out *ThirdPartyResource, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	out.Description = in.Description
+	if in.Versions != nil {
+		out.Versions = make([]APIVersion, len(in.Versions))
+		for i := range in.Versions {
+			if err := deepCopy_v1_APIVersion(in.Versions[i], &out.Versions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Versions = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_ThirdPartyResourceList(in ThirdPartyResourceList, out *ThirdPartyResourceList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ThirdPartyResource, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_ThirdPartyResource(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_util_Time(in util.Time, out *util.Time, c *conversion.Cloner) error {
 	if newVal, err := c.DeepCopy(in.Time); err != nil {
 		return err
@@ -244,6 +291,7 @@ func init() {
 		deepCopy_v1_ListMeta,
 		deepCopy_v1_ObjectMeta,
 		deepCopy_v1_TypeMeta,
+		deepCopy_v1_APIVersion,
 		deepCopy_v1_HorizontalPodAutoscaler,
 		deepCopy_v1_HorizontalPodAutoscalerList,
 		deepCopy_v1_HorizontalPodAutoscalerSpec,
@@ -254,6 +302,8 @@ func init() {
 		deepCopy_v1_ScaleSpec,
 		deepCopy_v1_ScaleStatus,
 		deepCopy_v1_SubresourceReference,
+		deepCopy_v1_ThirdPartyResource,
+		deepCopy_v1_ThirdPartyResourceList,
 		deepCopy_util_Time,
 	)
 	if err != nil {

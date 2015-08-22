@@ -1823,6 +1823,10 @@ func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
 	return allErrs
 }
 
+func ValidateThirdPartyResourceUpdate(old, update *api.ThirdPartyResource) errs.ValidationErrorList {
+	return ValidateThirdPartyResource(update)
+}
+
 func ValidateThirdPartyResource(obj *api.ThirdPartyResource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(obj.Name) == 0 {
