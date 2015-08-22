@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/tools/ha"
 	"k8s.io/kubernetes/pkg/util"
@@ -70,7 +73,18 @@ func main() {
 		haconfig.Key = "ha.scheduler.lock"
 	}
 
-	ha.RunHA(s.Kubeconfig, s.Master, startSched, endSched, &haconfig)
+	//We need a kubeconfig in order to use the locking API, so we create it here.
+	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+	if err != nil {
+		glog.Infof("Exiting, couldn't create kube configuration with parameters cfg=%v and master=%v ", kubeconfig, s.Master)
+		os.Exit(1)
+	}
+
+	kubeClient, err := client.New(kubeconfig)
+
+	ha.RunHA(kubeClient, s.Master, startSched, endSched, &haconfig)
 
 	for true {
 		glog.Infof("Scheduler lease loop is running...")

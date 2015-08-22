@@ -27,8 +27,8 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
+	//	"k8s.io/kubernetes/pkg/client/clientcmd"
+	//clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	"os"
 	"time"
 )
@@ -70,19 +70,7 @@ func (c *Config) AddFlags(fs *pflag.FlagSet) {
 }
 
 // RunHA runs a process in a highly available fashion.
-func RunHA(kubecfg string, master string, start func(l *LeaseUser) bool, stop func(l *LeaseUser) bool, mcfg *Config) {
-
-	//We need a kubeconfig in order to use the locking API, so we create it here.
-	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: master}}).ClientConfig()
-
-	if err != nil {
-		glog.Infof("Exiting, couldn't create kube configuration with parameters cfg=%v and master=%v ", kubecfg, master)
-		os.Exit(1)
-	}
-
-	kubeClient, err := client.New(kubeconfig)
+func RunHA(kubeClient *client.Client, master string, start func(l *LeaseUser) bool, stop func(l *LeaseUser) bool, mcfg *Config) {
 
 	leaseUserInfo := LeaseUser{
 		Running:      false,

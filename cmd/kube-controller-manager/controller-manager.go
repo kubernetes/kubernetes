@@ -25,6 +25,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	"k8s.io/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/clientcmd/api"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/tools/ha"
 	"k8s.io/kubernetes/pkg/util"
@@ -51,7 +54,6 @@ func main() {
 	defer util.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
-
 	//Functions to start and stop this daemon.
 	startCM := func(leaseUserInfo *ha.LeaseUser) bool {
 		leaseUserInfo.Running = true
@@ -77,8 +79,20 @@ func main() {
 	if haconfig.Key == "" {
 		haconfig.Key = "ha.controllermanager.lock"
 	}
+
+	//We need a kubeconfig in order to use the locking API, so we create it here.
+	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+	if err != nil {
+		glog.Infof("Exiting, couldn't create kube configuration with parameters cfg=%v and master=%v ", kubeconfig, s.Master)
+		os.Exit(1)
+	}
+
+	kubeClient, err := client.New(kubeconfig)
+
 	//This starts a thread that continues running.
-	ha.RunHA(s.Kubeconfig, s.Master, startCM, endCM, &haconfig)
+	ha.RunHA(kubeClient, s.Master, startCM, endCM, &haconfig)
 
 	for true {
 		glog.Infof("CM lease loop is running...")
