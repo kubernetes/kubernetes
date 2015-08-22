@@ -27,6 +27,10 @@ ALLOCATE_NODE_CIDRS=true
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 ASG_NAME="${NODE_INSTANCE_PREFIX}-group"
 
+# We will have two autoscaling groups - one for each AZ
+PRIMARY_ASG_NAME="${ASG_NAME}-${AWS_ZONE_PRIMARY}"
+SECONDARY_ASG_NAME="${ASG_NAME}-${AWS_ZONE_SECONDARY}"
+
 # We could allow the master disk volume id to be specified in future
 MASTER_DISK_ID=
 
@@ -45,9 +49,6 @@ case "${KUBE_OS_DISTRIBUTION}" in
     ;;
 esac
 
-# This removes the final character in bash (somehow)
-AWS_REGION=${ZONE%?}
-
 export AWS_DEFAULT_REGION=${AWS_REGION}
 AWS_CMD="aws --output json ec2"
 AWS_ELB_CMD="aws --output json elb"
@@ -56,6 +57,10 @@ AWS_ASG_CMD="aws --output json autoscaling"
 INTERNAL_IP_BASE=172.20.0
 MASTER_IP_SUFFIX=.9
 MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+
+# Note that MASTER_INTERNAL_IP must be in PRIMARY_ZONE_IP_RANGE
+PRIMARY_ZONE_IP_RANGE="172.20.0.0/24"
+SECONDARY_ZONE_IP_RANGE="172.20.1.0/24"
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
@@ -395,7 +400,7 @@ function find-master-pd {
   local name=${MASTER_NAME}-pd
   if [[ -z "${MASTER_DISK_ID}" ]]; then
     MASTER_DISK_ID=`$AWS_CMD --output text describe-volumes \
-                             --filters Name=availability-zone,Values=${ZONE} \
+                             --filters Name=availability-zone,Values=${AWS_REGION}${AWS_ZONE_PRIMARY} \
                                        Name=tag:Name,Values=${name} \
                                        Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                              --query Volumes[].VolumeId`
@@ -411,7 +416,7 @@ function ensure-master-pd {
 
   if [[ -z "${MASTER_DISK_ID}" ]]; then
     echo "Creating master disk: size ${MASTER_DISK_SIZE}GB, type ${MASTER_DISK_TYPE}"
-    MASTER_DISK_ID=`$AWS_CMD create-volume --availability-zone ${ZONE} --volume-type ${MASTER_DISK_TYPE} --size ${MASTER_DISK_SIZE} --query VolumeId --output text`
+    MASTER_DISK_ID=`$AWS_CMD create-volume --availability-zone ${AWS_REGION}${AWS_ZONE_PRIMARY} --volume-type ${MASTER_DISK_TYPE} --size ${MASTER_DISK_SIZE} --query VolumeId --output text`
     add-tag ${MASTER_DISK_ID} Name ${name}
     add-tag ${MASTER_DISK_ID} KubernetesCluster ${CLUSTER_ID}
   fi
@@ -489,7 +494,6 @@ function upload-server-tars() {
   fi
 
   echo "Uploading to Amazon S3"
-
   if ! aws s3api get-bucket-location --bucket ${AWS_S3_BUCKET} > /dev/null 2>&1 ; then
     echo "Creating ${AWS_S3_BUCKET}"
 
@@ -515,6 +519,10 @@ function upload-server-tars() {
       sleep 1
     done
   fi
+
+  # While S3 will return that the bucket was created without issue, it isn't actually ready
+  # right away. Even a 1 second sleep seems to solve this, but 3 should be enough to sidestep this.
+  sleep 3
 
   local s3_bucket_location=$(aws --output text s3api get-bucket-location --bucket ${AWS_S3_BUCKET})
   local s3_url_base=https://s3-${s3_bucket_location}.amazonaws.com
@@ -710,21 +718,27 @@ function kube-up {
 
   echo "Using VPC $VPC_ID"
 
-  if [[ -z "${SUBNET_ID:-}" ]]; then
-    SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
+  if [[ -z "${PRIMARY_SUBNET_ID:-}" ]]; then
+    PRIMARY_SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID ${AWS_REGION}${AWS_ZONE_PRIMARY})
   fi
-  if [[ -z "$SUBNET_ID" ]]; then
+  if [[ -z "$PRIMARY_SUBNET_ID" ]]; then
     echo "Creating subnet."
-    SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
-    add-tag $SUBNET_ID KubernetesCluster ${CLUSTER_ID}
-  else
-    EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock --output text)
-    echo "Using existing CIDR $EXISTING_CIDR"
-    INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
-    MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
+    PRIMARY_SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $PRIMARY_ZONE_IP_RANGE --vpc-id $VPC_ID --availability-zone ${AWS_REGION}${AWS_ZONE_PRIMARY} | json_val '["Subnet"]["SubnetId"]')
+    add-tag $PRIMARY_SUBNET_ID KubernetesCluster ${CLUSTER_ID}
   fi
 
-  echo "Using subnet $SUBNET_ID"
+  echo "Using subnet $PRIMARY_SUBNET_ID for zone ${AWS_REGION}${AWS_ZONE_PRIMARY}"
+
+  if [[ -z "${SECONDARY_SUBNET_ID:-}" ]]; then
+    SECONDARY_SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID ${AWS_REGION}${AWS_ZONE_SECONDARY})
+  fi
+  if [[ -z "$SECONDARY_SUBNET_ID" ]]; then
+    echo "Creating subnet."
+    SECONDARY_SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $SECONDARY_ZONE_IP_RANGE --vpc-id $VPC_ID --availability-zone ${AWS_REGION}${AWS_ZONE_SECONDARY} | json_val '["Subnet"]["SubnetId"]')
+    add-tag $SECONDARY_SUBNET_ID KubernetesCluster ${CLUSTER_ID}
+  fi
+
+  echo "Using subnet $SECONDARY_SUBNET_ID for zone ${AWS_REGION}${AWS_ZONE_SECONDARY}"
 
   IGW_ID=$($AWS_CMD describe-internet-gateways | get_igw_id $VPC_ID)
   if [[ -z "$IGW_ID" ]]; then
@@ -748,8 +762,9 @@ function kube-up {
     add-tag ${ROUTE_TABLE_ID} KubernetesCluster ${CLUSTER_ID}
   fi
 
-  echo "Associating route table ${ROUTE_TABLE_ID} to subnet ${SUBNET_ID}"
-  $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > $LOG || true
+  echo "Associating route table ${ROUTE_TABLE_ID} to subnets ${PRIMARY_SUBNET_ID} and ${SECONDARY_SUBNET_ID}"
+  $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $PRIMARY_SUBNET_ID > $LOG || true
+  $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SECONDARY_SUBNET_ID > $LOG || true
   echo "Adding route to route table ${ROUTE_TABLE_ID}"
   $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID > $LOG || true
 
@@ -779,14 +794,12 @@ function kube-up {
   authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${MINION_SG_ID} --protocol all"
   authorize-security-group-ingress "${MINION_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
 
-  # TODO(justinsb): Would be fairly easy to replace 0.0.0.0/0 in these rules
-
   # SSH is open to the world
-  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
-  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 22 --cidr ${KUBE_AWS_CIDR_WHITELIST}"
+  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 22 --cidr ${KUBE_AWS_CIDR_WHITELIST}"
 
   # HTTPS to the master is allowed (for API access)
-  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr ${KUBE_AWS_CIDR_WHITELIST}"
 
   # Get or create master persistent volume
   ensure-master-pd
@@ -810,7 +823,9 @@ function kube-up {
     echo "readonly ALLOCATE_NODE_CIDRS='${ALLOCATE_NODE_CIDRS}'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
-    echo "readonly ZONE='${ZONE}'"
+    echo "readonly AWS_REGION='${AWS_REGION}'"
+    echo "readonly AWS_ZONE_PRIMARY='${AWS_ZONE_PRIMARY}'"
+    echo "readonly AWS_ZONE_SECONDARY='${AWS_ZONE_SECONDARY}'"
     echo "readonly KUBE_USER='${KUBE_USER}'"
     echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD}'"
     echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
@@ -843,7 +858,7 @@ function kube-up {
     --image-id $AWS_IMAGE \
     --iam-instance-profile Name=$IAM_PROFILE_MASTER \
     --instance-type $MASTER_SIZE \
-    --subnet-id $SUBNET_ID \
+    --subnet-id $PRIMARY_SUBNET_ID \
     --private-ip-address $MASTER_INTERNAL_IP \
     --key-name ${AWS_SSH_KEY_NAME} \
     --security-group-ids ${MASTER_SG_ID} \
@@ -962,16 +977,27 @@ function kube-up {
       --block-device-mappings "${MINION_BLOCK_DEVICE_MAPPINGS}" \
       --user-data "file://${KUBE_TEMP}/minion-user-data"
 
-  echo "Creating autoscaling group"
+  echo "Creating autoscaling group for zone ${AWS_REGION}${AWS_ZONE_PRIMARY}"
   ${AWS_ASG_CMD} create-auto-scaling-group \
-      --auto-scaling-group-name ${ASG_NAME} \
+      --auto-scaling-group-name ${PRIMARY_ASG_NAME} \
       --launch-configuration-name ${ASG_NAME} \
-      --min-size ${NUM_MINIONS} \
-      --max-size ${NUM_MINIONS} \
-      --vpc-zone-identifier ${SUBNET_ID} \
-      --tags ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
-             ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${MINION_TAG} \
-             ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
+      --min-size ${NUM_MINIONS_PRIMARY_ZONE} \
+      --max-size ${NUM_MINIONS_PRIMARY_ZONE} \
+      --vpc-zone-identifier ${PRIMARY_SUBNET_ID} \
+      --tags ResourceId=${PRIMARY_ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
+             ResourceId=${PRIMARY_ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${MINION_TAG} \
+             ResourceId=${PRIMARY_ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
+
+  echo "Creating autoscaling group for zone ${AWS_REGION}${AWS_ZONE_SECONDARY}"
+  ${AWS_ASG_CMD} create-auto-scaling-group \
+    --auto-scaling-group-name ${SECONDARY_ASG_NAME} \
+    --launch-configuration-name ${ASG_NAME} \
+    --min-size ${NUM_MINIONS_SECONDARY_ZONE} \
+    --max-size ${NUM_MINIONS_SECONDARY_ZONE} \
+    --vpc-zone-identifier ${SECONDARY_SUBNET_ID} \
+    --tags ResourceId=${SECONDARY_ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
+           ResourceId=${SECONDARY_ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${MINION_TAG} \
+           ResourceId=${SECONDARY_ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
 
   # Wait for the minions to be running
   # TODO(justinsb): This is really not needed any more
@@ -1115,9 +1141,13 @@ function kube-down {
       done
     fi
 
-    if [[ -n $(${AWS_ASG_CMD} --output text describe-auto-scaling-groups --auto-scaling-group-names ${ASG_NAME} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
-      echo "Deleting auto-scaling group: ${ASG_NAME}"
-      ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${ASG_NAME}
+    if [[ -n $(${AWS_ASG_CMD} --output text describe-auto-scaling-groups --auto-scaling-group-names ${PRIMARY_ASG_NAME} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
+      echo "Deleting auto-scaling group: ${PRIMARY_ASG_NAME}"
+      ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${PRIMARY_ASG_NAME}
+    fi
+    if [[ -n $(${AWS_ASG_CMD} --output text describe-auto-scaling-groups --auto-scaling-group-names ${SECONDARY_ASG_NAME} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
+      echo "Deleting auto-scaling group: ${SECONDARY_ASG_NAME}"
+      ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${SECONDARY_ASG_NAME}
     fi
     if [[ -n $(${AWS_ASG_CMD} --output text describe-launch-configurations --launch-configuration-names ${ASG_NAME} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
       echo "Deleting auto-scaling launch configuration: ${ASG_NAME}"
@@ -1151,6 +1181,7 @@ function kube-down {
                                        Name=group-name,Values=default \
                              --query SecurityGroups[].GroupId \
                     | tr "\t" "\n")
+    # TODO (erulabs) It appears this doesn't pick up all security groups
     sg_ids=$($AWS_CMD --output text describe-security-groups \
                       --filters Name=vpc-id,Values=${vpc_id} \
                                 Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
@@ -1274,12 +1305,12 @@ function test-setup {
 
   # Open up port 80 & 8080 so common containers on minions can be reached
   # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
-  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 80 --cidr 0.0.0.0/0"
-  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 8080 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 80 --cidr ${KUBE_AWS_CIDR_WHITELIST}"
+  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 8080 --cidr ${KUBE_AWS_CIDR_WHITELIST}"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
-  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol all --port 30000-32767 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol all --port 30000-32767 --cidr ${KUBE_AWS_CIDR_WHITELIST}"
 
   echo "test-setup complete"
 }
