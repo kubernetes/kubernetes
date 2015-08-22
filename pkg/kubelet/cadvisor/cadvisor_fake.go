@@ -63,3 +63,6 @@ func (c *Fake) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
 func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return new(events.EventChannel), nil
 }
+
+func (c *Fake) StopWatch(watch_id int) {
+}

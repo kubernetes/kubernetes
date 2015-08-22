@@ -38,6 +38,9 @@ type Interface interface {
 	// Returns usage information about the root filesystem.
 	RootFsInfo() (cadvisorApiV2.FsInfo, error)
 
-	// Get events streamed through passedChannel that fit the request.
+	// Stream events that fit the request through the returned channel.
 	WatchEvents(request *events.Request) (*events.EventChannel, error)
+
+	// Stop watching the events.
+	StopWatch(watch_id int)
 }
