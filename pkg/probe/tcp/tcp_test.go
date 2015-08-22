@@ -29,17 +29,28 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 )
 
+func containsAny(s string, substrs []string) bool {
+	for _, substr := range substrs {
+		if strings.Contains(s, substr) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestTcpHealthChecker(t *testing.T) {
 	prober := New()
 	tests := []struct {
 		expectedStatus probe.Result
 		usePort        bool
 		expectError    bool
-		output         string
+		// Some errors are different depending on your system, make
+		// the test pass on all of them
+		accOutputs []string
 	}{
 		// The probe will be filled in below.  This is primarily testing that a connection is made.
-		{probe.Success, true, false, ""},
-		{probe.Failure, false, false, "tcp: unknown port"},
+		{probe.Success, true, false, []string{""}},
+		{probe.Failure, false, false, []string{"unknown port", "Servname not supported for ai_socktype"}},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -72,8 +83,8 @@ func TestTcpHealthChecker(t *testing.T) {
 		if err == nil && test.expectError {
 			t.Errorf("unexpected non-error.")
 		}
-		if !strings.Contains(output, test.output) {
-			t.Errorf("expected %s, got %s", test.output, output)
+		if !containsAny(output, test.accOutputs) {
+			t.Errorf("expected one of %#v, got %s", test.accOutputs, output)
 		}
 	}
 }
