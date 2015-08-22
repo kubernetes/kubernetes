@@ -544,24 +544,6 @@ function upload-server-tars() {
   SALT_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${salt_tar_path}"
 }
 
-
-# Ensure that we have a password created for validating to the master.  Will
-# read from kubeconfig for the current context if available.
-#
-# Assumed vars
-#   KUBE_ROOT
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-  fi
-}
-
 # Adds a tag to an AWS resource
 # usage: add-tag <resource-id> <tag-name> <tag-value>
 function add-tag {
@@ -681,7 +663,7 @@ function kube-up {
 
   ensure-iam-profiles
 
-  get-password
+  gen-kube-basicauth
 
   if [[ ! -f "$AWS_SSH_KEY" ]]; then
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
@@ -1082,6 +1064,8 @@ function kube-up {
       done
   done
 
+  # ensures KUBECONFIG is set
+  get-kubeconfig-basicauth
   echo
   echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
   echo
@@ -1241,7 +1225,7 @@ function kube-push {
     echo "sudo salt --force-color '*' state.highstate"
   ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo bash
 
-  get-password
+  get-kubeconfig-basicauth
 
   echo
   echo "Kubernetes cluster is running.  The master is running at:"

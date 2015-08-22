@@ -260,20 +260,6 @@ FLANNEL_OPTS=""
 EOF
 }
 
-# Ensure that we have a password created for validating to the master. Will
-# read from ${KUBECONFIG:-$DEFAULT_KUBECONFIG} if available.
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-  fi
-}
-
 # Detect the IP for the master
 #
 # Assumed vars:
@@ -360,7 +346,7 @@ function kube-up() {
   source "${KUBE_ROOT}/cluster/common.sh"
 
   # set kubernetes user and password
-  get-password
+  gen-kube-basicauth
 
   create-kubeconfig
 }

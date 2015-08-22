@@ -253,19 +253,21 @@ function verify-cluster {
   }
 
   (
+    # ensures KUBECONFIG is set
+    get-kubeconfig-basicauth
     echo
     echo "Kubernetes cluster is running.  The master is running at:"
     echo
     echo "  https://${MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ~/.kubernetes_vagrant_auth."
+    echo "The user name and password to use is located in ${KUBECONIG}"
     echo
     )
 }
 
 # Instantiate a kubernetes cluster
 function kube-up {
-  get-password
+  gen-kube-basicauth
   get-tokens
   create-provision-scripts
 
@@ -295,7 +297,7 @@ function kube-down {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
-  get-password
+  get-kubeconfig-basicauth
   create-provision-scripts
   vagrant provision
 }
@@ -314,13 +316,6 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
   kube-down
-}
-
-# Set the {user} and {password} environment values required to interact with provider
-function get-password {
-  export KUBE_USER=vagrant
-  export KUBE_PASSWORD=vagrant
-  echo "Using credentials: $KUBE_USER:$KUBE_PASSWORD" 1>&2
 }
 
 # Find the minion name based on the IP address

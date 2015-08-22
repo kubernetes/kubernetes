@@ -242,20 +242,6 @@ function detect-master () {
     echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
-# Ensure that we have a password created for validating to the master.  Will
-# read from kubeconfig current-context if available.
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-  fi
-}
-
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
@@ -268,7 +254,7 @@ function kube-up {
 
     ensure-temp-dir
 
-    get-password
+    gen-kube-basicauth
     python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
         -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
     local htpasswd
@@ -442,6 +428,8 @@ function kube-up {
         done
     done
 
+    # ensures KUBECONFIG is set
+    get-kubeconfig-basicauth
     echo
     echo "Kubernetes cluster is running.  The master is running at:"
     echo
@@ -486,7 +474,7 @@ function kube-down {
 #    echo "sudo salt --force-color '*' state.highstate"
 #   ) | gcutil ssh --project "$PROJECT" --zone "$ZONE" "$KUBE_MASTER" sudo bash
 
-#  get-password
+#  get-kubeconfig-basicauth
 
 #  echo
 #  echo "Kubernetes cluster is running.  The master is running at:"
