@@ -53,7 +53,7 @@ func NewResourceQuotaManager(kubeClient client.Interface) *ResourceQuotaManager 
 // Run begins watching and syncing.
 func (rm *ResourceQuotaManager) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
-	go util.Forever(func() { rm.synchronize() }, period)
+	go util.Until(func() { rm.synchronize() }, period, NeverStop)
 }
 
 func (rm *ResourceQuotaManager) synchronize() {

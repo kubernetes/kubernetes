@@ -88,7 +88,7 @@ func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyn
 // Run starts a watch and handles watch events. Will restart the watch if it is closed.
 // Run starts a goroutine and returns immediately.
 func (r *Reflector) Run() {
-	go util.Forever(func() { r.listAndWatch(util.NeverStop) }, r.period)
+	go util.Until(func() { r.listAndWatch(util.NeverStop) }, r.period, NeverStop)
 }
 
 // RunUntil starts a watch and handles watch events. Will restart the watch if it is closed.

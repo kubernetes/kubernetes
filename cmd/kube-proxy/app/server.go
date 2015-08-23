@@ -136,12 +136,12 @@ func (s *ProxyServer) Run(_ []string) error {
 	)
 
 	if s.HealthzPort > 0 {
-		go util.Forever(func() {
+		go util.Until(func() {
 			err := http.ListenAndServe(s.HealthzBindAddress.String()+":"+strconv.Itoa(s.HealthzPort), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second)
+		}, 5*time.Second, NeverStop)
 	}
 
 	// Just loop forever for now...

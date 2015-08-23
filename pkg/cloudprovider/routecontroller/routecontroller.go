@@ -50,11 +50,11 @@ func New(routes cloudprovider.Routes, kubeClient client.Interface, clusterName s
 }
 
 func (rc *RouteController) Run(syncPeriod time.Duration) {
-	go util.Forever(func() {
+	go util.Until(func() {
 		if err := rc.reconcileNodeRoutes(); err != nil {
 			glog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
-	}, syncPeriod)
+	}, syncPeriod, NeverStop)
 }
 
 func (rc *RouteController) reconcileNodeRoutes() error {

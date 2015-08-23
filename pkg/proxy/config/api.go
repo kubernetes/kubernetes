@@ -85,8 +85,8 @@ func NewSourceAPI(servicesWatcher ServicesWatcher, endpointsWatcher EndpointsWat
 			reconnectDuration: time.Second * 1,
 		},
 	}
-	go util.Forever(func() { config.s.listAndWatch() }, period)
-	go util.Forever(func() { config.e.listAndWatch() }, period)
+	go util.Until(func() { config.s.listAndWatch() }, period, NeverStop)
+	go util.Until(func() { config.e.listAndWatch() }, period, NeverStop)
 	return config
 }
 

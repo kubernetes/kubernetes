@@ -174,11 +174,11 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
 	// Incorporate the results of node status pushed from kubelet to master.
-	go util.Forever(func() {
+	go util.Until(func() {
 		if err := nc.monitorNodeStatus(); err != nil {
 			glog.Errorf("Error monitoring node status: %v", err)
 		}
-	}, nc.nodeMonitorPeriod)
+	}, nc.nodeMonitorPeriod, NeverStop)
 }
 
 func (nc *NodeController) recordNodeEvent(node *api.Node, event string) {

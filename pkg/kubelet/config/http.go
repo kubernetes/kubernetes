@@ -46,7 +46,7 @@ func NewSourceURL(url, hostname string, period time.Duration, updates chan<- int
 		data:     nil,
 	}
 	glog.V(1).Infof("Watching URL %s", url)
-	go util.Forever(config.run, period)
+	go util.Until(config.run, period, NeverStop)
 }
 
 func (s *sourceURL) run() {
