@@ -61,5 +61,5 @@ script:
   - KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4 LOG_LEVEL=4 ./hack/test-integration.sh
   - ./hack/test-update-storage-objects.sh
 
-notifications:
-  irc: "chat.freenode.net#kubernetes-dev"
+#notifications:
+#  irc: "chat.freenode.net#kubernetes-dev"
