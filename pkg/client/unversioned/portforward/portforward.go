@@ -161,10 +161,12 @@ func (pf *PortForwarder) forward() error {
 	listenSuccess := false
 	for _, port := range pf.ports {
 		err = pf.listenOnPort(&port)
-		if err != nil {
-			glog.Warningf("Unable to listen on port %d: %v", port, err)
+		switch {
+		case err == nil:
+			listenSuccess = true
+		default:
+			glog.Warningf("Unable to listen on port %d: %v", port.Local, err)
 		}
-		listenSuccess = true
 	}
 
 	if !listenSuccess {
