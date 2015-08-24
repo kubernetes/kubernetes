@@ -242,6 +242,7 @@ tls-cert-file
 tls-private-key-file
 token-auth-file
 ttl-secs
+type-src
 unix-socket
 update-period
 upgrade-target

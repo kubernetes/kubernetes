@@ -807,8 +807,8 @@ __EOF__
     file="${KUBE_TEMP}/schema-${version}.json"
     curl -s "http://127.0.0.1:${API_PORT}/swaggerapi/api/${version}" > "${file}"
     [[ "$(grep "list of returned" "${file}")" ]]
-    [[ "$(grep "list of pods" "${file}")" ]]
-    [[ "$(grep "watch for changes to the described resources" "${file}")" ]]
+    [[ "$(grep "List of pods" "${file}")" ]]
+    [[ "$(grep "Watch for changes to the described resources" "${file}")" ]]
   fi
 
   kube::test::clear_all

@@ -93,8 +93,8 @@ files_need_description=()
 # Check API schema definitions for field descriptions
 for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
   # Check for files with fields without description tags
-  descriptionless=$(hack/after-build/verify-description.sh "${file}")
-  if [[ "$descriptionless" != "" ]]; then
+  descriptionless=$(hack/after-build/verify-description.sh "${file}" > /dev/null; echo $?)
+  if [[ "$descriptionless" -ne "0" ]]; then
     files_need_description+=("${file}")
   fi
 done
@@ -152,6 +152,18 @@ if ! hack/after-build/verify-generated-deep-copies.sh > /dev/null; then
   echo "Some deep-copy functions need regeneration."
   echo "To regenerate deep-copies, run:"
   echo "  hack/update-generated-deep-copies.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for swagger type documentation that need updating... "
+if ! hack/after-build/verify-generated-swagger-docs.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Swagger type documentation needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-generated-swagger-docs.sh"
   exit_code=1
 else
   echo "${green}OK"
