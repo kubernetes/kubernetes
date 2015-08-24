@@ -34,6 +34,10 @@ resourcequotas (quota) or secrets.
     select all resources in the namespace of the specified resource types
 
 .PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to a file identifying the resource to update the annotation
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for annotate
 
@@ -178,6 +182,9 @@ resourcequotas (quota) or secrets.
 # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
 # If the same annotation is set multiple times, only the last value will be applied
 $ kubectl annotate pods foo description='my frontend'
+
+# Update a pod identified by type and name in "pod.json"
+$ kubectl annotate \-f pod.json description='my frontend'
 
 # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.
 $ kubectl annotate \-\-overwrite pods foo description='my frontend running nginx'

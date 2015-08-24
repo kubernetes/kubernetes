@@ -53,7 +53,7 @@ $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 # Describe a pod
 $ kubectl describe pods/nginx
 
-# Describe a pod using the data in pod.json.
+# Describe a pod identified by type and name in "pod.json"
 $ kubectl describe -f pod.json
 
 # Describe all pods
