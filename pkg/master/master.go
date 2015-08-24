@@ -108,6 +108,8 @@ type Config struct {
 	// allow api versions to be conditionally disabled
 	DisableV1 bool
 	EnableExp bool
+	// enable watch in apiserver for some resources
+	EnableCacher bool
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
@@ -431,7 +433,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 func (m *Master) init(c *Config) {
 	healthzChecks := []healthz.HealthzChecker{}
 	m.clock = util.RealClock{}
-	podStorage := podetcd.NewStorage(c.DatabaseStorage, true, c.KubeletClient)
+	podStorage := podetcd.NewStorage(c.DatabaseStorage, c.EnableCacher, c.KubeletClient)
 
 	podTemplateStorage := podtemplateetcd.NewREST(c.DatabaseStorage)
 
@@ -447,10 +449,10 @@ func (m *Master) init(c *Config) {
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(c.DatabaseStorage)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
-	endpointsStorage := endpointsetcd.NewREST(c.DatabaseStorage, true)
+	endpointsStorage := endpointsetcd.NewREST(c.DatabaseStorage, c.EnableCacher)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(c.DatabaseStorage, true, c.KubeletClient)
+	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(c.DatabaseStorage, c.EnableCacher, c.KubeletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
 	serviceStorage := serviceetcd.NewREST(c.DatabaseStorage)

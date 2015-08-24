@@ -159,6 +159,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		KubeletClient:         fakeKubeletClient{},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
+		EnableCacher:          true,
 		EnableProfiling:       true,
 		APIPrefix:             "/api",
 		ExpAPIPrefix:          "/experimental",

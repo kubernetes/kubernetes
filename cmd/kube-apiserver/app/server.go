@@ -102,6 +102,7 @@ type APIServer struct {
 	ServiceClusterIPRange      net.IPNet // TODO: make this a list
 	ServiceNodePortRange       util.PortRange
 	EnableLogsSupport          bool
+	EnableCacher               bool
 	MasterServiceNamespace     string
 	RuntimeConfig              util.ConfigurationMap
 	KubeletConfig              client.KubeletConfig
@@ -131,6 +132,7 @@ func NewAPIServer() *APIServer {
 		AdmissionControl:       "AlwaysAdmit",
 		EtcdPathPrefix:         master.DefaultEtcdPathPrefix,
 		EnableLogsSupport:      true,
+		EnableCacher:           true,
 		MasterServiceNamespace: api.NamespaceDefault,
 		ClusterName:            "kubernetes",
 		CertDirectory:          "/var/run/kubernetes",
@@ -229,6 +231,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.SSHUser, "ssh-user", "", "If non-empty, use secure SSH proxy to the nodes, using this user name")
 	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", "", "If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", 0, "If non-zero, throttle each user connection to this number of bytes/sec.  Currently only applies to long-running requests")
+	fs.BoolVar(&s.EnableCacher, "enable-cacher", true, "Enable cacher for watch in apiserver")
 	// Kubelet related flags:
 	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps, "Use https for kubelet connections")
 	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port, "Kubelet port")
@@ -439,6 +442,7 @@ func (s *APIServer) Run(_ []string) error {
 		AdmissionControl:       admissionController,
 		DisableV1:              disableV1,
 		EnableExp:              enableExp,
+		EnableCacher:           s.EnableCacher,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
 		ExternalHost:           s.ExternalHost,

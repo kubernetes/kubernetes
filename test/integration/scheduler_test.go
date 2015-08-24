@@ -71,6 +71,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
 		EnableUISupport:       false,
+		EnableCacher:          true,
 		EnableIndex:           true,
 		APIPrefix:             "/api",
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
