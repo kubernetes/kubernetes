@@ -294,7 +294,9 @@ func (s *APIServer) Run(_ []string) error {
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
 		// TODO(vmarmol): Implement support for HostNetworkSources.
-		HostNetworkSources:                     []string{},
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostNetworkSources: []string{},
+		},
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 

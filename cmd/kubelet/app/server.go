@@ -642,7 +642,11 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 	} else {
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
-	capabilities.Setup(kcfg.AllowPrivileged, kcfg.HostNetworkSources, 0)
+
+	privilegedSources := capabilities.PrivilegedSources{
+		HostNetworkSources: kcfg.HostNetworkSources,
+	}
+	capabilities.Setup(kcfg.AllowPrivileged, privilegedSources, 0)
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 

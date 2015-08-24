@@ -2828,7 +2828,9 @@ func TestHostNetworkAllowed(t *testing.T) {
 	kubelet := testKubelet.kubelet
 
 	capabilities.SetForTests(capabilities.Capabilities{
-		HostNetworkSources: []string{ApiserverSource, FileSource},
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostNetworkSources: []string{ApiserverSource, FileSource},
+		},
 	})
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -2858,7 +2860,9 @@ func TestHostNetworkDisallowed(t *testing.T) {
 	kubelet := testKubelet.kubelet
 
 	capabilities.SetForTests(capabilities.Capabilities{
-		HostNetworkSources: []string{},
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostNetworkSources: []string{},
+		},
 	})
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
