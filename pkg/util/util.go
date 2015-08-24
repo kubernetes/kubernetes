@@ -87,18 +87,13 @@ func logError(err error) {
 	glog.ErrorDepth(2, err)
 }
 
-// Forever loops forever running f every period.  Catches any panics, and keeps going.
-// Deprecated. Please use Until and pass NeverStop as the stopCh.
-func Forever(f func(), period time.Duration) {
-	Until(f, period, nil)
-}
-
 // NeverStop may be passed to Until to make it never stop.
 var NeverStop <-chan struct{} = make(chan struct{})
 
 // Until loops until stop channel is closed, running f every period.
 // Catches any panics, and keeps going. f may not be invoked if
-// stop channel is already closed.
+// stop channel is already closed. Pass NeverStop to Until if you
+// don't want it stop.
 func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 	for {
 		select {

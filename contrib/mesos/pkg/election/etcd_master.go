@@ -55,7 +55,7 @@ type etcdMasterElector struct {
 func (e *etcdMasterElector) Elect(path, id string) watch.Interface {
 	e.done = make(chan empty)
 	e.events = make(chan watch.Event)
-	go util.Forever(func() { e.run(path, id) }, time.Second*5)
+	go util.Until(func() { e.run(path, id) }, time.Second*5, util.NeverStop)
 	return e
 }
 

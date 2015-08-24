@@ -39,11 +39,11 @@ func New(kubeClient unversioned.ExperimentalInterface) *HorizontalPodAutoscalerC
 }
 
 func (a *HorizontalPodAutoscalerController) Run(syncPeriod time.Duration) {
-	go util.Forever(func() {
+	go util.Until(func() {
 		if err := a.reconcileAutoscalers(); err != nil {
 			glog.Errorf("Couldn't reconcile horizontal pod autoscalers: %v", err)
 		}
-	}, syncPeriod)
+	}, syncPeriod, util.NeverStop)
 }
 
 func (a *HorizontalPodAutoscalerController) reconcileAutoscalers() error {
