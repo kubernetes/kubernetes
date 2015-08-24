@@ -178,6 +178,8 @@ func (s *fakeUpgradeStream) Read(p []byte) (int, error) {
 	s.readCalled = true
 	b := []byte(s.data)
 	n := copy(p, b)
+	// Indicate we returned all the data, and have no more data (EOF)
+	// Returning an EOF here will cause the port forwarder to immediately terminate, which is correct when we have no more data to send
 	return n, io.EOF
 }
 
@@ -185,9 +187,10 @@ func (s *fakeUpgradeStream) Write(p []byte) (int, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.writeCalled = true
-	s.dataWritten = make([]byte, len(p))
-	copy(s.dataWritten, p)
-	return len(p), io.EOF
+	s.dataWritten = append(s.dataWritten, p...)
+	// Indicate the stream accepted all the data, and can accept more (no err)
+	// Returning an EOF here will cause the port forwarder to immediately terminate, which is incorrect, in case someone writes more data
+	return len(p), nil
 }
 
 func (s *fakeUpgradeStream) Close() error {
