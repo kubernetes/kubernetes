@@ -7,6 +7,3 @@
 -
     label: "Everything you wanted to know about Kubernetes but were afraid to ask"
     url: "http://googlecloudplatform.blogspot.com/search/label/Kubernetes"
--
-    label: "KubeWeekly - News about Kubernetes"
-    url: "https://kubeweekly.com/tag/kubernetes/"
