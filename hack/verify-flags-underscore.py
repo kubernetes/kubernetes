@@ -36,18 +36,17 @@ def is_binary(pathname):
     @author: Trent Mick <TrentM@ActiveState.com>
     @author: Jorge Orpinel <jorge@orpinel.com>"""
     try:
-        f = open(pathname, 'r')
-        CHUNKSIZE = 1024
-        while 1:
-            chunk = f.read(CHUNKSIZE)
-            if '\0' in chunk: # found null byte
-                return True
-            if len(chunk) < CHUNKSIZE:
-                break # done
+        with open(pathname, 'r') as f:
+            CHUNKSIZE = 1024
+            while 1:
+                chunk = f.read(CHUNKSIZE)
+                if '\0' in chunk: # found null byte
+                    return True
+                if len(chunk) < CHUNKSIZE:
+                    break # done
     except:
         return True
-    finally:
-        f.close()
+
     return False
 
 def get_all_files(rootdir):
