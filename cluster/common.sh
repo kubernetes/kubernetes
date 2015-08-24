@@ -146,6 +146,16 @@ function get-kubeconfig-basicauth() {
   fi
 }
 
+# Generate basic auth user and password.
+
+# Vars set:
+#   KUBE_USER
+#   KUBE_PASSWORD
+function gen-kube-basicauth() {
+    KUBE_USER=admin
+    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+}
+
 # Get the bearer token for the current-context in kubeconfig if one exists.
 # Assumed vars:
 #   KUBECONFIG  # if unset, defaults to global
@@ -169,6 +179,14 @@ function get-kubeconfig-bearertoken() {
   if [[ "${KUBE_BEARER_TOKEN}" == '<no value>' ]]; then
     KUBE_BEARER_TOKEN=''
   fi
+}
+
+# Generate bearer token.
+#
+# Vars set:
+#   KUBE_BEARER_TOKEN
+function gen-kube-bearertoken() {
+    KUBE_BEARER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 }
 
 # Get the master IP for the current-context in kubeconfig if one exists.

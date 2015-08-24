@@ -304,38 +304,6 @@ function detect-master () {
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
-# Ensure that we have a password created for validating to the master.  Will
-# read from kubeconfig for the current context if available.
-#
-# Assumed vars
-#   KUBE_ROOT
-#
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-  fi
-}
-
-# Ensure that we have a bearer token created for validating to the master.
-# Will read from kubeconfig for the current context if available.
-#
-# Assumed vars
-#   KUBE_ROOT
-#
-# Vars set:
-#   KUBE_BEARER_TOKEN
-function get-bearer-token() {
-  get-kubeconfig-bearertoken
-  if [[ -z "${KUBE_BEARER_TOKEN:-}" ]]; then
-    KUBE_BEARER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  fi
-}
-
 # Wait for background jobs to finish. Exit with
 # an error status if any of the jobs failed.
 function wait-for-jobs {
@@ -577,8 +545,8 @@ function kube-up {
   ensure-temp-dir
   detect-project
 
-  get-password
-  get-bearer-token
+  gen-kube-basicauth
+  gen-kube-bearertoken
 
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
@@ -758,6 +726,8 @@ function kube-up {
    create-kubeconfig
   )
 
+  # ensures KUBECONFIG is set
+  get-kubeconfig-basicauth
   echo
   echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
   echo
@@ -1035,8 +1005,8 @@ function prepare-push() {
   detect-project
   detect-master
   detect-minion-names
-  get-password
-  get-bearer-token
+  get-kubeconfig-basicauth
+  get-kubeconfig-bearertoken
 
   # Make sure we have the tar files staged on Google Storage
   tars_from_version

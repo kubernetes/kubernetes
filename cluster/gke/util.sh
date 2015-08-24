@@ -189,25 +189,6 @@ function test-setup() {
     --network="${NETWORK}"
 }
 
-# Ensure that we have a password created for validating to the master.
-#
-# Assumed vars:
-#  ZONE
-#  CLUSTER_NAME
-# Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
-function get-password() {
-  echo "... in gke:get-password()" >&2
-  detect-project >&2
-  KUBE_USER=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep user | cut -f 4 -d ' ')
-  KUBE_PASSWORD=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
-    --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
-    | grep password | cut -f 4 -d ' ')
-}
-
 # Detect the IP for the master. Note that on GKE, we don't know the name of the
 # master, so KUBE_MASTER is not set.
 #

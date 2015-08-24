@@ -41,10 +41,6 @@ function build-local() {
     cp -v $OUTPUT_DIR/* cluster/juju/charms/trusty/kubernetes-master/files/output
 }
 
-function get-password() {
-    echo "TODO: Assign username/password security"
-}
-
 function kube-up() {
     build-local
     if [[ -d "~/.juju/current-env" ]]; then
