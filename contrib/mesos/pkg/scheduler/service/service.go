@@ -80,6 +80,8 @@ const (
 
 	executorCPUs = mresource.CPUShares(0.25) // initial CPU allocated for executor
 	executorMem  = mresource.MegaBytes(64.0) // initial memory allocated for executor
+
+	ComponentType = "k8sm-scheduler"
 )
 
 type SchedulerServer struct {
@@ -630,62 +632,9 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	}
 	s.client = client
 
-	// extract scheme/host/port from URL (which is compiled from multiple flags)
-	urlStr := s.URI("")
-	urlObj, err := url.Parse(urlStr)
-	if err != nil {
-		log.Fatalf("Unable to parse component url %q: %v", urlStr, err)
-	}
-	host := urlObj.Host
-	port := util.IntOrString{}
-	if strings.Contains(host, ":") {
-		var portStr string
-		host, portStr, err = net.SplitHostPort(host)
-		if err != nil {
-			log.Fatalf("Unable to parse component host port %q: %v", host, err)
-		}
-		portInt, err := strconv.Atoi(portStr)
-		if err != nil {
-			log.Fatalf("Unable to parse component host port %q: %v", portStr, err)
-		}
-		port = util.NewIntOrStringFromInt(portInt)
-	}
-
-	var scheme api.URIScheme
-	switch urlObj.Scheme {
-	case "https":
-		scheme = api.URISchemeHTTPS
-	default:
-		scheme = api.URISchemeHTTP
-	}
-
 	// Register component
 	_, err = client.ComponentsClient().Create(&api.Component{
-		Spec: api.ComponentSpec{
-			Type: "k8sm-scheduler",
-			LivenessProbe: &api.Probe{
-				InitialDelaySeconds: int64(30),
-				TimeoutSeconds:      int64(5),
-				Handler: api.Handler{
-					TCPSocket: &api.TCPSocketAction{
-						Host: host,
-						Port: port,
-					},
-				},
-			},
-			ReadinessProbe: &api.Probe{
-				InitialDelaySeconds: int64(30),
-				TimeoutSeconds:      int64(5),
-				Handler: api.Handler{
-					HTTPGet: &api.HTTPGetAction{
-						Scheme: scheme,
-						Host:   host,
-						Port:   port,
-						Path:   "/healthz",
-					},
-				},
-			},
-		},
+		Spec: s.spec(),
 		Status: api.ComponentStatus{
 			Phase:      api.ComponentPending,
 			Conditions: []api.ComponentCondition{},
@@ -908,4 +857,58 @@ func (s *SchedulerServer) getUsername() (username string, err error) {
 		}
 	}
 	return
+}
+
+func (s *SchedulerServer) spec() api.ComponentSpec {
+	// extract scheme/host/port from URL (which is compiled from multiple flags)
+	urlStr := s.URI("")
+	urlObj, err := url.Parse(urlStr)
+	if err != nil {
+		log.Fatalf("Unable to parse component url %q: %v", urlStr, err)
+	}
+	host := urlObj.Host
+	port := util.IntOrString{}
+	if strings.Contains(host, ":") {
+		var portStr string
+		host, portStr, err = net.SplitHostPort(host)
+		if err != nil {
+			log.Fatalf("Unable to parse component host port %q: %v", host, err)
+		}
+		portInt, err := strconv.Atoi(portStr)
+		if err != nil {
+			log.Fatalf("Unable to parse component host port %q: %v", portStr, err)
+		}
+		port = util.NewIntOrStringFromInt(portInt)
+	}
+
+	scheme := api.URISchemeHTTP
+	if urlObj.Scheme == "https" {
+		scheme = api.URISchemeHTTPS
+	}
+
+	return api.ComponentSpec{
+		Type: ComponentType,
+		LivenessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				TCPSocket: &api.TCPSocketAction{
+					Host: host,
+					Port: port,
+				},
+			},
+		},
+		ReadinessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Scheme: scheme,
+					Host:   host,
+					Port:   port,
+					Path:   healthz.Path,
+				},
+			},
+		},
+	}
 }

@@ -41,6 +41,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	explatest "k8s.io/kubernetes/pkg/expapi/latest"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
 	componentregistry "k8s.io/kubernetes/pkg/registry/component"
@@ -61,6 +62,8 @@ const (
 	ReadWriteTimeout = time.Minute * 60
 	//TODO: This can be tightened up. It still matches objects named watch or proxy.
 	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs|portforward|exec)/?$)"
+
+	ComponentType = "kube-apiserver"
 )
 
 // APIServer runs a kubernetes api server.
@@ -357,37 +360,9 @@ func (s *APIServer) Run(_ []string) error {
 	componentStorage, componentStatusStorage := componentetcd.NewStorage(etcdStorage)
 	componentsClient := componentregistry.NewClient(componentStorage, componentStatusStorage)
 
-	host := s.InsecureBindAddress.String()
-	// TODO: what if port is zero?
-	port := util.NewIntOrStringFromInt(s.InsecurePort)
-
 	// Register component
 	_, err = componentsClient.Create(&api.Component{
-		Spec: api.ComponentSpec{
-			Type: "kube-apiserver",
-			LivenessProbe: &api.Probe{
-				InitialDelaySeconds: int64(30),
-				TimeoutSeconds:      int64(5),
-				Handler: api.Handler{
-					TCPSocket: &api.TCPSocketAction{
-						Host: host,
-						Port: port,
-					},
-				},
-			},
-			ReadinessProbe: &api.Probe{
-				InitialDelaySeconds: int64(30),
-				TimeoutSeconds:      int64(5),
-				Handler: api.Handler{
-					HTTPGet: &api.HTTPGetAction{
-						Scheme: api.URISchemeHTTP,
-						Host:   host,
-						Port:   port,
-						Path:   "/healthz",
-					},
-				},
-			},
-		},
+		Spec: s.spec(),
 		Status: api.ComponentStatus{
 			Phase:      api.ComponentPending,
 			Conditions: []api.ComponentCondition{},
@@ -603,4 +578,36 @@ func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool
 		return boolValue
 	}
 	return defaultValue
+}
+
+func (s *APIServer) spec() api.ComponentSpec {
+	host := s.InsecureBindAddress.String()
+	// TODO: what if port is zero?
+	port := util.NewIntOrStringFromInt(s.InsecurePort)
+
+	return api.ComponentSpec{
+		Type: ComponentType,
+		LivenessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				TCPSocket: &api.TCPSocketAction{
+					Host: host,
+					Port: port,
+				},
+			},
+		},
+		ReadinessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Scheme: api.URISchemeHTTP,
+					Host:   host,
+					Port:   port,
+					Path:   healthz.Path,
+				},
+			},
+		},
+	}
 }

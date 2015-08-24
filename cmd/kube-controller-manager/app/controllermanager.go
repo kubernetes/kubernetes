@@ -58,6 +58,10 @@ import (
 	// "k8s.io/kubernetes/pkg/controller/autoscaler"
 )
 
+const (
+	ComponentType = "kube-controller-manager"
+)
+
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
 	Port                      int
@@ -175,37 +179,9 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	host := s.Address.String()
-	// TODO: what if port is zero?
-	port := util.NewIntOrStringFromInt(s.Port)
-
 	// Register component
 	_, err = kubeClient.ComponentsClient().Create(&api.Component{
-		Spec: api.ComponentSpec{
-			Type: "kube-controller-manager",
-			LivenessProbe: &api.Probe{
-				InitialDelaySeconds: int64(30),
-				TimeoutSeconds:      int64(5),
-				Handler: api.Handler{
-					TCPSocket: &api.TCPSocketAction{
-						Host: host,
-						Port: port,
-					},
-				},
-			},
-			ReadinessProbe: &api.Probe{
-				InitialDelaySeconds: int64(30),
-				TimeoutSeconds:      int64(5),
-				Handler: api.Handler{
-					HTTPGet: &api.HTTPGetAction{
-						Scheme: api.URISchemeHTTP,
-						Host:   host,
-						Port:   port,
-						Path:   "/healthz",
-					},
-				},
-			},
-		},
+		Spec: s.spec(),
 		Status: api.ComponentStatus{
 			Phase:      api.ComponentPending,
 			Conditions: []api.ComponentCondition{},
@@ -324,4 +300,36 @@ func (s *CMServer) Run(_ []string) error {
 	// horizontalPodAutoscalerController.Run(s.NodeSyncPeriod)
 
 	select {}
+}
+
+func (s *CMServer) spec() api.ComponentSpec {
+	host := s.Address.String()
+	// TODO: what if port is zero?
+	port := util.NewIntOrStringFromInt(s.Port)
+
+	return api.ComponentSpec{
+		Type: ComponentType,
+		LivenessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				TCPSocket: &api.TCPSocketAction{
+					Host: host,
+					Port: port,
+				},
+			},
+		},
+		ReadinessProbe: &api.Probe{
+			InitialDelaySeconds: int64(30),
+			TimeoutSeconds:      int64(5),
+			Handler: api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Scheme: api.URISchemeHTTP,
+					Host:   host,
+					Port:   port,
+					Path:   healthz.Path,
+				},
+			},
+		},
+	}
 }
