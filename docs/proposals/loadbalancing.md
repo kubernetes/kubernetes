@@ -69,10 +69,10 @@ __What's not in scope for 1.1 (though it might be discussed below for context)__
 
 ## Proposal
 
-The following proposal goes beyond the scope of 1.1 just so we don't make myopic decisions about the API. The tl;dr proposal for 1.1 is to define an IngressPath resource type and write an L7 GCE load balancer controller that satisfies ingress requests. A draft of the L7 controller is available [here](https://github.com/kubernetes/kubernetes/pull/12825).
+The following proposal goes beyond the scope of 1.1 just so we don't make myopic decisions about the API. The tl;dr proposal for 1.1 is to define an IngressPoint resource type and write an L7 GCE load balancer controller that satisfies ingress requests. A draft of the L7 controller is available [here](https://github.com/kubernetes/kubernetes/pull/12825).
 
 __Terminology__:
-* **Ingress paths**: A resource representing a collection of inbound connections from the external network that would be satisfied by a load balancer. Similar to GCE's `UrlMaps` or OpenShift's `Routes`.
+* **Ingress points**: A resource representing a collection of inbound connections from the external network that would be satisfied by a load balancer. Similar to GCE's `UrlMaps` or OpenShift's `Routes`.
 * **Claim**: A resource that represents a claim on an IP address.
 * **Load Balancer Controller**: a controller capable of fulfilling all Ingress paths for a given class of claims.
 
@@ -124,58 +124,83 @@ See [draft pr](https://github.com/kubernetes/kubernetes/pull/12825) for an actua
 
 ```yaml
 apiVersion: v1
-kind: IngressPath
+kind: IngressPoint
 metadata:
   name: l7ingress
   type: l7
 spec:
-  host: www.example.com
+  host: example
   tlsMode: Termination
   secret: foosecret
   pathMap:
-    "/foo/*":
+    "foo.example.com":
+    - url: "/foo/*"
+      service:
+        name: foosvc
+        namespace: default
+        port: 80
+    - url: "/bar/*"
+      service:
+        name: barsvc
+        namespace: default
+        port: 80
+    "bar.example.com"
+    - url: "/foobar/*"
         service:
-            kind: Service
-            name: foosvc
-        port:
-            name: fooport
-            port: 80
-            targetPort: 8080
-            nodePort: 3230
-    "/bar/*":
-        service:
-            kind: Service
-            name: barsvc
-        port:
-            name: barport
-            port: 80
-            targetPort: 8081
-            nodePort: 3232
-    "/foobar/*":
-        service:
-            kind: Service
-            name: foobarsvc
-        port:
-            name: foobarport
-            port: 80
-            targetPort: 8082
-            nodePort: 3233
+          name: foobarsvc
+          namespace: default
+          port: 80
 status:
   # include host here when we have DNS figured out.
-  loadBalancer:
-    ingress:
-    - ip: 104.101.11.313
+  address: 104.101.11.39
 ```
+
+Put more rigidly:
+
+```go
+// IngressPoint represents a point for ingress traffic.
+type IngressPoint struct {
+	TypeMeta
+	ObjectMeta
+	Spec IngressPointSpec
+	Status IngressPointStatus
+}
+
+// IngressPointSpec describes the ingressPoint the user wishes to exist.
+type IngressPointSpec struct {
+	Host    string
+	IngressPoint map[string][]Path
+}
+
+// IngressPointStatus describes the current state of an ingressPoint.
+type IngressPointStatus struct {
+	Address string
+}
+
+// ServiceRef is a reference to a single service:port.
+type ServiceRef struct {
+	Name      string
+	Namespace string
+	Port      int64
+}
+
+// Path connects a url path regex to a service:port.
+type Path struct {
+	Url     string
+	Service ServiceRef
+}
+```
+
 
 #### Claims
 
-In the context of 1.1 a cluster will only have one l7 loadbalancer controller that claims all IngressPaths so we don't need claims. In the larger scheme of things, we might still not need claims, however they solve the impedance mismatch problem (why do I need a loadbalancer to expose my service?) because that is how you get an ip. If you want to expose your service, you need a public ip for it. No matter where you're running you can get one by creating a claim. If you want something to use an ip you already have, create a claim for it.
+In the context of 1.1 a cluster will only have one l7 loadbalancer controller that claims all IngressPoints so we don't need claims. In the larger scheme of things, we might still not need claims, however they solve the impedance mismatch problem (why do I need a loadbalancer to expose my service?) because that is how you get an ip. If you want to expose your service, you need a public ip for it. No matter where you're running you can get one by creating a claim. If you want something to use an ip you already have, create a claim for it.
 
 The downside is the user needs to create another resource. We can make this easier by defaulting claim-less ingress paths to a new claim.
 
 #### Load Balancer Controllers
 
-The duties of a loadbalancer controller are pretty straight forward: fulfill Ingress Paths. With claims, they have the additional duty of provisioning a loadbalancer backed public-ip. For all intents and purposes a loadbalancer controller is a black box that subscribes to updates to the IngressPath resource. The administrator needs to bootstrap the cluster with loadbalancer controllers.
+The duties of a loadbalancer controller are pretty straight forward: fulfill Ingress Paths. With claims, they have the additional duty of provisioning a loadbalancer backed public-ip. For all intents and purposes a loadbalancer controller is a black box that subscribes to updates to the IngressPoint resource. The administrator needs to bootstrap the cluster with loadbalancer controllers.
 
 ## Alternatives
 
@@ -223,11 +248,11 @@ People choose L4 for a few different reasons:
 - Want SSL passthrough or SNI switch for multi-certs
 - Need client IP and cannot set loadbalancer proxy as default gateway
 
-Point being, we can't reliably infer all these use case with Service.Type=LoadBalancer or the absence of a UrlMap in the IngressPath (because they might want L7 for session persistence). Instead, anything serving ingress traffic needs an ingress path (which is why it isn't called urlMap). An L4 ingress path might look like:
+Point being, we can't reliably infer all these use case with Service.Type=LoadBalancer or the absence of a UrlMap in the IngressPoint (because they might want L7 for session persistence). Instead, anything serving ingress traffic needs an ingress path (which is why it isn't called urlMap). An L4 ingress path might look like:
 
 ```yaml
 apiVersion: v1
-kind: IngressPath
+kind: IngressPoint
 metadata:
   name: l4ingress
   type: network
@@ -263,11 +288,13 @@ The proposed long term solution for this problem is to reference a claim on an i
 
 ### How does TLS work?
 
-Each IngressPath specifies a single secret and a tls mode. Its upto the loadbalancer controller to handle the tls mode. For example, the gce controller will only support TLS termination for 1.1 because each IngressPath gets a new loadbalancer, and GCE doesn't allow multiple certs per IP. With the current design a user can create the wrong type of secret for the wrong mode. They wouldn't know till they try creating the Ingress path. Validating a simple key:value secret is also hard.
+Each IngressPoint specifies a single secret and a tls mode. Its upto the loadbalancer controller to handle the tls mode. For example, the gce controller will only support TLS termination for 1.1 because each IngressPoint gets a new loadbalancer, and GCE doesn't allow multiple certs per IP. With the current design a user can create the wrong type of secret for the wrong mode. They wouldn't know till they try creating the Ingress path. Validating a simple key:value secret is also hard.
 
 Some alternatives to the proposed tls mode handling:
 * Remove tlsMode and create a new type of secret(s).
-* Don't use a secret, embed the TLSConfig in the IngressPath.
+* Don't use a secret, embed the TLSConfig in the IngressPoint.
+
+Regardless of how we implement it, we should probably treat tlsmode as a request and not a directive. Even if the user provides a secret the admin may choose to not expose it, or have a policy that controls that.
 
 ### What triggers the creation of a new loadbalancer controller, should this be exposed to users?
 
@@ -275,11 +302,11 @@ In the current proposal, the kube-controller-manager is started up with a --load
 
 ### How does public DNS work?
 
-Most of this is TDB. With the current model, if someone specifies a hostname the loadbalancer controllers assume they know what they're doing. If there are 2 IngressPaths with the same hostname and url endpoints, one of them will win. This is just like the overlapping labels rc problem.
+Most of this is TDB. With the current model, if someone specifies a hostname the loadbalancer controllers assume they know what they're doing. If there are 2 IngressPoints with the same hostname and url endpoints, one of them will win. This is just like the overlapping labels rc problem. Since this is ultimately a policy and security decision that admins make, having replaceable/plugin controllers with each one choosing a policy might suffice.
 
 ### What does the apiserver validate vs the loadbalancer controller?
 
-Not all loadbalancer backends will support all IngressPath configuration. This will be some confusion around validation errors. The apiserver will validate api constituents and nothing more (i.e that an IngressPath points to a valid service, that the tlsmodes match up to the provided secrets etc).
+Not all loadbalancer backends will support all IngressPoint configuration. There will be some confusion around validation errors. The apiserver will validate api constituents and nothing more (i.e that an IngressPoint points to a valid service, that the tlsmodes match up to the provided secrets etc). It's probably sufficient if the loadbalancer controllers have a way to write back their status.
 
 ### How do we expose more complex loadbalancing concepts through the api?
 
