@@ -52,7 +52,7 @@ When using token authentication from an http client the apiserver expects an `Au
 header with a value of `Bearer SOMETOKEN`.
 
 **OpenID Connect ID Token** is enabled by passing the following options to the apiserver:
-- `--oidc-issuer-url` (required) tells the apiserver where to connect to the OpenID provider.
+- `--oidc-issuer-url` (required) tells the apiserver where to connect to the OpenID provider. Only HTTPS scheme will be accepted.
 - `--oidc-client-id` (required) is used by apiserver to verify the audience of the token.
 A valid [ID token](http://openid.net/specs/openid-connect-core-1_0.html#IDToken) MUST have this
 client-id in its `aud` claims.
