@@ -400,14 +400,21 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 	taskState := taskStatus.GetState()
 	metrics.StatusUpdates.WithLabelValues(source, reason, taskState.String()).Inc()
 
+	message := "none"
+	if taskStatus.Message != nil {
+		message = *taskStatus.Message
+	}
+
 	log.Infof(
-		"task status update %q from %q for task %q on slave %q executor %q for reason %q",
+		"task status update %q from %q for task %q on slave %q executor %q for reason %q with message %q",
 		taskState.String(),
 		source,
 		taskStatus.TaskId.GetValue(),
 		taskStatus.SlaveId.GetValue(),
 		taskStatus.ExecutorId.GetValue(),
-		reason)
+		reason,
+		message,
+	)
 
 	switch taskState {
 	case mesos.TaskState_TASK_RUNNING, mesos.TaskState_TASK_FINISHED, mesos.TaskState_TASK_STARTING, mesos.TaskState_TASK_STAGING:
@@ -443,6 +450,17 @@ func (k *KubernetesScheduler) StatusUpdate(driver bindings.SchedulerDriver, task
 		fallthrough
 	case mesos.TaskState_TASK_LOST, mesos.TaskState_TASK_KILLED:
 		k.reconcileTerminalTask(driver, taskStatus)
+	default:
+		log.Errorf(
+			"unknown task status %q from %q for task %q on slave %q executor %q for reason %q with message %q",
+			taskState.String(),
+			source,
+			taskStatus.TaskId.GetValue(),
+			taskStatus.SlaveId.GetValue(),
+			taskStatus.ExecutorId.GetValue(),
+			reason,
+			message,
+		)
 	}
 }
 
