@@ -810,9 +810,9 @@ func describeDaemon(daemon *api.Daemon, events *api.EventList, running, waiting,
 		} else {
 			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
 		}
-		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(daemon.Spec.Selector))
-		fmt.Fprintf(out, "Node-Selector:\t%s\n", formatLabels(daemon.Spec.Template.Spec.NodeSelector))
-		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(daemon.Labels))
+		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Selector))
+		fmt.Fprintf(out, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(daemon.Labels))
 		fmt.Fprintf(out, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
 		fmt.Fprintf(out, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
 		fmt.Fprintf(out, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)

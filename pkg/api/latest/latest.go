@@ -95,7 +95,6 @@ func init() {
 		"PodExecOptions",
 		"PodAttachOptions",
 		"PodProxyOptions",
-		"Daemon",
 		"ThirdPartyResource",
 		"ThirdPartyResourceData",
 		"ThirdPartyResourceList")

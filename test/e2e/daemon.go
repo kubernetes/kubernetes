@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
@@ -32,6 +32,8 @@ import (
 )
 
 var _ = Describe("Daemon", func() {
+	f := NewFramework("daemons")
+
 	var c *client.Client
 
 	BeforeEach(func() {
@@ -48,7 +50,7 @@ var _ = Describe("Daemon", func() {
 	})
 
 	It("should launch a daemon pod on every node of the cluster", func() {
-		testDaemons(c)
+		testDaemons(f)
 	})
 })
 
@@ -123,8 +125,9 @@ func checkRunningOnNoNodes(c *client.Client, selector map[string]string) func() 
 	return checkDaemonPodOnNodes(c, selector, make([]string, 0))
 }
 
-func testDaemons(c *client.Client) {
-	ns := api.NamespaceDefault
+func testDaemons(f *Framework) {
+	ns := f.Namespace.Name
+	c := f.Client
 	simpleDaemonName := "simple-daemon"
 	image := "gcr.io/google_containers/serve_hostname:1.1"
 	label := map[string]string{"name": simpleDaemonName}
@@ -156,7 +159,7 @@ func testDaemons(c *client.Client) {
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		By(fmt.Sprintf("Check that reaper kills all daemon pods for %s", simpleDaemon.Name))
-		daemonReaper, err := kubectl.ReaperFor("Daemon", c)
+		daemonReaper, err := kubectl.ReaperFor("Daemon", c, nil)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = daemonReaper.Stop(ns, simpleDaemon.Name, 0, nil)
 		Expect(err).NotTo(HaveOccurred())
@@ -165,12 +168,11 @@ func testDaemons(c *client.Client) {
 	}()
 
 	By("Check that daemon pods launch on every node of the cluster.")
-	Expect(err).NotTo(HaveOccurred())
 	err = wait.Poll(retryInterval, retryTimeout, checkRunningOnAllNodes(c, label))
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Stop a daemon pod, check that the daemon pod is revived.")
-	podClient := c.Pods(api.NamespaceDefault)
+	podClient := c.Pods(ns)
 	podList, err := podClient.List(labels.Set(label).AsSelector(), fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(podList.Items)).To(BeNumerically(">", 0))
@@ -210,7 +212,7 @@ func testDaemons(c *client.Client) {
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		By(fmt.Sprintf("Check that reaper kills all daemon pods for %s", complexDaemon.Name))
-		daemonReaper, err := kubectl.ReaperFor("Daemon", c)
+		daemonReaper, err := kubectl.ReaperFor("Daemon", c, nil)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = daemonReaper.Stop(ns, complexDaemon.Name, 0, nil)
 		Expect(err).NotTo(HaveOccurred())

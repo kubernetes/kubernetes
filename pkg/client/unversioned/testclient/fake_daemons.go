@@ -31,35 +31,38 @@ type FakeDaemons struct {
 	Namespace string
 }
 
-const (
-	GetDaemonAction    = "get-daemon"
-	UpdateDaemonAction = "update-daemon"
-	WatchDaemonAction  = "watch-daemon"
-	DeleteDaemonAction = "delete-daemon"
-	ListDaemonAction   = "list-daemons"
-	CreateDaemonAction = "create-daemon"
-)
-
 // Ensure statically that FakeDaemons implements DaemonInterface.
 var _ kClientLib.DaemonInterface = &FakeDaemons{}
 
 func (c *FakeDaemons) Get(name string) (*api.Daemon, error) {
 	obj, err := c.Fake.Invokes(NewGetAction("daemons", c.Namespace, name), &api.Daemon{})
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.Daemon), err
 }
 
 func (c *FakeDaemons) List(label labels.Selector) (*api.DaemonList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("daemons", c.Namespace, label, nil), &api.DaemonList{})
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.DaemonList), err
 }
 
 func (c *FakeDaemons) Create(daemon *api.Daemon) (*api.Daemon, error) {
 	obj, err := c.Fake.Invokes(NewCreateAction("daemons", c.Namespace, daemon), &api.Daemon{})
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.Daemon), err
 }
 
 func (c *FakeDaemons) Update(daemon *api.Daemon) (*api.Daemon, error) {
 	obj, err := c.Fake.Invokes(NewUpdateAction("daemons", c.Namespace, daemon), &api.Daemon{})
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*api.Daemon), err
 }
 

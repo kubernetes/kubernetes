@@ -22,9 +22,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/unversioned/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
@@ -206,7 +206,7 @@ func (dm *DaemonManager) enqueueController(obj interface{}) {
 }
 
 func (dm *DaemonManager) getPodDaemon(pod *api.Pod) *api.Daemon {
-	controllers, err := dm.dcStore.GetPodDaemon(pod)
+	controllers, err := dm.dcStore.GetPodDaemons(pod)
 	if err != nil {
 		glog.V(4).Infof("No controllers found for pod %v, daemon manager will avoid syncing", pod.Name)
 		return nil

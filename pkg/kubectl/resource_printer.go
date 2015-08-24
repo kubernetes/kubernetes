@@ -667,7 +667,7 @@ func printServiceList(list *api.ServiceList, w io.Writer, withNamespace bool, wi
 	return nil
 }
 
-func printDaemon(daemon *api.Daemon, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+func printDaemon(daemon *api.Daemon, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	name := daemon.Name
 	namespace := daemon.Namespace
 
@@ -686,8 +686,8 @@ func printDaemon(daemon *api.Daemon, w io.Writer, withNamespace bool, wide bool,
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
-		formatLabels(daemon.Spec.Selector),
-		formatLabels(daemon.Spec.Template.Spec.NodeSelector),
+		labels.FormatLabels(daemon.Spec.Selector),
+		labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector),
 	); err != nil {
 		return err
 	}
@@ -712,9 +712,9 @@ func printDaemon(daemon *api.Daemon, w io.Writer, withNamespace bool, wide bool,
 	return nil
 }
 
-func printDaemonList(list *api.DaemonList, w io.Writer, withNamespace bool, wide bool, columnLabels []string) error {
+func printDaemonList(list *api.DaemonList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, daemon := range list.Items {
-		if err := printDaemon(&daemon, w, withNamespace, wide, columnLabels); err != nil {
+		if err := printDaemon(&daemon, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}
