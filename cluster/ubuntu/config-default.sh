@@ -66,3 +66,7 @@ ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
 #RUNTIME_CONFIG=""
+
+# Optional: Enable proxy in kube-up. If you neet set proxy when download easy-rsa in kube-up.
+HTTP_PROXY=${HTTP_PROXY:-""}
+HTTPS_PROXY=${HTTPS_PROXY:-""}

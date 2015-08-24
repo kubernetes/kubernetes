@@ -261,7 +261,7 @@ EOF
 }
 
 # Ensure that we have a password created for validating to the master. Will
-# read from ${KUBECONFIG:-$DEFAULT_KUBECONFIG} if available.
+# read from $HOME/.kubernetes_auth if available.
 #
 # Vars set:
 #   KUBE_USER
@@ -382,7 +382,9 @@ function provision-master() {
                             create-flanneld-opts; \
                             sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ;\
                             sudo groupadd -f -r kube-cert; \
+                            setProxy "${HTTP_PROXY}" "${HTTPS_PROXY}"; \
                             sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
+                            unsetProxy; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
                             sudo service etcd start;"
 }
@@ -426,7 +428,9 @@ function provision-masterandminion() {
                             create-flanneld-opts; \
                             sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
                             sudo groupadd -f -r kube-cert; \
+                            setProxy "${HTTP_PROXY}" "${HTTPS_PROXY}"; \
                             sudo ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
+                            unsetProxy; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
                             sudo service etcd start; \
                             sudo FLANNEL_NET=${FLANNEL_NET} -b ~/kube/reconfDocker.sh"
@@ -456,4 +460,27 @@ function kube-push {
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   echo "Ubuntu doesn't need special preparations for e2e tests" 1>&2
+}
+
+# Set proxy environment variables
+function setProxy() {
+  source "kube/${KUBE_CONFIG_FILE-"config-default.sh"}"
+  if grep -xn 'Defaults env_keep += "http_proxy https_proxy"' /etc/sudoers;then
+    echo "proxy env is kept"
+    set_env=false
+  else
+    echo 'Defaults env_keep += "http_proxy https_proxy"' >>  /etc/sudoers
+    set_env=true
+  fi
+  export http_proxy=$1
+  export https_proxy=$2
+}
+
+# Unset proxy environment variables
+function unsetProxy() {
+  if $set_env;then
+     sed -i 's/Defaults env_keep += "http_proxy https_proxy"//g' /etc/sudoers
+  fi
+  unset http_proxy
+  unset https_proxy
 }
