@@ -372,19 +372,33 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 		if err != nil {
 			return err
 		}
-		specs, err := m.GetContainerSpec(containerName, opt)
-		if err != nil {
-			return err
-		}
-		contMetrics := make(map[string]map[string][]info.MetricVal, 0)
+		contMetrics := make(map[string]map[string]map[string][]info.MetricValBasic, 0)
 		for _, cont := range conts {
-			metrics := map[string][]info.MetricVal{}
+			metrics := make(map[string]map[string][]info.MetricValBasic, 0)
 			contStats := convertStats(cont)
-			spec := specs[cont.Name]
 			for _, contStat := range contStats {
-				for _, ms := range spec.CustomMetrics {
-					if contStat.HasCustomMetrics && !contStat.CustomMetrics[ms.Name].Timestamp.IsZero() {
-						metrics[ms.Name] = append(metrics[ms.Name], contStat.CustomMetrics[ms.Name])
+				if contStat.HasCustomMetrics {
+					for name, allLabels := range contStat.CustomMetrics {
+						metricLabels := make(map[string][]info.MetricValBasic, 0)
+						for _, metric := range allLabels {
+							if !metric.Timestamp.IsZero() {
+								metVal := info.MetricValBasic{
+									Timestamp:  metric.Timestamp,
+									IntValue:   metric.IntValue,
+									FloatValue: metric.FloatValue,
+								}
+								labels := metrics[name]
+								if labels != nil {
+									values := labels[metric.Label]
+									values = append(values, metVal)
+									labels[metric.Label] = values
+									metrics[name] = labels
+								} else {
+									metricLabels[metric.Label] = []info.MetricValBasic{metVal}
+									metrics[name] = metricLabels
+								}
+							}
+						}
 					}
 				}
 			}
