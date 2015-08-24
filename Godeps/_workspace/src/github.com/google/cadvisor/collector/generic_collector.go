@@ -116,7 +116,7 @@ func (collector *GenericCollector) GetSpec() []v1.MetricSpec {
 }
 
 //Returns collected metrics and the next collection time of the collector
-func (collector *GenericCollector) Collect(metrics map[string]v1.MetricVal) (time.Time, map[string]v1.MetricVal, error) {
+func (collector *GenericCollector) Collect(metrics map[string][]v1.MetricVal) (time.Time, map[string][]v1.MetricVal, error) {
 	currentTime := time.Now()
 	nextCollectionTime := currentTime.Add(time.Duration(collector.info.minPollingFrequency))
 
@@ -142,16 +142,16 @@ func (collector *GenericCollector) Collect(metrics map[string]v1.MetricVal) (tim
 				if err != nil {
 					errorSlice = append(errorSlice, err)
 				}
-				metrics[metricConfig.Name] = v1.MetricVal{
-					FloatValue: regVal, Timestamp: currentTime,
+				metrics[metricConfig.Name] = []v1.MetricVal{
+					{FloatValue: regVal, Timestamp: currentTime},
 				}
 			} else if metricConfig.DataType == v1.IntType {
 				regVal, err := strconv.ParseInt(strings.TrimSpace(matchString[1]), 10, 64)
 				if err != nil {
 					errorSlice = append(errorSlice, err)
 				}
-				metrics[metricConfig.Name] = v1.MetricVal{
-					IntValue: regVal, Timestamp: currentTime,
+				metrics[metricConfig.Name] = []v1.MetricVal{
+					{IntValue: regVal, Timestamp: currentTime},
 				}
 
 			} else {
