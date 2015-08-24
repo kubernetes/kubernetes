@@ -446,20 +446,9 @@ func (proxier *Proxier) syncProxyRules() error {
 		if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, iptablesServicesChain); err != nil {
 			return err
 		}
-		comment := "kubernetes service portals; must be before nodeports"
+		comment := "kubernetes service portals"
 		args := []string{"-m", "comment", "--comment", comment, "-j", string(iptablesServicesChain)}
 		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, chain, args...); err != nil {
-			return err
-		}
-	}
-	// Link the nodeports chain.
-	for _, chain := range inputChains {
-		if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, iptablesNodePortsChain); err != nil {
-			return err
-		}
-		comment := "kubernetes service nodeports; must be after portals"
-		args := []string{"-m", "comment", "--comment", comment, "-m", "addrtype", "--dst-type", "LOCAL", "-j", string(iptablesNodePortsChain)}
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, chain, args...); err != nil {
 			return err
 		}
 	}
@@ -689,6 +678,14 @@ func (proxier *Proxier) syncProxyRules() error {
 			writeLine(rulesLines, "-X", chainString)
 		}
 	}
+
+	// Finally, tail-call to the nodeports chain.  This needs to be after all
+	// other service portal rules.
+	writeLine(rulesLines,
+		"-A", string(iptablesServicesChain),
+		"-m", "comment", "--comment", "\"kubernetes service nodeports; NOTE: this must be the last rule in this chain\"",
+		"-m", "addrtype", "--dst-type", "LOCAL",
+		"-j", string(iptablesNodePortsChain))
 
 	// Write the end-of-table marker.
 	writeLine(rulesLines, "COMMIT")
