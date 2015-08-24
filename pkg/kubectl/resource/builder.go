@@ -256,6 +256,23 @@ func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 // When two or more arguments are received, they must be a single type and resource name(s).
 // The allowEmptySelector permits to select all the resources (via Everything func).
 func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
+	// convert multiple resources to resource tuples, a,b,c d as a transform to a/d b/d c/d
+	if len(args) >= 2 {
+		resources := []string{}
+		resources = append(resources, SplitResourceArgument(args[0])...)
+		if len(resources) > 1 {
+			names := []string{}
+			names = append(names, args[1:]...)
+			newArgs := []string{}
+			for _, resource := range resources {
+				for _, name := range names {
+					newArgs = append(newArgs, strings.Join([]string{resource, name}, "/"))
+				}
+			}
+			args = newArgs
+		}
+	}
+
 	if ok, err := hasCombinedTypeArgs(args); ok {
 		if err != nil {
 			b.errs = append(b.errs, err)

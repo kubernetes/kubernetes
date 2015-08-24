@@ -386,6 +386,38 @@ func TestResourceByName(t *testing.T) {
 	}
 }
 
+func TestMultipleResourceByTheSameName(t *testing.T) {
+	pods, svcs := testData()
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+		"/namespaces/test/pods/baz":     runtime.EncodeOrDie(latest.Codec, &pods.Items[1]),
+		"/namespaces/test/services/foo": runtime.EncodeOrDie(latest.Codec, &svcs.Items[0]),
+		"/namespaces/test/services/baz": runtime.EncodeOrDie(latest.Codec, &svcs.Items[0]),
+	})).
+		NamespaceParam("test")
+
+	test := &testVisitor{}
+	singular := false
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	b.ResourceTypeOrNameArgs(true, "pods,services", "foo", "baz")
+
+	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
+	if err != nil || singular || len(test.Infos) != 4 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	}
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svcs.Items[0], &svcs.Items[0]}, test.Objects()) {
+		t.Errorf("unexpected visited objects: %#v", test.Objects())
+	}
+
+	if _, err := b.Do().ResourceMapping(); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
 func TestResourceByNameWithoutRequireObject(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{})).
 		NamespaceParam("test")
