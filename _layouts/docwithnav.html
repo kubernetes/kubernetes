@@ -13,6 +13,7 @@
 </div>
 <script type="text/javascript">
 	$(function() {
+		var menu_ul = $('.menu > li > ul');
 		/* For the current URL, find the corresponding item in navigation menu */
 		function findcurnavitem(){
 			var noanchorhref = window.location.href.split('#')[0];
@@ -22,12 +23,31 @@
 		/* Open the navigation menu and highlight the menu item that corresponds to the current URL */
 		function syncmenutourl(){
 			var curnavitem = findcurnavitem();
-			curnavitem.addClass('active');
-			if(curnavitem.parent().hasClass('haschild')){
-				curnavitem.next('ul').slideDown('normal');
-			}
-			else {
-				curnavitem.parent('li').parent('ul').slideDown('normal');
+			$('.menu a').removeClass('active');
+			if(curnavitem.hasClass('hiddenlink')){//if its a hidden getting started topic, highlight the container
+				curnavitem.parent().parent().parent().children('a.gentoc').addClass('active');
+				menu_ul.not(curnavitem.parents('ul.hiddenlist')).slideUp('fast', function() {//exclude active menus and close all others
+					curnavitem.parents('ul.hiddenlist').slideDown('fast', function() {
+						scrolltonavitem();
+					});
+				});
+				curnavitem = curnavitem.parent().parent().parent().children('a.gentoc');
+			}else{//highlight the nav item and open the menu
+				curnavitem.addClass('active');
+				var navmenu = curnavitem;
+				if(curnavitem.parent('li').hasClass('haschild')){//if its a container, find the submenu
+					navmenu = curnavitem.next('ul');
+					var activesubmenu = curnavitem.next('ul');
+				}
+				else {//if its a child, find it's menu
+					navmenu = curnavitem.parent('li').parent('ul');
+					var activemenu = curnavitem.parent('li').parent('ul.navSubMenu');
+				}
+				menu_ul.not(activemenu).not(activesubmenu).slideUp('fast', function() {//exclude active menus and close all others
+					navmenu.slideDown('fast', function() {
+						scrolltonavitem();
+					});
+				});
 			}
 			return;
 		}
@@ -36,56 +56,90 @@
 		function loadonstatechange(){
 		    $(window).bind('popstate', function (event) {
 				var returnLocation = history.location || document.location;
-				$('.menu a').removeClass('active');
-				var curnavitem = findcurnavitem();
-				$('#doccontent').load(returnLocation + ' #doccontent > *');
-				if (curnavitem.hasClass('gentoc')) {//generate the in-page TOC (full page loads)
+				if (findcurnavitem().hasClass('gentoc')) {//generate the in-page TOC (full page loads)
 					window.location = returnLocation;
 				}
-				if(curnavitem.parents('li.haschild').length === 0 && curnavitem.parents('li').find('a.active').length === 0){ //close sub-menu
-					menu_ul.filter(':visible').slideUp('normal');
-				}
+				$('#doccontent').load(returnLocation + ' #doccontent > *');
 				syncmenutourl();
 		       return;
 		    });
 		}
 		loadonstatechange();
 		/* Load only the doccontent div on click, push state so back/forward browser buttons work, and then animate nav menu */
-	    var menu_ul = $('.menu > li > ul');
-	    $('a').click(function(e) {
+	    $(document).on("click", 'a', function(e) {
 	        e.preventDefault();
 			var clickedon = $(this),
-				href = $(this).attr('href');
-			if(href != "#") {//get the absolute url
+				href = $(this).attr('href'),
+				isAnchor = false;
+			if (href.indexOf('#') == 0){//if its an anchor
+				isAnchor = true;
+			} else if(href != "#") {//get the absolute url
 				href = this.href;
 			}
 			if(this.host != location.host && href != "javascript:;") {//open external links in new tab/window
 				window.open(href, '_blank');
 			} else if(href != "#" && !clickedon.parents('header').is('#nav') && !clickedon.parents('div').is('#mobile-nav-container')) {//skip empty nav menu containers and any clicks in the banner and banner menu
 				history.pushState(null, null, href);
-				$('#doccontent').load(href + ' #doccontent > *');
-				if (clickedon.hasClass('gentoc')){//generate the in-page TOC (full page loads)
-					window.location = href;
+				if(isAnchor){//if an in-page anchors
+					var offset = 0;
+					if ($(href).length) {//make sure its a valid anchor, otherwise scroll no where (offset = 0)
+						offset = $(href).offset().top - 155;
+					}
+					$('html, body').animate({scrollTop: offset}, 0);//scroll to anchor
+					return false;
+				} else { //load only the new content into the page (do not load full page)
+					$('#doccontent').load(href + ' #doccontent > *');
+					$('html, body').animate({scrollTop: 0}, 0);
+					if (clickedon.hasClass('gentoc')) {//generate the in-page TOC (load the full page load)
+						window.location = href;
+					}
 				}
-				$('html, body').animate({scrollTop: 0}, 500);
-			} else if (href != "#"){ //open links in main menu (full page loads)
+				if(clickedon.parents().hasClass('bodywrapper')){//animate navigation menu
+					animatenav(findcurnavitem());//is an in-page link
+				} else {
+					animatenav(clickedon);//is a nav menu link
+				}
+			} else if (href != "#"){ //open links in main menu (load the full page load)
 				window.location = href;
 			}
-			animatenav(findcurnavitem());
-		    return false; // don't actually follow the link
+		    return false; // don't actually follow the link (avoid reloading page)
 	    });
 		/* Animate navigation menu to open/close and highlight item */
 		function animatenav(anhref){
-			if(!anhref.hasClass('active')) {
-				if(anhref.parents('li.haschild').length === 0 || anhref.parents('li').find('a.active').length === 0){
-					menu_ul.filter(':visible').slideUp('normal');
+			if(anhref.hasClass('hiddenlink')){//if its a hidden getting started topic, highlight and open the container
+				anhref.parent().parent().parent().children('a.gentoc').addClass('active');
+			} else if(!anhref.hasClass('active')) {
+				if(anhref.parents('li.haschild').length === 0 || anhref.parents('li').find('a.active').length === 0){ //close inactive menus
+					menu_ul.filter(':visible').slideUp('fast');
 				}
 				$('.menu a').removeClass('active');
-				anhref.addClass('active').next().stop(true,true).slideDown('normal');
-			}else if(anhref.hasClass('active') && anhref.parent().hasClass('haschild')){ //close sub-menu
-				anhref.removeClass('active');
-				anhref.next().stop(true,true).slideUp('normal');
+				if (anhref.next('ul').length === 0){//is a child nav item, open menu
+					anhref.addClass('active').closest('ul').slideDown('fast', function() {
+						scrolltonavitem();
+					});
+				} else {//is a container nav item, open menu
+					anhref.addClass('active').next().stop(true,true).slideDown('fast', function() {
+						scrolltonavitem();
+					});
+				}
 			}
+		}
+		/* Scroll to navigation item if its offscreen */
+		function scrolltonavitem(){
+			var curnavitem = findcurnavitem();
+			if(curnavitem.hasClass('hiddenlink')){//if its a hidden getting started topic, select the parent container
+				curnavitem = curnavitem.parent().parent().parent().children('a.gentoc');
+			}
+			var itemposition = curnavitem.position().top, //item's location relative to visible navigation menu
+				visible_start = $('#wrapper').scrollTop(), //location at top of visible navigation menu
+				total_visible = $('#wrapper').innerHeight(), //total height of visible navigation menu
+				visible_end = visible_start + total_visible; //location at bottom of visible window
+		    if(itemposition < 0 || itemposition > total_visible){// check if its outside visible area and then move it
+				$('#wrapper').animate({
+					scrollTop: (visible_start + itemposition - 155) // move to visible area and add padding to account for banner
+					}, 50);
+			}
+	        return false;
 		}
 	});
 </script>
