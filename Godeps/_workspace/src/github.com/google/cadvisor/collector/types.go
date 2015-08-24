@@ -27,7 +27,7 @@ type Collector interface {
 	// Returns the next time this collector should be collected from.
 	// Next collection time is always returned, even when an error occurs.
 	// A collection time of zero means no more collection.
-	Collect(map[string]v1.MetricVal) (time.Time, map[string]v1.MetricVal, error)
+	Collect(map[string][]v1.MetricVal) (time.Time, map[string][]v1.MetricVal, error)
 
 	// Return spec for all metrics associated with this collector
 	GetSpec() []v1.MetricSpec
@@ -45,7 +45,7 @@ type CollectorManager interface {
 	// at which a collector will be ready to collect from.
 	// Next collection time is always returned, even when an error occurs.
 	// A collection time of zero means no more collection.
-	Collect() (time.Time, map[string]v1.MetricVal, error)
+	Collect() (time.Time, map[string][]v1.MetricVal, error)
 
 	// Get metric spec from all registered collectors.
 	GetSpec() ([]v1.MetricSpec, error)
