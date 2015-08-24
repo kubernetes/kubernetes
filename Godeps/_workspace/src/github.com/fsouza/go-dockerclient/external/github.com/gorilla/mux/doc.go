@@ -60,8 +60,8 @@ Routes can also be restricted to a domain or subdomain. Just define a host
 pattern to be matched. They can also have variables:
 
 	r := mux.NewRouter()
-	// Only matches if domain is "www.domain.com".
-	r.Host("www.domain.com")
+	// Only matches if domain is "www.example.com".
+	r.Host("www.example.com")
 	// Matches a dynamic subdomain.
 	r.Host("{subdomain:[a-z]+}.domain.com")
 
@@ -94,7 +94,7 @@ There are several other matchers that can be added. To match path prefixes:
 ...and finally, it is possible to combine several matchers in a single route:
 
 	r.HandleFunc("/products", ProductsHandler).
-	  Host("www.domain.com").
+	  Host("www.example.com").
 	  Methods("GET").
 	  Schemes("http")
 
@@ -103,11 +103,11 @@ a way to group several routes that share the same requirements.
 We call it "subrouting".
 
 For example, let's say we have several URLs that should only match when the
-host is "www.domain.com". Create a route for that host and get a "subrouter"
+host is "www.example.com". Create a route for that host and get a "subrouter"
 from it:
 
 	r := mux.NewRouter()
-	s := r.Host("www.domain.com").Subrouter()
+	s := r.Host("www.example.com").Subrouter()
 
 Then register routes in the subrouter:
 
@@ -116,7 +116,7 @@ Then register routes in the subrouter:
 	s.HandleFunc("/articles/{category}/{id:[0-9]+}"), ArticleHandler)
 
 The three URL paths we registered above will only be tested if the domain is
-"www.domain.com", because the subrouter is tested first. This is not
+"www.example.com", because the subrouter is tested first. This is not
 only convenient, but also optimizes request matching. You can create
 subrouters combining any attribute matchers accepted by a route.
 

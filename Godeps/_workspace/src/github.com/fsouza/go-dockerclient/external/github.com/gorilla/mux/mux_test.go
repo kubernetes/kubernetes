@@ -7,10 +7,23 @@ package mux
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/fsouza/go-dockerclient/external/github.com/gorilla/context"
 )
+
+func (r *Route) GoString() string {
+	matchers := make([]string, len(r.matchers))
+	for i, m := range r.matchers {
+		matchers[i] = fmt.Sprintf("%#v", m)
+	}
+	return fmt.Sprintf("&Route{matchers:[]matcher{%s}}", strings.Join(matchers, ", "))
+}
+
+func (r *routeRegexp) GoString() string {
+	return fmt.Sprintf("&routeRegexp{template: %q, matchHost: %t, matchQuery: %t, strictSlash: %t, regexp: regexp.MustCompile(%q), reverse: %q, varsN: %v, varsR: %v", r.template, r.matchHost, r.matchQuery, r.strictSlash, r.regexp.String(), r.reverse, r.varsN, r.varsR)
+}
 
 type routeTest struct {
 	title          string            // title of the test
@@ -109,6 +122,15 @@ func TestHost(t *testing.T) {
 			shouldMatch: true,
 		},
 		{
+			title:       "Host route with pattern, additional capturing group, match",
+			route:       new(Route).Host("aaa.{v1:[a-z]{2}(b|c)}.ccc"),
+			request:     newRequest("GET", "http://aaa.bbb.ccc/111/222/333"),
+			vars:        map[string]string{"v1": "bbb"},
+			host:        "aaa.bbb.ccc",
+			path:        "",
+			shouldMatch: true,
+		},
+		{
 			title:       "Host route with pattern, wrong host in request URL",
 			route:       new(Route).Host("aaa.{v1:[a-z]{3}}.ccc"),
 			request:     newRequest("GET", "http://aaa.222.ccc/111/222/333"),
@@ -134,6 +156,33 @@ func TestHost(t *testing.T) {
 			host:        "aaa.bbb.ccc",
 			path:        "",
 			shouldMatch: false,
+		},
+		{
+			title:       "Host route with hyphenated name and pattern, match",
+			route:       new(Route).Host("aaa.{v-1:[a-z]{3}}.ccc"),
+			request:     newRequest("GET", "http://aaa.bbb.ccc/111/222/333"),
+			vars:        map[string]string{"v-1": "bbb"},
+			host:        "aaa.bbb.ccc",
+			path:        "",
+			shouldMatch: true,
+		},
+		{
+			title:       "Host route with hyphenated name and pattern, additional capturing group, match",
+			route:       new(Route).Host("aaa.{v-1:[a-z]{2}(b|c)}.ccc"),
+			request:     newRequest("GET", "http://aaa.bbb.ccc/111/222/333"),
+			vars:        map[string]string{"v-1": "bbb"},
+			host:        "aaa.bbb.ccc",
+			path:        "",
+			shouldMatch: true,
+		},
+		{
+			title:       "Host route with multiple hyphenated names and patterns, match",
+			route:       new(Route).Host("{v-1:[a-z]{3}}.{v-2:[a-z]{3}}.{v-3:[a-z]{3}}"),
+			request:     newRequest("GET", "http://aaa.bbb.ccc/111/222/333"),
+			vars:        map[string]string{"v-1": "aaa", "v-2": "bbb", "v-3": "ccc"},
+			host:        "aaa.bbb.ccc",
+			path:        "",
+			shouldMatch: true,
 		},
 		{
 			title:       "Path route with single pattern with pipe, match",
@@ -259,6 +308,42 @@ func TestPath(t *testing.T) {
 			host:        "",
 			path:        "/111/222/333",
 			shouldMatch: false,
+		},
+		{
+			title:       "Path route with multiple patterns with pipe, match",
+			route:       new(Route).Path("/{category:a|(b/c)}/{product}/{id:[0-9]+}"),
+			request:     newRequest("GET", "http://localhost/a/product_name/1"),
+			vars:        map[string]string{"category": "a", "product": "product_name", "id": "1"},
+			host:        "",
+			path:        "/a/product_name/1",
+			shouldMatch: true,
+		},
+		{
+			title:       "Path route with hyphenated name and pattern, match",
+			route:       new(Route).Path("/111/{v-1:[0-9]{3}}/333"),
+			request:     newRequest("GET", "http://localhost/111/222/333"),
+			vars:        map[string]string{"v-1": "222"},
+			host:        "",
+			path:        "/111/222/333",
+			shouldMatch: true,
+		},
+		{
+			title:       "Path route with multiple hyphenated names and patterns, match",
+			route:       new(Route).Path("/{v-1:[0-9]{3}}/{v-2:[0-9]{3}}/{v-3:[0-9]{3}}"),
+			request:     newRequest("GET", "http://localhost/111/222/333"),
+			vars:        map[string]string{"v-1": "111", "v-2": "222", "v-3": "333"},
+			host:        "",
+			path:        "/111/222/333",
+			shouldMatch: true,
+		},
+		{
+			title:       "Path route with multiple hyphenated names and patterns with pipe, match",
+			route:       new(Route).Path("/{product-category:a|(b/c)}/{product-name}/{product-id:[0-9]+}"),
+			request:     newRequest("GET", "http://localhost/a/product_name/1"),
+			vars:        map[string]string{"product-category": "a", "product-name": "product_name", "product-id": "1"},
+			host:        "",
+			path:        "/a/product_name/1",
+			shouldMatch: true,
 		},
 	}
 
@@ -598,6 +683,15 @@ func TestQueries(t *testing.T) {
 			shouldMatch: false,
 		},
 		{
+			title:       "Queries route with regexp pattern with quantifier, additional capturing group",
+			route:       new(Route).Queries("foo", "{v1:[0-9]{1}(a|b)}"),
+			request:     newRequest("GET", "http://localhost?foo=1a"),
+			vars:        map[string]string{"v1": "1a"},
+			host:        "",
+			path:        "",
+			shouldMatch: true,
+		},
+		{
 			title:       "Queries route with regexp pattern with quantifier, additional variable in query string, regexp does not match",
 			route:       new(Route).Queries("foo", "{v1:[0-9]{1}}"),
 			request:     newRequest("GET", "http://localhost?foo=12"),
@@ -605,6 +699,42 @@ func TestQueries(t *testing.T) {
 			host:        "",
 			path:        "",
 			shouldMatch: false,
+		},
+		{
+			title:       "Queries route with hyphenated name, match",
+			route:       new(Route).Queries("foo", "{v-1}"),
+			request:     newRequest("GET", "http://localhost?foo=bar"),
+			vars:        map[string]string{"v-1": "bar"},
+			host:        "",
+			path:        "",
+			shouldMatch: true,
+		},
+		{
+			title:       "Queries route with multiple hyphenated names, match",
+			route:       new(Route).Queries("foo", "{v-1}", "baz", "{v-2}"),
+			request:     newRequest("GET", "http://localhost?foo=bar&baz=ding"),
+			vars:        map[string]string{"v-1": "bar", "v-2": "ding"},
+			host:        "",
+			path:        "",
+			shouldMatch: true,
+		},
+		{
+			title:       "Queries route with hyphenate name and pattern, match",
+			route:       new(Route).Queries("foo", "{v-1:[0-9]+}"),
+			request:     newRequest("GET", "http://localhost?foo=10"),
+			vars:        map[string]string{"v-1": "10"},
+			host:        "",
+			path:        "",
+			shouldMatch: true,
+		},
+		{
+			title:       "Queries route with hyphenated name and pattern with quantifier, additional capturing group",
+			route:       new(Route).Queries("foo", "{v-1:[0-9]{1}(a|b)}"),
+			request:     newRequest("GET", "http://localhost?foo=1a"),
+			vars:        map[string]string{"v-1": "1a"},
+			host:        "",
+			path:        "",
+			shouldMatch: true,
 		},
 		{
 			title:       "Queries route with empty value, should match",
@@ -659,6 +789,15 @@ func TestQueries(t *testing.T) {
 			host:        "",
 			path:        "",
 			shouldMatch: true,
+		},
+		{
+			title:       "Queries route, bad submatch",
+			route:       new(Route).Queries("foo", "bar", "baz", "ding"),
+			request:     newRequest("GET", "http://localhost?fffoo=bar&baz=dingggg"),
+			vars:        map[string]string{},
+			host:        "",
+			path:        "",
+			shouldMatch: false,
 		},
 	}
 

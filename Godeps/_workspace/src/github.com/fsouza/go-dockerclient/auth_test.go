@@ -37,6 +37,18 @@ func TestAuthLegacyConfig(t *testing.T) {
 	}
 }
 
+func TestAuthBadConfig(t *testing.T) {
+	auth := base64.StdEncoding.EncodeToString([]byte("userpass"))
+	read := strings.NewReader(fmt.Sprintf(`{"docker.io":{"auth":"%s","email":"user@example.com"}}`, auth))
+	ac, err := NewAuthConfigurations(read)
+	if err != AuthParseError {
+		t.Errorf("Incorrect error returned %v\n", err)
+	}
+	if ac != nil {
+		t.Errorf("Invalid auth configuration returned, should be nil %v\n", ac)
+	}
+}
+
 func TestAuthConfig(t *testing.T) {
 	auth := base64.StdEncoding.EncodeToString([]byte("user:pass"))
 	read := strings.NewReader(fmt.Sprintf(`{"auths":{"docker.io":{"auth":"%s","email":"user@example.com"}}}`, auth))

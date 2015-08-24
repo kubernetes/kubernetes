@@ -128,13 +128,23 @@ type PortMapping map[string]string
 
 // NetworkSettings contains network-related information about a container
 type NetworkSettings struct {
-	IPAddress   string                 `json:"IPAddress,omitempty" yaml:"IPAddress,omitempty"`
-	IPPrefixLen int                    `json:"IPPrefixLen,omitempty" yaml:"IPPrefixLen,omitempty"`
-	MacAddress  string                 `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
-	Gateway     string                 `json:"Gateway,omitempty" yaml:"Gateway,omitempty"`
-	Bridge      string                 `json:"Bridge,omitempty" yaml:"Bridge,omitempty"`
-	PortMapping map[string]PortMapping `json:"PortMapping,omitempty" yaml:"PortMapping,omitempty"`
-	Ports       map[Port][]PortBinding `json:"Ports,omitempty" yaml:"Ports,omitempty"`
+	IPAddress              string                 `json:"IPAddress,omitempty" yaml:"IPAddress,omitempty"`
+	IPPrefixLen            int                    `json:"IPPrefixLen,omitempty" yaml:"IPPrefixLen,omitempty"`
+	MacAddress             string                 `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
+	Gateway                string                 `json:"Gateway,omitempty" yaml:"Gateway,omitempty"`
+	Bridge                 string                 `json:"Bridge,omitempty" yaml:"Bridge,omitempty"`
+	PortMapping            map[string]PortMapping `json:"PortMapping,omitempty" yaml:"PortMapping,omitempty"`
+	Ports                  map[Port][]PortBinding `json:"Ports,omitempty" yaml:"Ports,omitempty"`
+	NetworkID              string                 `json:"NetworkID,omitempty" yaml:"NetworkID,omitempty"`
+	EndpointID             string                 `json:"EndpointID,omitempty" yaml:"EndpointID,omitempty"`
+	SandboxKey             string                 `json:"SandboxKey,omitempty" yaml:"SandboxKey,omitempty"`
+	GlobalIPv6Address      string                 `json:"GlobalIPv6Address,omitempty" yaml:"GlobalIPv6Address,omitempty"`
+	GlobalIPv6PrefixLen    int                    `json:"GlobalIPv6PrefixLen,omitempty" yaml:"GlobalIPv6PrefixLen,omitempty"`
+	IPv6Gateway            string                 `json:"IPv6Gateway,omitempty" yaml:"IPv6Gateway,omitempty"`
+	LinkLocalIPv6Address   string                 `json:"LinkLocalIPv6Address,omitempty" yaml:"LinkLocalIPv6Address,omitempty"`
+	LinkLocalIPv6PrefixLen int                    `json:"LinkLocalIPv6PrefixLen,omitempty" yaml:"LinkLocalIPv6PrefixLen,omitempty"`
+	SecondaryIPAddresses   []string               `json:"SecondaryIPAddresses,omitempty" yaml:"SecondaryIPAddresses,omitempty"`
+	SecondaryIPv6Addresses []string               `json:"SecondaryIPv6Addresses,omitempty" yaml:"SecondaryIPv6Addresses,omitempty"`
 }
 
 // PortMappingAPI translates the port mappings as contained in NetworkSettings
@@ -726,6 +736,18 @@ func (c *Client) Stats(opts StatsOptions) (retErr error) {
 		close(errC)
 	}()
 
+	quit := make(chan struct{})
+	defer close(quit)
+	go func() {
+		// block here waiting for the signal to stop function
+		select {
+		case <-opts.Done:
+			readCloser.Close()
+		case <-quit:
+			return
+		}
+	}()
+
 	decoder := json.NewDecoder(readCloser)
 	stats := new(Stats)
 	for err := decoder.Decode(&stats); err != io.EOF; err = decoder.Decode(stats) {
@@ -734,12 +756,6 @@ func (c *Client) Stats(opts StatsOptions) (retErr error) {
 		}
 		opts.Stats <- stats
 		stats = new(Stats)
-		select {
-		case <-opts.Done:
-			readCloser.Close()
-		default:
-			// Continue
-		}
 	}
 	return nil
 }
