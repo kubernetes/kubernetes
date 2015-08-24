@@ -31,7 +31,10 @@ func AddPrinterFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|template|templatefile|wide|jsonpath.")
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
 	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
+	// template shorthand -t is deprecated to support -t for --tty
+	// TODO: remove template flag shorthand -t
 	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when -o=template, -o=templatefile or -o=jsonpath.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]. The jsonpath template is composed of jsonpath expressions enclosed by {} [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md]")
+	cmd.Flags().MarkShorthandDeprecated("template", "please use --template instead")
 	cmd.Flags().String("sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
 	cmd.Flags().BoolP("show-all", "a", false, "When printing, show all resources (default hide terminated pods.)")
 }

@@ -149,15 +149,16 @@ type FlagSet struct {
 
 // A Flag represents the state of a flag.
 type Flag struct {
-	Name        string              // name as it appears on command line
-	Shorthand   string              // one-letter abbreviated flag
-	Usage       string              // help message
-	Value       Value               // value as set
-	DefValue    string              // default value (as text); for usage message
-	Changed     bool                // If the user set the value (or if left to default)
-	NoOptDefVal string              //default value (as text); if the flag is on the command line without any options
-	Deprecated  string              // If this flag is deprecated, this string is the new or now thing to use
-	Annotations map[string][]string // used by cobra.Command  bash autocomple code
+	Name                string              // name as it appears on command line
+	Shorthand           string              // one-letter abbreviated flag
+	Usage               string              // help message
+	Value               Value               // value as set
+	DefValue            string              // default value (as text); for usage message
+	Changed             bool                // If the user set the value (or if left to default)
+	NoOptDefVal         string              //default value (as text); if the flag is on the command line without any options
+	Deprecated          string              // If this flag is deprecated, this string is the new or now thing to use
+	ShorthandDeprecated string              // If the shorthand of this flag is deprecated, this string is the new or now thing to use
+	Annotations         map[string][]string // used by cobra.Command  bash autocomple code
 }
 
 // Value is the interface to the dynamic value stored in a flag.
@@ -298,7 +299,25 @@ func (f *FlagSet) MarkDeprecated(name string, usageMessage string) error {
 	if flag == nil {
 		return fmt.Errorf("flag %q does not exist", name)
 	}
+	if len(usageMessage) == 0 {
+		return fmt.Errorf("deprecated message for flag %q must be set", name)
+	}
 	flag.Deprecated = usageMessage
+	return nil
+}
+
+// Mark the shorthand of a flag deprecated in your program. It will
+// continue to function but will not show up in help or usage messages. Using
+// this flag will also print the given usageMessage.
+func (f *FlagSet) MarkShorthandDeprecated(name string, usageMessage string) error {
+	flag := f.Lookup(name)
+	if flag == nil {
+		return fmt.Errorf("flag %q does not exist", name)
+	}
+	if len(usageMessage) == 0 {
+		return fmt.Errorf("deprecated message for flag %q must be set", name)
+	}
+	flag.ShorthandDeprecated = usageMessage
 	return nil
 }
 
@@ -379,7 +398,7 @@ func (f *FlagSet) FlagUsages() string {
 			return
 		}
 		format := ""
-		if len(flag.Shorthand) > 0 {
+		if len(flag.Shorthand) > 0 && len(flag.ShorthandDeprecated) == 0 {
 			format = "  -%s, --%s"
 		} else {
 			format = "   %s   --%s"
@@ -397,7 +416,11 @@ func (f *FlagSet) FlagUsages() string {
 			format = format + "]"
 		}
 		format = format + ": %s\n"
-		fmt.Fprintf(x, format, flag.Shorthand, flag.Name, flag.DefValue, flag.Usage)
+		shorthand := flag.Shorthand
+		if len(flag.ShorthandDeprecated) > 0 {
+			shorthand = ""
+		}
+		fmt.Fprintf(x, format, shorthand, flag.Name, flag.DefValue, flag.Usage)
 	})
 
 	return x.String()
@@ -586,7 +609,19 @@ func (f *FlagSet) setFlag(flag *Flag, value string, origArg string) error {
 	if len(flag.Deprecated) > 0 {
 		fmt.Fprintf(os.Stderr, "Flag --%s has been deprecated, %s\n", flag.Name, flag.Deprecated)
 	}
+	if len(flag.ShorthandDeprecated) > 0 && containsShorthand(origArg, flag.Shorthand) {
+		fmt.Fprintf(os.Stderr, "Flag shorthand -%s has been deprecated, %s\n", flag.Shorthand, flag.ShorthandDeprecated)
+	}
 	return nil
+}
+
+func containsShorthand(arg, shorthand string) bool {
+	// filter out flags --<flag_name>
+	if strings.HasPrefix(arg, "-") {
+		return false
+	}
+	arg = strings.SplitN(arg, "=", 2)[0]
+	return strings.Contains(arg, shorthand)
 }
 
 func (f *FlagSet) parseLongArg(s string, args []string) (a []string, err error) {

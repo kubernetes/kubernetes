@@ -729,6 +729,21 @@ func TestDeprecatedFlagInDocs(t *testing.T) {
 	}
 }
 
+func TestDeprecatedFlagShorthandInDocs(t *testing.T) {
+	f := NewFlagSet("bob", ContinueOnError)
+	name := "noshorthandflag"
+	f.BoolP(name, "n", true, "always true")
+	f.MarkShorthandDeprecated("noshorthandflag", fmt.Sprintf("use --%s instead", name))
+
+	out := new(bytes.Buffer)
+	f.SetOutput(out)
+	f.PrintDefaults()
+
+	if strings.Contains(out.String(), "-n,") {
+		t.Errorf("found deprecated flag shorthand in usage!")
+	}
+}
+
 func parseReturnStderr(t *testing.T, f *FlagSet, args []string) (string, error) {
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
@@ -758,6 +773,24 @@ func TestDeprecatedFlagUsage(t *testing.T) {
 	f.MarkDeprecated("badflag", usageMsg)
 
 	args := []string{"--badflag"}
+	out, err := parseReturnStderr(t, f, args)
+	if err != nil {
+		t.Fatal("expected no error; got ", err)
+	}
+
+	if !strings.Contains(out, usageMsg) {
+		t.Errorf("usageMsg not printed when using a deprecated flag!")
+	}
+}
+
+func TestDeprecatedFlagShorthandUsage(t *testing.T) {
+	f := NewFlagSet("bob", ContinueOnError)
+	name := "noshorthandflag"
+	f.BoolP(name, "n", true, "always true")
+	usageMsg := fmt.Sprintf("use --%s instead", name)
+	f.MarkShorthandDeprecated(name, usageMsg)
+
+	args := []string{"-n"}
 	out, err := parseReturnStderr(t, f, args)
 	if err != nil {
 		t.Fatal("expected no error; got ", err)

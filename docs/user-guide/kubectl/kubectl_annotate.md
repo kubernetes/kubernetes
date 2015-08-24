@@ -91,7 +91,7 @@ $ kubectl annotate pods foo description-
       --resource-version="": If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)
       --sort-by="": If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
-  -t, --template="": Template string or path to template file to use when -o=template, -o=templatefile or -o=jsonpath.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]. The jsonpath template is composed of jsonpath expressions enclosed by {} [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md]
+      --template="": Template string or path to template file to use when -o=template, -o=templatefile or -o=jsonpath.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]. The jsonpath template is composed of jsonpath expressions enclosed by {} [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md]
 ```
 
 ### Options inherited from parent commands
