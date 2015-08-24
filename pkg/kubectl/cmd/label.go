@@ -173,7 +173,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 
-	labels, remove, err := parseLabels(labelArgs)
+	lbls, remove, err := parseLabels(labelArgs)
 	if err != nil {
 		return cmdutil.UsageError(cmd, err.Error())
 	}
@@ -204,7 +204,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			return err
 		}
 		obj, err := cmdutil.UpdateObject(info, func(obj runtime.Object) error {
-			err := labelFunc(obj, overwrite, resourceVersion, labels, remove)
+			err := labelFunc(obj, overwrite, resourceVersion, lbls, remove)
 			if err != nil {
 				return err
 			}
@@ -214,10 +214,16 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			return err
 		}
 
-		printer, err := f.PrinterForMapping(cmd, info.Mapping, false)
-		if err != nil {
-			return err
+		outputFormat := cmdutil.GetFlagString(cmd, "output")
+		if outputFormat == "" {
+			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "labeled")
+		} else {
+			printer, err := f.PrinterForMapping(cmd, info.Mapping, false)
+			if err != nil {
+				return err
+			}
+			return printer.PrintObj(obj, out)
 		}
-		return printer.PrintObj(obj, out)
+		return nil
 	})
 }
