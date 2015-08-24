@@ -1171,7 +1171,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			if mirrorPod != nil {
 				podToUpdate = mirrorPod
 			}
-			existingStatus, ok := kl.statusManager.GetPodStatus(podFullName)
+			existingStatus, ok := kl.statusManager.GetPodStatus(podToUpdate.UID)
 			if !ok || existingStatus.Phase == api.PodPending && status.Phase == api.PodRunning &&
 				!firstSeenTime.IsZero() {
 				metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
@@ -1277,10 +1277,6 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
 				glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
 			}
-			// Pod status update is edge-triggered. If there is any update of the
-			// mirror pod, we need to delete the existing status associated with
-			// the static pod to trigger an update.
-			kl.statusManager.DeletePodStatus(podFullName)
 		}
 	}
 	return nil
@@ -1402,7 +1398,7 @@ func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, runningPods []*kubecon
 func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
 	now := util.Now()
 	if pod.Spec.ActiveDeadlineSeconds != nil {
-		podStatus, ok := kl.statusManager.GetPodStatus(kubecontainer.GetPodFullName(pod))
+		podStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 		if !ok {
 			podStatus = pod.Status
 		}
@@ -1432,7 +1428,7 @@ func (kl *Kubelet) filterOutTerminatedPods(allPods []*api.Pod) []*api.Pod {
 	for _, pod := range allPods {
 		var status api.PodStatus
 		// Check the cached pod status which was set after the last sync.
-		status, ok := kl.statusManager.GetPodStatus(kubecontainer.GetPodFullName(pod))
+		status, ok := kl.statusManager.GetPodStatus(pod.UID)
 		if !ok {
 			// If there is no cached status, use the status from the
 			// apiserver. This is useful if kubelet has recently been
@@ -1454,7 +1450,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncP
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
 
-	kl.removeOrphanedPodStatuses(allPods)
+	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
 	// Handles pod admission.
 	pods := kl.admitPods(allPods, podSyncTypes)
 	glog.V(4).Infof("Desired pods: %s", kubeletUtil.FormatPodNames(pods))
@@ -1469,14 +1465,15 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncP
 
 // removeOrphanedPodStatuses removes obsolete entries in podStatus where
 // the pod is no longer considered bound to this node.
-// TODO(yujuhong): consider using pod UID as they key in the status manager
-// to avoid returning the wrong status.
-func (kl *Kubelet) removeOrphanedPodStatuses(pods []*api.Pod) {
-	podFullNames := make(map[string]bool)
+func (kl *Kubelet) removeOrphanedPodStatuses(pods []*api.Pod, mirrorPods map[string]*api.Pod) {
+	podUIDs := make(map[types.UID]bool)
 	for _, pod := range pods {
-		podFullNames[kubecontainer.GetPodFullName(pod)] = true
+		podUIDs[pod.UID] = true
 	}
-	kl.statusManager.RemoveOrphanedStatuses(podFullNames)
+	for _, pod := range mirrorPods {
+		podUIDs[pod.UID] = true
+	}
+	kl.statusManager.RemoveOrphanedStatuses(podUIDs)
 }
 
 // dispatchWork dispatches pod updates to workers.
@@ -1904,10 +1901,21 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 	// Pod workers periodically write status to statusManager. If status is not
 	// cached there, something is wrong (or kubelet just restarted and hasn't
 	// caught up yet). Just assume the pod is not ready yet.
-	podStatus, found := kl.statusManager.GetPodStatus(podFullName)
+	name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
+	if err != nil {
+		return fmt.Errorf("unable to parse pod full name %q: %v", podFullName, err)
+	}
+
+	pod, ok := kl.GetPodByName(namespace, name)
+	if !ok {
+		return fmt.Errorf("unable to get logs for container %q in pod %q: unable to find pod", containerName, podFullName)
+	}
+
+	podStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
 		return fmt.Errorf("failed to get status for pod %q", podFullName)
 	}
+
 	if err := kl.validatePodPhase(&podStatus); err != nil {
 		// No log is available if pod is not in a "known" phase (e.g. Unknown).
 		return err
@@ -1917,10 +1925,6 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 		// No log is available if the container status is missing or is in the
 		// waiting state.
 		return err
-	}
-	pod, ok := kl.GetPodByFullName(podFullName)
-	if !ok {
-		return fmt.Errorf("unable to get logs for container %q in pod %q: unable to find pod", containerName, podFullName)
 	}
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, tail, follow, stdout, stderr)
 }

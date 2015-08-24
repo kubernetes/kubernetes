@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletUtil "k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -43,14 +43,14 @@ type statusManager struct {
 	kubeClient client.Interface
 	// Map from pod full name to sync status of the corresponding pod.
 	podStatusesLock  sync.RWMutex
-	podStatuses      map[string]api.PodStatus
+	podStatuses      map[types.UID]api.PodStatus
 	podStatusChannel chan podStatusSyncRequest
 }
 
 func newStatusManager(kubeClient client.Interface) *statusManager {
 	return &statusManager{
 		kubeClient:       kubeClient,
-		podStatuses:      make(map[string]api.PodStatus),
+		podStatuses:      make(map[types.UID]api.PodStatus),
 		podStatusChannel: make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
 	}
 }
@@ -83,18 +83,17 @@ func (s *statusManager) Start() {
 	}, 0)
 }
 
-func (s *statusManager) GetPodStatus(podFullName string) (api.PodStatus, bool) {
+func (s *statusManager) GetPodStatus(uid types.UID) (api.PodStatus, bool) {
 	s.podStatusesLock.RLock()
 	defer s.podStatusesLock.RUnlock()
-	status, ok := s.podStatuses[podFullName]
+	status, ok := s.podStatuses[uid]
 	return status, ok
 }
 
 func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
-	podFullName := kubecontainer.GetPodFullName(pod)
 	s.podStatusesLock.Lock()
 	defer s.podStatusesLock.Unlock()
-	oldStatus, found := s.podStatuses[podFullName]
+	oldStatus, found := s.podStatuses[pod.UID]
 
 	// ensure that the start time does not change across updates.
 	if found && oldStatus.StartTime != nil {
@@ -124,7 +123,7 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	// workers and/or the kubelet but dropping the lock before sending the
 	// status down the channel feels like an easy way to get a bullet in foot.
 	if !found || !isStatusEqual(&oldStatus, &status) || pod.DeletionTimestamp != nil {
-		s.podStatuses[podFullName] = status
+		s.podStatuses[pod.UID] = status
 		s.podStatusChannel <- podStatusSyncRequest{pod, status}
 	} else {
 		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", kubeletUtil.FormatPodName(pod), status)
@@ -154,18 +153,18 @@ func (s *statusManager) TerminatePods(pods []*api.Pod) bool {
 	return sent
 }
 
-func (s *statusManager) DeletePodStatus(podFullName string) {
+func (s *statusManager) DeletePodStatus(uid types.UID) {
 	s.podStatusesLock.Lock()
 	defer s.podStatusesLock.Unlock()
-	delete(s.podStatuses, podFullName)
+	delete(s.podStatuses, uid)
 }
 
 // TODO(filipg): It'd be cleaner if we can do this without signal from user.
-func (s *statusManager) RemoveOrphanedStatuses(podFullNames map[string]bool) {
+func (s *statusManager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 	s.podStatusesLock.Lock()
 	defer s.podStatusesLock.Unlock()
 	for key := range s.podStatuses {
-		if _, ok := podFullNames[key]; !ok {
+		if _, ok := podUIDs[key]; !ok {
 			glog.V(5).Infof("Removing %q from status map.", key)
 			delete(s.podStatuses, key)
 		}
@@ -176,7 +175,6 @@ func (s *statusManager) RemoveOrphanedStatuses(podFullNames map[string]bool) {
 func (s *statusManager) syncBatch() error {
 	syncRequest := <-s.podStatusChannel
 	pod := syncRequest.pod
-	podFullName := kubecontainer.GetPodFullName(pod)
 	status := syncRequest.status
 
 	var err error
@@ -209,7 +207,7 @@ func (s *statusManager) syncBatch() error {
 			}
 			if err := s.kubeClient.Pods(statusPod.Namespace).Delete(statusPod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", statusPod.Name)
-				s.DeletePodStatus(podFullName)
+				s.DeletePodStatus(pod.UID)
 				return nil
 			}
 		}
@@ -222,7 +220,7 @@ func (s *statusManager) syncBatch() error {
 	// is full, and the pod worker holding the lock is waiting on this method
 	// to clear the channel. Even if this delete never runs subsequent container
 	// changes on the node should trigger updates.
-	go s.DeletePodStatus(podFullName)
+	go s.DeletePodStatus(pod.UID)
 	return fmt.Errorf("error updating status for pod %q: %v", kubeletUtil.FormatPodName(pod), err)
 }
 
