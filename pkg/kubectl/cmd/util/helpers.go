@@ -259,6 +259,10 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return d
 }
 
+func AddValidateFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
+}
+
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {

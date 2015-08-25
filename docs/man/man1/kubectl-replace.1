@@ -54,6 +54,10 @@ Please refer to the models in
 \fB\-\-timeout\fP=0
     Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object
 
+.PP
+\fB\-\-validate\fP=true
+    If true, use a schema to validate the input before sending it
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
@@ -143,10 +147,6 @@ Please refer to the models in
 .PP
 \fB\-\-v\fP=0
     log level for V logs
-
-.PP
-\fB\-\-validate\fP=false
-    If true, use a schema to validate the input before sending it
 
 .PP
 \fB\-\-vmodule\fP=
