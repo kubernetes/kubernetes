@@ -41,7 +41,8 @@ const maxProbeRetries = 3
 
 // Prober checks the healthiness of a container.
 type Prober interface {
-	Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error)
+	ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error)
+	ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, error)
 }
 
 // Prober helps to check the liveness/readiness of a container.
@@ -51,55 +52,30 @@ type prober struct {
 	tcp    tcprobe.TCPProber
 	runner kubecontainer.ContainerCommandRunner
 
-	readinessManager *kubecontainer.ReadinessManager
-	refManager       *kubecontainer.RefManager
-	recorder         record.EventRecorder
+	refManager *kubecontainer.RefManager
+	recorder   record.EventRecorder
 }
 
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
 func New(
 	runner kubecontainer.ContainerCommandRunner,
-	readinessManager *kubecontainer.ReadinessManager,
 	refManager *kubecontainer.RefManager,
 	recorder record.EventRecorder) Prober {
 
 	return &prober{
-		exec:   execprobe.New(),
-		http:   httprobe.New(),
-		tcp:    tcprobe.New(),
-		runner: runner,
-
-		readinessManager: readinessManager,
-		refManager:       refManager,
-		recorder:         recorder,
+		exec:       execprobe.New(),
+		http:       httprobe.New(),
+		tcp:        tcprobe.New(),
+		runner:     runner,
+		refManager: refManager,
+		recorder:   recorder,
 	}
 }
 
-// New prober for use in tests.
-func NewTestProber(
-	exec execprobe.ExecProber,
-	readinessManager *kubecontainer.ReadinessManager,
-	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) Prober {
-
-	return &prober{
-		exec:             exec,
-		readinessManager: readinessManager,
-		refManager:       refManager,
-		recorder:         recorder,
-	}
-}
-
-// Probe checks the liveness/readiness of the given container.
-func (pb *prober) Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
-	pb.probeReadiness(pod, status, container, containerID, createdAt)
-	return pb.probeLiveness(pod, status, container, containerID, createdAt)
-}
-
-// probeLiveness probes the liveness of a container.
+// ProbeLiveness probes the liveness of a container.
 // If the initalDelay since container creation on liveness probe has not passed the probe will return probe.Success.
-func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+func (pb *prober) ProbeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
 	var live probe.Result
 	var output string
 	var err error
@@ -137,24 +113,20 @@ func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container ap
 	return probe.Success, nil
 }
 
-// probeReadiness probes and sets the readiness of a container.
-// If the initial delay on the readiness probe has not passed, we set readiness to false.
-func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) {
+// ProbeReadiness probes and sets the readiness of a container.
+func (pb *prober) ProbeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, error) {
 	var ready probe.Result
 	var output string
 	var err error
 	p := container.ReadinessProbe
 	if p == nil {
 		ready = probe.Success
-	} else if time.Now().Unix()-createdAt < p.InitialDelaySeconds {
-		ready = probe.Failure
 	} else {
 		ready, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 	}
 	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
 	if err != nil || ready == probe.Failure {
 		// Readiness failed in one way or another.
-		pb.readinessManager.SetReadiness(containerID, false)
 		ref, ok := pb.refManager.GetRef(containerID)
 		if !ok {
 			glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
@@ -164,21 +136,17 @@ func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container a
 			if ok {
 				pb.recorder.Eventf(ref, "Unhealthy", "Readiness probe errored: %v", err)
 			}
-			return
 		} else { // ready != probe.Success
 			glog.V(1).Infof("Readiness probe for %q failed (%v): %s", ctrName, ready, output)
 			if ok {
 				pb.recorder.Eventf(ref, "Unhealthy", "Readiness probe failed: %s", output)
 			}
-			return
 		}
-	}
-	if ready == probe.Success {
-		pb.readinessManager.SetReadiness(containerID, true)
+		return probe.Failure, err
 	}
 
 	glog.V(3).Infof("Readiness probe for %q succeeded", ctrName)
-
+	return ready, nil
 }
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result

@@ -44,7 +44,6 @@ func TestRunOnce(t *testing.T) {
 		nodeLister:          testNodeLister{},
 		statusManager:       status.NewManager(nil),
 		containerRefManager: kubecontainer.NewRefManager(),
-		readinessManager:    kubecontainer.NewReadinessManager(),
 		podManager:          podManager,
 		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
