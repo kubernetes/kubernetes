@@ -20,7 +20,8 @@ echo "WRITING KUBE FILES , will overwrite the jsons, then testing pods. is kube 
 #Args below can be overriden when calling from cmd line.
 #Just send all the args in order.
 #for dev/test you can use:
-#kubectl=$GOPATH/src/github.com/kubernetes/kubernetes/cluster/kubectl.sh"
+#kubectl="$GOPATH/src/k8s.io/kubernetes/cluster/kubectl.sh"
+
 kubectl="kubectl"
 VERSION="r.2.8.19"
 _SECONDS=1000          # number of seconds to measure throughput.
@@ -40,7 +41,7 @@ SLAVE="${6:-$SLAVE}"     # amount of redis slaves
 TEST="${7:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
 NS="${8:-$NS}"          # namespace
 NODE_PORT="${9:-$NODE_PORT}" #nodePort, see fe-s.json
-echo "Running w/ args: kubectl $kubectl version $VERSION sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS NODE_PORT $NODE_PORT"
+echo "Running w/ args: kubectl $kubectl version $VERSION sec $_SECONDS fe $FE lg $LG slave $SLAVE test = $TEST, NAMESPACE = $NS, NODE_PORT = $NODE_PORT"
 function create {
 
 cat << EOF > fe-rc.json
@@ -249,16 +250,17 @@ function getIP {
 }
 
 function getNodePort {
-NODE_PORT=$($kubectl get services/frontend -o go-template='{{(index .spec.ports 0).nodePort}}')
- if [ -z "$NODE_PORT" ]; then
+NODE_PORT=$($kubectl get services/frontend --namespace=$NS -o go-template='{{(index .spec.ports 0).nodePort}}')
+
+if [ -z "$NODE_PORT" ]; then
         echo "Error: Can't get NodePort of services/frontend!!!"
         exit 1
-    else
+else
         printf '\n\n\n%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' =
         echo -e "NodePort of services/frontend:\n$NODE_PORT"
         echo -e "WARNING: On cloud platforms like GCE, you may need to add a firewall rule to allow TCP traffic on port $NODE_PORT"
         printf '%*s\n\n\n\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' =
-    fi
+fi
 }
 
 function pollfor {
