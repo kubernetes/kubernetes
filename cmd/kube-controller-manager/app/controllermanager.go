@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller/autoscaler"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/node"
@@ -51,39 +52,38 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
-
-	// TODO: Enable the code belowe when horizontal pod autoscaler controller is implemented.
-	// "k8s.io/kubernetes/pkg/controller/autoscaler"
 )
 
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
-	Port                    int
-	Address                 net.IP
-	CloudProvider           string
-	CloudConfigFile         string
-	ConcurrentEndpointSyncs int
-	ConcurrentRCSyncs       int
-	ServiceSyncPeriod       time.Duration
-	NodeSyncPeriod          time.Duration
-	ResourceQuotaSyncPeriod time.Duration
-	NamespaceSyncPeriod     time.Duration
-	PVClaimBinderSyncPeriod time.Duration
-	RegisterRetryCount      int
-	NodeMonitorGracePeriod  time.Duration
-	NodeStartupGracePeriod  time.Duration
-	NodeMonitorPeriod       time.Duration
-	NodeStatusUpdateRetry   int
-	PodEvictionTimeout      time.Duration
-	DeletingPodsQps         float32
-	DeletingPodsBurst       int
-	ServiceAccountKeyFile   string
-	RootCAFile              string
+	Port                              int
+	Address                           net.IP
+	CloudProvider                     string
+	CloudConfigFile                   string
+	ConcurrentEndpointSyncs           int
+	ConcurrentRCSyncs                 int
+	ServiceSyncPeriod                 time.Duration
+	NodeSyncPeriod                    time.Duration
+	ResourceQuotaSyncPeriod           time.Duration
+	NamespaceSyncPeriod               time.Duration
+	PVClaimBinderSyncPeriod           time.Duration
+	HorizontalPodAutoscalerSyncPeriod time.Duration
+	RegisterRetryCount                int
+	NodeMonitorGracePeriod            time.Duration
+	NodeStartupGracePeriod            time.Duration
+	NodeMonitorPeriod                 time.Duration
+	NodeStatusUpdateRetry             int
+	PodEvictionTimeout                time.Duration
+	DeletingPodsQps                   float32
+	DeletingPodsBurst                 int
+	ServiceAccountKeyFile             string
+	RootCAFile                        string
 
-	ClusterName       string
-	ClusterCIDR       net.IPNet
-	AllocateNodeCIDRs bool
-	EnableProfiling   bool
+	ClusterName                   string
+	ClusterCIDR                   net.IPNet
+	AllocateNodeCIDRs             bool
+	EnableProfiling               bool
+	EnableHorizontalPodAutoscaler bool
 
 	Master     string
 	Kubeconfig string
@@ -92,18 +92,20 @@ type CMServer struct {
 // NewCMServer creates a new CMServer with a default config.
 func NewCMServer() *CMServer {
 	s := CMServer{
-		Port:                    ports.ControllerManagerPort,
-		Address:                 net.ParseIP("127.0.0.1"),
-		ConcurrentEndpointSyncs: 5,
-		ConcurrentRCSyncs:       5,
-		ServiceSyncPeriod:       5 * time.Minute,
-		NodeSyncPeriod:          10 * time.Second,
-		ResourceQuotaSyncPeriod: 10 * time.Second,
-		NamespaceSyncPeriod:     5 * time.Minute,
-		PVClaimBinderSyncPeriod: 10 * time.Second,
-		RegisterRetryCount:      10,
-		PodEvictionTimeout:      5 * time.Minute,
-		ClusterName:             "kubernetes",
+		Port:                              ports.ControllerManagerPort,
+		Address:                           net.ParseIP("127.0.0.1"),
+		ConcurrentEndpointSyncs:           5,
+		ConcurrentRCSyncs:                 5,
+		ServiceSyncPeriod:                 5 * time.Minute,
+		NodeSyncPeriod:                    10 * time.Second,
+		ResourceQuotaSyncPeriod:           10 * time.Second,
+		NamespaceSyncPeriod:               5 * time.Minute,
+		PVClaimBinderSyncPeriod:           10 * time.Second,
+		HorizontalPodAutoscalerSyncPeriod: 1 * time.Minute,
+		RegisterRetryCount:                10,
+		PodEvictionTimeout:                5 * time.Minute,
+		ClusterName:                       "kubernetes",
+		EnableHorizontalPodAutoscaler:     false,
 	}
 	return &s
 }
@@ -123,6 +125,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ResourceQuotaSyncPeriod, "resource-quota-sync-period", s.ResourceQuotaSyncPeriod, "The period for syncing quota usage status in the system")
 	fs.DurationVar(&s.NamespaceSyncPeriod, "namespace-sync-period", s.NamespaceSyncPeriod, "The period for syncing namespace life-cycle updates")
 	fs.DurationVar(&s.PVClaimBinderSyncPeriod, "pvclaimbinder-sync-period", s.PVClaimBinderSyncPeriod, "The period for syncing persistent volumes and persistent volume claims")
+	fs.DurationVar(&s.HorizontalPodAutoscalerSyncPeriod, "horizontal-pod-autoscaler-sync-period", s.HorizontalPodAutoscalerSyncPeriod, "The period for syncing the number of pods in horizontal pod autoscaler.")
 	fs.DurationVar(&s.PodEvictionTimeout, "pod-eviction-timeout", s.PodEvictionTimeout, "The grace period for deleting pods on failed nodes.")
 	fs.Float32Var(&s.DeletingPodsQps, "deleting-pods-qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
 	fs.IntVar(&s.DeletingPodsBurst, "deleting-pods-burst", 10, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")
@@ -145,6 +148,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
+	fs.BoolVar(&s.EnableHorizontalPodAutoscaler, "enable-horizontal-pod-autoscaler", s.EnableHorizontalPodAutoscaler, "Enables horizontal pod autoscaler (requires enabling experimental API on apiserver). NOT IMPLEMENTED YET!")
 }
 
 // Run runs the CMServer.  This should never exit.
@@ -267,13 +271,14 @@ func (s *CMServer) Run(_ []string) error {
 		serviceaccount.DefaultServiceAccountsControllerOptions(),
 	).Run()
 
-	// TODO: Enable the code belowe when horizontal pod autoscaler controller is implemented.
-	// expClient, err := client.NewExperimental(kubeconfig)
-	// if err != nil {
-	// 	glog.Fatalf("Invalid API configuration: %v", err)
-	// }
-	// horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, expClient)
-	// horizontalPodAutoscalerController.Run(s.NodeSyncPeriod)
+	if s.EnableHorizontalPodAutoscaler {
+		expClient, err := client.NewExperimental(kubeconfig)
+		if err != nil {
+			glog.Fatalf("Invalid API configuration: %v", err)
+		}
+		horizontalPodAutoscalerController := autoscalercontroller.New(kubeClient, expClient)
+		horizontalPodAutoscalerController.Run(s.HorizontalPodAutoscalerSyncPeriod)
+	}
 
 	select {}
 }
