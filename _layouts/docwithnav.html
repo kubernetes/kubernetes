@@ -93,6 +93,13 @@
 					if (clickedon.hasClass('gentoc')) {//generate the in-page TOC (load the full page load)
 						window.location = href;
 					}
+					$.get(href, function(html){//update the page's <title> tags with title from loaded page (so browser shows current title)
+					    var matches = html.match(/<title>([^<]*)/);
+					    if (matches.length>0) {
+					        var title = matches[1];
+					        document.title = title;
+					    }
+					});
 				}
 				if(clickedon.parents().hasClass('bodywrapper')){//animate navigation menu
 					animatenav(findcurnavitem());//is an in-page link
