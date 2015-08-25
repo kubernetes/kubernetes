@@ -227,6 +227,12 @@ Bring up a libvirt-CoreOS cluster of 5 nodes
 NUM_MINIONS=5 cluster/kube-up.sh
 ```
 
+Bring up a libvirt-CoreOS cluster with a local etcd discovery
+
+```sh
+DISCOVERY=local-etcd cluster/kube-up.sh
+```
+
 Destroy the libvirt-CoreOS cluster
 
 ```sh
