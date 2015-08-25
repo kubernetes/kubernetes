@@ -167,7 +167,16 @@ func libcontainerConfigToContainerSpec(config *libcontainerConfigs.Config, mi *i
 	}
 	spec.Cpu.Mask = utils.FixCpuMask(config.Cgroups.CpusetCpus, mi.NumCores)
 
-	spec.HasNetwork = len(config.Networks) > 0
+	// Docker reports a loop device for containers with --net=host. Ignore
+	// those too.
+	networkCount := 0
+	for _, n := range config.Networks {
+		if n.Type != "loopback" {
+			networkCount += 1
+		}
+	}
+
+	spec.HasNetwork = networkCount > 0
 	spec.HasDiskIo = true
 
 	return spec
