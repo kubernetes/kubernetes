@@ -46,7 +46,11 @@ type proxySocket interface {
 }
 
 func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
-	host := ip.String()
+	host := ""
+	if ip != nil {
+		host = ip.String()
+	}
+
 	switch strings.ToUpper(string(protocol)) {
 	case "TCP":
 		listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))

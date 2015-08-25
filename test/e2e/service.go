@@ -69,6 +69,7 @@ var _ = Describe("Services", func() {
 			}
 		}
 	})
+
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 	It("should provide secure master service", func() {
 		_, err := c.Services(api.NamespaceDefault).Get("kubernetes")
@@ -460,6 +461,16 @@ var _ = Describe("Services", func() {
 		By("hitting the pod through the service's NodePort")
 		ip := pickMinionIP(c)
 		testReachable(ip, nodePort)
+
+		hosts, err := NodeSSHHosts(c)
+		if err != nil {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
+		_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
+		if code != 0 {
+			Failf("expected node port (%d) to be in use", nodePort)
+		}
 	})
 
 	It("should be able to change the type and nodeport settings of a service", func() {
@@ -878,16 +889,26 @@ var _ = Describe("Services", func() {
 		if !ServiceNodePortRange.Contains(port.NodePort) {
 			Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
-		port1 := port.NodePort
+		nodePort := port.NodePort
 
 		By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", port1))
+		hosts, err := NodeSSHHosts(c)
+		if err != nil {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
+		_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
+		if code == 0 {
+			Failf("expected node port (%d) to not be in use", nodePort)
+		}
+
+		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
 		service = t.BuildServiceSpec()
 		service.Spec.Type = api.ServiceTypeNodePort
-		service.Spec.Ports[0].NodePort = port1
+		service.Spec.Ports[0].NodePort = nodePort
 		service, err = t.CreateService(service)
 		Expect(err).NotTo(HaveOccurred())
 	})
