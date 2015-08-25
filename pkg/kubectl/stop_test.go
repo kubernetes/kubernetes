@@ -18,46 +18,255 @@ package kubectl
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestReplicationControllerStop(t *testing.T) {
 	name := "foo"
 	ns := "default"
-	fake := testclient.NewSimpleFake(&api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+	tests := []struct {
+		Name            string
+		Objs            []runtime.Object
+		StopError       error
+		StopMessage     string
+		ExpectedActions []string
+	}{
+		{
+			Name: "OnlyOneRC",
+			Objs: []runtime.Object{
+				&api.ReplicationController{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: api.ReplicationControllerSpec{
+						Replicas: 0,
+						Selector: map[string]string{"k1": "v1"}},
+				},
+				&api.ReplicationControllerList{ // LIST
+					Items: []api.ReplicationController{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1"}},
+						},
+					},
+				},
+			},
+			StopError:       nil,
+			StopMessage:     "foo stopped",
+			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: 0,
+		{
+			Name: "NoOverlapping",
+			Objs: []runtime.Object{
+				&api.ReplicationController{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: api.ReplicationControllerSpec{
+						Replicas: 0,
+						Selector: map[string]string{"k1": "v1"}},
+				},
+				&api.ReplicationControllerList{ // LIST
+					Items: []api.ReplicationController{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      "baz",
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k3": "v3"}},
+						},
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1"}},
+						},
+					},
+				},
+			},
+			StopError:       nil,
+			StopMessage:     "foo stopped",
+			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
 		},
-	})
-	reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}
-	s, err := reaper.Stop(ns, name, 0, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		{
+			Name: "OverlappingError",
+			Objs: []runtime.Object{
+
+				&api.ReplicationController{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: api.ReplicationControllerSpec{
+						Replicas: 0,
+						Selector: map[string]string{"k1": "v1"}},
+				},
+				&api.ReplicationControllerList{ // LIST
+					Items: []api.ReplicationController{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      "baz",
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1", "k2": "v2"}},
+						},
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1"}},
+						},
+					},
+				},
+			},
+			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz, please manage deletion individually with --cascade=false."),
+			StopMessage:     "",
+			ExpectedActions: []string{"get", "list"},
+		},
+
+		{
+			Name: "OverlappingButSafeDelete",
+			Objs: []runtime.Object{
+
+				&api.ReplicationController{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: api.ReplicationControllerSpec{
+						Replicas: 0,
+						Selector: map[string]string{"k1": "v1", "k2": "v2"}},
+				},
+				&api.ReplicationControllerList{ // LIST
+					Items: []api.ReplicationController{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      "baz",
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"}},
+						},
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      "zaz",
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1"}},
+						},
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1", "k2": "v2"}},
+						},
+					},
+				},
+			},
+
+			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz,zaz, please manage deletion individually with --cascade=false."),
+			StopMessage:     "",
+			ExpectedActions: []string{"get", "list"},
+		},
+
+		{
+			Name: "TwoExactMatchRCs",
+			Objs: []runtime.Object{
+
+				&api.ReplicationController{ // GET
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: api.ReplicationControllerSpec{
+						Replicas: 0,
+						Selector: map[string]string{"k1": "v1"}},
+				},
+				&api.ReplicationControllerList{ // LIST
+					Items: []api.ReplicationController{
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      "zaz",
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1"}},
+						},
+						{
+							ObjectMeta: api.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+							},
+							Spec: api.ReplicationControllerSpec{
+								Replicas: 0,
+								Selector: map[string]string{"k1": "v1"}},
+						},
+					},
+				},
+			},
+
+			StopError:       nil,
+			StopMessage:     "foo stopped",
+			ExpectedActions: []string{"get", "list", "delete"},
+		},
 	}
-	expected := "foo stopped"
-	if s != expected {
-		t.Errorf("expected %s, got %s", expected, s)
-	}
-	actions := fake.Actions()
-	if len(actions) != 7 {
-		t.Errorf("unexpected actions: %v, expected 6 actions (get, list, get, update, get, get, delete)", fake.Actions)
-	}
-	for i, verb := range []string{"get", "list", "get", "update", "get", "get", "delete"} {
-		if actions[i].GetResource() != "replicationcontrollers" {
-			t.Errorf("unexpected action: %+v, expected %s-replicationController", actions[i], verb)
+
+	for _, test := range tests {
+		fake := testclient.NewSimpleFake(test.Objs...)
+		reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}
+		s, err := reaper.Stop(ns, name, 0, nil)
+		if !reflect.DeepEqual(err, test.StopError) {
+			t.Errorf("%s unexpected error: %v", test.Name, err)
 			continue
 		}
-		if actions[i].GetVerb() != verb {
-			t.Errorf("unexpected action: %+v, expected %s-replicationController", actions[i], verb)
+
+		if s != test.StopMessage {
+			t.Errorf("%s expected '%s', got '%s'", test.Name, test.StopMessage, s)
+			continue
+		}
+		actions := fake.Actions()
+		if len(actions) != len(test.ExpectedActions) {
+			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
+			continue
+		}
+		for i, verb := range test.ExpectedActions {
+			if actions[i].GetResource() != "replicationcontrollers" {
+				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
+			}
+			if actions[i].GetVerb() != verb {
+				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
+			}
 		}
 	}
 }
