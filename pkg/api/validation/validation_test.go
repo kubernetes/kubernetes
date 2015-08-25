@@ -234,7 +234,6 @@ func TestValidateAnnotations(t *testing.T) {
 }
 
 func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
-
 	objMeta := api.ObjectMeta{Name: name}
 	if namespace != "" {
 		objMeta.Namespace = namespace
@@ -247,7 +246,6 @@ func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *a
 }
 
 func TestValidatePersistentVolumes(t *testing.T) {
-
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		volume            *api.PersistentVolume
@@ -358,7 +356,6 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 }
 
 func TestValidatePersistentVolumeClaim(t *testing.T) {
-
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		claim             *api.PersistentVolumeClaim
@@ -802,7 +799,6 @@ func TestValidatePullPolicy(t *testing.T) {
 			t.Errorf("case[%s] expected policy %v, got %v", k, v.ExpectedPolicy, ctr.ImagePullPolicy)
 		}
 	}
-
 }
 
 func getResourceLimits(cpu, memory string) api.ResourceList {
@@ -2144,7 +2140,6 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
-
 }
 
 func TestValidateReplicationController(t *testing.T) {

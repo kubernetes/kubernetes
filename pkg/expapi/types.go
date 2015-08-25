@@ -179,9 +179,8 @@ type Deployment struct {
 }
 
 type DeploymentSpec struct {
-	// Number of desired pods. This is a pointer to distinguish between explicit
-	// zero and not specified. Defaults to 1.
-	Replicas *int `json:"replicas,omitempty"`
+	// Number of desired pods.
+	Replicas int `json:"replicas,omitempty"`
 
 	// Label selector for pods. Existing ReplicationControllers whose pods are
 	// selected by this will be scaled down.
