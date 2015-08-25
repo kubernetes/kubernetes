@@ -33,7 +33,7 @@ Documentation for other releases can be found at
 API Conventions
 ===============
 
-Updated: 8/12/2015
+Updated: 8/24/2015
 
 *This document is oriented at users who want a deeper understanding of the Kubernetes
 API structure, and developers wanting to extend the Kubernetes API.  An introduction to
@@ -219,7 +219,7 @@ Some resources report the `observedGeneration`, which is the `generation` most r
 
 References to loosely coupled sets of objects, such as [pods](../user-guide/pods.md) overseen by a [replication controller](../user-guide/replication-controller.md), are usually best referred to using a [label selector](../user-guide/labels.md). In order to ensure that GETs of individual objects remain bounded in time and space, these sets may be queried via separate API queries, but will not be expanded in the referring object's status.
 
-References to specific objects, especially specific resource versions and/or specific fields of those objects, are specified using the `ObjectReference` type. Unlike partial URLs, the ObjectReference type facilitates flexible defaulting of fields from the referring object or other contextual information.
+References to specific objects, especially specific resource versions and/or specific fields of those objects, are specified using the `ObjectReference` type (or other types representing strict subsets of it). Unlike partial URLs, the ObjectReference type facilitates flexible defaulting of fields from the referring object or other contextual information.
 
 References in the status of the referee to the referrer may be permitted, when the references are one-to-one and do not need to be frequently updated, particularly in an edge-based manner.
 
@@ -678,6 +678,8 @@ Accumulate repeated events in the client, especially for frequent events, to red
 
 ## Naming conventions
 
+* Go field names must be CamelCase. JSON field names must be camelCase. Other than capitalization of the initial letter, the two should almost always match. No underscores nor dashes in either.
+* Field and resource names should be declarative, not imperative (DoSomething, SomethingDoer).
 * `Minion` has been deprecated in favor of `Node`. Use `Node` where referring to the node resource in the context of the cluster. Use `Host` where referring to properties of the individual physical/virtual system, such as `hostname`, `hostPath`, `hostNetwork`, etc.
 * `FooController` is a deprecated kind naming convention. Name the kind after the thing being controlled instead (e.g., `Job` rather than `JobController`).
 * The name of a field that specifies the time at which `something` occurs should be called `somethingTime`. Do not use `stamp` (e.g., `creationTimestamp`).
@@ -687,6 +689,7 @@ Accumulate repeated events in the client, especially for frequent events, to red
   * `fooDeadlineSeconds` is preferred for activity completion deadlines.
 * Do not use abbreviations in the API, except where they are extremely commonly used, such as "id", "args", or "stdin".
 * Acronyms should similarly only be used when extremely commonly known. All letters in the acronym should have the same case, using the appropriate case for the situation. For example, at the beginning of a field name, the acronym should be all lowercase, such as "httpGet". Where used as a constant, all letters should be uppercase, such as "TCP" or "UDP".
+* The name of a field referring to another resource of kind `Foo` by name should be called `fooName`. The name of a field referring to another resource of kind `Foo` by ObjectReference (or subset thereof) should be called `fooRef`.
 
 ## Label, selector, and annotation conventions
 
