@@ -26,19 +26,19 @@ import (
 
 // TimedValue is a value that should be processed at a designated time.
 type TimedValue struct {
-	Value string
-	Added time.Time
-	Next  time.Time
+	Value     string
+	AddedAt   time.Time
+	ProcessAt time.Time
 }
 
 // now is used to test time
 var now func() time.Time = time.Now
 
-// TimedQueue is a priority heap where the lowest Next is at the front of the queue
+// TimedQueue is a priority heap where the lowest ProcessAt is at the front of the queue
 type TimedQueue []*TimedValue
 
 func (h TimedQueue) Len() int           { return len(h) }
-func (h TimedQueue) Less(i, j int) bool { return h[i].Next.Before(h[j].Next) }
+func (h TimedQueue) Less(i, j int) bool { return h[i].ProcessAt.Before(h[j].ProcessAt) }
 func (h TimedQueue) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 
 func (h *TimedQueue) Push(x interface{}) {
@@ -75,6 +75,23 @@ func (q *UniqueQueue) Add(value TimedValue) bool {
 	return true
 }
 
+// Replace replaces an existing value in the queue if it already exists, otherwise it does nothing.
+// Returns true if the item was found.
+func (q *UniqueQueue) Replace(value TimedValue) bool {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	for i := range q.queue {
+		if q.queue[i].Value != value.Value {
+			continue
+		}
+		heap.Remove(&q.queue, i)
+		heap.Push(&q.queue, &value)
+		return true
+	}
+	return false
+}
+
 // Removes the value from the queue, so Get() call won't return it, and allow subsequent addition
 // of the given value. If the value is not present does nothing and returns false.
 func (q *UniqueQueue) Remove(value string) bool {
@@ -100,6 +117,17 @@ func (q *UniqueQueue) Get() (TimedValue, bool) {
 	}
 	result := heap.Pop(&q.queue).(*TimedValue)
 	q.set.Delete(result.Value)
+	return *result, true
+}
+
+// Head returns the oldest added value that wasn't returned yet without removing it.
+func (q *UniqueQueue) Head() (TimedValue, bool) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	if len(q.queue) == 0 {
+		return TimedValue{}, false
+	}
+	result := q.queue[0]
 	return *result, true
 }
 
@@ -133,7 +161,7 @@ type ActionFunc func(TimedValue) (bool, time.Duration)
 // otherwise it is added back to the queue. The returned remaining is used to identify the minimum
 // time to execute the next item in the queue.
 func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
-	val, ok := q.queue.Get()
+	val, ok := q.queue.Head()
 	for ok {
 		// rate limit the queue checking
 		if q.leak {
@@ -145,18 +173,20 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 		}
 
 		now := now()
-		if now.Before(val.Next) {
-			q.queue.Add(val)
-			val, ok = q.queue.Get()
+		if now.Before(val.ProcessAt) {
+			q.queue.Replace(val)
+			val, ok = q.queue.Head()
 			// we do not sleep here because other values may be added at the front of the queue
 			continue
 		}
 
 		if ok, wait := fn(val); !ok {
-			val.Next = now.Add(wait + 1)
-			q.queue.Add(val)
+			val.ProcessAt = now.Add(wait + 1)
+			q.queue.Replace(val)
+		} else {
+			q.queue.Remove(val.Value)
 		}
-		val, ok = q.queue.Get()
+		val, ok = q.queue.Head()
 	}
 }
 
@@ -165,9 +195,9 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 func (q *RateLimitedTimedQueue) Add(value string) bool {
 	now := now()
 	return q.queue.Add(TimedValue{
-		Value: value,
-		Added: now,
-		Next:  now,
+		Value:     value,
+		AddedAt:   now,
+		ProcessAt: now,
 	})
 }
 
