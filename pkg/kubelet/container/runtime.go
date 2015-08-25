@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -24,8 +25,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 )
+
+// Container Terminated and Kubelet is backing off the restart
+var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
 
 type Version interface {
 	// Compare compares two versions of the runtime. On success it returns -1
@@ -53,7 +58,7 @@ type Runtime interface {
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error
+	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	KillPod(pod *api.Pod, runningPod Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of

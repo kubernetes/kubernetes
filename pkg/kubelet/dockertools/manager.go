@@ -468,10 +468,15 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		}
 	}
 
-	// Handle the containers for which we cannot find any associated active or
-	// dead docker containers.
+	// Handle the containers for which we cannot find any associated active or dead docker containers or are in restart backoff
 	for _, container := range manifest.Containers {
-		if _, found := statuses[container.Name]; found {
+		if containerStatus, found := statuses[container.Name]; found {
+			reason, ok := dm.reasonCache.Get(uid, container.Name)
+			if ok && reason == kubecontainer.ErrCrashLoopBackOff.Error() {
+				containerStatus.LastTerminationState = containerStatus.State
+				containerStatus.State.Waiting = &api.ContainerStateWaiting{Reason: reason}
+				containerStatus.State.Running = nil
+			}
 			continue
 		}
 		var containerStatus api.ContainerStatus
@@ -634,8 +639,9 @@ func (dm *DockerManager) runContainer(
 		// of CPU shares.
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
+	_, containerName := BuildDockerName(dockerName, container)
 	dockerOpts := docker.CreateContainerOptions{
-		Name: BuildDockerName(dockerName, container),
+		Name: containerName,
 		Config: &docker.Config{
 			Env:          makeEnvList(opts.Envs),
 			ExposedPorts: exposedPorts,
@@ -1641,7 +1647,7 @@ func (dm *DockerManager) clearReasonCache(pod *api.Pod, container *api.Container
 }
 
 // Sync the running pod to match the specified desired pod.
-func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error {
+func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("SyncPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1707,6 +1713,13 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	// Start everything
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
+
+		// containerChanges.StartInfraContainer causes the containers to be restarted for config reasons
+		// ignore backoff
+		if !containerChanges.StartInfraContainer && dm.doBackOff(pod, container, podStatus, backOff) {
+			glog.V(4).Infof("Backing Off restarting container %+v in pod %v", container, podFullName)
+			continue
+		}
 		glog.V(4).Infof("Creating container %+v in pod %v", container, podFullName)
 		err := dm.imagePuller.PullImage(pod, container, pullSecrets)
 		dm.updateReasonCache(pod, container, err)
@@ -1798,4 +1811,44 @@ func getUidFromUser(id string) string {
 	}
 	// no gid, just return the id
 	return id
+}
+
+func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podStatus api.PodStatus, backOff *util.Backoff) bool {
+	var ts util.Time
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.Name != container.Name {
+			continue
+		}
+		// first failure
+		if containerStatus.State.Terminated != nil {
+			ts = containerStatus.State.Terminated.FinishedAt
+			break
+		}
+		// state is waiting and the failure timestamp is in LastTerminationState
+		if (containerStatus.State.Waiting != nil) && (containerStatus.LastTerminationState.Terminated != nil) {
+			ts = containerStatus.LastTerminationState.Terminated.FinishedAt
+			break
+		}
+	}
+
+	// found a container that requires backoff
+	if !ts.IsZero() {
+		dockerName := KubeletContainerName{
+			PodFullName:   kubecontainer.GetPodFullName(pod),
+			PodUID:        pod.UID,
+			ContainerName: container.Name,
+		}
+		stableName, _ := BuildDockerName(dockerName, container)
+		if backOff.IsInBackOffSince(stableName, ts.Time) {
+			if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
+				dm.recorder.Eventf(ref, "Backoff", "Back-off restarting failed docker container")
+			}
+			dm.updateReasonCache(pod, container, kubecontainer.ErrCrashLoopBackOff)
+			glog.Infof("Back-off %s restarting failed container=%s pod=%s", backOff.Get(stableName), container.Name, kubecontainer.GetPodFullName(pod))
+			return true
+		}
+		backOff.Next(stableName, ts.Time)
+	}
+	dm.clearReasonCache(pod, container)
+	return false
 }

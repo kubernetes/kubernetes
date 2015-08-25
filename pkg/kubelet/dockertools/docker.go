@@ -233,14 +233,15 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 const containerNamePrefix = "k8s"
 
 // Creates a name which can be reversed to identify both full pod name and container name.
-func BuildDockerName(dockerName KubeletContainerName, container *api.Container) string {
+func BuildDockerName(dockerName KubeletContainerName, container *api.Container) (string, string) {
 	containerName := dockerName.ContainerName + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	return fmt.Sprintf("%s_%s_%s_%s_%08x",
+	stableName := fmt.Sprintf("%s_%s_%s_%s",
 		containerNamePrefix,
 		containerName,
 		dockerName.PodFullName,
-		dockerName.PodUID,
-		rand.Uint32())
+		dockerName.PodUID)
+
+	return stableName, fmt.Sprintf("%s_%08x", stableName, rand.Uint32())
 }
 
 // Unpacks a container name, returning the pod full name and container name we would have used to

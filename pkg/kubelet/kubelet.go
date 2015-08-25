@@ -79,6 +79,9 @@ const (
 
 	// Location of container logs.
 	containerLogsDir = "/var/log/containers"
+
+	// max backoff period
+	maxContainerBackOff = 300 * time.Second
 )
 
 var (
@@ -373,6 +376,7 @@ func NewMainKubelet(
 		}
 	}
 
+	klet.backOff = util.NewBackOff(resyncInterval, maxContainerBackOff)
 	return klet, nil
 }
 
@@ -525,6 +529,9 @@ type Kubelet struct {
 
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor util.AtomicValue
+
+	// Container restart Backoff
+	backOff *util.Backoff
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1258,7 +1265,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	err = kl.containerRuntime.SyncPod(pod, runningPod, podStatus, pullSecrets)
+	err = kl.containerRuntime.SyncPod(pod, runningPod, podStatus, pullSecrets, kl.backOff)
 	if err != nil {
 		return err
 	}
@@ -1560,6 +1567,7 @@ func (kl *Kubelet) cleanupPods(allPods []*api.Pod, admittedPods []*api.Pod) erro
 		glog.Errorf("Failed to cleanup terminated pods: %v", err)
 	}
 
+	kl.backOff.GC()
 	return err
 }
 
