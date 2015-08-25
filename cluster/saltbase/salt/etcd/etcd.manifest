@@ -21,6 +21,15 @@
               "-c",
               "/usr/local/bin/etcd --addr 127.0.0.1:4001 --bind-addr 127.0.0.1:4001 --data-dir /var/etcd/data 1>>/var/log/etcd.log 2>&1"
             ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 4001,
+        "path": "/health"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
     "ports":[
       { "name": "serverport",
         "containerPort": 2380,
