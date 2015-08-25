@@ -260,7 +260,7 @@ function verify-cluster {
     echo
     echo "  https://${MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ${KUBECONIG}"
+    echo "The user name and password to use is located in ${KUBECONFIG}"
     echo
     )
 }
