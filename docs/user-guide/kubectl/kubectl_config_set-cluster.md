@@ -42,7 +42,7 @@ Sets a cluster entry in kubeconfig.
 Specifying a name that already exists will merge new fields on top of existing values for those fields.
 
 ```
-kubectl config set-cluster NAME [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]
+kubectl config set-cluster NAME [--server=server] [--certificate-authority=path/to/certificate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]
 ```
 
 ### Examples
