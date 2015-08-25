@@ -464,7 +464,6 @@ function prepare-e2e() {
 
 # Set proxy environment variables
 function setProxy() {
-  source "kube/${KUBE_CONFIG_FILE-"config-default.sh"}"
   if grep -xn 'Defaults env_keep += "http_proxy https_proxy"' /etc/sudoers;then
     echo "proxy env is kept"
     set_env=false
