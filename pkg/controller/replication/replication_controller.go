@@ -202,10 +202,10 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 		return nil
 	}
 	// In theory, overlapping controllers is user error. This sorting will not prevent
-	// osciallation of replicas in all cases, eg:
-	// rc1 (older rc): [(k1:v1)], replicas=1 rc2: [(k2:v2), (k1:v1)], replicas=2
-	// pod: [(k1:v1)] will wake both rc1 and rc2, and we will sync rc1.
-	// pod: [(k2:v2), (k1:v1)] will wake rc2 which creates a new replica.
+	// oscillation of replicas in all cases, eg:
+	// rc1 (older rc): [(k1=v1)], replicas=1 rc2: [(k2=v2)], replicas=2
+	// pod: [(k1:v1), (k2:v2)] will wake both rc1 and rc2, and we will sync rc1.
+	// pod: [(k2:v2)] will wake rc2 which creates a new replica.
 	sort.Sort(overlappingControllers(controllers))
 	return &controllers[0]
 }
