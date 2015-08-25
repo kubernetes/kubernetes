@@ -11934,6 +11934,7 @@
    },
    "v1.ComponentList": {
     "id": "v1.ComponentList",
+    "description": "ComponentList describes a list of components",
     "required": [
      "items"
     ],
@@ -11948,14 +11949,14 @@
      },
      "metadata": {
       "$ref": "v1.ListMeta",
-      "description": "standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1.Component"
       },
-      "description": "list of component objects"
+      "description": "Items is a list of component objects."
      }
     }
    },
@@ -11975,6 +11976,7 @@
    },
    "v1.Component": {
     "id": "v1.Component",
+    "description": "Component describes an instance of a specific type of component, along with its definition and last known status",
     "required": [
      "spec",
      "status"
@@ -11990,35 +11992,36 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1.ComponentSpec",
-      "description": "defines the behavior of the component"
+      "description": "Spec defines the component and how to verify its status. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.ComponentStatus",
-      "description": "last known status of the component"
+      "description": "Status defines the component's last known state. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
    "v1.ComponentSpec": {
     "id": "v1.ComponentSpec",
+    "description": "ComponentSpec defines a component and how to verify its status",
     "required": [
      "type"
     ],
     "properties": {
      "type": {
       "type": "string",
-      "description": "type of the component"
+      "description": "Type of the component"
      },
      "livenessProbe": {
       "$ref": "v1.Probe",
-      "description": "periodic probe of component liveness"
+      "description": "Periodic probe of component liveness."
      },
      "readinessProbe": {
       "$ref": "v1.Probe",
-      "description": "periodic probe of component readiness"
+      "description": "Periodic probe of component readiness."
      }
     }
    },
@@ -12107,33 +12110,35 @@
    },
    "v1.ComponentStatus": {
     "id": "v1.ComponentStatus",
+    "description": "ComponentStatus describes the status of a component",
     "required": [
      "phase"
     ],
     "properties": {
      "phase": {
       "type": "string",
-      "description": "current lifecycle phase of the component"
+      "description": "Phase of the component in its lifecycle"
      },
      "conditions": {
       "type": "array",
       "items": {
        "$ref": "v1.ComponentCondition"
       },
-      "description": "array of historical node conditions"
+      "description": "Conditions of the component relative to the current phase"
      },
      "lastUpdateTime": {
       "type": "string",
-      "description": "last time the component status was updated"
+      "description": "LastUpdateTime of the component status, regardless of previous status."
      },
      "lastTransitionTime": {
       "type": "string",
-      "description": "last time the component status (phase or condition) changed"
+      "description": "LastTransitionTime of the component status, from a different phase and/or condition"
      }
     }
    },
    "v1.ComponentCondition": {
     "id": "v1.ComponentCondition",
+    "description": "ComponentCondition describes the state of a component relative to the current phase",
     "required": [
      "type",
      "status"
@@ -12141,19 +12146,19 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "type of condition: Pending, Running, or Terminated"
+      "description": "Type of condition: Pending, Running, or Terminated"
      },
      "status": {
       "type": "string",
-      "description": "status of the condition: True, False, or Unknown"
+      "description": "Status of the condition: True, False, or Unknown"
+     },
+     "reason": {
+      "type": "string",
+      "description": "Reason for the transition to the current status (machine-readable)"
      },
      "message": {
       "type": "string",
-      "description": "reason (brief) for the transition to this condition"
-     },
-     "error": {
-      "type": "string",
-      "description": "message (detailed) explaining the reason for the transition to this condition"
+      "description": "Message that describes the current status (human-readable)"
      }
     }
    },
@@ -12309,6 +12314,7 @@
    },
    "v1.ComponentStatuses": {
     "id": "v1.ComponentStatuses",
+    "description": "ComponentStatuses describes the set of conditions of a single component instance",
     "properties": {
      "kind": {
       "type": "string",

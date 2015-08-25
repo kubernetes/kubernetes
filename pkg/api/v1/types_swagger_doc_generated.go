@@ -69,7 +69,64 @@ func (Capabilities) SwaggerDoc() map[string]string {
 	return map_Capabilities
 }
 
+var map_Component = map[string]string{
+	"":         "Component describes an instance of a specific type of component, along with its definition and last known status",
+	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"spec":     "Spec defines the component and how to verify its status. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"status":   "Status defines the component's last known state. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+}
+
+func (Component) SwaggerDoc() map[string]string {
+	return map_Component
+}
+
+var map_ComponentCondition = map[string]string{
+	"":        "ComponentCondition describes the state of a component relative to the current phase",
+	"type":    "Type of condition: Pending, Running, or Terminated",
+	"status":  "Status of the condition: True, False, or Unknown",
+	"reason":  "Reason for the transition to the current status (machine-readable)",
+	"message": "Message that describes the current status (human-readable)",
+}
+
+func (ComponentCondition) SwaggerDoc() map[string]string {
+	return map_ComponentCondition
+}
+
+var map_ComponentList = map[string]string{
+	"":         "ComponentList describes a list of components",
+	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"items":    "Items is a list of component objects.",
+}
+
+func (ComponentList) SwaggerDoc() map[string]string {
+	return map_ComponentList
+}
+
+var map_ComponentSpec = map[string]string{
+	"":               "ComponentSpec defines a component and how to verify its status",
+	"type":           "Type of the component",
+	"livenessProbe":  "Periodic probe of component liveness.",
+	"readinessProbe": "Periodic probe of component readiness.",
+}
+
+func (ComponentSpec) SwaggerDoc() map[string]string {
+	return map_ComponentSpec
+}
+
+var map_ComponentStatus = map[string]string{
+	"":                   "ComponentStatus describes the status of a component",
+	"phase":              "Phase of the component in its lifecycle",
+	"conditions":         "Conditions of the component relative to the current phase",
+	"lastUpdateTime":     "LastUpdateTime of the component status, regardless of previous status.",
+	"lastTransitionTime": "LastTransitionTime of the component status, from a different phase and/or condition",
+}
+
+func (ComponentStatus) SwaggerDoc() map[string]string {
+	return map_ComponentStatus
+}
+
 var map_ComponentStatuses = map[string]string{
+	"":           "ComponentStatuses describes the set of conditions of a single component instance",
 	"metadata":   "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"conditions": "List of component statuses conditions observed",
 }

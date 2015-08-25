@@ -2494,68 +2494,106 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
+// ComponentType indicates a component group which may have one or more component instances
 type ComponentType string
 
 const (
-	ComponentAPIServer         ComponentType = "apiserver"
+	// ComponentAPIServer describes a component that exposes the Kubernetes API
+	ComponentAPIServer ComponentType = "apiserver"
+	// ComponentControllerManager describes a component that manages controllers
 	ComponentControllerManager ComponentType = "controller-manager"
-	ComponentScheduler         ComponentType = "scheduler"
+	// ComponentScheduler describes a component that schedules pod deployment and state changes
+	ComponentScheduler ComponentType = "scheduler"
 )
 
+// ComponentSpec defines a component and how to verify its status
 type ComponentSpec struct {
-	Type           ComponentType `json:"type" description:"type of the component"`
-	LivenessProbe  *Probe        `json:"livenessProbe,omitempty" description:"periodic probe of component liveness"`
-	ReadinessProbe *Probe        `json:"readinessProbe,omitempty" description:"periodic probe of component readiness"`
+	// Type of the component
+	Type ComponentType `json:"type"`
+	// Periodic probe of component liveness.
+	LivenessProbe *Probe `json:"livenessProbe,omitempty"`
+	// Periodic probe of component readiness.
+	ReadinessProbe *Probe `json:"readinessProbe,omitempty"`
 }
 
+// ComponentPhase describes a single stage of the component lifecycle
 type ComponentPhase string
 
 const (
-	ComponentPending    ComponentPhase = "Pending"
-	ComponentRunning    ComponentPhase = "Running"
+	// ComponentPending describes a component that is starting but not yet ready for use
+	ComponentPending ComponentPhase = "Pending"
+	// ComponentRunning describes a component that should be ready for use
+	ComponentRunning ComponentPhase = "Running"
+	// ComponentTerminated describes a component that has been shut down or has become unresponsive
 	ComponentTerminated ComponentPhase = "Terminated"
 )
 
+// ComponentConditionType describes a type of component condition
 type ComponentConditionType string
 
 const (
-	ComponentRunningHealthy    ComponentConditionType = "Healthy"
+	// ComponentRunningHealthy describes a running component that is ready for use
+	ComponentRunningHealthy ComponentConditionType = "Healthy"
+	// ComponentTerminatedCleanly describes a terminated component that exited without error
 	ComponentTerminatedCleanly ComponentConditionType = "Cleanly"
 )
 
+// ComponentCondition describes the state of a component relative to the current phase
 type ComponentCondition struct {
-	Type    ComponentConditionType `json:"type" description:"type of condition: Pending, Running, or Terminated"`
-	Status  ConditionStatus        `json:"status" description:"status of the condition: True, False, or Unknown"`
-	Reason  string                 `json:"message,omitempty" description:"reason (brief) for the transition to this condition"`
-	Message string                 `json:"error,omitempty" description:"message (detailed) explaining the reason for the transition to this condition"`
+	// Type of condition: Pending, Running, or Terminated
+	Type ComponentConditionType `json:"type"`
+	// Status of the condition: True, False, or Unknown
+	Status ConditionStatus `json:"status"`
+	// Reason for the transition to the current status (machine-readable)
+	Reason string `json:"reason,omitempty"`
+	// Message that describes the current status (human-readable)
+	Message string `json:"message,omitempty"`
 }
 
+// ComponentStatus describes the status of a component
 type ComponentStatus struct {
-	Phase              ComponentPhase       `json:"phase" description:"current lifecycle phase of the component"`
-	Conditions         []ComponentCondition `json:"conditions,omitempty" description:"array of historical node conditions"`
-	LastUpdateTime     util.Time            `json:"lastUpdateTime,omitempty" description:"last time the component status was updated"`
-	LastTransitionTime util.Time            `json:"lastTransitionTime,omitempty" description:"last time the component status (phase or condition) changed"`
+	// Phase of the component in its lifecycle
+	Phase ComponentPhase `json:"phase"`
+	// Conditions of the component relative to the current phase
+	Conditions []ComponentCondition `json:"conditions,omitempty"`
+	// LastUpdateTime of the component status, regardless of previous status.
+	LastUpdateTime util.Time `json:"lastUpdateTime,omitempty"`
+	// LastTransitionTime of the component status, from a different phase and/or condition
+	LastTransitionTime util.Time `json:"lastTransitionTime,omitempty"`
 }
 
+// Component describes an instance of a specific type of component, along with its definition and last known status
 type Component struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+	TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ComponentSpec `json:"spec" description:"defines the behavior of the component"`
+	// Spec defines the component and how to verify its status.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Spec ComponentSpec `json:"spec"`
 
-	Status ComponentStatus `json:"status" description:"last known status of the component"`
+	// Status defines the component's last known state.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	Status ComponentStatus `json:"status"`
 }
 
+// ComponentList describes a list of components
 type ComponentList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	ListMeta `json:"metadata,omitempty"`
 
-	Items []Component `json:"items" description:"list of component objects"`
+	// Items is a list of component objects.
+	Items []Component `json:"items"`
 }
 
+// ComponentStatusesConditionType describes a type of component statuses condition
 type ComponentStatusesConditionType string
 
 const (
+	// ComponentStatusesHealthy describes a component that is ready to use
 	ComponentStatusesHealthy ComponentStatusesConditionType = "Healthy"
 )
 
@@ -2575,6 +2613,7 @@ type ComponentStatusesCondition struct {
 	Error string `json:"error,omitempty"`
 }
 
+// ComponentStatuses describes the set of conditions of a single component instance
 type ComponentStatuses struct {
 	TypeMeta `json:",inline"`
 	// Standard object's metadata.
