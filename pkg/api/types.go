@@ -660,9 +660,9 @@ type ExecAction struct {
 type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
-	// Length of time before health checking is activated.  In seconds.
+	// Length of time before probing is expected to succeed.  In seconds.
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
-	// Length of time before health checking times out.  In seconds.
+	// Length of time before an individual probe attempt times out.  In seconds.
 	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
 }
 

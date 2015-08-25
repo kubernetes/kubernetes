@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
+	"sync"
 )
 
 const maxProbeRetries = 3
@@ -63,76 +64,89 @@ func New(
 
 // Probe checks the liveness/readiness of the given component.
 func (pb *prober) Probe(component *api.Component) (probe.Result, error) {
-	pb.probeReadiness(component)
-	return pb.probeLiveness(component)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		pb.probeReadiness(component)
+	}()
+	result, err := pb.probeLiveness(component)
+	wg.Wait()
+	return result, err
 }
 
 // probeLiveness probes the liveness of a component.
 // If the initalDelay since component creation on liveness probe has not passed the probe will return probe.Success.
 func (pb *prober) probeLiveness(component *api.Component) (probe.Result, error) {
-	var live probe.Result
-	var output string
-	var err error
 	p := component.Spec.LivenessProbe
+
+	// assume ready if no LivenessProbe was provided
 	if p == nil {
-		return probe.Success, nil
+		ready := probe.Success
+		glog.V(3).Infof("Liveness probe (%s) for component %q (not configured)", ready, component.Name)
+		return ready, nil
 	}
-	if time.Now().Unix()-component.CreationTimestamp.Unix() < p.InitialDelaySeconds {
-		return probe.Success, nil
-	} else {
-		live, output, err = pb.runProbeWithRetries(p, component, maxProbeRetries)
+
+	ready, output, err := pb.runProbeWithRetries(p, component, maxProbeRetries)
+	if err != nil {
+		glog.V(1).Infof("Liveness probe (error) for component %q: %v", component.Name, err)
+		return probe.Unknown, err
 	}
-	if err != nil || live != probe.Success {
-		// Liveness failed in one way or another.
-		if err != nil {
-			glog.V(1).Infof("Liveness probe for %q errored: %v", component.Name, err)
-			return probe.Unknown, err
-		} else { // live != probe.Success
-			glog.V(1).Infof("Liveness probe for %q failed (%v): %s", component.Name, live, output)
-			return live, nil
-		}
+
+	// don't expect success until after InitialDelaySeconds
+	if ready != probe.Success && time.Now().Unix()-component.CreationTimestamp.Unix() < p.InitialDelaySeconds {
+		glog.V(3).Infof(
+			"Liveness probe (%s) for component %q: within initial delay (%s)",
+			ready,
+			component.Name,
+			time.Duration(p.InitialDelaySeconds)*time.Second,
+		)
+		return probe.Unknown, nil
 	}
-	glog.V(3).Infof("Liveness probe for %q succeeded", component.Name)
-	return probe.Success, nil
+
+	glog.V(1).Infof("Liveness probe (%s) for component %q: %s", ready, component.Name, output)
+	return ready, nil
 }
 
 // probeReadiness probes and sets the readiness of a component.
 // If the initial delay on the readiness probe has not passed, we set readiness to false.
 func (pb *prober) probeReadiness(component *api.Component) {
-	var ready probe.Result
-	var output string
-	var err error
 	p := component.Spec.ReadinessProbe
+
+	// assume ready if no ReadinessProbe was provided
 	if p == nil {
-		ready = probe.Success
-	} else if time.Now().Unix()-component.CreationTimestamp.Unix() < p.InitialDelaySeconds {
-		ready = probe.Failure
-	} else {
-		ready, output, err = pb.runProbeWithRetries(p, component, maxProbeRetries)
-	}
-	if err != nil || ready == probe.Failure {
-		// Readiness failed in one way or another.
-		if err != nil {
-			glog.V(1).Infof("readiness probe for %q errored: %v", component.Name, err)
-			return
-		} else { // ready != probe.Success
-			glog.V(1).Infof("Readiness probe for %q failed (%v): %s", component.Name, ready, output)
-			return
-		}
-	}
-	if err != nil {
-		glog.V(1).Infof("readiness probe for %q errored: %v", component.Name, err)
-		return
-	}
-	if ready == probe.Failure {
-		glog.V(1).Infof("Readiness probe for %q failed (%v): %s", component.Name, ready, output)
-		return
-	}
-	if ready == probe.Success {
+		ready := probe.Success
 		pb.readinessManager.SetReadiness(component.Name, true)
+		glog.V(3).Infof("Readiness probe (%s) for component %q (not configured)", ready, component.Name)
+		return
 	}
 
-	glog.V(3).Infof("Readiness probe for %q succeeded", component.Name)
+	ready, output, err := pb.runProbeWithRetries(p, component, maxProbeRetries)
+	if err != nil {
+		glog.V(1).Infof("Readiness probe (error) for component %q: %v", component.Name, err)
+		return
+	}
+
+	// don't expect success until after InitialDelaySeconds
+	if ready != probe.Success && time.Now().Unix()-component.CreationTimestamp.Unix() < p.InitialDelaySeconds {
+		glog.V(3).Infof(
+			"Readiness probe (%s) for component %q: within initial delay (%s)",
+			ready,
+			component.Name,
+			time.Duration(p.InitialDelaySeconds)*time.Second,
+		)
+		return
+	}
+
+	glog.V(1).Infof("Readiness probe (%s) for component %q: %s", ready, component.Name, output)
+
+	switch ready {
+	case probe.Failure:
+		pb.readinessManager.SetReadiness(component.Name, false)
+	case probe.Success:
+		pb.readinessManager.SetReadiness(component.Name, true)
+	}
+	// do nothing if readiness is Unknown
 }
 
 // runProbeWithRetries tries to probe the component in a finite loop, it returns the last result
@@ -153,20 +167,20 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, component *api.Component, re
 func (pb *prober) runProbe(p *api.Probe, component *api.Component) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
-		return probe.Unknown, "", fmt.Errorf("Unsupported probe type (exec) for component: %v", component.Name)
+		return probe.Unknown, "", fmt.Errorf("Unsupported probe type (exec) for component %q", component.Name)
 	}
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
 		host := p.HTTPGet.Host
 		if host == "" {
-			return probe.Unknown, "", fmt.Errorf("Missing http probe host for component: %v", component.Name)
+			return probe.Unknown, "", fmt.Errorf("Missing http probe host for component %q", component.Name)
 		}
 		port, err := extractPort(p.HTTPGet.Port, component)
 		if err != nil {
 			return probe.Unknown, "", err
 		}
 		path := p.HTTPGet.Path
-		glog.V(4).Infof("HTTP-Probe - Component: %q, Host: %v://%v, Port: %v, Path: %v", component.Name, scheme, host, port, path)
+		glog.V(4).Infof("HTTP-Probe - Component: %q, Host: %v://%v, Port: %v, Path: %v, Timeout: %v", component.Name, scheme, host, port, path, timeout)
 		url := formatURL(scheme, host, port, path)
 		return pb.http.Probe(url, timeout)
 	}
@@ -177,7 +191,7 @@ func (pb *prober) runProbe(p *api.Probe, component *api.Component) (probe.Result
 		}
 		host := p.TCPSocket.Host
 		if host == "" {
-			return probe.Unknown, "", fmt.Errorf("Missing tcp probe host for component: %v", component.Name)
+			return probe.Unknown, "", fmt.Errorf("Missing tcp probe host for component %q", component.Name)
 		}
 		glog.V(4).Infof("TCP-Probe - Component: %q, Host: tcp://%v, Port: %v, Timeout: %v", component.Name, host, port, timeout)
 		return pb.tcp.Probe(host, port, timeout)

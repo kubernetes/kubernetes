@@ -1012,8 +1012,8 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 
 var map_Probe = map[string]string{
 	"": "Probe describes a liveness probe to be examined to the container.",
-	"initialDelaySeconds": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
-	"timeoutSeconds":      "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
+	"initialDelaySeconds": "Number of seconds after creation before probes are expected to succeed. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
+	"timeoutSeconds":      "Number of seconds after which an individual probe attempt times out. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
 }
 
 func (Probe) SwaggerDoc() map[string]string {

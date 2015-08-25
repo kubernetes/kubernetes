@@ -82,6 +82,11 @@ func (e *ComponentController) watcher() {
 		glog.Warningf("Failed to list components: %v", err)
 	}
 	for _, component := range list.Items {
+		// do not probe terminated components
+		if component.Status.Phase == api.ComponentTerminated {
+			continue
+		}
+
 		// TODO: clean up storage to do proper syncing
 		created := e.componentStore.Create(component.Name, component)
 		if !created {
@@ -125,13 +130,13 @@ func (e *ComponentController) probeComponent(componentName string) {
 	component, found := e.componentStore.Read(componentName)
 	if !found {
 		//TODO: what does this mean?
-		glog.Warningf("Unknown component dequeued by worker: %q", componentName)
+		glog.Warningf("Component %q unknown - dequeued by worker: %q", componentName)
 		return
 	}
 
 	result, err := e.prober.Probe(&component)
 	if err != nil {
-		glog.Warningf("Failed to probe component %q: %v", componentName, err)
+		glog.Warningf("Component %q probe errored: %v", componentName, err)
 		return
 	}
 
@@ -148,17 +153,17 @@ func (e *ComponentController) probeComponent(componentName string) {
 
 	newComponent, err := e.client.ComponentsClient().UpdateStatus(&component)
 	if err != nil {
-		glog.Errorf("Failed to update component state: %q %v", componentName, err)
+		glog.Errorf("failed to update component %q status: %v", componentName, err)
 	}
 	updated := e.componentStore.Update(componentName, *newComponent)
 	if !updated {
-		glog.Warningf("Component %q not cached, skipping cache update", componentName)
+		glog.Warningf("Component %q not cached - skipping cache update", componentName)
 		//TODO: does this mean the component record was removed form the cache while still in the queue?
 	}
 }
 
 func (e *ComponentController) handleProbeSuccess(component *api.Component) {
-	glog.V(4).Infof("Component probe success: %q", component.Name)
+	glog.V(3).Infof("Component %q alive", component.Name)
 
 	ready := e.readinessManager.GetReadiness(component.Name)
 
@@ -173,7 +178,7 @@ func (e *ComponentController) handleProbeSuccess(component *api.Component) {
 					Status: api.ConditionTrue,
 				},
 			}
-			glog.V(4).Infof("Component transitioning to running/healthy: %q", component.Name)
+			glog.V(3).Infof("Component transitioning to running/healthy: %q", component.Name)
 		}
 	case api.ComponentRunning:
 		if ready {
@@ -183,7 +188,7 @@ func (e *ComponentController) handleProbeSuccess(component *api.Component) {
 					Status: api.ConditionTrue,
 				},
 			}
-			glog.V(4).Infof("Component healthy: %q", component.Name)
+			glog.V(3).Infof("Component %q Running/Healthy", component.Name)
 		} else {
 			component.Status.Conditions = []api.ComponentCondition{
 				{
@@ -191,25 +196,27 @@ func (e *ComponentController) handleProbeSuccess(component *api.Component) {
 					Status: api.ConditionFalse,
 				},
 			}
-			glog.V(4).Infof("Component unhealthy: %q", component.Name)
+			glog.V(3).Infof("Component %q Running/Unhealthy", component.Name)
 		}
 	case api.ComponentTerminated:
-		glog.Warningf("Component alive after termination: %q", component.Name)
+		glog.Warningf("Component %q alive after termination", component.Name)
 	default:
-		glog.Warningf("Unknown component phase: %+v", component)
+		glog.Warningf("Component %q phase unknown: %+v", component.Name, component)
 	}
 }
 
 func (e *ComponentController) handleProbeFailure(component *api.Component) {
-	glog.V(4).Infof("component probe failure: %q", component.Name)
+	glog.V(3).Infof("Component %q not alive", component.Name)
 
 	component.Status.Phase = api.ComponentTerminated
-	component.Status.Conditions = []api.ComponentCondition{}
+	component.Status.Conditions = []api.ComponentCondition{
+		{
+			Type:   api.ComponentTerminatedCleanly,
+			Status: api.ConditionFalse,
+		},
+	}
 }
 
 func (e *ComponentController) handleProbeUnknown(component *api.Component) {
-	glog.V(4).Infof("component probe unknown: %q", component.Name)
-
-	component.Status.Phase = api.ComponentTerminated
-	component.Status.Conditions = []api.ComponentCondition{}
+	glog.V(3).Infof("Component %q liveness unknown", component.Name)
 }

@@ -12041,12 +12041,12 @@
      "initialDelaySeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+      "description": "Number of seconds after creation before probes are expected to succeed. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "timeoutSeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "Number of seconds after which liveness probes timeout. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
+      "description": "Number of seconds after which an individual probe attempt times out. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      }
     }
    },

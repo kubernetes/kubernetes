@@ -806,10 +806,10 @@ type ExecAction struct {
 type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
-	// Number of seconds after the container has started before liveness probes are initiated.
+	// Number of seconds after creation before probes are expected to succeed.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
-	// Number of seconds after which liveness probes timeout.
+	// Number of seconds after which an individual probe attempt times out.
 	// Defaults to 1 second.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
 	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
