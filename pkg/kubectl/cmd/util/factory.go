@@ -79,7 +79,7 @@ type Factory struct {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// Returns a schema that can validate objects stored on disk.
-	Validator func() (validation.Schema, error)
+	Validator func(validate bool) (validation.Schema, error)
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overriden.
@@ -247,8 +247,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return kubectl.ReaperFor(mapping.Kind, client, expClient)
 		},
-		Validator: func() (validation.Schema, error) {
-			if flags.Lookup("validate").Value.String() == "true" {
+		Validator: func(validate bool) (validation.Schema, error) {
+			if validate {
 				client, err := clients.ClientForVersion("")
 				if err != nil {
 					return nil, err
@@ -272,12 +272,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
 	flags.AddGoFlagSet(flag.CommandLine)
-
-	// Hack for global access to validation flag.
-	// TODO: Refactor out after configuration flag overhaul.
-	if f.flags.Lookup("validate") == nil {
-		f.flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
-	}
 
 	// Merge factory's flags
 	flags.AddFlagSet(f.flags)

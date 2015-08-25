@@ -85,6 +85,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
 	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
+	cmdutil.AddValidateFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	return cmd
 }
@@ -163,7 +164,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	mapper, typer := f.Object()
 
 	if len(filename) != 0 {
-		schema, err := f.Validator()
+		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 		if err != nil {
 			return err
 		}

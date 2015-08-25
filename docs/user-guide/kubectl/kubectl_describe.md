@@ -113,7 +113,6 @@ $ kubectl describe pods frontend
       --user="": The name of the kubeconfig user to use
       --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
-      --validate[=false]: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
 ```
 
