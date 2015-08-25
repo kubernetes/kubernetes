@@ -32,7 +32,6 @@ import (
 
 // AnnotateOptions have the data required to perform the annotate operation
 type AnnotateOptions struct {
-	out               io.Writer
 	resources         []string
 	newAnnotations    map[string]string
 	removeAnnotations []string
@@ -87,7 +86,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: annotate_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			options.filenames = cmdutil.GetFlagStringSlice(cmd, "filename")
-			if err := options.Complete(f, args, out); err != nil {
+			if err := options.Complete(f, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(args); err != nil {
@@ -98,7 +97,6 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			}
 		},
 	}
-	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
@@ -108,7 +106,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *AnnotateOptions) Complete(f *cmdutil.Factory, args []string, out io.Writer) (err error) {
+func (o *AnnotateOptions) Complete(f *cmdutil.Factory, args []string) (err error) {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

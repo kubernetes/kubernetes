@@ -401,7 +401,7 @@ func TestAnnotateErrors(t *testing.T) {
 			cmd.Flags().Set(k, v)
 		}
 		options := &AnnotateOptions{}
-		err := options.Complete(f, testCase.args, buf)
+		err := options.Complete(f, testCase.args)
 		if !testCase.errFn(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
@@ -448,11 +448,10 @@ func TestAnnotateObject(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &client.Config{Version: testapi.Version()}
-	buf := bytes.NewBuffer([]byte{})
 
 	options := &AnnotateOptions{}
 	args := []string{"pods/foo", "a=b", "c-"}
-	if err := options.Complete(f, args, buf); err != nil {
+	if err := options.Complete(f, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(args); err != nil {
@@ -496,12 +495,11 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &client.Config{Version: testapi.Version()}
-	buf := bytes.NewBuffer([]byte{})
 
 	options := &AnnotateOptions{}
 	options.filenames = []string{"../../../examples/cassandra/cassandra.yaml"}
 	args := []string{"a=b", "c-"}
-	if err := options.Complete(f, args, buf); err != nil {
+	if err := options.Complete(f, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(args); err != nil {
@@ -547,12 +545,11 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &client.Config{Version: testapi.Version()}
-	buf := bytes.NewBuffer([]byte{})
 
 	options := &AnnotateOptions{}
 	options.all = true
 	args := []string{"pods", "a=b", "c-"}
-	if err := options.Complete(f, args, buf); err != nil {
+	if err := options.Complete(f, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(args); err != nil {
