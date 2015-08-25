@@ -71,7 +71,7 @@ Kubernetes API server to provide the following features:
    * Watch for resource changes.
 
 The `Kind` for an instance of a third-party object (e.g. CronTab) below is expected to be
-programnatically convertible to the name of the resource using
+programmatically convertible to the name of the resource using
 the following conversion.  Kinds are expected to be of the form `<CamelCaseKind>`, the
 `APIVersion` for the object is expected to be `<domain-name>/<api-group>/<api-version>`.
 
@@ -178,7 +178,7 @@ and get back:
 }
 ```
 
-Because all objects are expected to contain standard Kubernetes metdata fileds, these
+Because all objects are expected to contain standard Kubernetes metadata fields, these
 list operations can also use `Label` queries to filter requests down to specific subsets.
 
 Likewise, clients can use watch endpoints to watch for changes to stored objects.

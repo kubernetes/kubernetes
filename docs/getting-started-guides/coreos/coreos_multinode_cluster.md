@@ -215,7 +215,7 @@ where ```<ip address>``` is the IP address that was available from the ```nova f
 
 #### Provision Worker Nodes
 
-Edit ```node.yaml``` and replace all instances of ```<master-private-ip>``` with the private IP address of the master node.  You can get this by runnning ```nova show kube-master``` assuming you named your instance kube master.  This is not the floating IP address you just assigned it.
+Edit ```node.yaml``` and replace all instances of ```<master-private-ip>``` with the private IP address of the master node.  You can get this by running ```nova show kube-master``` assuming you named your instance kube master.  This is not the floating IP address you just assigned it.
 
 ```sh
 nova boot \

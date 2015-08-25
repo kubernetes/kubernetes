@@ -196,7 +196,7 @@ TotalResourceLimits:
 [ ... lines removed for clarity ...]
 ```
 
-Here you can see from the `Allocated resorces` section that that a pod which ask for more than
+Here you can see from the `Allocated resources` section that that a pod which ask for more than
 90 millicpus or more than 1341MiB of memory will not be able to fit on this node.
 
 Looking at the `Pods` section, you can see which pods are taking up space on the node.
