@@ -101,6 +101,12 @@ func TestCreate(t *testing.T) {
 	test.TestCreate(
 		// valid
 		pod,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid (empty contains list)
 		&api.Pod{
 			Spec: api.PodSpec{
@@ -491,25 +497,6 @@ func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 	// Accept "namespace" or "Namespace".
 	if err == nil || !strings.Contains(err.Error(), "amespace") {
 		t.Fatalf("expected error that namespace was missing from context, got: %v", err)
-	}
-}
-
-func TestEtcdCreateAlreadyExisting(t *testing.T) {
-	storage, _, _, fakeClient := newStorage(t)
-	ctx := api.NewDefaultContext()
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(testapi.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
-			},
-		},
-		E: nil,
-	}
-	_, err := storage.Create(ctx, validNewPod())
-	if !errors.IsAlreadyExists(err) {
-		t.Errorf("Unexpected error returned: %#v", err)
 	}
 }
 
