@@ -18,6 +18,7 @@ package rkt
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -42,6 +43,21 @@ const (
 	// The prefix before the app name for each app's exit code in the output of 'rkt status'.
 	exitCodePrefix = "app-"
 )
+
+// rktInfo represents the information of the rkt pod that stored in the
+// systemd service file.
+type rktInfo struct {
+	uuid         string
+	restartCount int
+}
+
+func emptyRktInfo() *rktInfo {
+	return &rktInfo{restartCount: -1}
+}
+
+func (r *rktInfo) isEmpty() bool {
+	return reflect.DeepEqual(r, emptyRktInfo())
+}
 
 // podInfo is the internal type that represents the state of
 // the rkt pod.
@@ -122,15 +138,15 @@ func getIPFromNetworkInfo(networkInfo string) string {
 	return ""
 }
 
-// getContainerStatus creates the api.containerStatus of a container from the podInfo.
-func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.ContainerStatus {
+// makeContainerStatus creates the api.containerStatus of a container from the podInfo.
+func makeContainerStatus(container *kubecontainer.Container, podInfo *podInfo) api.ContainerStatus {
 	var status api.ContainerStatus
 	status.Name = container.Name
 	status.Image = container.Image
 	status.ContainerID = string(container.ID)
 	// TODO(yifan): Add image ID info.
 
-	switch p.state {
+	switch podInfo.state {
 	case Running:
 		// TODO(yifan): Get StartedAt.
 		status.State = api.ContainerState{
@@ -141,7 +157,7 @@ func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.Con
 	case Embryo, Preparing, Prepared:
 		status.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
 	case AbortedPrepare, Deleting, Exited, Garbage:
-		exitCode, ok := p.exitCodes[status.Name]
+		exitCode, ok := podInfo.exitCodes[status.Name]
 		if !ok {
 			glog.Warningf("rkt: Cannot get exit code for container %v", container)
 			exitCode = -1
@@ -154,18 +170,20 @@ func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.Con
 			},
 		}
 	default:
-		glog.Warningf("rkt: Unknown pod state: %q", p.state)
+		glog.Warningf("rkt: Unknown pod state: %q", podInfo.state)
 	}
 	return status
 }
 
-// toPodStatus converts a podInfo type into an api.PodStatus type.
-func (p *podInfo) toPodStatus(pod *kubecontainer.Pod) api.PodStatus {
+// makePodStatus constructs the pod status from the pod info and rkt info.
+func makePodStatus(pod *kubecontainer.Pod, podInfo *podInfo, rktInfo *rktInfo) api.PodStatus {
 	var status api.PodStatus
-	status.PodIP = p.ip
+	status.PodIP = podInfo.ip
 	// For now just make every container's state the same as the pod.
 	for _, container := range pod.Containers {
-		status.ContainerStatuses = append(status.ContainerStatuses, p.getContainerStatus(container))
+		containerStatus := makeContainerStatus(container, podInfo)
+		containerStatus.RestartCount = rktInfo.restartCount
+		status.ContainerStatuses = append(status.ContainerStatuses, containerStatus)
 	}
 	return status
 }
