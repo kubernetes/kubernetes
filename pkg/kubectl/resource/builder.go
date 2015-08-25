@@ -184,6 +184,28 @@ func (b *Builder) ResourceTypes(types ...string) *Builder {
 	return b
 }
 
+// ResourceNames accepts a default type and one or more names, and creates tuples of
+// resources
+func (b *Builder) ResourceNames(resource string, names ...string) *Builder {
+	for _, name := range names {
+		// See if this input string is of type/name format
+		tuple, ok, err := splitResourceTypeName(name)
+		if err != nil {
+			b.errs = append(b.errs, err)
+			return b
+		}
+
+		if ok {
+			b.resourceTuples = append(b.resourceTuples, tuple)
+			continue
+		}
+
+		// Use the given default type to create a resource tuple
+		b.resourceTuples = append(b.resourceTuples, resourceTuple{Resource: resource, Name: name})
+	}
+	return b
+}
+
 // SelectorParam defines a selector that should be applied to the object types to load.
 // This will not affect files loaded from disk or URL. If the parameter is empty it is
 // a no-op - to select all resources invoke `b.Selector(labels.Everything)`.
@@ -279,17 +301,14 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 			return b
 		}
 		for _, s := range args {
-			seg := strings.Split(s, "/")
-			if len(seg) != 2 {
-				b.errs = append(b.errs, fmt.Errorf("arguments in resource/name form may not have more than one slash"))
+			tuple, ok, err := splitResourceTypeName(s)
+			if err != nil {
+				b.errs = append(b.errs, err)
 				return b
 			}
-			resource, name := seg[0], seg[1]
-			if len(resource) == 0 || len(name) == 0 || len(SplitResourceArgument(resource)) != 1 {
-				b.errs = append(b.errs, fmt.Errorf("arguments in resource/name form must have a single resource and name"))
-				return b
+			if ok {
+				b.resourceTuples = append(b.resourceTuples, tuple)
 			}
-			b.resourceTuples = append(b.resourceTuples, resourceTuple{Resource: resource, Name: name})
 		}
 		return b
 	}
@@ -344,6 +363,23 @@ func hasCombinedTypeArgs(args []string) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+// splitResourceTypeName handles type/name resource formats and returns a resource tuple
+// (empty or not), whether it successfully found one, and an error
+func splitResourceTypeName(s string) (resourceTuple, bool, error) {
+	if !strings.Contains(s, "/") {
+		return resourceTuple{}, false, nil
+	}
+	seg := strings.Split(s, "/")
+	if len(seg) != 2 {
+		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form may not have more than one slash")
+	}
+	resource, name := seg[0], seg[1]
+	if len(resource) == 0 || len(name) == 0 || len(SplitResourceArgument(resource)) != 1 {
+		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form must have a single resource and name")
+	}
+	return resourceTuple{Resource: resource, Name: name}, true, nil
 }
 
 // Flatten will convert any objects with a field named "Items" that is an array of runtime.Object
