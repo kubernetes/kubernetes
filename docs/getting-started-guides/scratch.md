@@ -235,7 +235,7 @@ You have several choices for Kubernetes images:
   - The release contains files such as `./kubernetes/server/bin/kube-apiserver.tar` which
     can be converted into docker images using a command like
     `docker load -i kube-apiserver.tar`
-  - You can verify if the image is loaded successfully with the right reposity and tag using
+  - You can verify if the image is loaded successfully with the right repository and tag using
     command like `docker images`
 
 For etcd, you can:
