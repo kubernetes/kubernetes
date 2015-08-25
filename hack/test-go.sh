@@ -58,7 +58,11 @@ KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1"}
 # (kubernetes.io/registry).
 KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
 # Create a junit-style XML test report in this directory if set.
+# Requires github.com/jstemmer/go-junit-report.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
+# Create a Cobertura-style XML coverage report in this directory if set.
+# Requires github.com/axw/gocov/gocov and github.com/t-yuki/gocov-xml.
+KUBE_COVERAGE_XML_DIR=${KUBE_COVERAGE_XML_DIR:-}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -144,11 +148,7 @@ produceJUnitXMLReport() {
   local junit_xml_filename
   test_stdout_filenames=$(ls ${junit_filename_prefix}*.stdout)
   junit_xml_filename="${junit_filename_prefix}.xml"
-  if ! command -v go-junit-report >/dev/null 2>&1; then
-    kube::log::error "go-junit-report not found; please install with " \
-      "go get -u github.com/jstemmer/go-junit-report"
-    return
-  fi
+  kube::util::check-tool-installed "github.com/jstemmer/go-junit-report"
   cat ${test_stdout_filenames} | go-junit-report > "${junit_xml_filename}"
   rm ${test_stdout_filenames}
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
@@ -205,7 +205,8 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_API_VERSION}/$(kube::util::sortable_date)"
+  cover_report_name="${KUBE_API_VERSION}_$(kube::util::sortable_date)"
+  cover_report_dir="/tmp/k8s_coverage/${cover_report_name}"
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"
@@ -251,6 +252,15 @@ runTests() {
   coverage_html_file="${cover_report_dir}/combined-coverage.html"
   go tool cover -html="${COMBINED_COVER_PROFILE}" -o="${coverage_html_file}"
   kube::log::status "Combined coverage report: ${coverage_html_file}"
+
+  if [[ -n "${KUBE_COVERAGE_XML_DIR}" ]]; then
+    kube::util::check-tool-installed "github.com/axw/gocov/gocov"
+    kube::util::check-tool-installed "github.com/t-yuki/gocov-xml"
+    mkdir -p "${KUBE_COVERAGE_XML_DIR}"
+    local -r coverage_xml_file="${KUBE_COVERAGE_XML_DIR}/coverage_${cover_report_name}.xml"
+    gocov convert "${COMBINED_COVER_PROFILE}" | gocov-xml >"${coverage_xml_file}"
+    kube::log::status "Saved coverage XML report: ${coverage_xml_file}"
+  fi
 
   return ${test_result}
 }
