@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/registry/resourcequota"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
@@ -69,11 +68,6 @@ func validChangedResourceQuota() *api.ResourceQuota {
 		"foo": "bar",
 	}
 	return resourcequota
-}
-
-func TestStorage(t *testing.T) {
-	storage, _, _ := newStorage(t)
-	resourcequota.NewRegistry(storage)
 }
 
 func TestCreate(t *testing.T) {
