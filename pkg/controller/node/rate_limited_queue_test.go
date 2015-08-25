@@ -161,10 +161,10 @@ func TestTryOrdering(t *testing.T) {
 	queued := false
 	evictor.Try(func(value TimedValue) (bool, time.Duration) {
 		count++
-		if value.Added.IsZero() {
+		if value.AddedAt.IsZero() {
 			t.Fatalf("added should not be zero")
 		}
-		if value.Next.IsZero() {
+		if value.ProcessAt.IsZero() {
 			t.Fatalf("next should not be zero")
 		}
 		if !queued && value.Value == "second" {
@@ -178,6 +178,52 @@ func TestTryOrdering(t *testing.T) {
 		t.Fatalf("order was wrong: %v", order)
 	}
 	if count != 4 {
+		t.Fatalf("unexpected iterations: %d", count)
+	}
+}
+
+func TestTryRemovingWhileTry(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(util.NewFakeRateLimiter(), false)
+	evictor.Add("first")
+	evictor.Add("second")
+	evictor.Add("third")
+
+	processing := make(chan struct{})
+	wait := make(chan struct{})
+	order := []string{}
+	count := 0
+	queued := false
+
+	// while the Try function is processing "second", remove it from the queue
+	// we should not see "second" retried.
+	go func() {
+		<-processing
+		evictor.Remove("second")
+		close(wait)
+	}()
+
+	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+		count++
+		if value.AddedAt.IsZero() {
+			t.Fatalf("added should not be zero")
+		}
+		if value.ProcessAt.IsZero() {
+			t.Fatalf("next should not be zero")
+		}
+		if !queued && value.Value == "second" {
+			queued = true
+			close(processing)
+			<-wait
+			return false, time.Millisecond
+		}
+		order = append(order, value.Value)
+		return true, 0
+	})
+
+	if !reflect.DeepEqual(order, []string{"first", "third"}) {
+		t.Fatalf("order was wrong: %v", order)
+	}
+	if count != 3 {
 		t.Fatalf("unexpected iterations: %d", count)
 	}
 }

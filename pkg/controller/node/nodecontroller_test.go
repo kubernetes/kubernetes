@@ -347,7 +347,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			return true, 0
 		})
 		nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-			nodeController.terminatePods(value.Value, value.Added)
+			nodeController.terminatePods(value.Value, value.AddedAt)
 			return true, 0
 		})
 		podEvicted := false
