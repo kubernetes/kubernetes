@@ -568,7 +568,7 @@ prefers the Decoupled Hierarchical model for the reasons stated below).
     being only "one thing to manage", however in practise each of the
     underlying availability zones (and possibly cloud providers) has
     it's own capacity, pricing, hardware platforms, and possibly
-    bureaucratic boudaries (e.g. "our EMEA IT department manages those
+    bureaucratic boundaries (e.g. "our EMEA IT department manages those
     European clusters").  So explicitly allowing for (but not
     mandating) completely independent administration of each
     underlying Kubernetes cluster, and the Federation system itself,
