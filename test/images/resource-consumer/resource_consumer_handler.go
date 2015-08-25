@@ -49,12 +49,12 @@ func (handler ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *htt
 	}
 	// handle consumeCPU
 	if req.URL.Path == consumeCPUAddress {
-		handler.handleConsumeCPU(w, req.PostForm)
+		handler.handleConsumeCPU(w, req.Form)
 		return
 	}
 	// handle consumeMem
 	if req.URL.Path == consumeMemAddress {
-		handler.handleConsumeMem(w, req.PostForm)
+		handler.handleConsumeMem(w, req.Form)
 		return
 	}
 	// handle getCurrentStatus
