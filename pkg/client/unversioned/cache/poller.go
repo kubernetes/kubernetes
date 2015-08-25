@@ -57,7 +57,7 @@ func NewPoller(getFunc GetFunc, period time.Duration, store Store) *Poller {
 
 // Run begins polling. It starts a goroutine and returns immediately.
 func (p *Poller) Run() {
-	go util.Forever(p.run, p.period)
+	go util.Until(p.run, p.period, util.NeverStop)
 }
 
 // RunUntil begins polling. It starts a goroutine and returns immediately.

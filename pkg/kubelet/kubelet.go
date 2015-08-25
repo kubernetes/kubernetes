@@ -692,17 +692,17 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
-	go util.Forever(func() {
+	go util.Until(func() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
 		}
-	}, time.Minute)
+	}, time.Minute, util.NeverStop)
 
-	go util.Forever(func() {
+	go util.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
 		}
-	}, 5*time.Minute)
+	}, 5*time.Minute, util.NeverStop)
 }
 
 // Run starts the kubelet reacting to config updates

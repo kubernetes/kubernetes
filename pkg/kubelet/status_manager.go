@@ -75,12 +75,12 @@ func (s *statusManager) Start() {
 	}
 	// syncBatch blocks when no updates are available, we can run it in a tight loop.
 	glog.Info("Starting to sync pod status with apiserver")
-	go util.Forever(func() {
+	go util.Until(func() {
 		err := s.syncBatch()
 		if err != nil {
 			glog.Warningf("Failed to updated pod status: %v", err)
 		}
-	}, 0)
+	}, 0, util.NeverStop)
 }
 
 func (s *statusManager) GetPodStatus(uid types.UID) (api.PodStatus, bool) {
