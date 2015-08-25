@@ -30,7 +30,7 @@ import (
 func NewFakeDockerManager(
 	client DockerInterface,
 	recorder record.EventRecorder,
-	readinessManager *kubecontainer.ReadinessManager,
+	prober prober.Prober,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorApi.MachineInfo,
 	podInfraContainerImage string,
@@ -44,10 +44,9 @@ func NewFakeDockerManager(
 
 	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
 	fakeProcFs := procfs.NewFakeProcFs()
-	dm := NewDockerManager(client, recorder, readinessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
+	dm := NewDockerManager(client, recorder, prober, containerRefManager, machineInfo, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, &NativeExecHandler{},
 		fakeOOMAdjuster, fakeProcFs, false)
 	dm.dockerPuller = &FakeDockerPuller{}
-	dm.prober = prober.New(nil, readinessManager, containerRefManager, recorder)
 	return dm
 }
