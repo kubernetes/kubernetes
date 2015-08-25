@@ -52,6 +52,13 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// ResponseWrapper is an interface for getting a response.
+// The response may be either accessed as a raw data (the whole output is put into memory) or as a stream.
+type ResponseWrapper interface {
+	DoRaw() ([]byte, error)
+	Stream() (io.ReadCloser, error)
+}
+
 // RequestConstructionError is returned when there's an error assembling a request.
 type RequestConstructionError struct {
 	Err error

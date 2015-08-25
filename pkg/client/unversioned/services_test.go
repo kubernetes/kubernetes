@@ -152,3 +152,18 @@ func TestDeleteService(t *testing.T) {
 	err := c.Setup().Services(ns).Delete("1")
 	c.Validate(t, nil, err)
 }
+
+func TestServiceProxyGet(t *testing.T) {
+	body := "OK"
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request: testRequest{
+			Method: "GET",
+			Path:   testapi.ResourcePathWithPrefix("proxy", "services", ns, "service-1") + "/foo",
+			Query:  buildQueryValues(url.Values{"param-name": []string{"param-value"}}),
+		},
+		Response: Response{StatusCode: 200, RawBody: &body},
+	}
+	response, err := c.Setup().Services(ns).ProxyGet("service-1", "foo", map[string]string{"param-name": "param-value"}).DoRaw()
+	c.ValidateRaw(t, response, err)
+}
