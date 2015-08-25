@@ -284,7 +284,7 @@ var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
-var componentColumns = []string{"NAME", "TYPE", "STATUS", "CONDITION"}
+var componentColumns = []string{"NAME", "TYPE", "STATUS"}
 var componentStatusesColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
@@ -990,21 +990,32 @@ func printComponent(item *api.Component, w io.Writer, withNamespace bool, wide b
 		return fmt.Errorf("component is not namespaced")
 	}
 
-	lastCondition := ""
-	count := len(item.Status.Conditions)
-	if count > 0 {
-		condition := item.Status.Conditions[count-1]
-		switch condition.Status {
-		case api.ConditionTrue:
-			lastCondition = string(condition.Type)
-		case api.ConditionFalse:
-			lastCondition = "Not" + string(condition.Type)
-		default:
-			lastCondition = string(condition.Type)
-		}
+	// TODO(kalrkfi): order without filtering unknown types
+	validConditionTypes := []api.ComponentConditionType{
+		api.ComponentAlive,
+		api.ComponentReady,
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", item.Name, item.Spec.Type, item.Status.Phase, lastCondition); err != nil {
+	conditionMap := make(map[api.ComponentConditionType]*api.ComponentCondition)
+	for i := range item.Status.Conditions {
+		cond := item.Status.Conditions[i]
+		conditionMap[cond.Type] = &cond
+	}
+	var status []string
+	for _, validCondition := range validConditionTypes {
+		if condition, found := conditionMap[validCondition]; found {
+			if condition.Status == api.ConditionTrue {
+				status = append(status, string(condition.Type))
+			} else {
+				status = append(status, "Not"+string(condition.Type))
+			}
+		}
+	}
+	if len(status) == 0 {
+		status = append(status, "Unknown")
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", item.Name, item.Spec.Type, strings.Join(status, ",")); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))

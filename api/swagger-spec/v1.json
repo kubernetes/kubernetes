@@ -11976,7 +11976,7 @@
    },
    "v1.Component": {
     "id": "v1.Component",
-    "description": "Component describes an instance of a specific type of component, along with its definition and last known status",
+    "description": "Component describes an instance of a specific micro-service, along with its definition and last known status",
     "required": [
      "spec",
      "status"
@@ -11996,7 +11996,7 @@
      },
      "spec": {
       "$ref": "v1.ComponentSpec",
-      "description": "Spec defines the component and how to verify its status. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+      "description": "Spec defines the behavior of a component and how to verify its status. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1.ComponentStatus",
@@ -12027,7 +12027,7 @@
    },
    "v1.Probe": {
     "id": "v1.Probe",
-    "description": "Probe describes a liveness probe to be examined to the container.",
+    "description": "Probe describes a method by which status can be retrieved.",
     "properties": {
      "exec": {
       "$ref": "v1.ExecAction",
@@ -12111,20 +12111,13 @@
    "v1.ComponentStatus": {
     "id": "v1.ComponentStatus",
     "description": "ComponentStatus describes the status of a component",
-    "required": [
-     "phase"
-    ],
     "properties": {
-     "phase": {
-      "type": "string",
-      "description": "Phase of the component in its lifecycle"
-     },
      "conditions": {
       "type": "array",
       "items": {
        "$ref": "v1.ComponentCondition"
       },
-      "description": "Conditions of the component relative to the current phase"
+      "description": "Conditions of the component"
      },
      "lastUpdateTime": {
       "type": "string",
@@ -12138,7 +12131,7 @@
    },
    "v1.ComponentCondition": {
     "id": "v1.ComponentCondition",
-    "description": "ComponentCondition describes the state of a component relative to the current phase",
+    "description": "ComponentCondition describes one aspect of the state of a component",
     "required": [
      "type",
      "status"

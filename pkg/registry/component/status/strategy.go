@@ -63,17 +63,3 @@ func (updateStrategy) PrepareForUpdate(newO, oldO runtime.Object) {
 func (updateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateComponentStatusUpdate(old.(*api.Component), obj.(*api.Component))
 }
-
-func ConditionsMatch(a []api.ComponentCondition, b []api.ComponentCondition) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-
-	return true
-}

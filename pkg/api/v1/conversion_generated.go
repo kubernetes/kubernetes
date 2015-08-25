@@ -157,7 +157,6 @@ func convert_api_ComponentStatus_To_v1_ComponentStatus(in *api.ComponentStatus, 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ComponentStatus))(in)
 	}
-	out.Phase = ComponentPhase(in.Phase)
 	if in.Conditions != nil {
 		out.Conditions = make([]ComponentCondition, len(in.Conditions))
 		for i := range in.Conditions {
@@ -2624,7 +2623,6 @@ func convert_v1_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus, out 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ComponentStatus))(in)
 	}
-	out.Phase = api.ComponentPhase(in.Phase)
 	if in.Conditions != nil {
 		out.Conditions = make([]api.ComponentCondition, len(in.Conditions))
 		for i := range in.Conditions {

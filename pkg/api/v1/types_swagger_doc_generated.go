@@ -70,9 +70,9 @@ func (Capabilities) SwaggerDoc() map[string]string {
 }
 
 var map_Component = map[string]string{
-	"":         "Component describes an instance of a specific type of component, along with its definition and last known status",
+	"":         "Component describes an instance of a specific micro-service, along with its definition and last known status",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "Spec defines the component and how to verify its status. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"spec":     "Spec defines the behavior of a component and how to verify its status. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 	"status":   "Status defines the component's last known state. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 }
 
@@ -81,7 +81,7 @@ func (Component) SwaggerDoc() map[string]string {
 }
 
 var map_ComponentCondition = map[string]string{
-	"":        "ComponentCondition describes the state of a component relative to the current phase",
+	"":        "ComponentCondition describes one aspect of the state of a component",
 	"type":    "Type of condition: Pending, Running, or Terminated",
 	"status":  "Status of the condition: True, False, or Unknown",
 	"reason":  "Reason for the transition to the current status (machine-readable)",
@@ -115,8 +115,7 @@ func (ComponentSpec) SwaggerDoc() map[string]string {
 
 var map_ComponentStatus = map[string]string{
 	"":                   "ComponentStatus describes the status of a component",
-	"phase":              "Phase of the component in its lifecycle",
-	"conditions":         "Conditions of the component relative to the current phase",
+	"conditions":         "Conditions of the component",
 	"lastUpdateTime":     "LastUpdateTime of the component status, regardless of previous status.",
 	"lastTransitionTime": "LastTransitionTime of the component status, from a different phase and/or condition",
 }
@@ -1068,7 +1067,7 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 }
 
 var map_Probe = map[string]string{
-	"": "Probe describes a liveness probe to be examined to the container.",
+	"": "Probe describes a method by which status can be retrieved.",
 	"initialDelaySeconds": "Number of seconds after creation before probes are expected to succeed. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
 	"timeoutSeconds":      "Number of seconds after which an individual probe attempt times out. Defaults to 1 second. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
 }

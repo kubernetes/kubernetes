@@ -636,8 +636,18 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	_, err = client.ComponentsClient().Create(&api.Component{
 		Spec: s.spec(),
 		Status: api.ComponentStatus{
-			Phase:      api.ComponentPending,
-			Conditions: []api.ComponentCondition{},
+			Conditions: []api.ComponentCondition{
+				{
+					Type:   api.ComponentAlive,
+					Status: api.ConditionTrue,
+				},
+				{
+					Type:    api.ComponentReady,
+					Status:  api.ConditionFalse,
+					Reason:  "starting",
+					Message: "Starting",
+				},
+			},
 		},
 	})
 	if err != nil {

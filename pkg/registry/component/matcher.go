@@ -33,7 +33,6 @@ func ComponentToSelectableFields(component *api.Component) fields.Set {
 	return fields.Set{
 		"metadata.name": component.ObjectMeta.Name,
 		"spec.type":     string(component.Spec.Type),
-		"status.phase":  string(component.Status.Phase),
 	}
 }
 

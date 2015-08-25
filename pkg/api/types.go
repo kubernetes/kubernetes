@@ -656,7 +656,7 @@ type ExecAction struct {
 	Command []string `json:"command,omitempty"`
 }
 
-// Probe describes a liveness probe to be examined to the container.
+// Probe describes a method by which status can be retrieved.
 type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
@@ -2125,92 +2125,72 @@ const (
 	StrategicMergePatchType PatchType = "application/strategic-merge-patch+json"
 )
 
-// Type and constants for component type.
+// ComponentType is the name of a group of one or more component instances
 type ComponentType string
 
-// ComponentType constants define some known types of components.
-// Each type may have multiple instances, as long as their names are unique.
-const (
-	ComponentAPIServer         ComponentType = "apiserver"
-	ComponentControllerManager ComponentType = "controller-manager"
-	ComponentScheduler         ComponentType = "scheduler" // TODO: move mesos-specific component type & validation to contrib
-)
-
-// ComponentSpec describes the attributes that a component is created with.
+// ComponentSpec defines a component and how to verify its status
 type ComponentSpec struct {
 	// Type of the component
 	Type ComponentType `json:"type"`
-	// LivenessProbe describes how to determine whether a component instance is alive
+	// Periodic probe of component liveness.
 	LivenessProbe *Probe `json:"livenessProbe,omitempty"`
-	// LivenessProbe describes how to determine whether a component instance is ready to receive requests
+	// Periodic probe of component readiness.
 	ReadinessProbe *Probe `json:"readinessProbe,omitempty"`
 }
 
-type ComponentPhase string
-
-// These are the valid phases of a component.
-const (
-	// ComponentPending means the component has been created, but is still starting up.
-	ComponentPending ComponentPhase = "Pending"
-	// ComponentRunning means the component has started, but may or may not be healthy.
-	ComponentRunning ComponentPhase = "Running"
-	// ComponentTerminated means the component has been removed from the cluster, whether cleanly or not.
-	ComponentTerminated ComponentPhase = "Terminated"
-)
-
+// ComponentConditionType describes a type of component condition
 type ComponentConditionType string
 
-// These are the valid conditions for a component to have.
 const (
-	// ComponentRunningHealthy means the component is up and running, when true
-	ComponentRunningHealthy ComponentConditionType = "Healthy"
-	// ComponentTerminatedCleanly means the component is down and stopped without error, when true
-	ComponentTerminatedCleanly ComponentConditionType = "Cleanly"
+	// ComponentAlive indicates that a component is running
+	ComponentAlive ComponentConditionType = "Alive"
+	// ComponentReady indicates that a component is ready for use
+	ComponentReady ComponentConditionType = "Ready"
 )
 
+// ComponentCondition describes one aspect of the state of a component
 type ComponentCondition struct {
 	// Type of condition: Pending, Running, or Terminated
 	Type ComponentConditionType `json:"type"`
 	// Status of the condition: True, False, or Unknown
 	Status ConditionStatus `json:"status"`
-	// Reason (brief) for the transition to this condition
-	Reason string `json:"message,omitempty"`
-	// Message (detailed) explaining the reason for the transition to this condition
-	Message string `json:"error,omitempty"`
+	// Reason for the transition to the current status (machine-readable)
+	Reason string `json:"reason,omitempty"`
+	// Message that describes the current status (human-readable)
+	Message string `json:"message,omitempty"`
 }
 
-// ComponentStatus is information about the current status of a component.
+// ComponentStatus describes the status of a component
 type ComponentStatus struct {
-	// ComponentPhase is the current lifecycle phase of the component.
-	Phase ComponentPhase `json:"phase"`
-	// Conditions is an array of historical node conditions.
+	// Conditions of the component
 	Conditions []ComponentCondition `json:"conditions,omitempty"`
-	// LastUpdateTime is the last time the component status was updated.
-	// TODO(karlkfi): move LastUpdateTime to ObjectMeta? maybe both (one for spec, one for status)?
+	// LastUpdateTime of the component status, regardless of previous status.
 	LastUpdateTime util.Time `json:"lastUpdateTime,omitempty"`
-	// LastTransitionTime is the last time the component status (phase or condition) changed.
+	// LastTransitionTime of the component status, from a different phase and/or condition
 	LastTransitionTime util.Time `json:"lastTransitionTime,omitempty"`
 }
 
-// Component describes a core part of Kubernetes.
-// Each component is expected to serve a <location>/healthz endpoint.
-// Each component is also expected to heartbeat component status updates.
-// If Status.LastHeartbeatTime is sufficiently old (configurable) the component is considered unhealthy.
+// Component describes an instance of a specific micro-service, along with its definition and last known status
 type Component struct {
-	TypeMeta   `json:",inline"`
+	TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
-
-	// Spec defines the behavior of a component.
+	// Spec defines the behavior of a component and how to verify its status.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	Spec ComponentSpec `json:"spec"`
-
-	// Status of the component
+	// Status defines the component's last known state.
+	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	Status ComponentStatus `json:"status"`
 }
 
+// ComponentList describes a list of components
 type ComponentList struct {
 	TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	ListMeta `json:"metadata,omitempty"`
-
+	// Items is a list of component objects.
 	Items []Component `json:"items"`
 }
 

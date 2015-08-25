@@ -802,7 +802,7 @@ type ExecAction struct {
 	Command []string `json:"command,omitempty"`
 }
 
-// Probe describes a liveness probe to be examined to the container.
+// Probe describes a method by which status can be retrieved.
 type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline"`
@@ -2494,17 +2494,8 @@ type SecretList struct {
 	Items []Secret `json:"items"`
 }
 
-// ComponentType indicates a component group which may have one or more component instances
+// ComponentType is the name of a group of one or more component instances
 type ComponentType string
-
-const (
-	// ComponentAPIServer describes a component that exposes the Kubernetes API
-	ComponentAPIServer ComponentType = "apiserver"
-	// ComponentControllerManager describes a component that manages controllers
-	ComponentControllerManager ComponentType = "controller-manager"
-	// ComponentScheduler describes a component that schedules pod deployment and state changes
-	ComponentScheduler ComponentType = "scheduler"
-)
 
 // ComponentSpec defines a component and how to verify its status
 type ComponentSpec struct {
@@ -2516,29 +2507,17 @@ type ComponentSpec struct {
 	ReadinessProbe *Probe `json:"readinessProbe,omitempty"`
 }
 
-// ComponentPhase describes a single stage of the component lifecycle
-type ComponentPhase string
-
-const (
-	// ComponentPending describes a component that is starting but not yet ready for use
-	ComponentPending ComponentPhase = "Pending"
-	// ComponentRunning describes a component that should be ready for use
-	ComponentRunning ComponentPhase = "Running"
-	// ComponentTerminated describes a component that has been shut down or has become unresponsive
-	ComponentTerminated ComponentPhase = "Terminated"
-)
-
 // ComponentConditionType describes a type of component condition
 type ComponentConditionType string
 
 const (
-	// ComponentRunningHealthy describes a running component that is ready for use
-	ComponentRunningHealthy ComponentConditionType = "Healthy"
-	// ComponentTerminatedCleanly describes a terminated component that exited without error
-	ComponentTerminatedCleanly ComponentConditionType = "Cleanly"
+	// ComponentAlive indicates that a component is running
+	ComponentAlive ComponentConditionType = "Alive"
+	// ComponentReady indicates that a component is ready for use
+	ComponentReady ComponentConditionType = "Ready"
 )
 
-// ComponentCondition describes the state of a component relative to the current phase
+// ComponentCondition describes one aspect of the state of a component
 type ComponentCondition struct {
 	// Type of condition: Pending, Running, or Terminated
 	Type ComponentConditionType `json:"type"`
@@ -2552,9 +2531,7 @@ type ComponentCondition struct {
 
 // ComponentStatus describes the status of a component
 type ComponentStatus struct {
-	// Phase of the component in its lifecycle
-	Phase ComponentPhase `json:"phase"`
-	// Conditions of the component relative to the current phase
+	// Conditions of the component
 	Conditions []ComponentCondition `json:"conditions,omitempty"`
 	// LastUpdateTime of the component status, regardless of previous status.
 	LastUpdateTime util.Time `json:"lastUpdateTime,omitempty"`
@@ -2562,17 +2539,15 @@ type ComponentStatus struct {
 	LastTransitionTime util.Time `json:"lastTransitionTime,omitempty"`
 }
 
-// Component describes an instance of a specific type of component, along with its definition and last known status
+// Component describes an instance of a specific micro-service, along with its definition and last known status
 type Component struct {
 	TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	ObjectMeta `json:"metadata,omitempty"`
-
-	// Spec defines the component and how to verify its status.
+	// Spec defines the behavior of a component and how to verify its status.
 	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	Spec ComponentSpec `json:"spec"`
-
 	// Status defines the component's last known state.
 	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	Status ComponentStatus `json:"status"`
@@ -2584,7 +2559,6 @@ type ComponentList struct {
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	ListMeta `json:"metadata,omitempty"`
-
 	// Items is a list of component objects.
 	Items []Component `json:"items"`
 }

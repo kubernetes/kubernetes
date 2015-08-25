@@ -17,12 +17,13 @@ limitations under the License.
 package componentcontroller
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/component"
-	"k8s.io/kubernetes/pkg/component/prober"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/probe"
@@ -38,14 +39,11 @@ const (
 
 // NewEndpointController returns a new *EndpointController.
 func NewComponentController(client *client.Client) *ComponentController {
-	readinessManager := component.NewReadinessManager()
-
 	return &ComponentController{
-		client:           client,
-		componentStore:   component.NewCache(),
-		readinessManager: readinessManager,
-		queue:            workqueue.New(),
-		prober:           prober.New(readinessManager),
+		client:         client,
+		componentStore: component.NewCache(),
+		queue:          workqueue.New(),
+		prober:         component.NewProber(),
 	}
 }
 
@@ -54,13 +52,12 @@ type ComponentController struct {
 	client *client.Client
 
 	// store and synchronize, instead of just caching
-	componentStore   *component.Cache
-	readinessManager *component.ReadinessManager
+	componentStore *component.Cache
 
 	// Components that need to be probed.
 	queue *workqueue.Type
 
-	prober prober.Prober
+	prober component.Prober
 }
 
 // Runs e; will not return until stopCh is closed. workers determines how many
@@ -82,11 +79,6 @@ func (e *ComponentController) watcher() {
 		glog.Warningf("Failed to list components: %v", err)
 	}
 	for _, component := range list.Items {
-		// do not probe terminated components
-		if component.Status.Phase == api.ComponentTerminated {
-			continue
-		}
-
 		// TODO: clean up storage to do proper syncing
 		created := e.componentStore.Create(component.Name, component)
 		if !created {
@@ -134,22 +126,36 @@ func (e *ComponentController) probeComponent(componentName string) {
 		return
 	}
 
-	result, err := e.prober.Probe(&component)
-	if err != nil {
-		glog.Warningf("Component %q probe errored: %v", componentName, err)
-		return
-	}
+	conditionCh := make(chan api.ComponentCondition)
+	conditions := make([]api.ComponentCondition, 0, 2)
+	go func() {
+		for {
+			condition, open := <-conditionCh
+			if !open {
+				return
+			}
+			conditions = append(conditions, condition)
+		}
+	}()
 
-	switch result {
-	case probe.Success:
-		e.handleProbeSuccess(&component)
-	case probe.Failure:
-		e.handleProbeFailure(&component)
-	default:
-		e.handleProbeUnknown(&component)
-	}
+	var wg sync.WaitGroup
 
-	//TODO: delete component record after a timeout?
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		conditionCh <- e.probeLiveness(&component)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		conditionCh <- e.probeReadiness(&component)
+	}()
+
+	wg.Wait()
+	close(conditionCh)
+
+	component.Status.Conditions = conditions
 
 	newComponent, err := e.client.ComponentsClient().UpdateStatus(&component)
 	if err != nil {
@@ -162,61 +168,50 @@ func (e *ComponentController) probeComponent(componentName string) {
 	}
 }
 
-func (e *ComponentController) handleProbeSuccess(component *api.Component) {
-	glog.V(3).Infof("Component %q alive", component.Name)
+func (e *ComponentController) probeLiveness(c *api.Component) api.ComponentCondition {
+	condition := api.ComponentCondition{
+		Type: api.ComponentAlive,
+	}
 
-	ready := e.readinessManager.GetReadiness(component.Name)
+	result, err := e.prober.Probe(c, c.Spec.LivenessProbe)
+	if err != nil {
+		condition.Reason = "error"
+		condition.Message = fmt.Sprintf("Liveness probe errored: %v", err)
+	}
 
-	switch component.Status.Phase {
-	case api.ComponentPending:
-		if ready {
-			// transition to running
-			component.Status.Phase = api.ComponentRunning
-			component.Status.Conditions = []api.ComponentCondition{
-				{
-					Type:   api.ComponentRunningHealthy,
-					Status: api.ConditionTrue,
-				},
-			}
-			glog.V(3).Infof("Component transitioning to running/healthy: %q", component.Name)
-		}
-	case api.ComponentRunning:
-		if ready {
-			component.Status.Conditions = []api.ComponentCondition{
-				{
-					Type:   api.ComponentRunningHealthy,
-					Status: api.ConditionTrue,
-				},
-			}
-			glog.V(3).Infof("Component %q Running/Healthy", component.Name)
-		} else {
-			component.Status.Conditions = []api.ComponentCondition{
-				{
-					Type:   api.ComponentRunningHealthy,
-					Status: api.ConditionFalse,
-				},
-			}
-			glog.V(3).Infof("Component %q Running/Unhealthy", component.Name)
-		}
-	case api.ComponentTerminated:
-		glog.Warningf("Component %q alive after termination", component.Name)
+	switch result {
+	case probe.Success:
+		condition.Status = api.ConditionTrue
+	case probe.Failure:
+		condition.Status = api.ConditionFalse
 	default:
-		glog.Warningf("Component %q phase unknown: %+v", component.Name, component)
+		condition.Status = api.ConditionUnknown
 	}
+
+	glog.V(1).Infof("Component %q liveness condition: %s", c.Name, condition)
+	return condition
 }
 
-func (e *ComponentController) handleProbeFailure(component *api.Component) {
-	glog.V(3).Infof("Component %q not alive", component.Name)
-
-	component.Status.Phase = api.ComponentTerminated
-	component.Status.Conditions = []api.ComponentCondition{
-		{
-			Type:   api.ComponentTerminatedCleanly,
-			Status: api.ConditionFalse,
-		},
+func (e *ComponentController) probeReadiness(c *api.Component) api.ComponentCondition {
+	condition := api.ComponentCondition{
+		Type: api.ComponentReady,
 	}
-}
 
-func (e *ComponentController) handleProbeUnknown(component *api.Component) {
-	glog.V(3).Infof("Component %q liveness unknown", component.Name)
+	result, err := e.prober.Probe(c, c.Spec.ReadinessProbe)
+	if err != nil {
+		condition.Reason = "error"
+		condition.Message = fmt.Sprintf("Readiness probe errored: %v", err)
+	}
+
+	switch result {
+	case probe.Success:
+		condition.Status = api.ConditionTrue
+	case probe.Failure:
+		condition.Status = api.ConditionFalse
+	default:
+		condition.Status = api.ConditionUnknown
+	}
+
+	glog.V(1).Infof("Component %q readiness condition: %s", c.Name, condition)
+	return condition
 }

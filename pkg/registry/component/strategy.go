@@ -59,13 +59,13 @@ func (createUpdateStrategy) PrepareForCreate(obj runtime.Object) {
 		component.GenerateName = fmt.Sprintf("%s-", component.Spec.Type)
 	}
 
-	// Status sent by creator will be ignored
+	// Update timestamps
 	now := util.Now()
-	component.Status = api.ComponentStatus{
-		Phase:              api.ComponentPending,
-		Conditions:         []api.ComponentCondition{},
-		LastUpdateTime:     now,
-		LastTransitionTime: now,
+	component.Status.LastUpdateTime = now
+	component.Status.LastTransitionTime = now
+
+	if component.Status.Conditions == nil {
+		component.Status.Conditions = []api.ComponentCondition{}
 	}
 	// TODO(karlkfi): do the timestamps need to match component.ObjectMeta.CreationTimestamp? Is CreationTimestamp already populated?
 }
@@ -82,13 +82,10 @@ func (createUpdateStrategy) PrepareForUpdate(newO, oldO runtime.Object) {
 	now := util.Now()
 	// every update bumps LastUpdateTime
 	component.Status.LastUpdateTime = now
-	// only updates that change the phase bump LastTransitionTime
-	if component.Status.Phase != old.Status.Phase || !ConditionsMatch(component.Status.Conditions, old.Status.Conditions) {
+	// only update LastTransitionTime if the conditions changed
+	if !ConditionsMatch(component.Status.Conditions, old.Status.Conditions) {
 		component.Status.LastTransitionTime = now
 	}
-
-	// transfer existing spec
-	//component.Spec = old.Spec
 }
 
 // Validate validates a new component.

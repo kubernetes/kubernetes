@@ -152,7 +152,6 @@ func deepCopy_v1_ComponentSpec(in ComponentSpec, out *ComponentSpec, c *conversi
 }
 
 func deepCopy_v1_ComponentStatus(in ComponentStatus, out *ComponentStatus, c *conversion.Cloner) error {
-	out.Phase = in.Phase
 	if in.Conditions != nil {
 		out.Conditions = make([]ComponentCondition, len(in.Conditions))
 		for i := range in.Conditions {

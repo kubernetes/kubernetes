@@ -1857,18 +1857,12 @@ func ValidateSchemaUpdate(oldResource, newResource *api.ThirdPartyResource) errs
 	return errs.ValidationErrorList{fmt.Errorf("Schema update is not supported.")}
 }
 
-var supportedComponentType = util.NewStringSet(
-	string(api.ComponentAPIServer),
-	string(api.ComponentControllerManager),
-	string(api.ComponentScheduler),
-)
-
 // ValidateComponentCreate tests if required fields in the component are set for create.
 func ValidateComponentCreate(component *api.Component) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&component.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
 
-	//TODO(karlkfi): validate address is a valid url (scheme, host, port, path) if not empty (set default?)
+	//TODO(karlkfi): validate probes
 
 	if component.Name == "" {
 		allErrs = append(allErrs, errs.NewFieldNotFound("metadata.name", component.Name))
@@ -1882,10 +1876,6 @@ func ValidateComponentCreate(component *api.Component) errs.ValidationErrorList 
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
 	}
 
-	if component.Status.Phase == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("status.phase"))
-	}
-
 	return allErrs
 }
 
@@ -1894,7 +1884,7 @@ func ValidateComponentUpdate(old, new *api.Component) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&new.ObjectMeta, false, ValidateComponentName).Prefix("metadata")...)
 
-	//TODO: validate address is a valid url (scheme, host, port, path) if not empty
+	//TODO(karlkfi): validate probes
 
 	if new.Name == "" {
 		allErrs = append(allErrs, errs.NewFieldNotFound("metadata.name", new.Name))
@@ -1905,7 +1895,6 @@ func ValidateComponentUpdate(old, new *api.Component) errs.ValidationErrorList {
 	}
 
 	//TODO(karlkfi): validate name is valid format
-	//TODO(karlkfi): validate name exists in registry?
 
 	// only updaters with both the name and uid may update the resource
 	if new.UID != old.UID {
@@ -1918,10 +1907,6 @@ func ValidateComponentUpdate(old, new *api.Component) errs.ValidationErrorList {
 
 	if new.Spec.Type != old.Spec.Type {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.type", new.Spec.Type, fmt.Sprintf("expected: %s", old.Spec.Type)))
-	}
-
-	if new.Status.Phase == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("status.phase"))
 	}
 
 	return allErrs
@@ -1941,7 +1926,6 @@ func ValidateComponentStatusUpdate(old, new *api.Component) errs.ValidationError
 	}
 
 	//TODO(karlkfi): validate name is valid format
-	//TODO(karlkfi): validate name exists in registry?
 
 	// only updaters with both the name and uid may update the resource
 	if new.UID != old.UID {
@@ -1954,10 +1938,6 @@ func ValidateComponentStatusUpdate(old, new *api.Component) errs.ValidationError
 
 	if new.Spec.Type != old.Spec.Type {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.type", new.Spec.Type, fmt.Sprintf("expected: %s", old.Spec.Type)))
-	}
-
-	if new.Status.Phase == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("status.phase"))
 	}
 
 	return allErrs
