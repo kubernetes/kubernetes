@@ -163,7 +163,7 @@ cp calico-kubernetes-ubuntu-demo-master/node/network-environment-template networ
 
 3.) Edit `network-environment` to represent your current host's settings.
 
-4.) Move `netework-environment` into `/etc`
+4.) Move `network-environment` into `/etc`
 
 ```
 sudo mv -f network-environment /etc

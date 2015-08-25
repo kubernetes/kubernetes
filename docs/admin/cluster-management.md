@@ -126,7 +126,7 @@ The autoscaler will try to maintain the average CPU and memory utilization of no
 The target value can be configured by ```KUBE_TARGET_NODE_UTILIZATION``` environment variable (default: 0.7) for ``kube-up.sh`` when creating the cluster.
 The node utilization is the total node's CPU/memory usage (OS + k8s + user load) divided by the node's capacity.
 If the desired numbers of nodes in the cluster resulting from CPU utilization and memory utilization are different,
-the autosclaer will choose the bigger number.
+the autoscaler will choose the bigger number.
 The number of nodes in the cluster set by the autoscaler will be limited from ```KUBE_AUTOSCALER_MIN_NODES``` (default: 1)
 to ```KUBE_AUTOSCALER_MAX_NODES``` (default: the initial number of nodes in the cluster).
 

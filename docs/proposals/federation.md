@@ -518,7 +518,7 @@ thus far:
     approach.
 1. A more monolithic architecture, where a single instance of the
     Kubernetes control plane itself manages a single logical cluster
-    composed of nodes in multiple availablity zones and cloud
+    composed of nodes in multiple availability zones and cloud
     providers.
 
 A very brief, non-exhaustive list of pro's and con's of the two
@@ -563,12 +563,12 @@ prefers the Decoupled Hierarchical model for the reasons stated below).
       largely independently (different sets of developers, different
       release schedules etc).
 1. **Administration complexity:** Again, I think that this could be argued
-    both ways.  Superficially it woud seem that administration of a
+    both ways.  Superficially it would seem that administration of a
     single Monolithic multi-zone cluster might be simpler by virtue of
     being only "one thing to manage", however in practise each of the
     underlying availability zones (and possibly cloud providers) has
     it's own capacity, pricing, hardware platforms, and possibly
-    bureaucratic boudaries (e.g. "our EMEA IT department manages those
+    bureaucratic boundaries (e.g. "our EMEA IT department manages those
     European clusters").  So explicitly allowing for (but not
     mandating) completely independent administration of each
     underlying Kubernetes cluster, and the Federation system itself,

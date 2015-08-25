@@ -73,7 +73,7 @@ more control over how it is used, and reduces the risk of accidental exposure.
 Users can create secrets, and the system also creates some secrets.
 
 To use a secret, a pod needs to reference the secret.
-A secret can be used with a pod in two ways: eithe as files in a [volume](volumes.md) mounted on one or more of
+A secret can be used with a pod in two ways: either as files in a [volume](volumes.md) mounted on one or more of
 its containers, or used by kubelet when pulling images for the pod.
 
 ### Service Accounts Automatically Create and Attach Secrets with API Credentials

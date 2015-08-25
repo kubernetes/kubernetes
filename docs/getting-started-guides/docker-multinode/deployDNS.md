@@ -55,7 +55,7 @@ $ export DNS_SERVER_IP=10.0.0.10  # specify in startup parameter `--cluster-dns`
 $ export KUBE_SERVER=10.10.103.250 # your master server ip, you may change it
 ```
 
-### Replace the correponding value in the template.
+### Replace the corresponding value in the template.
 
 ```
 $ sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;s/{kube_server_url}/${KUBE_SERVER}/g;" skydns-rc.yaml.in > ./skydns-rc.yaml
