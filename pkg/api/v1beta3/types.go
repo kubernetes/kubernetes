@@ -76,7 +76,7 @@ type ListMeta struct {
 	// concurrency and change monitoring endpoints.  Clients must treat these values as opaque
 	// and values may only be valid for a particular resource or set of resources. Only servers
 	// will generate resource versions.
-	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/v1.0.3/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/v1.0.4/docs/api-conventions.md#concurrency-control-and-consistency"`
 }
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
@@ -119,7 +119,7 @@ type ObjectMeta struct {
 	// concurrency, change detection, and the watch operation on a resource or set of resources.
 	// Clients must treat these values as opaque and values may only be valid for a particular
 	// resource or set of resources. Only servers will generate resource versions.
-	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/v1.0.3/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/v1.0.4/docs/api-conventions.md#concurrency-control-and-consistency"`
 
 	// A sequence number representing a specific generation of the desired state.
 	// Currently only implemented by replication controllers.
@@ -238,7 +238,7 @@ type PersistentVolumeSource struct {
 
 type PersistentVolume struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	//Spec defines a persistent volume owned by the cluster
 	Spec PersistentVolumeSpec `json:"spec,omitempty" description:"specification of a persistent volume as provisioned by an administrator"`
@@ -289,14 +289,14 @@ type PersistentVolumeStatus struct {
 
 type PersistentVolumeList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#types-kinds"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#types-kinds"`
 	Items    []PersistentVolume `json:"items,omitempty" description:"list of persistent volumes"`
 }
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaim struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the volume requested by a pod author
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description:"the desired characteristics of a volume"`
@@ -307,7 +307,7 @@ type PersistentVolumeClaim struct {
 
 type PersistentVolumeClaimList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#types-kinds"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#types-kinds"`
 	Items    []PersistentVolumeClaim `json:"items,omitempty" description:"a list of persistent volume claims"`
 }
 
@@ -489,7 +489,7 @@ type GitRepoVolumeSource struct {
 
 // SecretVolumeSource adapts a Secret into a VolumeSource
 //
-// http://releases.k8s.io/v1.0.3/docs/design/secrets.md
+// http://releases.k8s.io/v1.0.4/docs/design/secrets.md
 type SecretVolumeSource struct {
 	// Name of the secret in the pod's namespace to use
 	SecretName string `json:"secretName" description:"secretName is the name of a secret in the pod's namespace"`
@@ -919,30 +919,30 @@ type PodStatus struct {
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
 type PodStatusResult struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 	// Status represents the current information about a pod. This data may not be up
 	// to date.
-	Status PodStatus `json:"status,omitempty" description:"most recently observed status of the pod; populated by the system, read-only; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Status PodStatus `json:"status,omitempty" description:"most recently observed status of the pod; populated by the system, read-only; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
 type Pod struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a pod.
-	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 
 	// Status represents the current information about a pod. This data may not be up
 	// to date.
-	Status PodStatus `json:"status,omitempty" description:"most recently observed status of the pod; populated by the system, read-only; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Status PodStatus `json:"status,omitempty" description:"most recently observed status of the pod; populated by the system, read-only; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // PodList is a list of Pods.
 type PodList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#types-kinds"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#types-kinds"`
 
 	Items []Pod `json:"items" description:"list of pods"`
 }
@@ -950,25 +950,25 @@ type PodList struct {
 // PodTemplateSpec describes the data a pod should have when created from a template
 type PodTemplateSpec struct {
 	// Metadata of the pods created from this template.
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a pod.
-	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplate struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Template defines the pods that will be created from this pod template
-	Template PodTemplateSpec `json:"template,omitempty" description:"the template of the desired behavior of the pod; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Template PodTemplateSpec `json:"template,omitempty" description:"the template of the desired behavior of the pod; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // PodTemplateList is a list of PodTemplates.
 type PodTemplateList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []PodTemplate `json:"items" description:"list of pod templates"`
 }
@@ -1006,20 +1006,20 @@ type ReplicationControllerStatus struct {
 type ReplicationController struct {
 	TypeMeta `json:",inline"`
 	// If the Labels of a ReplicationController are empty, they are defaulted to be the same as the Pod(s) that the replication controller manages.
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the desired behavior of this replication controller.
-	Spec ReplicationControllerSpec `json:"spec,omitempty" description:"specification of the desired behavior of the replication controller; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Spec ReplicationControllerSpec `json:"spec,omitempty" description:"specification of the desired behavior of the replication controller; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 
 	// Status is the current status of this replication controller. This data may be
 	// out of date by some window of time.
-	Status ReplicationControllerStatus `json:"status,omitempty" description:"most recently observed status of the replication controller; populated by the system, read-only; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Status ReplicationControllerStatus `json:"status,omitempty" description:"most recently observed status of the replication controller; populated by the system, read-only; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []ReplicationController `json:"items" description:"list of replication controllers"`
 }
@@ -1138,13 +1138,13 @@ type ServicePort struct {
 // will answer requests sent through the proxy.
 type Service struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a service.
-	Spec ServiceSpec `json:"spec,omitempty" description:"specification of the desired behavior of the service; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Spec ServiceSpec `json:"spec,omitempty" description:"specification of the desired behavior of the service; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 
 	// Status represents the current status of a service.
-	Status ServiceStatus `json:"status,omitempty" description:"most recently observed status of the service; populated by the system, read-only; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Status ServiceStatus `json:"status,omitempty" description:"most recently observed status of the service; populated by the system, read-only; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 const (
@@ -1156,7 +1156,7 @@ const (
 // ServiceList holds a list of services.
 type ServiceList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []Service `json:"items" description:"list of services"`
 }
@@ -1167,7 +1167,7 @@ type ServiceList struct {
 // * a set of secrets
 type ServiceAccount struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount
 	Secrets []ObjectReference `json:"secrets,omitempty" description:"list of secrets that can be used by pods running as this service account" patchStrategy:"merge" patchMergeKey:"name"`
@@ -1181,7 +1181,7 @@ type ServiceAccount struct {
 // ServiceAccountList is a list of ServiceAccount objects
 type ServiceAccountList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []ServiceAccount `json:"items" description:"list of ServiceAccounts"`
 }
@@ -1200,7 +1200,7 @@ type ServiceAccountList struct {
 //  ]
 type Endpoints struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// The set of all endpoints is the union of all subsets.
 	Subsets []EndpointSubset `json:"subsets" description:"sets of addresses and ports that comprise a service"`
@@ -1247,7 +1247,7 @@ type EndpointPort struct {
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []Endpoints `json:"items" description:"list of endpoints"`
 }
@@ -1287,8 +1287,8 @@ type NodeSystemInfo struct {
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
 	// Capacity represents the available resources of a node.
-	// see http://releases.k8s.io/v1.0.3/docs/resources.md for more details.
-	Capacity ResourceList `json:"capacity,omitempty" description:"compute resource capacity of the node; http://releases.k8s.io/v1.0.3/docs/resources.md"`
+	// see http://releases.k8s.io/v1.0.4/docs/resources.md for more details.
+	Capacity ResourceList `json:"capacity,omitempty" description:"compute resource capacity of the node; http://releases.k8s.io/v1.0.4/docs/resources.md"`
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty" description:"most recently observed lifecycle phase of the node"`
 	// Conditions is an array of current node conditions.
@@ -1363,19 +1363,19 @@ type ResourceList map[ResourceName]resource.Quantity
 // The name of the node according to etcd is in ID.
 type Node struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a node.
-	Spec NodeSpec `json:"spec,omitempty" description:"specification of a node; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Spec NodeSpec `json:"spec,omitempty" description:"specification of a node; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 
 	// Status describes the current status of a Node
-	Status NodeStatus `json:"status,omitempty" description:"most recently observed status of the node; populated by the system, read-only; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Status NodeStatus `json:"status,omitempty" description:"most recently observed status of the node; populated by the system, read-only; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // NodeList is a list of minions.
 type NodeList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []Node `json:"items" description:"list of nodes"`
 }
@@ -1413,19 +1413,19 @@ const (
 // Use of multiple namespaces is optional
 type Namespace struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of the Namespace.
-	Spec NamespaceSpec `json:"spec,omitempty" description:"spec defines the behavior of the Namespace; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Spec NamespaceSpec `json:"spec,omitempty" description:"spec defines the behavior of the Namespace; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 
 	// Status describes the current status of a Namespace
-	Status NamespaceStatus `json:"status,omitempty" description:"status describes the current status of a Namespace; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Status NamespaceStatus `json:"status,omitempty" description:"status describes the current status of a Namespace; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // NamespaceList is a list of Namespaces.
 type NamespaceList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Items is the list of Namespace objects in the list
 	Items []Namespace `json:"items"  description:"items is the list of Namespace objects in the list"`
@@ -1435,7 +1435,7 @@ type NamespaceList struct {
 type Binding struct {
 	TypeMeta `json:",inline"`
 	// ObjectMeta describes the object that is being bound.
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Target is the object to bind to.
 	Target ObjectReference `json:"target" description:"an object to bind to"`
@@ -1513,7 +1513,7 @@ type PodProxyOptions struct {
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// One of: "Success" or "Failure"
 	Status string `json:"status,omitempty" description:"status of the operation; either Success, or Failure"`
@@ -1671,7 +1671,7 @@ type ObjectReference struct {
 	Name            string    `json:"name,omitempty" description:"name of the referent"`
 	UID             types.UID `json:"uid,omitempty" description:"uid of the referent"`
 	APIVersion      string    `json:"apiVersion,omitempty" description:"API version of the referent"`
-	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: http://releases.k8s.io/v1.0.3/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: http://releases.k8s.io/v1.0.4/docs/api-conventions.md#concurrency-control-and-consistency"`
 
 	// Optional. If referring to a piece of an object instead of an entire object, this string
 	// should contain information to identify the sub-object. For example, if the object
@@ -1706,7 +1706,7 @@ type EventSource struct {
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Required. The object that this event is about.
 	InvolvedObject ObjectReference `json:"involvedObject" description:"object this event is about"`
@@ -1736,7 +1736,7 @@ type Event struct {
 // EventList is a list of events.
 type EventList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []Event `json:"items" description:"list of events"`
 }
@@ -1744,7 +1744,7 @@ type EventList struct {
 // List holds a list of objects, which may not be known by the server.
 type List struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []runtime.RawExtension `json:"items" description:"list of objects"`
 }
@@ -1780,16 +1780,16 @@ type LimitRangeSpec struct {
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
 type LimitRange struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the limits enforced
-	Spec LimitRangeSpec `json:"spec,omitempty" description:"spec defines the limits enforced; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Spec LimitRangeSpec `json:"spec,omitempty" description:"spec defines the limits enforced; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // LimitRangeList is a list of LimitRange items.
 type LimitRangeList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Items is a list of LimitRange objects
 	Items []LimitRange `json:"items" description:"items is a list of LimitRange objects"`
@@ -1828,19 +1828,19 @@ type ResourceQuotaStatus struct {
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Spec defines the desired quota
-	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 
 	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage; http://releases.k8s.io/v1.0.3/docs/api-conventions.md#spec-and-status"`
+	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage; http://releases.k8s.io/v1.0.4/docs/api-conventions.md#spec-and-status"`
 }
 
 // ResourceQuotaList is a list of ResourceQuota items
 type ResourceQuotaList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Items is a list of ResourceQuota objects
 	Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects"`
@@ -1850,7 +1850,7 @@ type ResourceQuotaList struct {
 // the Data field must be less than MaxSecretSize bytes.
 type Secret struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN
 	// or leading dot followed by valid DNS_SUBDOMAIN.
@@ -1901,7 +1901,7 @@ const (
 
 type SecretList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []Secret `json:"items" description:"items is a list of secret objects"`
 }
@@ -1924,14 +1924,14 @@ type ComponentCondition struct {
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 type ComponentStatus struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Conditions []ComponentCondition `json:"conditions,omitempty" description:"list of component conditions observed" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 type ComponentStatusList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Items []ComponentStatus `json:"items" description:"list of component status objects"`
 }
@@ -1975,7 +1975,7 @@ type SELinuxOptions struct {
 // RangeAllocation is not a public type
 type RangeAllocation struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.3/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/v1.0.4/docs/api-conventions.md#metadata"`
 
 	Range string `json:"range" description:"a range string that identifies the range represented by 'data'; required"`
 	Data  []byte `json:"data" description:"a bit array containing all allocated addresses in the previous segment"`
