@@ -26,29 +26,22 @@ import (
 	"k8s.io/kubernetes/pkg/expapi/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/tools/etcdtest"
 
 	"github.com/coreos/go-etcd/etcd"
 )
 
-var scheme *runtime.Scheme
-var codec runtime.Codec
-
 func init() {
 	// Ensure that expapi/v1 packege is used, so that it will get initialized and register HorizontalPodAutoscaler object.
 	_ = v1.ThirdPartyResource{}
 }
 
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	storage := NewREST(etcdStorage)
-	return storage, fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
+	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
+	return NewREST(etcdStorage), fakeClient
 }
 
 func validNewThirdPartyResource(name string) *expapi.ThirdPartyResource {
@@ -66,28 +59,34 @@ func validNewThirdPartyResource(name string) *expapi.ThirdPartyResource {
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	rsrc := validNewThirdPartyResource("foo")
 	rsrc.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		rsrc,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&expapi.ThirdPartyResource{},
 	)
 }
 
 func TestUpdate(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	key, err := storage.KeyFunc(test.TestContext(), "foo")
 	if err != nil {
 		t.Fatal(err)
 	}
 	key = etcdtest.AddPrefix(key)
-	fakeEtcdClient.ExpectNotFoundGet(key)
-	fakeEtcdClient.ChangeIndex = 2
+	fakeClient.ExpectNotFoundGet(key)
+	fakeClient.ChangeIndex = 2
 	rsrc := validNewThirdPartyResource("foo")
 	existing := validNewThirdPartyResource("exists")
 	existing.Namespace = test.TestNamespace()
@@ -106,13 +105,13 @@ func TestUpdate(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	rsrc := validNewThirdPartyResource("foo2")
 	key, _ := storage.KeyFunc(ctx, "foo2")
 	key = etcdtest.AddPrefix(key)
 	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
 					Value:         runtime.EncodeOrDie(testapi.Codec(), rsrc),
@@ -123,24 +122,24 @@ func TestDelete(t *testing.T) {
 		return rsrc
 	}
 	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
+		if fakeClient.Data[key].R.Node == nil {
 			return false
 		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
+		return fakeClient.Data[key].R.Node.TTL == 30
 	}
 	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
 }
 
 func TestGet(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	storage, fakeClient := newStorage(t)
+	test := resttest.New(t, storage, fakeClient.SetError)
 	rsrc := validNewThirdPartyResource("foo")
 	test.TestGet(rsrc)
 }
 
 func TestEmptyList(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
+	registry, fakeClient := newStorage(t)
 	fakeClient.ChangeIndex = 1
 	key := registry.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)
@@ -162,7 +161,7 @@ func TestEmptyList(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
+	registry, fakeClient := newStorage(t)
 	fakeClient.ChangeIndex = 1
 	key := registry.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)

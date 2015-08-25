@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -87,102 +86,33 @@ var validController = api.ReplicationController{
 	Spec:       validControllerSpec,
 }
 
-func TestEtcdCreateController(t *testing.T) {
-	ctx := api.NewDefaultContext()
+func TestCreate(t *testing.T) {
 	storage, fakeClient := newStorage(t)
-	_, err := storage.Create(ctx, &validController)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	key, _ := storage.KeyFunc(ctx, validController.Name)
-	key = etcdtest.AddPrefix(key)
-	resp, err := fakeClient.Get(key, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var ctrl api.ReplicationController
-	err = testapi.Codec().DecodeInto([]byte(resp.Node.Value), &ctrl)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if ctrl.Name != "foo" {
-		t.Errorf("Unexpected controller: %#v %s", ctrl, resp.Node.Value)
-	}
-}
-
-func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, fakeClient := newStorage(t)
-	key, _ := storage.KeyFunc(ctx, validController.Name)
-	key = etcdtest.AddPrefix(key)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &validController), 0)
-
-	_, err := storage.Create(ctx, &validController)
-	if !errors.IsAlreadyExists(err) {
-		t.Errorf("expected already exists err, got %#v", err)
-	}
-}
-
-func TestEtcdCreateControllerValidates(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	storage, _ := newStorage(t)
-	emptyName := validController
-	emptyName.Name = ""
-	failureCases := []api.ReplicationController{emptyName}
-	for _, failureCase := range failureCases {
-		c, err := storage.Create(ctx, &failureCase)
-		if c != nil {
-			t.Errorf("Expected nil channel")
-		}
-		if !errors.IsInvalid(err) {
-			t.Errorf("Expected to get an invalid resource error, got %v", err)
-		}
-	}
-}
-
-func TestCreateControllerWithGeneratedName(t *testing.T) {
-	storage, _ := newStorage(t)
-	controller := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Namespace:    api.NamespaceDefault,
-			GenerateName: "rc-",
+	test := resttest.New(t, storage, fakeClient.SetError)
+	test.TestCreate(
+		// valid
+		&api.ReplicationController{
+			Spec: api.ReplicationControllerSpec{
+				Replicas: 2,
+				Selector: map[string]string{"a": "b"},
+				Template: &validPodTemplate.Template,
+			},
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: 2,
-			Selector: map[string]string{"a": "b"},
-			Template: &validPodTemplate.Template,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
 		},
-	}
-
-	ctx := api.NewDefaultContext()
-	_, err := storage.Create(ctx, controller)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if controller.Name == "rc-" || !strings.HasPrefix(controller.Name, "rc-") {
-		t.Errorf("unexpected name: %#v", controller)
-	}
-}
-
-func TestCreateControllerWithConflictingNamespace(t *testing.T) {
-	storage, _ := newStorage(t)
-	controller := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
-	}
-
-	ctx := api.NewDefaultContext()
-	channel, err := storage.Create(ctx, controller)
-	if channel != nil {
-		t.Error("Expected a nil channel, but we got a value")
-	}
-	errSubString := "namespace"
-	if err == nil {
-		t.Errorf("Expected an error, but we didn't get one")
-	} else if !errors.IsBadRequest(err) ||
-		strings.Index(err.Error(), errSubString) == -1 {
-		t.Errorf("Expected a Bad Request error with the sub string '%s', got %v", errSubString, err)
-	}
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
+		// invalid
+		&api.ReplicationController{
+			Spec: api.ReplicationControllerSpec{
+				Replicas: 2,
+				Selector: map[string]string{},
+				Template: &validPodTemplate.Template,
+			},
+		},
+	)
 }
 
 func TestEtcdControllerValidatesUpdate(t *testing.T) {
@@ -551,29 +481,6 @@ func TestEtcdWatchControllersNotMatch(t *testing.T) {
 	case <-time.After(time.Millisecond * 100):
 		// expected case
 	}
-}
-
-func TestCreate(t *testing.T) {
-	storage, fakeClient := newStorage(t)
-	test := resttest.New(t, storage, fakeClient.SetError)
-	test.TestCreate(
-		// valid
-		&api.ReplicationController{
-			Spec: api.ReplicationControllerSpec{
-				Replicas: 2,
-				Selector: map[string]string{"a": "b"},
-				Template: &validPodTemplate.Template,
-			},
-		},
-		// invalid
-		&api.ReplicationController{
-			Spec: api.ReplicationControllerSpec{
-				Replicas: 2,
-				Selector: map[string]string{},
-				Template: &validPodTemplate.Template,
-			},
-		},
-	)
 }
 
 func TestDelete(t *testing.T) {

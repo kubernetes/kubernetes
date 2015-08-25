@@ -21,6 +21,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -36,8 +37,42 @@ func NewEtcdStorage(t *testing.T) (storage.Interface, *tools.FakeEtcdClient) {
 	return etcdStorage, fakeClient
 }
 
-func SetResourceVersion(fakeClient *tools.FakeEtcdClient, resourceVersion uint64) {
-	fakeClient.ChangeIndex = resourceVersion
+type keyFunc func(api.Context, string) (string, error)
+type newFunc func() runtime.Object
+
+func GetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, newFn newFunc, ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	meta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return nil, err
+	}
+	key, err := keyFn(ctx, meta.Name)
+	if err != nil {
+		return nil, err
+	}
+	key = etcdtest.AddPrefix(key)
+	resp, err := fakeClient.Get(key, false, false)
+	if err != nil {
+		return nil, err
+	}
+	result := newFn()
+	if err := testapi.Codec().DecodeInto([]byte(resp.Node.Value), result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func SetObject(fakeClient *tools.FakeEtcdClient, keyFn keyFunc, ctx api.Context, obj runtime.Object) error {
+	meta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return err
+	}
+	key, err := keyFn(ctx, meta.Name)
+	if err != nil {
+		return err
+	}
+	key = etcdtest.AddPrefix(key)
+	_, err = fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), obj), 0)
+	return err
 }
 
 func SetObjectsForKey(fakeClient *tools.FakeEtcdClient, key string, objects []runtime.Object) []runtime.Object {
@@ -65,4 +100,8 @@ func SetObjectsForKey(fakeClient *tools.FakeEtcdClient, key string, objects []ru
 		}
 	}
 	return result
+}
+
+func SetResourceVersion(fakeClient *tools.FakeEtcdClient, resourceVersion uint64) {
+	fakeClient.ChangeIndex = resourceVersion
 }

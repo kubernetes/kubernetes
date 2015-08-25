@@ -76,6 +76,12 @@ func TestCreate(t *testing.T) {
 	test.TestCreate(
 		// valid
 		pv,
+		func(ctx api.Context, obj runtime.Object) error {
+			return registrytest.SetObject(fakeClient, storage.KeyFunc, ctx, obj)
+		},
+		func(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+			return registrytest.GetObject(fakeClient, storage.KeyFunc, storage.NewFunc, ctx, obj)
+		},
 		// invalid
 		&api.PersistentVolume{
 			ObjectMeta: api.ObjectMeta{Name: "*BadName!"},
