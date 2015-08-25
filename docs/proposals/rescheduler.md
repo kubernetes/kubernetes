@@ -96,7 +96,7 @@ case, the nodes we move the Pods onto might have been in the system for a long t
 have been added by the cluster auto-scaler specifically to allow the rescheduler to
 rebalance utilization.
 
-A second spreading use case is to separate antagnosits.
+A second spreading use case is to separate antagonists.
 Sometimes the processes running in two different Pods on the same node
 may have unexpected antagonistic
 behavior towards one another. A system component might monitor for such

@@ -56,7 +56,7 @@ We are going to introduce Scale subresource and implement horizontal autoscaling
 Scale subresource will be supported for replication controllers and deployments.
 Scale subresource will be a Virtual Resource (will not be stored in etcd as a separate object).
 It will be only present in API as an interface to accessing replication controller or deployment,
-and the values of Scale fields will be inferred from the corresponing replication controller/deployment object.
+and the values of Scale fields will be inferred from the corresponding replication controller/deployment object.
 HorizontalPodAutoscaler object will be bound with exactly one Scale subresource and will be
 autoscaling associated replication controller/deployment through it.
 The main advantage of such approach is that whenever we introduce another type we want to auto-scale,
@@ -132,7 +132,7 @@ type HorizontalPodAutoscaler struct {
 // HorizontalPodAutoscalerSpec is the specification of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerSpec struct {
 	// ScaleRef is a reference to Scale subresource. HorizontalPodAutoscaler will learn the current
-	// resource consumption from its status, and will set the desired number of pods by modyfying its spec.
+	// resource consumption from its status, and will set the desired number of pods by modifying its spec.
 	ScaleRef *SubresourceReference
 	// MinCount is the lower limit for the number of pods that can be set by the autoscaler.
 	MinCount int
@@ -151,7 +151,7 @@ type HorizontalPodAutoscalerStatus struct {
 	CurrentReplicas int
 
 	// DesiredReplicas is the desired number of replicas of pods managed by this autoscaler.
-	// The number may be different because pod downscaling is someteimes delayed to keep the number
+	// The number may be different because pod downscaling is sometimes delayed to keep the number
 	// of pods stable.
 	DesiredReplicas int
 
@@ -161,7 +161,7 @@ type HorizontalPodAutoscalerStatus struct {
 	CurrentConsumption ResourceConsumption
 
 	// LastScaleTimestamp is the last time the HorizontalPodAutoscaler scaled the number of pods.
-	// This is used by the autoscaler to controll how often the number of pods is changed.
+	// This is used by the autoscaler to control how often the number of pods is changed.
 	LastScaleTimestamp *util.Time
 }
 
