@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/pod"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -80,11 +79,6 @@ func validChangedPod() *api.Pod {
 		"foo": "bar",
 	}
 	return pod
-}
-
-func TestStorage(t *testing.T) {
-	storage, _, _, _ := newStorage(t)
-	pod.NewRegistry(storage)
 }
 
 func TestCreate(t *testing.T) {
