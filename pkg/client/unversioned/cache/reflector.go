@@ -135,7 +135,7 @@ outer:
 // Run starts a watch and handles watch events. Will restart the watch if it is closed.
 // Run starts a goroutine and returns immediately.
 func (r *Reflector) Run() {
-	go util.Forever(func() { r.ListAndWatch(util.NeverStop) }, r.period)
+	go util.Until(func() { r.ListAndWatch(util.NeverStop) }, r.period, util.NeverStop)
 }
 
 // RunUntil starts a watch and handles watch events. Will restart the watch if it is closed.

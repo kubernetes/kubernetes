@@ -118,12 +118,12 @@ func (im *realImageManager) Start() error {
 		return err
 	}
 
-	go util.Forever(func() {
+	go util.Until(func() {
 		err := im.detectImages(time.Now())
 		if err != nil {
 			glog.Warningf("[ImageManager] Failed to monitor images: %v", err)
 		}
-	}, 5*time.Minute)
+	}, 5*time.Minute, util.NeverStop)
 
 	return nil
 }
