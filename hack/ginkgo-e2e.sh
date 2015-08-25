@@ -45,6 +45,9 @@ source "${KUBE_ROOT}/cluster/kube-env.sh"
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     echo "Conformance test: not doing test setup."
     KUBERNETES_PROVIDER=""
+
+    detect-master-from-kubeconfig
+
     auth_config=(
       "--kubeconfig=${KUBECONFIG}"
     )
@@ -56,6 +59,7 @@ else
     prepare-e2e
 
     detect-master >/dev/null
+    KUBE_MASTER_URL="${KUBE_MASTER_URL:-https://${KUBE_MASTER_IP:-}}"
 
     auth_config=(
       "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
