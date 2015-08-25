@@ -787,12 +787,7 @@ func deepCopy_expapi_DeploymentList(in DeploymentList, out *DeploymentList, c *c
 }
 
 func deepCopy_expapi_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *conversion.Cloner) error {
-	if in.Replicas != nil {
-		out.Replicas = new(int)
-		*out.Replicas = *in.Replicas
-	} else {
-		out.Replicas = nil
-	}
+	out.Replicas = in.Replicas
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {

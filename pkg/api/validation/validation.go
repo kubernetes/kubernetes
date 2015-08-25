@@ -53,13 +53,19 @@ var portNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 
 
 const totalAnnotationSizeLimitB int = 64 * (1 << 10) // 64 kB
 
+func ValidateLabelName(labelName, fieldName string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if !util.IsQualifiedName(labelName) {
+		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, labelName, qualifiedNameErrorMsg))
+	}
+	return allErrs
+}
+
 // ValidateLabels validates that a set of labels are correctly defined.
 func ValidateLabels(labels map[string]string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	for k, v := range labels {
-		if !util.IsQualifiedName(k) {
-			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, qualifiedNameErrorMsg))
-		}
+		allErrs = append(allErrs, ValidateLabelName(k, field)...)
 		if !util.IsValidLabelValue(v) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(field, v, labelValueErrorMsg))
 		}
@@ -202,6 +208,15 @@ func NameIsDNS952Label(name string, prefix bool) (bool, string) {
 	return false, DNS952LabelErrorMsg
 }
 
+// Validates that given value is not negative.
+func ValidatePositiveField(value int64, fieldName string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if value < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid(fieldName, value, isNegativeErrorMsg))
+	}
+	return allErrs
+}
+
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc) errs.ValidationErrorList {
@@ -224,9 +239,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 			allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, qualifier))
 		}
 	}
-	if meta.Generation < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("generation", meta.Generation, isNegativeErrorMsg))
-	}
+	allErrs = append(allErrs, ValidatePositiveField(meta.Generation, "generation")...)
 	if requiresNamespace {
 		if len(meta.Namespace) == 0 {
 			allErrs = append(allErrs, errs.NewFieldRequired("namespace"))
@@ -1206,34 +1219,49 @@ func ValidateReplicationControllerUpdate(oldController, controller *api.Replicat
 	return allErrs
 }
 
+// Validates that the given selector is non-empty.
+func ValidateNonEmptySelector(selectorMap map[string]string, fieldName string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	selector := labels.Set(selectorMap).AsSelector()
+	if selector.Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired(fieldName))
+	}
+	return allErrs
+}
+
+// Validates the given template and ensures that it is in accordance with the desrired selector and replicas.
+func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map[string]string, replicas int, fieldName string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if template == nil {
+		allErrs = append(allErrs, errs.NewFieldRequired(fieldName))
+	} else {
+		selector := labels.Set(selectorMap).AsSelector()
+		if !selector.Empty() {
+			// Verify that the RC selector matches the labels in template.
+			labels := labels.Set(template.Labels)
+			if !selector.Matches(labels) {
+				allErrs = append(allErrs, errs.NewFieldInvalid(fieldName+".metadata.labels", template.Labels, "selector does not match labels in "+fieldName))
+			}
+		}
+		allErrs = append(allErrs, ValidatePodTemplateSpec(template).Prefix(fieldName)...)
+		if replicas > 1 {
+			allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(template.Spec.Volumes).Prefix(fieldName+".spec.volumes")...)
+		}
+		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
+		if template.Spec.RestartPolicy != api.RestartPolicyAlways {
+			allErrs = append(allErrs, errs.NewFieldValueNotSupported(fieldName+".spec.restartPolicy", template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+		}
+	}
+	return allErrs
+}
+
 // ValidateReplicationControllerSpec tests if required fields in the replication controller spec are set.
 func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	selector := labels.Set(spec.Selector).AsSelector()
-	if selector.Empty() {
-		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
-	}
-	if spec.Replicas < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", spec.Replicas, isNegativeErrorMsg))
-	}
-
-	if spec.Template == nil {
-		allErrs = append(allErrs, errs.NewFieldRequired("template"))
-	} else {
-		labels := labels.Set(spec.Template.Labels)
-		if !selector.Matches(labels) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
-		}
-		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
-		if spec.Replicas > 1 {
-			allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes).Prefix("template.spec.volumes")...)
-		}
-		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
-		if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
-			allErrs = append(allErrs, errs.NewFieldValueNotSupported("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
-		}
-	}
+	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, "selector")...)
+	allErrs = append(allErrs, ValidatePositiveField(int64(spec.Replicas), "replicas")...)
+	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, "template")...)
 	return allErrs
 }
 

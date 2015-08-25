@@ -1512,44 +1512,6 @@ func convert_expapi_DeploymentList_To_v1_DeploymentList(in *expapi.DeploymentLis
 	return nil
 }
 
-func convert_expapi_DeploymentSpec_To_v1_DeploymentSpec(in *expapi.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*expapi.DeploymentSpec))(in)
-	}
-	if in.Replicas != nil {
-		out.Replicas = new(int)
-		*out.Replicas = *in.Replicas
-	} else {
-		out.Replicas = nil
-	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	if in.Template != nil {
-		out.Template = new(v1.PodTemplateSpec)
-		if err := convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
-	if err := convert_expapi_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
-		return err
-	}
-	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = new(string)
-		*out.UniqueLabelKey = *in.UniqueLabelKey
-	} else {
-		out.UniqueLabelKey = nil
-	}
-	return nil
-}
-
 func convert_expapi_DeploymentStatus_To_v1_DeploymentStatus(in *expapi.DeploymentStatus, out *DeploymentStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*expapi.DeploymentStatus))(in)
@@ -1929,66 +1891,12 @@ func convert_v1_DeploymentList_To_expapi_DeploymentList(in *DeploymentList, out 
 	return nil
 }
 
-func convert_v1_DeploymentSpec_To_expapi_DeploymentSpec(in *DeploymentSpec, out *expapi.DeploymentSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*DeploymentSpec))(in)
-	}
-	if in.Replicas != nil {
-		out.Replicas = new(int)
-		*out.Replicas = *in.Replicas
-	} else {
-		out.Replicas = nil
-	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
-		if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
-	if err := convert_v1_DeploymentStrategy_To_expapi_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
-		return err
-	}
-	if in.UniqueLabelKey != nil {
-		out.UniqueLabelKey = new(string)
-		*out.UniqueLabelKey = *in.UniqueLabelKey
-	} else {
-		out.UniqueLabelKey = nil
-	}
-	return nil
-}
-
 func convert_v1_DeploymentStatus_To_expapi_DeploymentStatus(in *DeploymentStatus, out *expapi.DeploymentStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeploymentStatus))(in)
 	}
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
-	return nil
-}
-
-func convert_v1_DeploymentStrategy_To_expapi_DeploymentStrategy(in *DeploymentStrategy, out *expapi.DeploymentStrategy, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*DeploymentStrategy))(in)
-	}
-	out.Type = expapi.DeploymentType(in.Type)
-	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(expapi.RollingUpdateDeployment)
-		if err := convert_v1_RollingUpdateDeployment_To_expapi_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
-			return err
-		}
-	} else {
-		out.RollingUpdate = nil
-	}
 	return nil
 }
 
@@ -2262,7 +2170,6 @@ func init() {
 		convert_expapi_DaemonStatus_To_v1_DaemonStatus,
 		convert_expapi_Daemon_To_v1_Daemon,
 		convert_expapi_DeploymentList_To_v1_DeploymentList,
-		convert_expapi_DeploymentSpec_To_v1_DeploymentSpec,
 		convert_expapi_DeploymentStatus_To_v1_DeploymentStatus,
 		convert_expapi_DeploymentStrategy_To_v1_DeploymentStrategy,
 		convert_expapi_Deployment_To_v1_Deployment,
@@ -2289,9 +2196,7 @@ func init() {
 		convert_v1_DaemonStatus_To_expapi_DaemonStatus,
 		convert_v1_Daemon_To_expapi_Daemon,
 		convert_v1_DeploymentList_To_expapi_DeploymentList,
-		convert_v1_DeploymentSpec_To_expapi_DeploymentSpec,
 		convert_v1_DeploymentStatus_To_expapi_DeploymentStatus,
-		convert_v1_DeploymentStrategy_To_expapi_DeploymentStrategy,
 		convert_v1_Deployment_To_expapi_Deployment,
 		convert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource,
 		convert_v1_EnvVarSource_To_api_EnvVarSource,
