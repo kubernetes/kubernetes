@@ -58,8 +58,9 @@ import (
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
+	"k8s.io/kubernetes/pkg/registry/network"
+	networketcd "k8s.io/kubernetes/pkg/registry/network/etcd"
 	"k8s.io/kubernetes/pkg/registry/node"
-	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
@@ -224,6 +225,7 @@ type Master struct {
 	// also be replaced
 	nodeRegistry              node.Registry
 	namespaceRegistry         namespace.Registry
+	networkRegistry           network.Registry
 	serviceRegistry           service.Registry
 	endpointRegistry          endpoint.Registry
 	serviceClusterIPAllocator service.RangeRegistry
@@ -449,6 +451,9 @@ func (m *Master) init(c *Config) {
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(c.DatabaseStorage)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
+	networkStorage, networkStatusStorage := networketcd.NewREST(c.DatabaseStorage)
+	m.networkRegistry = network.NewRegistry(networkStorage)
+
 	endpointsStorage := endpointsetcd.NewREST(c.DatabaseStorage, c.EnableWatchCache)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
@@ -505,6 +510,8 @@ func (m *Master) init(c *Config) {
 		"namespaces":                    namespaceStorage,
 		"namespaces/status":             namespaceStatusStorage,
 		"namespaces/finalize":           namespaceFinalizeStorage,
+		"networks":                      networkStorage,
+		"networks/status":               networkStatusStorage,
 		"secrets":                       secretStorage,
 		"serviceAccounts":               serviceAccountStorage,
 		"persistentVolumes":             persistentVolumeStorage,

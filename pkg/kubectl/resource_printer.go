@@ -389,6 +389,7 @@ var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "S
 var limitRangeColumns = []string{"NAME", "AGE"}
 var resourceQuotaColumns = []string{"NAME", "AGE"}
 var namespaceColumns = []string{"NAME", "LABELS", "STATUS", "AGE"}
+var networkColumns = []string{"NAME", "SUBNETS", "PROVIDERNETWORKID", "LABELS", "STATUS"}
 var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
@@ -425,6 +426,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(resourceQuotaColumns, printResourceQuotaList)
 	h.Handler(namespaceColumns, printNamespace)
 	h.Handler(namespaceColumns, printNamespaceList)
+	h.Handler(networkColumns, printNetwork)
+	h.Handler(networkColumns, printNetworkList)
 	h.Handler(secretColumns, printSecret)
 	h.Handler(secretColumns, printSecretList)
 	h.Handler(serviceAccountColumns, printServiceAccount)
@@ -907,6 +910,27 @@ func printNamespace(item *api.Namespace, w io.Writer, withNamespace bool, wide b
 func printNamespaceList(list *api.NamespaceList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
 	for _, item := range list.Items {
 		if err := printNamespace(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printNetwork(item *api.Network, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	subnets := []string{}
+	for _, subnet := range item.Spec.Subnets{
+		subnets = append(subnets, subnet.CIDR)
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s", item.Name, strings.Join(subnets, ";"), item.Spec.ProviderNetworkID, formatLabels(item.Labels), item.Status.Phase); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
+	return err
+}
+
+func printNetworkList(list *api.NetworkList, w io.Writer, withNamespace bool, wide bool, showAll bool, columnLabels []string) error {
+	for _, item := range list.Items {
+		if err := printNetwork(&item, w, withNamespace, wide, showAll, columnLabels); err != nil {
 			return err
 		}
 	}

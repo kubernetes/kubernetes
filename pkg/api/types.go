@@ -1511,6 +1511,9 @@ type NodeList struct {
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage
 	Finalizers []FinalizerName
+
+	// Network descibes a network segment
+	Network Network
 }
 
 type FinalizerName string
@@ -1555,6 +1558,66 @@ type NamespaceList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []Namespace `json:"items"`
+}
+
+// NetworkStatus is information about the current status of a Network.
+type NetworkStatus struct {
+	// Phase is the current lifecycle phase of the network.
+	Phase NetworkPhase `json:"phase,omitempty"`
+}
+
+type NetworkPhase string
+
+// These are the valid phases of a network.
+const (
+	// NetworkInitializing means the network is just accepted by system
+	NetworkInitializing NetworkPhase	= "Initializing"
+	// NetworkActive means the network is available for use in the system
+	NetworkActive NetworkPhase 	= "Active"
+	// NetworkPending means the network is accepted by system, but it is still
+	// processing by network provider
+	NetworkPending NetworkPhase	= "Pending"
+	// NetworkFailed means the network is not available
+	NetworkFailed NetworkPhase 	= "Failed"
+	// NetworkTerminating means the network is undergoing graceful termination
+	NetworkTerminating NetworkPhase	= "Terminating"
+)
+
+// Subnet is a description of a subnet
+type Subnet struct {
+	CIDR 	string	`json:"cidr"`
+	Gateway string	`json:"gateway"`
+}
+
+// NetworkSpec is a description of a network
+type NetworkSpec struct {
+	// There must be at least one subnet in a network
+	// Subnets and ProviderNetworkID must not be provided together
+	Subnets []Subnet `json:"subnets"`
+
+	// Network's ID of provider network
+	// ProviderNetworkID and Subnets must not be provided together
+	ProviderNetworkID	string	`json:"providerNetworkID"`
+}
+
+// Network describes a network
+type Network struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the behavior of the Network.
+	Spec NetworkSpec `json:"spec,omitempty"`
+
+	// Status describes the current status of a Network
+	Status NetworkStatus `json:"status,omitempty"`
+}
+
+// NetworkList is a list of Networks
+type NetworkList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []Network `json:"items"`
 }
 
 // Binding ties one object to another - for example, a pod is bound to a node by a scheduler.

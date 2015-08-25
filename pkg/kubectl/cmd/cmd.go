@@ -117,6 +117,7 @@ __custom_func() {
    * events (aka 'ev')
    * nodes (aka 'no')
    * namespaces (aka 'ns')
+   * networks (aka 'net')
    * secrets
    * persistentvolumes (aka 'pv')
    * persistentvolumeclaims (aka 'pvc')

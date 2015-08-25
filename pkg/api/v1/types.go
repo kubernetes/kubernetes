@@ -1946,6 +1946,66 @@ type NamespaceList struct {
 	Items []Namespace `json:"items"`
 }
 
+// NetworkStatus is information about the current status of a Network.
+type NetworkStatus struct {
+	// Phase is the current lifecycle phase of the network.
+	Phase NetworkPhase `json:"phase,omitempty"`
+}
+
+type NetworkPhase string
+
+// These are the valid phases of a network.
+const (
+// NetworkInitializing means the network is just accepted by system
+	NetworkInitializing NetworkPhase	= "Initializing"
+// NetworkActive means the network is available for use in the system
+	NetworkActive NetworkPhase 	= "Active"
+// NetworkPending means the network is accepted by system, but it is still
+// processing by network provider
+	NetworkPending NetworkPhase	= "Pending"
+// NetworkFailed means the network is not available
+	NetworkFailed NetworkPhase 	= "Failed"
+// NetworkTerminating means the network is undergoing graceful termination
+	NetworkTerminating NetworkPhase	= "Terminating"
+)
+
+// Subnet is a description of a subnet
+type Subnet struct {
+	CIDR 	string	`json:"cidr" description:"subnet cidr"`
+	Gateway string	`json:"gateway" description:"subnet gateway"`
+}
+
+// NetworkSpec is a description of a network
+type NetworkSpec struct {
+	// There must be at least one subnet in a network
+	// Subnets and ProviderNetworkID must not be provided together
+	Subnets []Subnet `json:"subnets" description:"list of subnets"`
+
+	// Network's ID of provider network
+	// ProviderNetworkID and Subnets must not be provided together
+	ProviderNetworkID	string	`json:"providerNetworkID"  description:"provider network ID"`
+}
+
+// Network describes a network
+type Network struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+
+	// Spec defines the behavior of the Network.
+	Spec NetworkSpec `json:"spec,omitempty" description:"network spec, including subnets and provider network id"`
+
+	// Status describes the current status of a Network
+	Status NetworkStatus `json:"status,omitempty" description:"status describes the current status of a Network"`
+}
+
+// NetworkList is a list of Networks
+type NetworkList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+
+	Items []Network `json:"items"  description:"items is the list of Network objects in the list"`
+}
+
 // Binding ties one object to another.
 // For example, a pod is bound to a node by a scheduler.
 type Binding struct {

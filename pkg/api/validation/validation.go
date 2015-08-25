@@ -53,6 +53,8 @@ var DNS952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %
 var pdPartitionErrorMsg string = intervalErrorMsg(0, 255)
 var portRangeErrorMsg string = intervalErrorMsg(0, 65536)
 var portNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 characters, matching regex %s, it must contain at least one letter [a-z], and hyphens cannot be adjacent to other hyphens): e.g. "http"`, validation.IdentifierNoHyphensBeginEndFmt)
+var CIDRErrorMsg string = fmt.Sprintf(`must be a CIDR, e.g. "192.168.0.0/24"`)
+var IPAddressErrorMsg string = fmt.Sprintf(`must be a ip address, e.g. "192.168.0.1"`)
 
 const totalAnnotationSizeLimitB int = 64 * (1 << 10) // 64 kB
 
@@ -133,6 +135,11 @@ func ValidateServiceName(name string, prefix bool) (bool, string) {
 // trailing dashes are allowed.
 func ValidateNodeName(name string, prefix bool) (bool, string) {
 	return NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateNetworkName can be used to check whether the given network name is valid.
+func ValidateNetworkName(name string, prefix bool) (bool, string) {
+	return NameIsDNSLabel(name, prefix)
 }
 
 // ValidateNamespaceName can be used to check whether the given namespace name is valid.
@@ -1818,6 +1825,65 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) 
 		allErrs = append(allErrs, validateFinalizerName(string(newNamespace.Spec.Finalizers[i]))...)
 	}
 	newNamespace.Status = oldNamespace.Status
+	return allErrs
+}
+
+func ValidateSubnet(ipAddress, cidr string) (bool, string) {
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return false, IPAddressErrorMsg
+	}
+
+	_, ipNet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return false, CIDRErrorMsg
+	}
+
+	if !ipNet.Contains(ip) {
+		return false, fmt.Sprintf("ip %s is not in the range of %s", ipAddress, cidr)
+	}
+
+	return true, ""
+}
+
+// ValidateNetwork tests if required fields are set.
+func ValidateNetwork(network *api.Network) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&network.ObjectMeta, false, ValidateNetworkName).Prefix("metadata")...)
+
+	if network.Spec.ProviderNetworkID != "" {
+		for _, subnet := range network.Spec.Subnets {
+			if validated, errMsg := ValidateSubnet(subnet.Gateway, subnet.CIDR); !validated {
+				allErrs = append(allErrs, errs.NewFieldInvalid("subnets", subnet.CIDR, errMsg))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateNetworkUpdate tests to make sure a network update can be applied.
+func ValidateNetworkUpdate(newNetwork *api.Network, oldNetwork *api.Network) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newNetwork.ObjectMeta, &oldNetwork.ObjectMeta).Prefix("metadata")...)
+	newNetwork.Status = oldNetwork.Status
+	return allErrs
+}
+
+// ValidateNetworkStatusUpdate tests to see if the update is legal for an end user to make
+func ValidateNetworkStatusUpdate(newNetwork, oldNetwork *api.Network) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newNetwork.ObjectMeta, &oldNetwork.ObjectMeta).Prefix("metadata")...)
+	newNetwork.Spec = oldNetwork.Spec
+	if newNetwork.DeletionTimestamp.IsZero() {
+		if newNetwork.Status.Phase != api.NetworkActive {
+			allErrs = append(allErrs, errs.NewFieldInvalid("Status.Phase", newNetwork.Status.Phase, "A network may only be in active status if it does not have a deletion timestamp."))
+		}
+	} else {
+		if newNetwork.Status.Phase != api.NetworkTerminating {
+			allErrs = append(allErrs, errs.NewFieldInvalid("Status.Phase", newNetwork.Status.Phase, "A network may only be in terminating status if it has a deletion timestamp."))
+		}
+	}
 	return allErrs
 }
 

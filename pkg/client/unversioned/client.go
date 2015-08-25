@@ -44,6 +44,7 @@ type Interface interface {
 	ServiceAccountsNamespacer
 	SecretsNamespacer
 	NamespacesInterface
+	NetworksInterface
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
@@ -95,6 +96,10 @@ func (c *Client) Secrets(namespace string) SecretsInterface {
 
 func (c *Client) Namespaces() NamespaceInterface {
 	return newNamespaces(c)
+}
+
+func (c *Client) Networks() NetworkInterface {
+	return newNetworks(c)
 }
 
 func (c *Client) PersistentVolumes() PersistentVolumeInterface {

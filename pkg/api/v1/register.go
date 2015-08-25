@@ -64,6 +64,8 @@ func addKnownTypes() {
 		&ResourceQuotaList{},
 		&Namespace{},
 		&NamespaceList{},
+		&Network{},
+		&NetworkList{},
 		&Secret{},
 		&SecretList{},
 		&ServiceAccount{},
@@ -111,6 +113,8 @@ func (*ResourceQuota) IsAnAPIObject()             {}
 func (*ResourceQuotaList) IsAnAPIObject()         {}
 func (*Namespace) IsAnAPIObject()                 {}
 func (*NamespaceList) IsAnAPIObject()             {}
+func (*Network) IsAnAPIObject()					  {}
+func (*NetworkList) IsAnAPIObject()				  {}
 func (*Secret) IsAnAPIObject()                    {}
 func (*SecretList) IsAnAPIObject()                {}
 func (*ServiceAccount) IsAnAPIObject()            {}

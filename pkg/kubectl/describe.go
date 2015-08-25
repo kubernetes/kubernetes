@@ -79,6 +79,7 @@ func describerMap(c *client.Client) map[string]Describer {
 		"PersistentVolume":      &PersistentVolumeDescriber{c},
 		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
 		"Namespace":             &NamespaceDescriber{c},
+		"Network":				 &NetworkDescriber{c},
 	}
 	return m
 }
@@ -137,6 +138,35 @@ func init() {
 		glog.Fatalf("Cannot register describers: %v", err)
 	}
 	DefaultObjectDescriber = d
+}
+
+// NetworkDescriber generates information about a network
+type NetworkDescriber struct {
+	client.Interface
+}
+
+func (d *NetworkDescriber) Describe(network, name string) (string, error) {
+	ns, err := d.Networks().Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	return describeNetwork(ns)
+}
+
+func describeNetwork(network *api.Network) (string, error) {
+	subnets := []string{}
+	for _, sub := range network.Spec.Subnets {
+		subnets = append(subnets, sub.CIDR)
+	}
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", network.Name)
+		fmt.Fprintf(out, "Subnets:\t%s\n", strings.Join(subnets, ";"))
+		fmt.Fprintf(out, "ProviderNetworkID:\t%s\n", network.Spec.ProviderNetworkID)
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(network.Labels))
+		fmt.Fprintf(out, "Status:\t%s\n", string(network.Status.Phase))
+		return nil
+	})
 }
 
 // NamespaceDescriber generates information about a namespace
