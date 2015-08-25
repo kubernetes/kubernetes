@@ -295,10 +295,6 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX:="pull-e2e-${EXECUTOR_NUMBER}"}
     : ${KUBE_GCS_STAGING_PATH_SUFFIX:="-${EXECUTOR_NUMBER}"}
     : ${PROJECT:="kubernetes-jenkins-pull"}
-    # Override GCE defaults.
-    MASTER_SIZE="n1-standard-1"
-    MINION_SIZE="n1-standard-1"
-    NUM_MINIONS="2"
     ;;
 
   # Runs non-flaky tests on GCE on the release-latest branch,
