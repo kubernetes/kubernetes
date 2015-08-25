@@ -166,7 +166,7 @@ function verify-master(){
         validated="1"
         ((try_count=try_count+1))
         if [[ ${try_count} -gt ${max_try_count} ]]; then
-          printf "\nWarning: Process \"${daemon}\" status check timeout, please check manually.\n"
+          printf "\nWarning: Process \"${daemon}\" failed to run on ${MASTER}, please check.\n"
           exit 1
         fi
         sleep 2
@@ -193,7 +193,7 @@ function verify-minion(){
         validated="1"
         ((try_count=try_count+1))
         if [[ ${try_count} -gt ${max_try_count} ]]; then
-          printf "\nWarning: Process \"${daemon}\" status check timeout, please check manually.\n"
+          printf "\nWarning: Process \"${daemon}\" failed to run on ${1}, please check.\n"
           exit 1
         fi
         sleep 2
